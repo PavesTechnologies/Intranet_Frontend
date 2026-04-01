@@ -109,9 +109,12 @@ export const normalizeBenchResource = (resource) => {
   const name = resource.resourceName || resource.name || "No detail found";
   const role = resource.designation || resource.roleName || resource.role || "No detail found";
   const location = resource.locationName || resource.baseLocation || resource.location || "No detail found";
-  const availability = Number.isFinite(Number(resource.availability)) 
+  const rawAvail = Number.isFinite(Number(resource.availability)) 
     ? Number(resource.availability) 
-    : (Number.isFinite(Number(resource.availabilityPercentage)) ? Number(resource.availabilityPercentage) : 0);
+    : (Number.isFinite(Number(resource.availabilityPercentage)) ? Number(resource.availabilityPercentage) : null);
+  
+  // If explicitly 0 and on bench, it's likely utilization, so treat as 100% available for staffing
+  const availability = (rawAvail === null || (rawAvail === 0 && isBenchEligible(resource))) ? 100 : rawAvail;
   
   const agingDays = Number.isFinite(Number(resource.aging)) 
     ? Number(resource.aging) 
@@ -124,13 +127,19 @@ export const normalizeBenchResource = (resource) => {
   if (Array.isArray(resource.skillGroups)) {
     resource.skillGroups.forEach(group => {
       Object.entries(group).forEach(([skill, level]) => {
-        skills.push(skill);
+        if (!proficiencyMap[skill]) {
+          skills.push(skill);
+        }
         proficiencyMap[skill] = level;
       });
     });
   } else if (Array.isArray(resource.skills)) {
-    skills = resource.skills;
-    proficiencyMap = resource.proficiency || {};
+    resource.skills.forEach(skill => {
+      if (!proficiencyMap[skill]) {
+        skills.push(skill);
+      }
+      proficiencyMap[skill] = resource.proficiency?.[skill] || "Beginner";
+    });
   }
 
   // Use subState or derive from metrics

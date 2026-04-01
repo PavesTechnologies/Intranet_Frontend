@@ -4,8 +4,6 @@ import {
   Filter,
   Eye,
   Trash2,
-  Download,
-  X,
   FileText,
   ChevronDown,
   ChevronUp,
@@ -19,44 +17,137 @@ import {
 export default function EmployeeDocumentsPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [groupCategoryFilters, setGroupCategoryFilters] = useState({});
   const [expandedEmp, setExpandedEmp] = useState(null);
-
 
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
   const [loadingDoc, setLoadingDoc] = useState(null);
 
-  const getEducationDocName = (doc) => {
-  // ✅ If backend already sends correct name, use it
-  if (doc.document_name && doc.document_name !== "Education Document") {
-    return doc.document_name;
-  }
+  const normalizeValue = (value) =>
+    String(value || "")
+      .replace(/[_-]+/g, " ")
+      .replace(/\.[a-z0-9]+$/i, "")
+      .trim();
 
-  // 🔥 If you start sending education_document_uuid from backend
-  const mapByUUID = {
-    "ED1": "10th Marksheet",
-    "ED2": "12th Marksheet",
-    "ED3": "Degree Certificate",
-    "ED4": "Provisional Certificate"
+  const getSearchableDocumentText = (doc) =>
+    [
+      doc.file_path,
+      doc.document_name,
+      doc.document_type,
+      doc.doc_type,
+      doc.identity_type,
+      doc.identity_type_name,
+      doc.uploaded_column,
+      doc.uploaded_type,
+      doc.education_type,
+      doc.education_level,
+      doc.degree_name,
+      doc.specialization,
+      doc.category
+    ]
+      .filter(Boolean)
+      .map((value) => normalizeValue(value).toLowerCase())
+      .join(" ");
+
+  const includesAny = (text, keywords) =>
+    keywords.some((keyword) => text.includes(keyword));
+
+  const isGenericParentLabel = (value) => {
+    const normalized = normalizeValue(value).toLowerCase();
+    return [
+      "document",
+      "education document",
+      "identity document",
+      "experience document",
+      "work document",
+      "hr document"
+    ].includes(normalized);
   };
 
-  if (doc.education_document_uuid && mapByUUID[doc.education_document_uuid]) {
-    return mapByUUID[doc.education_document_uuid];
-  }
+  const getDocumentCategory = (doc) => {
+    const path = String(doc.file_path || "").toLowerCase();
+    const text = getSearchableDocumentText(doc);
 
-  // 🛠️ fallback using file name
-  const path = doc.file_path.toLowerCase();
+    if (
+      path.includes("identity_documents") ||
+      doc.identity_type ||
+      includesAny(text, ["aadhaar", "aadhar", "pan", "passport", "voter", "driving licence", "driving license"])
+    ) {
+      return "Identity";
+    }
 
-  if (path.includes("10")) return "10th Marksheet";
-  if (path.includes("12")) return "12th Marksheet";
-  if (path.includes("provisional")) return "Provisional Certificate";
-  if (path.includes("degree")) return "Degree Certificate";
+    if (
+      path.includes("education_documents") ||
+      doc.education_document_uuid ||
+      includesAny(text, ["10th", "12th", "marksheet", "ssc", "hsc", "intermediate", "degree", "diploma", "provisional", "education"])
+    ) {
+      return "Education";
+    }
 
-  return "Education Document";
-};
-  /* ================= FETCH API DATA ================= */
+    if (
+      path.includes("experience_documents") ||
+      doc.experience_uuid ||
+      includesAny(text, ["offer", "relieving", "experience", "salary slip", "appointment", "work"])
+    ) {
+      return "Work";
+    }
+
+    return "HR Document";
+  };
+
+  const getDocumentName = (doc, category) => {
+    const explicitName = [
+      doc.uploaded_column,
+      doc.uploaded_type,
+      doc.identity_type_name,
+      doc.identity_type,
+      doc.education_level,
+      doc.education_type,
+      doc.degree_name,
+      doc.doc_type,
+      doc.document_type,
+      doc.document_name
+    ].find((value) => value && !isGenericParentLabel(value));
+
+    if (explicitName) {
+      return normalizeValue(explicitName);
+    }
+
+    const text = getSearchableDocumentText(doc);
+
+    if (category === "Identity") {
+      if (includesAny(text, ["aadhaar", "aadhar"])) return "Aadhaar Card";
+      if (text.includes("pan")) return "PAN Card";
+      if (text.includes("passport")) return "Passport";
+      if (includesAny(text, ["voter", "voter id"])) return "Voter ID";
+      if (includesAny(text, ["driving licence", "driving license", "license", "licence"])) return "Driving Licence";
+      return "Identity Document";
+    }
+
+    if (category === "Education") {
+      if (includesAny(text, ["10th", "ssc", "secondary"])) return "10th Marksheet";
+      if (includesAny(text, ["12th", "hsc", "intermediate", "senior secondary"])) return "12th Marksheet";
+      if (text.includes("diploma")) return "Diploma Certificate";
+      if (includesAny(text, ["degree", "graduation", "bachelor", "btech", "b.e", "be "])) return "Degree Certificate";
+      if (text.includes("provisional")) return "Provisional Certificate";
+      if (includesAny(text, ["marksheet", "mark sheet"])) return "Education Marksheet";
+      return "Education Document";
+    }
+
+    if (category === "Work") {
+      if (includesAny(text, ["offer", "appointment"])) return "Offer Letter";
+      if (text.includes("relieving")) return "Relieving Letter";
+      if (text.includes("experience")) return "Experience Letter";
+      if (includesAny(text, ["salary slip", "payslip", "pay slip"])) return "Salary Slip";
+      return "Work Document";
+    }
+
+    return "Document";
+  };
+
   React.useEffect(() => {
     const fetchDocuments = async () => {
       try {
@@ -65,46 +156,37 @@ export default function EmployeeDocumentsPage() {
         const token = localStorage.getItem("token");
 
         const response = await fetch(`${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/hr/employees/documents`, {
-          method: 'GET',
+          method: "GET",
           headers: {
-            'accept': 'application/json',
-            'Authorization': `Bearer ${token}`
+            accept: "application/json",
+            Authorization: `Bearer ${token}`
           }
         });
 
         if (!response.ok) {
-          throw new Error('Failed to fetch documents');
+          throw new Error("Failed to fetch documents");
         }
 
         const data = await response.json();
 
-        // Transform the API response to match our UI state
-        const formattedEmployees = data.map(emp => ({
+        const formattedEmployees = data.map((emp) => ({
           id: emp.user_uuid,
           empId: emp.emp_id,
           name: emp.name,
           department: emp.department,
           documents: emp.documents.map((doc, index) => {
-
-            let category = "HR Document";
-            let type = "Uploaded";
-            let status = "Signed";
-
-            if (doc.file_path.includes("identity_documents")) category = "Identity";
-            if (doc.file_path.includes("education_documents")) category = "Education";
-            if (doc.file_path.includes("experience_documents")) category = "Work";
+            const category = getDocumentCategory(doc);
+            const type = "Uploaded";
+            const status = "Signed";
 
             return {
               id: `${emp.emp_id}-${index}`,
-              docName:
-                category === "Education"
-                  ? getEducationDocName(doc)
-                  : doc.document_name,
+              docName: getDocumentName(doc, category),
               fileUrl: doc.file_path,
-              category: category,
-              type: type,
-              status: status,
-              updated: "Recently" // No timestamp from API, fallback text
+              category,
+              type,
+              status,
+              updated: "Recently"
             };
           })
         }));
@@ -121,8 +203,6 @@ export default function EmployeeDocumentsPage() {
     fetchDocuments();
   }, []);
 
-  /* ================= Actions ================= */
-
   const deleteDocument = (empId, docId) => {
     if (!window.confirm("Are you sure you want to delete this document?")) return;
 
@@ -130,72 +210,62 @@ export default function EmployeeDocumentsPage() {
       if (emp.id !== empId) return emp;
       return {
         ...emp,
-        documents: emp.documents.filter((doc) => doc.id !== docId),
+        documents: emp.documents.filter((doc) => doc.id !== docId)
       };
     }));
   };
 
-const viewDocument = async (filePath, docId) => {
-  try {
-    setLoadingDoc(docId);
-
-    const token = localStorage.getItem("token");
-
-    const response = await fetch(
-      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/hr/view_documents?file_path=${filePath}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    );
-
-    const textResult = await response.text();
-
-    let signedUrl;
-
+  const viewDocument = async (filePath, docId) => {
     try {
-      const parsed = JSON.parse(textResult);
-      signedUrl = parsed.url || parsed;
-    } catch {
-      signedUrl = textResult;
+      setLoadingDoc(docId);
+
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/hr/view_documents?file_path=${filePath}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      const textResult = await response.text();
+
+      let signedUrl;
+
+      try {
+        const parsed = JSON.parse(textResult);
+        signedUrl = parsed.url || parsed;
+      } catch {
+        signedUrl = textResult;
+      }
+
+      if (typeof signedUrl !== "string") {
+        signedUrl = String(signedUrl);
+      }
+
+      signedUrl = signedUrl.replace(/^"+|"+$/g, "").trim();
+
+      if (!signedUrl || !signedUrl.startsWith("http")) {
+        throw new Error("Invalid URL");
+      }
+
+      const link = document.createElement("a");
+      link.href = signedUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("ERROR:", error);
+      alert("Unable to open document");
+    } finally {
+      setLoadingDoc(null);
     }
-
-    // ✅ FIX TYPE ISSUE (important)
-    if (typeof signedUrl !== "string") {
-      signedUrl = String(signedUrl);
-    }
-
-    signedUrl = signedUrl.replace(/^"+|"+$/g, "").trim();
-
-    if (!signedUrl || !signedUrl.startsWith("http")) {
-      throw new Error("Invalid URL");
-    }
-
-    // ✅ SAFE NEW TAB OPEN (NO POPUP BLOCK)
-    const link = document.createElement("a");
-    link.href = signedUrl;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-
-    // required for Firefox
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-  } catch (error) {
-    console.error("ERROR:", error);
-    alert("Unable to open document");
-  } finally {
-    setLoadingDoc(null);
-  }
-};
-
-  const downloadDocument = (doc) => {
-    alert(`Downloading ${doc.docName}...`);
   };
-
-  /* ================= Helpers ================= */
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -231,18 +301,68 @@ const viewDocument = async (filePath, docId) => {
       default:
         return <FileText className="h-4 w-4 text-indigo-500" />;
     }
-  }
+  };
 
-  const filteredEmployees = employees.filter((emp) =>
-    emp.name.toLowerCase().includes(search.toLowerCase()) ||
-    emp.id.toLowerCase().includes(search.toLowerCase())
+  const categoryOptions = ["Identity", "Education", "Work", "HR Document"];
+
+  const departmentOptions = [...new Set(
+    employees
+      .map((emp) => emp.department)
+      .filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b));
+
+  const filteredEmployees = employees.filter((emp) => {
+    const matchesSearch =
+      emp.name.toLowerCase().includes(search.toLowerCase()) ||
+      emp.id.toLowerCase().includes(search.toLowerCase());
+    const matchesDepartment =
+      !departmentFilter || emp.department === departmentFilter;
+    const matchesCategory =
+      !categoryFilter || emp.documents.some((doc) => doc.category === categoryFilter);
+
+    return matchesSearch && matchesDepartment && matchesCategory;
+  });
+
+  const groupedEmployees = filteredEmployees.reduce((groups, emp) => {
+    const departmentName = emp.department || "Unassigned";
+    if (!groups[departmentName]) {
+      groups[departmentName] = [];
+    }
+    groups[departmentName].push(emp);
+    return groups;
+  }, {});
+
+  const departmentGroups = Object.entries(groupedEmployees).sort(([a], [b]) =>
+    a.localeCompare(b)
   );
 
-  /* ================= Render ================= */
+  const visibleDepartmentGroups = departmentGroups
+    .map(([departmentName, departmentEmployees]) => {
+      const groupCategoryFilter = groupCategoryFilters[departmentName] || "";
+      const visibleEmployees = departmentEmployees
+        .map((emp) => ({
+          ...emp,
+          documentsToShow: emp.documents.filter((doc) => {
+            const matchesGlobalCategory =
+              !categoryFilter || doc.category === categoryFilter;
+            const matchesGroupCategory =
+              !groupCategoryFilter || doc.category === groupCategoryFilter;
+            return matchesGlobalCategory && matchesGroupCategory;
+          })
+        }))
+        .filter((emp) => emp.documentsToShow.length > 0);
+
+      return {
+        departmentName,
+        groupCategoryFilter,
+        visibleEmployees
+      };
+    })
+    .filter((group) => group.visibleEmployees.length > 0);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8 flex items-center justify-center font-sans tracking-wide">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="h-10 w-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
           <p className="text-slate-500 font-medium">Loading documents...</p>
@@ -267,11 +387,8 @@ const viewDocument = async (filePath, docId) => {
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8 font-sans transition-colors duration-300">
       <div className="mx-auto max-w-7xl">
-
-        {/* Header Section with Gradient Magic */}
         <div className="mb-8 overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-slate-100">
           <div className="relative overflow-hidden px-8 py-10 sm:px-12">
-            {/* Decorative Gradients */}
             <div className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-indigo-50/50 opacity-70 blur-3xl"></div>
             <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-50/50 opacity-70 blur-3xl"></div>
 
@@ -311,10 +428,27 @@ const viewDocument = async (filePath, docId) => {
                       className="h-11 w-full appearance-none rounded-xl border-0 bg-slate-50/80 pl-10 pr-10 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 backdrop-blur-sm transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:w-48"
                     >
                       <option value="">All Categories</option>
-                      <option value="Identity">Identity</option>
-                      <option value="Education">Education</option>
-                      <option value="Work">Work</option>
-                      <option value="HR Document">HR Document</option>
+                      {categoryOptions.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3.5 h-4 w-4 text-slate-400 pointer-events-none transition-colors group-hover:text-slate-600" />
+                  </div>
+                </div>
+
+                <div className="relative group">
+                  <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 opacity-0 blur transition duration-500 group-focus-within:opacity-20"></div>
+                  <div className="relative flex items-center">
+                    <Briefcase className="absolute left-3.5 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-indigo-500" />
+                    <select
+                      value={departmentFilter}
+                      onChange={(e) => setDepartmentFilter(e.target.value)}
+                      className="h-11 w-full appearance-none rounded-xl border-0 bg-slate-50/80 pl-10 pr-10 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 backdrop-blur-sm transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:w-52"
+                    >
+                      <option value="">All Departments</option>
+                      {departmentOptions.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
                     </select>
                     <ChevronDown className="absolute right-3.5 h-4 w-4 text-slate-400 pointer-events-none transition-colors group-hover:text-slate-600" />
                   </div>
@@ -324,9 +458,8 @@ const viewDocument = async (filePath, docId) => {
           </div>
         </div>
 
-        {/* Employee List */}
-        <div className="space-y-5">
-          {filteredEmployees.length === 0 ? (
+        <div className="space-y-6">
+          {visibleDepartmentGroups.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white/50 py-20 text-center shadow-sm backdrop-blur-sm">
               <div className="rounded-full bg-slate-100 p-4 mb-4">
                 <AlertCircle className="h-8 w-8 text-slate-400" />
@@ -335,158 +468,198 @@ const viewDocument = async (filePath, docId) => {
               <p className="mt-2 text-sm text-slate-500 max-w-sm">We couldn't find any employees matching your current search and filter criteria.</p>
             </div>
           ) : (
-            filteredEmployees.map((emp) => {
-              const documentsToShow = emp.documents.filter(
-                (doc) => !categoryFilter || doc.category === categoryFilter
+            visibleDepartmentGroups.map(({ departmentName, groupCategoryFilter, visibleEmployees }) => {
+              const totalDocs = visibleEmployees.reduce(
+                (sum, emp) => sum + emp.documentsToShow.length,
+                0
               );
 
-              if (categoryFilter && documentsToShow.length === 0) return null;
-
-              const isExpanded = expandedEmp === emp.id;
-
               return (
-                <div
-                  key={emp.id}
-                  className={`overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition-all duration-300 ${isExpanded ? 'shadow-lg ring-indigo-100/50' : 'hover:shadow-md hover:ring-slate-300'
-                    }`}
+                <section
+                  key={departmentName}
+                  className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200"
                 >
-                  {/* Employer Header (Accordion Toggle) */}
-                  <div
-                    className="flex cursor-pointer items-center justify-between px-6 py-5 transition-colors hover:bg-slate-50/80"
-                    onClick={() => setExpandedEmp(isExpanded ? null : emp.id)}
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className="relative">
-                        {/* Avatar with subtle glow */}
-                        <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-indigo-200 to-blue-200 opacity-60 blur-sm"></div>
-                        <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 to-white text-lg font-bold text-indigo-600 shadow-sm ring-1 ring-indigo-100">
-                          {emp.name
-                            .split(" ")
-                            .slice(0, 2)
-                            .map((word) => word.charAt(0).toUpperCase())
-                            .join("")}
+                  <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-6 py-5 sm:px-8">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
+                            <Briefcase className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h2 className="text-lg font-bold text-slate-900">{departmentName}</h2>
+                            <p className="text-sm text-slate-500">
+                              {visibleEmployees.length} {visibleEmployees.length === 1 ? "candidate" : "candidates"} • {totalDocs} {totalDocs === 1 ? "document" : "documents"}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
-                          {emp.name}
-                          <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-200/50">
-                            {emp.empId}
-                          </span>
-                        </h3>
-                        <p className="mt-0.5 text-sm text-slate-500 font-medium">{emp.department}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-5">
-                      <div className="hidden sm:flex flex-col items-end">
-                        <span className="text-sm font-medium text-slate-700">
-                          {documentsToShow.length}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          {documentsToShow.length === 1 ? 'Document' : 'Documents'}
-                        </span>
-                      </div>
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isExpanded ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'}`}>
-                        {isExpanded ? (
-                          <ChevronUp className="h-5 w-5" />
-                        ) : (
-                          <ChevronDown className="h-5 w-5" />
-                        )}
+
+                      <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                        <div className="relative flex items-center">
+                          <Filter className="absolute left-3.5 h-4 w-4 text-slate-400" />
+                          <select
+                            value={groupCategoryFilter}
+                            onChange={(e) =>
+                              setGroupCategoryFilters((prev) => ({
+                                ...prev,
+                                [departmentName]: e.target.value
+                              }))
+                            }
+                            className="h-11 w-full appearance-none rounded-xl border-0 bg-slate-50 pl-10 pr-10 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:w-56"
+                          >
+                            <option value="">All In This Department</option>
+                            {categoryOptions.map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Documents Table */}
-                  <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-                    <div className="overflow-hidden">
-                      <div className="border-t border-slate-100 bg-slate-50/50">
-                        {documentsToShow.length > 0 ? (
-                          <div className="overflow-x-auto px-6 py-5">
-                            <table className="w-full text-left text-sm whitespace-nowrap">
-                              <thead>
-                                <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                  <th scope="col" className="pb-3 pl-2 pr-4">Document Details</th>
-                                  <th scope="col" className="px-4 pb-3">Type</th>
-                                  <th scope="col" className="px-4 pb-3">Category</th>
-                                  <th scope="col" className="px-4 pb-3">Last Updated</th>
-                                  <th scope="col" className="px-4 pb-3">Status</th>
-                                  <th scope="col" className="pb-3 pl-4 pr-2 text-right">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {documentsToShow.map((doc) => (
-                                  <tr key={doc.id} className="group transition-colors hover:bg-white">
-                                    <td className="py-4 pl-2 pr-4">
-                                      <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 ring-1 ring-slate-200/50 group-hover:bg-white group-hover:shadow-sm transition-all">
-                                          {getCategoryIcon(doc.category)}
-                                        </div>
-                                        <span className="font-semibold text-slate-900">{doc.docName}</span>
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-4 text-slate-600 font-medium">{doc.type}</td>
-                                    <td className="px-4 py-4 text-slate-600">
-                                      <div className="flex items-center gap-2">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
-                                        {doc.category}
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-4 text-slate-500">{doc.updated}</td>
-                                    <td className="px-4 py-4">
-                                      <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide ${getStatusBadge(doc.status)}`}>
-                                        {getStatusIcon(doc.status)}
-                                        {doc.status}
-                                      </span>
-                                    </td>
-                                    <td className="py-4 pl-4 pr-2 text-right">
-                                      <div className="flex items-center justify-end gap-2">
-                                        <button
-                                          onClick={() => viewDocument(doc.fileUrl, doc.id)}
-                                          disabled={loadingDoc === doc.id}
-                                          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition-all hover:bg-indigo-50 hover:text-indigo-700 hover:ring-indigo-300 disabled:opacity-50"
-                                        >
-                                          {loadingDoc === doc.id ? (
-                                            <>
-                                              <div className="h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                                              Loading...
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Eye className="h-4 w-4" />
-                                              <span className="hidden lg:inline">View</span>
-                                            </>
-                                          )}
-                                        </button>
-                                        <button
-                                          onClick={() => deleteDocument(emp.id, doc.id)}
-                                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm ring-1 ring-inset ring-slate-300 transition-all hover:bg-red-50 hover:text-red-600 hover:ring-red-300 focus:outline-none focus:ring-2 focus:ring-red-500"
-                                          title="Delete Document"
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                  <div className="space-y-5 p-4 sm:p-6">
+                    {visibleEmployees.map((emp) => {
+                      const documentsToShow = emp.documentsToShow;
+                      const isExpanded = expandedEmp === emp.id;
+
+                      return (
+                        <div
+                          key={emp.id}
+                          className={`overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition-all duration-300 ${isExpanded ? "shadow-lg ring-indigo-100/50" : "hover:shadow-md hover:ring-slate-300"
+                            }`}
+                        >
+                          <div
+                            className="flex cursor-pointer items-center justify-between px-6 py-5 transition-colors hover:bg-slate-50/80"
+                            onClick={() => setExpandedEmp(isExpanded ? null : emp.id)}
+                          >
+                            <div className="flex items-center gap-5">
+                              <div className="relative">
+                                <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-indigo-200 to-blue-200 opacity-60 blur-sm"></div>
+                                <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 to-white text-lg font-bold text-indigo-600 shadow-sm ring-1 ring-indigo-100">
+                                  {emp.name
+                                    .split(" ")
+                                    .slice(0, 2)
+                                    .map((word) => word.charAt(0).toUpperCase())
+                                    .join("")}
+                                </div>
+                              </div>
+                              <div>
+                                <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                                  {emp.name}
+                                  <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-200/50">
+                                    {emp.empId}
+                                  </span>
+                                </h3>
+                                <p className="mt-0.5 text-sm text-slate-500 font-medium">{emp.department}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-5">
+                              <div className="hidden sm:flex flex-col items-end">
+                                <span className="text-sm font-medium text-slate-700">
+                                  {documentsToShow.length}
+                                </span>
+                                <span className="text-xs text-slate-500">
+                                  {documentsToShow.length === 1 ? "Document" : "Documents"}
+                                </span>
+                              </div>
+                              <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isExpanded ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-400 group-hover:bg-slate-100"}`}>
+                                {isExpanded ? (
+                                  <ChevronUp className="h-5 w-5" />
+                                ) : (
+                                  <ChevronDown className="h-5 w-5" />
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        ) : (
-                          <div className="py-8 text-center text-sm text-slate-500">
-                            No documents available in this category.
+
+                          <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                            <div className="overflow-hidden">
+                              <div className="border-t border-slate-100 bg-slate-50/50">
+                                <div className="overflow-x-auto px-6 py-5">
+                                  <table className="w-full text-left text-sm whitespace-nowrap">
+                                    <thead>
+                                      <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                        <th scope="col" className="pb-3 pl-2 pr-4">Document Details</th>
+                                        <th scope="col" className="px-4 pb-3">Type</th>
+                                        <th scope="col" className="px-4 pb-3">Category</th>
+                                        <th scope="col" className="px-4 pb-3">Last Updated</th>
+                                        <th scope="col" className="px-4 pb-3">Status</th>
+                                        <th scope="col" className="pb-3 pl-4 pr-2 text-right">Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                      {documentsToShow.map((doc) => (
+                                        <tr key={doc.id} className="group transition-colors hover:bg-white">
+                                          <td className="py-4 pl-2 pr-4">
+                                            <div className="flex items-center gap-3">
+                                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 ring-1 ring-slate-200/50 group-hover:bg-white group-hover:shadow-sm transition-all">
+                                                {getCategoryIcon(doc.category)}
+                                              </div>
+                                              <span className="font-semibold text-slate-900">{doc.docName}</span>
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-4 text-slate-600 font-medium">{doc.type}</td>
+                                          <td className="px-4 py-4 text-slate-600">
+                                            <div className="flex items-center gap-2">
+                                              <span className="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+                                              {doc.category}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-4 text-slate-500">{doc.updated}</td>
+                                          <td className="px-4 py-4">
+                                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide ${getStatusBadge(doc.status)}`}>
+                                              {getStatusIcon(doc.status)}
+                                              {doc.status}
+                                            </span>
+                                          </td>
+                                          <td className="py-4 pl-4 pr-2 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                              <button
+                                                onClick={() => viewDocument(doc.fileUrl, doc.id)}
+                                                disabled={loadingDoc === doc.id}
+                                                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition-all hover:bg-indigo-50 hover:text-indigo-700 hover:ring-indigo-300 disabled:opacity-50"
+                                              >
+                                                {loadingDoc === doc.id ? (
+                                                  <>
+                                                    <div className="h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                                                    Loading...
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <Eye className="h-4 w-4" />
+                                                    <span className="hidden lg:inline">View</span>
+                                                  </>
+                                                )}
+                                              </button>
+                                              <button
+                                                onClick={() => deleteDocument(emp.id, doc.id)}
+                                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm ring-1 ring-inset ring-slate-300 transition-all hover:bg-red-50 hover:text-red-600 hover:ring-red-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                                title="Delete Document"
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
+                </section>
               );
             })
           )}
         </div>
       </div>
-
     </div>
   );
 }
-

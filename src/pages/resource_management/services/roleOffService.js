@@ -15,6 +15,19 @@ export const getResources = async (projectId) => {
   }
 };
 
+export const getRoleOffProjectKPI = async (projectId) => {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/role-off/get-role-off-project-kpi/${projectId}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 const getAuthHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
 });

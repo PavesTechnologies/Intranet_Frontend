@@ -74,3 +74,70 @@ export const getBenchKPIs = async () => {
     throw error;
   }
 };
+
+export const updateStatusResource = async (payload) => {
+  try {
+    const response = await axios.put(`${BASE_URL}/api/bench/update-resource-state`, payload, {
+      headers: getAuthHeaders(),
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to update resource status", error);
+    throw error;
+  }
+};
+/**
+ * Fetches demand matches and scores for a specific benched resource
+ */
+export const getBenchMatches = async (resourceId) => {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/bench/matches`, {
+      params: { id: resourceId },
+      headers: getAuthHeaders(),
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch bench demand matches", error);
+    throw error;
+  }
+};
+
+/**
+ * Fetches all open/approved demands available for quick allocation
+ */
+export const getOpenDemands = async () => {
+  try {
+    // Using /api/demand/rm/demands as generic /api/demand/* paths are being intercepted by UUID routers
+    const response = await axios.get(`${BASE_URL}/api/demand/rm/demands`, {
+      headers: getAuthHeaders(),
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch demands from role-scoped endpoint", error);
+    throw error;
+  }
+};
+
+/**
+ * Performs a quick allocation for a benched resource to a specific demand
+ * Uses application/x-www-form-urlencoded as per backend requirement
+ */
+export const quickAllocate = async (resourceId, demandId, allocationPercentage = 100) => {
+  try {
+    const params = new URLSearchParams();
+    params.set("resourceId", resourceId);
+    params.set("demandId", demandId);
+    params.set("allocationPercentage", String(allocationPercentage));
+
+    const response = await axios.post(`${BASE_URL}/api/bench/quick-allocate`, params, {
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Quick allocation failed", error);
+    throw error;
+  }
+};
