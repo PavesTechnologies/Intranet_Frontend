@@ -89,10 +89,9 @@ export const updateStatusResource = async (payload) => {
 /**
  * Fetches demand matches and scores for a specific benched resource
  */
-export const getBenchMatches = async (resourceId) => {
+export const getBenchMatches = async () => {
   try {
     const response = await axios.get(`${BASE_URL}/api/bench/matches`, {
-      params: { id: resourceId },
       headers: getAuthHeaders(),
     });
     return response.data;
