@@ -369,34 +369,6 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
   if (loading) return <div>Loading documents...</div>;
 
-  /* ---- Folder Definitions ---- */
-  const folders = [
-    {
-      key: "education",
-      label: "Degrees & Certificates",
-      icon: <GraduationCap size={16} />,
-      count: educationDocs.length,
-    },
-    {
-      key: "experience",
-      label: "Previous Experience",
-      icon: <Briefcase size={16} />,
-      count: experienceDocs.length,
-    },
-    {
-      key: "identity",
-      label: "Identity",
-      icon: <ShieldCheck size={16} />,
-      count: identityDocs.length,
-    },
-    {
-      key: "certifications",
-      label: "Certifications",
-      icon: <Award size={16} />,
-      count: certificationDocs.length,
-    },
-  ];
-
   /* ---- Filter documents by search query ---- */
   const filterDocs = (docs, keys) => {
     if (!searchQuery.trim()) return docs;
@@ -411,6 +383,49 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   const filteredIdentity = filterDocs(identityDocs, ["type", "number", "name"]);
   const filteredCertifications = filterDocs(certificationDocs, ["name", "issuing_org", "issue_date", "credential_id"]);
 
+  /* ---- Folder Definitions ---- */
+  const folders = [
+    {
+      key: "education",
+      label: "Degrees & Certificates",
+      icon: <GraduationCap size={16} />,
+      count: searchQuery.trim() ? filteredEducation.length : educationDocs.length,
+      hasMatches: filteredEducation.length > 0,
+    },
+    {
+      key: "experience",
+      label: "Previous Experience",
+      icon: <Briefcase size={16} />,
+      count: searchQuery.trim() ? filteredExperience.length : experienceDocs.length,
+      hasMatches: filteredExperience.length > 0,
+    },
+    {
+      key: "identity",
+      label: "Identity",
+      icon: <ShieldCheck size={16} />,
+      count: searchQuery.trim() ? filteredIdentity.length : identityDocs.length,
+      hasMatches: filteredIdentity.length > 0,
+    },
+    {
+      key: "certifications",
+      label: "Certifications",
+      icon: <Award size={16} />,
+      count: searchQuery.trim() ? filteredCertifications.length : certificationDocs.length,
+      hasMatches: filteredCertifications.length > 0,
+    },
+  ];
+
+  const visibleFolders = folders.filter(folder => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return folder.label.toLowerCase().includes(q) || folder.hasMatches;
+  });
+
+  const currentFolderKey = visibleFolders.some(f => f.key === activeFolder)
+    ? activeFolder
+    : visibleFolders.length > 0
+    ? visibleFolders[0].key
+    : activeFolder;
 
   return (
     <div className="space-y-6">
@@ -445,23 +460,23 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Folders</span>
             </div>
             <div className="p-2 space-y-0.5">
-              {folders.map((folder) => (
+              {visibleFolders.map((folder) => (
                 <button
                   key={folder.key}
                   onClick={() => setActiveFolder(folder.key)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-                    activeFolder === folder.key
+                    currentFolderKey === folder.key
                       ? "bg-indigo-50 text-indigo-700 font-semibold"
                       : "text-gray-600 hover:bg-gray-50 hover:text-gray-800"
                   }`}
                 >
-                  <span className={activeFolder === folder.key ? "text-indigo-500" : "text-gray-400"}>
+                  <span className={currentFolderKey === folder.key ? "text-indigo-500" : "text-gray-400"}>
                     {folder.icon}
                   </span>
                   <span className="flex-1 text-left">{folder.label}</span>
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full ${
-                      activeFolder === folder.key
+                      currentFolderKey === folder.key
                         ? "bg-indigo-100 text-indigo-600"
                         : "bg-gray-100 text-gray-500"
                     }`}
@@ -477,7 +492,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
         {/* ---- RIGHT CONTENT ---- */}
         <div className="flex-1 min-w-0">
           {/* ---- EDUCATION SECTION ---- */}
-          {activeFolder === "education" && (
+          {currentFolderKey === "education" && (
             <FolderContent
               title="Degrees & Certificates"
               icon={<GraduationCap size={18} />}
@@ -521,7 +536,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
           )}
 
           {/* ---- EXPERIENCE SECTION ---- */}
-          {activeFolder === "experience" && (
+          {currentFolderKey === "experience" && (
             <FolderContent
               title="Previous Experience"
               icon={<Briefcase size={18} />}
@@ -565,7 +580,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
           )}
 
           {/* ---- IDENTITY SECTION ---- */}
-          {activeFolder === "identity" && (
+          {currentFolderKey === "identity" && (
             <FolderContent
               title="Identity"
               icon={<ShieldCheck size={18} />}
@@ -606,7 +621,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
           )}
 
           {/* ---- CERTIFICATIONS SECTION ---- */}
-          {activeFolder === "certifications" && (
+          {currentFolderKey === "certifications" && (
             <FolderContent
               title="Certifications"
               icon={<Award size={18} />}
