@@ -50,7 +50,7 @@ const downloadCsv = (filename, content) => {
 };
 
 const BenchPage = () => {
-  // const navigate = useNavigate();
+  const navigate = useNavigate();
   const stored = getStoredState();
   const [resources, setResources] = useState([]);
   const [kpis, setKpis] = useState(null);

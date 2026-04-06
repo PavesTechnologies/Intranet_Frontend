@@ -33,9 +33,13 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
         return;
       }
 
-      // 1. Exclusively fetch matched demands for this resource
-      const res = await getBenchMatches(rid);
-      const matchesList = Array.isArray(res) ? res : (res?.data || []);
+      // 1. Fetch consolidated matches (service now returns matches for all resources)
+      const res = await getBenchMatches();
+      const rawData = Array.isArray(res) ? res : (res?.data || []);
+      
+      // 2. Identify the matching set for THIS specific resource
+      const myMatchSet = rawData.find(m => Number(m.resourceId) === Number(rid));
+      const matchesList = myMatchSet?.demands || [];
       
       if (matchesList.length === 0) {
         setError("No direct skill matches found for this resource.");
