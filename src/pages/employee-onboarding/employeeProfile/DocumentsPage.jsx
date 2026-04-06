@@ -20,7 +20,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-export default function DocumentsPage({ employee, user_uuid, hrData = {}, identityTypes = [] }) {
+export default function DocumentsPage({ employee, user_uuid, hrData = {}, identityTypes = [], config = null }) {
   const { employee_uuid } = useParams();
 
   const [educationDocs, setEducationDocs] = useState([]);
@@ -33,6 +33,16 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingDoc, setLoadingDoc] = useState(null);
   const [deletingDoc, setDeletingDoc] = useState(null);
+
+  /* ---- Sync folder and search from prop (deep linking) ---- */
+  useEffect(() => {
+    if (config?.folder) {
+      setActiveFolder(config.folder);
+    }
+    if (config?.search !== undefined) {
+      setSearchQuery(config.search || "");
+    }
+  }, [config]);
 
   /* ---- Confirm Modal State ---- */
   const [confirmModal, setConfirmModal] = useState({

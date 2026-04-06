@@ -2,12 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, ChevronDown, CheckCircle, Users, Clock, Info } from "lucide-react";
 import StatusBadge from "../../../components/status/statusbadge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-const FILTER_OPTIONS = [
-  "This Week",
-  "Previous Week",
-  "This Month",
-  "Previous Month",
-];
+
 
 const STATUS = {
   JOINING: "JOINING",
@@ -55,12 +50,6 @@ const getMonthStart = (date) =>
 const getMonthEnd = (date) =>
   endOfDay(new Date(date.getFullYear(), date.getMonth() + 1, 0));
 
-const isDateInRange = (value, range) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  return date >= range.start && date <= range.end;
-};
-
 const formatDate = (value, options = {}) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
@@ -72,6 +61,7 @@ const formatDate = (value, options = {}) => {
     ...options,
   });
 };
+
 
 const getDateRange = (filter) => {
   const today = new Date(REFERENCE_TODAY);
@@ -105,16 +95,6 @@ const getDateRange = (filter) => {
   }
 };
 
-const getDerivedStatus = (joiningDate, range, today) => {
-  const normalizedToday = startOfDay(today);
-  const normalizedDate = startOfDay(joiningDate);
-
-  if (range.end < normalizedToday) return STATUS.COMPLETED;
-  if (range.start > normalizedToday) return STATUS.JOINING;
-
-  return normalizedDate <= normalizedToday ? STATUS.COMPLETED : STATUS.JOINING;
-};
-
 const getWeekChunksInMonth = (date) => {
   const monthStart = getMonthStart(date);
 
@@ -130,156 +110,7 @@ const getWeekChunksInMonth = (date) => {
   });
 };
 
-const MOCK_CANDIDATES = (() => {
-  const today = new Date(REFERENCE_TODAY);
-  const currentWeekStart = getWeekStart(today);
-  const currentMonthStart = getMonthStart(today);
-  const previousWeekStart = addDays(currentWeekStart, -7);
-  const previousMonthStart = getMonthStart(addMonths(today, -1));
 
-  return [
-    {
-      id: "cand-001",
-      name: "Aarav Sharma",
-      role: "Frontend Engineer",
-      department: "Engineering",
-      joiningDate: addDays(currentWeekStart, 0),
-      reportingManager: "Nisha Rai",
-      location: "Hyderabad",
-    },
-    {
-      id: "cand-002",
-      name: "Diya Menon",
-      role: "QA Analyst",
-      department: "Engineering",
-      joiningDate: addDays(currentWeekStart, 0),
-      reportingManager: "Harish Kumar",
-      location: "Chennai",
-    },
-    {
-      id: "cand-003",
-      name: "Rahul Verma",
-      role: "HR Executive",
-      department: "HR",
-      joiningDate: addDays(currentWeekStart, 1),
-      reportingManager: "Megha Sethi",
-      location: "Bengaluru",
-    },
-    {
-      id: "cand-004",
-      name: "Sneha Iyer",
-      role: "Finance Associate",
-      department: "Finance",
-      joiningDate: addDays(currentWeekStart, 1),
-      reportingManager: "Aditya Nair",
-      location: "Pune",
-    },
-    {
-      id: "cand-005",
-      name: "Karthik Reddy",
-      role: "Product Analyst",
-      department: "Engineering",
-      joiningDate: addDays(currentWeekStart, 4),
-      reportingManager: "Nisha Rai",
-      location: "Hyderabad",
-    },
-    {
-      id: "cand-006",
-      name: "Meera Pillai",
-      role: "Support Executive",
-      department: "Support",
-      joiningDate: addDays(currentMonthStart, 2),
-      reportingManager: "Anil Das",
-      location: "Chennai",
-    },
-    {
-      id: "cand-007",
-      name: "Arjun Sharma",
-      role: "Frontend Engineer",
-      department: "Engineering",
-      joiningDate: addDays(currentMonthStart, 8),
-      reportingManager: "Nisha Rai",
-      location: "Hyderabad",
-    },
-    {
-      id: "cand-008",
-      name: "Ishita Kapoor",
-      role: "Backend Engineer",
-      department: "Engineering",
-      joiningDate: addDays(previousWeekStart, 1),
-      reportingManager: "Nisha Rai",
-      location: "Hyderabad",
-    },
-    {
-      id: "cand-009",
-      name: "Vikram Joshi",
-      role: "Talent Partner",
-      department: "HR",
-      joiningDate: addDays(previousWeekStart, 3),
-      reportingManager: "Megha Sethi",
-      location: "Mumbai",
-    },
-    {
-      id: "cand-010",
-      name: "Tanvi Jain",
-      role: "Business Analyst",
-      department: "Strategy",
-      joiningDate: addDays(previousMonthStart, 10),
-      reportingManager: "Aditi Shah",
-      location: "Mumbai",
-    },
-  ];
-})();
-
-const buildMonthlyFlow = (today) =>
-  getWeekChunksInMonth(today).map((chunk) => {
-    let completed = 0;
-    let joining = 0;
-    
-    MOCK_CANDIDATES.forEach((candidate) => {
-      if (isDateInRange(candidate.joiningDate, chunk)) {
-        const status = getDerivedStatus(candidate.joiningDate, chunk, today);
-        if (status === STATUS.COMPLETED) {
-          completed += 1;
-        } else {
-          joining += 1;
-        }
-      }
-    });
-
-    return {
-      name: chunk.label,
-      completed,
-      joining,
-    };
-  });
-
-const buildWeeklyFlow = (candidates, range, today) =>
-  Array.from({ length: 7 }, (_, index) => {
-    const date = addDays(range.start, index);
-
-    return candidates.reduce(
-      (summary, candidate) => {
-        if (
-          startOfDay(candidate.joiningDate).getTime() !==
-          startOfDay(date).getTime()
-        ) {
-          return summary;
-        }
-
-        const status = getDerivedStatus(candidate.joiningDate, range, today);
-        if (status === STATUS.COMPLETED) summary.completed += 1;
-        else summary.joining += 1;
-
-        return summary;
-      },
-      {
-        name: date.toLocaleDateString(undefined, { weekday: "short" }),
-        completed: 0,
-        joining: 0,
-      }
-    );
-  });
 
 function FilterDropdown({
   filter,
@@ -413,6 +244,7 @@ function MonthlyGraph({ data }) {
   );
 }
 
+
 function WeeklyGraph({ data }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -449,6 +281,18 @@ export default function WeeklyDashboard() {
   const [filter, setFilter] = useState("This Week");
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const filterRef = useRef(null);
+  const [loading, setLoading] = useState(true);
+  const [apiData, setApiData] = useState(null);
+  const [dateRange, setDateRange] = useState({
+  start: new Date(),
+  end: new Date(),
+});
+const formatDateSafe = (date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().split("T")[0];
+};
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -461,70 +305,64 @@ export default function WeeklyDashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const today = useMemo(() => startOfDay(REFERENCE_TODAY), []);
-  const selectedRange = useMemo(() => getDateRange(filter), [filter]);
+  useEffect(() => {
+  const fetchDashboard = async () => {
+    try {
+      setLoading(true);
 
-  const selectedCandidates = useMemo(
-    () =>
-      MOCK_CANDIDATES.filter((candidate) =>
-        isDateInRange(candidate.joiningDate, selectedRange)
-      )
-        .map((candidate) => ({
-          ...candidate,
-          derivedStatus: getDerivedStatus(candidate.joiningDate, selectedRange, today),
-        }))
-        .sort(
-          (left, right) =>
-            new Date(left.joiningDate).getTime() -
-            new Date(right.joiningDate).getTime()
-        ),
-    [selectedRange, today]
-  );
+      const response = await fetch(
+        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/weekly-joining-report/dashboard/?start_date=${formatDateSafe(dateRange.start)}&end_date=${formatDateSafe(dateRange.end)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      const data = await response.json();
+      setApiData(data);
 
-  const summary = useMemo(() => {
-    const completed = selectedCandidates.filter(
-      (candidate) => candidate.derivedStatus === STATUS.COMPLETED
-    ).length;
-    const joining = selectedCandidates.filter(
-      (candidate) => candidate.derivedStatus === STATUS.JOINING
-    ).length;
+    } catch (error) {
+      console.error("API Error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return {
-      completed,
-      joining,
-      total: selectedCandidates.length,
-    };
-  }, [selectedCandidates]);
+  fetchDashboard();
+}, [dateRange]);
 
-  const monthlyData = useMemo(() => buildMonthlyFlow(today), [today]);
-  const weeklyData = useMemo(
-    () => buildWeeklyFlow(selectedCandidates, selectedRange, today),
-    [selectedCandidates, selectedRange, today]
-  );
 
-  const activities = useMemo(
-    () =>
-      [...selectedCandidates]
-        .sort(
-          (left, right) =>
-            new Date(right.joiningDate).getTime() -
-            new Date(left.joiningDate).getTime()
-        )
-        .slice(0, 6)
-        .map((candidate) => ({
-          id: candidate.id,
-          // title:
-          //   candidate.derivedStatus === STATUS.COMPLETED
-          //     ? `${candidate.name} completed joining for ${candidate.role}.`
-          //     : `${candidate.name} is scheduled for joining as ${candidate.role}.`,
-          // meta: `${formatDate(candidate.joiningDate)} | ${candidate.location}`,
-          title: candidate.name,
-          subtitle: candidate.department,
-          meta: `${formatDate(candidate.joiningDate)} | ${candidate.location}`,
-          status: candidate.derivedStatus,
-        })),
-    [selectedCandidates]
-  );
+  const selectedCandidates = apiData?.joinedCandidates || [];
+
+  const summary = {
+  completed: apiData?.summary?.joined || 0,
+  joining: apiData?.summary?.pending || 0,
+  total: apiData?.joinedCandidates?.length || 0,
+};
+
+const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const weeklyData = (apiData?.weeklyJoinings || [])
+  .map(item => ({
+    name: item.day,
+    completed: item.completed,
+    joining: item.joining
+  }))
+  .sort((a, b) => dayOrder.indexOf(a.name) - dayOrder.indexOf(b.name));
+
+const monthlyData = apiData?.monthlyJoinings?.map(item => ({
+  name: item.week,
+  completed: item.completed,
+  joining: item.joining
+})) || [];
+  
+const activities = apiData?.activities?.map((item, index) => ({
+  id: index,
+  title: item.message.split(" ")[0], // name
+  subtitle: "", // optional
+  meta: item.time,
+  status: item.type === "Completed" ? STATUS.COMPLETED : STATUS.JOINING
+})) || [];
 
   return (
     <div  className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#eef4ff] to-[#f1f5f9] p-4 sm:p-6">
@@ -547,24 +385,54 @@ export default function WeeklyDashboard() {
       className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm hover:shadow-md transition"
     >
       <Calendar size={16} />
-      {filter}
+      {dateRange.start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {dateRange.end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
       <ChevronDown size={16} />
     </button>
 
     {showFilterDropdown && (
-      <div className="absolute right-0 mt-2 w-44 rounded-xl border bg-white shadow-lg z-10">
-        {FILTER_OPTIONS.map((option) => (
-          <div
-            key={option}
-            onClick={() => {
-              setFilter(option);
-              setShowFilterDropdown(false);
-            }}
-            className="px-4 py-2 text-sm hover:bg-slate-100 cursor-pointer"
-          >
-            {option}
+      <div className="absolute right-0 mt-2 w-[320px] rounded-xl border border-slate-200 bg-white shadow-xl z-20 p-4">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+          Select Date Range
+        </p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-1 w-full">
+            <label className="text-[10px] text-slate-400 font-medium">Start Date</label>
+            <input
+              type="date"
+              value={formatDateSafe(dateRange.start)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value) {
+                  setDateRange(prev => ({
+                    ...prev,
+                    start: new Date(value)
+                  }));
+                }
+              }}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+            />
           </div>
-        ))}
+
+          <div className="mt-5 text-slate-300 font-medium">-</div>
+
+          <div className="flex flex-col gap-1 w-full">
+            <label className="text-[10px] text-slate-400 font-medium">End Date</label>
+            <input
+              type="date"
+              value={formatDateSafe(dateRange.end)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value) {
+                  setDateRange(prev => ({
+                    ...prev,
+                    start: new Date(value)
+                  }));
+                }
+              }}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+            />
+          </div>
+        </div>
       </div>
     )}
   </div>
@@ -584,7 +452,7 @@ export default function WeeklyDashboard() {
       <div>
         <p className="text-sm font-medium text-slate-600">Completed</p>
         <h2 className="text-4xl font-bold mt-3 text-slate-900">
-          {summary.completed}
+          {apiData?.summary?.joined ||0}
         </h2>
       </div>
 
@@ -610,7 +478,7 @@ export default function WeeklyDashboard() {
       <div>
         <p className="text-sm font-medium text-slate-600">Joining</p>
         <h2 className="text-4xl font-bold mt-3 text-slate-900">
-          {summary.joining}
+          {apiData?.summary?.pending || 0}
         </h2>
       </div>
 
@@ -670,31 +538,33 @@ export default function WeeklyDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#edf2f7] bg-white">
-                {selectedCandidates.map((candidate) => (
-                  <tr key={candidate.id} className="text-[11px] text-[#64748b]">
-                    <td className="px-3 py-3">
-                      <div className="font-semibold text-[#334155]">{candidate.name}</div>
-                      <div className="mt-0.5 text-[10px] text-[#94a3b8]">
-                        {candidate.location}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">{candidate.role}</td>
-                    <td className="px-3 py-3">{candidate.department}</td>
-                    <td className="px-3 py-3">{formatDate(candidate.joiningDate)}</td>
-                    <td className="px-3 py-3">{candidate.reportingManager}</td>
-                    <td className="px-3 py-3">
-                      <StatusBadge
-                        label={
-                          candidate.derivedStatus === STATUS.COMPLETED
-                            ? "Completed"
-                            : "Joining"
-                        }
-                        size="sm"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+              {selectedCandidates.map((candidate, index) => (
+            <tr key={index} className="text-[11px] text-[#64748b]">
+              <td className="px-3 py-3">
+                <div className="font-semibold text-[#334155]">{candidate.name}</div>
+              </td>
+
+              <td className="px-3 py-3">{candidate.role}</td>
+
+              <td className="px-3 py-3">
+                {candidate.department || "N/A"}
+              </td>
+
+              <td className="px-3 py-3">
+                {formatDate(candidate.joiningDate)}
+              </td>
+
+              <td className="px-3 py-3">-</td>
+
+              <td className="px-3 py-3">
+                <StatusBadge
+                  label={candidate.status}
+                  size="sm"
+                />
+              </td>
+            </tr>
+          ))}
+          </tbody>
             </table>
           </div>
         </Section>
