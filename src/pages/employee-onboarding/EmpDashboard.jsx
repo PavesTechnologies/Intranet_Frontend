@@ -8,6 +8,11 @@ import { useAuth } from "../../contexts/AuthContext";
 import EmpTable from "./components/EmpTable";
 import axios from "axios";
 import AdminApprovalDashboard from "./admin/AdminApprovalDashboard";
+import {
+  getNormalizedStatus,
+  getOfferDisplayStatus,
+} from "./components/offerStatus";
+import { fetchOfferDetailsList } from "./components/fetchOfferDetails";
 
 
 export default function EmployeeOnboardingDashboard() {
@@ -17,6 +22,7 @@ export default function EmployeeOnboardingDashboard() {
   const isAdmin = roles.includes("Admin");
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [employeeUserIds, setEmployeeUserIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [viewRole, setViewRole] = useState("HR"); // HR | ADMIN
@@ -29,28 +35,46 @@ export default function EmployeeOnboardingDashboard() {
     const token = localStorage.getItem("token");
 
     const fetchOffers = async () => {
+      const detailedOffers = await fetchOfferDetailsList(
+        import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL,
+        token
+      );
+
+      setOffers(detailedOffers);
+    };
+
+    const fetchCoreEmployees = async () => {
+      const res = await axios.get(
+        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      setEmployeeUserIds((res.data || []).map((employee) => employee.user_uuid));
+    };
+
+    const fetchData = async () => {
       try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/user_id/details`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-        setOffers(res.data || []);
+        await Promise.all([fetchOffers(), fetchCoreEmployees()]);
       } catch (error) {
-        console.error("Failed to fetch offers", error);
+        console.error("Failed to fetch onboarding data", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchOffers();
+    fetchData();
   }, []);
 
-  const acceptCount = offers.filter((o) => o.status === "Accepted").length;
-  const sentCount = offers.filter((o) => o.status === "Offered").length;
-  const draftCount = offers.filter((o) => o.status === "Created").length;
-  const submittedCount = offers.filter((o) => o.status === "Submitted").length;
+  const acceptCount = offers.filter((o) => getNormalizedStatus(o.status) === "ACCEPTED").length;
+  const sentCount = offers.filter((o) => getNormalizedStatus(o.status) === "OFFERED").length;
+  const draftCount = offers.filter((o) => getNormalizedStatus(o.status) === "CREATED").length;
+  const submittedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "SUBMITTED").length;
+  const verifiedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "VERIFIED").length;
+  const joiningCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING").length;
+  const completedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "COMPLETED").length;
+  const rejectedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "REJECTED").length;
 
   // ✅ Filter offers based on search term (case-insensitive)
   const filteredOffers = useMemo(() => {
@@ -62,12 +86,14 @@ export default function EmployeeOnboardingDashboard() {
       const matchesName =
         fullName.includes(searchTerm.toLowerCase()) ||
         Role.includes(searchTerm.toLowerCase());
+      const displayStatus = getOfferDisplayStatus(offer, employeeUserIds);
       const matchesStatus =
-        statusFilter === "ALL" || offer.status === statusFilter;
+        statusFilter === "ALL" ||
+        displayStatus === getNormalizedStatus(statusFilter);
 
       return matchesName && matchesStatus;
     });
-  }, [offers, searchTerm, statusFilter]);
+  }, [offers, searchTerm, statusFilter, employeeUserIds]);
 
   return (
     <div className="p-1 space-y-6">
@@ -97,42 +123,56 @@ export default function EmployeeOnboardingDashboard() {
               value={acceptCount}
               icon={Handshake}
               color="text-orange-600"
-              onClick={() => handleKpiClick("Accepted")}
+              onClick={() => handleKpiClick("ACCEPTED")}
             />
             <StatCard
               title="Sent Offers"
               value={sentCount}
               icon={Send}
               color="text-green-600"
-              onClick={() => handleKpiClick("Offered")}
+              onClick={() => handleKpiClick("OFFERED")}
             />
             <StatCard
               title="Draft Offers"
               value={draftCount}
               icon={FileEdit}
               color="text-blue-600"
-              onClick={() => handleKpiClick("Created")}
+              onClick={() => handleKpiClick("CREATED")}
             />
             <StatCard
               title="Submitted Offers"
               value={submittedCount}
               icon={FileText}
               color="text-purple-600"
-              onClick={() => handleKpiClick("Submitted")}
+              onClick={() => handleKpiClick("SUBMITTED")}
             />
             <StatCard
               title="Verified Offers"
-              value={offers.filter((o) => o.status === "Verified").length}
+              value={verifiedCount}
               icon={ShieldCheck}
               color="text-teal-600"
-              onClick={() => handleKpiClick("Verified")}
+              onClick={() => handleKpiClick("VERIFIED")}
+            />
+            <StatCard
+              title="Joining Offers"
+              value={joiningCount}
+              icon={Send}
+              color="text-sky-600"
+              onClick={() => handleKpiClick("JOINING")}
+            />
+            <StatCard
+              title="Completed Offers"
+              value={completedCount}
+              icon={Users}
+              color="text-emerald-600"
+              onClick={() => handleKpiClick("COMPLETED")}
             />
             <StatCard
               title="Rejected Offers"
-              value={offers.filter((o) => o.status === "Rejected").length}
+              value={rejectedCount}
               icon={XCircle}
               color="text-red-600"
-              onClick={() => handleKpiClick("Rejected")}
+              onClick={() => handleKpiClick("REJECTED")}
             />
           </div>
 
@@ -159,37 +199,49 @@ export default function EmployeeOnboardingDashboard() {
                 All Status
               </option>
               <option
-                value="Accepted"
+                value="ACCEPTED"
                 className="hover:bg-blue-500 hover:text-white"
               >
                 Accepted
               </option>
               <option
-                value="Offered"
+                value="OFFERED"
                 className="hover:bg-blue-500 hover:text-white"
               >
                 Offered
               </option>
               <option
-                value="Created"
+                value="CREATED"
                 className="hover:bg-blue-500 hover:text-white"
               >
                 Created
               </option>
               <option
-                value="Rejected"
+                value="REJECTED"
                 className="hover:bg-blue-500 hover:text-white"
               >
                 Rejected
               </option>
               <option
-                value="Verified"
+                value="VERIFIED"
                 className="hover:bg-blue-500 hover:text-white"
               >
                 Verified
               </option>
               <option
-                value="Submitted"
+                value="JOINING"
+                className="hover:bg-blue-500 hover:text-white"
+              >
+                Joining
+              </option>
+              <option
+                value="COMPLETED"
+                className="hover:bg-blue-500 hover:text-white"
+              >
+                Completed
+              </option>
+              <option
+                value="SUBMITTED"
                 className="hover:bg-blue-500 hover:text-white"
               >
                 Submitted
@@ -202,6 +254,7 @@ export default function EmployeeOnboardingDashboard() {
             <EmpTable
               key={`${searchTerm}-${statusFilter}`}
               offers={filteredOffers}
+              employeeUserIds={employeeUserIds}
               loading={loading}
               stage="HR_VIEW"
             />

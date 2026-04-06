@@ -72,6 +72,11 @@ const StatusBadge = ({ label, size = "md" }) => {
     textColor = "text-blue-700";
   }
 
+  if (raw === "joining") {
+    bgColor = "bg-purple-100";
+    textColor = "text-purple-700";
+  }
+
   if (raw === "accepted") {
     bgColor = "bg-orange-100";
     textColor = "text-orange-700";

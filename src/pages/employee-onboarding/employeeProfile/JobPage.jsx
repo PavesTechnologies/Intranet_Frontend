@@ -30,7 +30,7 @@ export default function JobPage({ user_uuid, coreData = {}, hrData = {} }) {
     setOrganizationData({
       business_unit: coreData.business_unit || "NA",
       department: coreData.resolved_department_name || coreData.department_uuid || "NA",
-      location: coreData.location || hrData.offer?.location || "NA",
+      location: coreData.location || hrData.offer?.location || "Not Updated",
       cost_center: coreData.cost_center || "NA",
       legal_entity: coreData.legal_entity || hrData.offer?.legal_entity || "NA",
       reports_to: coreData.reports_to || "NA",

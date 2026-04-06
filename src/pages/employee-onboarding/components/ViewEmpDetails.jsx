@@ -17,6 +17,11 @@ import {
   Eye,
 } from "lucide-react";
 import { set } from "date-fns";
+import {
+  formatOfferStatusLabel,
+  getOfferDisplayStatus,
+  getOfferWithJoiningStatus,
+} from "./offerStatus";
 
 export default function ViewEmpDetails() {
   const { user_uuid } = useParams();
@@ -80,14 +85,14 @@ const selectedApproverName =
         `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/offer/${user_uuid}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
- 
-      setEmployee(res.data);
+      const offerData = getOfferWithJoiningStatus(res.data);
+
+      setEmployee(offerData);
   
       setEditData({
-        ...res.data,
-        cc_emails:  res.data?.cc_emails
-        ? res.data.cc_emails
+        ...offerData,
+        cc_emails:  offerData?.cc_emails
+        ? offerData.cc_emails
             .split(",")
             .map(e => e.trim())
             .filter(Boolean)
@@ -385,6 +390,9 @@ finally {
 
   if (loading) return <div className="p-10 text-center">Loading...</div>;
   if (!employee) return <div className="p-10 text-center">Not found</div>;
+  const displayStatus = formatOfferStatusLabel(
+    getOfferDisplayStatus(employee, [])
+  );
 
   /* ========================= UI (UNCHANGED) ========================= */
 
@@ -418,7 +426,7 @@ finally {
                 <BadgeCheck size={16} />
                 Status:
                 <span className="ml-1 font-medium text-blue-900">
-                  {employee.status}
+                  {displayStatus}
                 </span>
               </p>
 

@@ -1,7 +1,14 @@
 "use client";
- 
-import { useEffect, useState, useMemo, useRef } from "react";
-import { Users, X, XCircle, ShieldCheck, Clock } from "lucide-react";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Users,
+  X,
+  XCircle,
+  ShieldCheck,
+  Clock,
+  MailCheck,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
@@ -10,9 +17,14 @@ import Table from "../../../components/Table/table";
 import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
 import EmployeeCreateModal from "../components/employee-create-modal/EmployeeCreateModal";
-/* ============================
-   CONSTANTS
-============================ */
+import {
+  formatOfferStatusLabel,
+  getNormalizedStatus,
+  getOfferDisplayStatus,
+  persistJoiningStatus,
+} from "../components/offerStatus";
+import { fetchOfferDetailsList } from "../components/fetchOfferDetails";
+
 const PAGE_SIZE = 5;
 const DEPARTMENTS = [
   "Engineering",
@@ -24,31 +36,8 @@ const DEPARTMENTS = [
   "Admin",
 ];
 
-const ALLOWED_STATUSES = ["SUBMITTED", "VERIFIED", "REJECTED"];
+const ALLOWED_STATUSES = ["SUBMITTED", "VERIFIED", "REJECTED", "JOINING"];
 
-const getDisplayStatus = (employee, employeeUserIds) => {
-  const baseStatus = String(employee.status || "").trim().toUpperCase();
-
-  if (
-    baseStatus === "VERIFIED" &&
-    employeeUserIds.includes(employee.user_uuid)
-  ) {
-    return "COMPLETED";
-  }
-
-  return baseStatus;
-};
-
-const formatStatusLabel = (status) => {
-  if (!status) return "";
-
-  return status.charAt(0) + status.slice(1).toLowerCase();
-};
-
- 
-/* ============================
-   JOIN MODAL
-============================ */
 function JoinModal({
   open,
   onClose,
@@ -57,33 +46,25 @@ function JoinModal({
   form,
   setForm,
   managerOptions,
- 
   loadingManagers,
- 
 }) {
   if (!open) return null;
- 
- 
- 
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-     <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] p-6 relative flex flex-col">
- 
- 
+      <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] p-6 relative flex flex-col">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-gray-500 hover:text-gray-700"
         >
           <X size={20} />
         </button>
- 
+
         <h2 className="text-xl font-semibold mb-4">
           Send Joining Details
         </h2>
- 
+
         <div className="space-y-4 overflow-y-auto pr-2 flex-1">
- 
- 
           <InputField
             label="Joining Date *"
             type="date"
@@ -92,7 +73,7 @@ function JoinModal({
               setForm({ ...form, joining_date: v })
             }
           />
- 
+
           <InputField
             label="Reporting Time *"
             type="time"
@@ -101,7 +82,7 @@ function JoinModal({
               setForm({ ...form, reporting_time: v })
             }
           />
- 
+
           <InputField
             label="Location *"
             type="text"
@@ -110,27 +91,28 @@ function JoinModal({
               setForm({ ...form, location: v })
             }
           />
-           <SelectField
-                label="Department *"
-                value={form.department}
-                options={DEPARTMENTS}
-                onChange={(v) =>
-                  setForm({ ...form,department :v })
-                }
-           />
-          <SearchableSelect
-                label="Reporting Manager *"
-                value={form.reporting_manager}
-                options={managerOptions}
-                loading={loadingManagers}
-                disabled={loadingManagers}
-                placeholder ="Search manager"
- 
-                onChange={(v) =>
-                  setForm({ ...form, reporting_manager: v })
-                }
+
+          <SelectField
+            label="Department *"
+            value={form.department}
+            options={DEPARTMENTS}
+            onChange={(v) =>
+              setForm({ ...form, department: v })
+            }
           />
- 
+
+          <SearchableSelect
+            label="Reporting Manager *"
+            value={form.reporting_manager}
+            options={managerOptions}
+            loading={loadingManagers}
+            disabled={loadingManagers}
+            placeholder="Search manager"
+            onChange={(v) =>
+              setForm({ ...form, reporting_manager: v })
+            }
+          />
+
           <TextAreaField
             label="Additional Content"
             value={form.custom_message}
@@ -138,18 +120,9 @@ function JoinModal({
               setForm({ ...form, custom_message: v })
             }
           />
-          {/* <TextAreaField
-            label="cc_mails"
-            value={form.cc_mails}
-            onChange={(v) =>
-              setForm({ ...form, cc_mails: v })
-            }
-          /> */}
-         
         </div>
- 
+
         <div className="flex justify-end gap-3 mt-6">
- 
           <Button
             varient="secondary"
             size="small"
@@ -158,7 +131,7 @@ function JoinModal({
           >
             Cancel
           </Button>
- 
+
           <Button
             varient="primary"
             size="small"
@@ -167,14 +140,13 @@ function JoinModal({
           >
             {loading ? "Sending..." : "Send Email"}
           </Button>
- 
         </div>
       </div>
     </div>
   );
 }
 
-function ActionMenu({ onView, onCreate, showVerify }) {
+function ActionMenu({ onView, onCreate, showCreate }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -212,7 +184,7 @@ function ActionMenu({ onView, onCreate, showVerify }) {
             View
           </button>
 
-          {showVerify && (
+          {showCreate && (
             <button
               onClick={() => {
                 onCreate();
@@ -220,7 +192,7 @@ function ActionMenu({ onView, onCreate, showVerify }) {
               }}
               className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
             >
-              Create 
+              Create
             </button>
           )}
         </div>
@@ -229,41 +201,26 @@ function ActionMenu({ onView, onCreate, showVerify }) {
   );
 }
 
-
-
- 
-/* ============================
-   MAIN COMPONENT
-============================ */
 export default function HrOnboardingDashboard() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
   const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
-/* -------------------- State -------------------- */
- 
+
   const [data, setData] = useState([]);
   const [employeeUserIds, setEmployeeUserIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
- 
   const [bulkJoinMode, setBulkJoinMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
- 
   const [showModal, setShowModal] = useState(false);
   const [sending, setSending] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
- 
   const [currentPage, setCurrentPage] = useState(1);
   const [managerOptions, setManagerOptions] = useState([]);
   const [loadingManagers, setLoadingManagers] = useState(false);
-  
-  const handleKpiClick = (status) => {
-    setStatusFilter(status);
-    setCurrentPage(1);
-  };
- 
+
   const [joinForm, setJoinForm] = useState({
     joining_date: "",
     reporting_time: "",
@@ -272,59 +229,46 @@ export default function HrOnboardingDashboard() {
     reporting_manager: "",
     custom_message: "",
   });
- 
-  /* ============================
-     FETCH Employees DATA
-  ============================ */
- 
-   useEffect(() => {
-    const fetchEmployees = async () => {
-      setLoading(true);
-      try {
-        const res = await axios.get(
-          `${BASE_URL}/offerletters/user_id/details`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
- 
-        setData(res.data || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
- 
-    fetchEmployees();
-  }, []);
- 
+
+  const handleKpiClick = (status) => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const fetchEmployees = async () => {
+    setLoading(true);
+    try {
+      const offers = await fetchOfferDetailsList(BASE_URL, token);
+      setData(offers);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchCoreEmployees = async () => {
-  try {
-    const res = await axios.get(
-      `${BASE_URL}/permanent-employee/core-employee-details/`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/permanent-employee/core-employee-details/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-    const ids = (res.data || []).map((e) => e.user_uuid);
+      const ids = (res.data || []).map((e) => e.user_uuid);
+      setEmployeeUserIds(ids);
+    } catch (err) {
+      console.error("Failed to fetch core employees", err);
+    }
+  };
 
-    setEmployeeUserIds(ids);
-
-  } catch (err) {
-    console.error("Failed to fetch core employees", err);
-  }
-};
-
-useEffect(() => {
-  fetchCoreEmployees();
-}, []);
+  useEffect(() => {
+    fetchEmployees();
+    fetchCoreEmployees();
+  }, []);
 
   const handleOpenCreateModal = (employee) => {
     setSelectedEmployee({
@@ -341,90 +285,41 @@ useEffect(() => {
     setSelectedEmployee(null);
     setCurrentPage(1);
     fetchCoreEmployees();
+    fetchEmployees();
   };
- 
-// const fetchManagers = async () => {
-//   setLoadingManagers(true);
- 
-//   try {
-//     const res = await axios.get(
-//       `${BASE_URL}/offer-approval/admin-users`,
-//       {
-//         headers: {
-//           Authorization: `Bearer ${token}`,
-//         },
-//       }
-//     );
- 
-//     // TEMP: Treat all users as managers
-//     const managers = res.data.map((u) => ({
-//       value: u.name,
-//       label: u.name,
-//     }));
- 
-//     setManagerOptions(managers);
- 
-//   } catch (err) {
-//     console.error("Failed to load managers:", err);
-//   }
- 
-//   setLoadingManagers(false);
-// };
- 
- 
- 
-//  useEffect(() => {
-//   fetchManagers();
-//  }, []);
- 
- // currently all users are fetched as managers. Once the role based api  is ready, we can filter based on roles.
- 
- const fetchManagers = async () => {
-    setLoadingManagers(true);
- 
-        try {
-          const res = await axios.get(
-            `${BASE_URL}/offer-approval/admin-users`,
-            { headers: { Authorization: `Bearer ${token}` } }
-             
-          );
- 
-          console.log("Managers API Response:", res.data);
- 
-          const managers = (res.data || []).map((u) => ({
-            value: u.name,
-            label: `${u.name} (${u.mail})`,
-          }));
- 
-            console.log("Managers mapped:", managers);
- 
-          setManagerOptions(managers);
-        } catch (err) {
-          console.error("Failed to load managers:", err);
-        }
- 
-        setLoadingManagers(false);
-      };
- 
-      useEffect(() => {
-        fetchManagers();
-      }, []);
- 
- 
 
-  /*Adding page data for KPI filtering*/
+  const fetchManagers = async () => {
+    setLoadingManagers(true);
+
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/offer-approval/admin-users`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const managers = (res.data || []).map((u) => ({
+        value: u.name,
+        label: `${u.name} (${u.mail})`,
+      }));
+
+      setManagerOptions(managers);
+    } catch (err) {
+      console.error("Failed to load managers:", err);
+    }
+
+    setLoadingManagers(false);
+  };
+
+  useEffect(() => {
+    fetchManagers();
+  }, []);
+
   const pageData = useMemo(() => {
     return data.filter((emp) =>
-      ALLOWED_STATUSES.includes(
-        (emp.status || "").trim().toUpperCase()
-      )
+      ALLOWED_STATUSES.includes(getNormalizedStatus(emp.status))
     );
   }, [data]);
- 
-  /* ============================
-     FILTER (SEARCH + STATUS)
-  ============================ */
- 
+
   const filteredData = useMemo(() => {
     return pageData.filter((emp) => {
       const searchText = `${emp.first_name} ${emp.last_name} ${emp.designation}`
@@ -434,7 +329,7 @@ useEffect(() => {
         searchTerm.toLowerCase()
       );
 
-      const status = getDisplayStatus(emp, employeeUserIds);
+      const status = getOfferDisplayStatus(emp, employeeUserIds);
       const filter = statusFilter.trim().toUpperCase();
 
       if (filter === "ALL") {
@@ -444,12 +339,7 @@ useEffect(() => {
       return matchesSearch && status === filter;
     });
   }, [pageData, searchTerm, statusFilter, employeeUserIds]);
- 
- 
-  /* ============================
-     HELPERS
-  ============================ */
- 
+
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
       prev.includes(id)
@@ -457,12 +347,11 @@ useEffect(() => {
         : [...prev, id]
     );
   };
- 
+
   const resetBulk = () => {
     setBulkJoinMode(false);
     setSelectedIds([]);
     setShowModal(false);
- 
     setJoinForm({
       joining_date: "",
       reporting_time: "",
@@ -472,68 +361,92 @@ useEffect(() => {
       custom_message: "",
     });
   };
- 
-  /* ============================
-     SEND JOIN MAIL
-  ============================ */
- 
- 
- 
- const handleSendJoinEmail = async () => {
-  const { joining_date, reporting_time, location, department, reporting_manager } = joinForm;
- 
-  if (!joining_date || !reporting_time || !location || !department || !reporting_manager) {
-    showStatusToast("❌ Please fill all required fields");
-    return;
-  }
- 
-  // ✅ emails OUTSIDE try (important)
-  const emails = filteredData
-    .filter((e) => selectedIds.includes(e.user_uuid))
-    .map((e) => e.mail)
-    .filter(Boolean);
- 
-  if (emails.length === 0) {
-    showStatusToast("❌ No valid emails found");
-    return;
-  }
- 
-  const payload = {
-    user_emails_list: emails,
-    ...joinForm,
+
+  const handleSendJoinEmail = async () => {
+    const {
+      joining_date,
+      reporting_time,
+      location,
+      department,
+      reporting_manager,
+    } = joinForm;
+
+    if (
+      !joining_date ||
+      !reporting_time ||
+      !location ||
+      !department ||
+      !reporting_manager
+    ) {
+      showStatusToast("Please fill all required fields");
+      return;
+    }
+
+    const selectedEmployees = filteredData.filter((e) =>
+      selectedIds.includes(e.user_uuid)
+    );
+
+    const emails = selectedEmployees
+      .map((e) => e.mail)
+      .filter(Boolean);
+
+    if (emails.length === 0) {
+      showStatusToast("No valid emails found");
+      return;
+    }
+
+    const payload = {
+      user_emails_list: emails,
+      ...joinForm,
+    };
+
+    try {
+      setSending(true);
+
+      await axios.post(`${BASE_URL}/hr/offerletters/bulk-join`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      setData((prev) =>
+        prev.map((emp) =>
+          selectedIds.includes(emp.user_uuid)
+            ? {
+                ...emp,
+                ...joinForm,
+                status:
+                  getNormalizedStatus(emp.status) === "VERIFIED"
+                    ? "JOINING"
+                    : emp.status,
+              }
+            : emp
+        )
+      );
+
+      selectedEmployees.forEach((employee) =>
+        persistJoiningStatus({
+          ...employee,
+          ...joinForm,
+          status: "JOINING",
+        })
+      );
+
+      showStatusToast("Joining emails sent");
+      resetBulk();
+    } catch (err) {
+      console.log("JOIN ERROR FULL:", err.response?.data);
+      console.log("JOIN ERROR DETAIL:", err.response?.data?.detail);
+      console.log("JOIN PAYLOAD:", payload);
+      console.error(err);
+
+      showStatusToast("Failed to send emails");
+    } finally {
+      setSending(false);
+    }
   };
- 
-  console.log("PAYLOAD SENT:", payload);
- 
-  try {
-    setSending(true);
- 
-    await axios.post(`${BASE_URL}/hr/offerletters/bulk-join`, payload, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
- 
-    showStatusToast("Joining emails sent");
-    resetBulk();
- 
-  } catch (err) {
-    console.log("JOIN ERROR FULL:", err.response?.data);
-    console.log("JOIN ERROR DETAIL:", err.response?.data?.detail);
-    console.log("JOIN PAYLOAD:", payload);
-    console.error(err);
- 
-    showStatusToast("❌ Failed to send emails");
-  } finally {
-    setSending(false);
-  }
-};
- 
-  /* ============================
-     TABLE CONFIG
-  ============================ */
- 
+
   const headers = [
     bulkJoinMode ? "Select" : null,
     "Name",
@@ -543,7 +456,7 @@ useEffect(() => {
     "Status",
     "Action",
   ].filter(Boolean);
- 
+
   const columns = [
     bulkJoinMode ? "select" : null,
     "name",
@@ -553,14 +466,8 @@ useEffect(() => {
     "status",
     "action",
   ].filter(Boolean);
- 
-  /* ============================
-     ROWS + PAGINATION
-  ============================ */
- 
-  const totalPages = Math.ceil(
-    filteredData.length / PAGE_SIZE
-  );
+
+  const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
 
   useEffect(() => {
     if (totalPages === 0) {
@@ -573,20 +480,17 @@ useEffect(() => {
     }
   }, [currentPage, totalPages]);
 
-  //  const isVerified =
-  //       String(offer.status || "").trim().toUpperCase() === "VERIFIED";
-
- 
   const rows = useMemo(() => {
     const startIndex = (currentPage - 1) * PAGE_SIZE;
- 
+
     return filteredData
       .slice(startIndex, startIndex + PAGE_SIZE)
       .map((emp) => {
-        const displayStatus = getDisplayStatus(emp, employeeUserIds);
+        const displayStatus = getOfferDisplayStatus(emp, employeeUserIds);
         const isEmployeeCreated = displayStatus === "COMPLETED";
         const isVerified = displayStatus === "VERIFIED";
- 
+        const isJoining = displayStatus === "JOINING";
+
         return {
           rowClass: isEmployeeCreated ? "bg-green-100" : "",
           ...(bulkJoinMode && {
@@ -607,23 +511,13 @@ useEffect(() => {
               />
             ),
           }),
- 
           name: `${emp.first_name} ${emp.last_name}`,
- 
           mail: emp.mail || "—",
- 
           contact: emp.contact_number || "—",
- 
           designation: emp.designation || "—",
- 
-          // status: emp.status ? (
-          //     <StatusBadge label={emp.status} size="sm" />
-          //   ) : (
-          //     "—"
-          //   ),
           status: (
             <StatusBadge
-              label={formatStatusLabel(displayStatus)}
+              label={formatOfferStatusLabel(displayStatus)}
               size="sm"
             />
           ),
@@ -633,7 +527,7 @@ useEffect(() => {
                 navigate(`/employee-onboarding/hr/profile/${emp.user_uuid}`)
               }
               onCreate={() => handleOpenCreateModal(emp)}
-              showVerify={isVerified && !isEmployeeCreated}
+              showCreate={(isVerified || isJoining) && !isEmployeeCreated}
             />
           ),
         };
@@ -646,91 +540,89 @@ useEffect(() => {
     navigate,
     employeeUserIds,
   ]);
- 
-  /* ============================
-     LOADING
-  ============================ */
- 
-  // if (loading) {
-  //   return (
-  //     <div className="p-10 text-center">
-  //       Loading HR dashboard...
-  //     </div>
-  //   );
-  // }
- 
-  /* ============================
-     UI
-  ============================ */
- 
+
   return (
     <div className="p-6 space-y-6">
- 
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">
           HR Onboarding Dashboard
         </h1>
- 
+
         <p className="text-gray-500">
           Verify employee documents & profiles
         </p>
       </div>
- 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
- 
+
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <StatCard
           title="Total Profiles"
           value={loading ? "0" : pageData.length}
           icon={Users}
           onClick={() => handleKpiClick("ALL")}
         />
- 
+
         <StatCard
           title="Verified"
           value={
             loading
-            ? "0"
-            :pageData.filter(
-              (e) => getDisplayStatus(e, employeeUserIds) === "VERIFIED"
-            ).length
+              ? "0"
+              : pageData.filter(
+                  (e) =>
+                    getOfferDisplayStatus(e, employeeUserIds) ===
+                    "VERIFIED"
+                ).length
           }
           icon={ShieldCheck}
           onClick={() => handleKpiClick("VERIFIED")}
         />
 
         <StatCard
+          title="Joining"
+          value={
+            loading
+              ? "0"
+              : pageData.filter(
+                  (e) =>
+                    getOfferDisplayStatus(e, employeeUserIds) ===
+                    "JOINING"
+                ).length
+          }
+          icon={MailCheck}
+          onClick={() => handleKpiClick("JOINING")}
+        />
+
+        <StatCard
           title="Completed"
           value={
             loading
-            ? "0"
-            :pageData.filter(
-              (e) => getDisplayStatus(e, employeeUserIds) === "COMPLETED"
-            ).length
+              ? "0"
+              : pageData.filter(
+                  (e) =>
+                    getOfferDisplayStatus(e, employeeUserIds) ===
+                    "COMPLETED"
+                ).length
           }
           icon={Clock}
           onClick={() => handleKpiClick("COMPLETED")}
         />
- 
+
         <StatCard
           title="Rejected"
           value={
             loading
-            ? "0"
-            :pageData.filter(
-              (e) => getDisplayStatus(e, employeeUserIds) === "REJECTED"
-            ).length
+              ? "0"
+              : pageData.filter(
+                  (e) =>
+                    getOfferDisplayStatus(e, employeeUserIds) ===
+                    "REJECTED"
+                ).length
           }
           icon={XCircle}
           onClick={() => handleKpiClick("REJECTED")}
         />
- 
       </div>
- 
-      {/* Search + Filter */}
+
       <div className="flex flex-col md:flex-row gap-4">
- 
         <input
           placeholder="Search by candidate name... or Role"
           value={searchTerm}
@@ -740,54 +632,54 @@ useEffect(() => {
           }}
           className="w-full md:w-1/3 px-3 py-2 border rounded-lg"
         />
- 
+
         <select
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);
             setCurrentPage(1);
-            }}
+          }}
           className="w-full md:w-48 px-3 py-2 border rounded-lg bg-white"
         >
           <option value="ALL">All Status</option>
           <option value="SUBMITTED">Submitted</option>
           <option value="VERIFIED">Verified</option>
+          <option value="JOINING">Joining</option>
           <option value="COMPLETED">Completed</option>
           <option value="REJECTED">Rejected</option>
         </select>
- 
       </div>
- 
-      {/* Bulk Bar */}
+
       <div className="bg-white p-4 rounded-xl shadow-sm flex justify-between">
- 
         <h2 className="font-semibold text-gray-700">
           Recent Offer Letters
         </h2>
- 
+
         {!bulkJoinMode ? (
           <Button
-          varient="primary"
-          size="small"
-          onClick={() => {
-            const hasVerified = filteredData.some(
-              (e) => e.status?.toUpperCase() === "VERIFIED"
-            );
- 
-            if (!hasVerified) {
-              showStatusToast( "No verified candidates available for bulk join");
-              return;
-            }
- 
-            setBulkJoinMode(true);
-          }}
-        >
-          Bulk Join
-        </Button>
+            varient="primary"
+            size="small"
+            onClick={() => {
+              const hasVerified = filteredData.some(
+                (e) =>
+                  getOfferDisplayStatus(e, employeeUserIds) ===
+                  "VERIFIED"
+              );
+
+              if (!hasVerified) {
+                showStatusToast(
+                  "No verified candidates available for bulk join"
+                );
+                return;
+              }
+
+              setBulkJoinMode(true);
+            }}
+          >
+            Bulk Join
+          </Button>
         ) : (
- 
           <div className="flex gap-3">
- 
             <Button
               varient="primary"
               size="small"
@@ -796,7 +688,7 @@ useEffect(() => {
             >
               Send ({selectedIds.length})
             </Button>
- 
+
             <Button
               varient="secondary"
               size="small"
@@ -804,25 +696,19 @@ useEffect(() => {
             >
               Cancel
             </Button>
- 
           </div>
- 
         )}
- 
       </div>
- 
-      {/* Table + Pagination */}
+
       <div className="bg-white rounded-xl shadow-sm relative overflow-visible">
- 
         <Table
           headers={headers}
           columns={columns}
           rows={rows}
           loading={loading}
         />
- 
+
         {filteredData.length > PAGE_SIZE && (
- 
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
@@ -837,12 +723,9 @@ useEffect(() => {
               )
             }
           />
- 
         )}
- 
       </div>
- 
-      {/* Modal */}
+
       <JoinModal
         open={showModal}
         onClose={() => setShowModal(false)}
@@ -851,7 +734,6 @@ useEffect(() => {
         form={joinForm}
         setForm={setJoinForm}
         managerOptions={managerOptions}
-       
         loadingManagers={loadingManagers}
       />
 
@@ -863,15 +745,10 @@ useEffect(() => {
         middleName={selectedEmployee?.middleName}
         lastName={selectedEmployee?.lastName}
       />
- 
     </div>
   );
 }
- 
-/* ============================
-   SMALL COMPONENTS
-============================ */
- 
+
 function InputField({ label, type, value, onChange }) {
   return (
     <div>
@@ -887,7 +764,7 @@ function InputField({ label, type, value, onChange }) {
     </div>
   );
 }
- 
+
 function TextAreaField({ label, value, onChange }) {
   return (
     <div>
@@ -903,7 +780,7 @@ function TextAreaField({ label, value, onChange }) {
     </div>
   );
 }
- 
+
 function StatCard({ title, value, icon: Icon, onClick }) {
   return (
     <div
@@ -924,7 +801,7 @@ function StatCard({ title, value, icon: Icon, onClick }) {
     </div>
   );
 }
- 
+
 function SelectField({
   label,
   value,
@@ -938,7 +815,7 @@ function SelectField({
       <label className="text-sm font-medium">
         {label}
       </label>
- 
+
       <select
         disabled={disabled || loading}
         value={value}
@@ -949,9 +826,8 @@ function SelectField({
         <option value="">
           {loading ? "Loading..." : `Select ${label}`}
         </option>
- 
+
         {options.map((opt) => {
-          // If string → department
           if (typeof opt === "string") {
             return (
               <option key={opt} value={opt}>
@@ -959,8 +835,7 @@ function SelectField({
               </option>
             );
           }
- 
-          // If object → manager
+
           return (
             <option key={opt.value} value={opt.value}>
               {opt.label}
@@ -971,8 +846,7 @@ function SelectField({
     </div>
   );
 }
- 
- 
+
 function SearchableSelect({
   label,
   value,
@@ -983,21 +857,20 @@ function SearchableSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
- 
+
   const filtered = options.filter((opt) =>
     opt.label.toLowerCase().includes(query.toLowerCase())
   );
- 
+
   const selectedLabel =
     options.find((o) => o.value === value)?.label || "";
- 
+
   return (
     <div className="relative">
       <label className="text-sm font-medium">
         {label}
       </label>
- 
-      {/* Input */}
+
       <input
         disabled={disabled}
         value={open ? query : selectedLabel}
@@ -1007,17 +880,15 @@ function SearchableSelect({
         className={`w-full mt-1 px-3 py-2 border rounded-lg
           ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
       />
- 
-      {/* Dropdown */}
+
       {open && !disabled && (
         <div className="absolute z-50 w-full bg-white border rounded-lg shadow max-h-48 overflow-y-auto mt-1">
- 
           {filtered.length === 0 && (
             <div className="p-2 text-gray-500 text-sm">
               No results
             </div>
           )}
- 
+
           {filtered.map((opt) => (
             <div
               key={opt.value}
@@ -1036,4 +907,3 @@ function SearchableSelect({
     </div>
   );
 }
- 

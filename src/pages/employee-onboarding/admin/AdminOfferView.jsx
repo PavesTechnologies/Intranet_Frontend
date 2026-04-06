@@ -17,6 +17,11 @@ import {
   MoreVertical,
 } from "lucide-react";
 import { set } from "date-fns";
+import {
+  formatOfferStatusLabel,
+  getOfferDisplayStatus,
+  getOfferWithJoiningStatus,
+} from "../components/offerStatus";
 
 /* ================= MAIN COMPONENT ================= */
 
@@ -48,7 +53,7 @@ export default function AdminOfferView() {
     const res = await axios.get(`${BASE}/offerletters/offer/${user_uuid}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    setOffer(res.data);
+    setOffer(getOfferWithJoiningStatus(res.data));
   };
   console.log("OFFER:", offer);
 
@@ -227,6 +232,9 @@ const deleteApprovalRequest = async () => {
         Offer not found
       </div>
     );
+  const displayStatus = formatOfferStatusLabel(
+    getOfferDisplayStatus(offer, [])
+  );
 
   /* ================= UI ================= */
 
@@ -283,7 +291,7 @@ const deleteApprovalRequest = async () => {
               <BadgeCheck size={16} className="text-green-600" />
               Offer Status:
               <span className="font-medium text-gray-900">
-                {offer.status}
+                {displayStatus}
               </span>
             </p>
 

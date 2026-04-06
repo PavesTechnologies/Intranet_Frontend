@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useMyWorkData, useUpdateStatus, useMarkDone, MY_WORK_KEY } from "./hooks/useMyWork";
 import { useMyWorkStore } from "./hooks/myWorkStore";
 import { applyFilters } from "./utils/myWorkUtils";
-
+import { ArrowLeft } from "lucide-react";
 import SnapshotBar      from "./components/SnapshotBar";
 import FilterBar        from "./components/FilterBar";
 import ProjectGroup     from "./components/ProjectGroup";
@@ -16,12 +16,12 @@ import ManagerSection   from "./components/ManagerSection";
 import CompletedSection from "./components/CompletedSection";
 import ItemDetailPanel  from "./components/ItemDetailPanel";
 import { MyWorkPageSkeleton } from "./skeletons/MyWorkSkeletons";
-
+import { useNavigate } from "react-router-dom";
 export default function MyWorkPage() {
   const { user } = useAuth();
   const userId   = user?.id || user?.user_id;
   const isManager = user?.roles?.includes("Manager") || user?.roles?.includes("Admin");
-
+  const navigate = useNavigate();
   const qc = useQueryClient();
 
   // ── Data ────────────────────────────────────────────────────────────────────
@@ -96,12 +96,22 @@ export default function MyWorkPage() {
 
         {/* ── Page header ───────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between mb-6">
+          
           <div>
             <h1 className="text-xl font-bold text-slate-900">My Work</h1>
             <p className="text-sm text-slate-500 mt-0.5">
               Everything assigned to you across all projects
             </p>
+            
           </div>
+          <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate("/projects")}
+            className="flex items-center justify-center w-5 h-5 bg-white border border-gray-200 text-gray-600 rounded-full shadow-sm hover:bg-gray-50 hover:text-gray-900 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 shrink-0"
+            title="Go Back"
+          >
+            <ArrowLeft className="w-3 h-3" strokeWidth={2.5} />
+          </button>
           <button
             onClick={refetch}
             title="Refresh"
@@ -111,6 +121,7 @@ export default function MyWorkPage() {
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
           </button>
+          </div>
         </div>
 
         {/* ── Snapshot bar ──────────────────────────────────────────────────── */}
