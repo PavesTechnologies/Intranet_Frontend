@@ -5,6 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import StatusBadge from "../../../components/status/statusbadge";
 import {
   ArrowLeft,
   Mail,
@@ -232,9 +233,7 @@ const deleteApprovalRequest = async () => {
         Offer not found
       </div>
     );
-  const displayStatus = formatOfferStatusLabel(
-    getOfferDisplayStatus(offer, [])
-  );
+  const displayStatus = getOfferDisplayStatus(offer, []);
 
   /* ================= UI ================= */
 
@@ -290,9 +289,10 @@ const deleteApprovalRequest = async () => {
             <p className="flex items-center gap-2 text-gray-700 mt-1">
               <BadgeCheck size={16} className="text-green-600" />
               Offer Status:
-              <span className="font-medium text-gray-900">
-                {displayStatus}
-              </span>
+              <StatusBadge
+                label={formatOfferStatusLabel(displayStatus)}
+                size="sm"
+              />
             </p>
 
             {approval && (

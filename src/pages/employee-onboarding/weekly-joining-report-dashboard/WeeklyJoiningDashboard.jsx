@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, ChevronDown, CheckCircle, Users, Clock, Info } from "lucide-react";
 import StatusBadge from "../../../components/status/statusbadge";
+import { formatOfferStatusLabel, getNormalizedStatus } from "../components/offerStatus";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 
 const STATUS = {
   JOINING: "JOINING",
+  JOINING_PENDING: "JOINING_PENDING",
   COMPLETED: "COMPLETED",
 };
 
@@ -238,7 +240,7 @@ function MonthlyGraph({ data }) {
           wrapperStyle={{ fontSize: '10px', color: '#64748b', paddingTop: '10px' }} 
         />
         <Bar dataKey="completed" name="Completed" stackId="a" fill="#18a56f" radius={[0, 0, 2, 2]} barSize={80} />
-        <Bar dataKey="joining" name="Joining" stackId="a" fill="#43b3e8" radius={[2, 2, 0, 0]} barSize={80} />
+        <Bar dataKey="joining" name="Pending" stackId="a" fill="#43b3e8" radius={[2, 2, 0, 0]} barSize={80} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -271,7 +273,7 @@ function WeeklyGraph({ data }) {
           wrapperStyle={{ fontSize: '10px', color: '#64748b', paddingTop: '10px' }} 
         />
         <Bar dataKey="completed" name="Completed" stackId="a" fill="#157a74" radius={[0, 0, 2, 2]} barSize={50} />
-        <Bar dataKey="joining" name="Joining" stackId="a" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={50} />
+        <Bar dataKey="joining" name="Pending" stackId="a" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={50} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -340,9 +342,9 @@ const formatDateSafe = (date) => {
 
   const selectedCandidates = apiData?.joinedCandidates || [];
 
-  const summary = {
+const summary = {
   completed: apiData?.summary?.joined || 0,
-  joining: apiData?.summary?.pending || 0,
+  pending: apiData?.summary?.pending || 0,
   total: apiData?.joinedCandidates?.length || 0,
 };
 
@@ -362,13 +364,22 @@ const monthlyData = apiData?.monthlyJoinings?.map(item => ({
   joining: item.joining
 })) || [];
   
-const activities = apiData?.activities?.map((item, index) => ({
-  id: index,
-  title: item.message.split(" ")[0], // name
-  subtitle: "", // optional
-  meta: item.time,
-  status: item.type === "Completed" ? STATUS.COMPLETED : STATUS.JOINING
-})) || [];
+const activities = apiData?.activities?.map((item, index) => {
+  const normalizedType = getNormalizedStatus(item.type);
+
+  return {
+    id: index,
+    title: item.message.split(" ")[0],
+    subtitle: "",
+    meta: item.time,
+    status:
+      normalizedType === STATUS.COMPLETED
+        ? STATUS.COMPLETED
+        : normalizedType === STATUS.JOINING_PENDING
+          ? STATUS.JOINING_PENDING
+          : STATUS.JOINING,
+  };
+}) || [];
 
   return (
     <div  className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#eef4ff] to-[#f1f5f9] p-4 sm:p-6">
@@ -411,7 +422,7 @@ const activities = apiData?.activities?.map((item, index) => ({
                 if (value) {
                   setDateRange(prev => ({
                     ...prev,
-                    end: new Date(value)
+                    start: new Date(value)
                   }));
                 }
               }}
@@ -431,7 +442,7 @@ const activities = apiData?.activities?.map((item, index) => ({
                 if (value) {
                   setDateRange(prev => ({
                     ...prev,
-                    start: new Date(value)
+                    end: new Date(value)
                   }));
                 }
               }}
@@ -458,7 +469,7 @@ const activities = apiData?.activities?.map((item, index) => ({
       <div>
         <p className="text-sm font-medium text-slate-600">Completed</p>
         <h2 className="text-4xl font-bold mt-3 text-slate-900">
-          {apiData?.summary?.joined ||0}
+          {summary.completed}
         </h2>
       </div>
 
@@ -482,9 +493,9 @@ const activities = apiData?.activities?.map((item, index) => ({
 
     <div className="flex justify-between items-start">
       <div>
-        <p className="text-sm font-medium text-slate-600">Joining</p>
+        <p className="text-sm font-medium text-slate-600">Pending Joinings</p>
         <h2 className="text-4xl font-bold mt-3 text-slate-900">
-          {apiData?.summary?.pending || 0}
+          {summary.pending}
         </h2>
       </div>
 
@@ -495,14 +506,14 @@ const activities = apiData?.activities?.map((item, index) => ({
     </div>
 
     <p className="text-sm text-slate-500 mt-4">
-      Candidates still waiting for their joining day inside the selected period
+      Candidates still pending in the selected period, including overdue joinings
     </p>
   </div>
 
 </div>
         <Section
           title="Monthly Flow"
-          subtitle="Weekly blocks for the current month with the same completed vs joining logic."
+          subtitle="Weekly blocks for the current month with completed versus pending joining counts."
         >
           <div className="h-[240px]">
             <MonthlyGraph data={monthlyData} />
@@ -510,7 +521,7 @@ const activities = apiData?.activities?.map((item, index) => ({
         </Section>
         <Section
           title="Weekly View"
-          subtitle="Week selection is grouped day by day."
+          subtitle="Selected range grouped day by day using the same completed and pending logic."
           action={
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f59e0b]">
               This Week
@@ -521,7 +532,7 @@ const activities = apiData?.activities?.map((item, index) => ({
             <WeeklyGraph data={weeklyData} />
           </div>
         </Section>
-         <Section
+        <Section
           title="Candidate Table"
           subtitle="Table rows follow the exact same selected-range logic as the KPI cards and charts."
           action={
@@ -564,7 +575,7 @@ const activities = apiData?.activities?.map((item, index) => ({
 
               <td className="px-3 py-3">
                 <StatusBadge
-                  label={candidate.status}
+                  label={formatOfferStatusLabel(getNormalizedStatus(candidate.status))}
                   size="sm"
                 />
               </td>
@@ -577,7 +588,7 @@ const activities = apiData?.activities?.map((item, index) => ({
 
       <Section
       title="Recent Activities"
-      subtitle="Only joining and completed actions are shown for the selected period."
+      subtitle="Joining, joining pending, and completed actions are shown for the selected period."
     >
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {activities.map((activity) => (
@@ -602,15 +613,10 @@ const activities = apiData?.activities?.map((item, index) => ({
 
           {/* STATUS */}
           <div className="mt-4">
-            <span
-              className={`text-[10px] font-semibold px-3 py-1 rounded-full ${
-                activity.status === STATUS.COMPLETED
-                  ? "bg-green-100 text-green-600"
-                  : "bg-orange-100 text-orange-600"
-              }`}
-            >
-              {activity.status === STATUS.COMPLETED ? "Completed" : "Joining"}
-            </span>
+            <StatusBadge
+              label={formatOfferStatusLabel(activity.status)}
+              size="sm"
+            />
           </div>
         </div>
       ))}

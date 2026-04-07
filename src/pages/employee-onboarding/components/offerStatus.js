@@ -1,5 +1,16 @@
 export const getNormalizedStatus = (status) =>
-  String(status || "").trim().toUpperCase();
+  String(status || "").trim()
+.replace(/\s+/g, "_")      
+.toUpperCase();
+
+export const ONBOARDING_DISPLAY_STATUSES = [
+  "SUBMITTED",
+  "VERIFIED",
+  "REJECTED",
+  "JOINING",
+  "JOINING_PENDING",
+  "COMPLETED",
+];
 
 const JOINING_STATUS_STORAGE_KEY = "employee_onboarding_joining_status";
 
@@ -42,7 +53,6 @@ export const persistJoiningStatus = (offer) => {
     location: offer.location || "",
     department: offer.department || "",
     reporting_manager: offer.reporting_manager || "",
-    status: "JOINING",
   };
 
   writeJoiningStatusMap(current);
@@ -65,7 +75,18 @@ const getStoredJoiningStatus = (userUuid) => {
 
 export const getOfferWithJoiningStatus = (offer = {}) => {
   const storedJoiningStatus = getStoredJoiningStatus(offer?.user_uuid);
-  return storedJoiningStatus ? { ...offer, ...storedJoiningStatus } : offer;
+  if (!storedJoiningStatus) return offer;
+
+  return {
+    ...offer,
+    joining_date: offer?.joining_date || storedJoiningStatus.joining_date,
+    reporting_time:
+      offer?.reporting_time || storedJoiningStatus.reporting_time,
+    location: offer?.location || storedJoiningStatus.location,
+    department: offer?.department || storedJoiningStatus.department,
+    reporting_manager:
+      offer?.reporting_manager || storedJoiningStatus.reporting_manager,
+  };
 };
 
 export const hasJoiningDetails = (offer = {}) =>
@@ -77,19 +98,44 @@ export const hasJoiningDetails = (offer = {}) =>
       offer?.reporting_manager
   );
 
+// export const getOfferDisplayStatus = (offer, employeeUserIds = []) => {
+//   const baseStatus = getNormalizedStatus(offer?.status);
+//   const mergedOffer = getOfferWithJoiningStatus(offer);
+//   const isEmployeeCreated = employeeUserIds.includes(offer?.user_uuid);
+//   const joiningInitiated =
+//     getNormalizedStatus(mergedOffer?.status) === "JOINING" ||
+//     (baseStatus === "VERIFIED" && hasJoiningDetails(mergedOffer));
+
+//   if (isEmployeeCreated && (baseStatus === "VERIFIED" || joiningInitiated)) {
+//     clearJoiningStatus(offer?.user_uuid);
+//     return "COMPLETED";
+//   }
+
+//   if (joiningInitiated) {
+//     return "JOINING";
+//   }
+
+//   return baseStatus;
+// };
 export const getOfferDisplayStatus = (offer, employeeUserIds = []) => {
   const baseStatus = getNormalizedStatus(offer?.status);
   const mergedOffer = getOfferWithJoiningStatus(offer);
+  const mergedStatus = getNormalizedStatus(mergedOffer?.status);
   const isEmployeeCreated = employeeUserIds.includes(offer?.user_uuid);
+
   const joiningInitiated =
-    getNormalizedStatus(mergedOffer?.status) === "JOINING" ||
+    mergedStatus === "JOINING" ||
     (baseStatus === "VERIFIED" && hasJoiningDetails(mergedOffer));
+
+  if (baseStatus === "JOINING_PENDING" || mergedStatus === "JOINING_PENDING") {
+    return "JOINING_PENDING";
+  }
 
   if (isEmployeeCreated && (baseStatus === "VERIFIED" || joiningInitiated)) {
     clearJoiningStatus(offer?.user_uuid);
     return "COMPLETED";
   }
-
+  
   if (joiningInitiated) {
     return "JOINING";
   }
@@ -97,8 +143,24 @@ export const getOfferDisplayStatus = (offer, employeeUserIds = []) => {
   return baseStatus;
 };
 
+export const isTrackedOnboardingStatus = (
+  offer,
+  employeeUserIds = []
+) =>
+  ONBOARDING_DISPLAY_STATUSES.includes(
+    getOfferDisplayStatus(offer, employeeUserIds)
+  );
+
 export const formatOfferStatusLabel = (status) => {
   if (!status) return "";
 
-  return status.charAt(0) + status.slice(1).toLowerCase();
+  return String(status)
+    .trim()
+    .replace(/\s+/g, "_")
+    .split("_")
+    .filter(Boolean)
+    .map(
+      (part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+    )
+    .join(" ");
 };
