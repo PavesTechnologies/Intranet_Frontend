@@ -283,9 +283,15 @@ export default function WeeklyDashboard() {
   const filterRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [apiData, setApiData] = useState(null);
-  const [dateRange, setDateRange] = useState({
-  start: new Date(),
-  end: new Date(),
+//   const [dateRange, setDateRange] = useState({
+//   start: new Date(),
+//   end: new Date(),
+// });
+const today = new Date();
+
+const [dateRange, setDateRange] = useState({
+  start: getWeekStart(today),
+  end: getWeekEnd(today),
 });
 const formatDateSafe = (date) => {
   if (!date) return "";
@@ -405,7 +411,7 @@ const activities = apiData?.activities?.map((item, index) => ({
                 if (value) {
                   setDateRange(prev => ({
                     ...prev,
-                    start: new Date(value)
+                    end: new Date(value)
                   }));
                 }
               }}

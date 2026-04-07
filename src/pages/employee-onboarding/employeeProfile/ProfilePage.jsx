@@ -99,7 +99,7 @@ export default function ProfilePage({ activeTab, user_uuid, coreData = {}, hrDat
         {
           id: 1,
           relation: relationType || "Relation",
-          first_name: emergencyName,
+          full_name: emergencyName,
           mobile: emergencyPhone || "-",
           gender: relationGender,
         },
@@ -269,8 +269,7 @@ export default function ProfilePage({ activeTab, user_uuid, coreData = {}, hrDat
               {relationData.map((rel, idx) => (
                 <div key={rel.id || idx} className="flex flex-col">
                   <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1">{rel.relation || "Relation"}</span>
-                  {/* <span className="text-[14px] text-gray-800">{(rel.first_name || rel.last_name) ? `${rel.first_name || ""} ${rel.last_name || ""}`.trim() : "-"}</span> */}
-                  <span className="text-[14px] text-gray-800">{rel.first_name || "-"}</span>
+                  <span className="text-[14px] text-gray-800">{rel.full_name || "-"}</span>
                   <span className="text-[14px] text-gray-800 mt-0.5"><span className="font-medium text-gray-900">Mobile:</span> {rel.mobile || "-"}</span>
                   <span className="text-[14px] text-gray-800 mt-0.5"><span className="font-medium text-gray-900">Gender:</span> {rel.gender || "-"}</span>
                 </div>
@@ -838,7 +837,7 @@ const RelationsModal = ({ data, setData, onClose, personalUuid, hrData, refreshD
   const [saving, setSaving] = useState(false);
 
   const handleAdd = () => {
-    const newRel = { id: Date.now(), relation: "", gender: "", first_name: "", last_name: "", email: "", mobile: "", profession: "", dob: "" };
+    const newRel = { id: Date.now(), relation: "", gender: "", full_name: "", email: "", mobile: "", profession: "", dob: "" };
     setRelations([...relations, newRel]);
     setSelectedIndex(relations.length);
   };
@@ -884,7 +883,7 @@ const RelationsModal = ({ data, setData, onClose, personalUuid, hrData, refreshD
         blood_group: personal.blood_group || "",
         nationality_country_uuid: personal.nationality_country_uuid || "",
         residence_country_uuid: personal.residence_country_uuid || "",
-        emergency_contact_name: currentRel.first_name || personal.emergency_contact_name || "",
+        emergency_contact_name: currentRel.full_name || personal.emergency_contact_name || "",
         emergency_contact_phone: currentRel.mobile || personal.emergency_contact_phone || "",
         emergency_contact_relation_uuid: personal.emergency_contact_relation_uuid || "", // Need master list to change UUID
       };
@@ -942,7 +941,7 @@ const RelationsModal = ({ data, setData, onClose, personalUuid, hrData, refreshD
               >
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">{rel.relation || "NEW RELATION"}</div>
                 <div className="text-[15px] font-medium text-gray-800 mt-2 leading-tight">
-                  {rel.first_name || rel.last_name ? `${rel.first_name} ${rel.last_name}` : ""}
+                  {rel.full_name || ""}
                 </div>
                 <div className="text-[13px] text-gray-500 mt-1">[{rel.profession || "Profession"}]</div>
 
@@ -972,8 +971,9 @@ const RelationsModal = ({ data, setData, onClose, personalUuid, hrData, refreshD
                 <Select label="Relation" value={currentRel.relation} onChange={(e) => updateCurrent('relation', e.target.value)} options={["Father", "Mother", "Spouse", "Brother", "Sister", "Son", "Daughter", "Other"]} required />
                 <Select label="Gender" value={currentRel.gender} onChange={(e) => updateCurrent('gender', e.target.value)} options={["Male", "Female", "Other"]} required />
 
-                <Input label="First Name" value={currentRel.first_name} onChange={(e) => updateCurrent('first_name', e.target.value)} required />
-                <Input label="Last Name" value={currentRel.last_name} onChange={(e) => updateCurrent('last_name', e.target.value)} required />
+                <div className="md:col-span-2">
+                  <Input label="Full Name" value={currentRel.full_name} onChange={(e) => updateCurrent('full_name', e.target.value)} required />
+                </div>
 
                 <Input label="Email" type="email" value={currentRel.email} onChange={(e) => updateCurrent('email', e.target.value)} />
                 <Input label="Mobile" value={currentRel.mobile} onChange={(e) => updateCurrent('mobile', e.target.value)} required />
