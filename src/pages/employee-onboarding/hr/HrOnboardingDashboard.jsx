@@ -21,6 +21,7 @@ import {
   formatOfferStatusLabel,
   getNormalizedStatus,
   getOfferDisplayStatus,
+  isTrackedOnboardingStatus,
   persistJoiningStatus,
 } from "../components/offerStatus";
 import { fetchOfferDetailsList } from "../components/fetchOfferDetails";
@@ -35,8 +36,6 @@ const DEPARTMENTS = [
   "Operations",
   "Admin",
 ];
-
-const ALLOWED_STATUSES = ["SUBMITTED", "VERIFIED", "REJECTED", "JOINING"];
 
 function JoinModal({
   open,
@@ -146,7 +145,130 @@ function JoinModal({
   );
 }
 
-function ActionMenu({ onView, onCreate, showCreate }) {
+function ReassignJoiningModal({
+  open,
+  onClose,
+  onSubmit,
+  loading,
+  loadingDetails,
+  form,
+  setForm,
+  managerOptions,
+  loadingManagers,
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] p-6 relative flex flex-col">
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 text-gray-500 hover:text-gray-700"
+        >
+          <X size={20} />
+        </button>
+
+        <h2 className="text-xl font-semibold mb-4">
+          Reassign Joining Date
+        </h2>
+
+        <div className="space-y-4 overflow-y-auto pr-2 flex-1">
+          {loadingDetails ? (
+            <div className="py-8 text-center text-sm text-gray-500">
+              Loading joining details...
+            </div>
+          ) : (
+            <>
+              <InputField
+                label="New Joining Date *"
+                type="date"
+                value={form.joining_date}
+                onChange={(v) =>
+                  setForm({ ...form, joining_date: v })
+                }
+              />
+
+              <InputField
+                label="Reporting Time *"
+                type="time"
+                value={form.reporting_time}
+                onChange={(v) =>
+                  setForm({ ...form, reporting_time: v })
+                }
+              />
+
+              <InputField
+                label="Location *"
+                type="text"
+                value={form.location}
+                onChange={(v) =>
+                  setForm({ ...form, location: v })
+                }
+              />
+
+              <SelectField
+                label="Department *"
+                value={form.department}
+                options={DEPARTMENTS}
+                onChange={(v) =>
+                  setForm({ ...form, department: v })
+                }
+              />
+
+              <SearchableSelect
+                label="Reporting Manager *"
+                value={form.reporting_manager}
+                options={managerOptions}
+                loading={loadingManagers}
+                disabled={loadingManagers}
+                placeholder="Search manager"
+                onChange={(v) =>
+                  setForm({ ...form, reporting_manager: v })
+                }
+              />
+
+              <TextAreaField
+                label="Comment"
+                value={form.comment}
+                onChange={(v) =>
+                  setForm({ ...form, comment: v })
+                }
+              />
+            </>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3 mt-6">
+          <Button
+            varient="secondary"
+            size="small"
+            onClick={onClose}
+            disabled={loading || loadingDetails}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            varient="primary"
+            size="small"
+            onClick={onSubmit}
+            disabled={loading || loadingDetails}
+          >
+            {loading ? "Saving..." : "Save"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionMenu({
+  onView,
+  onCreate,
+  onEdit,
+  showCreate,
+  showEdit,
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -195,6 +317,18 @@ function ActionMenu({ onView, onCreate, showCreate }) {
               Create
             </button>
           )}
+
+          {showEdit && (
+            <button
+              onClick={() => {
+                onEdit();
+                setOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+            >
+              Edit
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -214,9 +348,14 @@ export default function HrOnboardingDashboard() {
   const [bulkJoinMode, setBulkJoinMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [sending, setSending] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [loadingEditDetails, setLoadingEditDetails] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [editDisabledUserIds, setEditDisabledUserIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [managerOptions, setManagerOptions] = useState([]);
   const [loadingManagers, setLoadingManagers] = useState(false);
@@ -228,6 +367,15 @@ export default function HrOnboardingDashboard() {
     department: "",
     reporting_manager: "",
     custom_message: "",
+  });
+
+  const [editJoinForm, setEditJoinForm] = useState({
+    joining_date: "",
+    reporting_time: "",
+    location: "",
+    department: "",
+    reporting_manager: "",
+    comment: "",
   });
 
   const handleKpiClick = (status) => {
@@ -280,12 +428,77 @@ export default function HrOnboardingDashboard() {
     setIsCreateOpen(true);
   };
 
+  const handleOpenEditModal = async (employee) => {
+    setEditingEmployee(employee);
+    setEditJoinForm({
+      joining_date: employee.joining_date || "",
+      reporting_time: employee.reporting_time || "",
+      location: employee.location || "",
+      department: employee.department || "",
+      reporting_manager: employee.reporting_manager || "",
+      comment: "",
+    });
+    setShowEditModal(true);
+
+    try {
+      setLoadingEditDetails(true);
+
+      const res = await axios.get(
+        `${BASE_URL}/hr/offerletters/${employee.user_uuid}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const detail = res.data || {};
+
+      setEditJoinForm({
+        joining_date: String(
+          detail.joining_date || employee.joining_date || ""
+        ).trim(),
+        reporting_time: String(
+          detail.reporting_time || employee.reporting_time || ""
+        ).trim(),
+        location: String(
+          detail.location || employee.location || ""
+        ).trim(),
+        department: String(
+          detail.department || employee.department || ""
+        ).trim(),
+        reporting_manager: String(
+          detail.reporting_manager || employee.reporting_manager || ""
+        ).trim(),
+        comment: "",
+      });
+    } catch (err) {
+      console.error("Failed to load joining details", err);
+      showStatusToast("Failed to load joining details");
+    } finally {
+      setLoadingEditDetails(false);
+    }
+  };
+
   const handleCloseCreateModal = () => {
     setIsCreateOpen(false);
     setSelectedEmployee(null);
     setCurrentPage(1);
     fetchCoreEmployees();
     fetchEmployees();
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingEmployee(null);
+    setEditJoinForm({
+      joining_date: "",
+      reporting_time: "",
+      location: "",
+      department: "",
+      reporting_manager: "",
+      comment: "",
+    });
   };
 
   const fetchManagers = async () => {
@@ -298,8 +511,8 @@ export default function HrOnboardingDashboard() {
       );
 
       const managers = (res.data || []).map((u) => ({
-        value: u.name,
-        label: `${u.name} (${u.mail})`,
+        value: String(u.name || "").trim(),
+        label: `${String(u.name || "").trim()} (${u.mail})`,
       }));
 
       setManagerOptions(managers);
@@ -314,11 +527,17 @@ export default function HrOnboardingDashboard() {
     fetchManagers();
   }, []);
 
+  const getHrDisplayStatus = (offer) =>
+    editDisabledUserIds.includes(offer?.user_uuid)
+      ? "JOINING_PENDING"
+      : getOfferDisplayStatus(offer, employeeUserIds);
+
   const pageData = useMemo(() => {
     return data.filter((emp) =>
-      ALLOWED_STATUSES.includes(getNormalizedStatus(emp.status))
+      editDisabledUserIds.includes(emp?.user_uuid) ||
+      isTrackedOnboardingStatus(emp, employeeUserIds)
     );
-  }, [data]);
+  }, [data, employeeUserIds, editDisabledUserIds]);
 
   const filteredData = useMemo(() => {
     return pageData.filter((emp) => {
@@ -329,7 +548,7 @@ export default function HrOnboardingDashboard() {
         searchTerm.toLowerCase()
       );
 
-      const status = getOfferDisplayStatus(emp, employeeUserIds);
+      const status = getHrDisplayStatus(emp);
       const filter = statusFilter.trim().toUpperCase();
 
       if (filter === "ALL") {
@@ -338,7 +557,7 @@ export default function HrOnboardingDashboard() {
 
       return matchesSearch && status === filter;
     });
-  }, [pageData, searchTerm, statusFilter, employeeUserIds]);
+  }, [pageData, searchTerm, statusFilter, employeeUserIds, editDisabledUserIds]);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
@@ -433,6 +652,7 @@ export default function HrOnboardingDashboard() {
         })
       );
 
+      await fetchEmployees();
       showStatusToast("Joining emails sent");
       resetBulk();
     } catch (err) {
@@ -444,6 +664,90 @@ export default function HrOnboardingDashboard() {
       showStatusToast("Failed to send emails");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleUpdateJoiningPending = async () => {
+    if (!editingEmployee) return;
+
+    const {
+      joining_date,
+      reporting_time,
+      location,
+      department,
+      reporting_manager,
+      comment,
+    } = editJoinForm;
+
+    if (
+      !joining_date ||
+      !reporting_time ||
+      !location ||
+      !department ||
+      !reporting_manager
+    ) {
+      showStatusToast("Please fill all required fields");
+      return;
+    }
+
+    const payload = {
+      user_uuid: editingEmployee.user_uuid,
+      new_joining_date: joining_date,
+      reporting_manager,
+      reporting_time,
+      location,
+      department,
+      comment: comment || "",
+    };
+
+    try {
+      setSavingEdit(true);
+
+      await axios.put(`${BASE_URL}/hr/offerletters/reassign-joining`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      persistJoiningStatus({
+        ...editingEmployee,
+        joining_date,
+        reporting_time,
+        location,
+        department,
+        reporting_manager,
+      });
+
+      setData((prev) =>
+        prev.map((emp) =>
+          emp.user_uuid === editingEmployee.user_uuid
+            ? {
+                ...emp,
+                status: "JOINING_PENDING",
+                joining_date,
+                reporting_time,
+                location,
+                department,
+                reporting_manager,
+              }
+            : emp
+        )
+      );
+
+      setEditDisabledUserIds((prev) =>
+        prev.includes(editingEmployee.user_uuid)
+          ? prev
+          : [...prev, editingEmployee.user_uuid]
+      );
+
+      showStatusToast("Joining date updated");
+      handleCloseEditModal();
+    } catch (err) {
+      console.error("Failed to update joining date", err);
+      showStatusToast("Failed to update joining date");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -486,10 +790,12 @@ export default function HrOnboardingDashboard() {
     return filteredData
       .slice(startIndex, startIndex + PAGE_SIZE)
       .map((emp) => {
-        const displayStatus = getOfferDisplayStatus(emp, employeeUserIds);
+        const displayStatus = getHrDisplayStatus(emp);
         const isEmployeeCreated = displayStatus === "COMPLETED";
         const isVerified = displayStatus === "VERIFIED";
         const isJoining = displayStatus === "JOINING";
+        const isJoiningPending = displayStatus === "JOINING_PENDING";
+        const isEditDisabled = editDisabledUserIds.includes(emp.user_uuid);
 
         return {
           rowClass: isEmployeeCreated ? "bg-green-100" : "",
@@ -527,7 +833,12 @@ export default function HrOnboardingDashboard() {
                 navigate(`/employee-onboarding/hr/profile/${emp.user_uuid}`)
               }
               onCreate={() => handleOpenCreateModal(emp)}
-              showCreate={(isVerified || isJoining) && !isEmployeeCreated}
+              onEdit={() => handleOpenEditModal(emp)}
+              showCreate={
+                (isVerified || isJoining || isJoiningPending) &&
+                !isEmployeeCreated
+              }
+              showEdit={isJoiningPending && !isEditDisabled}
             />
           ),
         };
@@ -539,6 +850,7 @@ export default function HrOnboardingDashboard() {
     selectedIds,
     navigate,
     employeeUserIds,
+    editDisabledUserIds,
   ]);
 
   return (
@@ -553,7 +865,7 @@ export default function HrOnboardingDashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <StatCard
           title="Total Profiles"
           value={loading ? "0" : pageData.length}
@@ -568,7 +880,7 @@ export default function HrOnboardingDashboard() {
               ? "0"
               : pageData.filter(
                   (e) =>
-                    getOfferDisplayStatus(e, employeeUserIds) ===
+                    getHrDisplayStatus(e) ===
                     "VERIFIED"
                 ).length
           }
@@ -583,12 +895,27 @@ export default function HrOnboardingDashboard() {
               ? "0"
               : pageData.filter(
                   (e) =>
-                    getOfferDisplayStatus(e, employeeUserIds) ===
+                    getHrDisplayStatus(e) ===
                     "JOINING"
                 ).length
           }
           icon={MailCheck}
           onClick={() => handleKpiClick("JOINING")}
+        />
+
+        <StatCard
+          title="Joining Pending"
+          value={
+            loading
+              ? "0"
+              : pageData.filter(
+                  (e) =>
+                    getHrDisplayStatus(e) ===
+                    "JOINING_PENDING"
+                ).length
+          }
+          icon={Clock}
+          onClick={() => handleKpiClick("JOINING_PENDING")}
         />
 
         <StatCard
@@ -598,11 +925,11 @@ export default function HrOnboardingDashboard() {
               ? "0"
               : pageData.filter(
                   (e) =>
-                    getOfferDisplayStatus(e, employeeUserIds) ===
+                    getHrDisplayStatus(e) ===
                     "COMPLETED"
                 ).length
           }
-          icon={Clock}
+          icon={Users}
           onClick={() => handleKpiClick("COMPLETED")}
         />
 
@@ -613,7 +940,7 @@ export default function HrOnboardingDashboard() {
               ? "0"
               : pageData.filter(
                   (e) =>
-                    getOfferDisplayStatus(e, employeeUserIds) ===
+                    getHrDisplayStatus(e) ===
                     "REJECTED"
                 ).length
           }
@@ -645,6 +972,7 @@ export default function HrOnboardingDashboard() {
           <option value="SUBMITTED">Submitted</option>
           <option value="VERIFIED">Verified</option>
           <option value="JOINING">Joining</option>
+          <option value="JOINING_PENDING">Joining Pending</option>
           <option value="COMPLETED">Completed</option>
           <option value="REJECTED">Rejected</option>
         </select>
@@ -662,7 +990,7 @@ export default function HrOnboardingDashboard() {
             onClick={() => {
               const hasVerified = filteredData.some(
                 (e) =>
-                  getOfferDisplayStatus(e, employeeUserIds) ===
+                  getHrDisplayStatus(e) ===
                   "VERIFIED"
               );
 
@@ -733,6 +1061,18 @@ export default function HrOnboardingDashboard() {
         loading={sending}
         form={joinForm}
         setForm={setJoinForm}
+        managerOptions={managerOptions}
+        loadingManagers={loadingManagers}
+      />
+
+      <ReassignJoiningModal
+        open={showEditModal}
+        onClose={handleCloseEditModal}
+        onSubmit={handleUpdateJoiningPending}
+        loading={savingEdit}
+        loadingDetails={loadingEditDetails}
+        form={editJoinForm}
+        setForm={setEditJoinForm}
         managerOptions={managerOptions}
         loadingManagers={loadingManagers}
       />
