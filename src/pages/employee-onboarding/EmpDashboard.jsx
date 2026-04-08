@@ -73,6 +73,7 @@ export default function EmployeeOnboardingDashboard() {
   const submittedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "SUBMITTED").length;
   const verifiedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "VERIFIED").length;
   const joiningCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING").length;
+  const joiningPendingCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING_PENDING").length;
   const completedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "COMPLETED").length;
   const rejectedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "REJECTED").length;
 
@@ -161,6 +162,13 @@ export default function EmployeeOnboardingDashboard() {
               onClick={() => handleKpiClick("JOINING")}
             />
             <StatCard
+              title="Joining Pending"
+              value={joiningPendingCount}
+              icon={XCircle}
+              color="text-amber-600"
+              onClick={() => handleKpiClick("JOINING_PENDING")}
+            />
+            <StatCard
               title="Completed Offers"
               value={completedCount}
               icon={Users}
@@ -233,6 +241,12 @@ export default function EmployeeOnboardingDashboard() {
                 className="hover:bg-blue-500 hover:text-white"
               >
                 Joining
+              </option>
+              <option
+                value="JOINING_PENDING"
+                className="hover:bg-blue-500 hover:text-white"
+              >
+                Joining Pending
               </option>
               <option
                 value="COMPLETED"
