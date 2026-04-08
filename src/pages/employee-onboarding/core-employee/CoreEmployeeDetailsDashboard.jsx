@@ -87,6 +87,9 @@ export default function EmployeeOnboardingPage() {
   const [exportLoading, setExportLoading] = useState(false);
 
   const [exportedEmails, setExportedEmails] = useState([]);
+  const fileInputRef = useRef(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [failedRecords, setFailedRecords] = useState([]);
 
   
 
@@ -171,11 +174,82 @@ const fetchDesignations = async () => {
     console.error("Failed to fetch designations", err);
   }
 };
+const handleBulkUpload = async (event) => {
+  try {
+
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    const token = localStorage.getItem("token");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setUploadLoading(true);
+
+    const response = await fetch(
+      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/bulk-direct-upload`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData
+      }
+    );
+
+    const data = await response.json();
+
+    if (response.ok) {
+
+      // Success toast
+      if (data.success_count > 0) {
+        showStatusToast(
+          `${data.success_count} employees uploaded successfully`,
+          "success"
+        );
+      }
+
+      // Error toasts
+      if (data.failed_records?.length > 0) {
+
+        data.failed_records.forEach((item) => {
+
+          showStatusToast(
+            `Row ${item.row}: ${formatError(item.reason)}`,
+            "error"
+          );
+
+        });
+
+      }
+
+      fetchEmployees();
+
+    } else {
+
+      showStatusToast("Upload failed", "error");
+
+    }
+
+  } catch (error) {
+
+    console.error(error);
+    showStatusToast("Upload failed", "error");
+
+  } finally {
+
+    setUploadLoading(false);
+
+  }
+};
 
   useEffect(() => {
     fetchEmployees();
     fetchDepartments();
     fetchDesignations();
+    handleBulkUpload;
   }, []);
   
    /* ============================
@@ -405,8 +479,24 @@ const downloadExcel = () => {
         </p>
       </div>
 
+
       {/* Buttons Section */}
       <div className="flex gap-3">
+        {/* Upload Button */}
+  <button
+    onClick={() => fileInputRef.current.click()}
+    className="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700"
+  >
+    {uploadLoading ? "Uploading..." : "Upload Excel"}
+  </button>
+
+  <input
+    type="file"
+    accept=".xlsx, .xls"
+    ref={fileInputRef}
+    onChange={handleBulkUpload}
+    hidden
+  />
 
         <button
         onClick={handleExportPreview}
@@ -423,6 +513,33 @@ const downloadExcel = () => {
           "Export Excel"
         )}
       </button>
+      {failedRecords.length > 0 && (
+  <div className="mt-4 border rounded-lg p-4 bg-red-50">
+    <h3 className="font-semibold text-red-600 mb-2">
+      Failed Records
+    </h3>
+
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b">
+          <th className="text-left p-2">Row</th>
+          <th className="text-left p-2">Reason</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {failedRecords.map((item, index) => (
+          <tr key={index} className="border-b">
+            <td className="p-2">{item.row}</td>
+            <td className="p-2">{formatError(item.reason)}</td>
+          </tr>
+        ))}
+      </tbody>
+
+    </table>
+
+  </div>
+)}
 
       </div>
 
@@ -542,6 +659,24 @@ const downloadExcel = () => {
 /* ============================
    STAT CARD
 ============================ */
+const formatError = (error) => {
+
+  if (!error) return "Unknown error";
+
+  if (error.includes("Duplicate entry")) {
+    return "Email already exists";
+  }
+
+  if (error.includes("IntegrityError")) {
+    return "Duplicate record found";
+  }
+
+  if (error.includes("NOT NULL")) {
+    return "Required field missing";
+  }
+
+  return "Upload failed";
+};
 
 function StatCard({ title, value, icon: Icon }) {
   return (

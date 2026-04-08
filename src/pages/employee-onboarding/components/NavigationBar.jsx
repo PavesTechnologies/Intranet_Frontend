@@ -68,7 +68,7 @@ const parentNav = [
     label: "Employee Documents",
     match: [
       "/employee-onboarding/employeedocuments",
-      "/employee-onboarding/document-templates",
+      "/employee-onboarding/employee-documents-template",
       "/employee-onboarding/organization-documents",
     ],
     redirect: "/employee-onboarding/employeedocuments",
@@ -112,7 +112,7 @@ const parentNav = [
 
   const documentsNav = [
     { label: "Employee Documents", path: "/employee-onboarding/employeedocuments" },
-    { label: "Document Templates", path: "/employee-onboarding/document-templates" },
+    { label: "Document Templates", path: "/employee-onboarding/employee-documents-template" },
     { label: "Organization Documents", path: "/employee-onboarding/organization-documents" },
   ];
 
@@ -138,7 +138,7 @@ const parentNav = [
     navToRender = directoryNav;
   } else if (
     location.pathname.startsWith("/employee-onboarding/employeedocuments") ||
-    location.pathname.startsWith("/employee-onboarding/document-templates") ||
+    location.pathname.startsWith("/employee-onboarding/employee-documents-template") ||
     location.pathname.startsWith("/employee-onboarding/organization-documents")
   ) {
     navToRender = documentsNav;
