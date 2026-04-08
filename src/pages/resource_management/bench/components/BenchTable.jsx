@@ -170,21 +170,48 @@ const BenchTable = ({
                     </div>
                   </td>
                   <td className={`px-4 py-4 align-middle min-w-[200px] ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`}>
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-col gap-1">
                       {row.topSkills.length === 0 ? (
                         <span className="text-[10px] text-slate-300 italic">No expertise logged</span>
                       ) : (
-                        row.topSkills.map((skill) => (
-                          <span
-                            key={`${row.id}-${skill.name}`}
-                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${skill.stale
-                              ? "bg-amber-50 text-amber-700 border-amber-100"
-                              : "bg-slate-50 text-slate-600 border-slate-100"
-                              }`}
-                          >
-                            {skill.name}
-                          </span>
-                        ))
+                        <>
+                          <div className="flex flex-wrap gap-1">
+                            {row.topSkills.slice(0, 3).map((skill) => (
+                              <span
+                                key={`${row.id}-${skill.name}`}
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${skill.stale
+                                  ? "bg-amber-50 text-amber-700 border-amber-100"
+                                  : "bg-slate-50 text-slate-600 border-slate-100"
+                                  }`}
+                              >
+                                {skill.name}
+                              </span>
+                            ))}
+                          </div>
+                          {(row.topSkills.length > 3 || row.skills?.length > 5) && (
+                            <div className="flex flex-wrap gap-1">
+                              {row.topSkills.slice(3, 5).map((skill) => (
+                                <span
+                                  key={`${row.id}-${skill.name}`}
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${skill.stale
+                                    ? "bg-amber-50 text-amber-700 border-amber-100"
+                                    : "bg-slate-50 text-slate-600 border-slate-100"
+                                    }`}
+                                >
+                                  {skill.name}
+                                </span>
+                              ))}
+                              {row.skills?.length > 5 && (
+                                <span
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border bg-indigo-50 text-indigo-600 border-indigo-100 cursor-help"
+                                  title={row.skills.slice(5).join(", ")}
+                                >
+                                  +{row.skills.length - 5}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                     {(row.warnings.missingSkills || row.missingSkills.length > 0) && (

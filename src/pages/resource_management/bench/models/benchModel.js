@@ -55,7 +55,7 @@ export const buildSkillSummary = (resource) => {
 
   if (skills.length === 0) return [];
 
-  return skills.slice(0, 3).map((skill) => {
+  return skills.slice(0, 5).map((skill) => {
     // Attempt to find proficiency in skillGroups or fallback to resource.proficiency
     let proficiency = "Beginner";
     if (Array.isArray(resource.skillGroups)) {
@@ -153,7 +153,7 @@ export const normalizeBenchResource = (resource) => {
     ? (CATEGORY_OPTIONS.includes(normalizedCategory) ? normalizedCategory : rawCategory)
     : (rawCategory || deriveCategory({ ...resource, availability, skills, proficiency: proficiencyMap }));
 
-  const topSkills = skills.slice(0, 3).map((skill) => ({
+  const topSkills = skills.slice(0, 5).map((skill) => ({
     name: skill,
     proficiency: proficiencyMap[skill] || "No detail found",
     stale: isSkillStale(resource.skillLastUsed?.[skill]),
