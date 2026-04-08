@@ -1,53 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { Briefcase, CalendarDays, MapPin, ShieldAlert, X, Loader2 } from "lucide-react";
 import { getAgingTone, isSkillStale } from "../models/benchModel";
-import { getBenchMatches } from "../services/benchService";
+// import { getBenchMatches } from "../services/benchService";
 
 const statCardClassName = "rounded-lg border border-slate-200 bg-slate-50 px-4 py-3";
 
-const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool }) => {
-  const [liveMatches, setLiveMatches] = useState([]);
-  const [loadingMatches, setLoadingMatches] = useState(false);
-
-  useEffect(() => {
-    if (open && resource?.id) {
-      const fetchMatches = async () => {
-        setLiveMatches([]);
-        setLoadingMatches(true);
-        try {
-          const res = await getBenchMatches(resource.id);
-          const rawData = Array.isArray(res) ? res : res?.data || [];
-          
-          // The endpoint returns matches for multiple resources; filter to only show matches for THIS consultant
-          const currentRid = Number(resource.employeeId || resource.resourceId || resource.id);
-          const filteredForConsultant = rawData.filter(m => Number(m.resourceId) === currentRid);
-
-          // Deduplicate matches by demandId to prevent double-rendering
-          const uniqueMatches = [];
-          const seenIds = new Set();
-          
-          filteredForConsultant.forEach(match => {
-            const id = match.demandId || match.id;
-            if (id && !seenIds.has(id)) {
-              seenIds.add(id);
-              uniqueMatches.push(match);
-            }
-          });
-          setLiveMatches(uniqueMatches);
-        } catch (error) {
-          console.error("Match fetch error", error);
-          setLiveMatches([]);
-        } finally {
-          setLoadingMatches(false);
-        }
-      };
-      fetchMatches();
-    }
-  }, [open, resource?.id]);
+const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMatches, loadingMatches }) => {
+  console.log("Resource from Bench Drawer: ", resource);
 
   if (!open || !resource) return null;
 
   const agingTone = getAgingTone(resource.agingDays);
+
+  const matchData = (liveMatches || []).find(m => Number(m.resourceId) === Number(resource.employeeId || resource.resourceId || resource.id));
+  const resourceDemands = matchData?.demands || [];
 
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-slate-900/20 backdrop-blur-[1px]">
@@ -101,8 +67,8 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool }) => {
                     <span
                       key={`${resource.id}-${skill}`}
                       className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${stale
-                          ? "border-amber-200 bg-amber-50 text-amber-700"
-                          : "border-slate-200 bg-slate-50 text-slate-700"
+                        ? "border-amber-200 bg-amber-50 text-amber-700"
+                        : "border-slate-200 bg-slate-50 text-slate-700"
                         }`}
                     >
                       {skill} | {resource.proficiency?.[skill] || "Beginner"}
@@ -164,19 +130,19 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool }) => {
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <p className="mt-2 text-[10px] font-bold uppercase tracking-widest italic">Calculating Scores...</p>
                 </div>
-              ) : liveMatches.length === 0 ? (
+              ) : resourceDemands.length === 0 ? (
                 <div className="py-4 text-center text-[11px] font-medium text-slate-400 italic bg-slate-50 rounded-lg">
                   No high-confidence matches found
                 </div>
               ) : (
-                liveMatches.map((match, idx) => (
+                resourceDemands.map((match, idx) => (
                   <div key={match.demandId || idx} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="font-bold text-slate-900 text-[13px] uppercase tracking-tight">{match.demandName || "Unnamed Demand"}</p>
                         <div className="flex items-center gap-2">
-                          <p className={`text-[10px] font-bold uppercase tracking-widest ${match.availability === 'Available' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                            {match.availability || "Check Status"}
+                          <p className={`text-[10px] font-bold uppercase tracking-widest ${matchData?.availability === 'Available' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {matchData?.availability || "Check Status"}
                           </p>
                           <div className="h-1 w-1 rounded-full bg-slate-300" />
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -185,10 +151,10 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool }) => {
                         </div>
                       </div>
                       <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-bold ${(match.matchScore || 0) >= 70
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                          : (match.matchScore || 0) >= 40
-                            ? "border-amber-200 bg-amber-50 text-amber-700"
-                            : "border-slate-200 bg-slate-100 text-slate-700"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : (match.matchScore || 0) >= 40
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : "border-slate-200 bg-slate-100 text-slate-700"
                         }`}>
                         {match.matchScore || 0}% match
                       </span>

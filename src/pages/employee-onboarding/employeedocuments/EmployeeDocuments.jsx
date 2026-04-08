@@ -155,21 +155,43 @@ export default function EmployeeDocumentsPage() {
 
         const token = localStorage.getItem("token");
 
-        const response = await fetch(`${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/hr/employees/documents`, {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            Authorization: `Bearer ${token}`
-          }
-        });
+        const [documentsResponse, offersResponse] = await Promise.all([
+          fetch(`${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/hr/employees/documents`, {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              Authorization: `Bearer ${token}`
+            }
+          }),
+          fetch(`${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/user_id/details`, {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              Authorization: `Bearer ${token}`
+            }
+          })
+        ]);
 
-        if (!response.ok) {
+        if (!documentsResponse.ok) {
           throw new Error("Failed to fetch documents");
         }
 
-        const data = await response.json();
+        if (!offersResponse.ok) {
+          throw new Error("Failed to fetch employee access");
+        }
 
-        const formattedEmployees = data.map((emp) => ({
+        const [documentsData, offersData] = await Promise.all([
+          documentsResponse.json(),
+          offersResponse.json()
+        ]);
+
+        const allowedUserUuids = new Set(
+          (offersData || []).map((offer) => offer.user_uuid).filter(Boolean)
+        );
+
+        const formattedEmployees = documentsData
+          .filter((emp) => allowedUserUuids.has(emp.user_uuid) && emp.emp_id)
+          .map((emp) => ({
           id: emp.user_uuid,
           empId: emp.emp_id,
           name: emp.name,
@@ -272,7 +294,7 @@ export default function EmployeeDocumentsPage() {
       case "Signed":
         return "bg-emerald-100/80 text-emerald-700 border-emerald-200/50 shadow-sm";
       case "Verified":
-        return "bg-blue-100/80 text-blue-700 border-blue-200/50 shadow-sm";
+        return "bg-pink-100/80 text-pink-700 border-pink-200/50 shadow-sm";
       case "Pending":
       default:
         return "bg-amber-100/80 text-amber-700 border-amber-200/50 shadow-sm";
@@ -294,12 +316,12 @@ export default function EmployeeDocumentsPage() {
   const getCategoryIcon = (category) => {
     switch (category) {
       case "Identity":
-        return <ShieldCheck className="h-4 w-4 text-blue-500" />;
+        return <ShieldCheck className="h-4 w-4 text-pink-500" />;
       case "Work":
         return <Briefcase className="h-4 w-4 text-emerald-500" />;
       case "HR Document":
       default:
-        return <FileText className="h-4 w-4 text-indigo-500" />;
+        return <FileText className="h-4 w-4 text-violet-500" />;
     }
   };
 
@@ -362,10 +384,10 @@ export default function EmployeeDocumentsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-medium">Loading documents...</p>
+          <div className="h-10 w-10 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin"></div>
+          <p className="text-zinc-500 font-medium">Loading documents...</p>
         </div>
       </div>
     );
@@ -373,84 +395,84 @@ export default function EmployeeDocumentsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8 flex items-center justify-center font-sans">
-        <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-2xl shadow-sm border border-red-100 max-w-md text-center">
+      <div className="min-h-screen bg-zinc-50 p-4 sm:p-6 lg:p-8 flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-3xl shadow-sm border border-red-100 max-w-md text-center">
           <AlertCircle className="h-12 w-12 text-red-500" />
-          <h2 className="text-lg font-bold text-slate-900">Failed to load data</h2>
-          <p className="text-slate-500 font-medium">{error}</p>
-          <button className="mt-4 px-4 py-2 bg-indigo-50 text-indigo-600 font-semibold rounded-lg hover:bg-indigo-100 transition-colors" onClick={() => window.location.reload()}>Try Again</button>
+          <h2 className="text-lg font-bold text-zinc-900">Failed to load data</h2>
+          <p className="text-zinc-500 font-medium">{error}</p>
+          <button className="mt-4 px-4 py-2 bg-violet-50 text-violet-600 font-semibold rounded-lg hover:bg-violet-100 transition-colors" onClick={() => window.location.reload()}>Try Again</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8 font-sans transition-colors duration-300">
+    <div className="min-h-screen bg-zinc-50 p-4 sm:p-6 lg:p-8 font-sans transition-colors duration-300">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-slate-100">
+        <div className="mb-8 overflow-hidden rounded-3xl bg-white/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white/50 ring-1 ring-zinc-100">
           <div className="relative overflow-hidden px-8 py-10 sm:px-12">
-            <div className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-indigo-50/50 opacity-70 blur-3xl"></div>
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-50/50 opacity-70 blur-3xl"></div>
+            <div className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-violet-50/50 opacity-70 blur-[100px]"></div>
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-pink-50/50 opacity-70 blur-[100px]"></div>
 
             <div className="relative z-10 flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <div>
-                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+                <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl">
                   Employee Documents
                 </h1>
-                <p className="mt-3 flex items-center gap-2 text-sm text-slate-500 max-w-xl">
-                  <FileText className="h-5 w-5 text-indigo-400" />
+                <p className="mt-3 flex items-center gap-2 text-sm text-zinc-500 max-w-xl">
+                  <FileText className="h-5 w-5 text-violet-400" />
                   Manage, verify, and seamlessly organize essential documents across your entire workforce.
                 </p>
               </div>
 
               <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
                 <div className="relative group">
-                  <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-500 opacity-0 blur transition duration-500 group-focus-within:opacity-20"></div>
+                  <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-violet-500 to-pink-500 opacity-0 blur transition duration-500 group-focus-within:opacity-20"></div>
                   <div className="relative flex items-center">
-                    <Search className="absolute left-3.5 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-indigo-500" />
+                    <Search className="absolute left-3.5 h-4 w-4 text-zinc-400 transition-colors group-focus-within:text-violet-500" />
                     <input
                       type="text"
                       placeholder="Search name or ID..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="h-11 w-full rounded-xl border-0 bg-slate-50/80 pl-10 pr-4 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 backdrop-blur-sm transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:w-64"
+                      className="h-11 w-full rounded-2xl border-0 bg-zinc-50/50 backdrop-blur-md pl-10 pr-4 text-sm text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-200 backdrop-blur-sm transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-violet-600 sm:w-64"
                     />
                   </div>
                 </div>
 
                 <div className="relative group">
-                  <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition duration-500 group-focus-within:opacity-20"></div>
+                  <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-pink-500 to-violet-500 opacity-0 blur transition duration-500 group-focus-within:opacity-20"></div>
                   <div className="relative flex items-center">
-                    <Filter className="absolute left-3.5 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-indigo-500" />
+                    <Filter className="absolute left-3.5 h-4 w-4 text-zinc-400 transition-colors group-focus-within:text-violet-500" />
                     <select
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="h-11 w-full appearance-none rounded-xl border-0 bg-slate-50/80 pl-10 pr-10 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 backdrop-blur-sm transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:w-48"
+                      className="h-11 w-full appearance-none rounded-2xl border-0 bg-zinc-50/50 backdrop-blur-md pl-10 pr-10 text-sm text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-200 backdrop-blur-sm transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-violet-600 sm:w-48"
                     >
                       <option value="">All Categories</option>
                       {categoryOptions.map((option) => (
                         <option key={option} value={option}>{option}</option>
                       ))}
                     </select>
-                    <ChevronDown className="absolute right-3.5 h-4 w-4 text-slate-400 pointer-events-none transition-colors group-hover:text-slate-600" />
+                    <ChevronDown className="absolute right-3.5 h-4 w-4 text-zinc-400 pointer-events-none transition-colors group-hover:text-zinc-600" />
                   </div>
                 </div>
 
                 <div className="relative group">
-                  <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 opacity-0 blur transition duration-500 group-focus-within:opacity-20"></div>
+                  <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-violet-500 to-rose-500 opacity-0 blur transition duration-500 group-focus-within:opacity-20"></div>
                   <div className="relative flex items-center">
-                    <Briefcase className="absolute left-3.5 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-indigo-500" />
+                    <Briefcase className="absolute left-3.5 h-4 w-4 text-zinc-400 transition-colors group-focus-within:text-violet-500" />
                     <select
                       value={departmentFilter}
                       onChange={(e) => setDepartmentFilter(e.target.value)}
-                      className="h-11 w-full appearance-none rounded-xl border-0 bg-slate-50/80 pl-10 pr-10 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 backdrop-blur-sm transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:w-52"
+                      className="h-11 w-full appearance-none rounded-2xl border-0 bg-zinc-50/50 backdrop-blur-md pl-10 pr-10 text-sm text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-200 backdrop-blur-sm transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-violet-600 sm:w-52"
                     >
                       <option value="">All Departments</option>
                       {departmentOptions.map((option) => (
                         <option key={option} value={option}>{option}</option>
                       ))}
                     </select>
-                    <ChevronDown className="absolute right-3.5 h-4 w-4 text-slate-400 pointer-events-none transition-colors group-hover:text-slate-600" />
+                    <ChevronDown className="absolute right-3.5 h-4 w-4 text-zinc-400 pointer-events-none transition-colors group-hover:text-zinc-600" />
                   </div>
                 </div>
               </div>
@@ -460,12 +482,12 @@ export default function EmployeeDocumentsPage() {
 
         <div className="space-y-6">
           {visibleDepartmentGroups.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white/50 py-20 text-center shadow-sm backdrop-blur-sm">
-              <div className="rounded-full bg-slate-100 p-4 mb-4">
-                <AlertCircle className="h-8 w-8 text-slate-400" />
+            <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-zinc-300 bg-white/50 py-20 text-center shadow-sm backdrop-blur-sm">
+              <div className="rounded-full bg-zinc-100 p-4 mb-4">
+                <AlertCircle className="h-8 w-8 text-zinc-400" />
               </div>
-              <h3 className="text-base font-semibold text-slate-900">No employees found</h3>
-              <p className="mt-2 text-sm text-slate-500 max-w-sm">We couldn't find any employees matching your current search and filter criteria.</p>
+              <h3 className="text-base font-semibold text-zinc-900">No employees found</h3>
+              <p className="mt-2 text-sm text-zinc-500 max-w-sm">We couldn't find any employees matching your current search and filter criteria.</p>
             </div>
           ) : (
             visibleDepartmentGroups.map(({ departmentName, groupCategoryFilter, visibleEmployees }) => {
@@ -477,18 +499,18 @@ export default function EmployeeDocumentsPage() {
               return (
                 <section
                   key={departmentName}
-                  className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200"
+                  className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-zinc-200"
                 >
-                  <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-6 py-5 sm:px-8">
+                  <div className="border-b border-zinc-100 bg-gradient-to-r from-zinc-50/50 to-white/50 backdrop-blur-md px-6 py-5 sm:px-8">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div>
                         <div className="flex items-center gap-3">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-3xl bg-violet-50 text-violet-600 ring-1 ring-violet-100">
                             <Briefcase className="h-5 w-5" />
                           </div>
                           <div>
-                            <h2 className="text-lg font-bold text-slate-900">{departmentName}</h2>
-                            <p className="text-sm text-slate-500">
+                            <h2 className="text-lg font-bold text-zinc-900">{departmentName}</h2>
+                            <p className="text-sm text-zinc-500">
                               {visibleEmployees.length} {visibleEmployees.length === 1 ? "candidate" : "candidates"} • {totalDocs} {totalDocs === 1 ? "document" : "documents"}
                             </p>
                           </div>
@@ -497,7 +519,7 @@ export default function EmployeeDocumentsPage() {
 
                       <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
                         <div className="relative flex items-center">
-                          <Filter className="absolute left-3.5 h-4 w-4 text-slate-400" />
+                          <Filter className="absolute left-3.5 h-4 w-4 text-zinc-400" />
                           <select
                             value={groupCategoryFilter}
                             onChange={(e) =>
@@ -506,14 +528,14 @@ export default function EmployeeDocumentsPage() {
                                 [departmentName]: e.target.value
                               }))
                             }
-                            className="h-11 w-full appearance-none rounded-xl border-0 bg-slate-50 pl-10 pr-10 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:w-56"
+                            className="h-11 w-full appearance-none rounded-2xl border-0 bg-zinc-50 pl-10 pr-10 text-sm text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-200 transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-violet-600 sm:w-56"
                           >
                             <option value="">All In This Department</option>
                             {categoryOptions.map((option) => (
                               <option key={option} value={option}>{option}</option>
                             ))}
                           </select>
-                          <ChevronDown className="absolute right-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
+                          <ChevronDown className="absolute right-3.5 h-4 w-4 text-zinc-400 pointer-events-none" />
                         </div>
                       </div>
                     </div>
@@ -527,17 +549,17 @@ export default function EmployeeDocumentsPage() {
                       return (
                         <div
                           key={emp.id}
-                          className={`overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition-all duration-300 ${isExpanded ? "shadow-lg ring-indigo-100/50" : "hover:shadow-md hover:ring-slate-300"
+                          className={`overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-zinc-200 transition-all duration-300 ${isExpanded ? "shadow-lg ring-violet-100/50" : "hover:shadow-md hover:ring-zinc-300"
                             }`}
                         >
                           <div
-                            className="flex cursor-pointer items-center justify-between px-6 py-5 transition-colors hover:bg-slate-50/80"
+                            className="flex cursor-pointer items-center justify-between px-6 py-5 transition-colors hover:bg-zinc-50/50 backdrop-blur-md"
                             onClick={() => setExpandedEmp(isExpanded ? null : emp.id)}
                           >
                             <div className="flex items-center gap-5">
                               <div className="relative">
-                                <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-indigo-200 to-blue-200 opacity-60 blur-sm"></div>
-                                <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 to-white text-lg font-bold text-indigo-600 shadow-sm ring-1 ring-indigo-100">
+                                <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-violet-200 to-pink-200 opacity-60 blur-sm"></div>
+                                <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-violet-50 to-white text-lg font-bold text-violet-600 shadow-sm ring-1 ring-violet-100">
                                   {emp.name
                                     .split(" ")
                                     .slice(0, 2)
@@ -546,25 +568,25 @@ export default function EmployeeDocumentsPage() {
                                 </div>
                               </div>
                               <div>
-                                <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                                <h3 className="text-base font-semibold text-zinc-900 flex items-center gap-2">
                                   {emp.name}
-                                  <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-200/50">
+                                  <span className="rounded-md bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600 ring-1 ring-inset ring-zinc-200/50">
                                     {emp.empId}
                                   </span>
                                 </h3>
-                                <p className="mt-0.5 text-sm text-slate-500 font-medium">{emp.department}</p>
+                                <p className="mt-0.5 text-sm text-zinc-500 font-medium">{emp.department}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-5">
                               <div className="hidden sm:flex flex-col items-end">
-                                <span className="text-sm font-medium text-slate-700">
+                                <span className="text-sm font-medium text-zinc-700">
                                   {documentsToShow.length}
                                 </span>
-                                <span className="text-xs text-slate-500">
+                                <span className="text-xs text-zinc-500">
                                   {documentsToShow.length === 1 ? "Document" : "Documents"}
                                 </span>
                               </div>
-                              <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isExpanded ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-400 group-hover:bg-slate-100"}`}>
+                              <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isExpanded ? "bg-violet-50 text-violet-600" : "bg-zinc-50 text-zinc-400 group-hover:bg-zinc-100"}`}>
                                 {isExpanded ? (
                                   <ChevronUp className="h-5 w-5" />
                                 ) : (
@@ -576,11 +598,11 @@ export default function EmployeeDocumentsPage() {
 
                           <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                             <div className="overflow-hidden">
-                              <div className="border-t border-slate-100 bg-slate-50/50">
+                              <div className="border-t border-zinc-100 bg-zinc-50/50">
                                 <div className="overflow-x-auto px-6 py-5">
                                   <table className="w-full text-left text-sm whitespace-nowrap">
                                     <thead>
-                                      <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                      <tr className="border-b border-zinc-200 text-xs font-semibold uppercase tracking-wider text-zinc-500">
                                         <th scope="col" className="pb-3 pl-2 pr-4">Document Details</th>
                                         <th scope="col" className="px-4 pb-3">Type</th>
                                         <th scope="col" className="px-4 pb-3">Category</th>
@@ -589,25 +611,25 @@ export default function EmployeeDocumentsPage() {
                                         <th scope="col" className="pb-3 pl-4 pr-2 text-right">Actions</th>
                                       </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-100">
+                                    <tbody className="divide-y divide-zinc-100">
                                       {documentsToShow.map((doc) => (
                                         <tr key={doc.id} className="group transition-colors hover:bg-white">
                                           <td className="py-4 pl-2 pr-4">
                                             <div className="flex items-center gap-3">
-                                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 ring-1 ring-slate-200/50 group-hover:bg-white group-hover:shadow-sm transition-all">
+                                              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-zinc-100 ring-1 ring-zinc-200/50 group-hover:bg-white group-hover:shadow-sm transition-all">
                                                 {getCategoryIcon(doc.category)}
                                               </div>
-                                              <span className="font-semibold text-slate-900">{doc.docName}</span>
+                                              <span className="font-semibold text-zinc-900">{doc.docName}</span>
                                             </div>
                                           </td>
-                                          <td className="px-4 py-4 text-slate-600 font-medium">{doc.type}</td>
-                                          <td className="px-4 py-4 text-slate-600">
+                                          <td className="px-4 py-4 text-zinc-600 font-medium">{doc.type}</td>
+                                          <td className="px-4 py-4 text-zinc-600">
                                             <div className="flex items-center gap-2">
-                                              <span className="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+                                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-400"></span>
                                               {doc.category}
                                             </div>
                                           </td>
-                                          <td className="px-4 py-4 text-slate-500">{doc.updated}</td>
+                                          <td className="px-4 py-4 text-zinc-500">{doc.updated}</td>
                                           <td className="px-4 py-4">
                                             <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide ${getStatusBadge(doc.status)}`}>
                                               {getStatusIcon(doc.status)}
@@ -619,11 +641,11 @@ export default function EmployeeDocumentsPage() {
                                               <button
                                                 onClick={() => viewDocument(doc.fileUrl, doc.id)}
                                                 disabled={loadingDoc === doc.id}
-                                                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition-all hover:bg-indigo-50 hover:text-indigo-700 hover:ring-indigo-300 disabled:opacity-50"
+                                                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-white px-3 text-sm font-medium text-zinc-700 shadow-sm ring-1 ring-inset ring-zinc-300 transition-all hover:bg-violet-50 hover:text-violet-700 hover:ring-violet-300 disabled:opacity-50"
                                               >
                                                 {loadingDoc === doc.id ? (
                                                   <>
-                                                    <div className="h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                                                    <div className="h-4 w-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
                                                     Loading...
                                                   </>
                                                 ) : (
@@ -635,7 +657,7 @@ export default function EmployeeDocumentsPage() {
                                               </button>
                                               <button
                                                 onClick={() => deleteDocument(emp.id, doc.id)}
-                                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm ring-1 ring-inset ring-slate-300 transition-all hover:bg-red-50 hover:text-red-600 hover:ring-red-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-zinc-400 shadow-sm ring-1 ring-inset ring-zinc-300 transition-all hover:bg-red-50 hover:text-red-600 hover:ring-red-300 focus:outline-none focus:ring-2 focus:ring-red-500"
                                                 title="Delete Document"
                                               >
                                                 <Trash2 className="h-4 w-4" />

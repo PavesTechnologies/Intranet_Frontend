@@ -3,7 +3,8 @@ import { AlertTriangle, Eye, Edit2, Check, X } from "lucide-react";
 import { CATEGORY_OPTIONS } from "../constants/benchConstants";
 import { getAgingTone } from "../models/benchModel";
 import { updateStatusResource } from "../services/benchService";
-import { toast } from "react-hot-toast";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { toast } from "react-toastify";
 
 const SUB_STATES = [
   "READY",
@@ -48,6 +49,7 @@ const BenchTable = ({
   onQuickAllocate,
   onCategoryChange,
   onRefresh,
+  loading,
 }) => {
   const [editingRowId, setEditingRowId] = useState(null);
   const [editStatus, setEditStatus] = useState("");
@@ -89,7 +91,7 @@ const BenchTable = ({
       });
       toast.success("Status updated successfully");
       setEditingRowId(null);
-      
+
       onRefresh?.();
     } catch (error) {
       toast.error("Failed to update status");
@@ -107,7 +109,7 @@ const BenchTable = ({
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50">
             <tr className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
-              <th className="w-12 px-5 py-4 text-left">
+              {/* <th className="w-12 px-5 py-4 text-left">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -117,7 +119,7 @@ const BenchTable = ({
                   onChange={(event) => onToggleAll(event.target.checked)}
                   className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
-              </th>
+              </th> */}
               <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Consultant Details</th>
               <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Core Expertise</th>
               <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
@@ -128,7 +130,15 @@ const BenchTable = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-20 text-center">
+                  <div className="flex justify-center items-center">
+                    <LoadingSpinner text="Loading Resources..." />
+                  </div>
+                </td>
+              </tr>
+            ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-6 py-20 text-center text-[13px] font-medium text-slate-400 italic">
                   {emptyState}
@@ -136,7 +146,7 @@ const BenchTable = ({
               </tr>
             ) : null}
 
-            {rows.map((row) => {
+            {!loading && rows.map((row) => {
               const agingTone = getAgingTone(row.agingDays);
 
               return (
@@ -145,14 +155,14 @@ const BenchTable = ({
                   onClick={() => !editingRowId ? onView(row) : undefined}
                   className={`group transition-all ${!editingRowId ? "cursor-pointer hover:bg-indigo-50/30" : ""} ${activeRowId === row.id ? "bg-indigo-50/50" : ""} ${editingRowId === row.id ? "bg-blue-50/30" : ""}`}
                 >
-                  <td className={`px-5 py-4 align-middle ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`} onClick={(event) => event.stopPropagation()}>
+                  {/* <td className={`px-5 py-4 align-middle ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`} onClick={(event) => event.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selectedRows.includes(row.id)}
                       onChange={(event) => onToggleRow(row.id, event.target.checked)}
                       className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                     />
-                  </td>
+                  </td> */}
                   <td className={`px-4 py-4 align-middle ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`}>
                     <div className="flex flex-col">
                       <span className="text-[13px] font-bold text-slate-900 leading-tight tracking-tight">{row.name}</span>
@@ -247,47 +257,47 @@ const BenchTable = ({
                   </td>
                   <td className="px-5 py-4 align-middle text-center" onClick={(event) => event.stopPropagation()}>
                     <div className="flex justify-center gap-2">
-                       {editingRowId === row.id ? (
-                          <>
-                             <button
-                               type="button"
-                               onClick={(e) => handleSaveStatus(row.id, e)}
-                               disabled={isSaving}
-                               title="Save Status"
-                               className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-emerald-700 transition-all hover:bg-emerald-50 disabled:opacity-50"
-                             >
-                                <Check className="h-4 w-4" />
-                             </button>
-                             <button
-                               type="button"
-                               onClick={handleCancelEdit}
-                               disabled={isSaving}
-                               title="Cancel Edit"
-                               className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-rose-700 transition-all hover:bg-rose-50 disabled:opacity-50"
-                             >
-                                <X className="h-4 w-4" />
-                             </button>
-                          </>
-                       ) : (
-                          <>
-                             <button
-                               type="button"
-                               onClick={() => onView(row)}
-                               title="View Details"
-                               className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700"
-                             >
-                               <Eye className="h-4 w-4" />
-                             </button>
-                             <button
-                               type="button"
-                               onClick={(e) => handleEditClick(row, e)}
-                               title="Edit Status"
-                               className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-blue-600 transition-all hover:bg-blue-50 hover:text-blue-700"
-                             >
-                               <Edit2 className="h-4 w-4" />
-                             </button>
-                          </>
-                       )}
+                      {editingRowId === row.id ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => handleSaveStatus(row.id, e)}
+                            disabled={isSaving}
+                            title="Save Status"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-emerald-700 transition-all hover:bg-emerald-50 disabled:opacity-50"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelEdit}
+                            disabled={isSaving}
+                            title="Cancel Edit"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-rose-700 transition-all hover:bg-rose-50 disabled:opacity-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onView(row)}
+                            title="View Details"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleEditClick(row, e)}
+                            title="Edit Status"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-blue-600 transition-all hover:bg-blue-50 hover:text-blue-700"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

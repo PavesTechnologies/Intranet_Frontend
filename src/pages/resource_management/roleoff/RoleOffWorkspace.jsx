@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { getResources } from "@/pages/resource_management/services/roleOffService";
 import KPISection from "./KPISection";
 import RoleOffTable from "./RoleOffTable";
 import BulkActionBar from "./BulkActionBar";
@@ -29,6 +28,8 @@ import {
   dlReject,
   getPendingRoleOffs,
   getPendingRoleOffsForDM,
+  getResources,
+  getRoleOffProjectKPI,
   pmCancelRoleOff,
   rmApprove,
   rmReject,
@@ -433,6 +434,46 @@ const buildPmDemandStyleKpis = (allocations, roleOffRequests, selectedRows) => {
   ];
 };
 
+const normalizePmKpis = (kpiPayload, fallbackMetrics = []) => {
+  const source = extractObjectPayload(kpiPayload);
+  if (!source) return fallbackMetrics;
+
+  return [
+    {
+      label: "Active Allocations",
+      count: getNumericMetricValue(
+        source,
+        ["activeAllocations", "totalActiveAllocations", "activeAllocationCount", "activeCount", "active", "totalAllocations"],
+        fallbackMetrics[0]?.count ?? 0,
+      ),
+    },
+    {
+      label: "Pending Role-Offs",
+      count: getNumericMetricValue(
+        source,
+        ["pendingRoleOffs", "pendingRoleOffCount", "pendingRequests", "pendingRequestCount", "pending", "pendingCount"],
+        fallbackMetrics[1]?.count ?? 0,
+      ),
+    },
+    {
+      label: "High Impact Allocations",
+      count: getNumericMetricValue(
+        source,
+        ["highImpactAllocations", "highImpactAllocationCount", "highImpact", "atRisk", "atRiskAllocations", "highRiskCount"],
+        fallbackMetrics[2]?.count ?? 0,
+      ),
+    },
+    {
+      label: "Total RoleOff",
+      count: getNumericMetricValue(
+        source,
+        ["totalRoleOff", "totalRoleOffs", "roleOffCount", "totalRoleOffCount", "totalRequests", "totalCount"],
+        fallbackMetrics[3]?.count ?? 0,
+      ),
+    },
+  ];
+};
+
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
 
 const getApiMessage = (payload, fallback) => {
@@ -512,6 +553,33 @@ const extractArrayPayload = (payload) => {
   return [];
 };
 
+const extractObjectPayload = (payload) => {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  if (payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)) {
+    if (payload.data.data && typeof payload.data.data === "object" && !Array.isArray(payload.data.data)) {
+      return payload.data.data;
+    }
+
+    return payload.data;
+  }
+
+  return payload;
+};
+
+const getNumericMetricValue = (source, keys, fallback = 0) => {
+  for (const key of keys) {
+    const value = source?.[key];
+    if (value !== undefined && value !== null && value !== "" && !Number.isNaN(Number(value))) {
+      return Number(value);
+    }
+  }
+
+  return fallback;
+};
+
 const createBulkPanelRecord = (records = []) => {
   const validRecords = Array.isArray(records) ? records : [];
   const count = validRecords.length;
@@ -583,6 +651,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   const [loading, setLoading] = useState(false);
   const [allocations, setAllocations] = useState([]);
   const [roleOffRequests, setRoleOffRequests] = useState([]);
+  const [projectKpiData, setProjectKpiData] = useState(null);
   const [selectedRows, setSelectedRows] = useState([]);
   const [filterPanelCollapsed, setFilterPanelCollapsed] = useState(true);
   const [filters, setFilters] = useState({
@@ -610,28 +679,45 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   const loadPmResources = useCallback(async (isActiveRef = () => true) => {
     if (mode !== "pm") {
       setAllocations([]);
+      setProjectKpiData(null);
       return;
     }
 
     if (!projectId) {
       setAllocations([]);
+      setProjectKpiData(null);
       return;
     }
 
     setLoading(true);
     try {
-      const response = await getResources(projectId);
+      const [resourcesResult, kpiResult] = await Promise.allSettled([
+        getResources(projectId),
+        getRoleOffProjectKPI(projectId),
+      ]);
       if (!isActiveRef()) return;
 
-      const nextAllocations = Array.isArray(response?.data)
-        ? response.data.map(mapResourceToAllocation)
-        : [];
+      if (resourcesResult.status === "fulfilled") {
+        const nextAllocations = Array.isArray(resourcesResult.value?.data)
+          ? resourcesResult.value.data.map(mapResourceToAllocation)
+          : [];
+        setAllocations(nextAllocations);
+      } else {
+        setAllocations([]);
+        toast.error("Failed to load role-off resources");
+      }
 
-      setAllocations(nextAllocations);
+      if (kpiResult.status === "fulfilled") {
+        setProjectKpiData(kpiResult.value);
+      } else {
+        setProjectKpiData(null);
+        console.error("Failed to load role-off project KPI", kpiResult.reason);
+      }
     } catch (error) {
       if (!isActiveRef()) return;
 
       setAllocations([]);
+      setProjectKpiData(null);
       toast.error("Failed to load role-off resources");
     } finally {
       if (isActiveRef()) setLoading(false);
@@ -716,9 +802,13 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     () => buildKpis(mode, scopedAllocations, scopedRoleOffRequests, selectedRows),
     [mode, scopedAllocations, scopedRoleOffRequests, selectedRows],
   );
-  const pmKpis = useMemo(
+  const pmKpiFallback = useMemo(
     () => buildPmDemandStyleKpis(scopedAllocations, scopedRoleOffRequests, selectedRows),
     [scopedAllocations, scopedRoleOffRequests, selectedRows],
+  );
+  const pmKpis = useMemo(
+    () => normalizePmKpis(projectKpiData, pmKpiFallback),
+    [projectKpiData, pmKpiFallback],
   );
 
   const pmTabCounts = useMemo(() => ({

@@ -27,7 +27,13 @@ import DocumentsPage from "./DocumentsPage";
 export default function EmployeeProfileView() {
   const {employee_uuid} = useParams();
 
-  const [activeTab, setActiveTab] = useState("about");
+  const [activeTab, setActiveTab] = useState("profile");
+  const [docTabConfig, setDocTabConfig] = useState({ folder: "education", search: "" });
+
+  const handleTabChange = (tab, config = null) => {
+    setActiveTab(tab);
+    if (config) setDocTabConfig(config);
+  };
   const [profileImg, setProfileImg] = useState(null);
   const profileRef = useRef(null);
   const [employee, setEmployee] = useState(null);
@@ -36,7 +42,6 @@ export default function EmployeeProfileView() {
   const [identityTypes, setIdentityTypes] = useState([]);
 
    // ✅ FETCH ALL DATA ONCE (core + hr + department + designation in parallel)
-  useEffect(() => {
     const fetchAllData = async () => {
       try {
         const token = localStorage.getItem("token");
@@ -96,7 +101,7 @@ export default function EmployeeProfileView() {
               { headers: { Authorization: `Bearer ${token}` } }
             );
             if (idTypesRes.ok) {
-              const idTypesData = await idTypesRes.json();
+              const idTypesData = await idTypesRes.ok ? await idTypesRes.json() : [];
               setIdentityTypes(Array.isArray(idTypesData) ? idTypesData : []);
             }
           } catch (e) {
@@ -110,6 +115,7 @@ export default function EmployeeProfileView() {
       }
     };
 
+  useEffect(() => {
     if (employee_uuid) fetchAllData();
   }, [employee_uuid, BASE_URL]);
 
@@ -140,7 +146,7 @@ export default function EmployeeProfileView() {
     designation: employee.resolved_designation_name || employee.designation_uuid,
     email: employee.work_email,
     phone: employee.contact_number,
-    office: employee.location,
+    office: employee.location || "Not Updated",
     empId: employee.employee_id,
     department: employee.resolved_department_name || employee.department_uuid,
     reportingManager: employee.reporting_manager_uuid || "N/A",
@@ -295,10 +301,10 @@ export default function EmployeeProfileView() {
         <div className="lg:col-span-2 xl:col-span-3 min-w-0 overflow-hidden">
 
           <div className="border-b border-indigo-100 mb-6 flex gap-1 sm:gap-6 text-sm overflow-x-auto scrollbar-hide">
-            <Tab active={activeTab === "about"} onClick={() => setActiveTab("about")}>About</Tab>
-            <Tab active={activeTab === "profile"} onClick={() => setActiveTab("profile")}>Profile</Tab>
-            <Tab active={activeTab === "job"} onClick={() => setActiveTab("job")}>Job</Tab>
-            <Tab active={activeTab === "documents"} onClick={() => setActiveTab("documents")}>Documents</Tab>
+            <Tab active={activeTab === "about"} onClick={() => handleTabChange("about")}>About</Tab>
+            <Tab active={activeTab === "profile"} onClick={() => handleTabChange("profile")}>Profile</Tab>
+            <Tab active={activeTab === "job"} onClick={() => handleTabChange("job")}>Job</Tab>
+            <Tab active={activeTab === "documents"} onClick={() => handleTabChange("documents")}>Documents</Tab>
           </div>
 
           {activeTab === "about" && (
@@ -321,10 +327,14 @@ export default function EmployeeProfileView() {
           )}
 
           {activeTab === "profile" && (
-            <ProfilePage activeTab={activeTab} 
-            user_uuid={employee.user_uuid}
-            coreData={employee}
-            hrData={hrData} />
+            <ProfilePage 
+              activeTab={activeTab} 
+              user_uuid={employee.user_uuid}
+              coreData={employee}
+              hrData={hrData}
+              refreshData={fetchAllData} 
+              onTabChange={handleTabChange}
+            />
           )}
           {activeTab === "job" && (
             <JobPage user_uuid={employee.user_uuid}
@@ -332,8 +342,13 @@ export default function EmployeeProfileView() {
             hrData={hrData} />
           )}
           {activeTab === "documents" && (
-            <DocumentsPage employee={mappedEmployee} user_uuid={employee.user_uuid}
-            hrData={hrData} identityTypes={identityTypes} />
+            <DocumentsPage 
+              employee={mappedEmployee} 
+              user_uuid={employee.user_uuid}
+              hrData={hrData} 
+              identityTypes={identityTypes} 
+              config={docTabConfig} 
+            />
            )}
 
         </div>

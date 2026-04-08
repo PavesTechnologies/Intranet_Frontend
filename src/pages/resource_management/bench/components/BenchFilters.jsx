@@ -9,11 +9,94 @@ const BenchFilters = ({
   onReset,
   onApply,
   onClose,
+  isDashboardPortal = false,
 }) => {
   if (!open) return null;
 
   const labelClassName = "text-[10px] font-black text-slate-400 uppercase tracking-tighter ml-0.5 mb-1.5 block";
   const selectClassName = "w-full text-[11px] font-semibold border-slate-200 rounded-lg h-9 bg-slate-50/50 focus:ring-indigo-600 shadow-sm transition-all outline-none";
+
+  const FilterBody = (
+    <div className={`space-y-4 ${isDashboardPortal ? '' : 'p-5 flex-1 max-h-[60vh] overflow-y-auto custom-scrollbar pb-8'}`}>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <label className={labelClassName}>Category Type</label>
+          <select value={filters.category} onChange={(event) => onChange("category", event.target.value)} className={selectClassName}>
+            <option value="">All Categories</option>
+            {filterOptions.categories.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label className={labelClassName}>Geography</label>
+          <select value={filters.location} onChange={(event) => onChange("location", event.target.value)} className={selectClassName}>
+            <option value="">All Locations</option>
+            {filterOptions.locations.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <label className={labelClassName}>Availability Band</label>
+          <select value={filters.availability} onChange={(event) => onChange("availability", event.target.value)} className={selectClassName}>
+            <option value="">All Ranges</option>
+            <option value="0-25">0-25%</option>
+            <option value="26-50">26-50%</option>
+            <option value="51-75">51-75%</option>
+            <option value="76-100">76-100%</option>
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label className={labelClassName}>Seniority Level</label>
+          <select value={filters.experience} onChange={(event) => onChange("experience", event.target.value)} className={selectClassName}>
+            <option value="">All Bands</option>
+            <option value="0-3">0-3 Years</option>
+            <option value="4-7">4-7 Years</option>
+            <option value="8-12">8-12 Years</option>
+            <option value="13+">13+ Years</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <label className={labelClassName}>Bench Aging</label>
+          <select value={filters.aging} onChange={(event) => onChange("aging", event.target.value)} className={selectClassName}>
+            <option value="">All Ranges</option>
+            <option value="0-15">0-15 days</option>
+            <option value="16-30">16-30 days</option>
+            <option value="31+">31+ days</option>
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label className={labelClassName}>Cost Exposure</label>
+          <select value={filters.cost} onChange={(event) => onChange("cost", event.target.value)} className={selectClassName}>
+            <option value="">All Ranges</option>
+            <option value="0-1500">0-1500</option>
+            <option value="1501-3000">1501-3000</option>
+            <option value="3001+">3001+</option>
+          </select>
+        </div>
+      </div>
+
+      {!isDashboardPortal && (
+        <div className="pt-2 border-t border-slate-100">
+          <p className="text-[10px] font-medium text-slate-400 italic leading-relaxed">
+            Adjust recruitment criteria to isolate specific bench availability gaps.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
+  if (isDashboardPortal) return FilterBody;
 
   return (
     <div className="flex flex-col w-full bg-white rounded-xl overflow-hidden font-sans">
@@ -29,81 +112,7 @@ const BenchFilters = ({
       </div>
 
       {/* Body */}
-      <div className="p-5 space-y-4 overflow-y-auto flex-1 max-h-[60vh] custom-scrollbar pb-8">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <label className={labelClassName}>Category Type</label>
-            <select value={filters.category} onChange={(event) => onChange("category", event.target.value)} className={selectClassName}>
-              <option value="">All Categories</option>
-              {filterOptions.categories.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className={labelClassName}>Geography</label>
-            <select value={filters.location} onChange={(event) => onChange("location", event.target.value)} className={selectClassName}>
-              <option value="">All Locations</option>
-              {filterOptions.locations.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <label className={labelClassName}>Availability Band</label>
-            <select value={filters.availability} onChange={(event) => onChange("availability", event.target.value)} className={selectClassName}>
-              <option value="">All Ranges</option>
-              <option value="0-25">0-25%</option>
-              <option value="26-50">26-50%</option>
-              <option value="51-75">51-75%</option>
-              <option value="76-100">76-100%</option>
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className={labelClassName}>Seniority Level</label>
-            <select value={filters.experience} onChange={(event) => onChange("experience", event.target.value)} className={selectClassName}>
-              <option value="">All Bands</option>
-              <option value="0-3">0-3 Years</option>
-              <option value="4-7">4-7 Years</option>
-              <option value="8-12">8-12 Years</option>
-              <option value="13+">13+ Years</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <label className={labelClassName}>Bench Aging</label>
-            <select value={filters.aging} onChange={(event) => onChange("aging", event.target.value)} className={selectClassName}>
-              <option value="">All Ranges</option>
-              <option value="0-15">0-15 days</option>
-              <option value="16-30">16-30 days</option>
-              <option value="31+">31+ days</option>
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className={labelClassName}>Cost Exposure</label>
-            <select value={filters.cost} onChange={(event) => onChange("cost", event.target.value)} className={selectClassName}>
-              <option value="">All Ranges</option>
-              <option value="0-1500">0-1500</option>
-              <option value="1501-3000">1501-3000</option>
-              <option value="3001+">3001+</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="pt-2 border-t border-slate-100">
-          <p className="text-[10px] font-medium text-slate-400 italic leading-relaxed">
-            Adjust recruitment criteria to isolate specific bench availability gaps.
-          </p>
-        </div>
-      </div>
+      {FilterBody}
 
       {/* Footer */}
       <div className="shrink-0 p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">

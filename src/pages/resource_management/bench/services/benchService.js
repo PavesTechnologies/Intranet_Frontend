@@ -89,10 +89,9 @@ export const updateStatusResource = async (payload) => {
 /**
  * Fetches demand matches and scores for a specific benched resource
  */
-export const getBenchMatches = async (resourceId) => {
+export const getBenchMatches = async () => {
   try {
     const response = await axios.get(`${BASE_URL}/api/bench/matches`, {
-      params: { id: resourceId },
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -138,6 +137,37 @@ export const quickAllocate = async (resourceId, demandId, allocationPercentage =
     return response.data;
   } catch (error) {
     console.error("Quick allocation failed", error);
+    throw error;
+  }
+};
+
+/**
+ * Fetches the bench pool report for reporting and dashboards
+ */
+export const getBenchPoolReport = async () => {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/reports/bench-pool`, {
+      headers: getAuthHeaders(),
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch bench pool report", error);
+    throw error;
+  }
+};
+
+/**
+ * Exports the bench pool report as a CSV/Blob file
+ */
+export const exportBenchPoolReport = async () => {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/reports/bench-pool/export`, {
+      headers: getAuthHeaders(),
+      responseType: "blob",
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to export bench pool report", error);
     throw error;
   }
 };

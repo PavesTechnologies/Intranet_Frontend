@@ -38,6 +38,8 @@ import RMRoleOffPage from "./pages/resource_management/pages/roleoff/rm.js";
 import DMRoleOffPage from "./pages/resource_management/pages/roleoff/dm.js";
 import BenchPage from "./pages/resource_management/bench/pages/BenchPage.jsx";
 import RoleOffDashboard from "./pages/resource_management/pages/roleoff/RoleOffDashboard.jsx";
+import BenchPoolDashboard from "./pages/resource_management/bench/pages/BenchPoolDashboard.jsx";
+import UtilizationPerformanceDashboard from "./pages/resource_management/bench/pages/UtilizationPerformanceDashboard.jsx";
 
 // Timesheets
 
@@ -112,6 +114,7 @@ import OnboardingSummary from "./pages/employee-onboarding/summary-page/Onboardi
 import DepartmentsMappingDashboard from "./pages/employee-onboarding/hr-configuration/departments/DepartmentsMappingDashboard.jsx";
 import DepartmentsList from "./pages/employee-onboarding/hr-configuration/departments/departmentsList/DepartmentsList.jsx";
 import DesignationsList from "./pages/employee-onboarding/hr-configuration/departments/designationsList/DesignationsList.jsx";
+import WeeklyJoiningDashboard from "./pages/employee-onboarding/weekly-joining-report-dashboard/WeeklyJoiningDashboard.jsx";
 
 
 import EmployeeDocuments from "./pages/employee-onboarding/employeedocuments/EmployeeDocuments.jsx";
@@ -483,6 +486,8 @@ const AppRoutes = () => {
             <Route path="onboarding-summary" element={<OnboardingSummary />} />
             <Route path="analytics" element={<HeadcountDemographicsPage />} />
 
+            <Route path="weekly-joining-report-dashboard" element={< WeeklyJoiningDashboard/>} />
+
             <Route path="offer/:user_uuid" element={<ViewEmpDetails />} />
             <Route path ="offer-preview/:offerId" element ={<OfferPreview/>} />
             <Route path ="final-offer-preview/:offerId" element={<FinalOfferPreview/>} />
@@ -765,6 +770,30 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path="/resource-management/bench"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+                <BenchPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resource-management/bench/report"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+                <BenchPoolDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resource-management/bench/utilization-performance"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+                <UtilizationPerformanceDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/resource-management/client-details/:clientId"
             element={
               <ProtectedRoute
@@ -858,14 +887,7 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/resource-management/bench"
-            element={
-              <ProtectedRoute allowedRoles={["RESOURCE-MANAGER"]}>
-                <BenchPage />
-              </ProtectedRoute>
-            }
-          />
+
           <Route
             path="/resource-management/roleoff/report"
             element={

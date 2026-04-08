@@ -73,6 +73,13 @@ const parentNav = [
     ],
     redirect: "/employee-onboarding/employeedocuments",
   },
+  {
+    label: "Weekly Workforce Summary",
+    match: [
+      "/employee-onboarding/weekly-joining-report-dashboard"
+    ],
+    redirect: "/employee-onboarding/weekly-joining-report-dashboard",
+  }
 ];
 
   /* ================= MAIN TASK NAV ================= */
@@ -121,6 +128,11 @@ const parentNav = [
     { label: "Core Employee", path: "/employee-onboarding/core-employee" },
   ];
 
+  const weeklyJoiningDashboardNav = [
+    { label: "Weekly Joining Dashboard", path: "/employee-onboarding/weekly-joining-report-dashboard" },
+  ];
+
+
   /* ================= SELECT NAV TO RENDER ================= */
 
   let navToRender = null;
@@ -153,7 +165,13 @@ const parentNav = [
     location.pathname.startsWith("/employee-onboarding/core-employee")
   ) {
     navToRender = hrverificationNav;
-  } else {
+  } 
+  else if (
+    location.pathname.startsWith("/employee-onboarding/weekly-joining-report-dashboard")
+  ) {
+    navToRender = weeklyJoiningDashboardNav;
+  }
+  else {
     navToRender = taskNav;
   }
 
