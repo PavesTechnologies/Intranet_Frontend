@@ -192,6 +192,17 @@ const AllocationBar = memo(function AllocationBar({
   const durationDays = daysBetween(parseDate(block.startDate), parseDate(block.endDate));
   const width = Math.max(durationDays * dayWidth, 4);
 
+  const [hoverX, setHoverX] = useState(null);
+
+  const handleMouseMove = useCallback((e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoverX(e.clientX - rect.left);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setHoverX(null);
+  }, []);
+
   const isAvailability = block.isAvailability || block.allocation === 0;
   const barColor = isAvailability
     ? "bg-slate-50 border-slate-200 border-dashed"
@@ -204,40 +215,52 @@ const AllocationBar = memo(function AllocationBar({
 
   return (
     <div
-      className={cn(
-        "absolute rounded-md border flex flex-col justify-center px-1.5 sm:px-2 transition-all group/bar shadow-sm overflow-hidden",
-        barColor,
-        hoverColor,
-        isAvailability ? "cursor-default text-slate-400" : "cursor-pointer text-white",
-      )}
+      className="absolute group/bar hover:z-[100]"
       style={{
         left: `${startOffset}px`,
         width: `${width}px`,
         ...style,
       }}
-      onClick={() => !isAvailability && onResourceClick && onResourceClick(resource)}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
     >
-      <div className="flex items-center gap-1 sm:gap-2 truncate max-w-full">
-        {block.tentative && <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />}
-        <span className={cn(
-          "text-[7px] sm:text-[9px] font-sans font-bold truncate whitespace-nowrap",
-          !isAvailability && "drop-shadow-[0_1px_1px_rgba(0,0,0,0.1)]"
-        )}>
-          {isAvailability ? "Available" : `${block.allocation}%`} {block.tentative ? "(Proposed)" : ""}
-        </span>
+      <div
+        className={cn(
+          "w-full h-full rounded-md border flex flex-col justify-center px-1.5 sm:px-2 transition-all shadow-sm overflow-hidden",
+          barColor,
+          hoverColor,
+          isAvailability ? "cursor-default text-slate-400" : "cursor-pointer text-white",
+        )}
+        onClick={() => !isAvailability && onResourceClick && onResourceClick(resource)}
+      >
+        <div className="flex items-center gap-1 sm:gap-2 truncate max-w-full">
+          {block.tentative && <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />}
+          <span className={cn(
+            "text-[7px] sm:text-[9px] font-sans font-bold truncate whitespace-nowrap",
+            !isAvailability && "drop-shadow-[0_1px_1px_rgba(0,0,0,0.1)]"
+          )}>
+            {isAvailability ? "Available" : `${block.allocation}%`} {block.tentative ? "(Proposed)" : ""}
+          </span>
+        </div>
+        {width > 40 && (
+          <p className={cn(
+            "text-[6px] sm:text-[7px] font-sans font-medium truncate leading-none mt-0.5 whitespace-nowrap",
+            !isAvailability ? "text-white/90" : "text-slate-400"
+          )}>
+            {projectName}
+          </p>
+        )}
       </div>
-      {width > 40 && (
-        <p className={cn(
-          "text-[6px] sm:text-[7px] font-sans font-medium truncate leading-none mt-0.5 whitespace-nowrap",
-          !isAvailability ? "text-white/90" : "text-slate-400"
-        )}>
-          {projectName}
-        </p>
-      )}
 
       {/* Tooltip Overlay (Desktop) */}
       {!isAvailability && (
-        <div className="absolute hidden group-hover/bar:block bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none">
+        <div 
+          className="absolute hidden group-hover/bar:block bottom-full mb-2 pointer-events-none z-[110] transition-all duration-75 easelinear will-change-transform"
+          style={{
+            left: hoverX !== null ? `${hoverX}px` : "50%",
+            transform: "translateX(-50%)"
+          }}
+        >
           <div className="bg-white p-2 shadow-xl border border-border rounded-md min-w-[140px] text-slate-900">
             <p className="text-[10px] font-bold border-b pb-1 mb-1">{projectName}</p>
             <div className="space-y-0.5">
@@ -301,7 +324,7 @@ const ResourceRow = memo(function ResourceRow({
 
   return (
     <div
-      className="relative flex items-center group/row border-b border-slate-50 hover:bg-slate-50/10 transition-colors shrink-0"
+      className="relative flex items-center group/row border-b border-slate-50 hover:bg-slate-50/10 transition-colors shrink-0 hover:z-50"
       style={{
         height: `${rowHeight}px`,
         width: `${totalDays * dayWidth}px`,
@@ -366,6 +389,87 @@ const ResourceRow = memo(function ResourceRow({
             />
           );
         })}
+      </div>
+    </div>
+  );
+});
+const RoleProjectBar = memo(function RoleProjectBar({ block, left, width, top, height }) {
+  const [hoverX, setHoverX] = useState(null);
+
+  const handleMouseMove = useCallback((e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoverX(e.clientX - rect.left);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setHoverX(null);
+  }, []);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: `${left}px`,
+        width: `${width}px`,
+        top: `${top}px`,
+        height: `${height}px`,
+      }}
+      className="group hover:z-[100]"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      <button
+        type="button"
+        className={cn(
+          "w-full h-full rounded shadow-sm border transition-colors flex items-center px-3 overflow-hidden",
+          getBarColor(block.allocation, block.tentative),
+          getBarHoverColor(block.allocation, block.tentative),
+        )}
+      >
+        {width > 60 && (
+          <span
+            className={cn(
+              "text-[11px] font-medium truncate block leading-none",
+              block.tentative ? "text-slate-600" : "text-white",
+            )}
+          >
+            {block.project}
+          </span>
+        )}
+      </button>
+
+      <div 
+        className="absolute hidden group-hover:block bottom-full mb-2 pointer-events-none transition-all duration-75 easelinear will-change-transform z-[110]"
+        style={{
+          left: hoverX !== null ? `${hoverX}px` : "50%",
+          transform: "translateX(-50%)"
+        }}
+      >
+        <div className="bg-white p-3 shadow-2xl border border-slate-200 rounded-lg min-w-[240px]">
+          <div className="space-y-2">
+            <p className="text-xs font-heading font-bold text-slate-900 border-b pb-1.5">
+              {block.project}
+            </p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              <span className="text-slate-500 text-[10px]">Team Size</span>
+              <span className="font-semibold text-slate-900 text-[10px] text-right">
+                {block.resources.length} people
+              </span>
+              <span className="text-slate-500 text-[10px]">Period</span>
+              <span className="font-semibold text-slate-900 text-[10px] text-right">
+                {block.startDate} to {block.endDate}
+              </span>
+            </div>
+            <div className="pt-1.5 border-t">
+              <p className="text-[9px] text-slate-400 uppercase font-black mb-1">
+                Assigned Personnel
+              </p>
+              <p className="text-[10px] text-slate-600 line-clamp-2 leading-relaxed">
+                {block.resources.join(", ")}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -452,67 +556,14 @@ function RoleAggregateRow({
         const width = Math.max(durationDaysVal * dayWidth, 4);
 
         return (
-          <div
+          <RoleProjectBar
             key={i}
-            style={{
-              position: "absolute",
-              left: `${left}px`,
-              width: `${width}px`,
-              top: `${i * TRACK_HEIGHT + ROW_PADDING / 2.5}px`,
-              height: `${TRACK_HEIGHT - 6}px`,
-            }}
-            className="group hover:z-[100]"
-          >
-            <button
-              type="button"
-              className={cn(
-                "w-full h-full rounded shadow-sm border transition-colors flex items-center px-3 overflow-hidden",
-                getBarColor(block.allocation, block.tentative),
-                getBarHoverColor(block.allocation, block.tentative),
-              )}
-            >
-              {width > 60 && (
-                <span
-                  className={cn(
-                    "text-[11px] font-medium truncate block leading-none",
-                    block.tentative ? "text-slate-600" : "text-white",
-                  )}
-                >
-                  {block.project}
-                </span>
-              )}
-            </button>
-
-            <div className="absolute hidden group-hover:block bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none">
-              <div className="bg-white p-3 shadow-2xl border border-slate-200 rounded-lg min-w-[240px]">
-                <div className="space-y-2">
-                  <p className="text-xs font-heading font-bold text-slate-900 border-b pb-1.5">
-                    {block.project}
-                  </p>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                    <span className="text-slate-500 text-[10px]">
-                      Team Size
-                    </span>
-                    <span className="font-semibold text-slate-900 text-[10px] text-right">
-                      {block.resources.length} people
-                    </span>
-                    <span className="text-slate-500 text-[10px]">Period</span>
-                    <span className="font-semibold text-slate-900 text-[10px] text-right">
-                      {block.startDate} to {block.endDate}
-                    </span>
-                  </div>
-                  <div className="pt-1.5 border-t">
-                    <p className="text-[9px] text-slate-400 uppercase font-black mb-1">
-                      Assigned Personnel
-                    </p>
-                    <p className="text-[10px] text-slate-600 line-clamp-2 leading-relaxed">
-                      {block.resources.join(", ")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+            block={block}
+            left={left}
+            width={width}
+            top={i * TRACK_HEIGHT + ROW_PADDING / 2.5}
+            height={TRACK_HEIGHT - 6}
+          />
         );
       })}
     </div>
@@ -615,10 +666,45 @@ export function AvailabilityTimeline({
     return d;
   }, [baseDate, config.totalDaysBefore, zoom]);
 
-  const endDate = useMemo(
-    () => addDays(baseDate, config.totalDaysAfter),
-    [baseDate, config.totalDaysAfter],
-  );
+  const endDate = useMemo(() => {
+    let maxDate = addDays(baseDate, config.totalDaysAfter);
+
+    if (filteredResources && filteredResources.length > 0) {
+      filteredResources.forEach((res) => {
+        const blocks = [
+          ...(res.allocationTimeline || []),
+          ...(res.allocations || []),
+          ...(res.benchPeriods || []),
+        ];
+        blocks.forEach((block) => {
+          if (block.endDate) {
+            const blockEnd = parseDate(block.endDate);
+            if (blockEnd > maxDate) {
+              maxDate = blockEnd;
+            }
+          }
+        });
+      });
+    }
+
+    if (zoom === "week") {
+      const day = maxDate.getDay();
+      const diff = day === 0 ? 0 : 7 - day;
+      maxDate.setDate(maxDate.getDate() + diff);
+    } else {
+      maxDate = new Date(
+        maxDate.getFullYear(),
+        maxDate.getMonth() + 1,
+        0,
+        0,
+        0,
+        0,
+        0
+      );
+    }
+
+    return maxDate;
+  }, [baseDate, config.totalDaysAfter, filteredResources, zoom]);
   const totalDays = daysBetween(startDate, endDate);
 
   const todayOffset = useMemo(() => {
