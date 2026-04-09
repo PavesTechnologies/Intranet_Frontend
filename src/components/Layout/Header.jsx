@@ -29,7 +29,7 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-40">
+    <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-[60]">
       <div className="flex items-center justify-between">
         {/* Left Section with Toggle */}
         <div className="flex items-center gap-4">

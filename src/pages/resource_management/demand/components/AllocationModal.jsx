@@ -12,6 +12,19 @@ const toDateInputValue = (date) => {
     const matchedDate = String(date).trim().match(/^(\d{4}-\d{2}-\d{2})/);
     return matchedDate ? matchedDate[1] : "";
 };
+const getTodayLocalDate = () => {
+    const today = new Date();
+    return new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+        .toISOString()
+        .split("T")[0];
+};
+
+const getAllocationStartDate = (demandStartDate) => {
+    const today = getTodayLocalDate();
+    const demandDate = toDateInputValue(demandStartDate);
+
+    return demandDate && demandDate > today ? demandDate : today;
+};
 
 const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
     const [resources, setResources] = useState([]);
@@ -22,7 +35,7 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
     const [formData, setFormData] = useState({
         resourceId: [],
         demandId: demand?.demandId || demand?.id || '',
-        allocationStartDate: toDateInputValue(demand?.demandStartDate),
+        allocationStartDate: getAllocationStartDate(demand?.demandStartDate),
         allocationEndDate: toDateInputValue(demand?.demandEndDate),
         allocationPercentage: demand?.allocationPercentage || 100,
         allocationStatus: 'ACTIVE',
@@ -81,7 +94,7 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
             setFormData(prev => ({
                 ...prev,
                 demandId: demand?.demandId || demand?.id || '',
-                allocationStartDate: toDateInputValue(demand?.demandStartDate),
+                allocationStartDate: getAllocationStartDate(demand?.demandStartDate),
                 allocationEndDate: toDateInputValue(demand?.demandEndDate),
                 resourceId: [],
                 skipValidation: false
@@ -330,6 +343,8 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
                             </label>
                             <Input
                                 type="date"
+                                min={new Date().toISOString().split('T')[0]}
+                                max={demand?.demandEndDate}
                                 value={formData.allocationStartDate}
                                 onChange={(e) => setFormData({ ...formData, allocationStartDate: e.target.value })}
                                 className={cn("h-10 rounded-xl border-slate-200 font-bold text-slate-900 text-xs", errors.allocationStartDate && "border-rose-500")}
@@ -342,6 +357,8 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
                             </label>
                             <Input
                                 type="date"
+                                min={formData.allocationStartDate}
+                                max={demand?.demandEndDate}
                                 value={formData.allocationEndDate}
                                 onChange={(e) => setFormData({ ...formData, allocationEndDate: e.target.value })}
                                 className={cn("h-10 rounded-xl border-slate-200 font-bold text-slate-900 text-xs", errors.allocationEndDate && "border-rose-500")}
