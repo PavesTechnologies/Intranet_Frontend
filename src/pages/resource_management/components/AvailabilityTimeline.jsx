@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect, memo } from "react";
+import { createPortal } from "react-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -152,7 +153,7 @@ const TimelineHeader = memo(function TimelineHeader({
 }) {
   return (
     <div
-      className="sticky top-0 h-10 border-b bg-white/95 backdrop-blur-sm"
+      className="sticky top-0 h-10 border-b bg-white/95 backdrop-blur-sm z-40"
       style={{ width: `${totalDays * dayWidth}px` }}
     >
       {ticks.map((tick, i) => (
@@ -192,15 +193,19 @@ const AllocationBar = memo(function AllocationBar({
   const durationDays = daysBetween(parseDate(block.startDate), parseDate(block.endDate));
   const width = Math.max(durationDays * dayWidth, 4);
 
-  const [hoverX, setHoverX] = useState(null);
+  const [hoverPos, setHoverPos] = useState(null);
 
   const handleMouseMove = useCallback((e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setHoverX(e.clientX - rect.left);
+    const isCloseToTop = e.clientY < 120;
+    setHoverPos({ 
+      x: e.clientX, 
+      y: isCloseToTop ? e.clientY + 20 : e.clientY - 12,
+      isCloseToTop
+    });
   }, []);
 
   const handleMouseLeave = useCallback(() => {
-    setHoverX(null);
+    setHoverPos(null);
   }, []);
 
   const isAvailability = block.isAvailability || block.allocation === 0;
@@ -253,12 +258,13 @@ const AllocationBar = memo(function AllocationBar({
       </div>
 
       {/* Tooltip Overlay (Desktop) */}
-      {!isAvailability && (
+      {!isAvailability && hoverPos && typeof document !== "undefined" && createPortal(
         <div 
-          className="absolute hidden group-hover/bar:block bottom-full mb-2 pointer-events-none z-[110] transition-all duration-75 easelinear will-change-transform"
+          className="fixed pointer-events-none z-[99999] transition-all duration-75 easelinear will-change-transform"
           style={{
-            left: hoverX !== null ? `${hoverX}px` : "50%",
-            transform: "translateX(-50%)"
+            left: `${hoverPos.x}px`,
+            top: `${hoverPos.y}px`,
+            transform: hoverPos.isCloseToTop ? "translate(-50%, 0)" : "translate(-50%, -100%)"
           }}
         >
           <div className="bg-white p-2 shadow-xl border border-border rounded-md min-w-[140px] text-slate-900">
@@ -274,7 +280,8 @@ const AllocationBar = memo(function AllocationBar({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -394,15 +401,19 @@ const ResourceRow = memo(function ResourceRow({
   );
 });
 const RoleProjectBar = memo(function RoleProjectBar({ block, left, width, top, height }) {
-  const [hoverX, setHoverX] = useState(null);
+  const [hoverPos, setHoverPos] = useState(null);
 
   const handleMouseMove = useCallback((e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setHoverX(e.clientX - rect.left);
+    const isCloseToTop = e.clientY < 180; // Tooltip is taller here (~120px + padding)
+    setHoverPos({ 
+      x: e.clientX, 
+      y: isCloseToTop ? e.clientY + 20 : e.clientY - 12,
+      isCloseToTop
+    });
   }, []);
 
   const handleMouseLeave = useCallback(() => {
-    setHoverX(null);
+    setHoverPos(null);
   }, []);
 
   return (
@@ -438,39 +449,43 @@ const RoleProjectBar = memo(function RoleProjectBar({ block, left, width, top, h
         )}
       </button>
 
-      <div 
-        className="absolute hidden group-hover:block bottom-full mb-2 pointer-events-none transition-all duration-75 easelinear will-change-transform z-[110]"
-        style={{
-          left: hoverX !== null ? `${hoverX}px` : "50%",
-          transform: "translateX(-50%)"
-        }}
-      >
-        <div className="bg-white p-3 shadow-2xl border border-slate-200 rounded-lg min-w-[240px]">
-          <div className="space-y-2">
-            <p className="text-xs font-heading font-bold text-slate-900 border-b pb-1.5">
-              {block.project}
-            </p>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-              <span className="text-slate-500 text-[10px]">Team Size</span>
-              <span className="font-semibold text-slate-900 text-[10px] text-right">
-                {block.resources.length} people
-              </span>
-              <span className="text-slate-500 text-[10px]">Period</span>
-              <span className="font-semibold text-slate-900 text-[10px] text-right">
-                {block.startDate} to {block.endDate}
-              </span>
-            </div>
-            <div className="pt-1.5 border-t">
-              <p className="text-[9px] text-slate-400 uppercase font-black mb-1">
-                Assigned Personnel
+      {hoverPos && typeof document !== "undefined" && createPortal(
+        <div 
+          className="fixed pointer-events-none transition-all duration-75 easelinear will-change-transform z-[99999]"
+          style={{
+            left: `${hoverPos.x}px`,
+            top: `${hoverPos.y}px`,
+            transform: hoverPos.isCloseToTop ? "translate(-50%, 0)" : "translate(-50%, -100%)"
+          }}
+        >
+          <div className="bg-white p-3 shadow-2xl border border-slate-200 rounded-lg min-w-[240px]">
+            <div className="space-y-2">
+              <p className="text-xs font-heading font-bold text-slate-900 border-b pb-1.5">
+                {block.project}
               </p>
-              <p className="text-[10px] text-slate-600 line-clamp-2 leading-relaxed">
-                {block.resources.join(", ")}
-              </p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                <span className="text-slate-500 text-[10px]">Team Size</span>
+                <span className="font-semibold text-slate-900 text-[10px] text-right">
+                  {block.resources.length} people
+                </span>
+                <span className="text-slate-500 text-[10px]">Period</span>
+                <span className="font-semibold text-slate-900 text-[10px] text-right">
+                  {block.startDate} to {block.endDate}
+                </span>
+              </div>
+              <div className="pt-1.5 border-t">
+                <p className="text-[9px] text-slate-400 uppercase font-black mb-1">
+                  Assigned Personnel
+                </p>
+                <p className="text-[10px] text-slate-600 line-clamp-2 leading-relaxed">
+                  {block.resources.join(", ")}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 });
@@ -938,7 +953,7 @@ export function AvailabilityTimeline({
           <div className="flex flex-1 overflow-hidden min-h-0">
             {/* Sidebar */}
             <div className="shrink-0 border-r bg-white w-[120px] sm:w-[180px] lg:w-[240px] flex flex-col shadow-sm">
-              <div className="sticky top-0 h-10 border-b bg-muted/40 flex items-center px-2 sm:px-4 shrink-0">
+              <div className="sticky top-0 z-40 h-10 border-b bg-muted/40 flex items-center px-2 sm:px-4 shrink-0">
                 <span className="text-[8px] sm:text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-wider truncate">
                   {viewMode === "resource" ? "Resource" : "Role Category"}
                 </span>
