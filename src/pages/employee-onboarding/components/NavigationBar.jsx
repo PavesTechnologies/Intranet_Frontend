@@ -134,11 +134,8 @@ const parentNav = [
 
   const hrverificationNav = [
     { label: "HR Verification", path: "/employee-onboarding/hr" },
-<<<<<<< HEAD
-    { label: "Background Check", path: "/employee-onboarding/hr/backgroundcheck" },
-=======
     { label: "Background Check", path: "/employee-onboarding/backgroundcheck" },
->>>>>>> e6d4dc88e56ad8bf81e7ea313afe8af244dcb00a
+
     { label: "Core Employee", path: "/employee-onboarding/core-employee" },
 
   ];
