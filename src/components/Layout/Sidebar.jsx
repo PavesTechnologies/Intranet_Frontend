@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Handshake,
   UserCog2,
+  AlertCircle,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -19,6 +20,7 @@ const navigation = [
   { name: "Leave Management", href: "/leave-management", icon: PlaneTakeoff },
   { name: "Timesheets", href: "/timesheets", icon: Clock },
   { name: "Calendar", href: "/calendar", icon: Calendar },
+  { name: "Employee Exit", href: "/employee-exit", icon: AlertCircle },
 ];
 
 const userManagementSubmenu = [
@@ -115,6 +117,10 @@ const employeeOnboardingSubmenu = [
       },
     ],
   },
+  {
+    label: "Employee Exit Process",
+    to: "/employee-exit",
+  }
 ];
 
 const Sidebar = ({ isCollapsed }) => {
