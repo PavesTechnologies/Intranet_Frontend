@@ -29,7 +29,7 @@ buildFrontendPipeline([
     // ── Optional ──────────────────────────────────────────────────────────────
     cloudfrontDomain: 'd15j2ej3bear0q.cloudfront.net',
     sonarProjectKey : 'intranet-frontend',
-    nodeVersion     : 'NodeJS-20',
+    nodeVersion     : 'NodeJS-22',
     awsRegion       : 'ap-south-1',
     buildDir        : 'dist',
 ])
