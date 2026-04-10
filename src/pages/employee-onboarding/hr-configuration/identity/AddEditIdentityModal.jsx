@@ -9,7 +9,7 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
   const [saving, setSaving] = useState(false);
 
   const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   useEffect(() => {
     if (editData) {
@@ -38,24 +38,40 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
       let savedItem;
 
       if (editData) {
-        await axios.put(`${BASE_URL}/identity/${editData.identity_type_uuid}`, payload, {
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        });
+        await axios.put(
+          `${BASE_URL}/identity/${editData.identity_type_uuid}`,
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
         toast.success("Identity type updated");
         savedItem = payload;
       } else {
         const res = await axios.post(`${BASE_URL}/identity`, payload, {
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         });
         toast.success("Identity type created");
-        savedItem = { ...payload, identity_type_uuid: res.data.identity_type_uuid || crypto.randomUUID() };
+        savedItem = {
+          ...payload,
+          identity_type_uuid:
+            res.data.identity_type_uuid || crypto.randomUUID(),
+        };
       }
 
       onSuccess(savedItem); // ✅ Update table immediately
       onClose();
     } catch (error) {
       console.error("Save identity failed:", error.response?.data);
-      toast.error(error.response?.data?.detail || "Failed to save identity type");
+      toast.error(
+        error.response?.data?.detail || "Failed to save identity type",
+      );
     } finally {
       setSaving(false);
     }
@@ -83,7 +99,11 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
         />
 
         <label className="flex items-center gap-2 mb-4">
-          <input type="checkbox" checked={isActive} onChange={() => setIsActive(!isActive)} />
+          <input
+            type="checkbox"
+            checked={isActive}
+            onChange={() => setIsActive(!isActive)}
+          />
           Active
         </label>
 
@@ -104,7 +124,9 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
             active:translate-y-[1px]
             disabled:opacity-60 disabled:cursor-not-allowed
             flex items-center justify-center gap-2 ${
-              saving || !name.trim() ? "bg-gray-400" : "bg-blue-700 hover:bg-blue-800"
+              saving || !name.trim()
+                ? "bg-gray-400"
+                : "bg-blue-700 hover:bg-blue-800"
             }`}
           >
             {saving ? "Saving..." : "Save"}

@@ -5,27 +5,25 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 
 export default function FinalOfferPreview() {
-
   const { offerId } = useParams();
   const [pdfUrl, setPdfUrl] = useState(null);
 
   useEffect(() => {
     const fetchPreview = async () => {
-
       const token = localStorage.getItem("token");
 
       const res = await axios.get(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/${offerId}/final-preview`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${offerId}/final-preview`,
         {
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
           },
-          responseType: "blob"
-        }
+          responseType: "blob",
+        },
       );
 
       const url = window.URL.createObjectURL(
-        new Blob([res.data], { type: "application/pdf" })
+        new Blob([res.data], { type: "application/pdf" }),
       );
 
       setPdfUrl(url);

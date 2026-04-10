@@ -30,7 +30,7 @@ const UserProfile = () => {
   const token = localStorage.getItem("token");
 
   const axiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_PMS_BASE_URL,
+    baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
     headers: { "Content-Type": "application/json" },
   });
 
@@ -73,7 +73,8 @@ const UserProfile = () => {
   const toggleExpand = (id, type) => {
     if (type === "project")
       setExpandedProjects(expandedProjects === id ? null : id);
-    if (type === "story") setExpandedStories(expandedStories === id ? null : id);
+    if (type === "story")
+      setExpandedStories(expandedStories === id ? null : id);
     if (type === "task") setExpandedTasks(expandedTasks === id ? null : id);
   };
 
@@ -252,13 +253,20 @@ const UserProfile = () => {
 
   // Filtered lists
   const filteredProjects = projects.filter(
-    (p) => projectFilter === "ALL" || p.status === projectFilter
+    (p) => projectFilter === "ALL" || p.status === projectFilter,
   );
   const filteredStories = stories.filter(
-    (s) => storyFilter === "ALL" || s.status === storyFilter || s.statusName === storyFilter || s.status?.name === storyFilter
+    (s) =>
+      storyFilter === "ALL" ||
+      s.status === storyFilter ||
+      s.statusName === storyFilter ||
+      s.status?.name === storyFilter,
   );
   const filteredTasks = tasks.filter(
-    (t) => taskFilter === "ALL" || t.status === taskFilter || t.statusName === taskFilter
+    (t) =>
+      taskFilter === "ALL" ||
+      t.status === taskFilter ||
+      t.statusName === taskFilter,
   );
 
   return (

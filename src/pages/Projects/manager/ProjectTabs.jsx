@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { lazy, Suspense } from "react";
-import {ArrowLeft} from "lucide-react"
+import { ArrowLeft } from "lucide-react";
 
 import Summary from "../Summary/Summary.jsx";
 import BacklogAndSprints from "./BacklogAndSprints";
@@ -15,8 +15,12 @@ import RiskRegisterPage from "./riskManagement/RiskRegisterPage";
 import RiskHealthModal from "./riskManagement/RiskHealthModal.jsx";
 
 const ProjectDemandManagement = lazy(() => import("./ProjectDemandManagement"));
-const ProjectConfigurations = lazy(() => import("./project/ProjectConfigurations"));
-const ProjectRoleOffManagement = lazy(() => import("./ProjectRoleOffManagement"));
+const ProjectConfigurations = lazy(
+  () => import("./project/ProjectConfigurations"),
+);
+const ProjectRoleOffManagement = lazy(
+  () => import("./ProjectRoleOffManagement"),
+);
 
 const ProjectTabs = () => {
   const { projectId } = useParams();
@@ -47,10 +51,9 @@ const ProjectTabs = () => {
     const tab = params.get("tab");
 
     if (tab === "test-management") {
-      navigate(
-        `/projects/${projectId}?tab=test-management/overview`,
-        { replace: true }
-      );
+      navigate(`/projects/${projectId}?tab=test-management/overview`, {
+        replace: true,
+      });
     }
   }, [location.search, navigate, projectId]);
 
@@ -58,11 +61,14 @@ const ProjectTabs = () => {
   useEffect(() => {
     if (projectId && token) {
       axios
-        .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
+        .get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           },
-        })
+        )
         .then((res) => {
           setProjectName(res.data.name);
           setNotFound(false);
@@ -79,7 +85,7 @@ const ProjectTabs = () => {
       setShowRiskModal(true);
     }
   }, [projectId]);
-  console.log(projectName)
+  console.log(projectName);
 
   // Render tab content
   const renderTabContent = () => {
@@ -109,29 +115,41 @@ const ProjectTabs = () => {
     }
     if (selectedTab === "demand-management") {
       return (
-        <Suspense fallback={<div className="p-12 text-center text-slate-400">Loading Demand Management...</div>}>
-          <ProjectDemandManagement
-            projectId={pid}
-            projectName={projectName}
-          />
+        <Suspense
+          fallback={
+            <div className="p-12 text-center text-slate-400">
+              Loading Demand Management...
+            </div>
+          }
+        >
+          <ProjectDemandManagement projectId={pid} projectName={projectName} />
         </Suspense>
       );
     }
 
     if (selectedTab === "roleoff-management") {
       return (
-        <Suspense fallback={<div className="p-12 text-center text-slate-400">Loading Role-Off Management...</div>}>
-          <ProjectRoleOffManagement
-            projectId={pid}
-            projectName={projectName}
-          />
+        <Suspense
+          fallback={
+            <div className="p-12 text-center text-slate-400">
+              Loading Role-Off Management...
+            </div>
+          }
+        >
+          <ProjectRoleOffManagement projectId={pid} projectName={projectName} />
         </Suspense>
       );
     }
 
     if (selectedTab === "configurations") {
       return (
-        <Suspense fallback={<div className="p-12 text-center text-slate-400">Loading Configurations...</div>}>
+        <Suspense
+          fallback={
+            <div className="p-12 text-center text-slate-400">
+              Loading Configurations...
+            </div>
+          }
+        >
           <ProjectConfigurations projectId={pid} />
         </Suspense>
       );
@@ -171,10 +189,8 @@ const ProjectTabs = () => {
     <div>
       {/* Header */}
       <header className="bg-white mb-4 px-4 py-3 flex items-center justify-between border-b">
-
         {/* LEFT SIDE */}
         <div className="flex items-center gap-6">
-
           {/* Project Name */}
           <button
             onClick={() => navigate("/projects")}
@@ -184,13 +200,10 @@ const ProjectTabs = () => {
           </button>
 
           {/* Back Button */}
-         
-
         </div>
 
         {/* Tabs */}
-       <div className="flex items-center gap-4">
-          
+        <div className="flex items-center gap-4">
           {/* Round Back Button (Positioned right before the Summary tab) */}
           <button
             onClick={() => navigate(-1)}
@@ -202,9 +215,7 @@ const ProjectTabs = () => {
 
           {/* Tab Navigation */}
           <Navbar logo={null} navItems={navItemsWithActive} />
-          
         </div>
-
       </header>
       {/* Tab Content */}
       <div>{renderTabContent()}</div>

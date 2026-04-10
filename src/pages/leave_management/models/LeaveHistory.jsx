@@ -8,7 +8,7 @@
 // import { XCircle } from "lucide-react";
 // import CancellationModal from "./CancellationModal";
 
-// const BASE_URL = import.meta.env.VITE_BASE_URL;
+// const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 // const LeaveHistory = ({ employeeId, refreshKey }) => {
 //   const [leaves, setLeaves] = useState([]);
@@ -503,7 +503,7 @@
 // import { XCircle } from "lucide-react";
 // import CancellationModal from "./CancellationModal";
 
-// const BASE_URL = import.meta.env.VITE_BASE_URL;
+// const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 // const LeaveHistory = ({ employeeId, refreshKey }) => {
 //   const [leaves, setLeaves] = useState([]);
@@ -957,7 +957,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import { XCircle } from "lucide-react";
 import CancellationModal from "./CancellationModal";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const LeaveHistory = ({ employeeId, refreshKey, setRefreshKey }) => {
   const [leaves, setLeaves] = useState([]);

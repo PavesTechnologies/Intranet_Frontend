@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { set } from "date-fns";
 import CarryForwardTrigger from "./models/CarryForwardTrigger";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const HRManageTools = ({ employeeId }) => {
   const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);

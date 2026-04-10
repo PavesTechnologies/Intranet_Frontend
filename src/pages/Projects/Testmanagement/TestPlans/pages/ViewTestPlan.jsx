@@ -13,10 +13,10 @@ const ViewTestPlan = ({ projectId, planId, onClose }) => {
       setLoading(true);
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/test-plans/${planId}`,
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/test-plans/${planId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
         setPlan(res.data);
       } catch (err) {

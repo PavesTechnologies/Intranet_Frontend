@@ -1,6 +1,13 @@
 import React, { useState, useEffect, Fragment, useMemo } from "react";
 import axios from "axios";
-import { X, Lock, CalendarDays, AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import {
+  X,
+  Lock,
+  CalendarDays,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+} from "lucide-react";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { toast } from "react-toastify";
@@ -10,9 +17,8 @@ import { useAuth } from "../../../contexts/AuthContext";
 import DateRangePicker from "./DateRangePicker";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const GENDER_BASED_IDS = ["L-ML", "L-PL"];
-
 
 // --- Helper 1: Maps leave balances to dropdown options ---
 // export function mapLeaveBalancesToDropdown(balances, leaveTypes) {
@@ -61,20 +67,35 @@ const GENDER_BASED_IDS = ["L-ML", "L-PL"];
 function formatDateForDisplay(dateStr) {
   if (!dateStr) return "";
   const date = new Date(`${dateStr}T00:00:00`);
-  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 // --- Helper 3: Day calculation ---
-function countWeekdaysBetween(fromDate, toDate, halfDayConfig, holidays = [], includeNonWorkingDays = false) {
+function countWeekdaysBetween(
+  fromDate,
+  toDate,
+  halfDayConfig,
+  holidays = [],
+  includeNonWorkingDays = false,
+) {
   if (!fromDate || !toDate || !halfDayConfig) return 0;
 
   const holidaySet = new Set(
-    holidays.filter(Boolean).map((h) => {
-      if (h instanceof Date && !isNaN(h))
-        return new Date(h.getTime() - h.getTimezoneOffset() * 60000).toISOString().split("T")[0];
-      if (typeof h === "string") return h;
-      return null;
-    }).filter(Boolean)
+    holidays
+      .filter(Boolean)
+      .map((h) => {
+        if (h instanceof Date && !isNaN(h))
+          return new Date(h.getTime() - h.getTimezoneOffset() * 60000)
+            .toISOString()
+            .split("T")[0];
+        if (typeof h === "string") return h;
+        return null;
+      })
+      .filter(Boolean),
   );
 
   let total = 0;
@@ -92,11 +113,20 @@ function countWeekdaysBetween(fromDate, toDate, halfDayConfig, holidays = [], in
       const isEndDate = currentDateStr === toDate;
 
       if (isStartDate && isEndDate) {
-        total += halfDayConfig.start === "first" || halfDayConfig.start === "second" ? 0.5 : 1;
+        total +=
+          halfDayConfig.start === "first" || halfDayConfig.start === "second"
+            ? 0.5
+            : 1;
       } else if (isStartDate) {
-        total += halfDayConfig.start === "first" || halfDayConfig.start === "second" ? 0.5 : 1;
+        total +=
+          halfDayConfig.start === "first" || halfDayConfig.start === "second"
+            ? 0.5
+            : 1;
       } else if (isEndDate) {
-        total += halfDayConfig.end === "first" || halfDayConfig.end === "second" ? 0.5 : 1;
+        total +=
+          halfDayConfig.end === "first" || halfDayConfig.end === "second"
+            ? 0.5
+            : 1;
       } else {
         total += 1;
       }
@@ -116,18 +146,22 @@ function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
           <span className="flex items-center justify-between">
             <span>
               {sel ? (
-                <span className="font-semibold text-gray-800 text-sm">{sel.leaveName}</span>
+                <span className="font-semibold text-gray-800 text-sm">
+                  {sel.leaveName}
+                </span>
               ) : (
                 <span className="text-gray-400 text-sm">Select leave type</span>
               )}
             </span>
-            <span className={`text-xs ml-4 font-medium px-2 py-0.5 rounded-full ${
-              sel?.isInfinite
-                ? "bg-blue-50 text-blue-600"
-                : sel?.disabled
-                ? "bg-red-50 text-red-400"
-                : "bg-green-50 text-green-600"
-            }`}>
+            <span
+              className={`text-xs ml-4 font-medium px-2 py-0.5 rounded-full ${
+                sel?.isInfinite
+                  ? "bg-blue-50 text-blue-600"
+                  : sel?.disabled
+                    ? "bg-red-50 text-red-400"
+                    : "bg-green-50 text-green-600"
+              }`}
+            >
               {sel?.availableText}
             </span>
           </span>
@@ -155,19 +189,25 @@ function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
               >
                 {({ selected }) => (
                   <>
-                    <span className={`text-sm font-medium ${selected ? "text-indigo-700" : "text-gray-800"}`}>
+                    <span
+                      className={`text-sm font-medium ${selected ? "text-indigo-700" : "text-gray-800"}`}
+                    >
                       {option.leaveName}
                     </span>
-                    <span className={`ml-4 text-xs font-medium px-2 py-0.5 rounded-full ${
-                      option.isInfinite
-                        ? "bg-blue-50 text-blue-500"
-                        : option.disabled
-                        ? "bg-red-50 text-red-400"
-                        : "bg-green-50 text-green-600"
-                    }`}>
+                    <span
+                      className={`ml-4 text-xs font-medium px-2 py-0.5 rounded-full ${
+                        option.isInfinite
+                          ? "bg-blue-50 text-blue-500"
+                          : option.disabled
+                            ? "bg-red-50 text-red-400"
+                            : "bg-green-50 text-green-600"
+                      }`}
+                    >
                       {option.availableText}
                     </span>
-                    {selected && <CheckIcon className="h-4 w-4 text-indigo-600 ml-2 shrink-0" />}
+                    {selected && (
+                      <CheckIcon className="h-4 w-4 text-indigo-600 ml-2 shrink-0" />
+                    )}
                   </>
                 )}
               </Listbox.Option>
@@ -180,7 +220,14 @@ function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
 }
 
 // ---- Main Modal ----
-export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBalances, onSuccess, year }) {
+export default function EditLeaveModal({
+  isOpen,
+  onClose,
+  initialData,
+  leaveBalances,
+  onSuccess,
+  year,
+}) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [leaveTypeId, setLeaveTypeId] = useState("");
@@ -191,7 +238,10 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [showCustomHalfDay, setShowCustomHalfDay] = useState(false);
-  const [halfDayConfig, setHalfDayConfig] = useState({ start: "none", end: "none" });
+  const [halfDayConfig, setHalfDayConfig] = useState({
+    start: "none",
+    end: "none",
+  });
   const [balanceWarning, setBalanceWarning] = useState("");
 
   const { user } = useAuth();
@@ -219,12 +269,17 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
 
     const fetchHolidays = async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
-          params: { state: "All", country: "India" },
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        const res = await axios.get(
+          `${BASE_URL}/api/holidays/by-location/${year}`,
+          {
+            params: { state: "All", country: "India" },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
+        );
         const holidayDates = res.data.data.map(
-          (holiday) => new Date(holiday.holidayDate + "T00:00:00")
+          (holiday) => new Date(holiday.holidayDate + "T00:00:00"),
         );
         setHolidays(holidayDates);
       } catch (err) {
@@ -242,48 +297,78 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
       setStartDate(initialData.startDate || "");
       setEndDate(initialData.endDate || "");
       // ✅ Fixed: use flat leaveTypeId from DTO, fallback for old shape
-      setLeaveTypeId(initialData.leaveTypeId || initialData.leaveType?.leaveTypeId || "");
+      setLeaveTypeId(
+        initialData.leaveTypeId || initialData.leaveType?.leaveTypeId || "",
+      );
       setReason(initialData.reason || "");
       setDriveLink(initialData.driveLink || "");
 
       const isCustom =
         initialData.isHalfDay ||
-        (initialData.startSession && initialData.startSession !== "none" && initialData.startSession !== "fullday");
+        (initialData.startSession &&
+          initialData.startSession !== "none" &&
+          initialData.startSession !== "fullday");
       setShowCustomHalfDay(isCustom);
 
       setHalfDayConfig({
-        start: isCustom && initialData.startSession !== "none" ? initialData.startSession : "none",
-        end: isCustom && initialData.endSession !== "none" ? initialData.endSession : "none",
+        start:
+          isCustom && initialData.startSession !== "none"
+            ? initialData.startSession
+            : "none",
+        end:
+          isCustom && initialData.endSession !== "none"
+            ? initialData.endSession
+            : "none",
       });
     }
   }, [isOpen, initialData]);
-  
-    const allBalances = useMemo(
-      () => [
-        ...(leaveBalances?.data?.regular ?? []),
-        ...(leaveBalances?.data?.genderBasedLeaveBalances ?? []),
-      ],
-      [leaveBalances],
-    );
+
+  const allBalances = useMemo(
+    () => [
+      ...(leaveBalances?.data?.regular ?? []),
+      ...(leaveBalances?.data?.genderBasedLeaveBalances ?? []),
+    ],
+    [leaveBalances],
+  );
 
   const leaveTypeOptions = useLeaveDropdownOptions(allBalances);
-  const selectedLeaveType = leaveTypeOptions.find((o) => o.leaveTypeId === leaveTypeId);
+  const selectedLeaveType = leaveTypeOptions.find(
+    (o) => o.leaveTypeId === leaveTypeId,
+  );
   const isMaternityLeave = selectedLeaveType?.leaveTypeId === "L-ML";
   const isMultiDay = startDate && endDate && startDate !== endDate;
-  const weekdays = countWeekdaysBetween(startDate, endDate, halfDayConfig, holidays, isMaternityLeave);
+  const weekdays = countWeekdaysBetween(
+    startDate,
+    endDate,
+    halfDayConfig,
+    holidays,
+    isMaternityLeave,
+  );
 
   // ✅ Balance warning check
   useEffect(() => {
-    if (!leaveTypeId || leaveTypeOptions.length === 0) { setBalanceWarning(""); return; }
-    const selected = leaveTypeOptions.find((o) => o.leaveTypeId === leaveTypeId);
-    if (!selected) { setBalanceWarning(""); return; }
+    if (!leaveTypeId || leaveTypeOptions.length === 0) {
+      setBalanceWarning("");
+      return;
+    }
+    const selected = leaveTypeOptions.find(
+      (o) => o.leaveTypeId === leaveTypeId,
+    );
+    if (!selected) {
+      setBalanceWarning("");
+      return;
+    }
 
     if (selected.isInfinite) {
       setBalanceWarning("");
     } else if (selected.availableDays <= 0) {
-      setBalanceWarning(`No balance available for ${selected.leaveName}. You have 0 days remaining.`);
+      setBalanceWarning(
+        `No balance available for ${selected.leaveName}. You have 0 days remaining.`,
+      );
     } else if (weekdays > 0 && selected.availableDays < weekdays) {
-      setBalanceWarning(`Insufficient balance. You have ${selected.availableDays} day(s) available but requested ${weekdays} day(s).`);
+      setBalanceWarning(
+        `Insufficient balance. You have ${selected.availableDays} day(s) available but requested ${weekdays} day(s).`,
+      );
     } else {
       setBalanceWarning("");
     }
@@ -291,19 +376,27 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
 
   const shouldShowDriveLink = () => {
     if (!selectedLeaveType) return false;
-    return selectedLeaveType.requiresDocumentation || (selectedLeaveType.leaveTypeId === "L-SL" && weekdays > 3);
+    return (
+      selectedLeaveType.requiresDocumentation ||
+      (selectedLeaveType.leaveTypeId === "L-SL" && weekdays > 3)
+    );
   };
 
   const handleHalfDayModeChange = (isCustom) => {
     setShowCustomHalfDay(isCustom);
-    setHalfDayConfig(isCustom ? { start: "fullday", end: "fullday" } : { start: "none", end: "none" });
+    setHalfDayConfig(
+      isCustom
+        ? { start: "fullday", end: "fullday" }
+        : { start: "none", end: "none" },
+    );
   };
 
   const handleStartDateChange = (date) => {
     if (!date) return;
     const dateString = format(date, "yyyy-MM-dd");
     setStartDate(dateString);
-    if (!endDate || new Date(endDate) < new Date(dateString)) setEndDate(dateString);
+    if (!endDate || new Date(endDate) < new Date(dateString))
+      setEndDate(dateString);
   };
 
   const handleEndDateChange = (date) => {
@@ -340,13 +433,17 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
       const { data } = await axios.put(
         `${BASE_URL}/api/leave-requests/employee/update`,
         payload,
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
       );
       toast.success("Leave request updated successfully");
       if (onSuccess) onSuccess(data);
       handleClose();
     } catch (err) {
-      setError("Failed to update: " + (err.response?.data?.message || err.message));
+      setError(
+        "Failed to update: " + (err.response?.data?.message || err.message),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -354,7 +451,8 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
 
   if (!isOpen) return null;
 
-  const hasBalanceError = balanceWarning !== "" && !selectedLeaveType?.isInfinite;
+  const hasBalanceError =
+    balanceWarning !== "" && !selectedLeaveType?.isInfinite;
 
   return (
     <div
@@ -362,8 +460,9 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
       aria-modal="true"
       onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
-      <div className={`bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-2 sm:mx-4 border border-gray-100 relative flex flex-col ${isLockedByOther ? "overflow-hidden" : "overflow-y-auto"} max-h-[92vh]`}>
-
+      <div
+        className={`bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-2 sm:mx-4 border border-gray-100 relative flex flex-col ${isLockedByOther ? "overflow-hidden" : "overflow-y-auto"} max-h-[92vh]`}
+      >
         {/* Lock overlay */}
         {isLockedByOther && (
           <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-center p-6 rounded-2xl">
@@ -371,10 +470,17 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
               <Lock className="w-8 h-8 text-yellow-500" />
             </div>
             <h3 className="text-xl font-bold text-gray-800">Record Locked</h3>
-            {lockMessage && <p className="text-gray-500 mt-2 text-sm">{lockMessage}</p>}
-            <p className="text-gray-400 text-xs mt-1">Please try again later.</p>
-            <button type="button" onClick={onClose}
-              className="mt-5 px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition">
+            {lockMessage && (
+              <p className="text-gray-500 mt-2 text-sm">{lockMessage}</p>
+            )}
+            <p className="text-gray-400 text-xs mt-1">
+              Please try again later.
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-5 px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition"
+            >
               Close
             </button>
           </div>
@@ -386,17 +492,21 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
             <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
               <CalendarDays className="w-4 h-4 text-indigo-600" />
             </div>
-            <h2 className="text-base font-bold text-gray-900">Edit Leave Request</h2>
+            <h2 className="text-base font-bold text-gray-900">
+              Edit Leave Request
+            </h2>
           </div>
-          <button onClick={handleClose}
+          <button
+            onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors rounded-lg p-1.5"
-            type="button" aria-label="Close">
+            type="button"
+            aria-label="Close"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleUpdate} className="px-5 py-4 space-y-4">
-
           {/* Error banner */}
           {error && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-100 p-3 rounded-xl text-red-700 text-sm">
@@ -406,7 +516,6 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
           )}
 
           <fieldset disabled={isLockedByOther} className="space-y-4">
-
             {/* Date pickers */}
             <div>
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
@@ -415,10 +524,16 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
               <div className="grid gap-3 sm:grid-cols-2">
                 <DateRangePicker
                   label="Start Date"
-                  defaultDate={startDate ? new Date(startDate + "T00:00:00") : null}
+                  defaultDate={
+                    startDate ? new Date(startDate + "T00:00:00") : null
+                  }
                   onChange={handleStartDateChange}
-                  defaultMonth={startDate ? new Date(startDate + "T00:00:00") : undefined}
-                  disabledDays={isMaternityLeave ? [] : [{ dayOfWeek: [0, 6] }, ...holidays]}
+                  defaultMonth={
+                    startDate ? new Date(startDate + "T00:00:00") : undefined
+                  }
+                  disabledDays={
+                    isMaternityLeave ? [] : [{ dayOfWeek: [0, 6] }, ...holidays]
+                  }
                   year={year}
                 />
                 <DateRangePicker
@@ -426,10 +541,16 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
                   align="right"
                   defaultDate={endDate ? new Date(endDate + "T00:00:00") : null}
                   onChange={handleEndDateChange}
-                  defaultMonth={endDate ? new Date(endDate + "T00:00:00") : undefined}
+                  defaultMonth={
+                    endDate ? new Date(endDate + "T00:00:00") : undefined
+                  }
                   disabledDays={[
-                    ...(isMaternityLeave ? [] : [{ dayOfWeek: [0, 6] }, ...holidays]),
-                    startDate ? { before: new Date(startDate + "T00:00:00") } : {},
+                    ...(isMaternityLeave
+                      ? []
+                      : [{ dayOfWeek: [0, 6] }, ...holidays]),
+                    startDate
+                      ? { before: new Date(startDate + "T00:00:00") }
+                      : {},
                   ]}
                   year={year}
                 />
@@ -456,16 +577,26 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
                   Day Type
                 </label>
                 <div className="p-1 inline-flex items-center bg-gray-100 rounded-lg">
-                  <button type="button" onClick={() => handleHalfDayModeChange(false)}
+                  <button
+                    type="button"
+                    onClick={() => handleHalfDayModeChange(false)}
                     className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                      !showCustomHalfDay ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                    }`}>
+                      !showCustomHalfDay
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
                     Full Days
                   </button>
-                  <button type="button" onClick={() => handleHalfDayModeChange(true)}
+                  <button
+                    type="button"
+                    onClick={() => handleHalfDayModeChange(true)}
                     className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                      showCustomHalfDay ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                    }`}>
+                      showCustomHalfDay
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
                     Custom
                   </button>
                 </div>
@@ -473,10 +604,19 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
                 {showCustomHalfDay && (
                   <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
                     <div className="flex-1 space-y-1">
-                      <label className="text-xs font-medium text-gray-500">Start — {formatDateForDisplay(startDate)}</label>
-                      <select value={halfDayConfig.start}
-                        onChange={(e) => setHalfDayConfig((p) => ({ ...p, start: e.target.value }))}
-                        className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none">
+                      <label className="text-xs font-medium text-gray-500">
+                        Start — {formatDateForDisplay(startDate)}
+                      </label>
+                      <select
+                        value={halfDayConfig.start}
+                        onChange={(e) =>
+                          setHalfDayConfig((p) => ({
+                            ...p,
+                            start: e.target.value,
+                          }))
+                        }
+                        className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+                      >
                         <option value="fullday">Full Day</option>
                         <option value="first">First Half</option>
                         <option value="second">Second Half</option>
@@ -486,10 +626,19 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
                       <>
                         <div className="pt-7 text-gray-300 font-bold">—</div>
                         <div className="flex-1 space-y-1">
-                          <label className="text-xs font-medium text-gray-500">End — {formatDateForDisplay(endDate)}</label>
-                          <select value={halfDayConfig.end}
-                            onChange={(e) => setHalfDayConfig((p) => ({ ...p, end: e.target.value }))}
-                            className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none">
+                          <label className="text-xs font-medium text-gray-500">
+                            End — {formatDateForDisplay(endDate)}
+                          </label>
+                          <select
+                            value={halfDayConfig.end}
+                            onChange={(e) =>
+                              setHalfDayConfig((p) => ({
+                                ...p,
+                                end: e.target.value,
+                              }))
+                            }
+                            className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+                          >
                             <option value="fullday">Full Day</option>
                             <option value="first">First Half</option>
                             <option value="second">Second Half</option>
@@ -507,7 +656,11 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
                 Leave Type
               </label>
-              <LeaveTypeDropdown options={leaveTypeOptions} selectedId={leaveTypeId} setSelectedId={setLeaveTypeId} />
+              <LeaveTypeDropdown
+                options={leaveTypeOptions}
+                selectedId={leaveTypeId}
+                setSelectedId={setLeaveTypeId}
+              />
 
               {/* ✅ Balance warning */}
               {balanceWarning ? (
@@ -515,7 +668,9 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
                   <p className="text-amber-700 text-xs">{balanceWarning}</p>
                 </div>
-              ) : selectedLeaveType && !selectedLeaveType.isInfinite && selectedLeaveType.availableDays > 0 ? (
+              ) : selectedLeaveType &&
+                !selectedLeaveType.isInfinite &&
+                selectedLeaveType.availableDays > 0 ? (
                 <div className="mt-2 flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
                   <p className="text-green-600 text-xs font-medium">
@@ -538,7 +693,9 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
                 placeholder="Add a reason for your leave..."
                 className="w-full border border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 focus:outline-none p-3 rounded-xl text-sm resize-none transition-all"
               />
-              <p className="text-right text-xs text-gray-400 mt-0.5">{reason.length}/100</p>
+              <p className="text-right text-xs text-gray-400 mt-0.5">
+                {reason.length}/100
+              </p>
             </div>
 
             {/* Drive link */}
@@ -556,7 +713,8 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
                 />
                 {selectedLeaveType?.leaveTypeId === "L-SL" && weekdays > 3 && (
                   <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                    <Info className="w-3 h-3" /> Required for sick leave exceeding 3 days
+                    <Info className="w-3 h-3" /> Required for sick leave
+                    exceeding 3 days
                   </p>
                 )}
               </div>
@@ -565,20 +723,27 @@ export default function EditLeaveModal({ isOpen, onClose, initialData, leaveBala
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-            <button type="button" onClick={handleClose}
+            <button
+              type="button"
+              onClick={handleClose}
               disabled={submitting || isLockedByOther}
-              className="px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50">
+              className="px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+            >
               Cancel
             </button>
-            <button type="submit"
+            <button
+              type="submit"
               disabled={submitting || isLockedByOther || hasBalanceError}
-              className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+              className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
               {submitting ? (
                 <>
                   <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Updating...
                 </>
-              ) : "Update Request"}
+              ) : (
+                "Update Request"
+              )}
             </button>
           </div>
         </form>

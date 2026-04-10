@@ -12,7 +12,7 @@ import { Listbox, Transition } from "@headlessui/react";
 import { Fragment } from "react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const EditHolidaysPage = () => {
   const [holidays, setHolidays] = useState([]);
@@ -45,7 +45,7 @@ const EditHolidaysPage = () => {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       setHolidays(response.data);
     } catch (err) {
@@ -86,7 +86,7 @@ const EditHolidaysPage = () => {
       });
       toast.success("Holiday updated successfully!");
       setHolidays((holidays) =>
-        holidays.map((h) => (h.holidayId === holidayId ? editedData : h))
+        holidays.map((h) => (h.holidayId === holidayId ? editedData : h)),
       );
       handleCancelEdit();
     } catch (err) {
@@ -108,11 +108,11 @@ const EditHolidaysPage = () => {
         `${BASE_URL}/api/holidays/delete/${holidayId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        },
       );
       toast.success(res.data.message || "Holiday deleted successfully!");
       setHolidays((holidays) =>
-        holidays.filter((h) => h.holidayId !== holidayId)
+        holidays.filter((h) => h.holidayId !== holidayId),
       );
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete holiday.");
@@ -311,7 +311,7 @@ const EditHolidaysPage = () => {
                     <td className="px-4 py-2">
                       {new Date(holiday.holidayDate).toLocaleDateString(
                         "en-US",
-                        { month: "short", day: "numeric", year: "numeric" }
+                        { month: "short", day: "numeric", year: "numeric" },
                       )}
                     </td>
                     <td className="px-4 py-2">{holiday.type}</td>

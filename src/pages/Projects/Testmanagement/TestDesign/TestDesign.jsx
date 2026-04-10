@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { 
-  Plus, 
-  Folder, 
-  ChevronRight, 
-  Layers, 
-  BookOpen, 
-  Loader2, 
-  AlertCircle 
+import {
+  Plus,
+  Folder,
+  ChevronRight,
+  Layers,
+  BookOpen,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
 import { useParams } from "react-router-dom";
@@ -21,7 +21,7 @@ export default function TestDesign() {
   const { projectId } = useParams();
 
   const [testStories, setTestStories] = useState([]);
-  const [expandedStories, setExpandedStories] = useState({}); 
+  const [expandedStories, setExpandedStories] = useState({});
 
   const [selectedStory, setSelectedStory] = useState(null);
   const [selectedScenario, setSelectedScenario] = useState(null);
@@ -41,7 +41,7 @@ export default function TestDesign() {
   const fetchTestStories = async () => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-stories/projects/${projectId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-stories/projects/${projectId}`,
       );
       return (res.data || []).map((s) => ({
         ...s,
@@ -59,7 +59,7 @@ export default function TestDesign() {
   const fetchScenarios = async (storyId) => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/scenarios/test-stories/${storyId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios/test-stories/${storyId}`,
       );
       return (res.data || []).map((sc) => ({
         ...sc,
@@ -77,7 +77,7 @@ export default function TestDesign() {
   const fetchCases = async (scenarioId) => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases/scenarios/${scenarioId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/scenarios/${scenarioId}`,
       );
       return res.data || [];
     } catch (err) {
@@ -92,7 +92,7 @@ export default function TestDesign() {
   const fetchSteps = async (caseId) => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases/${caseId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/${caseId}`,
       );
       return res.data.steps || [];
     } catch (err) {
@@ -119,9 +119,9 @@ export default function TestDesign() {
     }
 
     setTestStories((prev) =>
-      prev.map((s) => (s.id === storyId ? { ...s, scenarios } : s))
+      prev.map((s) => (s.id === storyId ? { ...s, scenarios } : s)),
     );
-    
+
     return scenarios;
   };
 
@@ -157,15 +157,15 @@ export default function TestDesign() {
   // ---------------------------------------------------------
   // CALLBACKS (SILENT REFRESHES)
   // ---------------------------------------------------------
-  
+
   const handleStoryCreated = async () => {
     const stories = await fetchTestStories();
     // Merge new stories while keeping the expanded scenarios of existing ones
-    setTestStories((prev) => 
+    setTestStories((prev) =>
       stories.map((s) => {
         const existing = prev.find((p) => p.id === s.id);
         return existing ? { ...s, scenarios: existing.scenarios } : s;
-      })
+      }),
     );
     setOpenStoryModal(false);
   };
@@ -181,21 +181,25 @@ export default function TestDesign() {
 
   const handleCaseCreated = async () => {
     // Find which story this scenario belongs to
-    const story = testStories.find((s) => 
-      s.scenarios?.some((sc) => sc.id === selectedScenario?.id)
+    const story = testStories.find((s) =>
+      s.scenarios?.some((sc) => sc.id === selectedScenario?.id),
     );
-    
+
     if (story) {
       const updatedScenarios = await loadStoryContents(story.id);
-      
+
       // Keep the current scenario and case seamlessly selected
-      const updatedScenario = updatedScenarios.find(sc => sc.id === selectedScenario.id);
+      const updatedScenario = updatedScenarios.find(
+        (sc) => sc.id === selectedScenario.id,
+      );
       if (updatedScenario) {
         setSelectedScenario(updatedScenario);
         if (!selectedCase) {
           setSelectedCase(updatedScenario.cases[0] || null);
         } else {
-          const updatedCase = updatedScenario.cases.find(c => c.id === selectedCase.id);
+          const updatedCase = updatedScenario.cases.find(
+            (c) => c.id === selectedCase.id,
+          );
           setSelectedCase(updatedCase || updatedScenario.cases[0] || null);
         }
       }
@@ -204,17 +208,21 @@ export default function TestDesign() {
   };
 
   const handleStepsCreated = async () => {
-    const story = testStories.find((s) => 
-      s.scenarios?.some((sc) => sc.id === selectedScenario?.id)
+    const story = testStories.find((s) =>
+      s.scenarios?.some((sc) => sc.id === selectedScenario?.id),
     );
-    
+
     if (story) {
       const updatedScenarios = await loadStoryContents(story.id);
-      const updatedScenario = updatedScenarios.find(sc => sc.id === selectedScenario.id);
+      const updatedScenario = updatedScenarios.find(
+        (sc) => sc.id === selectedScenario.id,
+      );
       if (updatedScenario) {
         setSelectedScenario(updatedScenario);
         if (selectedCase) {
-          const updatedCase = updatedScenario.cases.find(c => c.id === selectedCase.id);
+          const updatedCase = updatedScenario.cases.find(
+            (c) => c.id === selectedCase.id,
+          );
           setSelectedCase(updatedCase || null);
         }
       }
@@ -236,7 +244,6 @@ export default function TestDesign() {
 
   return (
     <div className="flex h-[calc(100vh-80px)] bg-gray-50 overflow-hidden">
-      
       {/* -------------------------------- */}
       {/* LEFT SIDEBAR — EXPLORER */}
       {/* -------------------------------- */}
@@ -245,7 +252,9 @@ export default function TestDesign() {
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white">
           <div className="flex items-center gap-2">
             <BookOpen size={18} className="text-blue-600" />
-            <h3 className="font-semibold text-gray-800 tracking-tight">Test Stories</h3>
+            <h3 className="font-semibold text-gray-800 tracking-tight">
+              Test Stories
+            </h3>
           </div>
           <button
             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
@@ -269,7 +278,6 @@ export default function TestDesign() {
 
               return (
                 <div key={story.id} className="select-none">
-                  
                   {/* Story Row */}
                   <div className="group flex items-center justify-between px-2 py-2 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors text-gray-700">
                     <div
@@ -279,12 +287,19 @@ export default function TestDesign() {
                         toggleStoryExpand(story);
                       }}
                     >
-                      <ChevronRight 
-                        size={16} 
-                        className={`text-gray-400 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} 
+                      <ChevronRight
+                        size={16}
+                        className={`text-gray-400 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}
                       />
-                      <Folder size={16} className={isExpanded ? "text-blue-500" : "text-gray-400"} />
-                      <span className="text-sm font-medium truncate">{story.name}</span>
+                      <Folder
+                        size={16}
+                        className={
+                          isExpanded ? "text-blue-500" : "text-gray-400"
+                        }
+                      />
+                      <span className="text-sm font-medium truncate">
+                        {story.name}
+                      </span>
                     </div>
 
                     {/* Add Scenario Button (Visible on hover) */}
@@ -310,14 +325,15 @@ export default function TestDesign() {
                         </div>
                       ) : (
                         story.scenarios.map((scenario) => {
-                          const isSelected = selectedScenario?.id === scenario.id;
+                          const isSelected =
+                            selectedScenario?.id === scenario.id;
 
                           return (
                             <div
                               key={scenario.id}
                               className={`group flex items-center justify-between px-3 py-1.5 rounded-md cursor-pointer transition-colors ${
-                                isSelected 
-                                  ? "bg-blue-50 text-blue-700 font-medium" 
+                                isSelected
+                                  ? "bg-blue-50 text-blue-700 font-medium"
                                   : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                               }`}
                               onClick={() => {
@@ -326,8 +342,17 @@ export default function TestDesign() {
                               }}
                             >
                               <div className="flex items-center gap-2 overflow-hidden">
-                                <Layers size={14} className={isSelected ? "text-blue-500" : "text-gray-400"} />
-                                <span className="text-sm truncate">{scenario.title}</span>
+                                <Layers
+                                  size={14}
+                                  className={
+                                    isSelected
+                                      ? "text-blue-500"
+                                      : "text-gray-400"
+                                  }
+                                />
+                                <span className="text-sm truncate">
+                                  {scenario.title}
+                                </span>
                               </div>
 
                               {/* Add Case Button (Visible on hover) */}

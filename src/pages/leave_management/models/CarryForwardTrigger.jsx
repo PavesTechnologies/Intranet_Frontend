@@ -8,7 +8,7 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
   const [year, setYear] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
   const queryClient = useQueryClient();
 
   if (!isOpen) return null;
@@ -23,7 +23,7 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       return response.data;
     },

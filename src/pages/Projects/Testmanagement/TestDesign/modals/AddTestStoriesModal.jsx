@@ -19,7 +19,7 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
     const fetchStories = async () => {
       try {
         const res = await axiosInstance.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
         );
         setPmsStories(res.data || []);
       } catch (err) {
@@ -49,8 +49,8 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
       };
 
       await axiosInstance.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-stories`,
-        payload
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-stories`,
+        payload,
       );
 
       toast.success("Test Story created successfully!"); // ⭐ 3. Toast success
@@ -68,11 +68,12 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white w-[520px] p-6 rounded-xl shadow-lg">
-
         {/* Header */}
         <div className="flex justify-between items-center mb-5">
-          <h2 className="text-lg font-semibold text-gray-800">Add Test Story</h2>
-          <button 
+          <h2 className="text-lg font-semibold text-gray-800">
+            Add Test Story
+          </h2>
+          <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded transition-colors"
           >
@@ -81,10 +82,11 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
         </div>
 
         <div className="space-y-4">
-
           {/* STORY NAME */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Story Name *</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Story Name *
+            </label>
             <input
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
               value={name}
@@ -95,7 +97,9 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
 
           {/* LINKED PMS STORY DROPDOWN */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Linked PMS Story (optional)</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Linked PMS Story (optional)
+            </label>
             {loadingStories ? (
               <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-500 bg-gray-50 flex items-center">
                 <span className="animate-pulse mr-2">●</span> Loading stories…
@@ -118,7 +122,9 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
 
           {/* DESCRIPTION */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Description</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Description
+            </label>
             <textarea
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
               rows={4}
@@ -130,8 +136,8 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
 
           {/* ACTION BUTTONS */}
           <div className="flex justify-end gap-3 pt-4 border-t mt-6">
-            <button 
-              className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors" 
+            <button
+              className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
               onClick={onClose}
               disabled={saving}
             >
@@ -145,9 +151,7 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
               {saving ? "Saving..." : "Create Story"}
             </button>
           </div>
-
         </div>
-
       </div>
     </div>
   );

@@ -56,11 +56,15 @@ export default function UsersTable() {
     try {
       setLoading(true);
       const res = await axios.get(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/users`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users`,
         {
-          params: { page: currentPage, limit: ITEMS_PER_PAGE, search: searchTerm },
+          params: {
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            search: searchTerm,
+          },
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       setUsers(res.data.users || []);
       setTotalUsers(res.data.total || 0);
@@ -121,15 +125,15 @@ export default function UsersTable() {
     try {
       if (actionType === "deactivate") {
         await axios.delete(
-          `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         showStatusToast("User deactivated successfully.", "success");
       } else {
         await axios.patch(
-          `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}/activate`,
+          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}/activate`,
           {},
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         showStatusToast("User activated successfully.", "success");
       }
@@ -153,7 +157,7 @@ export default function UsersTable() {
     let formattedContact = user.contact;
     if (user.contact) {
       const phoneNumber = parsePhoneNumberFromString(
-        "+" + user.contact.replace(/\D/g, "")
+        "+" + user.contact.replace(/\D/g, ""),
       );
       if (phoneNumber) {
         formattedContact = phoneNumber.formatInternational();
@@ -236,14 +240,21 @@ export default function UsersTable() {
         className="mb-4 max-w-md"
       />
 
-      <GenericTable headers={headers} rows={tableData} columns={columns} loading={loading} />
+      <GenericTable
+        headers={headers}
+        rows={tableData}
+        columns={columns}
+        loading={loading}
+      />
 
       {!loading && totalPages > 1 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
           onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          onNext={() =>
+            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+          }
         />
       )}
 
@@ -271,7 +282,10 @@ export default function UsersTable() {
         className="!mt-16 !max-h-[calc(100vh-8rem)] !overflow-hidden"
       >
         <Suspense fallback={<LoadingSpinner text="Loading bulk upload..." />}>
-          <BulkUserUpload onClose={() => setUserBulkUploadModalOpen(false)} onSuccess={fetchUsers} />
+          <BulkUserUpload
+            onClose={() => setUserBulkUploadModalOpen(false)}
+            onSuccess={fetchUsers}
+          />
         </Suspense>
       </Modal>
 
@@ -297,7 +311,9 @@ export default function UsersTable() {
         isOpen={isConfirmModalOpen}
         onClose={() => setConfirmModalOpen(false)}
         title={
-          actionType === "deactivate" ? "Confirm Deactivation" : "Confirm Activation"
+          actionType === "deactivate"
+            ? "Confirm Deactivation"
+            : "Confirm Activation"
         }
         subtitle={
           actionType === "deactivate"
@@ -307,7 +323,11 @@ export default function UsersTable() {
         className="!mt-16 !max-h-[calc(100vh-8rem)] !overflow-hidden"
       >
         <div className="flex justify-end gap-3 mt-6">
-          <Button onClick={() => setConfirmModalOpen(false)} variant="secondary" size="medium">
+          <Button
+            onClick={() => setConfirmModalOpen(false)}
+            variant="secondary"
+            size="medium"
+          >
             Cancel
           </Button>
           <Button

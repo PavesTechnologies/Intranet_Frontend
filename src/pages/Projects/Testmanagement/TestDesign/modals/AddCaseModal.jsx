@@ -44,18 +44,20 @@ export default function AddCaseModal({ scenarioId, onClose, onCreated }) {
           .filter((s) => s.action.trim() || s.expectedResult.trim())
           .map((s) => ({
             action: s.action,
-            expectedResult: s.expectedResult
-          }))
+            expectedResult: s.expectedResult,
+          })),
       };
 
-      await axiosInstance.post(`${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases`, payload);
+      await axiosInstance.post(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases`,
+        payload,
+      );
 
       // ⭐ 3. Replaced alert with toast.success
       toast.success("Test Case created successfully!");
-      
+
       if (onCreated) onCreated();
       onClose();
-      
     } catch (err) {
       console.error("Create Case FAILED →", err);
       // ⭐ 4. Replaced alert with toast.error
@@ -74,7 +76,6 @@ export default function AddCaseModal({ scenarioId, onClose, onCreated }) {
         </div>
 
         <div className="space-y-4">
-
           <div>
             <label className="text-sm">Title</label>
             <input
@@ -129,7 +130,12 @@ export default function AddCaseModal({ scenarioId, onClose, onCreated }) {
           <div>
             <div className="flex justify-between">
               <label className="text-sm">Steps</label>
-              <button onClick={addStep} className="text-blue-600 text-sm hover:text-blue-800">+ Add Step</button>
+              <button
+                onClick={addStep}
+                className="text-blue-600 text-sm hover:text-blue-800"
+              >
+                + Add Step
+              </button>
             </div>
 
             <div className="space-y-2 mt-2">
@@ -145,7 +151,9 @@ export default function AddCaseModal({ scenarioId, onClose, onCreated }) {
                     className="col-span-6 border rounded px-2 py-1"
                     placeholder="Expected Result"
                     value={step.expectedResult}
-                    onChange={(e) => updateStep(i, "expectedResult", e.target.value)}
+                    onChange={(e) =>
+                      updateStep(i, "expectedResult", e.target.value)
+                    }
                   />
                   <button
                     className="col-span-1 text-red-500 hover:bg-red-50 rounded p-1 flex items-center justify-center"
@@ -160,7 +168,10 @@ export default function AddCaseModal({ scenarioId, onClose, onCreated }) {
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-            <button className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors" onClick={onClose}>
+            <button
+              className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              onClick={onClose}
+            >
               Cancel
             </button>
             <button
@@ -171,9 +182,7 @@ export default function AddCaseModal({ scenarioId, onClose, onCreated }) {
               {saving ? "Saving..." : "Create Case"}
             </button>
           </div>
-
         </div>
-
       </div>
     </div>
   );

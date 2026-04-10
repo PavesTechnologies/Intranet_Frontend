@@ -24,7 +24,7 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
   const fetchTestPlans = async () => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/plans/projects/${projectId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/projects/${projectId}`,
       );
       setTestPlans(res.data || []);
     } catch (err) {
@@ -39,7 +39,7 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
   const fetchPmsStories = async () => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
       );
       setPmsStories(res.data || []);
     } catch (err) {
@@ -75,8 +75,8 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
 
     try {
       const res = await axiosInstance.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/scenarios`,
-        payload
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios`,
+        payload,
       );
 
       toast.success("Scenario created successfully!");
@@ -94,11 +94,10 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white w-[520px] p-6 rounded-xl shadow-lg">
-        
         {/* Header */}
         <div className="flex justify-between items-center mb-5">
           <h2 className="text-lg font-semibold text-gray-800">Add Scenario</h2>
-          <button 
+          <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded transition-colors"
           >
@@ -109,7 +108,9 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
         <div className="space-y-4">
           {/* Test Plan */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Select Test Plan *</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Select Test Plan *
+            </label>
             <select
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
               value={testPlanId}
@@ -126,7 +127,9 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
 
           {/* Linked Story */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Link PMS Story (optional)</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Link PMS Story (optional)
+            </label>
             <select
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
               value={linkedStoryId}
@@ -143,7 +146,9 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
 
           {/* Title */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Scenario Title *</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Scenario Title *
+            </label>
             <input
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
               placeholder="Enter scenario title"
@@ -154,7 +159,9 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
 
           {/* Priority */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Priority</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Priority
+            </label>
             <select
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
               value={priority}
@@ -169,7 +176,9 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
 
           {/* Description */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Description</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Description
+            </label>
             <textarea
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
               rows={3}

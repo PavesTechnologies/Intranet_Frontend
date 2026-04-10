@@ -1,8 +1,8 @@
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_RMS_BASE_URL;
-const LMS_BASE_URL = import.meta.env.VITE_BASE_URL;
-const TSM_BASE_URL = import.meta.env.VITE_TIMESHEET_API_ENDPOINT;
+const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+const LMS_BASE_URL = window.__APP_CONFIG__.BASE_URL;
+const TSM_BASE_URL = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
 
 export const getWorkforceFilters = async () => {
   try {
@@ -23,8 +23,10 @@ export const getWorkforceFilters = async () => {
 export const getWorkforceKPI = async (filters) => {
   try {
     const params = {};
-    if (filters.role && filters.role !== "All Roles") params.role = filters.role;
-    if (filters.location && filters.location !== "All Locations") params.location = filters.location;
+    if (filters.role && filters.role !== "All Roles")
+      params.role = filters.role;
+    if (filters.location && filters.location !== "All Locations")
+      params.location = filters.location;
     if (filters.employmentType && filters.employmentType !== "All Types")
       params.employmentType = filters.employmentType;
     if (filters.experienceRange?.[0] > 0)
@@ -56,8 +58,10 @@ export const getAvailabilityTimeline = async (filters, pagination) => {
     const params = {};
 
     // Pagination params
-    if (pagination.page !== undefined && pagination.page !== null) params.page = pagination.page;
-    if (pagination.size !== undefined && pagination.size !== null) params.size = pagination.size;
+    if (pagination.page !== undefined && pagination.page !== null)
+      params.page = pagination.page;
+    if (pagination.size !== undefined && pagination.size !== null)
+      params.size = pagination.size;
 
     // Date params - prioritizing pagination if provided, else filters
     if (pagination.startDate) {
@@ -73,8 +77,10 @@ export const getAvailabilityTimeline = async (filters, pagination) => {
     }
 
     // Filter params
-    if (filters.role && filters.role !== "All Roles") params.designation = filters.role;
-    if (filters.location && filters.location !== "All Locations") params.location = filters.location;
+    if (filters.role && filters.role !== "All Roles")
+      params.designation = filters.role;
+    if (filters.location && filters.location !== "All Locations")
+      params.location = filters.location;
     if (filters.employmentType && filters.employmentType !== "All Types")
       params.employmentType = filters.employmentType;
     if (filters.search && filters.search.trim() !== "") {
@@ -142,14 +148,11 @@ export const getUtilization = async (resourceId) => {
 };
 
 export const getSkillCategoriesTree = async () => {
-  const response = await axios.get(
-    `${BASE_URL}/api/skill-categories/tree`,
-    {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    }
-  );
+  const response = await axios.get(`${BASE_URL}/api/skill-categories/tree`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
   return response.data;
 };
 
@@ -162,7 +165,7 @@ export const createRoleExpectation = async (payload) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data;
   } catch (err) {
@@ -179,7 +182,7 @@ export const updateRoleExpectation = async (roleId, payload) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data;
   } catch (err) {
@@ -195,7 +198,7 @@ export const getRoleExpectations = async () => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data;
   } catch (err) {
@@ -211,7 +214,7 @@ export const getProficiencyLevels = async () => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response;
   } catch (err) {
@@ -223,14 +226,11 @@ export const getProficiencyLevels = async () => {
 
 export const fetchDemands = async () => {
   try {
-    const response = await axios.get(
-      `${BASE_URL}/api/demand/rm/demands`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
+    const response = await axios.get(`${BASE_URL}/api/demand/rm/demands`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
     return response.data.data; // Return the actual array
   } catch (err) {
     throw err;
@@ -263,7 +263,7 @@ export const getSkillGapAnalysis = async (demandId, resourceId) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data.data; // Return the analysis object
   } catch (err) {

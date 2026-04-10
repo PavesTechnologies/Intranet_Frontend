@@ -15,7 +15,7 @@ export default function IdentityTypeManagement() {
 
   const token = localStorage.getItem("token");
   const navigate = useNavigate();
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   /* ---------------- FETCH ALL IDENTITIES ---------------- */
   const fetchIdentities = async () => {
@@ -49,7 +49,8 @@ export default function IdentityTypeManagement() {
 
   /* ---------------- DELETE ---------------- */
   const handleDelete = async (uuid) => {
-    if (!window.confirm("Are you sure you want to delete this identity type?")) return;
+    if (!window.confirm("Are you sure you want to delete this identity type?"))
+      return;
 
     try {
       await axios.delete(`${BASE_URL}/identity/${uuid}`, {
@@ -58,13 +59,13 @@ export default function IdentityTypeManagement() {
 
       toast.success("Identity type deleted");
       setIdentities((prev) =>
-        prev.filter((i) => i.identity_type_uuid !== uuid)
+        prev.filter((i) => i.identity_type_uuid !== uuid),
       );
     } catch (err) {
       const detail = err?.response?.data?.detail;
 
       // 🔥 BUSINESS RULE: used in country mappings
-      if (err?.response?.status === 500 ) {
+      if (err?.response?.status === 500) {
         setDeleteBlocked({
           message:
             detail?.message ||
@@ -118,7 +119,10 @@ export default function IdentityTypeManagement() {
             <tbody>
               {identities.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-6 text-center text-gray-500">
+                  <td
+                    colSpan="4"
+                    className="px-6 py-6 text-center text-gray-500"
+                  >
                     No identity types found
                   </td>
                 </tr>
@@ -131,9 +135,7 @@ export default function IdentityTypeManagement() {
                     <td className="px-6 py-3 font-medium">
                       {item.identity_type_name}
                     </td>
-                    <td className="px-6 py-3">
-                      {item.description || "—"}
-                    </td>
+                    <td className="px-6 py-3">{item.description || "—"}</td>
                     <td className="px-6 py-3">
                       <span
                         className={`px-2 py-1 rounded text-sm ${
@@ -178,9 +180,7 @@ export default function IdentityTypeManagement() {
               Cannot Delete Identity Type
             </h3>
 
-            <p className="text-gray-700 mb-6">
-              {deleteBlocked.message}
-            </p>
+            <p className="text-gray-700 mb-6">{deleteBlocked.message}</p>
 
             <div className="flex justify-end gap-3">
               <button
@@ -212,13 +212,13 @@ export default function IdentityTypeManagement() {
           onSuccess={(savedItem) => {
             setIdentities((prev) => {
               const exists = prev.some(
-                (i) => i.identity_type_uuid === savedItem.identity_type_uuid
+                (i) => i.identity_type_uuid === savedItem.identity_type_uuid,
               );
               return exists
                 ? prev.map((i) =>
                     i.identity_type_uuid === savedItem.identity_type_uuid
                       ? savedItem
-                      : i
+                      : i,
                   )
                 : [savedItem, ...prev];
             });

@@ -44,7 +44,7 @@ const Dashboard = () => {
     const fetchEmployeeCount = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/users/count`,
+          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/count`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -63,7 +63,7 @@ const Dashboard = () => {
     const fetchActiveEmployees = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/users/active-count`,
+          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/active-count`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -83,7 +83,7 @@ const Dashboard = () => {
     const fetchProjectsCount = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/count`,
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/count`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -107,7 +107,7 @@ const Dashboard = () => {
     const fetchTasksCount = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/status/done/count`,
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/status/done/count`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -132,7 +132,7 @@ const Dashboard = () => {
     const fetchAvgTimesheetHours = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/dashboard/total_hours`,
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/dashboard/total_hours`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -158,7 +158,7 @@ const Dashboard = () => {
         const decodedToken = jwtDecode(token);
         const managerId = decodedToken.user_id;
         const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/leave-requests/manager/pending-count/${managerId}`,
+          `${window.__APP_CONFIG__.BASE_URL}/api/leave-requests/manager/pending-count/${managerId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -184,67 +184,69 @@ const Dashboard = () => {
   // ✅ Quick Stats — conditionally show based on role
   const quickStats = isAdminOrSuperAdmin
     ? [
-      {
-        label: "Total Employees",
-        value: employeeCount ?? "—",
-        change: "+12",
-        icon: Users,
-        positive: true,
-      },
-      {
-        label: "Active Employees",
-        value: activeEmployeeCount ?? "—",
-        change: "+10",
-        icon: Users,
-        positive: true,
-      },
-    ]
+        {
+          label: "Total Employees",
+          value: employeeCount ?? "—",
+          change: "+12",
+          icon: Users,
+          positive: true,
+        },
+        {
+          label: "Active Employees",
+          value: activeEmployeeCount ?? "—",
+          change: "+10",
+          icon: Users,
+          positive: true,
+        },
+      ]
     : [
-      {
-        label: "Total Employees",
-        value: employeeCount ?? "—",
-        change: "+12",
-        icon: Users,
-        positive: true,
-      },
-      {
-        label: "Active Projects",
-        value: projectsCount ?? "—",
-        change: "+2",
-        icon: FolderKanban,
-        positive: true,
-      },
-      {
-        label: "Pending Approvals",
-        value: pendingApprovals ?? "—",
-        change: "-3",
-        icon: AlertCircle,
-        positive: false,
-      },
-      {
-        label: "Completed Tasks",
-        value: taskCount ?? "—",
-        change: "+5%",
-        icon: CheckCircle,
-        positive: true,
-      },
-    ];
+        {
+          label: "Total Employees",
+          value: employeeCount ?? "—",
+          change: "+12",
+          icon: Users,
+          positive: true,
+        },
+        {
+          label: "Active Projects",
+          value: projectsCount ?? "—",
+          change: "+2",
+          icon: FolderKanban,
+          positive: true,
+        },
+        {
+          label: "Pending Approvals",
+          value: pendingApprovals ?? "—",
+          change: "-3",
+          icon: AlertCircle,
+          positive: false,
+        },
+        {
+          label: "Completed Tasks",
+          value: taskCount ?? "—",
+          change: "+5%",
+          icon: CheckCircle,
+          positive: true,
+        },
+      ];
 
   // ✅ Module cards remain same for all roles
   const moduleCards = [
-    ...(isAdminOrSuperAdmin || isRM) ? [
-      {
-        // title: (isPM && !isRM) ? "Resource Project Management" : "Resource Management",
-        title: "Resource Management",
-        description:
-          "Make the right people available to the right projects at the right time",
-        icon: UserCog2,
-        // href: (isPM && !isRM) ? "/resource-management/projects" : "/resource-management",
-        href: "/resource-management",
-        color: "bg-[#263383]",
-        stats: "Manage resources effectively",
-      },
-    ] : [],
+    ...(isAdminOrSuperAdmin || isRM
+      ? [
+          {
+            // title: (isPM && !isRM) ? "Resource Project Management" : "Resource Management",
+            title: "Resource Management",
+            description:
+              "Make the right people available to the right projects at the right time",
+            icon: UserCog2,
+            // href: (isPM && !isRM) ? "/resource-management/projects" : "/resource-management",
+            href: "/resource-management",
+            color: "bg-[#263383]",
+            stats: "Manage resources effectively",
+          },
+        ]
+      : []),
     {
       title: "Leave Management",
       description: "Handle leave requests and approvals",
@@ -352,12 +354,14 @@ const Dashboard = () => {
                 </p>
                 <div className="flex items-center mt-1">
                   <TrendingUp
-                    className={`h-4 w-4 ${stat.positive ? "text-green-500" : "text-red-500"
-                      }`}
+                    className={`h-4 w-4 ${
+                      stat.positive ? "text-green-500" : "text-red-500"
+                    }`}
                   />
                   <span
-                    className={`text-sm ml-1 ${stat.positive ? "text-green-600" : "text-red-600"
-                      }`}
+                    className={`text-sm ml-1 ${
+                      stat.positive ? "text-green-600" : "text-red-600"
+                    }`}
                   >
                     {stat.change}
                   </span>

@@ -5,7 +5,7 @@ import { Listbox, Transition } from "@headlessui/react";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const useLeavelables = () => {
   const [leavelables, setLeavelables] = useState([]);

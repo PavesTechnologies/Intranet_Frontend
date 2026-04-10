@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Users,
-  X,
-  XCircle,
-  ShieldCheck,
-  Clock,
-  MailCheck,
-} from "lucide-react";
+import { Users, X, XCircle, ShieldCheck, Clock, MailCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
@@ -59,45 +52,35 @@ function JoinModal({
           <X size={20} />
         </button>
 
-        <h2 className="text-xl font-semibold mb-4">
-          Send Joining Details
-        </h2>
+        <h2 className="text-xl font-semibold mb-4">Send Joining Details</h2>
 
         <div className="space-y-4 overflow-y-auto pr-2 flex-1">
           <InputField
             label="Joining Date *"
             type="date"
             value={form.joining_date}
-            onChange={(v) =>
-              setForm({ ...form, joining_date: v })
-            }
+            onChange={(v) => setForm({ ...form, joining_date: v })}
           />
 
           <InputField
             label="Reporting Time *"
             type="time"
             value={form.reporting_time}
-            onChange={(v) =>
-              setForm({ ...form, reporting_time: v })
-            }
+            onChange={(v) => setForm({ ...form, reporting_time: v })}
           />
 
           <InputField
             label="Location *"
             type="text"
             value={form.location}
-            onChange={(v) =>
-              setForm({ ...form, location: v })
-            }
+            onChange={(v) => setForm({ ...form, location: v })}
           />
 
           <SelectField
             label="Department *"
             value={form.department}
             options={DEPARTMENTS}
-            onChange={(v) =>
-              setForm({ ...form, department: v })
-            }
+            onChange={(v) => setForm({ ...form, department: v })}
           />
 
           <SearchableSelect
@@ -107,17 +90,13 @@ function JoinModal({
             loading={loadingManagers}
             disabled={loadingManagers}
             placeholder="Search manager"
-            onChange={(v) =>
-              setForm({ ...form, reporting_manager: v })
-            }
+            onChange={(v) => setForm({ ...form, reporting_manager: v })}
           />
 
           <TextAreaField
             label="Additional Content"
             value={form.custom_message}
-            onChange={(v) =>
-              setForm({ ...form, custom_message: v })
-            }
+            onChange={(v) => setForm({ ...form, custom_message: v })}
           />
         </div>
 
@@ -168,9 +147,7 @@ function ReassignJoiningModal({
           <X size={20} />
         </button>
 
-        <h2 className="text-xl font-semibold mb-4">
-          Reassign Joining Date
-        </h2>
+        <h2 className="text-xl font-semibold mb-4">Reassign Joining Date</h2>
 
         <div className="space-y-4 overflow-y-auto pr-2 flex-1">
           {loadingDetails ? (
@@ -183,36 +160,28 @@ function ReassignJoiningModal({
                 label="New Joining Date *"
                 type="date"
                 value={form.joining_date}
-                onChange={(v) =>
-                  setForm({ ...form, joining_date: v })
-                }
+                onChange={(v) => setForm({ ...form, joining_date: v })}
               />
 
               <InputField
                 label="Reporting Time *"
                 type="time"
                 value={form.reporting_time}
-                onChange={(v) =>
-                  setForm({ ...form, reporting_time: v })
-                }
+                onChange={(v) => setForm({ ...form, reporting_time: v })}
               />
 
               <InputField
                 label="Location *"
                 type="text"
                 value={form.location}
-                onChange={(v) =>
-                  setForm({ ...form, location: v })
-                }
+                onChange={(v) => setForm({ ...form, location: v })}
               />
 
               <SelectField
                 label="Department *"
                 value={form.department}
                 options={DEPARTMENTS}
-                onChange={(v) =>
-                  setForm({ ...form, department: v })
-                }
+                onChange={(v) => setForm({ ...form, department: v })}
               />
 
               <SearchableSelect
@@ -222,17 +191,13 @@ function ReassignJoiningModal({
                 loading={loadingManagers}
                 disabled={loadingManagers}
                 placeholder="Search manager"
-                onChange={(v) =>
-                  setForm({ ...form, reporting_manager: v })
-                }
+                onChange={(v) => setForm({ ...form, reporting_manager: v })}
               />
 
               <TextAreaField
                 label="Comment"
                 value={form.comment}
-                onChange={(v) =>
-                  setForm({ ...form, comment: v })
-                }
+                onChange={(v) => setForm({ ...form, comment: v })}
               />
             </>
           )}
@@ -262,13 +227,7 @@ function ReassignJoiningModal({
   );
 }
 
-function ActionMenu({
-  onView,
-  onCreate,
-  onEdit,
-  showCreate,
-  showEdit,
-}) {
+function ActionMenu({ onView, onCreate, onEdit, showCreate, showEdit }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -281,8 +240,7 @@ function ActionMenu({
 
     document.addEventListener("mousedown", handleClickOutside);
 
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
@@ -338,7 +296,7 @@ function ActionMenu({
 export default function HrOnboardingDashboard() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const [data, setData] = useState([]);
   const [employeeUserIds, setEmployeeUserIds] = useState([]);
@@ -403,7 +361,7 @@ export default function HrOnboardingDashboard() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       const ids = (res.data || []).map((e) => e.user_uuid);
@@ -449,26 +407,24 @@ export default function HrOnboardingDashboard() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       const detail = res.data || {};
 
       setEditJoinForm({
         joining_date: String(
-          detail.joining_date || employee.joining_date || ""
+          detail.joining_date || employee.joining_date || "",
         ).trim(),
         reporting_time: String(
-          detail.reporting_time || employee.reporting_time || ""
+          detail.reporting_time || employee.reporting_time || "",
         ).trim(),
-        location: String(
-          detail.location || employee.location || ""
-        ).trim(),
+        location: String(detail.location || employee.location || "").trim(),
         department: String(
-          detail.department || employee.department || ""
+          detail.department || employee.department || "",
         ).trim(),
         reporting_manager: String(
-          detail.reporting_manager || employee.reporting_manager || ""
+          detail.reporting_manager || employee.reporting_manager || "",
         ).trim(),
         comment: "",
       });
@@ -505,10 +461,9 @@ export default function HrOnboardingDashboard() {
     setLoadingManagers(true);
 
     try {
-      const res = await axios.get(
-        `${BASE_URL}/offer-approval/admin-users`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await axios.get(`${BASE_URL}/offer-approval/admin-users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       const managers = (res.data || []).map((u) => ({
         value: String(u.name || "").trim(),
@@ -533,20 +488,19 @@ export default function HrOnboardingDashboard() {
       : getOfferDisplayStatus(offer, employeeUserIds);
 
   const pageData = useMemo(() => {
-    return data.filter((emp) =>
-      editDisabledUserIds.includes(emp?.user_uuid) ||
-      isTrackedOnboardingStatus(emp, employeeUserIds)
+    return data.filter(
+      (emp) =>
+        editDisabledUserIds.includes(emp?.user_uuid) ||
+        isTrackedOnboardingStatus(emp, employeeUserIds),
     );
   }, [data, employeeUserIds, editDisabledUserIds]);
 
   const filteredData = useMemo(() => {
     return pageData.filter((emp) => {
-      const searchText = `${emp.first_name} ${emp.last_name} ${emp.designation}`
-        .toLowerCase();
+      const searchText =
+        `${emp.first_name} ${emp.last_name} ${emp.designation}`.toLowerCase();
 
-      const matchesSearch = searchText.includes(
-        searchTerm.toLowerCase()
-      );
+      const matchesSearch = searchText.includes(searchTerm.toLowerCase());
 
       const status = getHrDisplayStatus(emp);
       const filter = statusFilter.trim().toUpperCase();
@@ -557,13 +511,17 @@ export default function HrOnboardingDashboard() {
 
       return matchesSearch && status === filter;
     });
-  }, [pageData, searchTerm, statusFilter, employeeUserIds, editDisabledUserIds]);
+  }, [
+    pageData,
+    searchTerm,
+    statusFilter,
+    employeeUserIds,
+    editDisabledUserIds,
+  ]);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
-      prev.includes(id)
-        ? prev.filter((x) => x !== id)
-        : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -602,12 +560,10 @@ export default function HrOnboardingDashboard() {
     }
 
     const selectedEmployees = filteredData.filter((e) =>
-      selectedIds.includes(e.user_uuid)
+      selectedIds.includes(e.user_uuid),
     );
 
-    const emails = selectedEmployees
-      .map((e) => e.mail)
-      .filter(Boolean);
+    const emails = selectedEmployees.map((e) => e.mail).filter(Boolean);
 
     if (emails.length === 0) {
       showStatusToast("No valid emails found");
@@ -640,8 +596,8 @@ export default function HrOnboardingDashboard() {
                     ? "JOINING"
                     : emp.status,
               }
-            : emp
-        )
+            : emp,
+        ),
       );
 
       selectedEmployees.forEach((employee) =>
@@ -649,7 +605,7 @@ export default function HrOnboardingDashboard() {
           ...employee,
           ...joinForm,
           status: "JOINING",
-        })
+        }),
       );
 
       await fetchEmployees();
@@ -731,14 +687,14 @@ export default function HrOnboardingDashboard() {
                 department,
                 reporting_manager,
               }
-            : emp
-        )
+            : emp,
+        ),
       );
 
       setEditDisabledUserIds((prev) =>
         prev.includes(editingEmployee.user_uuid)
           ? prev
-          : [...prev, editingEmployee.user_uuid]
+          : [...prev, editingEmployee.user_uuid],
       );
 
       showStatusToast("Joining date updated");
@@ -787,62 +743,55 @@ export default function HrOnboardingDashboard() {
   const rows = useMemo(() => {
     const startIndex = (currentPage - 1) * PAGE_SIZE;
 
-    return filteredData
-      .slice(startIndex, startIndex + PAGE_SIZE)
-      .map((emp) => {
-        const displayStatus = getHrDisplayStatus(emp);
-        const isEmployeeCreated = displayStatus === "COMPLETED";
-        const isVerified = displayStatus === "VERIFIED";
-        const isJoining = displayStatus === "JOINING";
-        const isJoiningPending = displayStatus === "JOINING_PENDING";
-        const isEditDisabled = editDisabledUserIds.includes(emp.user_uuid);
+    return filteredData.slice(startIndex, startIndex + PAGE_SIZE).map((emp) => {
+      const displayStatus = getHrDisplayStatus(emp);
+      const isEmployeeCreated = displayStatus === "COMPLETED";
+      const isVerified = displayStatus === "VERIFIED";
+      const isJoining = displayStatus === "JOINING";
+      const isJoiningPending = displayStatus === "JOINING_PENDING";
+      const isEditDisabled = editDisabledUserIds.includes(emp.user_uuid);
 
-        return {
-          rowClass: isEmployeeCreated ? "bg-green-100" : "",
-          ...(bulkJoinMode && {
-            select: (
-              <input
-                type="checkbox"
-                disabled={!isVerified}
-                checked={selectedIds.includes(emp.user_uuid)}
-                onChange={() =>
-                  isVerified &&
-                  toggleSelect(emp.user_uuid)
-                }
-                className={`h-4 w-4 ${
-                  isVerified
-                    ? "cursor-pointer"
-                    : "opacity-40 cursor-not-allowed"
-                }`}
-              />
-            ),
-          }),
-          name: `${emp.first_name} ${emp.last_name}`,
-          mail: emp.mail || "—",
-          contact: emp.contact_number || "—",
-          designation: emp.designation || "—",
-          status: (
-            <StatusBadge
-              label={formatOfferStatusLabel(displayStatus)}
-              size="sm"
+      return {
+        rowClass: isEmployeeCreated ? "bg-green-100" : "",
+        ...(bulkJoinMode && {
+          select: (
+            <input
+              type="checkbox"
+              disabled={!isVerified}
+              checked={selectedIds.includes(emp.user_uuid)}
+              onChange={() => isVerified && toggleSelect(emp.user_uuid)}
+              className={`h-4 w-4 ${
+                isVerified ? "cursor-pointer" : "opacity-40 cursor-not-allowed"
+              }`}
             />
           ),
-          action: (
-            <ActionMenu
-              onView={() =>
-                navigate(`/employee-onboarding/hr/profile/${emp.user_uuid}`)
-              }
-              onCreate={() => handleOpenCreateModal(emp)}
-              onEdit={() => handleOpenEditModal(emp)}
-              showCreate={
-                (isVerified || isJoining || isJoiningPending) &&
-                !isEmployeeCreated
-              }
-              showEdit={isJoiningPending && !isEditDisabled}
-            />
-          ),
-        };
-      });
+        }),
+        name: `${emp.first_name} ${emp.last_name}`,
+        mail: emp.mail || "—",
+        contact: emp.contact_number || "—",
+        designation: emp.designation || "—",
+        status: (
+          <StatusBadge
+            label={formatOfferStatusLabel(displayStatus)}
+            size="sm"
+          />
+        ),
+        action: (
+          <ActionMenu
+            onView={() =>
+              navigate(`/employee-onboarding/hr/profile/${emp.user_uuid}`)
+            }
+            onCreate={() => handleOpenCreateModal(emp)}
+            onEdit={() => handleOpenEditModal(emp)}
+            showCreate={
+              (isVerified || isJoining || isJoiningPending) &&
+              !isEmployeeCreated
+            }
+            showEdit={isJoiningPending && !isEditDisabled}
+          />
+        ),
+      };
+    });
   }, [
     filteredData,
     currentPage,
@@ -856,13 +805,9 @@ export default function HrOnboardingDashboard() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">
-          HR Onboarding Dashboard
-        </h1>
+        <h1 className="text-2xl font-bold">HR Onboarding Dashboard</h1>
 
-        <p className="text-gray-500">
-          Verify employee documents & profiles
-        </p>
+        <p className="text-gray-500">Verify employee documents & profiles</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -878,11 +823,8 @@ export default function HrOnboardingDashboard() {
           value={
             loading
               ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "VERIFIED"
-                ).length
+              : pageData.filter((e) => getHrDisplayStatus(e) === "VERIFIED")
+                  .length
           }
           icon={ShieldCheck}
           onClick={() => handleKpiClick("VERIFIED")}
@@ -893,11 +835,8 @@ export default function HrOnboardingDashboard() {
           value={
             loading
               ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "JOINING"
-                ).length
+              : pageData.filter((e) => getHrDisplayStatus(e) === "JOINING")
+                  .length
           }
           icon={MailCheck}
           onClick={() => handleKpiClick("JOINING")}
@@ -909,9 +848,7 @@ export default function HrOnboardingDashboard() {
             loading
               ? "0"
               : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "JOINING_PENDING"
+                  (e) => getHrDisplayStatus(e) === "JOINING_PENDING",
                 ).length
           }
           icon={Clock}
@@ -923,11 +860,8 @@ export default function HrOnboardingDashboard() {
           value={
             loading
               ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "COMPLETED"
-                ).length
+              : pageData.filter((e) => getHrDisplayStatus(e) === "COMPLETED")
+                  .length
           }
           icon={Users}
           onClick={() => handleKpiClick("COMPLETED")}
@@ -938,11 +872,8 @@ export default function HrOnboardingDashboard() {
           value={
             loading
               ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "REJECTED"
-                ).length
+              : pageData.filter((e) => getHrDisplayStatus(e) === "REJECTED")
+                  .length
           }
           icon={XCircle}
           onClick={() => handleKpiClick("REJECTED")}
@@ -979,9 +910,7 @@ export default function HrOnboardingDashboard() {
       </div>
 
       <div className="bg-white p-4 rounded-xl shadow-sm flex justify-between">
-        <h2 className="font-semibold text-gray-700">
-          Recent Offer Letters
-        </h2>
+        <h2 className="font-semibold text-gray-700">Recent Offer Letters</h2>
 
         {!bulkJoinMode ? (
           <Button
@@ -989,14 +918,12 @@ export default function HrOnboardingDashboard() {
             size="small"
             onClick={() => {
               const hasVerified = filteredData.some(
-                (e) =>
-                  getHrDisplayStatus(e) ===
-                  "VERIFIED"
+                (e) => getHrDisplayStatus(e) === "VERIFIED",
               );
 
               if (!hasVerified) {
                 showStatusToast(
-                  "No verified candidates available for bulk join"
+                  "No verified candidates available for bulk join",
                 );
                 return;
               }
@@ -1017,11 +944,7 @@ export default function HrOnboardingDashboard() {
               Send ({selectedIds.length})
             </Button>
 
-            <Button
-              varient="secondary"
-              size="small"
-              onClick={resetBulk}
-            >
+            <Button varient="secondary" size="small" onClick={resetBulk}>
               Cancel
             </Button>
           </div>
@@ -1040,16 +963,8 @@ export default function HrOnboardingDashboard() {
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
-            onPrevious={() =>
-              setCurrentPage((p) =>
-                Math.max(p - 1, 1)
-              )
-            }
-            onNext={() =>
-              setCurrentPage((p) =>
-                Math.min(p + 1, totalPages)
-              )
-            }
+            onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+            onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
           />
         )}
       </div>
@@ -1092,9 +1007,7 @@ export default function HrOnboardingDashboard() {
 function InputField({ label, type, value, onChange }) {
   return (
     <div>
-      <label className="text-sm font-medium">
-        {label}
-      </label>
+      <label className="text-sm font-medium">{label}</label>
       <input
         type={type}
         value={value}
@@ -1108,9 +1021,7 @@ function InputField({ label, type, value, onChange }) {
 function TextAreaField({ label, value, onChange }) {
   return (
     <div>
-      <label className="text-sm font-medium">
-        {label}
-      </label>
+      <label className="text-sm font-medium">{label}</label>
       <textarea
         rows="3"
         value={value}
@@ -1131,12 +1042,8 @@ function StatCard({ title, value, icon: Icon, onClick }) {
     >
       <Icon className="text-indigo-600" />
       <div>
-        <p className="text-sm text-gray-500">
-          {title}
-        </p>
-        <p className="text-xl font-semibold text-gray-900">
-          {value}
-        </p>
+        <p className="text-sm text-gray-500">{title}</p>
+        <p className="text-xl font-semibold text-gray-900">{value}</p>
       </div>
     </div>
   );
@@ -1152,9 +1059,7 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="text-sm font-medium">
-        {label}
-      </label>
+      <label className="text-sm font-medium">{label}</label>
 
       <select
         disabled={disabled || loading}
@@ -1163,9 +1068,7 @@ function SelectField({
         className={`w-full mt-1 px-3 py-2 border rounded-lg bg-white
           ${disabled || loading ? "opacity-50 cursor-not-allowed" : ""}`}
       >
-        <option value="">
-          {loading ? "Loading..." : `Select ${label}`}
-        </option>
+        <option value="">{loading ? "Loading..." : `Select ${label}`}</option>
 
         {options.map((opt) => {
           if (typeof opt === "string") {
@@ -1199,17 +1102,14 @@ function SearchableSelect({
   const [query, setQuery] = useState("");
 
   const filtered = options.filter((opt) =>
-    opt.label.toLowerCase().includes(query.toLowerCase())
+    opt.label.toLowerCase().includes(query.toLowerCase()),
   );
 
-  const selectedLabel =
-    options.find((o) => o.value === value)?.label || "";
+  const selectedLabel = options.find((o) => o.value === value)?.label || "";
 
   return (
     <div className="relative">
-      <label className="text-sm font-medium">
-        {label}
-      </label>
+      <label className="text-sm font-medium">{label}</label>
 
       <input
         disabled={disabled}
@@ -1224,9 +1124,7 @@ function SearchableSelect({
       {open && !disabled && (
         <div className="absolute z-50 w-full bg-white border rounded-lg shadow max-h-48 overflow-y-auto mt-1">
           {filtered.length === 0 && (
-            <div className="p-2 text-gray-500 text-sm">
-              No results
-            </div>
+            <div className="p-2 text-gray-500 text-sm">No results</div>
           )}
 
           {filtered.map((opt) => (
