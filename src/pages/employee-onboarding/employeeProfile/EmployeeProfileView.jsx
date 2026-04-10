@@ -27,7 +27,7 @@ import DocumentsPage from "./DocumentsPage";
 export default function EmployeeProfileView() {
   const {employee_uuid} = useParams();
 
-  const [activeTab, setActiveTab] = useState("profile");
+  const [activeTab, setActiveTab] = useState("about");
   const [docTabConfig, setDocTabConfig] = useState({ folder: "education", search: "" });
 
   const handleTabChange = (tab, config = null) => {
