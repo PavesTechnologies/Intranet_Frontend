@@ -179,11 +179,7 @@ const parentNav = [
   }
   else if (
     location.pathname.startsWith("/employee-onboarding/hr") ||
-<<<<<<< HEAD
-    location.pathname.startsWith("/employee-onboarding/hr/backgroundcheck") ||
-=======
     location.pathname.startsWith("/employee-onboarding/backgroundcheck") ||
->>>>>>> e6d4dc88e56ad8bf81e7ea313afe8af244dcb00a
     location.pathname.startsWith("/employee-onboarding/core-employee")
   ) {
     navToRender = hrverificationNav;
