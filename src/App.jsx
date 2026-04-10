@@ -39,6 +39,7 @@ import DMRoleOffPage from "./pages/resource_management/pages/roleoff/dm.js";
 import BenchPage from "./pages/resource_management/bench/pages/BenchPage.jsx";
 import RoleOffDashboard from "./pages/resource_management/pages/roleoff/RoleOffDashboard.jsx";
 import BenchPoolDashboard from "./pages/resource_management/bench/pages/BenchPoolDashboard.jsx";
+import UtilizationPerformanceDashboard from "./pages/resource_management/bench/pages/UtilizationPerformanceDashboard.jsx";
 
 // Timesheets
 
@@ -458,6 +459,7 @@ const AppRoutes = () => {
 
             <Route path="hr" element={<HrOnboardingDashboard />} />
             <Route path="hr/profile/:user_uuid" element={<HrProfileView />} />
+            <Route path="backgroundcheck" element={<BackgroundCheckPage />} />
 
             <Route path="admin/approval-dashboard" element={<AdminApprovalDashboard />} />
             <Route path="admin/offer/:user_uuid" element={<AdminOfferView />} />
@@ -775,6 +777,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
                 <BenchPoolDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resource-management/bench/utilization-performance"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+                <UtilizationPerformanceDashboard />
               </ProtectedRoute>
             }
           />

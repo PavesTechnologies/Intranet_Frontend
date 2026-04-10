@@ -39,6 +39,7 @@ const resourceManagementSubmenu = [
   { label: "Demand Management", to: "/resource-management/demand" },
   { label: "Role-Off Management", to: "/resource-management/roleoff" },
   { label: "Bench Management", to: "/resource-management/bench" },
+  { label: "Utilization & Performance", to: "/resource-management/bench/utilization-performance" },
 ];
 
 const deliveryManagerResourceManagementSubmenu = resourceManagementSubmenu.filter(

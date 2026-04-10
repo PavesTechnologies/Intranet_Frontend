@@ -59,7 +59,8 @@ const parentNav = [
   {
     label: "Employee Verification",
     match: [
-      "/employee-onboarding/hr/",
+      "/employee-onboarding/hr",
+      "/employee-onboarding/backgroundcheck",
       "/employee-onboarding/core-employee",
     ],
     redirect: "/employee-onboarding/hr",
@@ -133,7 +134,11 @@ const parentNav = [
 
   const hrverificationNav = [
     { label: "HR Verification", path: "/employee-onboarding/hr" },
+<<<<<<< HEAD
     { label: "Background Check", path: "/employee-onboarding/hr/backgroundcheck" },
+=======
+    { label: "Background Check", path: "/employee-onboarding/backgroundcheck" },
+>>>>>>> e6d4dc88e56ad8bf81e7ea313afe8af244dcb00a
     { label: "Core Employee", path: "/employee-onboarding/core-employee" },
 
   ];
@@ -177,7 +182,11 @@ const parentNav = [
   }
   else if (
     location.pathname.startsWith("/employee-onboarding/hr") ||
+<<<<<<< HEAD
     location.pathname.startsWith("/employee-onboarding/hr/backgroundcheck") ||
+=======
+    location.pathname.startsWith("/employee-onboarding/backgroundcheck") ||
+>>>>>>> e6d4dc88e56ad8bf81e7ea313afe8af244dcb00a
     location.pathname.startsWith("/employee-onboarding/core-employee")
   ) {
     navToRender = hrverificationNav;
