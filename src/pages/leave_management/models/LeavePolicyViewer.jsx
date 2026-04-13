@@ -184,7 +184,6 @@ export default function LeavePolicyViewer() {
   const navigate = useNavigate();
 
   const BASE_URL = `https://lms-cms-k2r1.onrender.com/api/lms-cms`;
-
   useEffect(() => {
     const fetchPolicies = async () => {
       try {
