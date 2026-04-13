@@ -1,20 +1,6 @@
 import React from "react";
 import clsx from "clsx";
 
-
-// const normalizeStatus = (label = "") => {
-//   const map = {
-//     accepted: "active",
-//     verified: "active",
-//     submitted: "pending",
-//     rejected: "reject",
-//   };
-
-//   const key = label.toLowerCase();
-//   return map[key] || key;
-// };
-
-
 const StatusBadge = ({ label, size = "md" }) => {
   const raw = label?.toLowerCase() || "";
   const normalized = raw.replace(/_/g, " ").trim();
@@ -85,7 +71,10 @@ const StatusBadge = ({ label, size = "md" }) => {
     bgColor = "bg-yellow-100";
     textColor = "text-yellow-700";
   }
-
+  if (normalized === "rescheduled") {
+    bgColor = "bg-yellow-100";
+    textColor = "text-yellow-700";
+  }
 
   const sizeStyles = {
     sm: "text-xs px-2 py-0.5",
