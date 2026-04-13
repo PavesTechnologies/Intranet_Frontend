@@ -297,6 +297,14 @@ const Dashboard = () => {
       color: "bg-[#d23369]",
       stats: "5 events today",
     },
+    {
+      title: "Employee Exit",
+      description: "Manage employee exit processes",
+      icon: AlertCircle,
+      href: "/employee-exit",
+      color: "bg-[#ff3d72]",
+      stats: "2 exits this month",
+    },
   ];
 
   const filteredModuleCards = moduleCards.filter((card) => {
@@ -331,6 +339,12 @@ const Dashboard = () => {
       time: "1 day ago",
       type: "timesheet",
     },
+    {
+      action: "Employee Exit Process",
+      user: "Anna Lee",
+      time: "2 days ago",
+      type: "exit",
+    }
   ];
 
   return (

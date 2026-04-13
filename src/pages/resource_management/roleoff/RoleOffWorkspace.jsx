@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { getResources } from "@/pages/resource_management/services/roleOffService";
 import KPISection from "./KPISection";
 import RoleOffTable from "./RoleOffTable";
 import BulkActionBar from "./BulkActionBar";
@@ -29,6 +28,8 @@ import {
   dlReject,
   getPendingRoleOffs,
   getPendingRoleOffsForDM,
+  getResources,
+  getRoleOffProjectKPI,
   pmCancelRoleOff,
   rmApprove,
   rmReject,
@@ -36,11 +37,16 @@ import {
   from "../services/roleOffService";
 
 const mapStatus = (item) => {
-  if (item.roleOffStatus === "PENDING") return "Pending Approval";
-  if (item.roleOffStatus === "APPROVED") return "Approved";
-  if (item.roleOffStatus === "REJECTED") return "Rejected";
-  if (item.roleOffStatus === "FULFILLED") return "Fulfilled";
-  if (item.roleOffStatus === null) return "Not Requested";
+  const rawRoleOffStatus = item?.roleOffStatus;
+  const normalizedRoleOffStatus = String(rawRoleOffStatus ?? "").trim().toUpperCase();
+
+  if (normalizedRoleOffStatus === "PENDING") return "Pending Approval";
+  if (normalizedRoleOffStatus === "APPROVED") return "Approved";
+  if (normalizedRoleOffStatus === "REJECTED") return "Rejected";
+  if (normalizedRoleOffStatus === "FULFILLED") return "Fulfilled";
+  if (!normalizedRoleOffStatus || normalizedRoleOffStatus === "NULL" || normalizedRoleOffStatus === "NOT_REQUESTED") {
+    return "Not Requested";
+  }
   return normalizeStatus(item.status);
 };
 
@@ -101,6 +107,40 @@ const normalizeImpact = (impact) => {
   return impact;
 };
 
+const getRoleOffSources = (item) => ([
+  item,
+  item?.roleOff,
+  item?.roleOffRequest,
+  item?.currentRoleOff,
+  item?.latestRoleOff,
+  item?.activeRoleOff,
+  item?.request,
+]).filter(Boolean);
+
+const getFirstDefinedValue = (sources, keys, fallback = undefined) => {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = source?.[key];
+      if (value !== undefined && value !== null && value !== "") {
+        return value;
+      }
+    }
+  }
+
+  return fallback;
+};
+
+const toBoolean = (value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1", "y"].includes(normalized)) return true;
+    if (["false", "no", "0", "n", ""].includes(normalized)) return false;
+  }
+  if (typeof value === "number") return value !== 0;
+  return Boolean(value);
+};
+
 const isBulkCreatedRoleOff = (item) => {
   if (!item || typeof item !== "object") return false;
 
@@ -132,6 +172,40 @@ const isBulkCreatedRoleOff = (item) => {
 };
 
 const mapResourceToAllocation = (item, index) => {
+  const roleOffSources = getRoleOffSources(item);
+  const backendRoleOffId = getFirstDefinedValue(roleOffSources, ["roleOffId"], null);
+  const backendRoleOffStatus = getFirstDefinedValue(roleOffSources, ["roleOffStatus"], item.roleOffStatus);
+  const cachedRoleOffDetails = getCachedRoleOffDetails(item);
+  if (cachedRoleOffDetails) {
+    roleOffSources.unshift(cachedRoleOffDetails);
+  }
+  const roleOffId = backendRoleOffId;
+  const roleOffStatus = backendRoleOffStatus;
+  const effectiveDateIso = getFirstDefinedValue(
+    roleOffSources,
+    ["effectiveDate", "effectiveRoleOffDate", "roleOffEffectiveDate"],
+    "",
+  );
+  const roleOffType = getFirstDefinedValue(roleOffSources, ["roleOffType", "type"], "Planned");
+  const roleOffReason = getFirstDefinedValue(
+    roleOffSources,
+    ["roleOffReason", "reason", "reasonCode", "roleOffReasonCode", "reasonLabel", "reasonName"],
+    "",
+  );
+  const skipReason = getFirstDefinedValue(
+    roleOffSources,
+    ["skipReason", "skipReplacementReason", "replacementSkipReason", "noReplacementReason"],
+    "",
+  );
+  const replacementRequired = getFirstDefinedValue(
+    roleOffSources,
+    ["autoReplacementRequired", "replacementRequired", "requestedReplacement", "replacementNeeded"],
+    false,
+  );
+  const impactSummary = getFirstDefinedValue(roleOffSources, ["impactSummary"], "");
+  const rejectionReason = getFirstDefinedValue(roleOffSources, ["rejectionReason", "rejectReason"], "");
+  const rejectedBy = getFirstDefinedValue(roleOffSources, ["rejectedBy"], "");
+
   const allocation = {
     // 🔥 CRITICAL FIXES
     id: item.id || item.allocationId,          // ✅ UUID (MANDATORY)
@@ -176,20 +250,17 @@ const mapResourceToAllocation = (item, index) => {
     endDateIso: item.endDate || "",
 
     status: normalizeStatus(item.status),
-    roleOffId: item.roleOffId || null,
-    roleOffStatus: mapStatus(item),
-    effectiveDate: formatDisplayDate(item.effectiveDate),
-    effectiveDateIso: item.effectiveDate || "",
-    type: item.roleOffType || item.type || "Planned",
-    reason: item.roleOffReason || "",
-    impactSummary: item.impactSummary || "",
-    skipReason: item.skipReason || "",
-    replacementRequired: Boolean(
-      item.autoReplacementRequired
-      ?? item.replacementRequired,
-    ),
-    rejectionReason: item.rejectionReason || "",
-    rejectedBy: item.rejectedBy || "",
+    roleOffId,
+    roleOffStatus: mapStatus({ ...item, roleOffStatus }),
+    effectiveDate: formatDisplayDate(effectiveDateIso),
+    effectiveDateIso,
+    type: roleOffType,
+    reason: roleOffReason,
+    impactSummary,
+    skipReason,
+    replacementRequired: toBoolean(replacementRequired),
+    rejectionReason,
+    rejectedBy,
     isBulkCreated: isBulkCreatedRoleOff(item),
 
     businessCritical: Number(item.allocationPercentage || 0) >= 90,
@@ -363,7 +434,111 @@ const buildPmDemandStyleKpis = (allocations, roleOffRequests, selectedRows) => {
   ];
 };
 
+const normalizePmKpis = (kpiPayload, fallbackMetrics = []) => {
+  const source = extractObjectPayload(kpiPayload);
+  if (!source) return fallbackMetrics;
+
+  return [
+    {
+      label: "Active Allocations",
+      count: getNumericMetricValue(
+        source,
+        ["activeAllocations", "totalActiveAllocations", "activeAllocationCount", "activeCount", "active", "totalAllocations"],
+        fallbackMetrics[0]?.count ?? 0,
+      ),
+    },
+    {
+      label: "Pending Role-Offs",
+      count: getNumericMetricValue(
+        source,
+        ["pendingRoleOffs", "pendingRoleOffCount", "pendingRequests", "pendingRequestCount", "pending", "pendingCount"],
+        fallbackMetrics[1]?.count ?? 0,
+      ),
+    },
+    {
+      label: "High Impact Allocations",
+      count: getNumericMetricValue(
+        source,
+        ["highImpactAllocations", "highImpactAllocationCount", "highImpact", "atRisk", "atRiskAllocations", "highRiskCount"],
+        fallbackMetrics[2]?.count ?? 0,
+      ),
+    },
+    {
+      label: "Total RoleOff",
+      count: getNumericMetricValue(
+        source,
+        ["totalRoleOff", "totalRoleOffs", "roleOffCount", "totalRoleOffCount", "totalRequests", "totalCount"],
+        fallbackMetrics[3]?.count ?? 0,
+      ),
+    },
+  ];
+};
+
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
+
+const getApiMessage = (payload, fallback) => {
+  if (typeof payload === "string" && payload.trim()) return payload;
+  if (typeof payload?.message === "string" && payload.message.trim()) return payload.message;
+  if (typeof payload?.data?.message === "string" && payload.data.message.trim()) return payload.data.message;
+  return fallback;
+};
+
+const getErrorMessage = (error, fallback) =>
+  error?.response?.data?.message || error?.message || fallback;
+
+const ROLE_OFF_FORM_CACHE_KEY = "roleoff-form-cache";
+
+const readRoleOffFormCache = () => {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.sessionStorage.getItem(ROLE_OFF_FORM_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    console.error("Failed to read role-off form cache", error);
+    return {};
+  }
+};
+
+const writeRoleOffFormCache = (cache) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(ROLE_OFF_FORM_CACHE_KEY, JSON.stringify(cache));
+  } catch (error) {
+    console.error("Failed to write role-off form cache", error);
+  }
+};
+
+const getCachedRoleOffDetails = (item) => {
+  const cache = readRoleOffFormCache();
+  return cache[item?.roleOffId] || cache[item?.allocationId] || cache[item?.id] || null;
+};
+
+const cacheRoleOffDetails = (keys = [], details = {}) => {
+  const validKeys = keys.filter(Boolean);
+  if (validKeys.length === 0) return;
+
+  const cache = readRoleOffFormCache();
+  validKeys.forEach((key) => {
+    cache[key] = {
+      ...cache[key],
+      ...details,
+    };
+  });
+  writeRoleOffFormCache(cache);
+};
+
+const removeCachedRoleOffDetails = (keys = []) => {
+  const validKeys = keys.filter(Boolean);
+  if (validKeys.length === 0) return;
+
+  const cache = readRoleOffFormCache();
+  validKeys.forEach((key) => {
+    delete cache[key];
+  });
+  writeRoleOffFormCache(cache);
+};
 
 const PM_QUEUE_TABS = [
   { id: "active", label: "Active" },
@@ -376,6 +551,33 @@ const extractArrayPayload = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.data?.data)) return payload.data.data;
   return [];
+};
+
+const extractObjectPayload = (payload) => {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  if (payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)) {
+    if (payload.data.data && typeof payload.data.data === "object" && !Array.isArray(payload.data.data)) {
+      return payload.data.data;
+    }
+
+    return payload.data;
+  }
+
+  return payload;
+};
+
+const getNumericMetricValue = (source, keys, fallback = 0) => {
+  for (const key of keys) {
+    const value = source?.[key];
+    if (value !== undefined && value !== null && value !== "" && !Number.isNaN(Number(value))) {
+      return Number(value);
+    }
+  }
+
+  return fallback;
 };
 
 const createBulkPanelRecord = (records = []) => {
@@ -449,6 +651,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   const [loading, setLoading] = useState(false);
   const [allocations, setAllocations] = useState([]);
   const [roleOffRequests, setRoleOffRequests] = useState([]);
+  const [projectKpiData, setProjectKpiData] = useState(null);
   const [selectedRows, setSelectedRows] = useState([]);
   const [filterPanelCollapsed, setFilterPanelCollapsed] = useState(true);
   const [filters, setFilters] = useState({
@@ -476,28 +679,45 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   const loadPmResources = useCallback(async (isActiveRef = () => true) => {
     if (mode !== "pm") {
       setAllocations([]);
+      setProjectKpiData(null);
       return;
     }
 
     if (!projectId) {
       setAllocations([]);
+      setProjectKpiData(null);
       return;
     }
 
     setLoading(true);
     try {
-      const response = await getResources(projectId);
+      const [resourcesResult, kpiResult] = await Promise.allSettled([
+        getResources(projectId),
+        getRoleOffProjectKPI(projectId),
+      ]);
       if (!isActiveRef()) return;
 
-      const nextAllocations = Array.isArray(response?.data)
-        ? response.data.map(mapResourceToAllocation)
-        : [];
+      if (resourcesResult.status === "fulfilled") {
+        const nextAllocations = Array.isArray(resourcesResult.value?.data)
+          ? resourcesResult.value.data.map(mapResourceToAllocation)
+          : [];
+        setAllocations(nextAllocations);
+      } else {
+        setAllocations([]);
+        toast.error("Failed to load role-off resources");
+      }
 
-      setAllocations(nextAllocations);
+      if (kpiResult.status === "fulfilled") {
+        setProjectKpiData(kpiResult.value);
+      } else {
+        setProjectKpiData(null);
+        console.error("Failed to load role-off project KPI", kpiResult.reason);
+      }
     } catch (error) {
       if (!isActiveRef()) return;
 
       setAllocations([]);
+      setProjectKpiData(null);
       toast.error("Failed to load role-off resources");
     } finally {
       if (isActiveRef()) setLoading(false);
@@ -551,6 +771,10 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     };
   }, [loadPendingRoleOffRequests]);
 
+  const refreshPendingQueue = useCallback(async () => {
+    await loadPendingRoleOffRequests();
+  }, [loadPendingRoleOffRequests]);
+
   const pageCopy = titleMap[mode];
   const scopedAllocations = useMemo(() => {
     if (!projectName) return allocations;
@@ -578,9 +802,13 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     () => buildKpis(mode, scopedAllocations, scopedRoleOffRequests, selectedRows),
     [mode, scopedAllocations, scopedRoleOffRequests, selectedRows],
   );
-  const pmKpis = useMemo(
+  const pmKpiFallback = useMemo(
     () => buildPmDemandStyleKpis(scopedAllocations, scopedRoleOffRequests, selectedRows),
     [scopedAllocations, scopedRoleOffRequests, selectedRows],
+  );
+  const pmKpis = useMemo(
+    () => normalizePmKpis(projectKpiData, pmKpiFallback),
+    [projectKpiData, pmKpiFallback],
   );
 
   const pmTabCounts = useMemo(() => ({
@@ -629,6 +857,11 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       return matchesSearch && matchesStatus && matchesImpact && matchesReason;
     });
   }, [scopedAllocations, scopedRoleOffRequests, mode, filters, pmActiveTab]);
+
+  const hasActiveFilters = useMemo(
+    () => Object.values(filters).some((value) => String(value || "").trim() !== ""),
+    [filters],
+  );
 
   useEffect(() => {
     const visibleIds = new Set(visibleRows.map((item) => item.id));
@@ -701,25 +934,27 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
   const handleRmApprove = async (request) => {
     try {
+      let response;
       if (request?.isBulk) {
         setBulkActionState({ key: "rm-approve", loading: true });
-        await bulkRmApprove(request.records.map((item) => item.id));
+        response = await bulkRmApprove(request.records.map((item) => item.id));
       } else {
-        await rmApprove(request.id);
+        response = await rmApprove(request.id);
       }
-      await loadRoleOffRequests();
+      await refreshPendingQueue();
       setSelectedRows([]);
       setPanelState({ open: false, actionType: "view", record: null });
-      toast.success("Approved by RM");
-      loadPendingRoleOffRequests();
       toast.success(
-        request?.isBulk
-          ? `${request.records.length} role-off request(s) approved by RM`
-          : "Approved by RM",
+        getApiMessage(
+          response,
+          request?.isBulk
+            ? `${request.records.length} role-off request(s) approved by RM`
+            : "Role-off request approved by RM",
+        ),
       );
     } catch (err) {
       console.error(err);
-      toast.error("RM approval failed");
+      toast.error(getErrorMessage(err, "RM approval failed"));
     } finally {
       setBulkActionState({ key: null, loading: false });
     }
@@ -727,26 +962,30 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
   const handleRmReject = async (request, rejectionReason) => {
     try {
+      let response;
       if (request?.isBulk) {
         setBulkActionState({ key: "rm-reject", loading: true });
-        await bulkRmReject(
+        response = await bulkRmReject(
           request.records.map((item) => item.id),
           rejectionReason,
         );
       } else {
-        await rmReject(request.id, rejectionReason);
+        response = await rmReject(request.id, rejectionReason);
       }
-      await loadRoleOffRequests();
+      await refreshPendingQueue();
       setSelectedRows([]);
       setPanelState({ open: false, actionType: "view", record: null });
-      toast.error(
-        request?.isBulk
-          ? `${request.records.length} role-off request(s) rejected by RM`
-          : "Rejected by RM",
+      toast.success(
+        getApiMessage(
+          response,
+          request?.isBulk
+            ? `${request.records.length} role-off request(s) rejected by RM`
+            : "Role-off request rejected by RM",
+        ),
       );
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || "Request Rejection Failed");
+      toast.error(getErrorMessage(err, "Request rejection failed"));
     } finally {
       setBulkActionState({ key: null, loading: false });
     }
@@ -782,12 +1021,12 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     // 🔥 RM APPROVE
     if (mode === "rm" && action === "approve") {
       try {
-        await rmApprove(row.id);
-        toast.success("Approved by RM");
-        // await fetchRoleOffs();
+        const response = await rmApprove(row.id);
+        await refreshPendingQueue();
+        toast.success(getApiMessage(response, "Role-off request approved by RM"));
       } catch (err) {
         console.error(err);
-        toast.error("RM approval failed");
+        toast.error(getErrorMessage(err, "RM approval failed"));
       }
       return;
     }
@@ -795,12 +1034,12 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     // 🔥 RM REJECT
     if (mode === "rm" && action === "reject") {
       try {
-        const res = await rmReject(row.id, "Rejected by RM");
-        toast.success(res?.message || "Rejected by RM");
-        loadPendingRoleOffRequests();
+        const response = await rmReject(row.id, "Rejected by RM");
+        await refreshPendingQueue();
+        toast.success(getApiMessage(response, "Role-off request rejected by RM"));
       } catch (err) {
         console.error(err);
-        toast.error(err.response?.data?.message || "RM rejection failed");
+        toast.error(getErrorMessage(err, "RM rejection failed"));
       }
       return;
     }
@@ -808,12 +1047,12 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     // 🔥 DM APPROVE (FULFILL)
     if (mode === "dm" && action === "approve") {
       try {
-        const res = await dlFulfill(row.id);
-        toast.success(res?.message || "DL Approved");
-        loadPendingRoleOffRequests();
+        await dlFulfill(row.id);
+        await refreshPendingQueue();
+        toast.success("Role-off request fulfilled by DM");
       } catch (err) {
         console.error(err);
-        toast.error(err.response?.data?.message || "DL approval failed");
+        toast.error(getErrorMessage(err, "DM fulfillment failed"));
       }
       return;
     }
@@ -821,12 +1060,12 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     // 🔥 DM REJECT
     if (mode === "dm" && action === "reject") {
       try {
-        const res = await dlReject(row.id, "Rejected by DL");
-        toast.success(res?.message || "DL Rejected");
-        loadPendingRoleOffRequests();
+        const response = await dlReject(row.id, "Rejected by DL");
+        await refreshPendingQueue();
+        toast.success(getApiMessage(response, "Role-off request rejected by DM"));
       } catch (err) {
         console.error(err);
-        toast.error(err.response?.data?.message || "DL rejection failed");
+        toast.error(getErrorMessage(err, "DM rejection failed"));
       }
       return;
     }
@@ -870,13 +1109,33 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           return response;
         }
 
+        records.forEach((record) => {
+          cacheRoleOffDetails(
+            [record?.roleOffId, record?.allocationId, record?.id],
+            {
+              type: "Planned",
+              roleOffType: "Planned",
+              reason: formState.reason,
+              roleOffReason: formState.reason,
+              effectiveDate: formState.effectiveDate,
+              effectiveRoleOffDate: formState.effectiveDate,
+              replacementRequired: formState.replacementRequired,
+              autoReplacementRequired: formState.replacementRequired,
+              skipReason: formState.skipReason,
+            },
+          );
+        });
+
         await loadPmResources();
         setSelectedRows([]);
         setPanelState({ open: false, actionType: "create", record: null });
-        toast.success(`${records.length} planned role-off request(s) created`);
+        toast.success(
+          getApiMessage(response, `${records.length} planned role-off request(s) created`),
+        );
         return { success: true };
       }
 
+      let lastResponse = null;
       for (const currentAllocation of records) {
         const isBulkStyleUpdate =
           panelState.actionType === "update" && Boolean(currentAllocation?.isBulkCreated);
@@ -902,10 +1161,32 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         };
 
         const response = await createRoleOff(payload);
+        lastResponse = response;
         if (response?.requiresConfirmation && !formState.reviewConfirmed) {
           confirmationResponse = response;
           break;
         }
+
+        cacheRoleOffDetails(
+          [
+            response?.roleOffId,
+            response?.data?.roleOffId,
+            currentAllocation?.roleOffId,
+            currentAllocation?.allocationId,
+            currentAllocation?.id,
+          ],
+          {
+            type: formState.type,
+            roleOffType: formState.type,
+            reason: formState.reason,
+            roleOffReason: formState.reason,
+            effectiveDate: formState.effectiveDate,
+            effectiveRoleOffDate: formState.effectiveDate,
+            replacementRequired: formState.replacementRequired,
+            autoReplacementRequired: formState.replacementRequired,
+            skipReason: formState.skipReason,
+          },
+        );
       }
 
       if (confirmationResponse) {
@@ -913,11 +1194,14 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       }
 
       toast.success(
-        panelState.actionType === "bulk-create"
-          ? `${records.length} planned role-off request(s) created`
-          : panelState.actionType === "update"
-            ? "Role-off request updated"
-            : "Role-off request created"
+        getApiMessage(
+          lastResponse,
+          panelState.actionType === "bulk-create"
+            ? `${records.length} planned role-off request(s) created`
+            : panelState.actionType === "update"
+              ? "Role-off request updated"
+              : "Role-off request created",
+        ),
       );
 
       setSelectedRows([]);
@@ -926,11 +1210,12 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       return { success: true };
     } catch (err) {
       console.error(err);
-      toast.error(
-        panelState.actionType === "bulk-create"
+      const fallbackMessage = panelState.actionType === "bulk-create"
           ? "Failed to create bulk role-off"
-          : "Failed to create role-off",
-      );
+          : panelState.actionType === "update"
+            ? "Failed to update role-off"
+            : "Failed to create role-off";
+      toast.error(getErrorMessage(err, fallbackMessage));
       throw err;
     }
   };
@@ -945,14 +1230,15 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     setCancelModalState((prev) => ({ ...prev, isSubmitting: true }));
 
     try {
-      await pmCancelRoleOff(record.roleOffId);
+      const response = await pmCancelRoleOff(record.roleOffId);
+      removeCachedRoleOffDetails([record?.roleOffId, record?.allocationId, record?.id]);
       await loadPmResources();
       setCancelModalState({ open: false, record: null, isSubmitting: false });
-      toast.success("Role-off request cancelled");
+      toast.success(getApiMessage(response, "Role-off request cancelled"));
     } catch (err) {
       console.error(err);
       setCancelModalState((prev) => ({ ...prev, isSubmitting: false }));
-      toast.error(err?.response?.data?.message || "Failed to cancel role-off");
+      toast.error(getErrorMessage(err, "Failed to cancel role-off"));
     }
   };
 
@@ -1015,18 +1301,17 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       } else {
         await dlFulfill(request.id);
       }
-      await loadRoleOffRequests();
+      await refreshPendingQueue();
       setSelectedRows([]);
       setPanelState({ open: false, actionType: "view", record: null });
-      toast.success(res?.message ||
+      toast.success(
         request?.isBulk
-        ? `${request.records.length} role-off request(s) fulfilled`
-        : `${request.resource} role-off approved`,
+          ? `${request.records.length} role-off request(s) fulfilled by DM`
+          : `${request.resource} role-off fulfilled by DM`,
       );
-      loadPendingRoleOffRequests();
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || "DL approval failed");
+      toast.error(getErrorMessage(err, "DM fulfillment failed"));
     } finally {
       setBulkActionState({ key: null, loading: false });
     }
@@ -1034,27 +1319,30 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
   const handleRejectRequest = async (request, reason) => {
     try {
+      let response;
       if (request?.isBulk) {
         setBulkActionState({ key: "dm-reject", loading: true });
-        await bulkDlReject(
+        response = await bulkDlReject(
           request.records.map((item) => item.id),
           reason,
         );
       } else {
-        await dlReject(request.id, reason);
+        response = await dlReject(request.id, reason);
       }
-      await loadRoleOffRequests();
+      await refreshPendingQueue();
       setSelectedRows([]);
       setPanelState({ open: false, actionType: "view", record: null });
-      toast.success(res?.message ||
-        request?.isBulk
-        ? `${request.records.length} role-off request(s) rejected`
-        : `${request.resource} role-off rejected`,
+      toast.success(
+        getApiMessage(
+          response,
+          request?.isBulk
+            ? `${request.records.length} role-off request(s) rejected`
+            : `${request.resource} role-off rejected`,
+        ),
       );
-      loadPendingRoleOffRequests();
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || "DL rejection failed");
+      toast.error(getErrorMessage(err, "DM rejection failed"));
     } finally {
       setBulkActionState({ key: null, loading: false });
     }
@@ -1220,7 +1508,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                         onChange={(event) =>
                           setFilters((prev) => ({ ...prev, search: event.target.value }))
                         }
-                        placeholder={mode === "pm" ? "Search resource, client or role" : "Search resource, project, client or role"}
+                        placeholder={mode === "pm" ? "Search resource, client or demand name" : "Search resource, project, client or demand name"}
                         className="h-10 w-full rounded-md border border-gray-300 bg-white pl-10 pr-3 text-sm outline-none transition-colors focus:border-blue-500"
                       />
                     </div>
@@ -1339,6 +1627,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                 pmTab={pmActiveTab}
                 loading={loading}
                 rows={visibleRows}
+                hasActiveFilters={hasActiveFilters}
                 selectedRows={selectedRows}
                 activeRowId={panelState.record?.id}
                 onToggleRow={handleToggleRow}

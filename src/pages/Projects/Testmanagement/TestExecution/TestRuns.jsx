@@ -86,7 +86,7 @@ export default function TestRunAccordion({ run, projectId }) {
   }, []);
 
   const options = employee.map((option) => ({
-    value: option.user_id,
+    value: option.id,
     label: option.name,
   }));
 
@@ -196,22 +196,39 @@ export default function TestRunAccordion({ run, projectId }) {
                           />
                         </td>
                         <td className="py-3 px-3 text-center">
-                          {tc.runStatus === "NOT_STARTED" ? (
-                            <button
-                              onClick={() => setRunTestCaseId(tc.testCaseId)}
-                              className="px-3 py-1 text-blue-600 border border-blue-300 rounded hover:bg-blue-100"
-                            >
-                              ▶ Run
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setRunTestCaseId(tc.testCaseId)}
-                              className="text-blue-600 hover:underline"
-                            >
-                              View Result
-                            </button>
-                          )}
-                        </td>
+  {tc.runStatus === "NOT_STARTED" ? (
+    <button
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Fallback to tc.id just in case the backend names it differently
+        const idToRun = tc.testCaseId || tc.id; 
+        console.log("▶️ Opening Run Modal for ID:", idToRun);
+        
+        setRunTestCaseId(idToRun);
+      }}
+      className="px-3 py-1 text-blue-600 border border-blue-300 rounded hover:bg-blue-100"
+    >
+      ▶ Run
+    </button>
+  ) : (
+    <button
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const idToView = tc.testCaseId || tc.id;
+        console.log("🔍 Opening View Result Modal for ID:", idToView);
+        
+        setViewResultCaseId(idToView);
+      }}
+      className="text-blue-600 hover:underline"
+    >
+      View Result
+    </button>
+  )}
+</td>
                       </tr>
                     ))}
                   </tbody>
@@ -237,16 +254,19 @@ export default function TestRunAccordion({ run, projectId }) {
           )}
         </div>
       )}
-
-      {runTestCaseId && (
+{/* ⬇️ Use != null to prevent falsy zero bugs ⬇️ */}
+      {runTestCaseId != null && (
         <RunTestCaseComponent
           runId={run.id}
           testCaseId={runTestCaseId}
-          onClose={() => setRunTestCaseId(null)}
+          onClose={() => {
+            setRunTestCaseId(null);
+            loadTestCases();
+          }}
         />
       )}
 
-      {viewResultCaseId && (
+      {viewResultCaseId != null && (
         <TestCaseResultComponent
           runId={run.id}
           testCaseId={viewResultCaseId}

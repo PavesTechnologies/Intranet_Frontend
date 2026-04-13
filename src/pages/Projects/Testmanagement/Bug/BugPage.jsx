@@ -112,7 +112,7 @@ const BugPage = () => {
   }, []);
 
   const options = employees.map((option) => ({
-    value: option.user_id,
+    value: option.id,
     label: option.name,
   }));
 
@@ -281,6 +281,7 @@ const BugPage = () => {
                       options={options}
                       placeholder="Select Employee"
                       isSearchable
+                      
                       onChange={(selected) => {
                         addAssignee(bug.id, selected.value);
                       }}

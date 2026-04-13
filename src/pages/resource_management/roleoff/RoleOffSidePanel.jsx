@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getRoleOffReasons } from "@/pages/resource_management/services/roleOffService";
-import { toast } from "react-toastify";
 
 const formatReason = (str) => {
   if (typeof str !== 'string') return str;
@@ -62,6 +61,25 @@ const getBannerErrorMessage = (errors) => {
   }
 
   return "Enter all required fields.";
+};
+
+const getReasonOptionValue = (reason) => reason?.code || reason?.id || reason?.reason || reason;
+
+const getReasonOptionLabel = (reason) => reason?.label || reason?.name || reason?.reason || formatReason(reason);
+
+const normalizeReasonValue = (reasonValue, options = []) => {
+  const current = String(reasonValue || "").trim();
+  if (!current) return "";
+
+  const directMatch = options.find((option) => String(getReasonOptionValue(option)) === current);
+  if (directMatch) return String(getReasonOptionValue(directMatch));
+
+  const labelMatch = options.find(
+    (option) => String(getReasonOptionLabel(option)).trim().toLowerCase() === current.toLowerCase(),
+  );
+  if (labelMatch) return String(getReasonOptionValue(labelMatch));
+
+  return current;
 };
 
 const RoleOffSidePanel = ({
@@ -127,7 +145,7 @@ const RoleOffSidePanel = ({
     setForm({
       type: isExistingRequest ? (record.type || "Planned") : "Planned",
       effectiveDate: isExistingRequest ? (record.effectiveDateIso || "") : "",
-      reason: isExistingRequest ? (record.reason || "") : "",
+      reason: isExistingRequest ? normalizeReasonValue(record.reason, reasons) : "",
       replacementRequired:
         isExistingRequest
           ? Boolean(record.replacementRequired)
@@ -141,7 +159,7 @@ const RoleOffSidePanel = ({
     setError("");
     setShowRejectError(false);
     setFieldErrors({});
-  }, [record, open]);
+  }, [record, open, actionType, reasons]);
 
   if (!open || !record) return null;
 
@@ -149,6 +167,9 @@ const RoleOffSidePanel = ({
   const isRM = mode === "rm";
   const isDM = mode === "dm";
   const isBulkRecord = Boolean(record.isBulk);
+  const isBulkRejectFlow =
+    (isRM && actionType === "bulk-rm") ||
+    (isDM && actionType === "bulk-dm");
   const isBulkPmCreate = isPM && actionType === "bulk-create";
   const isBulkPmEdit = isPM && actionType === "update" && Boolean(record.isBulkCreated);
   const isBulkPmFlow = isBulkPmCreate || isBulkPmEdit;
@@ -234,7 +255,6 @@ const RoleOffSidePanel = ({
       } catch (error) {
         console.error("Error submitting role-off:", error);
         setError("Failed to submit role-off request.");
-        toast.error(error.message || "Failed to submit role-off request.");
       } finally {
         setSubmittingAction(null);
       }
@@ -391,6 +411,14 @@ const RoleOffSidePanel = ({
                 <span className="text-gray-500">Client</span>
                 <span className="font-medium text-gray-800">{record.client}</span>
               </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-gray-500">Demand Name</span>
+                <span className="font-medium text-gray-800 text-right">{record.role || "-"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-gray-500">Demand Skills</span>
+                <span className="font-medium text-gray-800 text-right">{record.skill || "-"}</span>
+              </div>
               {isBulkRecord ? (
                 <>
                   <div className="flex items-center justify-between gap-3">
@@ -473,8 +501,8 @@ const RoleOffSidePanel = ({
                   >
                     <option value="">Select reason</option>
                     {reasons.map((r, idx) => {
-                      const value = r.code || r.id || r.reason || r;
-                      const label = r.label || r.name || r.reason || formatReason(r);
+                      const value = getReasonOptionValue(r);
+                      const label = getReasonOptionLabel(r);
                       return (
                         <option key={idx} value={value}>
                           {label}
@@ -718,7 +746,7 @@ const RoleOffSidePanel = ({
               <>
                 <Button
                   onClick={handleRmApproveClick}
-                  disabled={isSubmitting || !isPendingStatus(record.status)}
+                  disabled={isSubmitting || !isPendingStatus(record.status) || isBulkRejectFlow}
                   className={`h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting || !isPendingStatus(record.status) ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   {submittingAction === "approve" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -739,7 +767,7 @@ const RoleOffSidePanel = ({
               <>
                 <Button
                   onClick={handleDmApproveClick}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isBulkRejectFlow}
                   className="h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submittingAction === "approve" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

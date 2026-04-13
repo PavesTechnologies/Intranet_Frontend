@@ -813,20 +813,21 @@ const RoleOffDashboard = () => {
                   <th className="px-5 py-3 whitespace-nowrap">Date</th>
                   <th className="px-5 py-3 whitespace-nowrap">Resource</th>
                   <th className="px-5 py-3 whitespace-nowrap">Project</th>
+                  <th className="px-5 py-3 whitespace-nowrap">Performance</th>
                   <th className="px-5 py-3 whitespace-nowrap">Reason</th>
                   <th className="px-5 py-3 whitespace-nowrap text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
-                  <tr><td colSpan="5" className="p-10 text-center text-slate-500">
+                  <tr><td colSpan="6" className="p-10 text-center text-slate-500">
                     <div className="flex items-center justify-center gap-2">
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#081534]"></div>
                       <span>Syncing...</span>
                     </div>
                   </td></tr>
                 ) : displayedEvents.length === 0 ? (
-                  <tr><td colSpan="5" className="p-10 text-center text-slate-500">No events matched.</td></tr>
+                  <tr><td colSpan="6" className="p-10 text-center text-slate-500">No events matched.</td></tr>
                 ) : (
                   displayedEvents.slice(0, 15).map((row, i) => (
                     <tr key={i} className="hover:bg-slate-50/50 bg-white transition-colors">
@@ -838,6 +839,13 @@ const RoleOffDashboard = () => {
                       </td>
                       <td className="px-5 py-2.5 whitespace-nowrap text-slate-600">
                         {row.projectName || '-'}
+                      </td>
+                      <td className="px-5 py-2.5 whitespace-nowrap font-medium">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
+                          !row.resourcePerformance ? 'bg-slate-50 text-slate-400' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                        }`}>
+                          {row.resourcePerformance || '—'}
+                        </span>
                       </td>
                       <td className="px-5 py-2.5 whitespace-nowrap">
                         <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-semibold">

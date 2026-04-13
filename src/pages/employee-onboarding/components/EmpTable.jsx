@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Table from "../../../components/Table/table";
 import Pagination from "../../../components/Pagination/pagination";
 import Button from "../../../components/Button/Button";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
-import { useEffect, useRef } from "react";
-import { Mail } from "lucide-react";
 import StatusBadge from "../../../components/status/statusbadge";
+import {
+  formatOfferStatusLabel,
+  getNormalizedStatus,
+  getOfferDisplayStatus,
+} from "./offerStatus";
 
 const PAGE_SIZE = 5;
 
@@ -68,23 +71,20 @@ function ActionMenu({ onView, onVerify, showVerify }) {
   );
 }
 
-export default function OffersTable({ offers = [], loading = false }) {
+export default function OffersTable({
+  offers = [],
+  employeeUserIds = [],
+  loading = false,
+}) {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
   const [currentPage, setCurrentPage] = useState(1);
   const [bulkMode, setBulkMode] = useState(false);
-
-  /*
-  const [bulkJoinMode, setBulkJoinMode] = useState(false);
-  */
-
   const [selectedIds, setSelectedIds] = useState([]);
   const [sending, setSending] = useState(false);
 
   const totalPages = Math.ceil(offers.length / PAGE_SIZE);
-
-  /* -------------------- Bulk Helpers -------------------- */
 
   const toggleSelect = (userUuid) => {
     setSelectedIds((prev) =>
@@ -98,15 +98,6 @@ export default function OffersTable({ offers = [], loading = false }) {
     setBulkMode(false);
     setSelectedIds([]);
   };
-
-  /*
-  const cancelBulkJoin = () => {
-    setBulkJoinMode(false);
-    setSelectedIds([]);
-  };
-  */
-
-  /* -------------------- Bulk Send API -------------------- */
 
   const handleBulkSend = async () => {
     if (selectedIds.length === 0) return;
@@ -128,30 +119,19 @@ export default function OffersTable({ offers = [], loading = false }) {
       );
 
       showStatusToast(
-        `✅ Bulk Send Complete\n\nSuccessful: ${res.data.successful}\nFailed: ${res.data.failed}`
+        `Bulk Send Complete\n\nSuccessful: ${res.data.successful}\nFailed: ${res.data.failed}`
       );
       cancelBulk();
     } catch (error) {
       console.error("Bulk send failed", error);
-      showStatusToast("❌ Bulk send failed");
+      showStatusToast("Bulk send failed");
     } finally {
       setSending(false);
     }
   };
 
- 
-
-
-
-  /* -------------------- Table Config -------------------- */
-
   const headers = [
     bulkMode ? "Select" : null,
-
-    /*
-    bulkJoinMode ? "Select" : null,
-    */
-
     "Candidate Name",
     "Email",
     "Contact",
@@ -163,11 +143,6 @@ export default function OffersTable({ offers = [], loading = false }) {
 
   const columns = [
     bulkMode ? "select" : null,
-
-    /*
-    bulkJoinMode ? "select" : null,
-    */
-
     "candidate_name",
     "mail",
     "contact",
@@ -179,22 +154,13 @@ export default function OffersTable({ offers = [], loading = false }) {
 
   const rows = useMemo(() => {
     const startIndex = (currentPage - 1) * PAGE_SIZE;
-    
+
     return offers.slice(startIndex, startIndex + PAGE_SIZE).map((offer) => {
-      
-      const isStatusCreated =
-        String(offer.status || "").trim().toUpperCase() === "CREATED";
-
-
-      const isSubmitted =
-        String(offer.status || "").trim().toUpperCase() === "SUBMITTED";
-
-      const isCheckboxEnabled =
-        bulkMode && isStatusCreated;
-
-      /*
-      || (bulkJoinMode && isStatusVerified);
-      */
+      const displayStatus = getOfferDisplayStatus(offer, employeeUserIds);
+      const normalizedStatus = getNormalizedStatus(offer.status);
+      const isStatusCreated = normalizedStatus === "CREATED";
+      const isSubmitted = displayStatus === "SUBMITTED";
+      const isCheckboxEnabled = bulkMode && isStatusCreated;
 
       return {
         ...(bulkMode && {
@@ -214,25 +180,29 @@ export default function OffersTable({ offers = [], loading = false }) {
             />
           ),
         }),
-
-      candidate_name:
-      [offer.first_name, offer.middle_name, offer.last_name]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .replace(/\b\w/g, (c) => c.toUpperCase())
-        .trim() || "—",
-
-        mail: offer.mail ? offer.mail.toLowerCase() : "—" ,
+        candidate_name:
+          [offer.first_name, offer.middle_name, offer.last_name]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+            .replace(/\b\w/g, (c) => c.toUpperCase())
+            .trim() || "—",
+        mail: offer.mail ? offer.mail.toLowerCase() : "—",
         contact: offer.contact_number || "—",
-        designation: offer.designation ? offer.designation.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()): "—",
+        designation: offer.designation
+          ? offer.designation
+              .toLowerCase()
+              .replace(/\b\w/g, (c) => c.toUpperCase())
+          : "—",
         employee_type: offer.employee_type || "—",
-        status: offer.status ? (
-          <StatusBadge label={offer.status} size="sm" />
+        status: displayStatus ? (
+          <StatusBadge
+            label={formatOfferStatusLabel(displayStatus)}
+            size="sm"
+          />
         ) : (
           "—"
         ),
-
         action: (
           <ActionMenu
             onView={() =>
@@ -246,9 +216,14 @@ export default function OffersTable({ offers = [], loading = false }) {
         ),
       };
     });
-  }, [offers, currentPage, bulkMode, selectedIds, navigate]);
-
-  /* -------------------- UI -------------------- */
+  }, [
+    offers,
+    currentPage,
+    bulkMode,
+    selectedIds,
+    navigate,
+    employeeUserIds,
+  ]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm relative overflow-visible">
@@ -258,37 +233,6 @@ export default function OffersTable({ offers = [], loading = false }) {
         </h2>
 
         <div className="flex items-center gap-3">
-
-          {/*
-          {!bulkJoinMode ? (
-            <Button
-              varient="primary"
-              size="small"
-              onClick={() => setBulkJoinMode(true)}
-            >
-              Bulk Join
-            </Button>
-          ) : (
-            <div className="flex gap-3">
-              <Button
-                varient="primary"
-                size="small"
-                onClick={handleBulkJoin}
-              >
-                Send
-              </Button>
-
-              <Button
-                varient="secondary"
-                size="small"
-                onClick={cancelBulkJoin}
-              >
-                Cancel
-              </Button>
-            </div>
-          )}
-          */}
-
           {!bulkMode ? (
             <Button
               varient="primary"

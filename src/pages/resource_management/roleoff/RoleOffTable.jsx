@@ -44,7 +44,7 @@ const getPmExtraColumnConfig = (pmTab) => {
   }
 
   return {
-    header: "Skill",
+    header: "Demand Skills",
     renderCell: (row) => <span className="text-gray-700">{row.skill || "-"}</span>,
   };
 };
@@ -53,6 +53,7 @@ const RoleOffTable = ({
   mode,
   pmTab = "active",
   rows,
+  hasActiveFilters = false,
   selectedRows = [],
   activeRowId,
   onToggleRow,
@@ -66,6 +67,9 @@ const RoleOffTable = ({
   const allSelected = rows.length > 0 && rows.every((row) => selectedRows.includes(row.id));
   const anySelected = rows.some((row) => selectedRows.includes(row.id));
   const pmExtraColumn = getPmExtraColumnConfig(pmTab);
+  const emptyStateMessage = hasActiveFilters
+    ? "No records match the current filters."
+    : "No role-off records available.";
   const canPmCancel = (row) =>
     pmTab === "process" &&
     (row.roleOffStatus === "Pending Approval" || row.roleOffStatus === "Approved");
@@ -128,7 +132,7 @@ const RoleOffTable = ({
                 Resource
               </th>
               <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                {mode === "pm" && pmTab === "active" ? "Role" : "Role / Skill"}
+                Demand Name
               </th>
               <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
                 Impact
@@ -167,7 +171,7 @@ const RoleOffTable = ({
                   colSpan={mode === "pm" ? (showSelectionCheckboxes ? 8 : 7) : 8}
                   className="px-6 py-12 text-center text-sm text-gray-500"
                 >
-                  No records match the current filters.
+                  {emptyStateMessage}
                 </td>
               </tr>
             ) : (

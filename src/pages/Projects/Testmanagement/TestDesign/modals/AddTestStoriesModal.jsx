@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import axiosInstance from "../../api/axiosInstance";
 import { X } from "lucide-react";
-import toast from "react-hot-toast"; // ⭐ 1. Imported toast
+import toast from "react-hot-toast";
 
-export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
+// ⭐ 1. Add `storyToEdit` to props
+export default function AddTestStoryModal({ projectId, onClose, onCreated, storyToEdit,testStoryId }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [linkedStoryId, setLinkedStoryId] = useState("");
@@ -11,6 +12,15 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
   const [pmsStories, setPmsStories] = useState([]);
   const [loadingStories, setLoadingStories] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // ⭐ 2. Prefill form if `storyToEdit` exists
+  useEffect(() => {
+    if (storyToEdit) {
+      setName(storyToEdit.name || "");
+      setDescription(storyToEdit.description || "");
+      setLinkedStoryId(storyToEdit.linkedStoryId || "");
+    }
+  }, [storyToEdit]);
 
   // ---------------------------------------------------------
   // LOAD PMS STORIES
@@ -33,10 +43,10 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
   }, [projectId]);
 
   // ---------------------------------------------------------
-  // SAVE TEST STORY
+  // SAVE / UPDATE TEST STORY
   // ---------------------------------------------------------
   const handleSave = async () => {
-    if (!name.trim()) return toast.error("Story name is required"); // ⭐ 2. Toast error
+    if (!name.trim()) return toast.error("Story name is required");
 
     setSaving(true);
 
@@ -48,18 +58,27 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
         linkedStoryId: linkedStoryId ? Number(linkedStoryId) : null,
       };
 
-      await axiosInstance.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-stories`,
-        payload
-      );
-
-      toast.success("Test Story created successfully!"); // ⭐ 3. Toast success
+      // ⭐ 3. Check if editing vs creating
+      if (storyToEdit) {
+        await axiosInstance.put(
+          `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-stories/project-test-data/${testStoryId}`,
+          payload
+        );
+        toast.success("Test Story updated successfully!");
+      } else {
+        await axiosInstance.post(
+          `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-stories`,
+          payload
+        );
+        toast.success("Test Story created successfully!");
+      }
 
       if (onCreated) onCreated();
       onClose();
     } catch (err) {
-      console.error("Create Test Story FAILED →", err);
-      toast.error("Failed to create test story"); // ⭐ 4. Toast error
+      console.error("Save Test Story FAILED →", err);
+      // ⭐ 4. Dynamic error message
+      toast.error(storyToEdit ? "Failed to update test story" : "Failed to create test story");
     } finally {
       setSaving(false);
     }
@@ -71,7 +90,10 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
 
         {/* Header */}
         <div className="flex justify-between items-center mb-5">
-          <h2 className="text-lg font-semibold text-gray-800">Add Test Story</h2>
+          {/* ⭐ 5. Dynamic Modal Title */}
+          <h2 className="text-lg font-semibold text-gray-800">
+            {storyToEdit ? "Edit Test Story" : "Add Test Story"}
+          </h2>
           <button 
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded transition-colors"
@@ -142,7 +164,8 @@ export default function AddTestStoryModal({ projectId, onClose, onCreated }) {
               onClick={handleSave}
               disabled={saving}
             >
-              {saving ? "Saving..." : "Create Story"}
+              {/* ⭐ 6. Dynamic Button Text */}
+              {saving ? "Saving..." : (storyToEdit ? "Update Story" : "Create Story")}
             </button>
           </div>
 

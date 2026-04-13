@@ -127,7 +127,7 @@ export default function OnboardingSummary() {
   const pending_actions = [
     { action: 'Pending Verification', count: summaryData?.pending_actions?.pending_verification || 0, urgency: 'high', icon: ShieldCheck, color: 'text-rose-600', bg: 'bg-rose-100' },
     { action: 'Pending Joining', count: summaryData?.pending_actions?.pending_joining || 0, urgency: 'medium', icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-100' },
-    { action: 'Pending Documents', count: summaryData?.pending_actions?.pending_documents || 0, urgency: 'high', icon: FileText, color: 'text-amber-600', bg: 'bg-amber-100' },
+    { action: 'Pending Documents by Candidate', count: summaryData?.pending_actions?.pending_documents || 0, urgency: 'high', icon: FileText, color: 'text-amber-600', bg: 'bg-amber-100' },
   ];
 
   const metrics = [
@@ -145,8 +145,8 @@ export default function OnboardingSummary() {
     { stage: 'Created', count: summaryData?.pipeline?.created || 0 },
     { stage: 'Offered', count: summaryData?.pipeline?.offered || 0 },
     { stage: 'Accepted', count: summaryData?.pipeline?.accepted || 0 },
+    { stage: 'Submitted', count: summaryData?.pipeline?.submitted || 0 },
     { stage: 'Verified', count: summaryData?.pipeline?.verified || 0 },
-    { stage: 'Completed', count: summaryData?.pipeline?.completed || 0 },
   ];
 
   const docTypeColors = {
@@ -267,7 +267,7 @@ export default function OnboardingSummary() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
               <Clock className="w-5 h-5 text-amber-500" />
-              Aging Insights
+             Pending Status Duration
             </h3>
             <div className="grid grid-cols-2 gap-4">
               {agingData.map((age, i) => (

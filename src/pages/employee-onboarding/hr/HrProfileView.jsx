@@ -47,7 +47,7 @@ export default function HrProfileView() {
       default: return tab;
     }
   };
- 
+
   const verifyDocumentAPI = async ({
     document_uuid = null,
     doc_type,
@@ -77,7 +77,7 @@ export default function HrProfileView() {
       return false;
     }
   };
- 
+
   const handleApproveDocument = async (d, i) => {
     const key = getDocKey(d, i);
     const success = await verifyDocumentAPI({
@@ -85,13 +85,13 @@ export default function HrProfileView() {
       doc_type: getDocType(activeTab),
       status: "Verified"
     });
- 
+
     if (success) {
       setDocStatus(s => ({ ...s, [key]: true }));
       showStatusToast("Document verified", "success");
     }
   };
- 
+
   useEffect(() => {
     (async () => {
  
@@ -126,7 +126,7 @@ export default function HrProfileView() {
  
           setDocStatus(allDocs);
           setActiveTab("overview");
- 
+
         } else {
           // Submitted → reset UI
           setSectionStatus({
@@ -153,9 +153,9 @@ export default function HrProfileView() {
     })();
  
   }, [user_uuid]);
- 
- 
- 
+
+
+
   /* open document */
   async function openFileInNewTab(url, key) {
  
@@ -186,19 +186,19 @@ export default function HrProfileView() {
  
   }
   const handleRejectDocument = async () => {
- 
+
     if (!rejectRemarks.trim()) {
       showStatusToast("Please enter rejection remarks", "error");
       return;
     }
- 
+
     const success = await verifyDocumentAPI({
       document_uuid: rejectDocKey,
       doc_type: getDocType(activeTab),
       status: "Rejected",
       remarks: rejectRemarks
     });
- 
+
     if (success) {
       setDocStatus(s => ({
         ...s,
@@ -209,7 +209,7 @@ export default function HrProfileView() {
       }));
       showStatusToast("Document rejected", "success");
     }
- 
+
     setRejectModal(false);
     setRejectRemarks("");
     setRejectDocKey(null);
@@ -217,9 +217,9 @@ export default function HrProfileView() {
   };
  
   /* verify section */
- 
+
   const verifySection = async () => {
- 
+
     const currentDocs =
       activeTab === "education"
         ? profile.education_documents || []
@@ -247,17 +247,17 @@ export default function HrProfileView() {
       showStatusToast("Please verify all documents first", "error");
       return;
     }
- 
+
     if (activeTab === "overview") {
       const types = ["personal", "address", "bank", "pf"];
       for (const type of types) {
         await verifyDocumentAPI({ doc_type: type, status: "Verified" });
       }
     }
- 
+
     setSectionStatus(s => ({ ...s, [activeTab]: true }));
     showStatusToast(`${activeTab} section verified`, "success");
- 
+
   };
  
   /* final verify */
@@ -289,7 +289,7 @@ export default function HrProfileView() {
         { user_uuid, status: "Verified" },
         { headers: { Authorization: `Bearer ${token}` } }
       );
- 
+
       setVerificationStatus("Verified");
       setSectionStatus({
         overview: true,
@@ -600,7 +600,7 @@ export default function HrProfileView() {
                   disabled={verificationStatus === "Verified"}
                   className="px-10 py-3 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-800 shadow-lg shadow-gray-300 disabled:opacity-30 transition-all transform active:scale-95"
                 >
-                  Complete Review
+                  Final Verification
                 </button>
               )}
             </div>
@@ -939,11 +939,11 @@ const groupExperience = (l = []) =>
       notice_period_days: e.notice_period_days,
       documents: []
     };
- 
+
     a[k].documents.push(
       ...(e.documents || []).map((d) => ({ ...d, experience_uuid: e.experience_uuid }))
     );
- 
+
     return a;
  
   }, {});

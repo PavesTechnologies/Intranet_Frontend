@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Download, Filter, Layers, Search, Users, ArrowLeft } from "lucide-react";
+import { Download, Filter, Layers, Search, Users, ArrowLeft, BarChart2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import BenchKPI from "../components/BenchKPI";
 import BenchFilters from "../components/BenchFilters";
 import BenchTable from "../components/BenchTable";
 import BenchDrawer from "../components/BenchDrawer";
 import AllocateModal from "../components/AllocateModal";
+import QuickAllocateModal from "../components/QuickAllocateModal";
 import MoveToPoolModal from "../components/MoveToPoolModal";
+import { getBenchMatches } from "../services/benchService";
 import { createPortal } from "react-dom";
 import {
   BENCH_STORAGE_KEY,
@@ -60,11 +62,15 @@ const BenchPage = () => {
   const [dropdownPos, setDropdownPos] = useState(null);
   const filterButtonRef = useRef(null);
   const [selectedRows, setSelectedRows] = useState([]);
-  const [selectedResourceId, setSelectedResourceId] = useState(stored?.selectedResourceId || null);
-  const [drawerOpen, setDrawerOpen] = useState(Boolean(stored?.selectedResourceId));
+  const [selectedResourceId, setSelectedResourceId] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [allocateTargets, setAllocateTargets] = useState([]);
+  const [quickAllocateTarget, setQuickAllocateTarget] = useState(null);
   const [moveToPoolTargets, setMoveToPoolTargets] = useState([]);
   const [bulkCategory, setBulkCategory] = useState(CATEGORY_OPTIONS[0]);
+  const [liveMatches, setLiveMatches] = useState([]);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const updatePosition = () => {
     if (filterButtonRef.current) {
@@ -115,35 +121,56 @@ const BenchPage = () => {
     }
   }, [filterPanelOpen]);
 
+  const fetchLiveMatches = async () => {
+    setLoadingMatches(true);
+    try {
+      const res = await getBenchMatches();
+      // const rawData = Array.isArray(res) ? res : res?.data || [];
+      setLiveMatches(res.data);
+    } catch (error) {
+      console.error("Match fetch error", error);
+      setLiveMatches([]);
+    } finally {
+      setLoadingMatches(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveMatches();
+  }, []);
+
   const toggleFilters = () => setFilterPanelOpen(!filterPanelOpen);
+
+  const fetchData = async (isActive = true) => {
+    setLoading(true);
+    try {
+      const [benchRes, poolRes, kpiRes] = await Promise.all([
+        getBenchResources(),
+        getPoolResources(),
+        getBenchKPIs()
+      ]);
+
+      if (!isActive) return;
+
+      // Unpack and tag resources
+      const benchList = (benchRes?.data || (Array.isArray(benchRes) ? benchRes : [])).map(r => ({ ...r, _source: 'bench' }));
+      const poolList = (poolRes?.data || (Array.isArray(poolRes) ? poolRes : [])).map(r => ({ ...r, _source: 'pool' }));
+      setResources(sanitizeResources([...benchList, ...poolList]));
+
+      // Set live KPI data
+      setKpis(kpiRes?.data || kpiRes || null);
+    } catch (error) {
+      if (!isActive) return;
+      console.error("Resource Supply Data Load Error", error);
+      toast.error("Failed to load bench or pool data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
-
-    const load = async () => {
-      try {
-        const [benchRes, poolRes, kpiRes] = await Promise.all([
-          getBenchResources(),
-          getPoolResources(),
-          getBenchKPIs()
-        ]);
-        
-        if (!active) return;
-        
-        // Unpack and tag resources
-        const benchList = (benchRes?.data || (Array.isArray(benchRes) ? benchRes : [])).map(r => ({ ...r, _source: 'bench' }));
-        const poolList = (poolRes?.data || (Array.isArray(poolRes) ? poolRes : [])).map(r => ({ ...r, _source: 'pool' }));
-        setResources(sanitizeResources([...benchList, ...poolList]));
-
-        // Set live KPI data
-        setKpis(kpiRes?.data || kpiRes || null);
-      } catch (error) {
-        console.error("Resource Supply Data Load Error", error);
-        toast.error("Failed to load bench or pool data");
-      }
-    };
-
-    load();
+    fetchData(active);
     return () => {
       active = false;
     };
@@ -157,10 +184,9 @@ const BenchPage = () => {
         search,
         activeTab,
         filters,
-        selectedResourceId,
       }),
     );
-  }, [search, activeTab, filters, selectedResourceId]);
+  }, [search, activeTab, filters]);
 
   const visibleRows = useMemo(
     () => filterResources(resources, search, filters, activeTab),
@@ -240,11 +266,20 @@ const BenchPage = () => {
   };
 
   const handleAllocate = (targets) => {
-    setAllocateTargets(Array.isArray(targets) ? targets : [targets]);
+    const list = Array.isArray(targets) ? targets : [targets];
+    if (list.length === 1) {
+      setQuickAllocateTarget(list[0]);
+    } else {
+      setAllocateTargets(list);
+    }
   };
 
   const handleMoveToPool = (targets) => {
     setMoveToPoolTargets(Array.isArray(targets) ? targets : [targets]);
+  };
+
+  const handleQuickAllocate = (resource) => {
+    setQuickAllocateTarget(resource);
   };
 
   const applyAllocation = ({ project, allocation, startDate }) => {
@@ -254,19 +289,19 @@ const BenchPage = () => {
       prev.map((item) =>
         ids.includes(item.id)
           ? {
-              ...item,
-              allocation,
-              availability: Math.max(0, 100 - allocation),
-              lastAllocationDate: startDate,
-              poolType: "",
-              category: "Not Available",
-              lastProject: {
-                name: project,
-                client: "Assigned",
-                endDate: startDate,
-                reason: "Allocated from bench management",
-              },
-            }
+            ...item,
+            allocation,
+            availability: Math.max(0, 100 - allocation),
+            lastAllocationDate: startDate,
+            poolType: "",
+            category: "Not Available",
+            lastProject: {
+              name: project,
+              client: "Assigned",
+              endDate: startDate,
+              reason: "Allocated from bench management",
+            },
+          }
           : item,
       ),
     );
@@ -287,15 +322,15 @@ const BenchPage = () => {
       prev.map((item) =>
         ids.includes(item.id)
           ? {
-              ...item,
-              poolType,
-              category: poolCategory,
-              transitionReason: reason,
-              lastProject: {
-                ...item.lastProject,
-                reason,
-              },
-            }
+            ...item,
+            poolType,
+            category: poolCategory,
+            transitionReason: reason,
+            lastProject: {
+              ...item.lastProject,
+              reason,
+            },
+          }
           : item,
       ),
     );
@@ -316,13 +351,13 @@ const BenchPage = () => {
     <div className="min-h-screen bg-slate-50/50 p-6 font-sans">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button
+          {/* <button
             onClick={() => navigate('/resource-management/roleoff')}
             className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm shrink-0"
             title="Back to Role-Off Operations"
           >
             <ArrowLeft size={18} />
-          </button>
+          </button> */}
           <div className="flex-1">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-none">Bench Management Workspace</h1>
             <p className="mt-1 text-xs sm:text-sm font-medium text-slate-500">
@@ -333,11 +368,19 @@ const BenchPage = () => {
         <div className="flex items-center gap-3">
           <button
             type="button"
+            onClick={() => navigate('/resource-management/bench/report')}
+            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm"
+          >
+            <BarChart2 className="h-3.5 w-3.5 text-indigo-600" />
+            BENCH ANALYTICS
+          </button>
+          <button
+            type="button"
             onClick={handleExport}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-[12px] font-bold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
           >
             <Download className="h-3.5 w-3.5" />
-            EXPORT ANALYTICS
+            EXPORT AUDIT
           </button>
         </div>
       </div>
@@ -360,9 +403,8 @@ const BenchPage = () => {
                       setActiveTab(tab.id);
                       setSelectedRows([]);
                     }}
-                    className={`group relative inline-flex items-center gap-2 whitespace-nowrap px-1 pb-4 pt-2 text-left transition-all ${
-                      isActive ? "text-indigo-600" : "text-slate-500 hover:text-indigo-600"
-                    }`}
+                    className={`group relative inline-flex items-center gap-2 whitespace-nowrap px-1 pb-4 pt-2 text-left transition-all ${isActive ? "text-indigo-600" : "text-slate-500 hover:text-indigo-600"
+                      }`}
                   >
                     <Icon className={`h-4 w-4 transition-colors ${isActive ? "text-indigo-600" : "text-slate-400 group-hover:text-indigo-500"}`} />
                     <span className={`text-[12px] font-bold tracking-tight lowercase ${isActive ? "text-slate-900" : "text-slate-500"}`}>
@@ -396,11 +438,10 @@ const BenchPage = () => {
                   ref={filterButtonRef}
                   type="button"
                   onClick={toggleFilters}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all shadow-sm ${
-                    filterPanelOpen
-                      ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/10"
-                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                  }`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all shadow-sm ${filterPanelOpen
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/10"
+                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
                 >
                   <Filter className={`h-3.5 w-3.5 ${filterPanelOpen ? 'fill-current' : ''}`} />
                   <span className="text-[11px] font-bold uppercase tracking-wider">Filters</span>
@@ -410,13 +451,12 @@ const BenchPage = () => {
                     </span>
                   )}
                 </button>
- 
+
                 {filterPanelOpen && dropdownPos && createPortal(
-                  <div 
+                  <div
                     id="bench-filter-portal"
-                    className={`fixed bg-white border border-slate-200 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] z-[100] w-[calc(100vw-3rem)] sm:w-[400px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${
-                      dropdownPos.align === 'up' ? "origin-bottom-right" : "origin-top-right"
-                    }`}
+                    className={`fixed bg-white border border-slate-200 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] z-[100] w-[calc(100vw-3rem)] sm:w-[400px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${dropdownPos.align === 'up' ? "origin-bottom-right" : "origin-top-right"
+                      }`}
                     style={{
                       top: dropdownPos.top === 'auto' ? 'auto' : `${dropdownPos.top}px`,
                       bottom: dropdownPos.bottom === 'auto' ? 'auto' : `${dropdownPos.bottom}px`,
@@ -449,14 +489,17 @@ const BenchPage = () => {
 
         <div className="p-4">
           <BenchTable
-            rows={visibleRows} 
+            rows={visibleRows}
             selectedRows={selectedRows}
             activeRowId={selectedResourceId}
             emptyState={emptyState}
             onToggleAll={handleToggleAll}
             onToggleRow={handleToggleRow}
             onView={handleView}
+            onQuickAllocate={handleQuickAllocate}
             onCategoryChange={(id, category) => setResourceCategory([id], category)}
+            onRefresh={() => fetchData(true)}
+            loading={loading}
           />
         </div>
       </div>
@@ -467,6 +510,8 @@ const BenchPage = () => {
         onClose={() => setDrawerOpen(false)}
         onAllocate={(resource) => handleAllocate(resource)}
         onMoveToPool={(resource) => handleMoveToPool(resource)}
+        liveMatches={liveMatches}
+        loadingMatches={loadingMatches}
       />
 
       <AllocateModal
@@ -474,6 +519,13 @@ const BenchPage = () => {
         resources={allocateTargets}
         onClose={() => setAllocateTargets([])}
         onSubmit={applyAllocation}
+      />
+
+      <QuickAllocateModal
+        open={Boolean(quickAllocateTarget)}
+        resource={quickAllocateTarget}
+        onClose={() => setQuickAllocateTarget(null)}
+        onRefresh={fetchData}
       />
 
       <MoveToPoolModal

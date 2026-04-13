@@ -1,14 +1,19 @@
-import React from "react";
-import { Briefcase, CalendarDays, MapPin, ShieldAlert, X } from "lucide-react";
-import { computeDemandMatches, getAgingTone, isSkillStale } from "../models/benchModel";
+import React, { useState, useEffect } from "react";
+import { Briefcase, CalendarDays, MapPin, ShieldAlert, X, Loader2 } from "lucide-react";
+import { getAgingTone, isSkillStale } from "../models/benchModel";
+// import { getBenchMatches } from "../services/benchService";
 
 const statCardClassName = "rounded-lg border border-slate-200 bg-slate-50 px-4 py-3";
 
-const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool }) => {
+const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMatches, loadingMatches }) => {
+  console.log("Resource from Bench Drawer: ", resource);
+
   if (!open || !resource) return null;
 
-  const matches = computeDemandMatches(resource);
   const agingTone = getAgingTone(resource.agingDays);
+
+  const matchData = (liveMatches || []).find(m => Number(m.resourceId) === Number(resource.employeeId || resource.resourceId || resource.id));
+  const resourceDemands = matchData?.demands || [];
 
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-slate-900/20 backdrop-blur-[1px]">
@@ -27,21 +32,25 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool }) => {
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
           <div className="grid grid-cols-2 gap-3">
             <div className={statCardClassName}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Availability</p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{resource.availability}%</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Availability</p>
+              <p className="mt-2 text-lg font-black text-slate-900">{resource.allocation}%</p>
             </div>
             <div className={statCardClassName}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Category</p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{resource.category}</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Aging</p>
+              <div className="mt-2">
+                <span className={`inline-flex rounded-lg border px-2.5 py-1 text-[11px] font-black tracking-tight ${agingTone.className}`}>
+                  {agingTone.label}
+                </span>
+              </div>
             </div>
             <div className={statCardClassName}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Aging</p>
-              <span className={`mt-2 inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${agingTone.className}`}>{agingTone.label}</span>
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Category</p>
+              <p className="mt-2 text-lg font-black text-slate-900">{resource.category}</p>
             </div>
             <div className={statCardClassName}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Cost Exposure</p>
-              <p className={`mt-2 text-lg font-semibold ${resource.warnings.highCost || resource.warnings.longAging ? "text-rose-700" : "text-slate-900"}`}>
-                {resource.costExposure === null ? "Cost unavailable" : resource.costExposure.toLocaleString()}
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Cost Exposure</p>
+              <p className={`mt-2 text-lg font-black ${resource.warnings.highCost || resource.warnings.longAging ? "text-rose-600" : "text-slate-900"}`}>
+                {resource.costExposure === null ? "Cost unavailable" : `${resource.costExposure.toLocaleString()}`}
               </p>
             </div>
           </div>
@@ -57,11 +66,10 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool }) => {
                   return (
                     <span
                       key={`${resource.id}-${skill}`}
-                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                        stale
-                          ? "border-amber-200 bg-amber-50 text-amber-700"
-                          : "border-slate-200 bg-slate-50 text-slate-700"
-                      }`}
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${stale
+                        ? "border-amber-200 bg-amber-50 text-amber-700"
+                        : "border-slate-200 bg-slate-50 text-slate-700"
+                        }`}
                     >
                       {skill} | {resource.proficiency?.[skill] || "Beginner"}
                     </span>
@@ -88,7 +96,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool }) => {
             <div className="mt-3 space-y-2 text-sm text-slate-600">
               <div className="flex items-center gap-2">
                 <CalendarDays className="h-4 w-4 text-slate-400" />
-                <span>Last allocation date: {resource.lastAllocationDate || "-"}</span>
+                <span>Last allocation date: {resource.lastAllocationDate ?? "Never allocated"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4 text-slate-400" />
@@ -101,7 +109,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool }) => {
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
+          {/* <div className="rounded-lg border border-gray-200 bg-white p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Last Project</p>
             <div className="mt-3 space-y-2 text-sm text-slate-600">
               <div className="flex items-center gap-2">
@@ -111,25 +119,59 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool }) => {
               <p>Ended on: {resource.lastProject?.endDate || "-"}</p>
               <p>Transition reason: {resource.transitionReason || resource.lastProject?.reason || "-"}</p>
             </div>
-          </div>
+          </div> */}
 
+          {/* DEMAND MATCHING SECTION */}
           <div className="rounded-lg border border-gray-200 bg-white p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Demand Matching</p>
             <div className="mt-3 space-y-3">
-              {matches.map((match) => (
-                <div key={match.id} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-slate-900">{match.name}</p>
-                      <p className="text-xs text-slate-500">{match.project}</p>
-                    </div>
-                    <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${match.score >= 70 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : match.score >= 40 ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-100 text-slate-700"}`}>
-                      {match.score}% match
-                    </span>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">Overlap: {match.overlap.length > 0 ? match.overlap.join(", ") : "No overlap"}</p>
+              {loadingMatches ? (
+                <div className="flex flex-col items-center justify-center py-6 text-slate-400">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <p className="mt-2 text-[10px] font-bold uppercase tracking-widest italic">Calculating Scores...</p>
                 </div>
-              ))}
+              ) : resourceDemands.length === 0 ? (
+                <div className="py-4 text-center text-[11px] font-medium text-slate-400 italic bg-slate-50 rounded-lg">
+                  No high-confidence matches found
+                </div>
+              ) : (
+                resourceDemands.map((match, idx) => (
+                  <div key={match.demandId || idx} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-bold text-slate-900 text-[13px] uppercase tracking-tight">{match.demandName || "Unnamed Demand"}</p>
+                        <div className="flex items-center gap-2">
+                          <p className={`text-[10px] font-bold uppercase tracking-widest ${matchData?.availability === 'Available' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {matchData?.availability || "Check Status"}
+                          </p>
+                          <div className="h-1 w-1 rounded-full bg-slate-300" />
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            {match.matchScore === 100 ? "Perfect Fit" : "Potential Fit"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-bold ${(match.matchScore || 0) >= 70
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : (match.matchScore || 0) >= 40
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : "border-slate-200 bg-slate-100 text-slate-700"
+                        }`}>
+                        {match.matchScore || 0}% match
+                      </span>
+                    </div>
+                    {match.matchedSkills && match.matchedSkills.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1">Skills:</span>
+                        {match.matchedSkills.map((sk, sidx) => (
+                          <span key={sidx} className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                            {sk}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
