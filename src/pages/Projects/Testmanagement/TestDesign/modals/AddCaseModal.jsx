@@ -1,15 +1,36 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // ⭐ 1. Added useEffect
 import axiosInstance from "../../api/axiosInstance";
 import { X } from "lucide-react";
-import toast from "react-hot-toast"; // ⭐ 1. Imported toast
+import toast from "react-hot-toast";
 
-export default function AddCaseModal({ scenarioId, onClose, onCreated }) {
+// ⭐ 2. Added caseToEdit prop
+export default function AddCaseModal({ scenarioId, caseToEdit, onClose, onCreated }) {
   const [title, setTitle] = useState("");
   const [preConditions, setPreConditions] = useState("");
   const [priority, setPriority] = useState("LOW");
   const [type, setType] = useState("FUNCTIONAL");
   const [steps, setSteps] = useState([{ action: "", expectedResult: "" }]);
   const [saving, setSaving] = useState(false);
+
+  // ⭐ 3. Added useEffect to pre-fill the form when editing
+  useEffect(() => {
+    if (caseToEdit) {
+      setTitle(caseToEdit.title || "");
+      setPreConditions(caseToEdit.preConditions || "");
+      setPriority(caseToEdit.priority || "LOW");
+      setType(caseToEdit.type || "FUNCTIONAL");
+      
+      // If the case already has steps, pre-fill them. Otherwise, leave one blank row.
+      if (caseToEdit.steps && caseToEdit.steps.length > 0) {
+        setSteps(caseToEdit.steps.map(s => ({
+          action: s.action || "",
+          expectedResult: s.expectedResult || s.expected || "" // Safely handle DTO variations
+        })));
+      } else {
+        setSteps([{ action: "", expectedResult: "" }]);
+      }
+    }
+  }, [caseToEdit]);
 
   const addStep = () => {
     setSteps([...steps, { action: "", expectedResult: "" }]);
@@ -27,9 +48,9 @@ export default function AddCaseModal({ scenarioId, onClose, onCreated }) {
   };
 
   const handleSave = async () => {
-    // ⭐ 2. Replaced alerts with toast.error
     if (!title.trim()) return toast.error("Case title is required");
-    if (!scenarioId) return toast.error("No scenario selected");
+    // Only strictly require scenarioId if we are creating a new case
+    if (!caseToEdit && !scenarioId) return toast.error("No scenario selected");
 
     setSaving(true);
 
@@ -48,18 +69,21 @@ export default function AddCaseModal({ scenarioId, onClose, onCreated }) {
           }))
       };
 
-      await axiosInstance.post(`${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases`, payload);
-
-      // ⭐ 3. Replaced alert with toast.success
-      toast.success("Test Case created successfully!");
+      // ⭐ 4. Conditional logic for PUT (Edit) vs POST (Create)
+      if (caseToEdit) {
+        await axiosInstance.put(`${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases/${caseToEdit.id}`, payload);
+        toast.success("Test Case updated successfully!");
+      } else {
+        await axiosInstance.post(`${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases`, payload);
+        toast.success("Test Case created successfully!");
+      }
       
       if (onCreated) onCreated();
       onClose();
       
     } catch (err) {
-      console.error("Create Case FAILED →", err);
-      // ⭐ 4. Replaced alert with toast.error
-      toast.error("Failed to create test case");
+      console.error("Action FAILED →", err);
+      toast.error(caseToEdit ? "Failed to update test case" : "Failed to create test case");
     } finally {
       setSaving(false);
     }
@@ -69,7 +93,8 @@ export default function AddCaseModal({ scenarioId, onClose, onCreated }) {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white w-[650px] max-h-[80vh] overflow-auto p-5 rounded-xl shadow-lg">
         <div className="flex justify-between mb-4">
-          <h2 className="text-lg font-semibold">Add Test Case</h2>
+          {/* ⭐ 5. Dynamic Modal Title */}
+          <h2 className="text-lg font-semibold">{caseToEdit ? "Edit Test Case" : "Add Test Case"}</h2>
           <X className="cursor-pointer" onClick={onClose} />
         </div>
 
@@ -168,7 +193,8 @@ export default function AddCaseModal({ scenarioId, onClose, onCreated }) {
               onClick={handleSave}
               disabled={saving}
             >
-              {saving ? "Saving..." : "Create Case"}
+              {/* ⭐ 6. Dynamic Save Button Text */}
+              {saving ? "Saving..." : (caseToEdit ? "Update Case" : "Create Case")}
             </button>
           </div>
 

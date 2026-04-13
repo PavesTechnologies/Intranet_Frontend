@@ -28,7 +28,18 @@ export default function TestExecution() {
   const [openDropdownId, setOpenDropdownId] = useState(null);
 
   const dropdownRef = useRef(null);
-
+const executeDeleteCycle = async (cycleId) => {
+    try {
+      // Make sure this URL matches your backend endpoint for deleting a cycle
+      await axiosInstance.delete(`/test-execution/test-cycles/${cycleId}`);
+      
+      toast.success("Cycle deleted successfully!");
+      loadCycles(); // Refresh the list so the deleted cycle disappears
+    } catch (err) {
+      console.error("Failed to delete cycle:", err);
+      toast.error("Failed to delete cycle.");
+    }
+  };
   // ── Close dropdown on outside click ──────────────────────────────────────
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -86,26 +97,42 @@ export default function TestExecution() {
   });
 
   // ── Delete ────────────────────────────────────────────────────────────────
-  const handleDeleteCycle = async (cycleId) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this cycle? All test runs inside it will also be deleted."
-      )
-    )
-      return;
-    try {
-      await axiosInstance.delete(
-        `/test-execution/test-cycles/${cycleId}`
-      );
-      toast.success("Cycle deleted successfully");
-      setOpenDropdownId(null);
-      loadCycles();
-    } catch (err) {
-      console.error("Error deleting cycle:", err);
-      toast.error("Failed to delete cycle");
+ const handleDeleteCycle = (cycleId) => {
+  toast.warn(
+    ({ closeToast }) => (
+      <div>
+        <p className="text-sm font-medium text-gray-800 mb-3">
+          Are you sure you want to delete this cycle? All test runs inside it will also be deleted.
+        </p>
+        <div className="flex justify-end space-x-2">
+          <button
+            onClick={closeToast}
+            className="px-3 py-1.5 text-xs font-medium bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              executeDeleteCycle(cycleId);
+              closeToast();
+            }}
+            className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700 transition"
+          >
+            Yes, Delete
+          </button>
+        </div>
+      </div>
+    ),
+    {
+      // Toast configuration for confirmations
+      position: "top-center",
+      autoClose: false, // Keep open until user clicks an option
+      closeOnClick: false,
+      draggable: false,
+      closeButton: false, // Hide the default 'x' so they use our buttons
     }
-  };
-
+  );
+};
   // ── Edit ──────────────────────────────────────────────────────────────────
   const handleEditClick = (e, cycle) => {
     e.stopPropagation();
