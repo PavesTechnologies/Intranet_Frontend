@@ -263,6 +263,9 @@ const RequestCard = ({ request }) => (
         <p className="text-xs text-gray-600 mt-1">
           Reason: <span className="text-gray-700">{request.reason || "N/A"}</span>
         </p>
+         <p className="text-xs text-gray-600 mt-1">
+          Approved by: <span className="text-gray-700">{request.approvedBy?.fullName || "N/A"}</span>
+        </p>
       </div>
       <div className="mt-3 sm:mt-0 text-left sm:text-right flex flex-col items-start sm:items-center">
         <span
@@ -272,6 +275,9 @@ const RequestCard = ({ request }) => (
         </span>
         <p className="text-sm font-bold text-gray-800 mt-2">
           -{request.daysRequested} Day{request.daysRequested !== 1 ? 's' : ''}
+        </p>
+         <p className="text-xs text-gray-600 mt-1">
+          Applied by: <span className="text-gray-700">{request.appliedBy?.fullName || "N/A"}</span>
         </p>
       </div>
     </div>

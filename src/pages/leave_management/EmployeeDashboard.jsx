@@ -280,7 +280,7 @@ const EmployeeDashboard = ({ employeeId }) => {
       )}
 
       {isCompOffModalOpen && (
-        <CompOffR equestModal
+        <CompOffRequestModal
           loading={isLoading}
           onSubmit={handleCompOffSubmit}
           // onSuccess={() => setrefreshKeys((prev) => !prev)}

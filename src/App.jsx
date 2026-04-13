@@ -163,6 +163,7 @@ import ManageBlockLeave from "./pages/leave_management/models/ManageBlockLeave";
 import ApprovalRulesPage from "./pages/leave_management/models/ApprovalRulesPage.jsx";
 import RiskRegisterPage from "./pages/Projects/manager/riskManagement/RiskRegisterPage.jsx";
 import LeaveUploadWizard from "./pages/leave_management/models/LeaveUploadWizard.jsx";
+import ApplyLeaveOnBehalf from "./pages/leave_management/models/ApplyLeaveOnBehalf.jsx";
 
 import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.jsx";
 import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
@@ -746,6 +747,16 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+
+            <Route
+              path="/behalf-leave"
+              element={
+                <ProtectedRoute allowedRoles={["HR", "Hr-Manager", "Manager"]}>
+                  <ApplyLeaveOnBehalf />
+                </ProtectedRoute>
+              }
+            />
+
           <Route
             path="/leave-policies"
             element={
