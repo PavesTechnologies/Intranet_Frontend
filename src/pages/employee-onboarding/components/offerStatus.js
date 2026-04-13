@@ -3,13 +3,24 @@ export const getNormalizedStatus = (status) =>
 .replace(/\s+/g, "_")      
 .toUpperCase();
 
+export const OFFER_STATUS = {
+  SUBMITTED: "SUBMITTED",
+  VERIFIED: "VERIFIED",
+  REJECTED: "REJECTED",
+  JOINING: "JOINING",
+  JOINING_PENDING: "JOINING_PENDING",
+  RESCHEDULED: "RESCHEDULED",
+  COMPLETED: "COMPLETED",
+};
+
 export const ONBOARDING_DISPLAY_STATUSES = [
-  "SUBMITTED",
-  "VERIFIED",
-  "REJECTED",
-  "JOINING",
-  "JOINING_PENDING",
-  "COMPLETED",
+  OFFER_STATUS.SUBMITTED,
+  OFFER_STATUS.VERIFIED,
+  OFFER_STATUS.REJECTED,
+  OFFER_STATUS.JOINING,
+  OFFER_STATUS.JOINING_PENDING,
+  OFFER_STATUS.RESCHEDULED,
+  OFFER_STATUS.COMPLETED,
 ];
 
 const JOINING_STATUS_STORAGE_KEY = "employee_onboarding_joining_status";
@@ -124,20 +135,40 @@ export const getOfferDisplayStatus = (offer, employeeUserIds = []) => {
   const isEmployeeCreated = employeeUserIds.includes(offer?.user_uuid);
 
   const joiningInitiated =
-    mergedStatus === "JOINING" ||
-    (baseStatus === "VERIFIED" && hasJoiningDetails(mergedOffer));
+    mergedStatus === OFFER_STATUS.JOINING ||
+    (baseStatus === OFFER_STATUS.VERIFIED && hasJoiningDetails(mergedOffer));
 
-  if (baseStatus === "JOINING_PENDING" || mergedStatus === "JOINING_PENDING") {
-    return "JOINING_PENDING";
+  if (
+    baseStatus === OFFER_STATUS.JOINING_PENDING ||
+    mergedStatus === OFFER_STATUS.JOINING_PENDING
+  ) {
+    return OFFER_STATUS.JOINING_PENDING;
   }
 
-  if (isEmployeeCreated && (baseStatus === "VERIFIED" || joiningInitiated)) {
+  if (
+    baseStatus === OFFER_STATUS.RESCHEDULED ||
+    mergedStatus === OFFER_STATUS.RESCHEDULED
+  ) {
+    return OFFER_STATUS.RESCHEDULED;
+  }
+
+  if (
+    baseStatus === OFFER_STATUS.JOINING ||
+    mergedStatus === OFFER_STATUS.JOINING
+  ) {
+    return OFFER_STATUS.JOINING;
+  }
+
+  if (
+    isEmployeeCreated &&
+    (baseStatus === OFFER_STATUS.VERIFIED || joiningInitiated)
+  ) {
     clearJoiningStatus(offer?.user_uuid);
-    return "COMPLETED";
+    return OFFER_STATUS.COMPLETED;
   }
   
   if (joiningInitiated) {
-    return "JOINING";
+    return OFFER_STATUS.JOINING;
   }
 
   return baseStatus;

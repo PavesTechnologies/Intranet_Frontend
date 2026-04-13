@@ -319,7 +319,7 @@ const formatDateSafe = (date) => {
       setLoading(true);
 
       const response = await fetch(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/weekly-joining-report/dashboard/?start_date=${formatDateSafe(dateRange.start)}&end_date=${formatDateSafe(dateRange.end)}`,
+        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/weekly-dashboard/?start_date=${formatDateSafe(dateRange.start)}&end_date=${formatDateSafe(dateRange.end)}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
