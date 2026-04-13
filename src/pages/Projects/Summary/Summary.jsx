@@ -82,8 +82,21 @@ const Summary = ({ projectId, projectName }) => {
 
   const allWork = useMemo(() => {
     if (!isDataReady.work) return [];
-    return [...projectData.tasks, ...projectData.stories, ...projectData.bugs];
-  }, [projectData.epics, projectData.stories, projectData.tasks, projectData.bugs, isDataReady.work]);
+
+    return [
+      ...(projectData.tasks || []).map(t => ({
+        status: { name: t.statusName || "UNKNOWN" }
+      })),
+
+      ...(projectData.stories || []).map(s => ({
+        status: { name: s.statusName || "UNKNOWN" }
+      })),
+
+      ...(projectData.bugs || []).map(b => ({
+        status: { name: b.status || "UNKNOWN" }
+      })),
+    ];
+  }, [projectData.tasks, projectData.stories, projectData.bugs, isDataReady.work]);
 
   return (
     <motion.div

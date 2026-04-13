@@ -148,7 +148,7 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
     setLoadingMeta(true);
     const headers = { Authorization: `Bearer ${token}` };
     Promise.all([
-      axios.get(`${BASE_URL}/api/projects/${projectId}/members`, { headers }),
+      axios.get(`${BASE_URL}/api/projects/${projectId}/members-with-owner`, { headers }),
       axios.get(`${BASE_URL}/api/projects/${projectId}/risk-statuses`, { headers }),
       axios.get(`${BASE_URL}/api/risk/category`, { headers }),
     ]).then(([m, s, c]) => {
