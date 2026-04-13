@@ -11,7 +11,7 @@ import { LeaveTypeDropdown } from "./RequestLeaveModal";
 import { useAuth } from "../../../contexts/AuthContext";
 import { countWeekdaysBetween } from "./RequestLeaveModal";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 export default function ApplyLeaveOnBehalf({
   isOpen,
@@ -26,7 +26,7 @@ export default function ApplyLeaveOnBehalf({
   const [employeeId, setEmployeeId] = useState("");
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [search, setSearch] = useState("");
-  
+
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [leaveTypeId, setLeaveTypeId] = useState("");
@@ -55,7 +55,7 @@ export default function ApplyLeaveOnBehalf({
       endDate,
       halfDayConfig,
       holidays,
-      leaveTypeId
+      leaveTypeId,
     );
   }, [startDate, endDate, halfDayConfig, holidays, leaveTypeId]);
 
@@ -65,7 +65,7 @@ export default function ApplyLeaveOnBehalf({
 
   const leaveTypeOptions = useLeaveDropdownOptions(allBalances);
   const selectedLeave = leaveTypeOptions.find(
-    (l) => l.leaveTypeId === leaveTypeId
+    (l) => l.leaveTypeId === leaveTypeId,
   );
 
   // Logic for Drive Link visibility
@@ -96,10 +96,15 @@ export default function ApplyLeaveOnBehalf({
   const fetchEmployees = useCallback(
     async (searchText) => {
       try {
-        const res = await axios.get(`${BASE_URL}/api/employee/search/${userId}`, {
-          params: { search: searchText, page: 0 },
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        const res = await axios.get(
+          `${BASE_URL}/api/employee/search/${userId}`,
+          {
+            params: { search: searchText, page: 0 },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
+        );
         const formatted = res.data.data.map((emp) => ({
           value: emp.employeeId,
           label: emp.name,
@@ -109,12 +114,12 @@ export default function ApplyLeaveOnBehalf({
         toast.error("Failed to load employees");
       }
     },
-    [userId]
+    [userId],
   );
 
   const debouncedSearch = useMemo(
     () => debounce((input) => fetchEmployees(input), 400),
-    [fetchEmployees]
+    [fetchEmployees],
   );
 
   useEffect(() => {
@@ -142,7 +147,7 @@ export default function ApplyLeaveOnBehalf({
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    
+
     // Basic validation for Drive Link
     if (shouldShowDriveLink() && !driveLink.trim()) {
       toast.warn("Please provide a drive link for documentation");
@@ -168,7 +173,7 @@ export default function ApplyLeaveOnBehalf({
         },
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        },
       );
       toast.success("Leave applied successfully");
       onSuccess?.();
@@ -187,21 +192,32 @@ export default function ApplyLeaveOnBehalf({
       <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden border flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b bg-gray-50 flex-shrink-0">
-          <h2 className="text-lg font-bold text-gray-800">Apply Leave on Behalf</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
+          <h2 className="text-lg font-bold text-gray-800">
+            Apply Leave on Behalf
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+          >
             <X size={20} />
           </button>
         </div>
 
         {/* Scrollable Form */}
-        <form className="p-6 space-y-5 overflow-y-auto custom-scrollbar pb-10" onSubmit={handleSubmit}>
-          
+        <form
+          className="p-6 space-y-5 overflow-y-auto custom-scrollbar pb-10"
+          onSubmit={handleSubmit}
+        >
           {/* Employee Selection */}
           <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Employee</label>
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Employee
+            </label>
             <Select
               className="mt-1 text-sm"
-              value={employeeOptions.find((o) => o.value === employeeId) || null}
+              value={
+                employeeOptions.find((o) => o.value === employeeId) || null
+              }
               onChange={(opt) => {
                 setEmployeeId(opt?.value);
                 setLeaveTypeId(""); // Reset leave type when employee changes
@@ -227,15 +243,22 @@ export default function ApplyLeaveOnBehalf({
               label="End Date"
               defaultDate={endDate ? new Date(endDate) : null}
               onChange={handleEndDateChange}
-              disabledDays={[{ dayOfWeek: [0, 6] }, ...holidays, startDate ? { before: new Date(startDate) } : {}]}
+              disabledDays={[
+                { dayOfWeek: [0, 6] },
+                ...holidays,
+                startDate ? { before: new Date(startDate) } : {},
+              ]}
               align="right"
             />
             <div className="col-span-2 flex items-center justify-between pt-2 border-t border-gray-200">
               <span className="flex items-center gap-1 text-xs font-bold text-indigo-600">
-                <Calculator size={14} /> {weekdays} {weekdays === 1 ? "Day" : "Days"}
+                <Calculator size={14} /> {weekdays}{" "}
+                {weekdays === 1 ? "Day" : "Days"}
               </span>
               <span className="text-[10px] text-gray-400 font-medium">
-                {leaveTypeId === "L-ML" ? "Includes All Days" : "Excludes Weekends"}
+                {leaveTypeId === "L-ML"
+                  ? "Includes All Days"
+                  : "Excludes Weekends"}
               </span>
             </div>
           </div>
@@ -251,7 +274,9 @@ export default function ApplyLeaveOnBehalf({
                     setHalfDayConfig({ start: "none", end: "none" });
                   }}
                   className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
-                    !showCustomHalfDay ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                    !showCustomHalfDay
+                      ? "bg-white text-indigo-600 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
                   Full Days
@@ -263,7 +288,9 @@ export default function ApplyLeaveOnBehalf({
                     setHalfDayConfig({ start: "fullday", end: "fullday" });
                   }}
                   className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
-                    showCustomHalfDay ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                    showCustomHalfDay
+                      ? "bg-white text-indigo-600 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
                   Custom (Half-Day)
@@ -273,10 +300,17 @@ export default function ApplyLeaveOnBehalf({
               {showCustomHalfDay && (
                 <div className="flex items-start gap-3 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
                   <div className="flex-1 space-y-1">
-                    <label className="text-[10px] font-bold text-indigo-600 uppercase">Start Day</label>
+                    <label className="text-[10px] font-bold text-indigo-600 uppercase">
+                      Start Day
+                    </label>
                     <select
                       value={halfDayConfig.start}
-                      onChange={(e) => setHalfDayConfig((p) => ({ ...p, start: e.target.value }))}
+                      onChange={(e) =>
+                        setHalfDayConfig((p) => ({
+                          ...p,
+                          start: e.target.value,
+                        }))
+                      }
                       className="w-full p-2 bg-white border border-indigo-200 rounded-md text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       <option value="fullday">Full Day</option>
@@ -286,10 +320,17 @@ export default function ApplyLeaveOnBehalf({
                   </div>
                   {startDate !== endDate && (
                     <div className="flex-1 space-y-1">
-                      <label className="text-[10px] font-bold text-indigo-600 uppercase">End Day</label>
+                      <label className="text-[10px] font-bold text-indigo-600 uppercase">
+                        End Day
+                      </label>
                       <select
                         value={halfDayConfig.end}
-                        onChange={(e) => setHalfDayConfig((p) => ({ ...p, end: e.target.value }))}
+                        onChange={(e) =>
+                          setHalfDayConfig((p) => ({
+                            ...p,
+                            end: e.target.value,
+                          }))
+                        }
                         className="w-full p-2 bg-white border border-indigo-200 rounded-md text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value="fullday">Full Day</option>
@@ -305,7 +346,9 @@ export default function ApplyLeaveOnBehalf({
 
           {/* Leave Type Selection */}
           <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Leave Type</label>
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Leave Type
+            </label>
             {!employeeId ? (
               <div className="mt-1 p-3 text-xs text-gray-400 bg-gray-50 rounded-xl border border-dashed italic">
                 Select employee first to see available balances...
@@ -321,7 +364,8 @@ export default function ApplyLeaveOnBehalf({
             )}
             {selectedLeave && (
               <p className="mt-2 text-[11px] text-emerald-600 font-bold flex items-center gap-1 px-1">
-                <Info size={12} /> Available Balance: {selectedLeave.availableDays} Days
+                <Info size={12} /> Available Balance:{" "}
+                {selectedLeave.availableDays} Days
               </p>
             )}
           </div>
@@ -347,14 +391,18 @@ export default function ApplyLeaveOnBehalf({
                 />
               </div>
               <p className="text-[10px] text-gray-400 italic px-1">
-                {leaveTypeId === "L-SL" ? "Medical certificate link is mandatory for sick leave exceeding 3 days." : "This leave type requires documentation."}
+                {leaveTypeId === "L-SL"
+                  ? "Medical certificate link is mandatory for sick leave exceeding 3 days."
+                  : "This leave type requires documentation."}
               </p>
             </div>
           )}
 
           {/* Reason */}
           <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Reason</label>
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Reason
+            </label>
             <textarea
               placeholder="Note for the record..."
               value={reason}
@@ -377,7 +425,9 @@ export default function ApplyLeaveOnBehalf({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting || !employeeId || !leaveTypeId || weekdays <= 0}
+            disabled={
+              submitting || !employeeId || !leaveTypeId || weekdays <= 0
+            }
             className="px-6 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold disabled:opacity-50 hover:bg-indigo-700 transition-all shadow-md active:scale-95 flex items-center gap-2"
           >
             {submitting ? "Applying..." : "Confirm & Apply"}

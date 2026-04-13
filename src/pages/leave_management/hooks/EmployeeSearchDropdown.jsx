@@ -3,7 +3,7 @@ import Select from "react-select";
 import axios from "axios";
 import debounce from "lodash.debounce";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const EmployeeSearchDropdown = ({ value, onChange }) => {
   const [options, setOptions] = useState([]);
@@ -28,7 +28,7 @@ const EmployeeSearchDropdown = ({ value, onChange }) => {
       }));
 
       setOptions((prev) => (append ? [...prev, ...formatted] : formatted));
-      setHasMore(data.length === 10); 
+      setHasMore(data.length === 10);
     } catch (err) {
       console.error("API Error:", err);
     }
@@ -40,7 +40,7 @@ const EmployeeSearchDropdown = ({ value, onChange }) => {
       fetchEmployees(input, 0, false);
       setPage(0);
     }, 500),
-    []
+    [],
   );
 
   useEffect(() => {
@@ -72,7 +72,7 @@ const EmployeeSearchDropdown = ({ value, onChange }) => {
       onMenuScrollToBottom={handleMenuScrollToBottom}
       isClearable
       // Optional: adds a loading state while typing
-      isLoading={false} 
+      isLoading={false}
     />
   );
 };

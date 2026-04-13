@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { showStatusToast } from "../../../../components/toastfy/toast";
- 
+
 export default function PermissionManagement() {
   const [permissions, setPermissions] = useState([]);
   const [filteredPermissions, setFilteredPermissions] = useState([]);
@@ -34,19 +34,18 @@ export default function PermissionManagement() {
   const [deleting, setDeleting] = useState(false);
   const [processing, setProcessing] = useState(false); // for generic cancel/ok actions if needed
 
- 
   const token = localStorage.getItem("token");
- 
+
   const axiosInstance = axios.create({
-    baseURL: `${import.meta.env.VITE_USER_MANAGEMENT_URL}`,
+    baseURL: `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}`,
     headers: { Authorization: `Bearer ${token}` },
   });
- 
+
   useEffect(() => {
     fetchPermissions();
     fetchGroups();
   }, []);
- 
+
   const fetchPermissions = async () => {
     try {
       const res = await axiosInstance.get("/admin/permissions/");
@@ -56,7 +55,7 @@ export default function PermissionManagement() {
       console.error("Failed to fetch permissions", err);
     }
   };
- 
+
   const fetchGroups = async () => {
     try {
       const res = await axiosInstance.get("/admin/groups");
@@ -65,29 +64,35 @@ export default function PermissionManagement() {
       console.error("Failed to fetch groups", err);
     }
   };
- 
+
   const showSingleToast = (msg, type) => {
     toast.dismiss();
     showStatusToast(msg, type);
   };
- 
+
   const validatePermissionCode = (code) => {
     if (!code.trim()) {
       showSingleToast("Enter the permission", "error");
       return false;
     }
     if (!/[A-Z]/.test(code)) {
-      showSingleToast("Permission code must contain at least one capital letter", "error");
+      showSingleToast(
+        "Permission code must contain at least one capital letter",
+        "error",
+      );
       return false;
     }
     const validCharsRegex = /^[A-Za-z\s-_]+$/;
     if (!validCharsRegex.test(code)) {
-      showSingleToast("Permission code can only contain letters, spaces, hyphens, and underscores", "error");
+      showSingleToast(
+        "Permission code can only contain letters, spaces, hyphens, and underscores",
+        "error",
+      );
       return false;
     }
     return true;
   };
- 
+
   const validateDescription = (desc) => {
     if (!desc.trim()) {
       showSingleToast("Description shouldn't be empty", "error");
@@ -95,63 +100,74 @@ export default function PermissionManagement() {
     }
     const textOnlyRegex = /^[A-Za-z0-9\s.,!?'"()_-]+$/;
     if (!textOnlyRegex.test(desc)) {
-      showSingleToast("Description should contain only valid text format", "error");
+      showSingleToast(
+        "Description should contain only valid text format",
+        "error",
+      );
       return false;
     }
     return true;
   };
- 
+
   const handleCreate = async () => {
     if (!validatePermissionCode(newPermission)) return;
     if (!validateDescription(description)) return;
- 
+
     try {
       const payload = {
         permission_code: newPermission,
         description,
-        group_uuid: selectedGroup 
+        group_uuid: selectedGroup,
       };
- 
+
       const endpoint = "/admin/permissions/group";
- 
+
       await axiosInstance.post(endpoint, payload);
- 
+
       showSingleToast("Permission created successfully!", "success");
       resetForm();
       fetchPermissions();
     } catch (err) {
       console.error("Error creating permission", err);
-      const detail = err.response?.data?.detail || "Failed to create permission";
+      const detail =
+        err.response?.data?.detail || "Failed to create permission";
       showSingleToast(detail, "error");
     }
   };
- 
+
   const handleUpdate = async () => {
     if (!validatePermissionCode(editCode)) return;
     if (!validateDescription(editDescription)) return;
- 
+
     try {
-      await axiosInstance.put(`/admin/permissions/${editingPermission.permission_uuid}`, {
-        permission_code: editCode,
-        description: editDescription,
-      });
- 
+      await axiosInstance.put(
+        `/admin/permissions/${editingPermission.permission_uuid}`,
+        {
+          permission_code: editCode,
+          description: editDescription,
+        },
+      );
+
       if (mode === "withGroup") {
-        await axiosInstance.put(`/admin/permissions/${editingPermission.permission_uuid}/group`, {
-          group_uuid: editGroup,
-        });
+        await axiosInstance.put(
+          `/admin/permissions/${editingPermission.permission_uuid}/group`,
+          {
+            group_uuid: editGroup,
+          },
+        );
       }
- 
+
       showSingleToast("Permission updated successfully!", "success");
       setShowModal(false);
       fetchPermissions();
     } catch (err) {
       console.error("Error updating permission", err);
-      const detail = err.response?.data?.detail || "Failed to update permission";
+      const detail =
+        err.response?.data?.detail || "Failed to update permission";
       showSingleToast(detail, "error");
     }
   };
- 
+
   const confirmDelete = async () => {
     try {
       await axiosInstance.delete(`/admin/permissions/${deleteId}`);
@@ -165,27 +181,27 @@ export default function PermissionManagement() {
       setDeleteId(null);
     }
   };
- 
+
   const handlePermissionChange = (e) => {
     const value = e.target.value;
     if (/^[A-Za-z\s-_]*$/.test(value)) setNewPermission(value);
   };
- 
+
   const handleDescriptionChange = (e) => {
     const value = e.target.value;
     if (/^[A-Za-z0-9\s.,!?'"()_-]*$/.test(value)) setNewDescription(value);
   };
- 
+
   const handleEditPermissionChange = (e) => {
     const value = e.target.value;
     if (/^[A-Za-z\s-_]*$/.test(value)) setEditCode(value);
   };
- 
+
   const handleEditDescriptionChange = (e) => {
     const value = e.target.value;
     if (/^[A-Za-z0-9\s.,!?'"()_-]*$/.test(value)) setEditDescription(value);
   };
- 
+
   const handleEdit = (permission) => {
     setEditingPermission(permission);
     setEditCode(permission.permission_code);
@@ -193,64 +209,65 @@ export default function PermissionManagement() {
     setEditGroup(permission.group_uuid || "");
     setShowModal(true);
   };
- 
+
   const handleDeleteClick = (id) => {
     setDeleteId(id);
     setShowDeleteModal(true);
   };
- 
+
   const resetForm = () => {
     setNewPermission("");
     setNewDescription("");
     setSelectedGroup("");
   };
- 
+
   const handleAddPermission = () => {
     setAddPermission(!addpermission);
     setAddPermissionModal(!addPermissionModal);
   };
- 
+
   useEffect(() => {
     if (!searchTerm.trim()) {
       setFilteredPermissions(permissions);
     } else {
       const filtered = permissions.filter((perm) =>
-        perm.permission_code.toLowerCase().includes(searchTerm.toLowerCase())
+        perm.permission_code.toLowerCase().includes(searchTerm.toLowerCase()),
       );
       setFilteredPermissions(filtered);
     }
     setCurrentPage(1);
   }, [searchTerm, permissions]);
- 
+
   const totalPages = Math.ceil(filteredPermissions.length / itemsPerPage);
   const paginatedPermissions = filteredPermissions.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
- 
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6 flex justify-between items-center">
         <h2 className="text-2xl font-semibold">Permission Management</h2>
         <Button
-  onClick={async () => {
-    setAdding(true);
-    try {
-      await handleAddPermission(); // <-- your existing function
-    } finally {
-      setAdding(false);
-    }
-  }}
-  disabled={adding}
-  className={`px-6 py-2 text-white rounded transition-colors font-medium ${
-    adding ? "bg-gray-400 cursor-not-allowed" : "bg-blue-900 hover:bg-blue-950"
-  }`}
->
-  {adding ? "Adding..." : "Add Permission"}
-</Button>
-
+          onClick={async () => {
+            setAdding(true);
+            try {
+              await handleAddPermission(); // <-- your existing function
+            } finally {
+              setAdding(false);
+            }
+          }}
+          disabled={adding}
+          className={`px-6 py-2 text-white rounded transition-colors font-medium ${
+            adding
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-900 hover:bg-blue-950"
+          }`}
+        >
+          {adding ? "Adding..." : "Add Permission"}
+        </Button>
       </div>
- 
+
       {/* Add Permission Modal */}
       <Modal isOpen={addPermissionModal} onClose={handleAddPermission}>
         {addpermission && (
@@ -278,7 +295,6 @@ export default function PermissionManagement() {
               onChange={(e) => setSelectedGroup(String(e.target.value))}
               className="w-full p-2 border rounded mb-3"
             >
-              
               <option value="">Select Group</option>
               {groups.map((g) => (
                 <option key={g.group_uuid} value={g.group_uuid}>
@@ -286,13 +302,18 @@ export default function PermissionManagement() {
                 </option>
               ))}
             </select>
-            <Button onClick={handleCreate} variant="primary" size="medium" className="mt-3">
+            <Button
+              onClick={handleCreate}
+              variant="primary"
+              size="medium"
+              className="mt-3"
+            >
               Add Permission
             </Button>
           </div>
         )}
       </Modal>
- 
+
       {/* Permission List */}
       <div className="bg-white p-4 rounded shadow">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -304,7 +325,7 @@ export default function PermissionManagement() {
             className="max-w-md"
           />
         </div>
- 
+
         <ul className="space-y-3">
           {paginatedPermissions.map((perm) => (
             <li
@@ -319,7 +340,7 @@ export default function PermissionManagement() {
                   {perm.description || "No description available."}
                 </p>
               </div>
- 
+
               <div className="flex gap-3 ml-4 flex-shrink-0">
                 <button
                   onClick={() => handleEdit(perm)}
@@ -339,15 +360,17 @@ export default function PermissionManagement() {
             </li>
           ))}
         </ul>
- 
+
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
           onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          onNext={() =>
+            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+          }
         />
       </div>
- 
+
       {/* Edit Modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
         <h2 className="text-lg font-semibold mb-4">Edit Permission</h2>
@@ -369,21 +392,23 @@ export default function PermissionManagement() {
         />
         <div className="flex gap-3 mt-4">
           <Button
-  onClick={async () => {
-    setUpdating(true);
-    try {
-      await handleUpdate(); // <-- your existing function
-    } finally {
-      setUpdating(false);
-    }
-  }}
-  disabled={updating}
-  className={`px-6 py-2 text-white rounded transition-colors font-medium ${
-    updating ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
-  }`}
->
-  {updating ? "Updating..." : "Update"}
-</Button>
+            onClick={async () => {
+              setUpdating(true);
+              try {
+                await handleUpdate(); // <-- your existing function
+              } finally {
+                setUpdating(false);
+              }
+            }}
+            disabled={updating}
+            className={`px-6 py-2 text-white rounded transition-colors font-medium ${
+              updating
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-green-600 hover:bg-green-700"
+            }`}
+          >
+            {updating ? "Updating..." : "Update"}
+          </Button>
 
           <Button
             onClick={() => setShowModal(false)}
@@ -394,7 +419,7 @@ export default function PermissionManagement() {
           </Button>
         </div>
       </Modal>
- 
+
       {/* Delete Modal */}
       <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)}>
         <h2 className="text-lg font-semibold mb-4">

@@ -11,7 +11,7 @@ const CommentBox = ({ entityId, entityType, currentUser }) => {
 
   // Create Axios instance *inside useEffect or function* (not at top level)
   const axiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_PMS_BASE_URL,
+    baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
     },
@@ -21,7 +21,9 @@ const CommentBox = ({ entityId, entityType, currentUser }) => {
   const fetchComments = async () => {
     try {
       setLoading(true);
-      const res = await axiosInstance.get(`/api/comments/${entityType}/${entityId}`);
+      const res = await axiosInstance.get(
+        `/api/comments/${entityType}/${entityId}`,
+      );
       const data = Array.isArray(res.data) ? res.data : [];
       setComments(data);
     } catch (error) {
@@ -47,7 +49,10 @@ const CommentBox = ({ entityId, entityType, currentUser }) => {
     };
 
     try {
-      await axiosInstance.post(`/api/comments/${entityType}/${entityId}`, payload);
+      await axiosInstance.post(
+        `/api/comments/${entityType}/${entityId}`,
+        payload,
+      );
       setNewComment("");
       setReplyingTo(null);
       fetchComments();

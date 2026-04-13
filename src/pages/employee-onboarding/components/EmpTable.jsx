@@ -29,8 +29,7 @@ function ActionMenu({ onView, onVerify, showVerify }) {
 
     document.addEventListener("mousedown", handleClickOutside);
 
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
@@ -90,7 +89,7 @@ export default function OffersTable({
     setSelectedIds((prev) =>
       prev.includes(userUuid)
         ? prev.filter((id) => id !== userUuid)
-        : [...prev, userUuid]
+        : [...prev, userUuid],
     );
   };
 
@@ -106,7 +105,7 @@ export default function OffersTable({
       setSending(true);
 
       const res = await axios.post(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/bulk-send`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/bulk-send`,
         {
           user_uuid_list: selectedIds,
         },
@@ -115,11 +114,11 @@ export default function OffersTable({
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       showStatusToast(
-        `Bulk Send Complete\n\nSuccessful: ${res.data.successful}\nFailed: ${res.data.failed}`
+        `Bulk Send Complete\n\nSuccessful: ${res.data.successful}\nFailed: ${res.data.failed}`,
       );
       cancelBulk();
     } catch (error) {
@@ -216,21 +215,12 @@ export default function OffersTable({
         ),
       };
     });
-  }, [
-    offers,
-    currentPage,
-    bulkMode,
-    selectedIds,
-    navigate,
-    employeeUserIds,
-  ]);
+  }, [offers, currentPage, bulkMode, selectedIds, navigate, employeeUserIds]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm relative overflow-visible">
       <div className="p-4 border-b flex justify-between items-center">
-        <h2 className="font-semibold text-gray-800">
-          Recent Offer Letters
-        </h2>
+        <h2 className="font-semibold text-gray-800">Recent Offer Letters</h2>
 
         <div className="flex items-center gap-3">
           {!bulkMode ? (
@@ -249,16 +239,10 @@ export default function OffersTable({
                 disabled={selectedIds.length === 0 || sending}
                 onClick={handleBulkSend}
               >
-                {sending
-                  ? "Sending..."
-                  : `Send (${selectedIds.length})`}
+                {sending ? "Sending..." : `Send (${selectedIds.length})`}
               </Button>
 
-              <Button
-                varient="secondary"
-                size="small"
-                onClick={cancelBulk}
-              >
+              <Button varient="secondary" size="small" onClick={cancelBulk}>
                 Cancel
               </Button>
             </div>
@@ -277,12 +261,8 @@ export default function OffersTable({
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          onPrevious={() =>
-            setCurrentPage((p) => Math.max(p - 1, 1))
-          }
-          onNext={() =>
-            setCurrentPage((p) => Math.min(p + 1, totalPages))
-          }
+          onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+          onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
         />
       )}
     </div>

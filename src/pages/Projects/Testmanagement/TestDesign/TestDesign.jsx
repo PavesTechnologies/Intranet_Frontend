@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { 
-  Plus, 
-  Folder, 
-  ChevronRight, 
-  Layers, 
-  BookOpen, 
-  Loader2, 
-  AlertCircle ,
-  Edit,    
-  Trash2
+import {
+  Plus,
+  Folder,
+  ChevronRight,
+  Layers,
+  BookOpen,
+  Loader2,
+  AlertCircle,
+  Edit,
+  Trash2,
 } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
 import { useParams } from "react-router-dom";
@@ -23,7 +23,7 @@ export default function TestDesign() {
   const { projectId } = useParams();
 
   const [testStories, setTestStories] = useState([]);
-  const [expandedStories, setExpandedStories] = useState({}); 
+  const [expandedStories, setExpandedStories] = useState({});
 
   const [selectedStory, setSelectedStory] = useState(null);
   const [selectedScenario, setSelectedScenario] = useState(null);
@@ -47,7 +47,7 @@ export default function TestDesign() {
   const fetchTestStories = async () => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-stories/projects/${projectId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-stories/projects/${projectId}`,
       );
       return (res.data || []).map((s) => ({
         ...s,
@@ -58,25 +58,25 @@ export default function TestDesign() {
       return [];
     }
   };
-// ---------------------------------------------------------
+  // ---------------------------------------------------------
   // DELETE STORY
   // ---------------------------------------------------------
   const handleDeleteStory = async (e, storyId) => {
     e.stopPropagation(); // Prevent row expand/collapse
-    
+
     if (!window.confirm("Are you sure you want to delete this test story?")) {
       return;
     }
 
     try {
       await axiosInstance.delete(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-stories/project-test-data/${storyId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-stories/project-test-data/${storyId}`,
       );
       toast.success("Test story deleted successfully!");
-      
+
       // Remove it from the local state
       setTestStories((prev) => prev.filter((s) => s.id !== storyId));
-      
+
       // Clear selections if the deleted story was active
       if (selectedStory?.id === storyId) {
         setSelectedStory(null);
@@ -88,12 +88,12 @@ export default function TestDesign() {
       toast.error("Failed to delete test story.");
     }
   };
-  
+
   // ---------------------------------------------------------
   // DELETE CASE
   // ---------------------------------------------------------
   const handleDeleteCase = async (caseId, scenarioId, storyId) => {
-    console.log("🚨 handleDeleteCase triggered for ID:", caseId); 
+    console.log("🚨 handleDeleteCase triggered for ID:", caseId);
 
     // Use the reliable browser popup just like Story and Scenario!
     if (!window.confirm("Are you sure you want to delete this test case?")) {
@@ -103,15 +103,15 @@ export default function TestDesign() {
     try {
       // 1. Delete from backend
       await axiosInstance.delete(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases/${caseId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/${caseId}`,
       );
-      
+
       // 2. Show standard success toast
       toast.success("Test case deleted successfully!");
-      
+
       // 3. Refresh the story contents silently in the background
       await loadStoryContents(storyId);
-      
+
       // 4. Clear the right panel if the deleted case was currently selected
       if (selectedCase?.id === caseId) {
         setSelectedCase(null);
@@ -127,7 +127,7 @@ export default function TestDesign() {
   const fetchScenarios = async (storyId) => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/scenarios/test-stories/${storyId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios/test-stories/${storyId}`,
       );
       return (res.data || []).map((sc) => ({
         ...sc,
@@ -145,7 +145,7 @@ export default function TestDesign() {
   const fetchCases = async (scenarioId) => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases/scenarios/${scenarioId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/scenarios/${scenarioId}`,
       );
       return res.data || [];
     } catch (err) {
@@ -153,26 +153,28 @@ export default function TestDesign() {
       return [];
     }
   };
- 
+
   // ---------------------------------------------------------
   // DELETE SCENARIO
   // ---------------------------------------------------------
   const handleDeleteScenario = async (e, scenarioId, storyId) => {
     e.stopPropagation(); // Prevent row selection/collapse
-    
-    if (!window.confirm("Are you sure you want to delete this test scenario?")) {
+
+    if (
+      !window.confirm("Are you sure you want to delete this test scenario?")
+    ) {
       return;
     }
 
     try {
       await axiosInstance.delete(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/scenarios/${scenarioId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios/${scenarioId}`,
       );
       toast.success("Scenario deleted successfully!");
-      
+
       // Silently refresh the story contents to remove it from the list
       await loadStoryContents(storyId);
-      
+
       // Clear selections if the deleted scenario was currently active
       if (selectedScenario?.id === scenarioId) {
         setSelectedScenario(null);
@@ -181,7 +183,10 @@ export default function TestDesign() {
     } catch (err) {
       console.error("❌ Error deleting scenario", err);
       // Extract specific error message from the backend response
-      const errorMessage = err.response?.data?.message || err.response?.data?.error || "Failed to delete scenario.";
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to delete scenario.";
       toast.error(errorMessage);
     }
   };
@@ -192,7 +197,7 @@ export default function TestDesign() {
   const fetchSteps = async (caseId) => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases/${caseId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/${caseId}`,
       );
       return res.data.steps || [];
     } catch (err) {
@@ -219,9 +224,9 @@ export default function TestDesign() {
     }
 
     setTestStories((prev) =>
-      prev.map((s) => (s.id === storyId ? { ...s, scenarios } : s))
+      prev.map((s) => (s.id === storyId ? { ...s, scenarios } : s)),
     );
-    
+
     return scenarios;
   };
 
@@ -257,21 +262,21 @@ export default function TestDesign() {
     setExpandedStories((p) => ({ ...p, [story.id]: true }));
 
     // ✅ THEN fetch the nested scenarios, cases, and steps in the background
-    await loadStoryContents(story.id); 
+    await loadStoryContents(story.id);
   };
 
   // ---------------------------------------------------------
   // CALLBACKS (SILENT REFRESHES)
   // ---------------------------------------------------------
-  
+
   const handleStoryCreated = async () => {
     const stories = await fetchTestStories();
     // Merge new stories while keeping the expanded scenarios of existing ones
-    setTestStories((prev) => 
+    setTestStories((prev) =>
       stories.map((s) => {
         const existing = prev.find((p) => p.id === s.id);
         return existing ? { ...s, scenarios: existing.scenarios } : s;
-      })
+      }),
     );
     setOpenStoryModal(false);
   };
@@ -287,21 +292,25 @@ export default function TestDesign() {
 
   const handleCaseCreated = async () => {
     // Find which story this scenario belongs to
-    const story = testStories.find((s) => 
-      s.scenarios?.some((sc) => sc.id === selectedScenario?.id)
+    const story = testStories.find((s) =>
+      s.scenarios?.some((sc) => sc.id === selectedScenario?.id),
     );
-    
+
     if (story) {
       const updatedScenarios = await loadStoryContents(story.id);
-      
+
       // Keep the current scenario and case seamlessly selected
-      const updatedScenario = updatedScenarios.find(sc => sc.id === selectedScenario.id);
+      const updatedScenario = updatedScenarios.find(
+        (sc) => sc.id === selectedScenario.id,
+      );
       if (updatedScenario) {
         setSelectedScenario(updatedScenario);
         if (!selectedCase) {
           setSelectedCase(updatedScenario.cases[0] || null);
         } else {
-          const updatedCase = updatedScenario.cases.find(c => c.id === selectedCase.id);
+          const updatedCase = updatedScenario.cases.find(
+            (c) => c.id === selectedCase.id,
+          );
           setSelectedCase(updatedCase || updatedScenario.cases[0] || null);
         }
       }
@@ -310,17 +319,21 @@ export default function TestDesign() {
   };
 
   const handleStepsCreated = async () => {
-    const story = testStories.find((s) => 
-      s.scenarios?.some((sc) => sc.id === selectedScenario?.id)
+    const story = testStories.find((s) =>
+      s.scenarios?.some((sc) => sc.id === selectedScenario?.id),
     );
-    
+
     if (story) {
       const updatedScenarios = await loadStoryContents(story.id);
-      const updatedScenario = updatedScenarios.find(sc => sc.id === selectedScenario.id);
+      const updatedScenario = updatedScenarios.find(
+        (sc) => sc.id === selectedScenario.id,
+      );
       if (updatedScenario) {
         setSelectedScenario(updatedScenario);
         if (selectedCase) {
-          const updatedCase = updatedScenario.cases.find(c => c.id === selectedCase.id);
+          const updatedCase = updatedScenario.cases.find(
+            (c) => c.id === selectedCase.id,
+          );
           setSelectedCase(updatedCase || null);
         }
       }
@@ -342,7 +355,6 @@ export default function TestDesign() {
 
   return (
     <div className="flex h-[calc(100vh-80px)] bg-gray-50 overflow-hidden">
-      
       {/* -------------------------------- */}
       {/* LEFT SIDEBAR — EXPLORER */}
       {/* -------------------------------- */}
@@ -352,7 +364,9 @@ export default function TestDesign() {
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white">
           <div className="flex items-center gap-2">
             <BookOpen size={18} className="text-blue-600" />
-            <h3 className="font-semibold text-gray-800 tracking-tight">Test Stories</h3>
+            <h3 className="font-semibold text-gray-800 tracking-tight">
+              Test Stories
+            </h3>
           </div>
           <button
             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
@@ -379,7 +393,6 @@ export default function TestDesign() {
 
               return (
                 <div key={story.id} className="select-none">
-                  
                   {/* Story Row */}
                   <div className="group flex items-center justify-between px-2 py-2 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors text-gray-700">
                     <div
@@ -389,55 +402,62 @@ export default function TestDesign() {
                         toggleStoryExpand(story);
                       }}
                     >
-                      <ChevronRight 
-                        size={16} 
-                        className={`text-gray-400 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} 
+                      <ChevronRight
+                        size={16}
+                        className={`text-gray-400 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}
                       />
-                      <Folder size={16} className={isExpanded ? "text-blue-500" : "text-gray-400"} />
-                      <span className="text-sm font-medium truncate">{story.name}</span>
+                      <Folder
+                        size={16}
+                        className={
+                          isExpanded ? "text-blue-500" : "text-gray-400"
+                        }
+                      />
+                      <span className="text-sm font-medium truncate">
+                        {story.name}
+                      </span>
                     </div>
 
                     {/* Add Scenario Button (Visible on hover) */}
-                  {/* Action Buttons (Visible on hover) */}
-                  <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-                    {/* Edit Button */}
-                    <button
-                      className="p-1 hover:bg-blue-100 hover:text-blue-600 rounded text-gray-500 transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingStory(story);
-                        setOpenStoryModal(true);
-                      }}
-                      title="Edit Story"
-                    >
-                      <Edit size={14} />
-                    </button>
+                    {/* Action Buttons (Visible on hover) */}
+                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                      {/* Edit Button */}
+                      <button
+                        className="p-1 hover:bg-blue-100 hover:text-blue-600 rounded text-gray-500 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingStory(story);
+                          setOpenStoryModal(true);
+                        }}
+                        title="Edit Story"
+                      >
+                        <Edit size={14} />
+                      </button>
 
-                    {/* Delete Button */}
-                    <button
-                      className="p-1 hover:bg-red-100 hover:text-red-600 rounded text-gray-500 transition-colors"
-                      onClick={(e) => handleDeleteStory(e, story.id)}
-                      title="Delete Story"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                      {/* Delete Button */}
+                      <button
+                        className="p-1 hover:bg-red-100 hover:text-red-600 rounded text-gray-500 transition-colors"
+                        onClick={(e) => handleDeleteStory(e, story.id)}
+                        title="Delete Story"
+                      >
+                        <Trash2 size={14} />
+                      </button>
 
-                    {/* Add Scenario Button */}
-                    {/* Add Scenario Button (Inside Story Row) */}
-                    {/* Add Scenario Button (Inside Story Row) */}
-                    <button
-                      className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingScenario(null); // <-- ADD THIS to ensure it's a NEW scenario
-                        setScenarioStory(story);
-                        setOpenScenarioModal(true);
-                      }}
-                      title="Add Scenario"
-                    >
-                      <Plus size={14} />
-                    </button>
-                  </div>
+                      {/* Add Scenario Button */}
+                      {/* Add Scenario Button (Inside Story Row) */}
+                      {/* Add Scenario Button (Inside Story Row) */}
+                      <button
+                        className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingScenario(null); // <-- ADD THIS to ensure it's a NEW scenario
+                          setScenarioStory(story);
+                          setOpenScenarioModal(true);
+                        }}
+                        title="Add Scenario"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Expandable Scenario List */}
@@ -449,14 +469,15 @@ export default function TestDesign() {
                         </div>
                       ) : (
                         story.scenarios.map((scenario) => {
-                          const isSelected = selectedScenario?.id === scenario.id;
+                          const isSelected =
+                            selectedScenario?.id === scenario.id;
 
                           return (
                             <div
                               key={scenario.id}
                               className={`group flex items-center justify-between px-3 py-1.5 rounded-md cursor-pointer transition-colors ${
-                                isSelected 
-                                  ? "bg-blue-50 text-blue-700 font-medium" 
+                                isSelected
+                                  ? "bg-blue-50 text-blue-700 font-medium"
                                   : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                               }`}
                               onClick={() => {
@@ -465,52 +486,66 @@ export default function TestDesign() {
                               }}
                             >
                               <div className="flex items-center gap-2 overflow-hidden">
-                                <Layers size={14} className={isSelected ? "text-blue-500" : "text-gray-400"} />
-                                <span className="text-sm truncate">{scenario.title}</span>
+                                <Layers
+                                  size={14}
+                                  className={
+                                    isSelected
+                                      ? "text-blue-500"
+                                      : "text-gray-400"
+                                  }
+                                />
+                                <span className="text-sm truncate">
+                                  {scenario.title}
+                                </span>
                               </div>
 
                               {/* Add Case Button (Visible on hover) */}
-                             {/* Action Buttons (Visible on hover) */}
                               {/* Action Buttons (Visible on hover) */}
-<div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity ml-2 shrink-0">
-  
-  {/* Edit Scenario */}
-  <button
-    className="p-1 hover:bg-blue-200 hover:text-blue-800 rounded text-gray-500 transition-colors"
-    onClick={(e) => {
-      e.stopPropagation();
-      setEditingScenario(scenario); // <-- Sets the scenario data to prefill
-      setScenarioStory(story);      // <-- Ensures the modal knows the parent story
-      setOpenScenarioModal(true);   // <-- Opens the correct modal!
-    }}
-    title="Edit Scenario"
-  >
-    <Edit size={12} />
-  </button>
+                              {/* Action Buttons (Visible on hover) */}
+                              <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity ml-2 shrink-0">
+                                {/* Edit Scenario */}
+                                <button
+                                  className="p-1 hover:bg-blue-200 hover:text-blue-800 rounded text-gray-500 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingScenario(scenario); // <-- Sets the scenario data to prefill
+                                    setScenarioStory(story); // <-- Ensures the modal knows the parent story
+                                    setOpenScenarioModal(true); // <-- Opens the correct modal!
+                                  }}
+                                  title="Edit Scenario"
+                                >
+                                  <Edit size={12} />
+                                </button>
 
-  {/* Delete Scenario */}
-  <button
-    className="p-1 hover:bg-red-200 hover:text-red-800 rounded text-gray-500 transition-colors"
-    onClick={(e) => handleDeleteScenario(e, scenario.id, story.id)}
-    title="Delete Scenario"
-  >
-    <Trash2 size={12} />
-  </button>
+                                {/* Delete Scenario */}
+                                <button
+                                  className="p-1 hover:bg-red-200 hover:text-red-800 rounded text-gray-500 transition-colors"
+                                  onClick={(e) =>
+                                    handleDeleteScenario(
+                                      e,
+                                      scenario.id,
+                                      story.id,
+                                    )
+                                  }
+                                  title="Delete Scenario"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
 
-  {/* Add Case Button */}
-  <button
-    className="p-1 hover:bg-green-200 hover:text-green-800 rounded text-gray-500 transition-colors"
-    onClick={(e) => {
-      e.stopPropagation();
-      setEditingCase(null); 
-      setSelectedScenario(scenario);
-      setOpenCaseModal(true);
-    }}
-    title="Add Test Case"
-  >
-    <Plus size={12} />
-  </button>
-</div>
+                                {/* Add Case Button */}
+                                <button
+                                  className="p-1 hover:bg-green-200 hover:text-green-800 rounded text-gray-500 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingCase(null);
+                                    setSelectedScenario(scenario);
+                                    setOpenCaseModal(true);
+                                  }}
+                                  title="Add Test Case"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </div>
                             </div>
                           );
                         })
@@ -543,26 +578,35 @@ export default function TestDesign() {
             setOpenCaseModal(true);
           }}
           onAddSteps={() => setOpenStepsModal(true)}
-          
           // --- ADD THESE TWO PROPS ---
           onEditCase={(tc) => {
             setEditingCase(tc);
             setOpenCaseModal(true);
           }}
           onDeleteCase={(testCaseData) => {
-            const caseIdToDelete = testCaseData.id || testCaseData.caseId; 
+            const caseIdToDelete = testCaseData.id || testCaseData.caseId;
             const scenarioIdForCase = selectedScenario?.id;
-            
+
             // ⭐ FIX 2: Bulletproof fallback to find the Story ID
-            const storyIdForCase = selectedStory?.id || testStories.find(s => 
-              s.scenarios?.some(sc => sc.id === scenarioIdForCase)
-            )?.id;
+            const storyIdForCase =
+              selectedStory?.id ||
+              testStories.find((s) =>
+                s.scenarios?.some((sc) => sc.id === scenarioIdForCase),
+              )?.id;
 
             if (caseIdToDelete && scenarioIdForCase && storyIdForCase) {
-              handleDeleteCase(caseIdToDelete, scenarioIdForCase, storyIdForCase);
+              handleDeleteCase(
+                caseIdToDelete,
+                scenarioIdForCase,
+                storyIdForCase,
+              );
             } else {
               toast.error("Error: Could not find case data to delete.");
-              console.error("Missing IDs for delete:", { caseIdToDelete, scenarioIdForCase, storyIdForCase });
+              console.error("Missing IDs for delete:", {
+                caseIdToDelete,
+                scenarioIdForCase,
+                storyIdForCase,
+              });
             }
           }}
         />
@@ -584,7 +628,6 @@ export default function TestDesign() {
           }}
           onCreated={handleStoryCreated}
           testStoryId={editingStory?.id || null}
-
         />
       )}
 

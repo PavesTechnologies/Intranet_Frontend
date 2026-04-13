@@ -1,11 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
-import {toast} from "react-toastify";
+import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import beachDay from "../../../components/icons/beach-day_cnsv.svg"
+import beachDay from "../../../components/icons/beach-day_cnsv.svg";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 // Helper to format dates for readability
 const formatDate = (dateString) => {
@@ -45,10 +45,15 @@ export default function LeaveDetailsPage() {
   const navigate = useNavigate();
 
   // Retrieve employeeId and leaveTypeName passed from the dashboard
-  const { leaveTypeName: initialLeaveTypeName, allLeaveTypes: intialAllLeaveTypes= [] } = location.state || {};
+  const {
+    leaveTypeName: initialLeaveTypeName,
+    allLeaveTypes: intialAllLeaveTypes = [],
+  } = location.state || {};
   const [allLeaveTypes, setAllLeaveTypes] = useState(intialAllLeaveTypes);
   const [leaveRequests, setLeaveRequests] = useState([]);
-  const [displayName, setDisplayName] = useState(initialLeaveTypeName || formatLeaveNameFromParam(leaveName));
+  const [displayName, setDisplayName] = useState(
+    initialLeaveTypeName || formatLeaveNameFromParam(leaveName),
+  );
   const [loading, setLoading] = useState(true);
 
   const fetchAllLeaveTypes = async () => {
@@ -84,7 +89,7 @@ export default function LeaveDetailsPage() {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         );
 
         if (res.data?.success) {
@@ -95,7 +100,8 @@ export default function LeaveDetailsPage() {
             const formattedName = fetchedName
               .split("_")
               .map(
-                (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                (word) =>
+                  word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
               )
               .join(" ");
             setDisplayName(formattedName);
@@ -104,7 +110,9 @@ export default function LeaveDetailsPage() {
           toast.error(res.data.message || "Failed to fetch leave details.");
         }
       } catch (err) {
-        toast.error(err.response?.data?.message || err.message || "An error occurred.");
+        toast.error(
+          err.response?.data?.message || err.message || "An error occurred.",
+        );
       } finally {
         setLoading(false);
       }
@@ -145,7 +153,7 @@ export default function LeaveDetailsPage() {
 
       // Add the current request to this month's list.
       acc[monthYear].requests.push(req);
-      
+
       // Add the days from this request to the month's total.
       acc[monthYear].totalDays += req.daysRequested;
 
@@ -153,7 +161,9 @@ export default function LeaveDetailsPage() {
     }, {}); // Start with an empty object.
   }, [leaveRequests]);
 
-  const sortedMonthKeys = Object.keys(groupedLeaves).sort((a, b) => new Date(b) - new Date(a));
+  const sortedMonthKeys = Object.keys(groupedLeaves).sort(
+    (a, b) => new Date(b) - new Date(a),
+  );
 
   if (loading) {
     return (
@@ -164,14 +174,15 @@ export default function LeaveDetailsPage() {
   }
 
   // Separate requests for better UI presentation
-  const pendingRequests = leaveRequests.filter(req => req.status === 'PENDING');
-  const pastRequests = leaveRequests.filter(req => req.status !== 'PENDING');
+  const pendingRequests = leaveRequests.filter(
+    (req) => req.status === "PENDING",
+  );
+  const pastRequests = leaveRequests.filter((req) => req.status !== "PENDING");
 
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-
           {/* Column 1: Sidebar Navigation */}
           <aside className="lg:col-span-1">
             <div className="sticky top-6">
@@ -210,7 +221,7 @@ export default function LeaveDetailsPage() {
                 onClick={() => navigate(-1)}
                 className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors"
               >
-                &larr; Back 
+                &larr; Back
               </button>
             </div>
 
@@ -222,9 +233,12 @@ export default function LeaveDetailsPage() {
                   return (
                     <section key={monthKey}>
                       <div className="flex justify-between items-center mb-3">
-                        <h2 className="text-lg font-semibold text-gray-700">{monthKey}</h2>
+                        <h2 className="text-lg font-semibold text-gray-700">
+                          {monthKey}
+                        </h2>
                         <p className="font-semibold text-gray-600">
-                          {monthData.totalDays} Day{monthData.totalDays !== 1 ? 's' : ''}
+                          {monthData.totalDays} Day
+                          {monthData.totalDays !== 1 ? "s" : ""}
                         </p>
                       </div>
                       <div className="space-y-4">
@@ -239,9 +253,10 @@ export default function LeaveDetailsPage() {
             ) : (
               // Display this message if there are no leave requests at all
               <div className="flex flex-col justify-center items-center p-8 bg-white rounded-lg border">
-                <img src={beachDay} alt="No Leave History" className="w-40"/>
+                <img src={beachDay} alt="No Leave History" className="w-40" />
                 <p className="text-gray-500 mt-5">
-                  No requests found for {displayName} in {new Date().getFullYear()}.
+                  No requests found for {displayName} in{" "}
+                  {new Date().getFullYear()}.
                 </p>
               </div>
             )}
@@ -261,7 +276,8 @@ const RequestCard = ({ request }) => (
           {formatDate(request.startDate)} to {formatDate(request.endDate)}
         </p>
         <p className="text-xs text-gray-600 mt-1">
-          Reason: <span className="text-gray-700">{request.reason || "N/A"}</span>
+          Reason:{" "}
+          <span className="text-gray-700">{request.reason || "N/A"}</span>
         </p>
          <p className="text-xs text-gray-600 mt-1">
           Approved by: <span className="text-gray-700">{request.approvedBy?.fullName || "N/A"}</span>
@@ -274,7 +290,7 @@ const RequestCard = ({ request }) => (
           {request.status}
         </span>
         <p className="text-sm font-bold text-gray-800 mt-2">
-          -{request.daysRequested} Day{request.daysRequested !== 1 ? 's' : ''}
+          -{request.daysRequested} Day{request.daysRequested !== 1 ? "s" : ""}
         </p>
          <p className="text-xs text-gray-600 mt-1">
           Applied by: <span className="text-gray-700">{request.appliedBy?.fullName || "N/A"}</span>
@@ -282,4 +298,4 @@ const RequestCard = ({ request }) => (
       </div>
     </div>
   </div>
-);  
+);

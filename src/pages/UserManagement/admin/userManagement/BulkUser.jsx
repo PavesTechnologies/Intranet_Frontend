@@ -30,14 +30,14 @@ const BulkUserUpload = ({ onClose, onSuccess }) => {
       toastId = toast("Uploading file and reading data...");
 
       const response = await axios.post(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/users/multiple-users`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/multiple-users`,
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       const { created_count, failed_count } = response.data;
@@ -120,4 +120,3 @@ const BulkUserUpload = ({ onClose, onSuccess }) => {
 };
 
 export default BulkUserUpload;
- 

@@ -18,19 +18,19 @@ const InternalActivities = () => {
     try {
       const res = await axios.get(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/internal-projects/all`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       setInternalActivities(res.data);
     } catch (err) {
       console.log("failed to fetch internal activities: ", err);
       toast.error(
-        err?.response?.data || "Failed to fetch internal activities."
+        err?.response?.data || "Failed to fetch internal activities.",
       );
     } finally {
       setLoading(false);
@@ -46,7 +46,7 @@ const InternalActivities = () => {
     try {
       const res = await axios.post(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/internal-projects/create`,
         {
           taskName: newTaskName,
@@ -55,7 +55,7 @@ const InternalActivities = () => {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       setNewTaskName("");
       setAddTaskField(false);
@@ -93,14 +93,14 @@ const InternalActivities = () => {
     try {
       const res = await axios.put(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/internal-projects/${id}`,
         { taskName: tempTaskName },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       setEditingTaskId(null);
       setTempTaskName("");

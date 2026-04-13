@@ -7,11 +7,10 @@ import axios from "axios";
 import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { Plus, List, ChevronRight, ChevronDown } from "lucide-react";
-import { ToastContainer } from "react-toastify";   // ✅ Added
+import { ToastContainer } from "react-toastify"; // ✅ Added
 import { showStatusToast } from "../../../components/toastfy/toast";
-import {jwtDecode} from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 import { useAuth } from "../../../contexts/AuthContext";
-
 
 import Button from "../../../components/Button/Button";
 import StoryCard from "./Sprint/StoryCard";
@@ -27,13 +26,8 @@ import SprintPendingModal from "./Sprint/SprintPendingModal";
 import { ca } from "date-fns/locale";
 import { useLocation } from "react-router-dom";
 
-
-
 const BacklogAndSprints = ({ projectId, projectName }) => {
-  
-
   const navigate = useNavigate();
-
 
   const [stories, setStories] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -55,14 +49,20 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const [permissions, setPermissions] = useState(null);
   const toggleStoryExpand = (storyId) => {
     setExpandedBacklogStories((prev) =>
-      prev.includes(storyId) ? prev.filter((id) => id !== storyId) : [...prev, storyId]
+      prev.includes(storyId)
+        ? prev.filter((id) => id !== storyId)
+        : [...prev, storyId],
     );
   };
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
   const { user } = useAuth();
-  const userRole = user?.roles?.includes("Manager") ? "MANAGER" : user?.roles?.includes("Admin") ? "ADMIN" : "EMPLOYEE";
+  const userRole = user?.roles?.includes("Manager")
+    ? "MANAGER"
+    : user?.roles?.includes("Admin")
+      ? "ADMIN"
+      : "EMPLOYEE";
   const canManageProjects = userRole === "MANAGER" || userRole === "ADMIN";
 
   // =======================================
@@ -70,8 +70,8 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   // =======================================
   const fetchStoryById = async (storyId) => {
     const res = await axios.get(
-      `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/${storyId}`,
-      { headers }
+      `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}`,
+      { headers },
     );
     return res.data;
   };
@@ -93,17 +93,16 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
     dueDate: story.dueDate,
   });
   const isManager = (() => {
-  const token = localStorage.getItem("token");
-  if (!token) return false;
+    const token = localStorage.getItem("token");
+    if (!token) return false;
 
-  try {
-    const decoded = jwtDecode(token);
-    return decoded?.roles?.includes("Manager");
-  } catch (e) {
-    return false;
-  }
-})();
-
+    try {
+      const decoded = jwtDecode(token);
+      return decoded?.roles?.includes("Manager");
+    } catch (e) {
+      return false;
+    }
+  })();
 
   // =======================================
   // Move Story (Sprint <-> Backlog)
@@ -111,7 +110,7 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const handleDropStory = async (storyId, sprintId) => {
     // Optimistic UI update
     setStories((prev) =>
-      prev.map((s) => (s.id === storyId ? { ...s, sprintId } : s))
+      prev.map((s) => (s.id === storyId ? { ...s, sprintId } : s)),
     );
 
     try {
@@ -119,21 +118,24 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
       const body = buildUpdatedStoryBody(fullStory, sprintId);
 
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/${storyId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}`,
         body,
-        { headers }
+        { headers },
       );
 
-      toast.success(sprintId ? "Story moved successfully!" : "Moved to backlog", { autoClose: 1500 });
+      toast.success(
+        sprintId ? "Story moved successfully!" : "Moved to backlog",
+        { autoClose: 1500 },
+      );
       fetchStories();
     } catch (err) {
       const errorMessage =
-    err?.response?.data?.message ||   // backend message
-    err?.message ||                   // axios/network message
-    "Failed to move story";           // fallback
+        err?.response?.data?.message || // backend message
+        err?.message || // axios/network message
+        "Failed to move story"; // fallback
 
       toast.error(errorMessage, { autoClose: 2000 });
-    
+
       fetchStories(); // rollback to server truth
     }
   };
@@ -144,17 +146,19 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const handleSprintStatus = async (sprintId, action) => {
     try {
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
         {},
-        { headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        } }
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
       );
 
       toast.success(
-  action === "start" ? "Sprint started" : "Sprint completed",
-  { autoClose: 1500 }
-);
+        action === "start" ? "Sprint started" : "Sprint completed",
+        { autoClose: 1500 },
+      );
 
       fetchSprints();
       fetchStories();
@@ -162,7 +166,10 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
       const data = err.response?.data || {};
 
       // 1. Handle Sprint Completion Error (Pending Tasks)
-      if (action === "complete" && data.code === "SPRINT_COMPLETION_VALIDATION_ERROR") {
+      if (
+        action === "complete" &&
+        data.code === "SPRINT_COMPLETION_VALIDATION_ERROR"
+      ) {
         setPendingData({
           sprintId,
           tasks: data.data?.pendingTasks || [],
@@ -173,10 +180,16 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
       }
 
       // 2. Handle "Another sprint is already active" error specifically
-      if (data.message && data.message.includes("Another active sprint already exists")) {
-        toast.warn("Cannot start sprint: Another active sprint already exists in this project.", { 
-          autoClose: 3000 
-        });
+      if (
+        data.message &&
+        data.message.includes("Another active sprint already exists")
+      ) {
+        toast.warn(
+          "Cannot start sprint: Another active sprint already exists in this project.",
+          {
+            autoClose: 3000,
+          },
+        );
         return;
       }
 
@@ -193,9 +206,11 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const handleAssignEpicToStory = async (storyId, epicId) => {
     try {
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/${storyId}/assign-epic/${epicId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}/assign-epic/${epicId}`,
         {},
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
       );
       toast.success("Epic assigned successfully!", { autoClose: 1500 });
       fetchStories(); // Refresh the list
@@ -211,16 +226,16 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
     console.log("handleDropTask called with:", sprintId);
     try {
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, sprintId } : t))
+        prev.map((t) => (t.id === taskId ? { ...t, sprintId } : t)),
       );
 
       await axios.patch(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/tasks/${taskId}/assign-sprint/${sprintId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}/assign-sprint/${sprintId}`,
         {},
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
-          }
+          },
         },
       );
       toast.success("Task moved!", { autoClose: 1500 });
@@ -230,21 +245,24 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
     }
   };
 
-
   // =======================================
   // Assign Task to Story
   // =======================================
   const handleAssignTaskToStory = async (taskId, storyId) => {
     try {
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/tasks/${taskId}/assign-story/${storyId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}/assign-story/${storyId}`,
         {},
-        { headers }
+        { headers },
       );
-      toast.success("Task successfully assigned to story!", { autoClose: 1500 });
+      toast.success("Task successfully assigned to story!", {
+        autoClose: 1500,
+      });
       fetchTasks(); // Refresh to update the UI hierarchy
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to assign story", { autoClose: 2000 });
+      toast.error(err.response?.data?.message || "Failed to assign story", {
+        autoClose: 2000,
+      });
     }
   };
   // =======================================
@@ -253,10 +271,12 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const fetchStories = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`,
-        { headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        }}
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
       );
 
       const list = Array.isArray(res.data) ? res.data : res.data.content || [];
@@ -264,15 +284,14 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
       setBacklogStories(list.filter((s) => !s.sprintId));
     } catch {
       toast.error("Failed to fetch stories", { autoClose: 2000 });
-
     }
   };
 
   const fetchPermissions = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/permissions`,
-        { headers }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/permissions`,
+        { headers },
       );
 
       setPermissions(res.data);
@@ -284,10 +303,12 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const fetchTasks = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/tasks`,
-        { headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        } }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
       );
 
       const list = Array.isArray(res.data) ? res.data : res.data.content || [];
@@ -301,10 +322,12 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const fetchEpics = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`,
-        { headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        } }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
       );
 
       setEpics(Array.isArray(res.data) ? res.data : res.data.content || []);
@@ -316,10 +339,12 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const fetchSprints = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`,
-        { headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        } }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
       );
 
       setSprints(Array.isArray(res.data) ? res.data : res.data.content || []);
@@ -328,9 +353,9 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
     }
   };
   // =======================================
-// Delete Sprint
-// =======================================
-// =======================================
+  // Delete Sprint
+  // =======================================
+  // =======================================
   // Delete Sprint
   // =======================================
   const handleDeleteSprint = (sprintId) => {
@@ -351,19 +376,21 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
             <button
               onClick={async () => {
                 closeToast(); // Close the confirmation toast immediately
-                
+
                 // Execute the deletion logic
                 try {
                   await axios.delete(
-                    `${import.meta.env.VITE_PMS_BASE_URL}/api/sprints/${sprintId}`,
+                    `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}`,
                     {
                       headers: {
                         Authorization: `Bearer ${localStorage.getItem("token")}`,
                       },
-                    }
+                    },
                   );
 
-                  toast.success("Sprint deleted successfully", { autoClose: 1500 });
+                  toast.success("Sprint deleted successfully", {
+                    autoClose: 1500,
+                  });
                   fetchSprints();
                   fetchStories();
                 } catch (err) {
@@ -372,7 +399,7 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
                   if (message.includes("foreign key constraint")) {
                     toast.error(
                       "Cannot delete sprint because tasks are still assigned to it. Move them to backlog first.",
-                      { autoClose: 4000 }
+                      { autoClose: 4000 },
                     );
                   } else {
                     toast.error("Failed to delete sprint", { autoClose: 2000 });
@@ -387,16 +414,15 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
         </div>
       ),
       {
-        autoClose: false,       // Keep open until user interacts
-        closeButton: false,     // Hide default close 'x'
-        closeOnClick: false,    // Don't close if they click the background of the toast
-        draggable: false,       // Disable dragging to dismiss
+        autoClose: false, // Keep open until user interacts
+        closeButton: false, // Hide default close 'x'
+        closeOnClick: false, // Don't close if they click the background of the toast
+        draggable: false, // Disable dragging to dismiss
         toastId: `delete-sprint-${sprintId}`, // Prevent opening multiple duplicate toasts
-        className: "border border-gray-100 shadow-xl rounded-xl", 
-      }
+        className: "border border-gray-100 shadow-xl rounded-xl",
+      },
     );
   };
-
 
   useEffect(() => {
     fetchStories();
@@ -409,53 +435,50 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   // =======================================
   // Backlog Drop Zone
   // =======================================// =======================================
-// Backlog Drop Zone (UPDATED)
-// =======================================
-const BacklogDropWrapper = ({ children }) => {
-  const [{ isOver }, dropRef] = useDrop(() => ({
-    accept: ["STORY", "TASK"],   // 👈 accept BOTH
-    drop: (item) => {
-      if (item.type === "TASK") {
-        handleDropTask(item.id, null);   // move TASK to backlog
-      } else {
-        handleDropStory(item.id, null);  // move STORY to backlog
-      }
-    },
-    collect: (monitor) => ({
-      isOver: monitor.isOver(),
-    }),
-  }));
+  // Backlog Drop Zone (UPDATED)
+  // =======================================
+  const BacklogDropWrapper = ({ children }) => {
+    const [{ isOver }, dropRef] = useDrop(() => ({
+      accept: ["STORY", "TASK"], // 👈 accept BOTH
+      drop: (item) => {
+        if (item.type === "TASK") {
+          handleDropTask(item.id, null); // move TASK to backlog
+        } else {
+          handleDropStory(item.id, null); // move STORY to backlog
+        }
+      },
+      collect: (monitor) => ({
+        isOver: monitor.isOver(),
+      }),
+    }));
 
-  return (
-    <div
-      ref={dropRef}
-      className={`transition border rounded p-4 shadow-sm ${
-        isOver ? "bg-green-100 border-green-500" : "bg-white"
-      }`}
-    >
-      {children}
-    </div>
-  );
-};
-
+    return (
+      <div
+        ref={dropRef}
+        className={`transition border rounded p-4 shadow-sm ${
+          isOver ? "bg-green-100 border-green-500" : "bg-white"
+        }`}
+      >
+        {children}
+      </div>
+    );
+  };
 
   const activeAndPlanningSprints = sprints.filter(
-    (s) => s.status === "ACTIVE" || s.status === "PLANNING"
+    (s) => s.status === "ACTIVE" || s.status === "PLANNING",
   );
-  const completedSprints = sprints.filter(
-  (s) => s.status === "COMPLETED"
-);
+  const completedSprints = sprints.filter((s) => s.status === "COMPLETED");
 
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         {/* Toast Container — MUST EXIST for instant toasts */}
-        <ToastContainer position="top-right" autoClose={1500} /> {/* ✅ Sped up global autoClose */}
-
+        <ToastContainer position="top-right" autoClose={1500} />{" "}
+        {/* ✅ Sped up global autoClose */}
         {/* Header */}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-semibold text-indigo-900">
-            Backlog & Sprint Planning  {projectName}
+            Backlog & Sprint Planning {projectName}
           </h1>
 
           <div className="flex gap-3">
@@ -464,26 +487,27 @@ const BacklogDropWrapper = ({ children }) => {
               variant="outline"
               className="flex items-center gap-2"
               onClick={() =>
-                navigate(`/projects/${projectId}/issuetracker`, { state: { projectId,projectName } })
+                navigate(`/projects/${projectId}/issuetracker`, {
+                  state: { projectId, projectName },
+                })
               }
             >
               <List size={18} /> Issue Tracker
             </Button>
 
-          <Button
-            className={`flex items-center gap-2 ${
-              !permissions?.canEdit ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-            disabled={!permissions?.canEdit}
-            onClick={() => {
-              if (permissions?.canEdit) {
-                setShowSprintModal(true);
-              }
-            }}
-          >
-            <Plus size={18} /> Create Sprint
-          </Button>
-
+            <Button
+              className={`flex items-center gap-2 ${
+                !permissions?.canEdit ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              disabled={!permissions?.canEdit}
+              onClick={() => {
+                if (permissions?.canEdit) {
+                  setShowSprintModal(true);
+                }
+              }}
+            >
+              <Plus size={18} /> Create Sprint
+            </Button>
 
             <Button
               variant="outline"
@@ -494,15 +518,14 @@ const BacklogDropWrapper = ({ children }) => {
             </Button>
           </div>
         </div>
-
         {/* Sprints */}
         <div className="space-y-6">
           {activeAndPlanningSprints.map((sprint) => {
             const sprintStories = stories.filter(
-              (s) => s.sprintId === sprint.id || s.sprint?.id === sprint.id
+              (s) => s.sprintId === sprint.id || s.sprint?.id === sprint.id,
             );
             const sprintTasks = tasks.filter(
-              (t) => t.sprintId === sprint.id || t.sprint?.id === sprint.id
+              (t) => t.sprintId === sprint.id || t.sprint?.id === sprint.id,
             );
 
             // 👇 1. Check if it's active
@@ -510,11 +533,11 @@ const BacklogDropWrapper = ({ children }) => {
 
             return (
               // 👇 2. Add the highlight wrapper and badge
-              <div 
-                key={sprint.id} 
+              <div
+                key={sprint.id}
                 className={`relative transition-all rounded-xl ${
-                  isActive 
-                    ? "ring-2 ring-emerald-500 shadow-md bg-emerald-50/20 pt-1 pb-1 px-1 mt-4" 
+                  isActive
+                    ? "ring-2 ring-emerald-500 shadow-md bg-emerald-50/20 pt-1 pb-1 px-1 mt-4"
                     : ""
                 }`}
               >
@@ -524,7 +547,7 @@ const BacklogDropWrapper = ({ children }) => {
                     Active Sprint
                   </div>
                 )}
-                
+
                 <SprintColumn
                   sprint={sprint}
                   stories={sprintStories}
@@ -561,7 +584,7 @@ const BacklogDropWrapper = ({ children }) => {
               </div>
             );
           })}
-         {/* Completed Sprints Section */}
+          {/* Completed Sprints Section */}
           {completedSprints.length > 0 && (
             <div className="mt-10">
               <button
@@ -569,7 +592,11 @@ const BacklogDropWrapper = ({ children }) => {
                 className="flex items-center gap-2 w-full text-left pb-2 border-b border-gray-200 group focus:outline-none"
               >
                 <div className="p-1 rounded-md bg-gray-100 group-hover:bg-indigo-100 text-gray-500 group-hover:text-indigo-600 transition-colors">
-                  {showCompletedSprints ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                  {showCompletedSprints ? (
+                    <ChevronDown size={18} />
+                  ) : (
+                    <ChevronRight size={18} />
+                  )}
                 </div>
                 <h2 className="text-lg font-bold text-gray-600 group-hover:text-gray-900 transition-colors">
                   Completed Sprints ({completedSprints.length})
@@ -580,11 +607,13 @@ const BacklogDropWrapper = ({ children }) => {
                 <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
                   {completedSprints.map((sprint) => {
                     const sprintStories = stories.filter(
-                      (s) => s.sprintId === sprint.id || s.sprint?.id === sprint.id
+                      (s) =>
+                        s.sprintId === sprint.id || s.sprint?.id === sprint.id,
                     );
 
                     const sprintTasks = tasks.filter(
-                      (t) => t.sprintId === sprint.id || t.sprint?.id === sprint.id
+                      (t) =>
+                        t.sprintId === sprint.id || t.sprint?.id === sprint.id,
                     );
 
                     return (
@@ -621,7 +650,6 @@ const BacklogDropWrapper = ({ children }) => {
             </div>
           )}
         </div>
-
         {/* Backlog */}
         {/* Backlog */}
         {/* Backlog */}
@@ -634,14 +662,15 @@ const BacklogDropWrapper = ({ children }) => {
             {/* 1. STORIES AND THEIR NESTED TASKS */}
             {backlogStories.map((story) => {
               // Find tasks that belong to this story
-              const childTasks = backlogTasks.filter((t) => t.storyId === story.id);
+              const childTasks = backlogTasks.filter(
+                (t) => t.storyId === story.id,
+              );
               // Check if this specific story is expanded
               const isExpanded = expandedBacklogStories.includes(story.id);
 
               return (
                 <div key={story.id} className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    
                     {/* Expand/Collapse Button (Only shows if story has tasks) */}
                     {childTasks.length > 0 ? (
                       <button
@@ -649,7 +678,11 @@ const BacklogDropWrapper = ({ children }) => {
                         className="p-1 rounded-md bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-700 transition-colors shadow-sm"
                         title={isExpanded ? "Collapse tasks" : "Expand tasks"}
                       >
-                        {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                        {isExpanded ? (
+                          <ChevronDown size={18} />
+                        ) : (
+                          <ChevronRight size={18} />
+                        )}
                       </button>
                     ) : (
                       <span className="w-[26px]"></span> // Invisible spacer for alignment
@@ -662,7 +695,7 @@ const BacklogDropWrapper = ({ children }) => {
                         sprints={activeAndPlanningSprints}
                         epics={epics}
                         onAddToSprint={handleDropStory}
-                         onSelectEpic={handleAssignEpicToStory}
+                        onSelectEpic={handleAssignEpicToStory}
                         onClick={() => {
                           setPanelMode("story");
                           setSelectedStoryId(story.id);
@@ -749,7 +782,10 @@ const BacklogDropWrapper = ({ children }) => {
         onCreated={(newSprint) => setSprints((prev) => [...prev, newSprint])}
       />
 
-      <RightSidePanel isOpen={rightPanelOpen} onClose={() => setRightPanelOpen(false)}>
+      <RightSidePanel
+        isOpen={rightPanelOpen}
+        onClose={() => setRightPanelOpen(false)}
+      >
         {panelMode === "story" && selectedStoryId && (
           <EditStoryForm
             storyId={selectedStoryId}

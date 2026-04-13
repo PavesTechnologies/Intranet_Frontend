@@ -4,7 +4,12 @@ import { X } from "lucide-react";
 import toast from "react-hot-toast";
 
 // ⭐ 2. Added caseToEdit prop
-export default function AddCaseModal({ scenarioId, caseToEdit, onClose, onCreated }) {
+export default function AddCaseModal({
+  scenarioId,
+  caseToEdit,
+  onClose,
+  onCreated,
+}) {
   const [title, setTitle] = useState("");
   const [preConditions, setPreConditions] = useState("");
   const [priority, setPriority] = useState("LOW");
@@ -19,13 +24,15 @@ export default function AddCaseModal({ scenarioId, caseToEdit, onClose, onCreate
       setPreConditions(caseToEdit.preConditions || "");
       setPriority(caseToEdit.priority || "LOW");
       setType(caseToEdit.type || "FUNCTIONAL");
-      
+
       // If the case already has steps, pre-fill them. Otherwise, leave one blank row.
       if (caseToEdit.steps && caseToEdit.steps.length > 0) {
-        setSteps(caseToEdit.steps.map(s => ({
-          action: s.action || "",
-          expectedResult: s.expectedResult || s.expected || "" // Safely handle DTO variations
-        })));
+        setSteps(
+          caseToEdit.steps.map((s) => ({
+            action: s.action || "",
+            expectedResult: s.expectedResult || s.expected || "", // Safely handle DTO variations
+          })),
+        );
       } else {
         setSteps([{ action: "", expectedResult: "" }]);
       }
@@ -65,25 +72,34 @@ export default function AddCaseModal({ scenarioId, caseToEdit, onClose, onCreate
           .filter((s) => s.action.trim() || s.expectedResult.trim())
           .map((s) => ({
             action: s.action,
-            expectedResult: s.expectedResult
-          }))
+            expectedResult: s.expectedResult,
+          })),
       };
 
       // ⭐ 4. Conditional logic for PUT (Edit) vs POST (Create)
       if (caseToEdit) {
-        await axiosInstance.put(`${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases/${caseToEdit.id}`, payload);
+        await axiosInstance.put(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/${caseToEdit.id}`,
+          payload,
+        );
         toast.success("Test Case updated successfully!");
       } else {
-        await axiosInstance.post(`${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases`, payload);
+        await axiosInstance.post(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases`,
+          payload,
+        );
         toast.success("Test Case created successfully!");
       }
-      
+
       if (onCreated) onCreated();
       onClose();
-      
     } catch (err) {
       console.error("Action FAILED →", err);
-      toast.error(caseToEdit ? "Failed to update test case" : "Failed to create test case");
+      toast.error(
+        caseToEdit
+          ? "Failed to update test case"
+          : "Failed to create test case",
+      );
     } finally {
       setSaving(false);
     }
@@ -94,12 +110,13 @@ export default function AddCaseModal({ scenarioId, caseToEdit, onClose, onCreate
       <div className="bg-white w-[650px] max-h-[80vh] overflow-auto p-5 rounded-xl shadow-lg">
         <div className="flex justify-between mb-4">
           {/* ⭐ 5. Dynamic Modal Title */}
-          <h2 className="text-lg font-semibold">{caseToEdit ? "Edit Test Case" : "Add Test Case"}</h2>
+          <h2 className="text-lg font-semibold">
+            {caseToEdit ? "Edit Test Case" : "Add Test Case"}
+          </h2>
           <X className="cursor-pointer" onClick={onClose} />
         </div>
 
         <div className="space-y-4">
-
           <div>
             <label className="text-sm">Title</label>
             <input
@@ -154,7 +171,12 @@ export default function AddCaseModal({ scenarioId, caseToEdit, onClose, onCreate
           <div>
             <div className="flex justify-between">
               <label className="text-sm">Steps</label>
-              <button onClick={addStep} className="text-blue-600 text-sm hover:text-blue-800">+ Add Step</button>
+              <button
+                onClick={addStep}
+                className="text-blue-600 text-sm hover:text-blue-800"
+              >
+                + Add Step
+              </button>
             </div>
 
             <div className="space-y-2 mt-2">
@@ -170,7 +192,9 @@ export default function AddCaseModal({ scenarioId, caseToEdit, onClose, onCreate
                     className="col-span-6 border rounded px-2 py-1"
                     placeholder="Expected Result"
                     value={step.expectedResult}
-                    onChange={(e) => updateStep(i, "expectedResult", e.target.value)}
+                    onChange={(e) =>
+                      updateStep(i, "expectedResult", e.target.value)
+                    }
                   />
                   <button
                     className="col-span-1 text-red-500 hover:bg-red-50 rounded p-1 flex items-center justify-center"
@@ -185,7 +209,10 @@ export default function AddCaseModal({ scenarioId, caseToEdit, onClose, onCreate
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-            <button className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors" onClick={onClose}>
+            <button
+              className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              onClick={onClose}
+            >
               Cancel
             </button>
             <button
@@ -194,12 +221,14 @@ export default function AddCaseModal({ scenarioId, caseToEdit, onClose, onCreate
               disabled={saving}
             >
               {/* ⭐ 6. Dynamic Save Button Text */}
-              {saving ? "Saving..." : (caseToEdit ? "Update Case" : "Create Case")}
+              {saving
+                ? "Saving..."
+                : caseToEdit
+                  ? "Update Case"
+                  : "Create Case"}
             </button>
           </div>
-
         </div>
-
       </div>
     </div>
   );

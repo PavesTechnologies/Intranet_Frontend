@@ -919,7 +919,7 @@ function App() {
   return (
     <>
       <ToastContainer position="top-right" autoClose={3000} />
-      <Router>
+      <Router basename={window.__APP_CONFIG__.basePath}>
         <></>
         <AuthProvider>
           <NotificationProvider>
