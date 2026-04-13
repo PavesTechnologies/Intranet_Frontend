@@ -3,15 +3,13 @@ import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const GENDER_BASED_IDS = ["L-ML", "L-PL"];
 
 export function useLeaveDropdownOptions(balances) {
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [hasFetched, setHasFetched] = useState(false);
-
-  
 
   useEffect(() => {
     if (hasFetched) return;
@@ -25,7 +23,9 @@ export function useLeaveDropdownOptions(balances) {
         setLeaveTypes(res.data);
         setHasFetched(true);
       } catch (err) {
-        toast.error(err?.response?.data?.message || "Failed to load leave type details.");
+        toast.error(
+          err?.response?.data?.message || "Failed to load leave type details.",
+        );
       }
     };
     fetchLeaveTypes();
@@ -33,24 +33,30 @@ export function useLeaveDropdownOptions(balances) {
 
   return useMemo(() => {
     console.log("useLeaveDropdownOptions", { balances, leaveTypes });
-    if (!balances || balances.length === 0 || leaveTypes.length === 0) return [];
+    if (!balances || balances.length === 0 || leaveTypes.length === 0)
+      return [];
 
     return balances.map((balance) => {
       const leaveTypeId = balance.leaveType.leaveTypeId;
       const originalName = balance.leaveType.leaveName.replace(/^L-/, "");
       const matchingType = leaveTypes.find(
-        (type) => type.name === balance.leaveType.leaveName
+        (type) => type.name === balance.leaveType.leaveName,
       );
       const leaveName = matchingType ? matchingType.label : originalName;
 
       // ✅ Gender-based leaves use remainingDays, all others use remainingLeaves
       const isGenderBased = GENDER_BASED_IDS.includes(leaveTypeId);
-      const remaining = isGenderBased ? balance.remainingDays : balance.remainingLeaves;
+      const remaining = isGenderBased
+        ? balance.remainingDays
+        : balance.remainingLeaves;
 
       let availableText;
       let isInfinite = false;
 
-      if (leaveTypeId === "L-UP" || leaveName.toLowerCase().includes("unpaid")) {
+      if (
+        leaveTypeId === "L-UP" ||
+        leaveName.toLowerCase().includes("unpaid")
+      ) {
         availableText = "infinite balance";
         isInfinite = true;
       } else if (remaining > 0) {
@@ -64,12 +70,13 @@ export function useLeaveDropdownOptions(balances) {
         leaveTypeId,
         leaveName,
         availableText,
-        availableDays: isInfinite ? Infinity : remaining,   // ✅
+        availableDays: isInfinite ? Infinity : remaining, // ✅
         isInfinite,
-        disabled: (!isInfinite && remaining <= 0) || balance.isBlocked,  // ✅
+        disabled: (!isInfinite && remaining <= 0) || balance.isBlocked, // ✅
         allowHalfDay: !!balance.leaveType.allowHalfDay,
         requiresDocumentation: !!balance.leaveType.requiresDocumentation,
-        weekendsAndHolidaysAllowed: !!balance.leaveType?.weekendsAndHolidaysAllowed,
+        weekendsAndHolidaysAllowed:
+          !!balance.leaveType?.weekendsAndHolidaysAllowed,
         raw: balance,
       };
     });

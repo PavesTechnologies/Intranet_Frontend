@@ -13,7 +13,7 @@ const getCurrentDateTime = () => {
 };
 const CreateSprintModal = ({
   isOpen,
-  sprint,            // <-- EDIT MODE sprint object
+  sprint, // <-- EDIT MODE sprint object
   projectId,
   onClose,
   onCreated,
@@ -54,8 +54,8 @@ const CreateSprintModal = ({
     const load = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         setProjectName(res.data.name);
       } catch (e) {
@@ -73,12 +73,8 @@ const CreateSprintModal = ({
       setFormData({
         name: sprint.name || "",
         goal: sprint.goal || "",
-        startDate: sprint.startDate
-          ? sprint.startDate.slice(0, 16)
-          : "",
-        endDate: sprint.endDate
-          ? sprint.endDate.slice(0, 16)
-          : "",
+        startDate: sprint.startDate ? sprint.startDate.slice(0, 16) : "",
+        endDate: sprint.endDate ? sprint.endDate.slice(0, 16) : "",
         status: sprint.status || "PLANNING",
         projectId: projectId.toString(),
       });
@@ -95,8 +91,7 @@ const CreateSprintModal = ({
   // ---------------------------
   // Helpers
   // ---------------------------
-  const toLocalDateTime = (val) =>
-    val.length === 16 ? `${val}:00` : val;
+  const toLocalDateTime = (val) => (val.length === 16 ? `${val}:00` : val);
 
   const calculateEndDate = (start, weeks) => {
     if (!start || !weeks) return "";
@@ -175,9 +170,9 @@ const CreateSprintModal = ({
         // EDIT MODE
         // -------------------------
         res = await axios.put(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/sprints/${sprint.id}`,
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprint.id}`,
           payload,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         toast.success("Sprint updated successfully!");
@@ -186,9 +181,9 @@ const CreateSprintModal = ({
         // CREATE MODE
         // -------------------------
         res = await axios.post(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/sprints`,
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`,
           payload,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         toast.success("Sprint created successfully!");
@@ -198,9 +193,7 @@ const CreateSprintModal = ({
 
       setTimeout(() => onClose(), 600);
     } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Error saving sprint"
-      );
+      toast.error(err.response?.data?.message || "Error saving sprint");
     }
   };
 
@@ -315,14 +308,10 @@ const CreateSprintModal = ({
                     setShowDecimalWarning(false);
                     setCustomWeeks(value);
 
-                    if (
-                      value !== "" &&
-                      value !== "0" &&
-                      formData.startDate
-                    ) {
+                    if (value !== "" && value !== "0" && formData.startDate) {
                       const end = calculateEndDate(
                         formData.startDate,
-                        Number(value)
+                        Number(value),
                       );
                       setFormData({ ...formData, endDate: end });
                     }

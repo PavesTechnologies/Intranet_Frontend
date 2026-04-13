@@ -3,12 +3,12 @@ import axios from "axios";
 import { Listbox, Transition } from "@headlessui/react";
 import { Check, Plus, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import {toast} from "react-toastify"
+import { toast } from "react-toastify";
 import ConfirmationModal from "./ConfirmationModal";
 import { set } from "date-fns";
 import { is } from "date-fns/locale";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 export default function ApprovalRulesPage() {
   const [rules, setRules] = useState([]);
@@ -53,7 +53,7 @@ export default function ApprovalRulesPage() {
         `${BASE_URL}/api/approval-rules/action-types`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        },
       );
       setActionTypeOptions(res.data);
     } catch (err) {
@@ -67,7 +67,7 @@ export default function ApprovalRulesPage() {
         `${BASE_URL}/api/approval-rules/approver-types`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        },
       );
       setApproverTypeOptions(res.data);
     } catch (err) {
@@ -94,7 +94,7 @@ export default function ApprovalRulesPage() {
         approvalLevel: 1,
         approvalCondition: "",
         approverType: "",
-      }
+      },
     );
     setIsModalOpen(true);
   };

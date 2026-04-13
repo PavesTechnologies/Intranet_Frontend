@@ -25,11 +25,7 @@ const Wrapper = ({ children, mode, onClose }) => {
       </div>
     );
   }
-  return (
-    <div className="w-full h-full flex flex-col bg-white">
-      {children}
-    </div>
-  );
+  return <div className="w-full h-full flex flex-col bg-white">{children}</div>;
 };
 
 const EditTaskForm = ({
@@ -79,24 +75,24 @@ const EditTaskForm = ({
         const [taskRes, userRes, storyRes, sprintRes, statusRes] =
           await Promise.all([
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/tasks/${taskId}`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/statuses`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
+              axiosConfig,
             ),
           ]);
 
@@ -113,7 +109,7 @@ const EditTaskForm = ({
           sprintId: task.sprintId ? String(task.sprintId) : "",
           assigneeId: task.assigneeId ? String(task.assigneeId) : "",
           reporterId: task.reporterId ? String(task.reporterId) : "",
-          
+
           startDate: task.startDate ? task.startDate.split("T")[0] : "",
           dueDate: task.dueDate ? task.dueDate.split("T")[0] : "",
           billable: task.billable ? "true" : "false",
@@ -147,43 +143,49 @@ const EditTaskForm = ({
   };
 
   // 🔥 Build Changed Fields Only
-//   const buildUpdatedPayload = () => {
+  //   const buildUpdatedPayload = () => {
 
-//     const dateKeys = ["startDate", "dueDate"];
-//     if (!originalData) return formData;
-//     const payload = {};
+  //     const dateKeys = ["startDate", "dueDate"];
+  //     if (!originalData) return formData;
+  //     const payload = {};
 
-//     const numericKeys = [
-//       "statusId",
-//       "sprintId",
-//       "assigneeId",
-//       "reporterId",
-//       "storyId",
-//     ];
+  //     const numericKeys = [
+  //       "statusId",
+  //       "sprintId",
+  //       "assigneeId",
+  //       "reporterId",
+  //       "storyId",
+  //     ];
 
-//     Object.keys(formData).forEach((key) => {
-//       if (String(formData[key]) !== String(originalData[key])) {
-//         if (key === "billable") {
-//           payload[key] = formData[key] === "true";
-//         } else if (numericKeys.includes(key)) {
-//           // Convert to Number, or send null if cleared out
-//           payload[key] = formData[key] !== "" ? Number(formData[key]) : null;
-//         } else if (dateKeys.includes(key)) {
-//   payload[key] = formData[key] ? `${formData[key]}T00:00:00` : null;
-// } else {
-//   payload[key] = formData[key];
-// }
-//       }
-//     });
+  //     Object.keys(formData).forEach((key) => {
+  //       if (String(formData[key]) !== String(originalData[key])) {
+  //         if (key === "billable") {
+  //           payload[key] = formData[key] === "true";
+  //         } else if (numericKeys.includes(key)) {
+  //           // Convert to Number, or send null if cleared out
+  //           payload[key] = formData[key] !== "" ? Number(formData[key]) : null;
+  //         } else if (dateKeys.includes(key)) {
+  //   payload[key] = formData[key] ? `${formData[key]}T00:00:00` : null;
+  // } else {
+  //   payload[key] = formData[key];
+  // }
+  //       }
+  //     });
 
-//     return payload;
-//   };
+  //     return payload;
+  //   };
 
   // 🔥 Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const numericKeys = ["statusId", "sprintId", "assigneeId", "reporterId", "storyId"];
+    const numericKeys = [
+      "statusId",
+      "sprintId",
+      "assigneeId",
+      "reporterId",
+      "storyId",
+    ];
 
     const updatedPayload = {
       ...formData,
@@ -217,9 +219,9 @@ const EditTaskForm = ({
 
     try {
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/tasks/${taskId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}`,
         updatedPayload,
-        axiosConfig
+        axiosConfig,
       );
 
       toast.success("Task updated successfully!");
@@ -228,7 +230,6 @@ const EditTaskForm = ({
         onUpdated?.();
         onClose?.();
       }, 500);
-
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || "Failed to update task");

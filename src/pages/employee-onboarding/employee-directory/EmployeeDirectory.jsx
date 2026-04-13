@@ -14,7 +14,7 @@ const EmployeeDirectory = () => {
   const [designationsList, setDesignationsList] = useState([]);
 
   const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -24,26 +24,36 @@ const EmployeeDirectory = () => {
         // Fetch employees, departments, and designations in parallel
         const [empRes, deptRes, desigRes] = await Promise.all([
           axios.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           }),
           axios.get(`${BASE_URL}/masters/departments/`, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           }),
           axios.get(`${BASE_URL}/masters/designations/`, {
-            headers: { Authorization: `Bearer ${token}` }
-          })
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
 
-        const depts = Array.isArray(deptRes.data) ? deptRes.data : (deptRes.data.data || []);
-        const desigs = Array.isArray(desigRes.data) ? desigRes.data : (desigRes.data.data || []);
+        const depts = Array.isArray(deptRes.data)
+          ? deptRes.data
+          : deptRes.data.data || [];
+        const desigs = Array.isArray(desigRes.data)
+          ? desigRes.data
+          : desigRes.data.data || [];
 
         setDepartmentsList(depts);
         setDesignationsList(desigs);
 
-        const deptMap = Object.fromEntries(depts.map(d => [d.department_uuid, d.department_name]));
-        const desigMap = Object.fromEntries(desigs.map(d => [d.designation_uuid, d.designation_name]));
+        const deptMap = Object.fromEntries(
+          depts.map((d) => [d.department_uuid, d.department_name]),
+        );
+        const desigMap = Object.fromEntries(
+          desigs.map((d) => [d.designation_uuid, d.designation_name]),
+        );
 
-        const mappedEmployees = (Array.isArray(empRes.data) ? empRes.data : (empRes.data.data || [])).map(emp => ({
+        const mappedEmployees = (
+          Array.isArray(empRes.data) ? empRes.data : empRes.data.data || []
+        ).map((emp) => ({
           ...emp,
           name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
           email: emp.work_email || emp.email || "N/A",
@@ -51,13 +61,15 @@ const EmployeeDirectory = () => {
           role: desigMap[emp.designation_uuid] || emp.role || "N/A",
           department: deptMap[emp.department_uuid] || emp.department || "N/A",
           location: emp.location || "Hyderabad Office",
-          initials: ((emp.first_name?.[0] || "") + (emp.last_name?.[0] || "")).toUpperCase(),
+          initials: (
+            (emp.first_name?.[0] || "") + (emp.last_name?.[0] || "")
+          ).toUpperCase(),
           // Additional fields for Profile Modal
           employeeId: emp.employee_id || "N/A",
           gender: emp.gender || "N/A",
           employeeType: emp.employment_status || "Full-Time",
           dateOfJoining: emp.joining_date || "N/A",
-          reportingManager: emp.reporting_manager || "N/A"
+          reportingManager: emp.reporting_manager || "N/A",
         }));
 
         setEmployees(mappedEmployees);
@@ -74,7 +86,7 @@ const EmployeeDirectory = () => {
   }, [BASE_URL, token]);
 
   // Departments for the filter chips
-  const departments = ["All", ...departmentsList.map(d => d.department_name)];
+  const departments = ["All", ...departmentsList.map((d) => d.department_name)];
 
   // Filter Logic
   const filteredEmployees = employees.filter((emp) => {
@@ -88,11 +100,8 @@ const EmployeeDirectory = () => {
     return matchesSearch && matchesDepartment;
   });
 
-
   return (
-
     <div className="p-0.5 overflow-x-hidden">
-
       {/* Header */}
       <div className="flex justify-between items-center mb-2">
         <div>
@@ -107,7 +116,6 @@ const EmployeeDirectory = () => {
 
       {/* Search + Filters */}
       <div className="flex flex-wrap items-center gap-4 mb-6">
-
         {/* Search Bar */}
         <div className="relative flex-1 min-w-[150px]">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -158,13 +166,13 @@ const EmployeeDirectory = () => {
             <EmployeeCard key={index} employee={emp} index={index} />
           ))
         ) : (
-          <p className="text-gray-500 col-span-full text-center py-20">No employees found.</p>
+          <p className="text-gray-500 col-span-full text-center py-20">
+            No employees found.
+          </p>
         )}
       </div>
     </div>
   );
-
 };
 
 export default EmployeeDirectory;
-

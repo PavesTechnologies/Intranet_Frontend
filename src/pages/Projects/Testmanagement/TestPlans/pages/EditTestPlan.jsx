@@ -12,10 +12,7 @@ const Wrapper = ({ mode, onClose, children }) => {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         {/* Overlay */}
-        <div
-          className="absolute inset-0 bg-black/50"
-          onClick={onClose}
-        />
+        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
         {/* Modal content */}
         <div
@@ -28,14 +25,16 @@ const Wrapper = ({ mode, onClose, children }) => {
     );
   }
 
-  return (
-    <div className="w-full h-full flex flex-col bg-white">
-      {children}
-    </div>
-  );
+  return <div className="w-full h-full flex flex-col bg-white">{children}</div>;
 };
 
-const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" }) => {
+const EditTestPlan = ({
+  projectId,
+  planId,
+  onClose,
+  onSuccess,
+  mode = "modal",
+}) => {
   const token = localStorage.getItem("token");
 
   const [formData, setFormData] = useState({
@@ -52,8 +51,8 @@ const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" })
     const fetchPlan = async () => {
       try {
         const response = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/plans/${planId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/${planId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         const plan = response.data;
@@ -98,14 +97,14 @@ const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" })
 
     try {
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/plans/update/${planId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/update/${planId}`,
         payload,
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       toast.success("Test Plan updated successfully");

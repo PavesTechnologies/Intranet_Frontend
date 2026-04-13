@@ -1,32 +1,41 @@
 import React, { useEffect, useState } from "react";
-import { AlertCircle, Plus, X, User, Tag, Pencil, Check, ShieldAlert } from "lucide-react";
+import {
+  AlertCircle,
+  Plus,
+  X,
+  User,
+  Tag,
+  Pencil,
+  Check,
+  ShieldAlert,
+} from "lucide-react";
 import axios from "axios";
 import AddMitigationForm from "./AddMitigationForm";
 import MitigationList from "./MitigationList";
 import CreateRiskModal from "./createRiskModal";
 
 export default function RiskDetailModal({ risk, onClose, projectId }) {
-  const [riskDetail, setRiskDetail]   = useState(null);
+  const [riskDetail, setRiskDetail] = useState(null);
   const [mitigations, setMitigations] = useState([]);
-  const [members, setMembers]         = useState([]);
-  const [category, setCategory]       = useState(null);
-  const [owner, setOwner]             = useState(null);
-  const [reporter, setReporter]       = useState(null);
+  const [members, setMembers] = useState([]);
+  const [category, setCategory] = useState(null);
+  const [owner, setOwner] = useState(null);
+  const [reporter, setReporter] = useState(null);
 
   /* ── Status ── */
-  const [status, setStatus]               = useState(null);
-  const [statuses, setStatuses]           = useState([]);
+  const [status, setStatus] = useState(null);
+  const [statuses, setStatuses] = useState([]);
   const [editingStatus, setEditingStatus] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
 
   /* ── Edit ── */
   const [showEdit, setShowEdit] = useState(false);
-  const [showAdd, setShowAdd]   = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
-  const token    = localStorage.getItem("token");
+  const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
+  const token = localStorage.getItem("token");
 
   useEffect(() => {
     if (!risk?.id) return;
@@ -46,26 +55,47 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
           .catch(() => ({ data: [] }));
         const membersReq = axios.get(
           `${BASE_URL}/api/projects/${projectId}/members`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         const riskRes = (await riskReq).data;
 
         const categoryReq = riskRes.categoryId
-          ? axios.get(`${BASE_URL}/api/risk/category/${riskRes.categoryId}`, { headers: { Authorization: `Bearer ${token}` } })
+          ? axios.get(`${BASE_URL}/api/risk/category/${riskRes.categoryId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
           : null;
         const ownerReq = riskRes.ownerId
-          ? axios.get(`${BASE_URL}/api/users/${riskRes.ownerId}`, { headers: { Authorization: `Bearer ${token}` } })
+          ? axios.get(`${BASE_URL}/api/users/${riskRes.ownerId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
           : null;
         const reporterReq = riskRes.reporterId
-          ? axios.get(`${BASE_URL}/api/users/${riskRes.reporterId}`, { headers: { Authorization: `Bearer ${token}` } })
+          ? axios.get(`${BASE_URL}/api/users/${riskRes.reporterId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
           : null;
         const statusReq = riskRes.statusId
-          ? axios.get(`${BASE_URL}/api/risk-statuses/${riskRes.statusId}`, { headers: { Authorization: `Bearer ${token}` } })
+          ? axios.get(`${BASE_URL}/api/risk-statuses/${riskRes.statusId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
           : null;
 
-        const [mitigationRes, membersRes, categoryRes, ownerRes, reporterRes, statusRes] =
-          await Promise.all([mitigationReq, membersReq, categoryReq, ownerReq, reporterReq, statusReq]);
+        const [
+          mitigationRes,
+          membersRes,
+          categoryRes,
+          ownerRes,
+          reporterRes,
+          statusRes,
+        ] = await Promise.all([
+          mitigationReq,
+          membersReq,
+          categoryReq,
+          ownerReq,
+          reporterReq,
+          statusReq,
+        ]);
 
         if (!mounted) return;
         setRiskDetail(riskRes);
@@ -89,9 +119,12 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
   }, [risk?.id, projectId, BASE_URL, token]);
 
   async function startEditStatus() {
-    const res = await axios.get(`${BASE_URL}/api/projects/${projectId}/risk-statuses`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await axios.get(
+      `${BASE_URL}/api/projects/${projectId}/risk-statuses`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     setStatuses(res.data || []);
     setEditingStatus(true);
   }
@@ -100,38 +133,50 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
     await axios.patch(
       `${BASE_URL}/api/risks/${risk.id}/status`,
       { statusId: selectedStatusId },
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` } },
     );
     const updated = statuses.find((s) => s.id === selectedStatusId);
     setStatus(updated || null);
     setEditingStatus(false);
   }
 
-  function handleCreated(plan) { setMitigations((p) => [...p, plan]); setShowAdd(false); }
-  function handleUpdated(updated) { setMitigations((p) => p.map((m) => (m.id === updated.id ? updated : m))); }
-  function handleDeleted(id) { setMitigations((p) => p.filter((m) => m.id !== id)); }
+  function handleCreated(plan) {
+    setMitigations((p) => [...p, plan]);
+    setShowAdd(false);
+  }
+  function handleUpdated(updated) {
+    setMitigations((p) => p.map((m) => (m.id === updated.id ? updated : m)));
+  }
+  function handleDeleted(id) {
+    setMitigations((p) => p.filter((m) => m.id !== id));
+  }
 
   if (!risk) return null;
 
   /* ── Score colour ── */
   const score = riskDetail?.riskScore ?? 0;
-  const scoreColor = score >= 20 ? "text-red-600 bg-red-50 border-red-200"
-    : score >= 12 ? "text-orange-600 bg-orange-50 border-orange-200"
-    : score >= 6  ? "text-amber-600 bg-amber-50 border-amber-200"
-    :               "text-emerald-600 bg-emerald-50 border-emerald-200";
+  const scoreColor =
+    score >= 20
+      ? "text-red-600 bg-red-50 border-red-200"
+      : score >= 12
+        ? "text-orange-600 bg-orange-50 border-orange-200"
+        : score >= 6
+          ? "text-amber-600 bg-amber-50 border-amber-200"
+          : "text-emerald-600 bg-emerald-50 border-emerald-200";
 
   return (
     /* bottom-sheet on mobile, centred card on sm+ */
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center sm:justify-center">
-      <div className="
+      <div
+        className="
         bg-white w-full
         sm:max-w-3xl sm:mx-4
         rounded-t-2xl sm:rounded-2xl
         shadow-2xl flex flex-col
         max-h-[92dvh] sm:max-h-[88vh]
         overflow-hidden
-      ">
-
+      "
+      >
         {/* ── Header ── */}
         <div className="bg-indigo-600 text-white px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-start sm:items-center flex-shrink-0">
           <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
@@ -140,7 +185,9 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="font-bold text-sm sm:text-base">Risk #{risk.id}</h2>
+                <h2 className="font-bold text-sm sm:text-base">
+                  Risk #{risk.id}
+                </h2>
                 {riskDetail?.priority && (
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/20 uppercase tracking-wide">
                     {riskDetail.priority}
@@ -185,13 +232,27 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
 
         {/* ── Scrollable body ── */}
         <div className="flex-1 overflow-y-auto">
-
           {/* Loading / error */}
           {loading && (
             <div className="flex items-center justify-center py-12">
-              <svg className="animate-spin w-6 h-6 text-indigo-500" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              <svg
+                className="animate-spin w-6 h-6 text-indigo-500"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8z"
+                />
               </svg>
             </div>
           )}
@@ -203,22 +264,39 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
 
           {riskDetail && (
             <div className="px-4 sm:px-6 py-4 space-y-4">
-
               {/* ── Metrics strip ── */}
               <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 <Metric label="Probability" value={riskDetail.probability} />
-                <Metric label="Impact"      value={riskDetail.impact}      />
-                <div className={`border rounded-xl p-3 sm:p-4 text-center ${scoreColor}`}>
-                  <div className="text-[10px] uppercase tracking-wide font-semibold opacity-70">Risk Score</div>
-                  <div className="text-xl sm:text-2xl font-black mt-0.5">{riskDetail.riskScore ?? "—"}</div>
+                <Metric label="Impact" value={riskDetail.impact} />
+                <div
+                  className={`border rounded-xl p-3 sm:p-4 text-center ${scoreColor}`}
+                >
+                  <div className="text-[10px] uppercase tracking-wide font-semibold opacity-70">
+                    Risk Score
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black mt-0.5">
+                    {riskDetail.riskScore ?? "—"}
+                  </div>
                 </div>
               </div>
 
               {/* ── Info grid — 1 col mobile, 2 col sm+ ── */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                <InfoCard label="Category" value={category?.name}   icon={<Tag  size={13} className="text-slate-400" />} />
-                <InfoCard label="Owner"    value={owner?.name}      icon={<User size={13} className="text-slate-400" />} />
-                <InfoCard label="Reporter" value={reporter?.name}   icon={<User size={13} className="text-slate-400" />} />
+                <InfoCard
+                  label="Category"
+                  value={category?.name}
+                  icon={<Tag size={13} className="text-slate-400" />}
+                />
+                <InfoCard
+                  label="Owner"
+                  value={owner?.name}
+                  icon={<User size={13} className="text-slate-400" />}
+                />
+                <InfoCard
+                  label="Reporter"
+                  value={reporter?.name}
+                  icon={<User size={13} className="text-slate-400" />}
+                />
                 <InfoCard label="Triggers" value={riskDetail.triggers || "—"} />
               </div>
 
@@ -226,7 +304,9 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
               <div className="border border-slate-200 rounded-xl p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-1.5">Status</p>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-1.5">
+                      Status
+                    </p>
                     {!editingStatus ? (
                       <span className="px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
                         {status?.name || "—"}
@@ -234,11 +314,15 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
                     ) : (
                       <select
                         value={selectedStatusId}
-                        onChange={(e) => setSelectedStatusId(Number(e.target.value))}
+                        onChange={(e) =>
+                          setSelectedStatusId(Number(e.target.value))
+                        }
                         className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
                       >
                         {statuses.map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
                         ))}
                       </select>
                     )}
@@ -272,8 +356,12 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
               {/* ── Description ── */}
               {riskDetail.description && (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4">
-                  <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-2">Description</p>
-                  <p className="text-sm text-slate-700 leading-relaxed">{riskDetail.description}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-2">
+                    Description
+                  </p>
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {riskDetail.description}
+                  </p>
                 </div>
               )}
 
@@ -310,7 +398,6 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
                   />
                 )}
               </div>
-
             </div>
           )}
         </div>
@@ -347,8 +434,12 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
 function Metric({ label, value }) {
   return (
     <div className="border border-slate-200 rounded-xl p-3 sm:p-4 text-center bg-white">
-      <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">{label}</div>
-      <div className="text-xl sm:text-2xl font-black text-slate-800 mt-0.5">{value ?? "—"}</div>
+      <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+        {label}
+      </div>
+      <div className="text-xl sm:text-2xl font-black text-slate-800 mt-0.5">
+        {value ?? "—"}
+      </div>
     </div>
   );
 }
@@ -362,8 +453,12 @@ function InfoCard({ label, value, icon }) {
         </div>
       )}
       <div className="min-w-0">
-        <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">{label}</div>
-        <div className="text-sm font-medium text-slate-700 mt-0.5 truncate">{value || "—"}</div>
+        <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+          {label}
+        </div>
+        <div className="text-sm font-medium text-slate-700 mt-0.5 truncate">
+          {value || "—"}
+        </div>
       </div>
     </div>
   );

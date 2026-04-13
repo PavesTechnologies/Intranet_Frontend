@@ -4,7 +4,12 @@ import { useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { X } from "lucide-react"; // Added X icon import for consistency
 
-export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCreated }) {
+export default function AddScenarioModal({
+  storyId,
+  scenarioToEdit,
+  onClose,
+  onCreated,
+}) {
   const { projectId } = useParams();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -24,7 +29,7 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
   const fetchTestPlans = async () => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/plans/projects/${projectId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/projects/${projectId}`,
       );
       setTestPlans(res.data || []);
     } catch (err) {
@@ -39,7 +44,7 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
   const fetchPmsStories = async () => {
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
       );
       setPmsStories(res.data || []);
     } catch (err) {
@@ -54,7 +59,7 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
       fetchPmsStories();
     }
   }, [projectId]);
- /* ---------------------------------------------------------
+  /* ---------------------------------------------------------
      PRE-FILL FORM FOR EDIT MODE
   ---------------------------------------------------------- */
   useEffect(() => {
@@ -62,11 +67,12 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
       setTitle(scenarioToEdit.title || "");
       setDescription(scenarioToEdit.description || "");
       setPriority(scenarioToEdit.priority || "LOW");
-      
-      // If your DTO returns these IDs, pre-fill them. 
+
+      // If your DTO returns these IDs, pre-fill them.
       // Note: linkedUserStoryId matches the DTO property we defined earlier
       if (scenarioToEdit.testPlanId) setTestPlanId(scenarioToEdit.testPlanId);
-      if (scenarioToEdit.linkedUserStoryId) setLinkedStoryId(scenarioToEdit.linkedUserStoryId);
+      if (scenarioToEdit.linkedUserStoryId)
+        setLinkedStoryId(scenarioToEdit.linkedUserStoryId);
     }
   }, [scenarioToEdit]);
   /* ---------------------------------------------------------
@@ -77,7 +83,8 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
   ---------------------------------------------------------- */
   const handleSave = async () => {
     // Only require testPlanId if we are creating a new scenario
-    if (!scenarioToEdit && !testPlanId) return toast.error("Test Plan is required");
+    if (!scenarioToEdit && !testPlanId)
+      return toast.error("Test Plan is required");
     if (!title.trim()) return toast.error("Scenario title is required");
 
     setLoading(true);
@@ -95,8 +102,8 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
         };
 
         res = await axiosInstance.put(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/scenarios/${scenarioToEdit.id}`,
-          updatePayload
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios/${scenarioToEdit.id}`,
+          updatePayload,
         );
         toast.success("Scenario updated successfully!");
       } else {
@@ -111,8 +118,8 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
         };
 
         res = await axiosInstance.post(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/scenarios`,
-          createPayload
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios`,
+          createPayload,
         );
         toast.success("Scenario created successfully!");
       }
@@ -121,7 +128,11 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
       onClose();
     } catch (err) {
       console.error("❌ Action failed", err.response?.data || err);
-      toast.error(scenarioToEdit ? "Failed to update scenario" : "Failed to create scenario");
+      toast.error(
+        scenarioToEdit
+          ? "Failed to update scenario"
+          : "Failed to create scenario",
+      );
     } finally {
       setLoading(false);
     }
@@ -130,15 +141,14 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white w-[520px] p-6 rounded-xl shadow-lg">
-        
         {/* Header */}
         <div className="flex justify-between items-center mb-5">
           {/* Header */}
-       
+
           <h2 className="text-lg font-semibold text-gray-800">
             {scenarioToEdit ? "Edit Scenario" : "Add Scenario"}
           </h2>
-          <button 
+          <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded transition-colors"
           >
@@ -149,7 +159,9 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
         <div className="space-y-4">
           {/* Test Plan */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Select Test Plan *</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Select Test Plan *
+            </label>
             <select
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
               value={testPlanId}
@@ -166,7 +178,9 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
 
           {/* Linked Story */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Link PMS Story (optional)</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Link PMS Story (optional)
+            </label>
             <select
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
               value={linkedStoryId}
@@ -183,7 +197,9 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
 
           {/* Title */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Scenario Title *</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Scenario Title *
+            </label>
             <input
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
               placeholder="Enter scenario title"
@@ -194,7 +210,9 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
 
           {/* Priority */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Priority</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Priority
+            </label>
             <select
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
               value={priority}
@@ -209,7 +227,9 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
 
           {/* Description */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Description</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Description
+            </label>
             <textarea
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
               rows={3}
@@ -229,12 +249,16 @@ export default function AddScenarioModal({ storyId, scenarioToEdit,onClose, onCr
               Cancel
             </button>
 
-           <button
+            <button
               className={`px-4 py-2 bg-blue-600 text-white rounded-lg transition-colors ${loading ? "opacity-70 cursor-not-allowed" : "hover:bg-blue-700"}`}
               onClick={handleSave}
               disabled={loading}
             >
-              {loading ? "Saving..." : (scenarioToEdit ? "Update Scenario" : "Create Scenario")}
+              {loading
+                ? "Saving..."
+                : scenarioToEdit
+                  ? "Update Scenario"
+                  : "Create Scenario"}
             </button>
           </div>
         </div>

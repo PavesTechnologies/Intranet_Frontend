@@ -48,40 +48,44 @@ const getMonthName = (dateStr) => {
 
 const TimesheetHistory = () => {
   const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null); 
+  const [endDate, setEndDate] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [historyData, setHistoryData] = useState([]); 
-  const [groupedData, setGroupedData] = useState({}); 
+  const [historyData, setHistoryData] = useState([]);
+  const [groupedData, setGroupedData] = useState({});
   const [error, setError] = useState(null);
 
   const [openYears, setOpenYears] = useState({});
   const [openMonths, setOpenMonths] = useState({});
-  const [openWeeks, setOpenWeeks] = useState({}); 
+  const [openWeeks, setOpenWeeks] = useState({});
   const [projectInfo, setProjectInfo] = useState([]);
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
 
   useEffect(() => {
     const today = new Date();
-    const oneMonthAgo = new Date(); 
+    const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(today.getMonth() - 1);
     oneMonthAgo.setDate(1);
-    const oneMonthAgoEndDate = new Date(oneMonthAgo.getFullYear(), oneMonthAgo.getMonth() + 1, 0);
+    const oneMonthAgoEndDate = new Date(
+      oneMonthAgo.getFullYear(),
+      oneMonthAgo.getMonth() + 1,
+      0,
+    );
     setStartDate(oneMonthAgo);
     setEndDate(oneMonthAgoEndDate);
-  }, []); 
+  }, []);
 
   useEffect(() => {
     const fetchAndStoreProjectTaskInfo = async () => {
       try {
         const response = await fetch(
-          `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/project-info`,
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/project-info`,
           {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         );
 
         if (!response.ok) {
@@ -94,12 +98,12 @@ const TimesheetHistory = () => {
         console.log("project info fetch error :", error);
         showStatusToast(
           error.response?.data || "Failed fetching projects info",
-          "error"
+          "error",
         );
       }
     };
     fetchAndStoreProjectTaskInfo();
-  }, []); 
+  }, []);
 
   const fetchHistory = async (start, end) => {
     if (!start || !end) return;
@@ -110,7 +114,7 @@ const TimesheetHistory = () => {
       const startStr = toLocalISODate(start);
       const endStr = toLocalISODate(end);
 
-      const baseUrl = import.meta.env.VITE_TIMESHEET_API_ENDPOINT;
+      const baseUrl = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
       const url = `${baseUrl}/api/timesheet/historyRange?startDate=${startStr}&endDate=${endStr}`;
 
       const res = await axios.get(url, {
@@ -126,7 +130,7 @@ const TimesheetHistory = () => {
       setError(err.message || "Error loading timesheet history");
       showStatusToast(
         err?.response?.data || "Error loading timesheet history",
-        "error"
+        "error",
       );
     } finally {
       setLoading(false);
@@ -137,7 +141,7 @@ const TimesheetHistory = () => {
     if (startDate && endDate) {
       fetchHistory(startDate, endDate);
     }
-  }, [startDate, endDate]); 
+  }, [startDate, endDate]);
 
   useEffect(() => {
     if (!Array.isArray(historyData) || historyData.length === 0) {
@@ -198,7 +202,7 @@ const TimesheetHistory = () => {
 
   const yearKeys = useMemo(
     () => Object.keys(groupedData).sort((a, b) => Number(b) - Number(a)),
-    [groupedData]
+    [groupedData],
   ); // Helper function (mocked or full implementation)
 
   const mapWorkType = (type) => {
@@ -212,7 +216,7 @@ const TimesheetHistory = () => {
         onClick={() => navigate(-1)}
         className="text-blue-600 hover:text-blue-800 flex items-center gap-2 mb-4"
       >
-        <ArrowLeft size={20} /> Back 
+        <ArrowLeft size={20} /> Back
       </button>
       <h1 className="text-xl font-semibold mb-4">Timesheet History</h1>
       <div className="mb-4 flex flex-col md:flex-row md:items-end gap-3">
@@ -258,7 +262,7 @@ const TimesheetHistory = () => {
       )}
       {!loading && yearKeys.length === 0 && (
         <div className="text-sm text-gray-500 italic font-semibold">
-          No timesheet history available for the selected range. 
+          No timesheet history available for the selected range.
         </div>
       )}
       <div className="space-y-3">
@@ -273,7 +277,9 @@ const TimesheetHistory = () => {
                 onClick={() => handleToggleYear(year)}
                 className="w-full flex justify-between items-center px-4 py-2 text-left hover:bg-gray-50"
               >
-                <span className="text-xl font-semibold text-gray-800">{year}</span>
+                <span className="text-xl font-semibold text-gray-800">
+                  {year}
+                </span>
                 <span className="text-xs text-gray-500">
                   {openYears[year] ? "Hide months" : "Show months"}
                 </span>
@@ -317,17 +323,15 @@ const TimesheetHistory = () => {
                                     className="w-full flex justify-between items-center px-4 py-2 text-left hover:bg-gray-200"
                                   >
                                     <div className="flex flex-col">
-                                      
                                       <span className="text-lg font-semibold text-gray-800">
                                         Week {weekGroup.weekId}
                                       </span>
-                                      
+
                                       <span className="text-sm text-gray-600">
                                         {weekGroup.weekRange}
                                       </span>
                                     </div>
                                     <span className="text-xs text-gray-500">
-                                      
                                       {openWeeks[openKey]
                                         ? "Hide details"
                                         : "Show details"}
@@ -340,7 +344,7 @@ const TimesheetHistory = () => {
                                         refreshData={() =>
                                           fetchHistory(startDate, endDate)
                                         }
-                                        mapWorkType={mapWorkType} 
+                                        mapWorkType={mapWorkType}
                                         projectInfo={projectInfo}
                                         holidaysMap={{}}
                                       />
