@@ -342,120 +342,178 @@ const formatDateSafe = (date) => {
 
   const selectedCandidates = apiData?.joinedCandidates || [];
 
-const summary = {
-  completed: apiData?.summary?.joined || 0,
-  pending: apiData?.summary?.pending || 0,
-  total: apiData?.joinedCandidates?.length || 0,
-};
+  const summary = {
+    completed: apiData?.summary?.joined || 0,
+    pending: apiData?.summary?.pending || 0,
+    total: apiData?.joinedCandidates?.length || 0,
+  };
 
-const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const weeklyData = (apiData?.weeklyJoinings || [])
-  .map(item => ({
-    name: item.day,
+  const weeklyData = (apiData?.weeklyJoinings || [])
+    .map((item) => ({
+      name: item.day,
+      completed: item.completed,
+      joining: item.joining,
+    }))
+    .sort((a, b) => dayOrder.indexOf(a.name) - dayOrder.indexOf(b.name));
+
+  const monthlyData = apiData?.monthlyJoinings?.map((item) => ({
+    name: item.week,
     completed: item.completed,
-    joining: item.joining
-  }))
-  .sort((a, b) => dayOrder.indexOf(a.name) - dayOrder.indexOf(b.name));
+    joining: item.joining,
+  })) || [];
 
-const monthlyData = apiData?.monthlyJoinings?.map(item => ({
-  name: item.week,
-  completed: item.completed,
-  joining: item.joining
-})) || [];
-  
-const activities = apiData?.activities?.map((item, index) => {
-  const normalizedType = getNormalizedStatus(item.type);
+  const activities = apiData?.activities?.map((item, index) => {
+    const normalizedType = getNormalizedStatus(item.type);
 
-  return {
-    id: index,
-    title: item.message.split(" ")[0],
-    subtitle: "",
-    meta: item.time,
-    status:
-      normalizedType === STATUS.COMPLETED
-        ? STATUS.COMPLETED
-        : normalizedType === STATUS.JOINING_PENDING
+    return {
+      id: index,
+      title: item.message.split(" ")[0],
+      subtitle: "",
+      meta: item.time,
+      status:
+        normalizedType === STATUS.COMPLETED
+          ? STATUS.COMPLETED
+          : normalizedType === STATUS.JOINING_PENDING
           ? STATUS.JOINING_PENDING
           : STATUS.JOINING,
-  };
-}) || [];
+    };
+  }) || [];
+
+  const hasWeeklyNonZero = weeklyData.some(
+  item => item.completed > 0 || item.joining > 0
+);
+
+const hasMonthlyNonZero = monthlyData.some(
+  item => item.completed > 0 || item.joining > 0
+);
+
+const hasCandidates = selectedCandidates.length > 0;
+const hasActivities = activities.length > 0;
+
+const hasSummary =
+  summary.completed > 0 || summary.pending > 0;
+
+const hasAnyData =
+  hasWeeklyNonZero ||
+  hasMonthlyNonZero ||
+  hasCandidates ||
+  hasActivities ||
+  hasSummary;
+
+  // const hasChartTableData = weeklyData.length > 0 || monthlyData.length > 0 || selectedCandidates.length > 0;
+  // const hasAnyData = hasChartTableData || activities.length > 0 || summary.completed > 0 || summary.pending > 0;
 
   return (
     <div  className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#eef4ff] to-[#f1f5f9] p-4 sm:p-6">
       <div className="mx-auto max-w-[1180px] space-y-4">
-<div className="flex items-start justify-between mb-6">
+{/* PAGE HEADER */}
+<div className="mb-6">
 
-  <div>
-    <h1 className="text-3xl font-bold text-slate-900">
-      Joining Report Dashboard
-    </h1>
-    <p className="text-sm text-slate-500 mt-1">
-      Overview of weekly joining and completion trends for new hires
-    </p>
-  </div>
+  {/* TOP HEADER ROW */}
+  <div className="flex items-start justify-between">
 
-  {/* FILTER RIGHT */}
-  <div className="relative" ref={filterRef}>
-    <button
-      onClick={() => setShowFilterDropdown((v) => !v)}
-      className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm hover:shadow-md transition"
-    >
-      <Calendar size={16} />
-      {dateRange.start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {dateRange.end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-      <ChevronDown size={16} />
-    </button>
+    {/* LEFT TITLE */}
+    <div>
+      <h1 className="text-3xl font-bold text-slate-900">
+        Joining Report Dashboard
+      </h1>
+      <p className="text-sm text-slate-500 mt-1">
+        Overview of weekly joining and completion trends for new hires
+      </p>
+    </div>
 
-    {showFilterDropdown && (
-      <div className="absolute right-0 mt-2 w-[320px] rounded-xl border border-slate-200 bg-white shadow-xl z-20 p-4">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-          Select Date Range
-        </p>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-col gap-1 w-full">
-            <label className="text-[10px] text-slate-400 font-medium">Start Date</label>
-            <input
-              type="date"
-              value={formatDateSafe(dateRange.start)}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value) {
-                  setDateRange(prev => ({
-                    ...prev,
-                    start: new Date(value)
-                  }));
-                }
-              }}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-            />
-          </div>
+    {/* RIGHT FILTER CALENDAR ALWAYS VISIBLE */}
+    <div className="relative ml-4" ref={filterRef}>
+      <button
+        onClick={() => setShowFilterDropdown((v) => !v)}
+        className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm hover:shadow-md transition"
+      >
+        <Calendar size={16} />
+        {dateRange.start.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })}{" "}
+        -{" "}
+        {dateRange.end.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })}
+        <ChevronDown size={16} />
+      </button>
 
-          <div className="mt-5 text-slate-300 font-medium">-</div>
+      {showFilterDropdown && (
+        <div className="absolute right-0 mt-2 w-[320px] rounded-xl border border-slate-200 bg-white shadow-xl z-20 p-4">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+            Select Date Range
+          </p>
 
-          <div className="flex flex-col gap-1 w-full">
-            <label className="text-[10px] text-slate-400 font-medium">End Date</label>
-            <input
-              type="date"
-              value={formatDateSafe(dateRange.end)}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value) {
-                  setDateRange(prev => ({
-                    ...prev,
-                    end: new Date(value)
-                  }));
-                }
-              }}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-            />
+          <div className="flex items-center justify-between gap-3">
+
+            {/* START DATE */}
+            <div className="flex flex-col gap-1 w-full">
+              <label className="text-[10px] text-slate-400 font-medium">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={formatDateSafe(dateRange.start)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value) {
+                    setDateRange((prev) => ({
+                      ...prev,
+                      start: new Date(value),
+                    }));
+                  }
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              />
+            </div>
+
+            <div className="mt-5 text-slate-300 font-medium">-</div>
+
+            {/* END DATE */}
+            <div className="flex flex-col gap-1 w-full">
+              <label className="text-[10px] text-slate-400 font-medium">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={formatDateSafe(dateRange.end)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value) {
+                    setDateRange((prev) => ({
+                      ...prev,
+                      end: new Date(value),
+                    }));
+                  }
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              />
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
+    </div>
   </div>
+
+  {/* FULL WIDTH NO DATA BANNER */}
+  {!loading && !hasAnyData && (
+    <div className="mt-5 w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-5 text-center shadow-sm">
+      <p className="text-sm font-medium text-slate-600">
+        No data available for the selected date range.
+      </p>
+      <p className="text-xs text-slate-400 mt-1">
+        Please try another date range or verify the selected period.
+      </p>
+    </div>
+  )}
 </div>
-
-
+{hasAnyData ? (
+  <>
 {/* KPI CARDS */}
 <div className="grid gap-5 md:grid-cols-2">
 
@@ -516,7 +574,13 @@ const activities = apiData?.activities?.map((item, index) => {
           subtitle="Weekly blocks for the current month with completed versus pending joining counts."
         >
           <div className="h-[240px]">
-            <MonthlyGraph data={monthlyData} />
+            {monthlyData.length > 0 ? (
+              <MonthlyGraph data={monthlyData} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-slate-500 text-base font-medium">
+                No available data
+              </div>
+            )}
           </div>
         </Section>
         <Section
@@ -529,7 +593,7 @@ const activities = apiData?.activities?.map((item, index) => {
           }
         >
           <div className="h-[240px]">
-            <WeeklyGraph data={weeklyData} />
+            {weeklyData.length > 0 ? <WeeklyGraph data={weeklyData} /> : <div className="flex items-center justify-center h-full text-slate-500 text-lg font-medium">No available data</div>}
           </div>
         </Section>
         <Section
@@ -555,33 +619,41 @@ const activities = apiData?.activities?.map((item, index) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#edf2f7] bg-white">
-              {selectedCandidates.map((candidate, index) => (
-            <tr key={index} className="text-[11px] text-[#64748b]">
-              <td className="px-3 py-3">
-                <div className="font-semibold text-[#334155]">{candidate.name}</div>
-              </td>
+                {selectedCandidates.length > 0 ? (
+                  selectedCandidates.map((candidate, index) => (
+                    <tr key={index} className="text-[11px] text-[#64748b]">
+                      <td className="px-3 py-3">
+                        <div className="font-semibold text-[#334155]">{candidate.name}</div>
+                      </td>
 
-              <td className="px-3 py-3">{candidate.role}</td>
+                      <td className="px-3 py-3">{candidate.role}</td>
 
-              <td className="px-3 py-3">
-                {candidate.department || "N/A"}
-              </td>
+                      <td className="px-3 py-3">
+                        {candidate.department || "N/A"}
+                      </td>
 
-              <td className="px-3 py-3">
-                {formatDate(candidate.joiningDate)}
-              </td>
+                      <td className="px-3 py-3">
+                        {formatDate(candidate.joiningDate)}
+                      </td>
 
-              <td className="px-3 py-3">-</td>
+                      <td className="px-3 py-3">-</td>
 
-              <td className="px-3 py-3">
-                <StatusBadge
-                  label={formatOfferStatusLabel(getNormalizedStatus(candidate.status))}
-                  size="sm"
-                />
-              </td>
-            </tr>
-          ))}
-          </tbody>
+                      <td className="px-3 py-3">
+                        <StatusBadge
+                          label={formatOfferStatusLabel(getNormalizedStatus(candidate.status))}
+                          size="sm"
+                        />
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-10 text-center text-[11px] text-slate-500">
+                      No available data
+                    </td>
+                  </tr>
+                )}
+              </tbody>
             </table>
           </div>
         </Section>
@@ -622,6 +694,8 @@ const activities = apiData?.activities?.map((item, index) => {
       ))}
     </div>
     </Section>
+    </>
+):null}
       </div>
     </div>
   );
