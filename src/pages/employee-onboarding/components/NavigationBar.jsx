@@ -59,7 +59,8 @@ const parentNav = [
   {
     label: "Employee Verification",
     match: [
-      "/employee-onboarding/hr/",
+      "/employee-onboarding/hr",
+      "/employee-onboarding/backgroundcheck",
       "/employee-onboarding/core-employee",
     ],
     redirect: "/employee-onboarding/hr",
@@ -70,6 +71,7 @@ const parentNav = [
       "/employee-onboarding/employeedocuments",
       "/employee-onboarding/document-templates",
       "/employee-onboarding/organization-documents",
+      "/employee-onboarding/backgroundcheck"
     ],
     redirect: "/employee-onboarding/employeedocuments",
   },
@@ -79,6 +81,13 @@ const parentNav = [
       "/employee-onboarding/weekly-joining-report-dashboard"
     ],
     redirect: "/employee-onboarding/weekly-joining-report-dashboard",
+  },
+  {
+    label: "Employee Exit",
+    match: [
+      "/employee-exit"
+    ],
+    redirect: "/employee-exit",
   }
 ];
 
@@ -125,13 +134,21 @@ const parentNav = [
 
   const hrverificationNav = [
     { label: "HR Verification", path: "/employee-onboarding/hr" },
+    { label: "Background Check", path: "/employee-onboarding/backgroundcheck" },
+
     { label: "Core Employee", path: "/employee-onboarding/core-employee" },
+
   ];
 
   const weeklyJoiningDashboardNav = [
     { label: "Weekly Joining Dashboard", path: "/employee-onboarding/weekly-joining-report-dashboard" },
   ];
 
+  /* ================= EMPLOYEE EXIT NAV ================= */
+
+  const employeeExitNav = [
+    { label: "Exit Dashboard", path: "/employee-exit" },
+  ];
 
   /* ================= SELECT NAV TO RENDER ================= */
 
@@ -162,6 +179,7 @@ const parentNav = [
   }
   else if (
     location.pathname.startsWith("/employee-onboarding/hr") ||
+    location.pathname.startsWith("/employee-onboarding/backgroundcheck") ||
     location.pathname.startsWith("/employee-onboarding/core-employee")
   ) {
     navToRender = hrverificationNav;
@@ -170,6 +188,11 @@ const parentNav = [
     location.pathname.startsWith("/employee-onboarding/weekly-joining-report-dashboard")
   ) {
     navToRender = weeklyJoiningDashboardNav;
+  }
+  else if (
+    location.pathname.startsWith("/employee-exit")
+  ) {
+    navToRender = employeeExitNav;
   }
   else {
     navToRender = taskNav;

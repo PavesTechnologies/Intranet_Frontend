@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import StatusBadge from "../../../components/status/statusbadge";
 import {
   ArrowLeft,
   Mail,
@@ -390,9 +391,7 @@ finally {
 
   if (loading) return <div className="p-10 text-center">Loading...</div>;
   if (!employee) return <div className="p-10 text-center">Not found</div>;
-  const displayStatus = formatOfferStatusLabel(
-    getOfferDisplayStatus(employee, [])
-  );
+  const displayStatus = getOfferDisplayStatus(employee, []);
 
   /* ========================= UI (UNCHANGED) ========================= */
 
@@ -425,8 +424,11 @@ finally {
               <p className="flex items-center gap-2 text-gray-900">
                 <BadgeCheck size={16} />
                 Status:
-                <span className="ml-1 font-medium text-blue-900">
-                  {displayStatus}
+                <span className="ml-1">
+                  <StatusBadge
+                    label={formatOfferStatusLabel(displayStatus)}
+                    size="sm"
+                  />
                 </span>
               </p>
 

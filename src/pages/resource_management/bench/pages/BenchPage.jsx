@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Download, Filter, Layers, Search, Users, ArrowLeft } from "lucide-react";
+import { Download, Filter, Layers, Search, Users, ArrowLeft, BarChart2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import BenchKPI from "../components/BenchKPI";
 import BenchFilters from "../components/BenchFilters";
@@ -50,7 +50,7 @@ const downloadCsv = (filename, content) => {
 };
 
 const BenchPage = () => {
-  // const navigate = useNavigate();
+  const navigate = useNavigate();
   const stored = getStoredState();
   const [resources, setResources] = useState([]);
   const [kpis, setKpis] = useState(null);
@@ -368,11 +368,19 @@ const BenchPage = () => {
         <div className="flex items-center gap-3">
           <button
             type="button"
+            onClick={() => navigate('/resource-management/bench/report')}
+            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm"
+          >
+            <BarChart2 className="h-3.5 w-3.5 text-indigo-600" />
+            BENCH ANALYTICS
+          </button>
+          <button
+            type="button"
             onClick={handleExport}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-[12px] font-bold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
           >
             <Download className="h-3.5 w-3.5" />
-            EXPORT ANALYTICS
+            EXPORT AUDIT
           </button>
         </div>
       </div>
