@@ -174,42 +174,54 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
           </div>
         )}
 
-        <div className="p-4 flex items-center gap-2 border-b">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            ref={(el) => {
-              if (el) el.indeterminate = partiallySelected;
-            }}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setSelectedSteps(steps.map((s) => s.id));
-              } else {
-                setSelectedSteps([]);
-              }
-            }}
-          />
-          <span className="text-gray-700 font-medium">Select All Steps</span>
-        </div>
+        {steps.length > 0 && (
+          <div className="p-4 flex items-center gap-2 border-b">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = partiallySelected;
+              }}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedSteps(steps.map((s) => s.id));
+                } else {
+                  setSelectedSteps([]);
+                }
+              }}
+            />
+            <span className="text-gray-700 font-medium">Select All Steps</span>
+          </div>
+        )}
 
         {/* STEPS LIST */}
         <div className="max-h-[70vh] overflow-y-auto p-6 space-y-6">
-          {steps.map((step) => {
-            const effectiveStatus = stepResults[step.id] || step.status;
+          {isLoading ? (
+            <div className="text-center text-gray-500 py-10">
+              <p className="text-lg">Loading steps...</p>
+            </div>
+          ) : steps.length === 0 ? (
+            /* NO STEPS FALLBACK MESSAGE */
+            <div className="text-center text-gray-500 py-10">
+              <p className="text-lg font-medium">No test steps found for this test case.</p>
+            </div>
+          ) : 
+            steps.map((step) => {
+              const effectiveStatus = stepResults[step.id] || step.status;
 
-            return (
-              <div
-                key={step.id}
-                className={`p-4 border rounded-xl shadow-sm ${
-                  effectiveStatus === "PASSED"
-                    ? "bg-green-50 border-green-300"
-                    : effectiveStatus === "FAILED"
+              return (
+                <div
+                  key={step.id}
+                  className={`p-4 border rounded-xl shadow-sm ${
+                    effectiveStatus === "PASSED"
+                      ? "bg-green-50 border-green-300"
+                      : effectiveStatus === "FAILED"
                       ? "bg-red-50 border-red-300"
                       : effectiveStatus === "SKIPPED"
-                        ? "bg-blue-50 border-blue-300"
-                        : "bg-gray-50 border-gray-200"
-                }`}
-              >
+                      ? "bg-blue-50 border-blue-300"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
                 {/* STEP HEADER */}
                 <div className="flex justify-between mb-3">
                   <div className="flex items-start gap-3">

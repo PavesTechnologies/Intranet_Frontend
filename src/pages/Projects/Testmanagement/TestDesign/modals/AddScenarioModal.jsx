@@ -4,7 +4,12 @@ import { useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { X } from "lucide-react"; // Added X icon import for consistency
 
-export default function AddScenarioModal({ storyId, onClose, onCreated }) {
+export default function AddScenarioModal({
+  storyId,
+  scenarioToEdit,
+  onClose,
+  onCreated,
+}) {
   const { projectId } = useParams();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -54,38 +59,80 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
       fetchPmsStories();
     }
   }, [projectId]);
+  /* ---------------------------------------------------------
+     PRE-FILL FORM FOR EDIT MODE
+  ---------------------------------------------------------- */
+  useEffect(() => {
+    if (scenarioToEdit) {
+      setTitle(scenarioToEdit.title || "");
+      setDescription(scenarioToEdit.description || "");
+      setPriority(scenarioToEdit.priority || "LOW");
 
+      // If your DTO returns these IDs, pre-fill them.
+      // Note: linkedUserStoryId matches the DTO property we defined earlier
+      if (scenarioToEdit.testPlanId) setTestPlanId(scenarioToEdit.testPlanId);
+      if (scenarioToEdit.linkedUserStoryId)
+        setLinkedStoryId(scenarioToEdit.linkedUserStoryId);
+    }
+  }, [scenarioToEdit]);
   /* ---------------------------------------------------------
      SAVE NEW SCENARIO
   ---------------------------------------------------------- */
+  /* ---------------------------------------------------------
+     SAVE OR UPDATE SCENARIO
+  ---------------------------------------------------------- */
   const handleSave = async () => {
-    if (!testPlanId) return toast.error("Test Plan is required");
+    // Only require testPlanId if we are creating a new scenario
+    if (!scenarioToEdit && !testPlanId)
+      return toast.error("Test Plan is required");
     if (!title.trim()) return toast.error("Scenario title is required");
 
     setLoading(true);
 
-    const payload = {
-      testPlanId: Number(testPlanId),
-      testStoryId: Number(storyId),
-      linkedStoryId: linkedStoryId ? Number(linkedStoryId) : null,
-      title: title.trim(),
-      description: description.trim(),
-      priority,
-    };
-
     try {
-      const res = await axiosInstance.post(
-        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios`,
-        payload,
-      );
+      let res;
 
-      toast.success("Scenario created successfully!");
+      if (scenarioToEdit) {
+        // --- EDIT MODE ---
+        // Note: We only send mutable fields to the update endpoint
+        const updatePayload = {
+          title: title.trim(),
+          description: description.trim(),
+          priority,
+        };
+
+        res = await axiosInstance.put(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios/${scenarioToEdit.id}`,
+          updatePayload,
+        );
+        toast.success("Scenario updated successfully!");
+      } else {
+        // --- CREATE MODE ---
+        const createPayload = {
+          testPlanId: Number(testPlanId),
+          testStoryId: Number(storyId),
+          linkedStoryId: linkedStoryId ? Number(linkedStoryId) : null,
+          title: title.trim(),
+          description: description.trim(),
+          priority,
+        };
+
+        res = await axiosInstance.post(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios`,
+          createPayload,
+        );
+        toast.success("Scenario created successfully!");
+      }
 
       if (onCreated) onCreated(res.data);
       onClose();
     } catch (err) {
-      console.error("❌ Create scenario failed", err.response?.data || err);
-      toast.error("Failed to create scenario");
+      console.error("❌ Action failed", err.response?.data || err);
+      toast.error(
+        scenarioToEdit
+          ? "Failed to update scenario"
+          : "Failed to create scenario",
+      );
     } finally {
       setLoading(false);
     }
@@ -96,7 +143,11 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
       <div className="bg-white w-[520px] p-6 rounded-xl shadow-lg">
         {/* Header */}
         <div className="flex justify-between items-center mb-5">
-          <h2 className="text-lg font-semibold text-gray-800">Add Scenario</h2>
+          {/* Header */}
+
+          <h2 className="text-lg font-semibold text-gray-800">
+            {scenarioToEdit ? "Edit Scenario" : "Add Scenario"}
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded transition-colors"
@@ -203,7 +254,11 @@ export default function AddScenarioModal({ storyId, onClose, onCreated }) {
               onClick={handleSave}
               disabled={loading}
             >
-              {loading ? "Saving..." : "Create Scenario"}
+              {loading
+                ? "Saving..."
+                : scenarioToEdit
+                  ? "Update Scenario"
+                  : "Create Scenario"}
             </button>
           </div>
         </div>

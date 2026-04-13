@@ -115,7 +115,7 @@ import DepartmentsMappingDashboard from "./pages/employee-onboarding/hr-configur
 import DepartmentsList from "./pages/employee-onboarding/hr-configuration/departments/departmentsList/DepartmentsList.jsx";
 import DesignationsList from "./pages/employee-onboarding/hr-configuration/departments/designationsList/DesignationsList.jsx";
 import WeeklyJoiningDashboard from "./pages/employee-onboarding/weekly-joining-report-dashboard/WeeklyJoiningDashboard.jsx";
-
+import DocumentTemplates from "./pages/employee-onboarding/document-templates/DocumentTemplates.jsx";
 
 import EmployeeDocuments from "./pages/employee-onboarding/employeedocuments/EmployeeDocuments.jsx";
 
@@ -163,8 +163,10 @@ import ManageBlockLeave from "./pages/leave_management/models/ManageBlockLeave";
 import ApprovalRulesPage from "./pages/leave_management/models/ApprovalRulesPage.jsx";
 import RiskRegisterPage from "./pages/Projects/manager/riskManagement/RiskRegisterPage.jsx";
 import LeaveUploadWizard from "./pages/leave_management/models/LeaveUploadWizard.jsx";
+import ApplyLeaveOnBehalf from "./pages/leave_management/models/ApplyLeaveOnBehalf.jsx";
 
-
+import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.jsx";
+import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -172,14 +174,7 @@ import OnboardingDashboard from "./pages/employee-onboarding/onboarding-task/Onb
 import OnboardingSummaryPage from "./pages/employee-onboarding/summary-page/SummaryPage.jsx";
 
 
-// function App() {
-//   return (
-//     <>
-//       {/* ... your routes or components ... */}
-//       <Toaster position="top-right" reverseOrder={false} />
-//     </>
-//   );
-// }
+
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, user, logout } = useAuth();
   const location = useLocation();
@@ -488,7 +483,7 @@ const AppRoutes = () => {
             <Route path="analytics" element={<HeadcountDemographicsPage />} />
 
             <Route path="weekly-joining-report-dashboard" element={< WeeklyJoiningDashboard/>} />
-
+            <Route path="document-templates" element={< DocumentTemplates/>} />
             <Route path="offer/:user_uuid" element={<ViewEmpDetails />} />
             <Route path ="offer-preview/:offerId" element ={<OfferPreview/>} />
             <Route path ="final-offer-preview/:offerId" element={<FinalOfferPreview/>} />
@@ -752,6 +747,16 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+
+            <Route
+              path="/behalf-leave"
+              element={
+                <ProtectedRoute allowedRoles={["HR", "Hr-Manager", "Manager"]}>
+                  <ApplyLeaveOnBehalf />
+                </ProtectedRoute>
+              }
+            />
+
           <Route
             path="/leave-policies"
             element={
@@ -897,6 +902,11 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+          {/* employee exit routes*/}
+          <Route element={<EmployeeOnboardingLayout />}>
+            <Route path="/employee-exit" element={<EmployeeExitDashboard />} />
+            <Route path="/employee-exit/:exit_uuid" element={<ExitDetailsPage />} />
+          </Route>
         </Route>
       </Routes>
       <SaveLastPath />

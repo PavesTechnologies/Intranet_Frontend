@@ -596,7 +596,13 @@ export default function WeeklyDashboard() {
           subtitle="Weekly blocks for the current month with completed versus pending joining counts."
         >
           <div className="h-[240px]">
-            <MonthlyGraph data={monthlyData} />
+            {monthlyData.length > 0 ? (
+              <MonthlyGraph data={monthlyData} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-slate-500 text-base font-medium">
+                No available data
+              </div>
+            )}
           </div>
         </Section>
         <Section
@@ -609,7 +615,13 @@ export default function WeeklyDashboard() {
           }
         >
           <div className="h-[240px]">
-            <WeeklyGraph data={weeklyData} />
+            {weeklyData.length > 0 ? (
+              <WeeklyGraph data={weeklyData} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-500 text-lg font-medium">
+                No available data
+              </div>
+            )}
           </div>
         </Section>
         <Section

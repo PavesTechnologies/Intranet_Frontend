@@ -94,7 +94,7 @@ function formatDateForDisplay(dateStr) {
 
 // --- MODIFIED ---
 // Updated function signature to accept leaveTypeId
-function countWeekdaysBetween(
+export function countWeekdaysBetween(
   fromDate,
   toDate,
   halfDayConfig,
@@ -170,7 +170,7 @@ function countWeekdaysBetween(
 }
 
 // -- The HeadlessUI Leave Type Dropdown -- (Unchanged)
-function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
+export function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
   const sel = options.find((o) => o.leaveTypeId === selectedId) ?? null;
   return (
     <Listbox value={sel} onChange={(opt) => setSelectedId(opt.leaveTypeId)}>
