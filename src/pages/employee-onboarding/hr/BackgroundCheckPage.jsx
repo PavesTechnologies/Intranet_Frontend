@@ -186,7 +186,7 @@ const TYPE_COLORS = {
   "Experience":      { bg: "bg-teal-100",    text: "text-teal-700"    },
 };
 
-const DocCard = ({ doc, idx, onPreview, isVerified, onDelete }) => {
+const DocCard = ({ doc, idx, onPreview, isVerified, onDelete, onUpload }) => {
   const typeKey = doc.identity_type || doc._cat || "Education";
   const color   = TYPE_COLORS[typeKey] || { bg: "bg-gray-100", text: "text-gray-600" };
   const label   = doc.document_name || doc.doc_type || doc.identity_type || `Document ${idx + 1}`;
@@ -229,19 +229,13 @@ const DocCard = ({ doc, idx, onPreview, isVerified, onDelete }) => {
         >
           <Eye className="w-3.5 h-3.5" /> View
         </button>
-        {isVerified ? (
-          <button
-            title="Re-upload document"
-            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-600 hover:text-white hover:border-green-600 transition-all"
-          >
-            <Upload className="w-3.5 h-3.5" /> Upload
-          </button>
-        ) : (
-          <span title="Verify the BG check first to re-upload"
-            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] text-gray-400 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed">
-            <Lock className="w-3 h-3" /> Upload
-          </span>
-        )}
+        <label className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-600 hover:text-white hover:border-green-600 transition-all cursor-pointer" title="Re-upload document">
+          <input type="file" className="hidden" onChange={(e) => {
+            const file = e.target.files[0];
+            if (file && onUpload) onUpload(doc, file);
+          }} />
+          <Upload className="w-3.5 h-3.5" /> Upload
+        </label>
         <button
           onClick={() => onDelete && onDelete(doc)}
           title="Delete document"
@@ -271,7 +265,7 @@ export default function BackgroundCheckPage() {
   const [loadingProfile, setLoadingProfile]   = useState(false);
   
   // Confirmation Modal States
-  const [deleteConf, setDeleteConf] = useState({ isOpen: false, docId: null, cat: null });
+  const [deleteConf, setDeleteConf] = useState({ isOpen: false, docId: null, cat: null, sourceId: null, doc: null });
   const [showFinalizeConf, setShowFinalizeConf] = useState(false);
   const [rejectionConf, setRejectionConf] = useState({ isOpen: false, id: null, reason: "" });
   const [addCheckModal, setAddCheckModal] = useState({ isOpen: false, group: "" });
@@ -286,6 +280,9 @@ export default function BackgroundCheckPage() {
   const [checkFilter, setCheckFilter]   = useState("ALL");
   const [selectedIds, setSelectedIds]   = useState([]);
   const [updatingId, setUpdatingId]     = useState(null);
+  const [editModeId, setEditModeId]     = useState(null);
+  const [editFields, setEditFields]     = useState([]);
+  const [uploadModal, setUploadModal]   = useState({ isOpen: false, cat: "", file: null, docName: "", docType: "" });
 
   /* ── Preview ── */
   const [previewDoc, setPreviewDoc] = useState(null);
@@ -567,7 +564,7 @@ export default function BackgroundCheckPage() {
     setIsSending(false);
   };
 
-  /* ─── All docs from profile ─── */
+  /* ─── All docs from profile & manual doc uploads ─── */
   const allDocuments = useMemo(() => {
     if (!profile) return [];
     const docs = [];
@@ -585,8 +582,17 @@ export default function BackgroundCheckPage() {
     (profile.bank_documents || []).forEach(d =>
       docs.push({ ...d, _cat: "Bank Statement", _title: d.document_name || "Bank Statement" })
     );
+
+    // Merge in any manually uploaded session documents
+    checks.forEach(c => {
+      // Manual uploads should have _isManual: true or identity_type: "Manual Upload" set on the docRef inside checks
+      if (c.docRef && (c.docRef._isManual || c.docRef.identity_type === "Manual Upload")) {
+        docs.push({ ...c.docRef, _cat: c.group || "Other", _title: c.label });
+      }
+    });
+
     return docs;
-  }, [profile]);
+  }, [profile, checks]);
 
   /* ══════════════════════════ RENDER ══════════════════════════ */
   return (
@@ -895,16 +901,72 @@ export default function BackgroundCheckPage() {
                                       {/* ... expanded content remains same ... */}
                                       {isExp && (
                                         <div className="border-t border-gray-100 px-4 pb-4 pt-3 ml-16">
-                                          {Object.keys(check.details).length > 0 ? (
-                                            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 mb-4">
-                                              {Object.entries(check.details).map(([k, v]) => (
-                                                <div key={k} className="text-xs">
-                                                  <span className="text-gray-400 mr-1">{k}:</span>
-                                                  <span className="font-semibold text-gray-800">{String(v)}</span>
+                                          <div className="flex justify-between items-center mb-3">
+                                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Verification Details</h4>
+                                            {editModeId !== check.id && (
+                                              <button onClick={() => {
+                                                setEditModeId(check.id);
+                                                setEditFields(Object.entries(check.details || {}).map(([k,v]) => ({ key: k, value: v })));
+                                              }} className="text-[10px] bg-indigo-50 border border-indigo-100 text-indigo-600 hover:bg-indigo-100 px-2 py-1.5 rounded font-semibold flex items-center gap-1 transition-all">
+                                                Edit Fields
+                                              </button>
+                                            )}
+                                          </div>
+                                          {editModeId === check.id ? (
+                                            <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                              {editFields.map((f, i) => (
+                                                <div key={i} className="flex items-center gap-2">
+                                                  <input type="text" value={f.key} onChange={e => {
+                                                    const n = [...editFields]; n[i].key = e.target.value; setEditFields(n);
+                                                  }} className="w-1/3 px-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500 bg-white" placeholder="Field Name" />
+                                                  <input type="text" value={f.value} onChange={e => {
+                                                    const n = [...editFields]; n[i].value = e.target.value; setEditFields(n);
+                                                  }} className="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500 bg-white" placeholder="Value" />
+                                                  <button onClick={() => {
+                                                    setEditFields(editFields.filter((_, idx) => idx !== i));
+                                                  }} className="p-1.5 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors" title="Remove Field">
+                                                     <Trash2 className="w-3.5 h-3.5" />
+                                                  </button>
                                                 </div>
                                               ))}
+                                              <div className="flex flex-wrap gap-2 pt-2 mt-2 border-t border-gray-200">
+                                                 <button onClick={() => setEditFields([...editFields, { key: "", value: "" }])} className="text-[11px] font-semibold px-2.5 py-1.5 text-indigo-600 bg-indigo-100/50 hover:bg-indigo-100 rounded-lg flex items-center gap-1 transition-all">
+                                                    <Plus className="w-3.5 h-3.5" /> Add Field
+                                                 </button>
+                                                 <button onClick={() => {
+                                                    setUpdatingId(check.id + "_save");
+                                                    setTimeout(() => {
+                                                      const newDetails = {};
+                                                      editFields.forEach(f => { if (f.key.trim()) newDetails[f.key] = f.value; });
+                                                      setChecks(prev => prev.map(c => c.id === check.id ? { ...c, details: newDetails } : c));
+                                                      showStatusToast("Details saved successfully", "success");
+                                                      setUpdatingId(null);
+                                                      setEditModeId(null);
+                                                    }, 300);
+                                                 }} disabled={updatingId === check.id + "_save"} className="ml-auto text-[11px] font-semibold px-4 py-1.5 text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-1 transition-all shadow-sm">
+                                                    {updatingId === check.id + "_save" ? (
+                                                      <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Saving...</>
+                                                    ) : (
+                                                      <><CheckCircle2 className="w-3.5 h-3.5" /> Save Changes</>
+                                                    )}
+                                                 </button>
+                                                 <button onClick={() => setEditModeId(null)} className="text-[11px] font-semibold px-4 py-1.5 text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-all shadow-sm">
+                                                    Cancel
+                                                 </button>
+                                              </div>
                                             </div>
-                                          ) : <p className="text-xs text-gray-400 italic mb-3">No details available.</p>}
+                                          ) : (
+                                            Object.keys(check.details || {}).length > 0 ? (
+                                              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 mb-4 px-1">
+                                                {Object.entries(check.details || {}).map(([k, v]) => (
+                                                  <div key={k} className="text-xs">
+                                                    <span className="text-gray-400 mr-2">{k}:</span>
+                                                    <span className="font-semibold text-gray-800">{String(v)}</span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : <p className="text-xs text-gray-400 italic mb-3 px-1">No details available.</p>
+                                          )}
                                           {check.notes && (
                                             <p className="text-xs bg-amber-50 border border-amber-100 text-amber-800 rounded px-3 py-2 mb-3">📝 {check.notes}</p>
                                           )}
@@ -915,11 +977,37 @@ export default function BackgroundCheckPage() {
                                             </div>
                                           )}
                                           <div className="flex flex-wrap items-center gap-2">
-                                            {check.docRef && (
-                                              <Button variant="secondary" size="small" onClick={() => setActiveTab("documents")}>
-                                                <Folder className="w-3.5 h-3.5 inline-block mr-1" />
-                                                View Document in Docs Tab
-                                              </Button>
+                                            {check.docRef ? (
+                                              <>
+                                                <Button variant="secondary" size="small" onClick={() => setActiveTab("documents")}>
+                                                  <Folder className="w-3.5 h-3.5 inline-block mr-1" />
+                                                  View Document in Docs Tab
+                                                </Button>
+                                                <Button variant="danger" size="small" onClick={() => {
+                                                  setDeleteConf({ isOpen: true, docId: check.id, sourceId: "session" });
+                                                }} disabled={updatingId === `${check.id}_del_doc`}>
+                                                  {updatingId === `${check.id}_del_doc` ? <RefreshCw className="w-3.5 h-3.5 inline-block mr-1 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 inline-block mr-1" />}
+                                                  Remove Document
+                                                </Button>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <input type="file" id={`upload-doc-${check.id}`} className="hidden" onChange={(e) => {
+                                                  const file = e.target.files[0];
+                                                  if (!file) return;
+                                                  setUpdatingId(`${check.id}_up_doc`);
+                                                  setTimeout(() => {
+                                                    const mockDoc = { document_name: file.name, uploaded_at: new Date().toISOString(), identity_type: "Manual Upload", _isManual: true };
+                                                    setChecks(prev => prev.map(c => c.id === check.id ? { ...c, docRef: mockDoc } : c));
+                                                    showStatusToast(`Uploaded ${file.name}`, "success");
+                                                    setUpdatingId(null);
+                                                  }, 500);
+                                                }} />
+                                                <Button variant="secondary" size="small" onClick={() => document.getElementById(`upload-doc-${check.id}`).click()} disabled={updatingId === `${check.id}_up_doc`}>
+                                                  {updatingId === `${check.id}_up_doc` ? <RefreshCw className="w-3.5 h-3.5 inline-block mr-1 animate-spin" /> : <Upload className="w-3.5 h-3.5 inline-block mr-1" />}
+                                                  Upload Document
+                                                </Button>
+                                              </>
                                             )}
                                             <Button variant="success" size="small"
                                               disabled={updatingId === check.id || check.status === "VERIFIED"}
@@ -1092,33 +1180,11 @@ export default function BackgroundCheckPage() {
                                     <CatIcon className="w-4 h-4 text-indigo-600" />
                                     <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{cat}</span>
                                     <span className="text-[11px] text-gray-400">{docs.length} doc{docs.length !== 1 ? "s" : ""}</span>
-                                    {isVerified && (
-                                      <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                        <CheckCircle2 className="w-3 h-3" /> Verified
-                                      </span>
-                                    )}
                                   </div>
-                                  {isVerified ? (
-                                    <button className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all">
-                                      <Upload className="w-3 h-3" /> Upload New
-                                    </button>
-                                  ) : (
-                                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400 border border-gray-200 px-3 py-1.5 rounded-lg cursor-not-allowed bg-gray-50"
-                                      title={relCheck ? `Mark "${relCheck.label}" as Verified first` : "BG check required"}>
-                                      <Lock className="w-3 h-3" /> Upload Locked
-                                    </span>
-                                  )}
+                                  <button onClick={() => setUploadModal({ isOpen: true, cat: cat, file: null, docName: "", docType: "" })} disabled={updatingId === `upload_folder_${cat}`} className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all">
+                                    {updatingId === `upload_folder_${cat}` ? <><RefreshCw className="w-3 h-3 animate-spin"/> Uploading</> : <><Upload className="w-3 h-3" /> Upload New</>}
+                                  </button>
                                 </div>
-                                {/* Warning banner when locked */}
-                                {!isVerified && relCheck && (
-                                  <div className="flex items-start gap-2 px-4 py-2 bg-amber-50 border-b border-amber-100 text-amber-700 text-xs">
-                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                                    <span>
-                                      <span className="font-semibold">Upload locked.</span> Go to BG Checks tab and verify{" "}
-                                      <span className="font-semibold">"{relCheck.label}"</span> to enable uploads for this folder.
-                                    </span>
-                                  </div>
-                                )}
                                 {/* Doc cards */}
                                 <div className="p-3 space-y-2">
                                   {docs.map((doc, idx) => (
@@ -1129,9 +1195,21 @@ export default function BackgroundCheckPage() {
                                       <DocCard
                                         doc={doc}
                                         idx={idx}
-                                        isVerified={isVerified}
+                                        isVerified={true}
                                         onPreview={setPreviewDoc}
-                                        onDelete={(d) => setDeleteConf({ isOpen: true, docId: d.id, cat })}
+                                        onDelete={(d) => setDeleteConf({ isOpen: true, doc: d, sourceId: "documents" })}
+                                        onUpload={(d, file) => {
+                                          setUpdatingId(`upload_doc_${d.id || idx}`);
+                                          setTimeout(() => {
+                                            const fallbackCheck = checks.find(c => c.group === cat) || checks[0];
+                                            if (fallbackCheck) {
+                                              const mockDoc = { ...d, document_name: file.name, uploaded_at: new Date().toISOString() };
+                                              setChecks(prev => prev.map(c => c.id === fallbackCheck.id ? { ...c, docRef: mockDoc } : c));
+                                            }
+                                            showStatusToast(`Re-uploaded ${file.name} successfully`, "success");
+                                            setUpdatingId(null);
+                                          }, 500);
+                                        }}
                                       />
                                     </div>
                                   ))}
@@ -1167,7 +1245,7 @@ export default function BackgroundCheckPage() {
             <div className="px-6 py-5 overflow-y-auto flex-1 space-y-4">
               <div className="flex gap-2 bg-indigo-50 border border-indigo-100 text-indigo-800 text-xs rounded-lg px-4 py-3">
                 <FileArchive className="w-4 h-4 shrink-0 mt-0.5" />
-                <p>Selected checks will be packed into a ZIP and emailed to the consultancy.</p>
+                <p>Selected checks and their attached documents will be packed into a ZIP and emailed to the consultancy.</p>
               </div>
               {selectedEmp && (
                 <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
@@ -1205,7 +1283,12 @@ export default function BackgroundCheckPage() {
                     return (
                       <li key={item.id} className="flex items-center gap-3 text-xs bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
                         <Icon className="w-4 h-4 text-indigo-600 shrink-0" />
-                        <span className="flex-1 font-medium text-gray-800">{item.label}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-800 truncate">{item.label}</p>
+                          {item.docRef && (
+                            <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5"><FileText className="w-3 h-3 text-indigo-400" /> Attached: {item.docRef.document_name || item.docRef.identity_type || "Document"}</p>
+                          )}
+                        </div>
                         <StatusBadge label={item.status.replace("_", " ")} size="sm" />
                       </li>
                     );
@@ -1252,12 +1335,38 @@ export default function BackgroundCheckPage() {
         onConfirm={async () => {
           setUpdatingId("delete");
           await new Promise(r => setTimeout(r, 600));
-          // TODO: Real API call here
+          
+          if (deleteConf.sourceId === "session") {
+             setChecks(prev => prev.map(c => c.id === deleteConf.docId ? { ...c, docRef: null } : c));
+          } else {
+             const d = deleteConf.doc;
+             if (d && d._isManual) {
+                // If it's a manual upload, it lives inside checks
+                setChecks(prev => prev.filter(c => c.docRef !== d));
+             } else if (d) {
+                // If it's from profile, modify the profile state optimistically
+                setProfile(prev => {
+                   if (!prev) return prev;
+                   const copy = { ...prev };
+                   if (d._cat === "Identity") {
+                     copy.identity_documents = copy.identity_documents?.filter(x => x !== d);
+                   } else if (d._cat === "Education") {
+                     copy.education_documents = copy.education_documents?.filter(x => x !== d);
+                   } else if (d._cat === "Experience") {
+                     copy.experience = copy.experience?.map(exp => ({ ...exp, documents: exp.documents?.filter(x => x !== d) }));
+                   } else if (d._cat === "Bank Statement") {
+                     copy.bank_documents = copy.bank_documents?.filter(x => x !== d);
+                   }
+                   return copy;
+                });
+             }
+          }
+
           showStatusToast("Document deleted successfully", "success");
-          setDeleteConf({ isOpen: false, docId: null });
+          setDeleteConf({ isOpen: false, docId: null, cat: null, sourceId: null, doc: null });
           setUpdatingId(null);
         }}
-        onCancel={() => setDeleteConf({ isOpen: false, docId: null })}
+        onCancel={() => setDeleteConf({ isOpen: false, docId: null, cat: null, sourceId: null, doc: null })}
         isLoading={updatingId === "delete"}
         confirmText="Delete"
       />
@@ -1379,6 +1488,113 @@ export default function BackgroundCheckPage() {
                 className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2"
               >
                 Create Task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UPLOAD DOC MODAL */}
+      {uploadModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-indigo-950/20 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-300">
+            <div className="p-8">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 mb-6">
+                <Upload className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Upload Details</h3>
+              <p className="text-sm text-gray-500 mb-6">Please provide details for the uploaded document in the <span className="font-bold text-indigo-600">{uploadModal.cat}</span> category.</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Document Name</label>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={uploadModal.docName}
+                    onChange={e => setUploadModal(p => ({ ...p, docName: e.target.value }))}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Document Type / Sub-category</label>
+                  <input
+                    type="text"
+                    value={uploadModal.docType}
+                    onChange={e => setUploadModal(p => ({ ...p, docType: e.target.value }))}
+                    placeholder={`e.g. Aadhaar, Passport, etc.`}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Document File</label>
+                  <label className="flex items-center justify-center w-full px-4 py-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 hover:border-indigo-300 transition-all">
+                    <div className="text-center">
+                      <Upload className="w-6 h-6 mx-auto text-indigo-400 mb-2" />
+                      {uploadModal.file ? (
+                        <p className="text-xs font-semibold text-indigo-600 truncate max-w-[250px]">{uploadModal.file.name}</p>
+                      ) : (
+                        <p className="text-xs font-medium text-gray-500">Click to attach file</p>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files[0];
+                        if (file) {
+                           setUploadModal(p => ({ ...p, file, docName: p.docName || file.name }));
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="px-8 py-6 bg-gray-50 flex justify-end gap-3">
+              <button 
+                onClick={() => setUploadModal({ isOpen: false, cat: "", file: null, docName: "", docType: "" })}
+                className="px-5 py-2.5 text-xs font-bold text-gray-500 hover:text-gray-700 transition-colors"
+                disabled={updatingId === "upload_new_doc"}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  setUpdatingId("upload_new_doc");
+                  setTimeout(() => {
+                    const mockDoc = { 
+                      document_name: uploadModal.docName || uploadModal.file.name, 
+                      uploaded_at: new Date().toISOString(), 
+                      identity_type: uploadModal.docType || uploadModal.cat,
+                      _isManual: true
+                    };
+                    const fallbackCheck = checks.find(c => c.group === uploadModal.cat);
+                    const newCheck = {
+                      id: `manual_upload_${Date.now()}`,
+                      check_type: `manual_${uploadModal.cat.toLowerCase()}_${Date.now()}`,
+                      label: uploadModal.docName || `Additional ${uploadModal.cat} Document`,
+                      icon: fallbackCheck ? fallbackCheck.icon : FileText,
+                      group: uploadModal.cat,
+                      status: "VERIFIED",
+                      details: { "Created": "Manually uploaded HR addition" },
+                      notes: "",
+                      docRef: {
+                        ...mockDoc,
+                        _cat: uploadModal.cat,
+                        _title: uploadModal.docType || uploadModal.cat
+                      }
+                    };
+                    setChecks(prev => [...prev, newCheck]);
+                    showStatusToast(`Uploaded successfully to ${uploadModal.cat}`, "success");
+                    setUpdatingId(null);
+                    setUploadModal({ isOpen: false, cat: "", file: null, docName: "", docType: "" });
+                  }, 500);
+                }}
+                disabled={!uploadModal.docName.trim() || !uploadModal.file || updatingId === "upload_new_doc"}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2"
+              >
+                {updatingId === "upload_new_doc" ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Upload"}
               </button>
             </div>
           </div>
