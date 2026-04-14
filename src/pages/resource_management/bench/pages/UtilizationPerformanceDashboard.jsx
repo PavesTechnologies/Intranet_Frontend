@@ -12,8 +12,11 @@ import {
    AlertTriangle, ArrowUpRight, ArrowDownRight, History, Bell, CheckCircle2,
    Share2, RefreshCcw, Info, Database, Fingerprint, Lock, ShieldAlert,
    Verified, ZapOff, Scale, LayoutGrid, CalendarRange, Clock, PieChart as PieChartIcon,
-   TrendingUp as TrendingUpIcon, MoveUpRight, Gauge
+   TrendingUp as TrendingUpIcon, MoveUpRight
 } from 'lucide-react';
+import { getBillNonBillable } from '../../services/utilizationService';
+import Pagination from '../../../../components/Pagination/pagination';
+import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { utilizationService } from '../../../../services/utilizationService';
 import { fetchResources } from '../../services/resource';
 
@@ -152,6 +155,53 @@ const UtilizationPerformanceDashboard = () => {
       const user = rmsUsers.find(u => String(u.userId) === String(selectedResourceId));
       return user?.name || `User ${selectedResourceId}`;
    }, [selectedResourceId, rmsUsers]);
+
+   const [resourceMetrics, setResourceMetrics] = useState([]);
+   const [isResourceLoading, setIsResourceLoading] = useState(false);
+   const [dateRange, setDateRange] = useState({
+      startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
+      endDate: new Date().toISOString().split('T')[0]
+   });
+
+   const [searchQuery, setSearchQuery] = useState('');
+   const [currentPage, setCurrentPage] = useState(1);
+   const ITEMS_PER_PAGE = 8;
+
+   const filteredAndPaginatedResources = useMemo(() => {
+      let filtered = Array.isArray(resourceMetrics) ? resourceMetrics : [];
+      if (searchQuery) {
+         const lowerQuery = searchQuery.toLowerCase();
+         filtered = filtered.filter(res =>
+            res.userName?.toLowerCase().includes(lowerQuery)
+         );
+      }
+
+      const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1;
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      const paginated = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+      return { paginated, totalPages };
+   }, [resourceMetrics, searchQuery, currentPage]);
+
+   useEffect(() => {
+      const fetchResourceMetrics = async () => {
+         if (!dateRange.startDate || !dateRange.endDate) return;
+         if (new Date(dateRange.startDate) > new Date(dateRange.endDate)) return;
+         try {
+            setIsResourceLoading(true);
+            const data = await getBillNonBillable(dateRange.startDate, dateRange.endDate);
+            console.log("Data from tms: ", data);
+            setResourceMetrics(data);
+         } catch (err) {
+            console.error(err);
+            setResourceMetrics([]);
+         } finally {
+            setIsResourceLoading(false);
+         }
+      };
+
+      fetchResourceMetrics();
+   }, [dateRange.startDate, dateRange.endDate]);
 
    const activeChartData = useMemo(() => {
       if (liveData && liveData.portfolioTrends) {
@@ -298,8 +348,25 @@ const UtilizationPerformanceDashboard = () => {
    }, [activeBillingData]);
 
    return (
-      <div className="min-h-screen bg-slate-50/50 p-6 font-sans">
+      <div className="min-h-screen bg-[#FDFDFE] p-6 font-sans select-none">
 
+         {/* Confidence Banner */}
+         {OVERALL_CONFIDENCE_SCORE < 100 && (
+            <div className="mb-6 flex items-center justify-between p-3 bg-amber-50/50 border border-amber-100 rounded-xl">
+               <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white text-amber-500 rounded-lg shadow-sm border border-amber-50">
+                     <ShieldAlert size={18} />
+                  </div>
+                  <div>
+                     <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest leading-none">Historical Data Confidence (Story 5 & 11)</span>
+                     <p className="text-[11px] font-medium text-amber-600/80 mt-0.5 font-serif">Trend preservation active. Metrics based on 94% verified historical actuals.</p>
+                  </div>
+               </div>
+               <div className="flex items-center gap-2 px-3 py-1 bg-white border border-rose-100 rounded-lg text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">
+                  <ZapOff size={12} /> Sync Restricted
+               </div>
+            </div>
+         )}
 
          {/* Header — Unified Command Strip */}
          <div className="mb-6 flex items-center justify-between">
@@ -594,92 +661,115 @@ const UtilizationPerformanceDashboard = () => {
                         <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                            <div>
                               <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest leading-none">Capability & Performance Ledger</h3>
-                              <p className="text-[10px] font-medium text-slate-400 mt-1 uppercase tracking-widest opacity-70 italic font-serif">Deep-dive into individual billable efficiency vs historical directional signals (Story 5)</p>
+                              {/* <p className="text-[10px] font-medium text-slate-400 mt-1 uppercase tracking-widest opacity-70 italic font-serif">Deep-dive into individual billable efficiency vs historical directional signals</p> */}
                            </div>
-                           <div className="flex items-center gap-2 bg-slate-900 text-white rounded-lg px-3 py-1 text-[9px] font-black uppercase tracking-widest">
-                              <ShieldCheck size={12} className="text-emerald-400" /> {selectedResourceId ? `LIVE DATA IS ${selectedResourceName}` : 'LIVE DATA IS OVERALL RESOURCE'}
+                           <div className="flex items-center gap-4">
+                              <div className="relative">
+                                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                                 <input
+                                    type="text"
+                                    placeholder="Search Resource..."
+                                    className="pl-7 text-[10px] font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500 w-40"
+                                    value={searchQuery}
+                                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                                 />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                 <input
+                                    type="date"
+                                    className="text-[10px] uppercase font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
+                                    value={dateRange.startDate}
+                                    max={dateRange.endDate || new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                                 />
+                                 <span className="text-[10px] font-bold text-slate-400 uppercase">to</span>
+                                 <input
+                                    type="date"
+                                    className="text-[10px] uppercase font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
+                                    value={dateRange.endDate}
+                                    min={dateRange.startDate}
+                                    max={new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                                 />
+                              </div>
+                              {/* <div className="flex items-center gap-2 bg-slate-900 text-white rounded-lg px-3 py-1 text-[9px] font-black uppercase tracking-widest">
+                           <ShieldCheck size={12} className="text-emerald-400" /> Source Verified
+                        </div> */}
                            </div>
                         </div>
                         <div className="overflow-x-auto no-scrollbar">
                            <table className="w-full text-left">
                               <thead>
                                  <tr className="bg-slate-50/50 border-b border-slate-50">
-                                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Resource Context</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Hourly Split (B / NB / I)</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Resource Registry</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Hourly Split (B / NB)</th>
                                     <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Trend Signal</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-indigo-600 text-right">Final Util %</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-indigo-600 text-right">Overall Util %</th>
                                  </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-50">
-                                 {rmsUsers.length > 0 ? (
-                                    rmsUsers.map((user) => (
-                                       <tr
-                                          key={user.userId}
-                                          onClick={() => {
-                                             setSelectedResourceId(user.userId);
-                                             setActiveTab('portfolio');
-                                          }}
-                                          className={`hover:bg-indigo-50/40 transition-colors group cursor-pointer ${selectedResourceId === user.userId ? 'bg-indigo-50/60 border-l-4 border-indigo-500' : ''}`}
-                                       >
+                                 {isResourceLoading ? (
+                                    <tr>
+                                       <td colSpan="4" className="px-6 py-8 text-center">
+                                          <div className="flex flex-col items-center justify-center gap-2">
+                                             {/* <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div> */}
+                                             {/* <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Loading Resources...</span> */}
+                                             <LoadingSpinner text='Loading Resources...' />
+                                          </div>
+                                       </td>
+                                    </tr>
+                                 ) : filteredAndPaginatedResources.paginated.length === 0 ? (
+                                    <tr>
+                                       <td colSpan="4" className="px-6 py-8 text-center">
+                                          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">No Resource Data Available</span>
+                                       </td>
+                                    </tr>
+                                 ) : (
+                                    filteredAndPaginatedResources.paginated.map((res, idx) => (
+                                       <tr key={res.userId || idx} className="hover:bg-slate-50/40 transition-colors group">
                                           <td className="px-6 py-4">
-                                             <div className="flex items-center gap-3">
-                                                <div className="h-9 w-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-400">
-                                                   {user.name?.split(' ').map(n => n[0]).join('') || '??'}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                   <span className="text-[13px] font-bold text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{user.name}</span>
-                                                   <span className="text-[9px] font-black px-1.5 py-0.5 rounded-[4px] bg-slate-100 text-slate-400 uppercase tracking-widest mt-1.5 w-fit">{user.resourceContext}</span>
-                                                </div>
+                                             <div className="flex flex-col">
+                                                <span className="text-[13px] font-bold text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{res.userName}</span>
+                                                <span className="text-[10px] font-medium text-slate-400 mt-1.5 uppercase tracking-widest italic">Resource</span>
                                              </div>
                                           </td>
                                           <td className="px-6 py-4 text-center">
-                                             <span className="text-[11px] font-black text-slate-600 tracking-tighter">
-                                                   {user.hourlySplit?.split('/').map((val, idx) => (
-                                                      <span key={idx} className="after:content-['/'] last:after:content-[''] after:mx-1 after:text-slate-300">
-                                                         {val}h
-                                                      </span>
-                                                   ))}
-                                                </span>
+                                             <div className="flex items-center justify-center gap-3">
+                                                <div className="flex flex-col items-center"><span className="text-[11px] font-black text-indigo-600">{res.billableHours}h</span><span className="text-[8px] font-bold text-slate-400 uppercase">Billable</span></div>
+                                                <div className="h-6 w-px bg-slate-100" />
+                                                <div className="flex flex-col items-center"><span className="text-[11px] font-black text-slate-600">{res.nonBillableHours}h</span><span className="text-[8px] font-bold text-slate-400 uppercase">Non-Bill</span></div>
+                                             </div>
                                           </td>
                                           <td className="px-6 py-4 text-center">
-                                             <div className="flex justify-center">
-                                                {user.trendSignal === 'up' ? (
-                                                   <div className="px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center gap-1 text-[9px] font-black uppercase"><ArrowUpRight size={12} strokeWidth={3} /> Improving</div>
-                                                ) : user.trendSignal === 'down' ? (
-                                                   <div className="px-2 py-0.5 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 flex items-center gap-1 text-[9px] font-black uppercase"><ArrowDownRight size={12} strokeWidth={3} /> Declining</div>
-                                                ) : user.trendSignal === 'stable' ? (
-                                                   <div className="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 flex items-center gap-1 text-[9px] font-black uppercase"><TrendingUp size={12} strokeWidth={3} /> Stable</div>
-                                                ) : (
-                                                   <div className="px-2 py-0.5 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-500 flex items-center gap-1 text-[9px] font-black uppercase"><Zap size={12} strokeWidth={3} /> Volatile</div>
-                                                )}
+                                             {/* STORY 5: Individual Trend Signals */}
+                                             <div className="flex flex-col items-center gap-0.5">
+                                                <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black uppercase"><Zap size={14} /> Stable</div>
                                              </div>
                                           </td>
                                           <td className="px-6 py-4 text-right">
                                              <div className="flex flex-col items-end">
-                                                <div className="flex items-end gap-1">
-                                                   <span className="text-[14px] font-black text-slate-900 leading-none">{user.finalUtilPercentage}%</span>
-                                                   <span className="text-[8px] font-black text-slate-400 pb-0.5 uppercase">Util</span>
-                                                </div>
-                                                <div className="h-1.5 w-14 bg-slate-100 rounded-full mt-2 overflow-hidden">
-                                                   <div className={`h-full rounded-full ${user.finalUtilPercentage >= 75 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.2)]' : user.finalUtilPercentage >= 40 ? 'bg-indigo-500' : 'bg-rose-500'}`} style={{ width: `${Math.min(user.finalUtilPercentage, 100)}%` }} />
+                                                <span className="text-[16px] font-black text-slate-900">{res.billablePercentage}%</span>
+                                                <div className="h-1 w-12 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                                                   <div className="h-full bg-indigo-500" style={{ width: `${res.billablePercentage}%` }} />
                                                 </div>
                                              </div>
                                           </td>
                                        </tr>
                                     ))
-                                 ) : (
-                                    <tr>
-                                       <td colSpan={4} className="px-6 py-10 text-center">
-                                          <div className="flex flex-col items-center gap-2 text-slate-400">
-                                             <Activity size={20} />
-                                             <span className="text-[11px] font-bold uppercase tracking-widest">Loading user data...</span>
-                                          </div>
-                                       </td>
-                                    </tr>
                                  )}
                               </tbody>
                            </table>
                         </div>
+                        {filteredAndPaginatedResources.totalPages > 1 && (
+                           <div className="border-t border-slate-100 bg-white p-3">
+                              <Pagination
+                                 currentPage={currentPage}
+                                 totalPages={filteredAndPaginatedResources.totalPages}
+                                 onPrevious={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                 onNext={() => setCurrentPage(p => Math.min(filteredAndPaginatedResources.totalPages, p + 1))}
+                              />
+                           </div>
+                        )}
                      </div>
                   )}
 

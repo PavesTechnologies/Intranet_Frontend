@@ -39,7 +39,7 @@ const EmployeeDashboard = ({ employeeId }) => {
   const onPendingRequestsChange = (newRequests) => {
     setPendingRequests(newRequests);
   };
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
   // const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user"));
   const userPermissions = user?.permissions || [];
@@ -69,7 +69,7 @@ const EmployeeDashboard = ({ employeeId }) => {
       });
       if (res.data.success) {
         toast.success(
-          res?.data?.message || "Comp-Off request submitted successfully!"
+          res?.data?.message || "Comp-Off request submitted successfully!",
         );
         setrefreshKeys((prev) => (typeof prev === "number" ? prev + 1 : 1));
         try {
@@ -84,7 +84,7 @@ const EmployeeDashboard = ({ employeeId }) => {
       }
     } catch (err) {
       toast.error(
-        err?.response?.data?.message || "Failed to submit comp-off request."
+        err?.response?.data?.message || "Failed to submit comp-off request.",
       );
       return false;
     } finally {
@@ -107,7 +107,7 @@ const EmployeeDashboard = ({ employeeId }) => {
         `${BASE_URL}/api/compoff/employee/${employeeId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        },
       );
 
       if (res.data && res.data.success) {
@@ -247,9 +247,7 @@ const EmployeeDashboard = ({ employeeId }) => {
 
         {/* Upcoming Holidays */}
         <div className="md:w-full lg:w-[35%]">
-          <UpcomingHolidays 
-            year={currentYear}
-          />
+          <UpcomingHolidays year={currentYear} />
         </div>
       </div>
 
@@ -280,7 +278,7 @@ const EmployeeDashboard = ({ employeeId }) => {
       )}
 
       {isCompOffModalOpen && (
-        <CompOffR equestModal
+        <CompOffRequestModal
           loading={isLoading}
           onSubmit={handleCompOffSubmit}
           // onSuccess={() => setrefreshKeys((prev) => !prev)}
@@ -290,17 +288,29 @@ const EmployeeDashboard = ({ employeeId }) => {
 
       <h2 className="text-small font-semibold m-4">My Leave Stats</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <WeeklyPattern employeeId={employeeId} year={currentYear} refreshKey={refreshKeys} />
+        <WeeklyPattern
+          employeeId={employeeId}
+          year={currentYear}
+          refreshKey={refreshKeys}
+        />
         <CustomActiveShapePieChart
           employeeId={employeeId}
           year={currentYear}
           refreshKey={refreshKeys}
         />
-        <MonthlyStats employeeId={employeeId} year={currentYear} refreshKey={refreshKeys} />
+        <MonthlyStats
+          employeeId={employeeId}
+          year={currentYear}
+          refreshKey={refreshKeys}
+        />
       </div>
 
       <h2 className="text-small font-semibold m-4">Leave Balances</h2>
-      <LeaveDashboard employeeId={employeeId} year={currentYear} refreshKey={refreshKeys} />
+      <LeaveDashboard
+        employeeId={employeeId}
+        year={currentYear}
+        refreshKey={refreshKeys}
+      />
 
       <h2 className="text-small font-semibold m-4">Leave History</h2>
       <LeaveHistory employeeId={employeeId} refreshKey={refreshKeys} />

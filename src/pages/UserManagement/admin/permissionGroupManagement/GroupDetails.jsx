@@ -13,20 +13,20 @@ export default function GroupDetails() {
     const fetchGroup = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/groups/${groupId}`,
+          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/groups/${groupId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
         setGroup(res.data);
         // Fetch permissions for the group
         const permRes = await axios.get(
           `${
-            import.meta.env.VITE_USER_MANAGEMENT_URL
+            window.__APP_CONFIG__.USER_MANAGEMENT_URL
           }/admin/groups/${groupId}/permissions`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
         setPermissions(permRes.data);
       } catch (err) {

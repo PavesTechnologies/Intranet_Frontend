@@ -24,7 +24,7 @@ const PendingLeaveRequests = ({ refreshKey, year }) => {
   const employeeId = useAuth()?.user?.user_id;
 
   const ITEMS_PER_PAGE = 5;
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
   /**
    * Fetch pending leave requests, leave types, and balances.

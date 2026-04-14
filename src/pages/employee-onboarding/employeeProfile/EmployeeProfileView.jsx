@@ -21,13 +21,12 @@ import { useParams } from "react-router-dom";
 
 import ProfilePage from "./ProfilePage";
 import JobPage from "./JobPage";
-import DocumentsPage from "./DocumentsPage";  
-
+import DocumentsPage from "./DocumentsPage";
 
 export default function EmployeeProfileView() {
-  const {employee_uuid} = useParams();
+  const { employee_uuid } = useParams();
 
-  const [activeTab, setActiveTab] = useState("profile");
+  const [activeTab, setActiveTab] = useState("about");
   const [docTabConfig, setDocTabConfig] = useState({ folder: "education", search: "" });
 
   const handleTabChange = (tab, config = null) => {
@@ -37,89 +36,103 @@ export default function EmployeeProfileView() {
   const [profileImg, setProfileImg] = useState(null);
   const profileRef = useRef(null);
   const [employee, setEmployee] = useState(null);
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const [hrData, setHrData] = useState(null);
   const [identityTypes, setIdentityTypes] = useState([]);
 
-   // ✅ FETCH ALL DATA ONCE (core + hr + department + designation in parallel)
-    const fetchAllData = async () => {
-      try {
-        const token = localStorage.getItem("token");
+  // ✅ FETCH ALL DATA ONCE (core + hr + department + designation in parallel)
+  const fetchAllData = async () => {
+    try {
+      const token = localStorage.getItem("token");
 
-        // 1. Fetch core employee details
-        const coreRes = await fetch(
-          `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+      // 1. Fetch core employee details
+      const coreRes = await fetch(
+        `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
 
-        if (!coreRes.ok) throw new Error("Failed to fetch employee");
-        const coreData = await coreRes.json();
+      if (!coreRes.ok) throw new Error("Failed to fetch employee");
+      const coreData = await coreRes.json();
 
-        // 2. Fire department, designation, and HR profile calls IN PARALLEL
-        const parallelPromises = [];
+      // 2. Fire department, designation, and HR profile calls IN PARALLEL
+      const parallelPromises = [];
 
-        // Department
-        const deptPromise = coreData.department_uuid
-          ? fetch(`${BASE_URL}/masters/departments/${coreData.department_uuid}`, { headers: { Authorization: `Bearer ${token}` } })
-              .then(r => r.ok ? r.json() : {})
-              .catch(() => ({}))
-          : Promise.resolve({});
-        parallelPromises.push(deptPromise);
+      // Department
+      const deptPromise = coreData.department_uuid
+        ? fetch(`${BASE_URL}/masters/departments/${coreData.department_uuid}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+            .then((r) => (r.ok ? r.json() : {}))
+            .catch(() => ({}))
+        : Promise.resolve({});
+      parallelPromises.push(deptPromise);
 
-        // Designation
-        const desigPromise = coreData.designation_uuid
-          ? fetch(`${BASE_URL}/masters/designations/${coreData.designation_uuid}`, { headers: { Authorization: `Bearer ${token}` } })
-              .then(r => r.ok ? r.json() : {})
-              .catch(() => ({}))
-          : Promise.resolve({});
-        parallelPromises.push(desigPromise);
+      // Designation
+      const desigPromise = coreData.designation_uuid
+        ? fetch(
+            `${BASE_URL}/masters/designations/${coreData.designation_uuid}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          )
+            .then((r) => (r.ok ? r.json() : {}))
+            .catch(() => ({}))
+        : Promise.resolve({});
+      parallelPromises.push(desigPromise);
 
-        // HR profile
-        const targetUserUuid = coreData.user_uuid;
-        const hrPromise = targetUserUuid
-          ? fetch(`${BASE_URL}/hr/hr/${targetUserUuid}`, { headers: { Authorization: `Bearer ${token}` } })
-              .then(r => r.ok ? r.json() : {})
-              .catch(() => ({}))
-          : Promise.resolve({});
-        parallelPromises.push(hrPromise);
+      // HR profile
+      const targetUserUuid = coreData.user_uuid;
+      const hrPromise = targetUserUuid
+        ? fetch(`${BASE_URL}/hr/hr/${targetUserUuid}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+            .then((r) => (r.ok ? r.json() : {}))
+            .catch(() => ({}))
+        : Promise.resolve({});
+      parallelPromises.push(hrPromise);
 
-        const [deptData, desigData, hrResult] = await Promise.all(parallelPromises);
+      const [deptData, desigData, hrResult] =
+        await Promise.all(parallelPromises);
 
-        coreData.resolved_department_name = deptData.department_name || coreData.department_uuid;
-        coreData.resolved_designation_name = desigData.designation_name || desigData.name || coreData.designation_uuid;
+      coreData.resolved_department_name =
+        deptData.department_name || coreData.department_uuid;
+      coreData.resolved_designation_name =
+        desigData.designation_name ||
+        desigData.name ||
+        coreData.designation_uuid;
 
-        setEmployee(coreData);
-        setHrData(hrResult);
+      setEmployee(coreData);
+      setHrData(hrResult);
 
-        // 3. Fetch identity types based on country_uuid from address
-        const addresses = hrResult?.addresses || [];
-        const countryUuid = addresses[0]?.country_uuid || null;
-        if (countryUuid) {
-          try {
-            const idTypesRes = await fetch(
-              `${BASE_URL}/identity/country-mapping/identities/${countryUuid}`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            if (idTypesRes.ok) {
-              const idTypesData = await idTypesRes.ok ? await idTypesRes.json() : [];
-              setIdentityTypes(Array.isArray(idTypesData) ? idTypesData : []);
-            }
-          } catch (e) {
-            console.error("Failed to fetch identity types:", e);
+      // 3. Fetch identity types based on country_uuid from address
+      const addresses = hrResult?.addresses || [];
+      const countryUuid = addresses[0]?.country_uuid || null;
+      if (countryUuid) {
+        try {
+          const idTypesRes = await fetch(
+            `${BASE_URL}/identity/country-mapping/identities/${countryUuid}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          if (idTypesRes.ok) {
+            const idTypesData = (await idTypesRes.ok)
+              ? await idTypesRes.json()
+              : [];
+            setIdentityTypes(Array.isArray(idTypesData) ? idTypesData : []);
           }
+        } catch (e) {
+          console.error("Failed to fetch identity types:", e);
         }
-      } catch (err) {
-        console.error("Error fetching employee:", err);
-        setEmployee({}); // prevent infinite loading
-        setHrData({});
       }
-    };
+    } catch (err) {
+      console.error("Error fetching employee:", err);
+      setEmployee({}); // prevent infinite loading
+      setHrData({});
+    }
+  };
 
   useEffect(() => {
     if (employee_uuid) fetchAllData();
   }, [employee_uuid, BASE_URL]);
 
-    const [about, setAbout] = useState({
+  const [about, setAbout] = useState({
     summary: "",
     loveJob: "",
     hobbies: "",
@@ -142,8 +155,12 @@ export default function EmployeeProfileView() {
   }
 
   const mappedEmployee = {
-    name: `${employee.first_name || ""} ${employee.last_name || ""}` .toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).trim(),
-    designation: employee.resolved_designation_name || employee.designation_uuid,
+    name: `${employee.first_name || ""} ${employee.last_name || ""}`
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim(),
+    designation:
+      employee.resolved_designation_name || employee.designation_uuid,
     email: employee.work_email,
     phone: employee.contact_number,
     office: employee.location || "Not Updated",
@@ -177,12 +194,24 @@ export default function EmployeeProfileView() {
       {editingField === fieldKey ? (
         <div className="border border-indigo-100 rounded-xl bg-white shadow-md w-full">
           <div className="flex flex-wrap gap-4 p-3 border-b bg-indigo-50 text-indigo-700">
-            <button onClick={() => formatText("bold")}><Bold size={16} /></button>
-            <button onClick={() => formatText("italic")}><Italic size={16} /></button>
-            <button onClick={() => formatText("underline")}><Underline size={16} /></button>
-            <button onClick={() => formatText("insertUnorderedList")}><List size={16} /></button>
-            <button onClick={() => formatText("insertOrderedList")}><ListOrdered size={16} /></button>
-            <button onClick={() => formatText("createLink")}><Link size={16} /></button>
+            <button onClick={() => formatText("bold")}>
+              <Bold size={16} />
+            </button>
+            <button onClick={() => formatText("italic")}>
+              <Italic size={16} />
+            </button>
+            <button onClick={() => formatText("underline")}>
+              <Underline size={16} />
+            </button>
+            <button onClick={() => formatText("insertUnorderedList")}>
+              <List size={16} />
+            </button>
+            <button onClick={() => formatText("insertOrderedList")}>
+              <ListOrdered size={16} />
+            </button>
+            <button onClick={() => formatText("createLink")}>
+              <Link size={16} />
+            </button>
           </div>
 
           <div
@@ -226,10 +255,8 @@ export default function EmployeeProfileView() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 px-3 sm:px-6 lg:px-10 py-6 sm:py-10">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8">
-
         {/* LEFT SIDEBAR */}
         <div className="space-y-6 lg:col-span-1">
-
           <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md p-6 text-center border border-indigo-100 overflow-hidden">
             <div
               onClick={() => profileRef.current.click()}
@@ -271,7 +298,10 @@ export default function EmployeeProfileView() {
             <Info icon={<Mail size={14} />} text={mappedEmployee.email} />
             <Info icon={<Phone size={14} />} text={mappedEmployee.phone} />
             <Info icon={<Building2 size={14} />} text={mappedEmployee.office} />
-            <Info icon={<User size={14} />} text={`ID: ${mappedEmployee.empId}`} />
+            <Info
+              icon={<User size={14} />}
+              text={`ID: ${mappedEmployee.empId}`}
+            />
           </div>
 
           {/* Department Section */}
@@ -294,29 +324,55 @@ export default function EmployeeProfileView() {
               </p>
             </div>
           </div>
-
         </div>
 
         {/* RIGHT SIDE */}
         <div className="lg:col-span-2 xl:col-span-3 min-w-0 overflow-hidden">
-
           <div className="border-b border-indigo-100 mb-6 flex gap-1 sm:gap-6 text-sm overflow-x-auto scrollbar-hide">
-            <Tab active={activeTab === "about"} onClick={() => handleTabChange("about")}>About</Tab>
-            <Tab active={activeTab === "profile"} onClick={() => handleTabChange("profile")}>Profile</Tab>
-            <Tab active={activeTab === "job"} onClick={() => handleTabChange("job")}>Job</Tab>
-            <Tab active={activeTab === "documents"} onClick={() => handleTabChange("documents")}>Documents</Tab>
+            <Tab
+              active={activeTab === "about"}
+              onClick={() => handleTabChange("about")}
+            >
+              About
+            </Tab>
+            <Tab
+              active={activeTab === "profile"}
+              onClick={() => handleTabChange("profile")}
+            >
+              Profile
+            </Tab>
+            <Tab
+              active={activeTab === "job"}
+              onClick={() => handleTabChange("job")}
+            >
+              Job
+            </Tab>
+            <Tab
+              active={activeTab === "documents"}
+              onClick={() => handleTabChange("documents")}
+            >
+              Documents
+            </Tab>
           </div>
 
           {activeTab === "about" && (
             <div className="space-y-6">
               <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md p-6 border border-indigo-100">
                 <AboutBlock title="About" fieldKey="summary" />
-                <AboutBlock title="What I love about my job?" fieldKey="loveJob" />
-                <AboutBlock title="My interests and hobbies" fieldKey="hobbies" />
+                <AboutBlock
+                  title="What I love about my job?"
+                  fieldKey="loveJob"
+                />
+                <AboutBlock
+                  title="My interests and hobbies"
+                  fieldKey="hobbies"
+                />
               </div>
 
               <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md p-6 border border-indigo-100">
-                <h3 className="text-lg font-semibold text-indigo-900 mb-4">Skillset</h3>
+                <h3 className="text-lg font-semibold text-indigo-900 mb-4">
+                  Skillset
+                </h3>
                 <div className="flex flex-wrap gap-3">
                   {skills.map((skill, index) => (
                     <SkillTag key={index} name={skill} />
@@ -327,30 +383,31 @@ export default function EmployeeProfileView() {
           )}
 
           {activeTab === "profile" && (
-            <ProfilePage 
-              activeTab={activeTab} 
+            <ProfilePage
+              activeTab={activeTab}
               user_uuid={employee.user_uuid}
               coreData={employee}
               hrData={hrData}
-              refreshData={fetchAllData} 
+              refreshData={fetchAllData}
               onTabChange={handleTabChange}
             />
           )}
           {activeTab === "job" && (
-            <JobPage user_uuid={employee.user_uuid}
-            coreData={employee}
-            hrData={hrData} />
+            <JobPage
+              user_uuid={employee.user_uuid}
+              coreData={employee}
+              hrData={hrData}
+            />
           )}
           {activeTab === "documents" && (
-            <DocumentsPage 
-              employee={mappedEmployee} 
+            <DocumentsPage
+              employee={mappedEmployee}
               user_uuid={employee.user_uuid}
-              hrData={hrData} 
-              identityTypes={identityTypes} 
-              config={docTabConfig} 
+              hrData={hrData}
+              identityTypes={identityTypes}
+              config={docTabConfig}
             />
-           )}
-
+          )}
         </div>
       </div>
     </div>

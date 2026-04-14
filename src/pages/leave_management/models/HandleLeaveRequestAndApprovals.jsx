@@ -10,8 +10,8 @@ import LeaveSection from "./LeaveSection";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useAuth } from "../../../contexts/AuthContext";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-const RMS_BASE_URL = import.meta.env.VITE_RMS_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
 const formatted = new Date().toISOString().slice(0, 7);
 
@@ -159,7 +159,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
       const arr = Array.isArray(res.data) ? res.data : res.data?.data || [];
       setAdminLeaveRequests(arr);
       const regular = types.data?.regualar || [];
-      const genderBased = types.data?.genderBasedLeaves|| []; 
+      const genderBased = types.data?.genderBasedLeaves || [];
       const mergedLeaves = [...regular, ...genderBased];
       setAllLeaveTypes(mergedLeaves || []);
     } catch (err) {
@@ -303,7 +303,8 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
       setSelectedRequests([]);
       selectedResourceId.forEach((empId) => {
         try {
-          const res = axios.post(`${RMS_BASE_URL}/api/availability/recalculate/resource/${empId}`,
+          const res = axios.post(
+            `${RMS_BASE_URL}/api/availability/recalculate/resource/${empId}`,
             {},
             {
               params: {
@@ -362,7 +363,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
     leaveId,
     commentParam,
     resourceId,
-    year
+    year,
   }) => {
     const comment = commentParam ?? (comments[leaveId] || "");
 
@@ -383,7 +384,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
           managerId,
           leaveId,
           comment,
-          year
+          year,
         },
         {
           headers: {
@@ -950,7 +951,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                                   action: "approve",
                                   leaveId: request.leaveId,
                                   resourceId: request.employeeId,
-                                  year: request.year
+                                  year: request.year,
                                 })
                               }
                               aria-label="Approve Request"
@@ -979,7 +980,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                                   action: "reject",
                                   leaveId: request.leaveId,
                                   resourceId: request.employeeId,
-                                  year: request.year
+                                  year: request.year,
                                 })
                               }
                               aria-label="Reject Request"

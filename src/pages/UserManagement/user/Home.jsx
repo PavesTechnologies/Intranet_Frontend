@@ -18,13 +18,13 @@ export default function Home() {
           const token = localStorage.getItem("token");
 
           const res = await axios.get(
-            `${import.meta.env.VITE_USER_MANAGEMENT_URL}/general_user/search`,
+            `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/general_user/search`,
             {
               params: { query: q },
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           setResults(res.data);
@@ -35,7 +35,7 @@ export default function Home() {
         setResults([]);
       }
     }, 300),
-    []
+    [],
   );
 
   useEffect(() => {

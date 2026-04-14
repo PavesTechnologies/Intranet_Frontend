@@ -34,24 +34,24 @@ const EditBugForm = ({ bugId, projectId, onClose, onUpdated }) => {
         const [bugRes, membersRes, sprintsRes, epicsRes, tasksRes] =
           await Promise.all([
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/bugs/${bugId}`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/bugs/${bugId}`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/tasks`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
+              axiosConfig,
             ),
           ]);
 
@@ -96,7 +96,13 @@ const EditBugForm = ({ bugId, projectId, onClose, onUpdated }) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: ["assignedTo", "reporter", "sprintId", "epicId", "taskId"].includes(name)
+      [name]: [
+        "assignedTo",
+        "reporter",
+        "sprintId",
+        "epicId",
+        "taskId",
+      ].includes(name)
         ? value
           ? Number(value)
           : null
@@ -117,9 +123,9 @@ const EditBugForm = ({ bugId, projectId, onClose, onUpdated }) => {
     try {
       setLoading(true);
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/bugs/${bugId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/bugs/${bugId}`,
         payload,
-        axiosConfig
+        axiosConfig,
       );
       toast.success("✅ Bug updated successfully!");
       setTimeout(() => {

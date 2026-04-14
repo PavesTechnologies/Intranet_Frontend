@@ -9,7 +9,7 @@ import { toast } from "react-toastify";
 import CompOffRequestsTable from "./CompOffRequestsTable";
 import LoadingSpinner from "../../../components/LoadingSpinner"; // your spinner component
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const CompOffPage = forwardRef(
   ({ employeeId, onPendingRequestsChange, refreshKey }, ref) => {
@@ -31,7 +31,11 @@ const CompOffPage = forwardRef(
         setIsLoading(true);
         const res = await axios.get(
           `${BASE_URL}/api/compoff/employee/${employeeId}`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
         );
 
         if (res.data.success) {
@@ -62,10 +66,12 @@ const CompOffPage = forwardRef(
           `${BASE_URL}/api/compoff/request`,
           payload,
           {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-          }
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
         );
-        console.log("response",res);
+        console.log("response", res);
         toast.success(res?.data?.message || "Comp-Off request submitted!");
         await fetchRequests();
         return true;
@@ -98,8 +104,10 @@ const CompOffPage = forwardRef(
                     `${BASE_URL}/api/compoff/employee/cancel/${id}`,
                     {},
                     {
-                      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-                    }
+                      headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                      },
+                    },
                   );
                   toast.success("Comp-Off request cancelled!");
                   await fetchRequests(); // ✅ awaited
@@ -133,7 +141,7 @@ const CompOffPage = forwardRef(
       )} */}
       </div>
     );
-  }
+  },
 );
 
 export default CompOffPage;

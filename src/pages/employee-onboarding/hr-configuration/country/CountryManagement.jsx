@@ -11,7 +11,7 @@ export default function CountryManagement() {
   const [showModal, setShowModal] = useState(false);
 
   const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   /* -------------------- FETCH COUNTRIES -------------------- */
   const fetchCountries = async () => {
@@ -50,11 +50,11 @@ export default function CountryManagement() {
           params: { is_active: country.is_active ? "false" : "true" },
           headers: { Authorization: `Bearer ${token}` },
           validateStatus: (status) => status >= 200 && status < 300,
-        }
+        },
       );
 
       toast.success(
-        `Country ${country.is_active ? "deactivated" : "activated"} successfully`
+        `Country ${country.is_active ? "deactivated" : "activated"} successfully`,
       );
 
       // Update table instantly
@@ -62,11 +62,15 @@ export default function CountryManagement() {
         prev.map((c) =>
           c.country_uuid === country.country_uuid
             ? { ...c, is_active: !c.is_active }
-            : c
-        )
+            : c,
+        ),
       );
     } catch (error) {
-      console.error("Toggle failed", error.response?.status, error.response?.data);
+      console.error(
+        "Toggle failed",
+        error.response?.status,
+        error.response?.data,
+      );
       toast.error("Failed to update country status");
     }
   };
@@ -114,7 +118,10 @@ export default function CountryManagement() {
             <tbody>
               {countries.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-6 text-center text-gray-500">
+                  <td
+                    colSpan="4"
+                    className="px-6 py-6 text-center text-gray-500"
+                  >
                     No countries found
                   </td>
                 </tr>

@@ -1,12 +1,31 @@
-// src/pages/Projects/Testmanagement/TestDesign/panels/CasePanel.jsx
 import React from "react";
+import { Edit, Trash2 } from "lucide-react"; // <-- Import icons
 
-export default function CasePanel({ caseItem }) {
+export default function CasePanel({ caseItem, onEdit, onDelete }) { // <-- Accept new props
   return (
     <div className="border rounded-lg p-4 bg-white shadow-sm">
       <div className="flex justify-between items-center mb-3">
         <div>
-          <div className="text-sm text-slate-500">Test Case</div>
+          <div className="text-sm text-slate-500 flex items-center gap-3 mb-1">
+            <span>Test Case</span>
+            {/* ACTION BUTTONS */}
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => onEdit && onEdit(caseItem)}
+                className="p-1 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-400 transition-colors"
+                title="Edit Case"
+              >
+                <Edit size={14} />
+              </button>
+              <button 
+                onClick={() => onDelete && onDelete(caseItem)}
+                className="p-1 hover:bg-red-50 hover:text-red-600 rounded text-gray-400 transition-colors"
+                title="Delete Case"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
           <h3 className="font-semibold text-slate-800">{caseItem.title}</h3>
           <div className="text-xs text-slate-400 mt-1">Priority: {caseItem.priority ?? "Medium"}</div>
         </div>

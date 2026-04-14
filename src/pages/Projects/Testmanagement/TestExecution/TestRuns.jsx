@@ -28,7 +28,7 @@ export default function TestRunAccordion({ run, projectId }) {
   const loadTestCases = async () => {
     try {
       const res = await axiosInstance.get(
-        `/test-execution/test-runs/${run.id}/cases` // ✅ correct
+        `/test-execution/test-runs/${run.id}/cases`, // ✅ correct
       );
       setTestCases(res.data || []);
     } catch (err) {
@@ -40,12 +40,12 @@ export default function TestRunAccordion({ run, projectId }) {
   const loadEmployees = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       setEmployee(res.data || []);
     } catch (err) {
@@ -57,7 +57,7 @@ export default function TestRunAccordion({ run, projectId }) {
   const addAssignee = async (testCaseId, userId) => {
     try {
       await axios.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-execution/test-runs/assign/apply`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-runs/assign/apply`,
         {
           runId: run.id,
           objectType: "CASE",
@@ -69,7 +69,7 @@ export default function TestRunAccordion({ run, projectId }) {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       loadTestCases();
     } catch (err) {
@@ -86,7 +86,7 @@ export default function TestRunAccordion({ run, projectId }) {
   }, []);
 
   const options = employee.map((option) => ({
-    value: option.user_id,
+    value: option.id,
     label: option.name,
   }));
 
@@ -156,7 +156,10 @@ export default function TestRunAccordion({ run, projectId }) {
                   </thead>
                   <tbody>
                     {testCases.map((tc) => (
-                      <tr key={tc.testCaseId} className="border-b hover:bg-gray-50">
+                      <tr
+                        key={tc.testCaseId}
+                        className="border-b hover:bg-gray-50"
+                      >
                         <td className="py-3 px-3 text-center font-medium text-gray-700">
                           {tc.testCaseId}
                         </td>
@@ -169,8 +172,8 @@ export default function TestRunAccordion({ run, projectId }) {
                               tc.priority === "HIGH"
                                 ? "bg-red-100 text-red-600"
                                 : tc.priority === "MEDIUM"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-blue-100 text-blue-600"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-blue-100 text-blue-600"
                             }`}
                           >
                             {tc.priority}
@@ -190,28 +193,45 @@ export default function TestRunAccordion({ run, projectId }) {
                             }
                             value={
                               options.find(
-                                (option) => option.value === tc.assigneeId
+                                (option) => option.value === tc.assigneeId,
                               ) || null
                             }
                           />
                         </td>
                         <td className="py-3 px-3 text-center">
-                          {tc.runStatus === "NOT_STARTED" ? (
-                            <button
-                              onClick={() => setRunTestCaseId(tc.testCaseId)}
-                              className="px-3 py-1 text-blue-600 border border-blue-300 rounded hover:bg-blue-100"
-                            >
-                              ▶ Run
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setRunTestCaseId(tc.testCaseId)}
-                              className="text-blue-600 hover:underline"
-                            >
-                              View Result
-                            </button>
-                          )}
-                        </td>
+  {tc.runStatus === "NOT_STARTED" ? (
+    <button
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Fallback to tc.id just in case the backend names it differently
+        const idToRun = tc.testCaseId || tc.id; 
+        console.log("▶️ Opening Run Modal for ID:", idToRun);
+        
+        setRunTestCaseId(idToRun);
+      }}
+      className="px-3 py-1 text-blue-600 border border-blue-300 rounded hover:bg-blue-100"
+    >
+      ▶ Run
+    </button>
+  ) : (
+    <button
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const idToView = tc.testCaseId || tc.id;
+        console.log("🔍 Opening View Result Modal for ID:", idToView);
+        
+        setViewResultCaseId(idToView);
+      }}
+      className="text-blue-600 hover:underline"
+    >
+      View Result
+    </button>
+  )}
+</td>
                       </tr>
                     ))}
                   </tbody>
@@ -237,16 +257,19 @@ export default function TestRunAccordion({ run, projectId }) {
           )}
         </div>
       )}
-
-      {runTestCaseId && (
+{/* ⬇️ Use != null to prevent falsy zero bugs ⬇️ */}
+      {runTestCaseId != null && (
         <RunTestCaseComponent
           runId={run.id}
           testCaseId={runTestCaseId}
-          onClose={() => setRunTestCaseId(null)}
+          onClose={() => {
+            setRunTestCaseId(null);
+            loadTestCases();
+          }}
         />
       )}
 
-      {viewResultCaseId && (
+      {viewResultCaseId != null && (
         <TestCaseResultComponent
           runId={run.id}
           testCaseId={viewResultCaseId}

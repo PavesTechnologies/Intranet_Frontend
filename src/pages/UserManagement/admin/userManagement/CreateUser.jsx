@@ -4,7 +4,7 @@ import { showStatusToast } from "../../../../components/toastfy/toast";
 import FormInput from "../../../../components/forms/FormInput";
 import Button from "../../../../components/Button/Button";
 import PhoneInput from "react-phone-input-2";
-import "react-phone-input-2/lib/style.css"
+import "react-phone-input-2/lib/style.css";
 export default function CreateUserForm({ onSuccess, onClose }) {
   const token = localStorage.getItem("token");
 
@@ -41,7 +41,9 @@ export default function CreateUserForm({ onSuccess, onClose }) {
   const generatePasswordFromUser = (firstName, mobile) => {
     if (!firstName.trim()) return showSingleToast("First Name is required.");
     if (!/^[A-Za-z ]*$/.test(form.first_name))
-      return showSingleToast("First Name must contain only letters and spaces.");
+      return showSingleToast(
+        "First Name must contain only letters and spaces.",
+      );
 
     const namePart = (firstName || "").slice(0, 4);
     const digits = String(mobile || "").replace(/\D/g, "");
@@ -58,19 +60,25 @@ export default function CreateUserForm({ onSuccess, onClose }) {
   };
 
   const validateForm = () => {
-    if (!form.first_name.trim()) return showSingleToast("First Name is required.");
+    if (!form.first_name.trim())
+      return showSingleToast("First Name is required.");
     if (!/^[A-Za-z ]*$/.test(form.first_name))
-      return showSingleToast("First Name must contain only letters and spaces.");
-    if (!form.last_name.trim()) return showSingleToast("Last Name is required.");
+      return showSingleToast(
+        "First Name must contain only letters and spaces.",
+      );
+    if (!form.last_name.trim())
+      return showSingleToast("Last Name is required.");
     if (!/^[A-Za-z ]*$/.test(form.last_name))
       return showSingleToast("Last Name must contain only letters and spaces.");
     if (!form.mail.trim()) return showSingleToast("Email is required.");
     if (!/^[a-zA-Z0-9@._-]+$/.test(form.mail))
       return showSingleToast("Email contains invalid characters.");
-    if (!form.contact.trim()) return showSingleToast("Contact number is required.");
+    if (!form.contact.trim())
+      return showSingleToast("Contact number is required.");
 
     const digitsOnly = form.contact.replace(/\D/g, "");
-    if (digitsOnly.length < 8) return showSingleToast("Phone number seems too short.");
+    if (digitsOnly.length < 8)
+      return showSingleToast("Phone number seems too short.");
 
     if (!form.password.trim()) return showSingleToast("Password is required.");
     if (form.password.length < 6)
@@ -88,7 +96,7 @@ export default function CreateUserForm({ onSuccess, onClose }) {
     if (form.password !== password) {
       showSingleToast(
         "Password does not match the criteria. Please click 'Generate' again.",
-        "error"
+        "error",
       );
       setLoading(false);
       return;
@@ -96,16 +104,16 @@ export default function CreateUserForm({ onSuccess, onClose }) {
 
     try {
       await axios.post(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/users`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users`,
         form,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       onSuccess();
     } catch (err) {
       console.error("User creation failed:", err);
       showSingleToast(
         err?.response?.data?.detail || "Failed to create user.",
-        "error"
+        "error",
       );
     } finally {
       setLoading(false);
@@ -208,7 +216,7 @@ export default function CreateUserForm({ onSuccess, onClose }) {
                 if (!form.password) {
                   const localGenerated = generatePasswordFromUser(
                     form.first_name,
-                    form.contact
+                    form.contact,
                   );
                   if (localGenerated) {
                     setForm((prev) => ({ ...prev, password: localGenerated }));
@@ -224,32 +232,34 @@ export default function CreateUserForm({ onSuccess, onClose }) {
           </div>
 
           <Button
-  type="button"
-  variant="secondary"
-  size="small"
-  disabled={generating} // disable while generating
-  onClick={() => {
-    setGenerating(true);
-    setTimeout(() => {
-      const suggestion = generatePasswordFromUser(form.first_name, form.contact);
-      if (suggestion) {
-        setForm((prev) => ({ ...prev, password: suggestion }));
-        setGeneratedPassword(suggestion);
-        showStatusToast(
-          "Password generated from current First Name & Contact.",
-          "info"
-        );
-      } else {
-        showStatusToast("Failed to generate password.", "error");
-      }
-      setGenerating(false);
-    }, 600); // short delay for UX (optional)
-  }}
-  className="whitespace-nowrap h-[34px]"
->
-  {generating ? "Generating..." : "Generate"}
-</Button>
-
+            type="button"
+            variant="secondary"
+            size="small"
+            disabled={generating} // disable while generating
+            onClick={() => {
+              setGenerating(true);
+              setTimeout(() => {
+                const suggestion = generatePasswordFromUser(
+                  form.first_name,
+                  form.contact,
+                );
+                if (suggestion) {
+                  setForm((prev) => ({ ...prev, password: suggestion }));
+                  setGeneratedPassword(suggestion);
+                  showStatusToast(
+                    "Password generated from current First Name & Contact.",
+                    "info",
+                  );
+                } else {
+                  showStatusToast("Failed to generate password.", "error");
+                }
+                setGenerating(false);
+              }, 600); // short delay for UX (optional)
+            }}
+            className="whitespace-nowrap h-[34px]"
+          >
+            {generating ? "Generating..." : "Generate"}
+          </Button>
         </div>
 
         {/* Active checkbox */}

@@ -20,12 +20,27 @@ const StatusOverview = ({ workItems, statuses }) => {
   const totalItems = workItems.length;
 
   useEffect(() => {
-    const statusMap = new Map(statuses.map((s) => [s.id, { ...s, count: 0 }]));
-    workItems.forEach((item) => {
-      if (item.status && statusMap.has(item.status.id)) {
-        statusMap.get(item.status.id).count++;
-      }
-    });
+  const normalize = (s) => {
+    if (!s) return "";
+
+    // convert everything to string safely
+    const str = String(s);
+
+    return str.toLowerCase().replace(/\s+/g, "");
+  };
+
+  const statusMap = new Map(
+    statuses.map((s) => [normalize(s.name), { ...s, count: 0 }])
+  );
+
+  workItems.forEach((item) => {
+    const key = normalize(item?.status?.name);
+    if (!key) return;
+
+    if (statusMap.has(key)) {
+      statusMap.get(key).count++;
+    }
+  });
     const data = Array.from(statusMap.values())
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((status, index) => ({
@@ -36,6 +51,9 @@ const StatusOverview = ({ workItems, statuses }) => {
       }));
     setChartData(data);
   }, [workItems, statuses, totalItems]);
+
+  console.log("WORK ITEMS:", workItems);
+  console.log("STATUSES:", statuses);
 
   const ActiveSliceShape = (props) => {
     const {

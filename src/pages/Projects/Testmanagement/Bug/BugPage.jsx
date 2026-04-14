@@ -71,12 +71,12 @@ const BugPage = () => {
   const loadEmployees = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       setEmployees(res.data);
       console.log("Loaded employees:", res);
@@ -92,12 +92,12 @@ const BugPage = () => {
 
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/testing/bugs/${bugId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/testing/bugs/${bugId}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       setBugDetails(res.data);
     } catch (err) {
@@ -112,7 +112,7 @@ const BugPage = () => {
   }, []);
 
   const options = employees.map((option) => ({
-    value: option.user_id,
+    value: option.id,
     label: option.name,
   }));
 
@@ -134,12 +134,12 @@ const BugPage = () => {
     }
   };
 
-  const addAssignee = async ( bugId, userId) => {
+  const addAssignee = async (bugId, userId) => {
     setAssignLoading(true);
     try {
       const res = await axios.put(
         `${
-          import.meta.env.VITE_PMS_BASE_URL
+          window.__APP_CONFIG__.PMS_BASE_URL
         }/api/testing/bugs/${bugId}/assign`,
         {
           assigneeId: userId,
@@ -148,7 +148,7 @@ const BugPage = () => {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       toast.success("Assignee added successfully");
       // fetchBugs();
@@ -281,11 +281,12 @@ const BugPage = () => {
                       options={options}
                       placeholder="Select Employee"
                       isSearchable
+                      
                       onChange={(selected) => {
                         addAssignee(bug.id, selected.value);
                       }}
                       value={options.find(
-                        (option) => option.value === bug.assignedTo
+                        (option) => option.value === bug.assignedTo,
                       )}
                       isDisabled={assignLoading}
                     />

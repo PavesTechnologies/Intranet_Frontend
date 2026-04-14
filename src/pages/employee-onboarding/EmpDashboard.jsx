@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { FileEdit, Send, Users, ShieldCheck, XCircle, FileText, Handshake } from "lucide-react";
+import {
+  FileEdit,
+  Send,
+  Users,
+  ShieldCheck,
+  XCircle,
+  FileText,
+  Handshake,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 // import Button from "../../components/Button/Button";
@@ -13,7 +21,6 @@ import {
   getOfferDisplayStatus,
 } from "./components/offerStatus";
 import { fetchOfferDetailsList } from "./components/fetchOfferDetails";
-
 
 export default function EmployeeOnboardingDashboard() {
   const navigate = useNavigate();
@@ -36,8 +43,8 @@ export default function EmployeeOnboardingDashboard() {
 
     const fetchOffers = async () => {
       const detailedOffers = await fetchOfferDetailsList(
-        import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL,
-        token
+        window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL,
+        token,
       );
 
       setOffers(detailedOffers);
@@ -45,13 +52,15 @@ export default function EmployeeOnboardingDashboard() {
 
     const fetchCoreEmployees = async () => {
       const res = await axios.get(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
 
-      setEmployeeUserIds((res.data || []).map((employee) => employee.user_uuid));
+      setEmployeeUserIds(
+        (res.data || []).map((employee) => employee.user_uuid),
+      );
     };
 
     const fetchData = async () => {
@@ -67,15 +76,33 @@ export default function EmployeeOnboardingDashboard() {
     fetchData();
   }, []);
 
-  const acceptCount = offers.filter((o) => getNormalizedStatus(o.status) === "ACCEPTED").length;
-  const sentCount = offers.filter((o) => getNormalizedStatus(o.status) === "OFFERED").length;
-  const draftCount = offers.filter((o) => getNormalizedStatus(o.status) === "CREATED").length;
-  const submittedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "SUBMITTED").length;
-  const verifiedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "VERIFIED").length;
-  const joiningCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING").length;
-  const joiningPendingCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING_PENDING").length;
-  const completedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "COMPLETED").length;
-  const rejectedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "REJECTED").length;
+  const acceptCount = offers.filter(
+    (o) => getNormalizedStatus(o.status) === "ACCEPTED",
+  ).length;
+  const sentCount = offers.filter(
+    (o) => getNormalizedStatus(o.status) === "OFFERED",
+  ).length;
+  const draftCount = offers.filter(
+    (o) => getNormalizedStatus(o.status) === "CREATED",
+  ).length;
+  const submittedCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "SUBMITTED",
+  ).length;
+  const verifiedCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "VERIFIED",
+  ).length;
+  const joiningCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING",
+  ).length;
+  const joiningPendingCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING_PENDING",
+  ).length;
+  const completedCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "COMPLETED",
+  ).length;
+  const rejectedCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "REJECTED",
+  ).length;
 
   // ✅ Filter offers based on search term (case-insensitive)
   const filteredOffers = useMemo(() => {
@@ -118,7 +145,12 @@ export default function EmployeeOnboardingDashboard() {
 
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <StatCard title="Total Offers" value={offers.length} icon={Users} onClick={() => handleKpiClick("ALL")} />
+            <StatCard
+              title="Total Offers"
+              value={offers.length}
+              icon={Users}
+              onClick={() => handleKpiClick("ALL")}
+            />
             <StatCard
               title="Accepted Offers"
               value={acceptCount}
@@ -282,7 +314,13 @@ export default function EmployeeOnboardingDashboard() {
 }
 
 /* Reusable Stat Card */
-function StatCard({ title, value, icon: Icon, color = "text-gray-700", onClick }) {
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  color = "text-gray-700",
+  onClick,
+}) {
   return (
     <div
       onClick={onClick}

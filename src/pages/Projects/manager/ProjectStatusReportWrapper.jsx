@@ -1,14 +1,14 @@
 // ProjectStatusReportWrapper.jsx
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import ProjectStatusReport from './ProjectStatusReport';
-import { useParams } from 'react-router-dom'; 
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import ProjectStatusReport from "./ProjectStatusReport";
+import { useParams } from "react-router-dom";
 
 function ProjectStatusReportWrapper() {
   const { projectId } = useParams();
-  console.log('Wrapper loaded with projectId:', projectId);
+  console.log("Wrapper loaded with projectId:", projectId);
   const [projectData, setProjectData] = useState(null);
-  const authToken = localStorage.getItem('token');
+  const authToken = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${authToken}` };
 
   useEffect(() => {
@@ -24,61 +24,79 @@ function ProjectStatusReportWrapper() {
           bugsRes,
           usersRes,
         ] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`, { headers }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`, { headers }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`, { headers }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/tasks`, { headers }),
-          //axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`, { headers }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/bugs/project/${projectId}`, { headers }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`, { headers }),
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
+            { headers },
+          ),
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+            { headers },
+          ),
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
+            { headers },
+          ),
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
+            { headers },
+          ),
+          //axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`, { headers }),
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/bugs/project/${projectId}`,
+            { headers },
+          ),
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+            { headers },
+          ),
         ]);
 
         const projectDetails = projectRes.data;
 
         const combinedIssues = [
-          ...epicsRes.data.map(item => ({
+          ...epicsRes.data.map((item) => ({
             id: item.id,
             title: item.name,
             assignee: item.assignee,
-            type: 'Epic',
+            type: "Epic",
             status: item.status,
-            storyPoints: item.storyPoints ,
+            storyPoints: item.storyPoints,
             estimate: item.estimate || 0,
-            created: item.created || item.createdAt || '-',
+            created: item.created || item.createdAt || "-",
           })),
-          ...storiesRes.data.map(item => ({
+          ...storiesRes.data.map((item) => ({
             id: item.id,
             title: item.title,
             assignee: item.assignee,
-            type: 'Story',
+            type: "Story",
             status: item.status,
             storyPoints: item.storyPoints || 0,
             estimate: item.estimate || 0,
-            created: item.created || item.createdAt || '-',
+            created: item.created || item.createdAt || "-",
           })),
-          ...tasksRes.data.map(item => ({
+          ...tasksRes.data.map((item) => ({
             id: item.id,
             title: item.title,
             assignee: item.assignee,
-            type: 'Task',
+            type: "Task",
             status: item.status,
             storyPoints: item.storyPoints || 0,
             estimate: item.estimate || 0,
-            created: item.created || item.createdAt || '-',
+            created: item.created || item.createdAt || "-",
           })),
-          ...bugsRes.data.map(item => ({
+          ...bugsRes.data.map((item) => ({
             id: item.id,
             title: item.title,
             assignee: item.assignee,
-            type: 'Bug',
+            type: "Bug",
             status: item.status,
             storyPoints: item.storyPoints || 0,
             estimate: item.estimate || 0,
-            created: item.created || item.createdAt || '-',
+            created: item.created || item.createdAt || "-",
           })),
         ];
 
-        const sprints = sprintsRes.data.map(sprint => ({
+        const sprints = sprintsRes.data.map((sprint) => ({
           id: sprint.id,
           name: sprint.name,
           done: sprint.done || 0,
@@ -90,29 +108,44 @@ function ProjectStatusReportWrapper() {
           },
         }));
 
-        const totalEstimated = sprints.reduce((sum, sp) => sum + (sp.storyPoints.estimated || 0), 0);
-        const totalCompleted = sprints.reduce((sum, sp) => sum + (sp.storyPoints.completed || 0), 0);
-        const progressPercent = totalEstimated > 0 ? (totalCompleted / totalEstimated) * 100 : 0;
+        const totalEstimated = sprints.reduce(
+          (sum, sp) => sum + (sp.storyPoints.estimated || 0),
+          0,
+        );
+        const totalCompleted = sprints.reduce(
+          (sum, sp) => sum + (sp.storyPoints.completed || 0),
+          0,
+        );
+        const progressPercent =
+          totalEstimated > 0 ? (totalCompleted / totalEstimated) * 100 : 0;
 
-        const risks = projectDetails.risks?.map(risk => ({
-          id: risk.id,
-          title: risk.title,
-          severity: risk.severity,
-        })) || [];
+        const risks =
+          projectDetails.risks?.map((risk) => ({
+            id: risk.id,
+            title: risk.title,
+            severity: risk.severity,
+          })) || [];
 
         const projectInfo = {
           id: projectDetails.id,
           name: projectDetails.name,
-          status: projectDetails.status === 'ACTIVE' ? 'In Progress' : projectDetails.status,
+          status:
+            projectDetails.status === "ACTIVE"
+              ? "In Progress"
+              : projectDetails.status,
           progress: Math.round(progressPercent),
-          startDate: projectDetails.startDate || '2025-01-01',
-          endDate: projectDetails.endDate || '2025-12-31',
+          startDate: projectDetails.startDate || "2025-01-01",
+          endDate: projectDetails.endDate || "2025-12-31",
           risks,
         };
 
-        setProjectData({ project: projectInfo, sprints, issues: combinedIssues });
+        setProjectData({
+          project: projectInfo,
+          sprints,
+          issues: combinedIssues,
+        });
       } catch (error) {
-        console.error('Failed to load data', error);
+        console.error("Failed to load data", error);
       }
     }
 

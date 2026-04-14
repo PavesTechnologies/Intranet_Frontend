@@ -8,17 +8,16 @@ export default function EducationDocumentManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState(null);
 
-  const BASE = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const token = localStorage.getItem("token");
 
   /* -------------------- FETCH (INITIAL LOAD ONLY) -------------------- */
   const fetchDocs = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(
-        `${BASE}/education/education-document`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await axios.get(`${BASE}/education/education-document`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setDocs(res.data);
     } catch {
       toast.error("Failed to load education documents");
@@ -36,14 +35,11 @@ export default function EducationDocumentManagement() {
     if (!window.confirm("Delete document?")) return;
 
     try {
-      await axios.delete(
-        `${BASE}/education/education-document/${uuid}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.delete(`${BASE}/education/education-document/${uuid}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-      setDocs((prev) =>
-        prev.filter((d) => d.education_document_uuid !== uuid)
-      );
+      setDocs((prev) => prev.filter((d) => d.education_document_uuid !== uuid));
 
       toast.success("Document deleted");
     } catch {
@@ -107,12 +103,8 @@ export default function EducationDocumentManagement() {
                     key={d.education_document_uuid}
                     className="border-b hover:bg-gray-50"
                   >
-                    <td className="px-6 py-3">
-                      {d.document_name}
-                    </td>
-                    <td className="px-6 py-3">
-                      {d.description || "—"}
-                    </td>
+                    <td className="px-6 py-3">{d.document_name}</td>
+                    <td className="px-6 py-3">{d.description || "—"}</td>
                     <td className="px-6 py-3 text-right space-x-4">
                       <button
                         className="text-blue-700 hover:underline"
@@ -125,9 +117,7 @@ export default function EducationDocumentManagement() {
                       </button>
                       <button
                         className="text-red-600 hover:underline"
-                        onClick={() =>
-                          deleteDoc(d.education_document_uuid)
-                        }
+                        onClick={() => deleteDoc(d.education_document_uuid)}
                       >
                         Delete
                       </button>
@@ -150,7 +140,7 @@ export default function EducationDocumentManagement() {
               const exists = prev.some(
                 (d) =>
                   d.education_document_uuid ===
-                  savedDoc.education_document_uuid
+                  savedDoc.education_document_uuid,
               );
 
               return exists
@@ -158,7 +148,7 @@ export default function EducationDocumentManagement() {
                     d.education_document_uuid ===
                     savedDoc.education_document_uuid
                       ? savedDoc
-                      : d
+                      : d,
                   )
                 : [savedDoc, ...prev];
             });
@@ -176,7 +166,7 @@ function DocumentModal({ editData, onClose, onSuccess }) {
   const [desc, setDesc] = useState(editData?.description || "");
   const [saving, setSaving] = useState(false);
 
-  const BASE = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const token = localStorage.getItem("token");
 
   const save = async () => {
@@ -202,7 +192,7 @@ function DocumentModal({ editData, onClose, onSuccess }) {
           {
             headers: { Authorization: `Bearer ${token}` },
             responseType: "text",
-          }
+          },
         );
       } else {
         res = await axios.post(
@@ -211,12 +201,12 @@ function DocumentModal({ editData, onClose, onSuccess }) {
           {
             headers: { Authorization: `Bearer ${token}` },
             responseType: "text",
-          }
+          },
         );
       }
 
       toast.success(
-        `Document ${editData ? "updated" : "created"} successfully`
+        `Document ${editData ? "updated" : "created"} successfully`,
       );
 
       onSuccess({
@@ -240,18 +230,14 @@ function DocumentModal({ editData, onClose, onSuccess }) {
           {editData ? "Edit" : "Add"} Document
         </h2>
 
-        <label className="block text-sm font-medium mb-1">
-          Document Name
-        </label>
+        <label className="block text-sm font-medium mb-1">Document Name</label>
         <input
           className="w-full border rounded-lg px-3 py-2 mb-3"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
 
-        <label className="block text-sm font-medium mb-1">
-          Description
-        </label>
+        <label className="block text-sm font-medium mb-1">Description</label>
         <textarea
           className="w-full border rounded-lg px-3 py-2 mb-4"
           value={desc}

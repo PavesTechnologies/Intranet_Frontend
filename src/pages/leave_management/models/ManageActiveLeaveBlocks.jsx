@@ -15,8 +15,8 @@ import EditBlockLeaveModal from "./EditBlockLeaveModal";
 
 // Tailwind tokens
 const skeleton = "animate-pulse bg-gray-400 rounded hover:cursor-wait";
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-const PMS_BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+const PMS_BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 
 // Toggle
 const Toggle = ({ checked, onChange, label, hint, id }) => (
@@ -322,27 +322,27 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
       const projJson = Array.isArray(projRes.data)
         ? projRes.data
         : Array.isArray(projRes.data?.data)
-        ? projRes.data.data
-        : [];
+          ? projRes.data.data
+          : [];
       setProjects(projJson);
 
       const ltJson = Array.isArray(ltRes.data)
         ? ltRes.data
         : Array.isArray(ltRes.data?.data)
-        ? ltRes.data.data
-        : [];
+          ? ltRes.data.data
+          : [];
 
       const ltIdsJson = Array.isArray(ltIdsRes.data)
         ? ltIdsRes.data
         : Array.isArray(ltIdsRes.data?.data)
-        ? ltIdsRes.data.data
-        : [];
+          ? ltIdsRes.data.data
+          : [];
 
       const leaveIdMap = new Map(
         (ltIdsJson || []).map((item) => [
           item.leaveName,
           String(item.leaveTypeId),
-        ])
+        ]),
       );
 
       const mergedLeaveTypes = (ltJson || []).map((lt) => ({
@@ -359,7 +359,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
 
       // Preload members for all projects in blocks
       const uniqueProjectIds = Array.from(
-        new Set(rawBlocks.map((b) => String(b.projectId)))
+        new Set(rawBlocks.map((b) => String(b.projectId))),
       );
       const memberEntries = await Promise.all(
         uniqueProjectIds.map(async (pid) => {
@@ -370,13 +370,13 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
                 headers: {
                   Authorization: `Bearer ${localStorage.getItem("token")}`,
                 },
-              }
+              },
             );
             const memsRaw = Array.isArray(res.data)
               ? res.data
               : Array.isArray(res.data?.data)
-              ? res.data.data
-              : [];
+                ? res.data.data
+                : [];
             const mems = memsRaw.map((m) => ({
               value: String(m.id),
               label: `${m.name}`,
@@ -386,7 +386,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
             console.error(`Failed to load members for project ${pid}`, err);
             return [String(pid), []];
           }
-        })
+        }),
       );
       const newMembersMap = new Map(memberEntries);
       setMembersMap(newMembersMap);
@@ -441,20 +441,20 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
       const normalizedBlocks = rawBlocks.map((block) => {
         const projectIdStr = String(block.projectId);
         const project = (projJson || []).find(
-          (p) => String(p.id) === projectIdStr
+          (p) => String(p.id) === projectIdStr,
         );
 
         const allProjectMembers = newMembersMap.get(projectIdStr) || [];
         const allMemberIds = new Set(
-          allProjectMembers.map((m) => String(m.value))
+          allProjectMembers.map((m) => String(m.value)),
         );
 
         // Extract block-level data
         const blockMemberIds = (block.members || []).map((m) =>
-          String(m.employeeId)
+          String(m.employeeId),
         );
         const blockLeaveTypeIds = (block.leaveTypes || []).map((lt) =>
-          String(lt.leaveTypeId)
+          String(lt.leaveTypeId),
         );
 
         // Extract mappings (these represent blocked leaves)
@@ -467,14 +467,14 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
         // Resolve names
         const memberNames = blockMemberIds.map((id) => {
           const found = allProjectMembers.find(
-            (m) => String(m.value) === String(id)
+            (m) => String(m.value) === String(id),
           );
           return found ? found.label : id;
         });
 
         const leaveTypeNames = blockLeaveTypeIds.map((id) => {
           const found = mergedLeaveTypes.find(
-            (lt) => String(lt.value) === String(id)
+            (lt) => String(lt.value) === String(id),
           );
           return found ? found.label : id;
         });
@@ -508,12 +508,15 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
   const fetchHolidays = async () => {
     try {
       const year = new Date().getFullYear();
-      const res = await axios.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
-        params: { state: "All", country: "India" },
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      const res = await axios.get(
+        `${BASE_URL}/api/holidays/by-location/${year}`,
+        {
+          params: { state: "All", country: "India" },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
+      );
       const holidayDates = (Array.isArray(res.data) ? res.data : []).map(
-        (holiday) => new Date(holiday.holidayDate + "T00:00:00")
+        (holiday) => new Date(holiday.holidayDate + "T00:00:00"),
       );
       setHolidays(holidayDates);
     } catch (err) {
@@ -534,13 +537,13 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
         `${PMS_BASE_URL}/api/projects/${key}/members`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        },
       );
       const memsRaw = Array.isArray(res.data)
         ? res.data
         : Array.isArray(res.data?.data)
-        ? res.data.data
-        : [];
+          ? res.data.data
+          : [];
       const mems = memsRaw.map((m) => ({
         value: String(m.id),
         label: `${m.name}`,
@@ -783,7 +786,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
         payload,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        },
       );
 
       toast.success("Leave block updated successfully.");
@@ -792,7 +795,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
     } catch (err) {
       console.error("Failed to save modal data:", err);
       toast.error(
-        err.response?.data?.message || "Failed to update leave block"
+        err.response?.data?.message || "Failed to update leave block",
       );
     }
   };
@@ -808,7 +811,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       if (!res.data?.success) {
         throw new Error(res.data?.message || "Failed to unblock");
@@ -982,7 +985,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
                           <div className="flex flex-wrap gap-2">
                             {(b.leaveTypeIds || []).slice(0, 4).map((id, i) => {
                               const found = (leaveTypes || []).find(
-                                (lt) => String(lt.value) === String(id)
+                                (lt) => String(lt.value) === String(id),
                               );
                               return (
                                 <Pill key={i}>{found ? found.label : id}</Pill>
