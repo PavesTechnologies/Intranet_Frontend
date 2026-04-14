@@ -3,7 +3,7 @@ import Select from "react-select";
 import axios from "axios";
 import debounce from "lodash.debounce";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const EmployeeSearchDropdown = ({ value, onChange }) => {
   const [options, setOptions] = useState([]);

@@ -5,7 +5,7 @@ import {toast} from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import beachDay from "../../../components/icons/beach-day_cnsv.svg"
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 // Helper to format dates for readability
 const formatDate = (dateString) => {

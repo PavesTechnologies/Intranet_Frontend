@@ -29,7 +29,7 @@ export default function Calendar() {
   useEffect(() => {
     const fetchHolidays = async () => {
       try {
-        const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/api/holidays/all`,{
+        const res = await axios.get(`${window.__APP_CONFIG__.BASE_URL}/api/holidays/all`,{
             headers: { Authorization: `Bearer ${token}` }
         });
         setHolidays(res.data);

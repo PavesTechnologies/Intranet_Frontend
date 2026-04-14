@@ -11,7 +11,7 @@ const useLeaveConsumption = (employeeId, refreshKey, year) => {
   const [leaveData, setLeaveData] = useState({regular:[], genderBasedLeaveBalances: []});
   const [loading, setLoading] = useState(true);
 
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
   // ---------------------------
   // FUNCTION TO FETCH LEAVE DATA

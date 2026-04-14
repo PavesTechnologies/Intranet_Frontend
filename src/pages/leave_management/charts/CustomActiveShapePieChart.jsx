@@ -80,7 +80,7 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
   const [data, setData] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(false);
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
   useEffect(() => {
     const fetchLeaves = async () => {
       try {

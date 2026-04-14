@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const GENDER_BASED_IDS = ["L-ML", "L-PL"];
 

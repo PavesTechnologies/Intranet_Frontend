@@ -20,7 +20,7 @@ export default function UpcomingHolidays({year}) {
     const fetchHolidays = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/holidays/year/${year}`,
+          `${window.__APP_CONFIG__.BASE_URL}/api/holidays/year/${year}`,
           { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
         );
         setHolidays(res.data);

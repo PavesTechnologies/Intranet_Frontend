@@ -39,7 +39,7 @@ const EmployeeDashboard = ({ employeeId }) => {
   const onPendingRequestsChange = (newRequests) => {
     setPendingRequests(newRequests);
   };
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
   // const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user"));
   const userPermissions = user?.permissions || [];

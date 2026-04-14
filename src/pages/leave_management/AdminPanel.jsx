@@ -10,7 +10,7 @@ import { toast } from "react-toastify";
 import { se } from "date-fns/locale";
 import { useWebSocket } from "./websockets/WebSocketProvider.jsx";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const AdminPanel = ({ employeeId }) => {
   // const [searchTerm, setSearchTerm] = useState("");

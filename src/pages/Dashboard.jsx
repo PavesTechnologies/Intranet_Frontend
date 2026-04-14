@@ -158,7 +158,7 @@ const Dashboard = () => {
         const decodedToken = jwtDecode(token);
         const managerId = decodedToken.user_id;
         const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/leave-requests/manager/pending-count/${managerId}`,
+          `${window.__APP_CONFIG__.BASE_URL}/api/leave-requests/manager/pending-count/${managerId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
