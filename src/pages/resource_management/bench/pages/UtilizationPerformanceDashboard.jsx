@@ -14,6 +14,8 @@ import {
    TrendingUp as TrendingUpIcon, MoveUpRight
 } from 'lucide-react';
 import { getBillNonBillable } from '../../services/utilizationService';
+import Pagination from '../../../../components/Pagination/pagination';
+import LoadingSpinner from "../../../../components/LoadingSpinner";
 
 // --- INTEGRATED MOCK DATA MODELS FOR ALL 12 STORIES ---
 
@@ -85,23 +87,45 @@ const UtilizationPerformanceDashboard = () => {
       endDate: new Date().toISOString().split('T')[0]
    });
 
-   useEffect(() => {
-      fetchResourceMetrics();
-   }, [dateRange]);
+   const [searchQuery, setSearchQuery] = useState('');
+   const [currentPage, setCurrentPage] = useState(1);
+   const ITEMS_PER_PAGE = 8;
 
-   const fetchResourceMetrics = async () => {
-      try {
-         setIsResourceLoading(true);
-         const data = await getBillNonBillable(dateRange.startDate, dateRange.endDate);
-         console.log("Data from tms: ", data);
-         setResourceMetrics(data);
-      } catch (err) {
-         console.error(err);
-         setResourceMetrics([]);
-      } finally {
-         setIsResourceLoading(false);
+   const filteredAndPaginatedResources = useMemo(() => {
+      let filtered = Array.isArray(resourceMetrics) ? resourceMetrics : [];
+      if (searchQuery) {
+         const lowerQuery = searchQuery.toLowerCase();
+         filtered = filtered.filter(res =>
+            res.userName?.toLowerCase().includes(lowerQuery)
+         );
       }
-   };
+
+      const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1;
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      const paginated = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+      return { paginated, totalPages };
+   }, [resourceMetrics, searchQuery, currentPage]);
+
+   useEffect(() => {
+      const fetchResourceMetrics = async () => {
+         if (!dateRange.startDate || !dateRange.endDate) return;
+         if (new Date(dateRange.startDate) > new Date(dateRange.endDate)) return;
+         try {
+            setIsResourceLoading(true);
+            const data = await getBillNonBillable(dateRange.startDate, dateRange.endDate);
+            console.log("Data from tms: ", data);
+            setResourceMetrics(data);
+         } catch (err) {
+            console.error(err);
+            setResourceMetrics([]);
+         } finally {
+            setIsResourceLoading(false);
+         }
+      };
+
+      fetchResourceMetrics();
+   }, [dateRange.startDate, dateRange.endDate]);
 
    const activeChartData = useMemo(() => {
       return PORTFOLIO_DATA[granularity] || [];
@@ -363,14 +387,25 @@ const UtilizationPerformanceDashboard = () => {
                   <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                      <div>
                         <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest leading-none">Capability & Performance Ledger</h3>
-                        <p className="text-[10px] font-medium text-slate-400 mt-1 uppercase tracking-widest opacity-70 italic font-serif">Deep-dive into individual billable efficiency vs historical directional signals (Story 5)</p>
+                        {/* <p className="text-[10px] font-medium text-slate-400 mt-1 uppercase tracking-widest opacity-70 italic font-serif">Deep-dive into individual billable efficiency vs historical directional signals</p> */}
                      </div>
                      <div className="flex items-center gap-4">
+                        <div className="relative">
+                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                           <input
+                              type="text"
+                              placeholder="Search Resource..."
+                              className="pl-7 text-[10px] font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500 w-40"
+                              value={searchQuery}
+                              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                           />
+                        </div>
                         <div className="flex items-center gap-2">
                            <input
                               type="date"
                               className="text-[10px] uppercase font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
                               value={dateRange.startDate}
+                              max={dateRange.endDate || new Date().toISOString().split('T')[0]}
                               onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
                            />
                            <span className="text-[10px] font-bold text-slate-400 uppercase">to</span>
@@ -378,12 +413,14 @@ const UtilizationPerformanceDashboard = () => {
                               type="date"
                               className="text-[10px] uppercase font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
                               value={dateRange.endDate}
+                              min={dateRange.startDate}
+                              max={new Date().toISOString().split('T')[0]}
                               onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
                            />
                         </div>
-                        <div className="flex items-center gap-2 bg-slate-900 text-white rounded-lg px-3 py-1 text-[9px] font-black uppercase tracking-widest">
+                        {/* <div className="flex items-center gap-2 bg-slate-900 text-white rounded-lg px-3 py-1 text-[9px] font-black uppercase tracking-widest">
                            <ShieldCheck size={12} className="text-emerald-400" /> Source Verified
-                        </div>
+                        </div> */}
                      </div>
                   </div>
                   <div className="overflow-x-auto no-scrollbar">
@@ -391,8 +428,8 @@ const UtilizationPerformanceDashboard = () => {
                         <thead>
                            <tr className="bg-slate-50/50 border-b border-slate-50">
                               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Resource Registry</th>
-                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Hourly Split (B / NB / I)</th>
-                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Trend Signal (Story 5)</th>
+                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Hourly Split (B / NB)</th>
+                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Trend Signal</th>
                               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-indigo-600 text-right">Overall Util %</th>
                            </tr>
                         </thead>
@@ -401,19 +438,20 @@ const UtilizationPerformanceDashboard = () => {
                               <tr>
                                  <td colSpan="4" className="px-6 py-8 text-center">
                                     <div className="flex flex-col items-center justify-center gap-2">
-                                       <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Loading Resources...</span>
+                                       {/* <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div> */}
+                                       {/* <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Loading Resources...</span> */}
+                                       <LoadingSpinner text='Loading Resources...' />
                                     </div>
                                  </td>
                               </tr>
-                           ) : !Array.isArray(resourceMetrics) || resourceMetrics.length === 0 ? (
+                           ) : filteredAndPaginatedResources.paginated.length === 0 ? (
                               <tr>
                                  <td colSpan="4" className="px-6 py-8 text-center">
                                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">No Resource Data Available</span>
                                  </td>
                               </tr>
                            ) : (
-                              resourceMetrics.map((res, idx) => (
+                              filteredAndPaginatedResources.paginated.map((res, idx) => (
                                  <tr key={res.userId || idx} className="hover:bg-slate-50/40 transition-colors group">
                                     <td className="px-6 py-4">
                                        <div className="flex flex-col">
@@ -448,6 +486,16 @@ const UtilizationPerformanceDashboard = () => {
                         </tbody>
                      </table>
                   </div>
+                  {filteredAndPaginatedResources.totalPages > 1 && (
+                     <div className="border-t border-slate-100 bg-white p-3">
+                        <Pagination
+                           currentPage={currentPage}
+                           totalPages={filteredAndPaginatedResources.totalPages}
+                           onPrevious={() => setCurrentPage(p => Math.max(1, p - 1))}
+                           onNext={() => setCurrentPage(p => Math.min(filteredAndPaginatedResources.totalPages, p + 1))}
+                        />
+                     </div>
+                  )}
                </div>
             )}
 
