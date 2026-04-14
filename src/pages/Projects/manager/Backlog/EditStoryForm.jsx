@@ -79,24 +79,24 @@ const EditStoryForm = ({
         const [storyRes, userRes, epicRes, sprintRes, statusRes] =
           await Promise.all([
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/${storyId}`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/statuses`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
+              axiosConfig,
             ),
           ]);
 
@@ -114,7 +114,7 @@ const EditStoryForm = ({
           assigneeId: data.assigneeId || "",
           reporterId: data.reporterId || "",
           startDate: data.startDate || "",
-          dueDate: data.dueDate || "",  
+          dueDate: data.dueDate || "",
         });
 
         setUsers(userRes.data.content || userRes.data || []);
@@ -185,9 +185,9 @@ const EditStoryForm = ({
 
     try {
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/${storyId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}`,
         payload,
-        axiosConfig
+        axiosConfig,
       );
 
       toast.success("Story updated successfully!");
@@ -213,19 +213,19 @@ const EditStoryForm = ({
 
   const validateForm = () => {
     const title = formData.title?.trim();
-  
+
     // Required validation
     if (!title) {
       toast.error("Story title is required.");
       return false;
     }
-  
+
     // Length validation
     if (title.length < 2 || title.length > 200) {
       toast.error("Story title must be between 2 and 200 characters.");
       return false;
     }
-    
+
     // Start Date vs Due Date validation
     if (formData.startDate && formData.dueDate) {
       const start = new Date(formData.startDate);
@@ -235,7 +235,7 @@ const EditStoryForm = ({
         return false;
       }
     }
-  
+
     return true;
   };
 
@@ -256,7 +256,10 @@ const EditStoryForm = ({
       {/* HEADER */}
       <div className="flex justify-between items-center p-6 border-b shrink-0">
         <h2 className="text-xl font-semibold text-gray-800">Edit User Story</h2>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 transition-colors">
+        <button
+          onClick={onClose}
+          className="text-gray-500 hover:text-gray-800 transition-colors"
+        >
           <X size={20} />
         </button>
       </div>
@@ -365,18 +368,18 @@ const EditStoryForm = ({
               ...users.map((u) => ({ label: u.name, value: u.id })),
             ]}
           />
-         
-          <FormDatePicker 
-            label="Start Date" 
-            name="startDate" 
-            value={formData.startDate || ""} 
-            onChange={handleChange}  
+
+          <FormDatePicker
+            label="Start Date"
+            name="startDate"
+            value={formData.startDate || ""}
+            onChange={handleChange}
           />
 
-          <FormDatePicker 
-            label="Due Date" 
-            name="dueDate" 
-            value={formData.dueDate || ""} 
+          <FormDatePicker
+            label="Due Date"
+            name="dueDate"
+            value={formData.dueDate || ""}
             onChange={handleChange}
           />
         </div>

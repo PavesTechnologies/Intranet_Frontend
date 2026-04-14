@@ -1,12 +1,22 @@
 import React from "react";
-import { Plus, CheckCircle2, ListTodo, ClipboardList, ListChecks, ArrowRight } from "lucide-react";
+import { 
+  Plus, 
+  ListTodo, 
+  ClipboardList, 
+  ListChecks, 
+  ArrowRight,
+  Edit,      // ⭐ ADDED IMPORT
+  Trash2     // ⭐ ADDED IMPORT
+} from "lucide-react";
 
 export default function ScenarioPanel({
   selectedScenario,
   selectedCase,
   onSelectCase,
   onAddCase,
-  onAddSteps
+  onAddSteps,
+  onEditCase,   // ⭐ ADDED PROP
+  onDeleteCase  // ⭐ ADDED PROP
 }) {
   
   // -----------------------------
@@ -106,6 +116,40 @@ export default function ScenarioPanel({
                       <h4 className={`text-sm font-semibold leading-snug ${isSelected ? 'text-blue-900' : 'text-gray-800'}`}>
                         {testCase.title}
                       </h4>
+                      
+                      {/* ⭐ ACTION BUTTONS ADDED HERE ⭐ */}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevents row click
+                            if (onEditCase) onEditCase(testCase);
+                          }}
+                          className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Edit Case"
+                        >
+                          <Edit size={14} />
+                        </button>
+                       {/* Delete Case Button */}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation(); // Prevents row click
+                            console.log("🗑️ Clicked delete on:", testCase.title); // <-- Trace log
+                            
+                            if (onDeleteCase) {
+                              onDeleteCase(testCase);
+                            } else {
+                              console.error("onDeleteCase prop is missing!");
+                            }
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded relative z-10"
+                          title="Delete Case"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      {/* ⭐ END ACTION BUTTONS ⭐ */}
+
                     </div>
                     
                     <div className="mt-3 flex items-center justify-between">
@@ -186,7 +230,6 @@ export default function ScenarioPanel({
                           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
                             Action
                           </span>
-                          {/* ⭐ Added the background box and padding here so it matches the Expected Result box perfectly! */}
                           <div className="text-sm text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 whitespace-pre-wrap">
                             {step.action}
                           </div>

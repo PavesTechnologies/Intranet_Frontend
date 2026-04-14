@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_RMS_BASE_URL || "http://localhost:8080";
+const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL || "http://localhost:8080";
 
 const getAuthHeader = () => {
   const token = localStorage.getItem("token");
@@ -29,7 +29,7 @@ const allocationModificationApi = {
   getDemandModifications: async (demandId) => {
     const response = await axios.get(
       `${BASE_URL}/api/allocation-modifications/demand/${demandId}`,
-      getAuthHeader()
+      getAuthHeader(),
     );
 
     return getResponseData(response);
@@ -38,7 +38,7 @@ const allocationModificationApi = {
   getModificationById: async (id) => {
     const response = await axios.get(
       `${BASE_URL}/api/allocation-modifications/${id}`,
-      getAuthHeader()
+      getAuthHeader(),
     );
 
     return getResponseData(response);
@@ -48,7 +48,7 @@ const allocationModificationApi = {
     const response = await axios.post(
       `${BASE_URL}/api/allocation-modifications/pm`,
       payload,
-      getAuthHeader()
+      getAuthHeader(),
     );
 
     return response.data;
@@ -58,7 +58,7 @@ const allocationModificationApi = {
     const response = await axios.put(
       `${BASE_URL}/api/allocation-modifications/${id}/rm/decision`,
       payload,
-      getAuthHeader()
+      getAuthHeader(),
     );
 
     return response.data;
@@ -67,7 +67,7 @@ const allocationModificationApi = {
   cancelModification: async (id) => {
     const response = await axios.delete(
       `${BASE_URL}/api/allocation-modifications/${id}/pm`,
-      getAuthHeader()
+      getAuthHeader(),
     );
 
     return response.data;

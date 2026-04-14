@@ -3,14 +3,14 @@ export const fetchDashboardAnalytics = async () => {
     const token = localStorage.getItem("token"); // or your auth store
 
     const response = await fetch(
-      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/api/analytics/dashboard`,
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/analytics/dashboard`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`, // ✅ ADD THIS
         },
-      }
+      },
     );
 
     console.log("Status:", response.status);
@@ -22,13 +22,11 @@ export const fetchDashboardAnalytics = async () => {
     }
 
     return await response.json();
-
   } catch (error) {
     console.error("Analytics API Error:", error);
     return null;
   }
 };
-
 
 // export const demographicsMock = {
 //   total: 26,
@@ -90,4 +88,3 @@ export const fetchDashboardAnalytics = async () => {
 //   { dept: "Engineering", full: 20 },
 //   { dept: "Human Resources", full: 3 },
 // ];
-

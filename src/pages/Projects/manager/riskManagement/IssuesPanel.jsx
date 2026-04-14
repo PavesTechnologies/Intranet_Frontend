@@ -54,14 +54,14 @@ export default function IssuesPanel({
         issueSearch,
       });
 
-      if (lastFetchKey.current === paramsKey) return; 
+      if (lastFetchKey.current === paramsKey) return;
       lastFetchKey.current = paramsKey;
 
       setIsLoadingIssues(true);
 
       try {
         const token = localStorage.getItem("token");
-        const BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+        const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 
         const params = {
           page: issuePage - 1,
@@ -81,14 +81,16 @@ export default function IssuesPanel({
           {
             headers: { Authorization: `Bearer ${token}` },
             params,
-          }
+          },
         );
 
         if (cancelled) return;
 
         // ✅ Ensure only unique issues by linkedType + linkedId
         const uniqueIssues = Array.from(
-          new Map(res.data.content.map((i) => [`${i.linkedType}-${i.linkedId}`, i])).values()
+          new Map(
+            res.data.content.map((i) => [`${i.linkedType}-${i.linkedId}`, i]),
+          ).values(),
         );
 
         setIssuesPageItems(uniqueIssues);
@@ -197,7 +199,7 @@ export default function IssuesPanel({
                       <div className="flex items-center gap-2 mt-2">
                         <span
                           className={`text-xs px-2 py-1 rounded ${getStatusColor(
-                            issue.issueStatus
+                            issue.issueStatus,
                           )}`}
                         >
                           {issue.issueStatus}

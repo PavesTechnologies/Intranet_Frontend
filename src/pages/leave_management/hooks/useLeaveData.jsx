@@ -11,7 +11,7 @@ const useLeaveData = (employeeId, refreshKey, year) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
   // ---------------------------
   // SHARED FUNCTION (used by both effects)
@@ -32,12 +32,12 @@ const useLeaveData = (employeeId, refreshKey, year) => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       const allLeaves = response.data?.data || [];
       const approvedLeaves = allLeaves.filter(
-        (leave) => leave.status === "APPROVED" || leave.status === "PENDING"
+        (leave) => leave.status === "APPROVED" || leave.status === "PENDING",
       );
 
       setLeaveData(approvedLeaves);

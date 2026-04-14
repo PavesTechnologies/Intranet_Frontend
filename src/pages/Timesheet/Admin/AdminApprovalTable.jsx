@@ -24,7 +24,8 @@ const AdminApprovalTable = ({
   const [holidayData, setHolidayData] = useState([]);
   const [holidayLoading, setHolidayLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [rejectAllCancellationModal, setRejectAllCancellationModal] = useState(false);
+  const [rejectAllCancellationModal, setRejectAllCancellationModal] =
+    useState(false);
 
   // 🆕 Update User feature hooks — moved here to fix undefined error
   const [isUpdateMode, setIsUpdateMode] = useState(false);
@@ -45,12 +46,12 @@ const AdminApprovalTable = ({
     const fetchProjectInfo = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/project-info/all`,
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/project-info/all`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         );
         if (!res.ok) throw new Error("Failed to fetch project info");
         const data = await res.json();
@@ -79,13 +80,13 @@ const AdminApprovalTable = ({
     try {
       const res = await fetch(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/all`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       if (!res.ok) throw new Error("Failed to fetch holiday users");
       const data = await res.json();
@@ -113,15 +114,15 @@ const AdminApprovalTable = ({
   const projectIdToName = useMemo(
     () =>
       Object.fromEntries(projectInfo.map((p) => [p.projectId, p.projectName])),
-    [projectInfo]
+    [projectInfo],
   );
 
   const taskIdToName = useMemo(
     () =>
       Object.fromEntries(
-        projectInfo.flatMap((p) => p.tasks.map((t) => [t.taskId, t.taskName]))
+        projectInfo.flatMap((p) => p.tasks.map((t) => [t.taskId, t.taskName])),
       ),
-    [projectInfo]
+    [projectInfo],
   );
 
   // -----------------------------
@@ -145,7 +146,7 @@ const AdminApprovalTable = ({
           })),
         })),
       })),
-    [groupedData, projectIdToName, taskIdToName]
+    [groupedData, projectIdToName, taskIdToName],
   );
 
   // -----------------------------
@@ -156,7 +157,7 @@ const AdminApprovalTable = ({
       await reviewTimesheet(timesheetId, comment, status);
       showStatusToast(
         `Timesheet ${status.toLowerCase()} successfully`,
-        "success"
+        "success",
       );
       onRefresh?.();
     } catch (err) {
@@ -167,11 +168,11 @@ const AdminApprovalTable = ({
 
   const disableButton = (user) => {
     const submittedWeeks = user.weeklySummary.filter((week) => {
-        const status = week.weeklyStatus?.toUpperCase();
-        return status === "SUBMITTED" || status === "PARTIALLY APPROVED";
-      });
+      const status = week.weeklyStatus?.toUpperCase();
+      return status === "SUBMITTED" || status === "PARTIALLY APPROVED";
+    });
 
-      return (submittedWeeks.length === 0 );
+    return submittedWeeks.length === 0;
   };
 
   // -----------------------------
@@ -205,7 +206,7 @@ const AdminApprovalTable = ({
 
       const res = await fetch(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/timesheets/review/internal/bulk`,
         {
           method: "POST",
@@ -214,7 +215,7 @@ const AdminApprovalTable = ({
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(requestPayload),
-        }
+        },
       );
 
       if (!res.ok) throw new Error("Bulk review failed");
@@ -223,10 +224,10 @@ const AdminApprovalTable = ({
         `All submitted weeks ${status.toLowerCase()} successfully for ${
           user.userName
         }`,
-        "success"
+        "success",
       );
 
-       onRefresh?.();
+      onRefresh?.();
     } catch (err) {
       console.error("Error approving all weeks:", err);
       showStatusToast(`Failed to ${status.toLowerCase()} all weeks`, "error");
@@ -296,7 +297,7 @@ const AdminApprovalTable = ({
       user.weeklySummary.forEach((week) => {
         // Get week details based on calendar month
         const allDates = week.timesheets.flatMap((t) =>
-          t.entries.map((e) => new Date(t.workDate))
+          t.entries.map((e) => new Date(t.workDate)),
         );
         const firstEntryDate = allDates[0];
         const { weekNumber, dateRange } = getMonthWeekRange(firstEntryDate);
@@ -305,7 +306,7 @@ const AdminApprovalTable = ({
         const totalHours = week.timesheets.reduce(
           (sum, sheet) =>
             sum + sheet.entries.reduce((s, e) => s + (e.hoursWorked || 0), 0),
-          0
+          0,
         );
 
         // 🧮 Calculate Billable Hours based on `billable === "Yes"` (or true)
@@ -315,7 +316,7 @@ const AdminApprovalTable = ({
             sheet.entries
               .filter((e) => e.billable === "Yes" || e.billable === true)
               .reduce((s, e) => s + (e.hoursWorked || 0), 0),
-          0
+          0,
         );
 
         let weekPrinted = false;
@@ -351,7 +352,7 @@ const AdminApprovalTable = ({
 
             userPrinted = true;
             weekPrinted = true;
-          })
+          }),
         );
       });
     });
@@ -390,10 +391,10 @@ const AdminApprovalTable = ({
               entry.hoursWorked?.toFixed(2) || 0,
               new Date(sheet.workDate).toLocaleDateString(),
               sheet.status,
-            ])
-          )
-        )
-      )
+            ]),
+          ),
+        ),
+      ),
     );
 
     autoTable(doc, {
@@ -423,7 +424,7 @@ const AdminApprovalTable = ({
       .filter(
         (week) =>
           statusFilter === "All" ||
-          week.weeklyStatus?.toUpperCase() === statusFilter.toUpperCase()
+          week.weeklyStatus?.toUpperCase() === statusFilter.toUpperCase(),
       )
       .map((week) => (
         <div
@@ -441,7 +442,7 @@ const AdminApprovalTable = ({
                     variant="success"
                     size="medium"
                     disabled={Object.values(weekLevelLoading || {}).some(
-                      Boolean
+                      Boolean,
                     )}
                     onClick={async () => {
                       setWeekLevelLoading((prev) => ({
@@ -450,19 +451,19 @@ const AdminApprovalTable = ({
                       }));
                       try {
                         const timesheetIds = week.timesheets.map(
-                          (t) => t.timesheetId
+                          (t) => t.timesheetId,
                         );
                         await handleBulkReviewAdmin(
                           user.userId,
                           timesheetIds,
                           "APPROVED",
-                          "approved"
+                          "approved",
                         );
-                         onRefresh?.();
+                        onRefresh?.();
                       } catch (err) {
                         showStatusToast(
                           "Failed to approve timesheets",
-                          "error"
+                          "error",
                         );
                       } finally {
                         setWeekLevelLoading((prev) => ({
@@ -479,7 +480,7 @@ const AdminApprovalTable = ({
                     variant="danger"
                     size="medium"
                     disabled={Object.values(weekLevelLoading || {}).some(
-                      Boolean
+                      Boolean,
                     )}
                     onClick={() => {
                       setShowCommentBox({ [user.userId]: week.weekId });
@@ -501,9 +502,9 @@ const AdminApprovalTable = ({
               weekEnd: week.endDate,
               timesheets: week.timesheets,
               weekRange: `${new Date(
-                week.startDate
+                week.startDate,
               ).toLocaleDateString()} - ${new Date(
-                week.endDate
+                week.endDate,
               ).toLocaleDateString()}`,
               totalHours: week.totalHours,
               status: week.weeklyStatus,
@@ -541,14 +542,14 @@ const AdminApprovalTable = ({
                     setActionLoading(true);
                     try {
                       const timesheetIds = week.timesheets.map(
-                        (t) => t.timesheetId
+                        (t) => t.timesheetId,
                       );
                       const comment = rejectionComments[week.weekId] || "";
                       await handleBulkReviewAdmin(
                         user.userId,
                         timesheetIds,
                         "REJECTED",
-                        comment
+                        comment,
                       );
                       // showStatusToast(
                       //   "Timesheets rejected successfully!",
@@ -558,7 +559,7 @@ const AdminApprovalTable = ({
                         ...prev,
                         [user.userId]: null,
                       }));
-                       onRefresh?.();
+                      onRefresh?.();
                     } catch (err) {
                       console.error("Error rejecting timesheets:", err);
                       showStatusToast("Failed to reject timesheets", "error");
@@ -611,7 +612,7 @@ const AdminApprovalTable = ({
       setSelectedUsers((prev) =>
         prev.includes(record.id)
           ? prev.filter((id) => id !== record.id)
-          : [...prev, record.id]
+          : [...prev, record.id],
       );
       return;
     }
@@ -646,7 +647,7 @@ const AdminApprovalTable = ({
     if (selectedUsers.length === 0) return;
 
     const confirmDelete = window.confirm(
-      `Are you sure you want to remove ${selectedUsers.length} user(s)?`
+      `Are you sure you want to remove ${selectedUsers.length} user(s)?`,
     );
     if (!confirmDelete) return;
 
@@ -654,14 +655,14 @@ const AdminApprovalTable = ({
       for (const id of selectedUsers) {
         const res = await fetch(
           `${
-            import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+            window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holiday-exclude-users/${id}`,
           {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         );
         if (!res.ok) throw new Error(`Failed to delete user ${id}`);
       }
@@ -693,7 +694,7 @@ const AdminApprovalTable = ({
     try {
       const res = await fetch(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/create`,
         {
           method: "POST",
@@ -706,7 +707,7 @@ const AdminApprovalTable = ({
             holidayDate: selectedHoliday,
             reason,
           }),
-        }
+        },
       );
 
       if (!res.ok)
@@ -714,7 +715,7 @@ const AdminApprovalTable = ({
 
       showStatusToast(
         "User added to holiday exclusion successfully!",
-        "success"
+        "success",
       );
       fetchHolidayExcludedUsers();
       setShowAddUserSection(false);
@@ -737,23 +738,23 @@ const AdminApprovalTable = ({
       const [usersRes, holidaysRes] = await Promise.all([
         fetch(
           `${
-            import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+            window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holiday-exclude-users/allusers`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         ),
         fetch(
           `${
-            import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+            window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holidays/currentMonth`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         ),
       ]);
 
@@ -789,7 +790,7 @@ const AdminApprovalTable = ({
     try {
       const res = await fetch(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/${selectedUpdateRecord.id}`,
         {
           method: "PUT",
@@ -802,7 +803,7 @@ const AdminApprovalTable = ({
             holidayDate: updateHoliday,
             reason: updateReason,
           }),
-        }
+        },
       );
 
       if (!res.ok) throw new Error("Failed to update user record");
@@ -835,7 +836,11 @@ const AdminApprovalTable = ({
             <Button variant="primary" size="small" onClick={exportPDF}>
               Export PDF
             </Button>
-            <Button variant="secondary" size="small" onClick={() => setIsOpen(true)}>
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={() => setIsOpen(true)}
+            >
               Internal Activities
             </Button>
             <Button
@@ -871,7 +876,9 @@ const AdminApprovalTable = ({
                         <Button
                           variant="success"
                           size="small"
-                          disabled={userLevelLoading !== null || disableButton(user)}
+                          disabled={
+                            userLevelLoading !== null || disableButton(user)
+                          }
                           className={`disabled:opacity-50 disabled:cursor-not-allowed`}
                           onClick={async () => {
                             setUserLevelLoading(user.userId);
@@ -888,7 +895,9 @@ const AdminApprovalTable = ({
                         <Button
                           variant="danger"
                           size="small"
-                          disabled={userLevelLoading !== null || disableButton(user)}
+                          disabled={
+                            userLevelLoading !== null || disableButton(user)
+                          }
                           className={`disabled:opacity-50 disabled:cursor-not-allowed`}
                           onClick={handleCancelModal}
                         >
@@ -1024,7 +1033,7 @@ const AdminApprovalTable = ({
                     if (!holidayData || holidayData.length === 0) {
                       showStatusToast(
                         "No holiday excluded users found. Please create one first.",
-                        "info"
+                        "info",
                       );
                       return;
                     }
@@ -1051,7 +1060,7 @@ const AdminApprovalTable = ({
                       if (!holidayData || holidayData.length === 0) {
                         showStatusToast(
                           "No holiday excluded users found. Please create one first.",
-                          "info"
+                          "info",
                         );
                         return;
                       }
@@ -1278,7 +1287,7 @@ const AdminApprovalTable = ({
         </div>
       )}
 
-      <Modal 
+      <Modal
         title="Internal Activities"
         subtitle="Manage Internal Activities"
         isOpen={isOpen}

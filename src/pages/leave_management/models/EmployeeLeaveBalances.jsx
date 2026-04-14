@@ -40,7 +40,9 @@ export const YearDropdown = ({ value, onChange }) => {
               >
                 {({ selected }) => (
                   <>
-                    <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>
+                    <span
+                      className={`block truncate ${selected ? "font-medium" : "font-normal"}`}
+                    >
                       {year}
                     </span>
                     {selected && (
@@ -59,7 +61,7 @@ export const YearDropdown = ({ value, onChange }) => {
   );
 };
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 // ─────────────────────────────────────────────
 // Pure fetch function — used by React Query
@@ -93,20 +95,22 @@ const fetchLeaveBalances = async ({ query, year, page, rowsPerPage }) => {
         balances: {},
       };
 
-      (emp.leaves || []).forEach(({ leaveTypeId, leaveTypeName, remainingLeaves }) => {
-        if (!leaveTypeName || !leaveTypeId) return;
+      (emp.leaves || []).forEach(
+        ({ leaveTypeId, leaveTypeName, remainingLeaves }) => {
+          if (!leaveTypeName || !leaveTypeId) return;
 
-        employeeMap[emp.employeeId].balances[leaveTypeName] = {
-          leaveTypeId,
-          remainingLeaves: remainingLeaves ?? 0,
-          year: emp.year,
-          leaveType: { maxDaysPerYear: null },
-        };
+          employeeMap[emp.employeeId].balances[leaveTypeName] = {
+            leaveTypeId,
+            remainingLeaves: remainingLeaves ?? 0,
+            year: emp.year,
+            leaveType: { maxDaysPerYear: null },
+          };
 
-        if (!leaveTypeCollection[leaveTypeName]) {
-          leaveTypeCollection[leaveTypeName] = { leaveTypeName, leaveTypeId };
-        }
-      });
+          if (!leaveTypeCollection[leaveTypeName]) {
+            leaveTypeCollection[leaveTypeName] = { leaveTypeName, leaveTypeId };
+          }
+        },
+      );
     });
 
     return {
@@ -131,7 +135,8 @@ const fetchLeaveBalances = async ({ query, year, page, rowsPerPage }) => {
     if (!employeeMap[empId]) {
       employeeMap[empId] = {
         employeeId: empId,
-        employeeName: `${entry.employee?.firstName ?? ""} ${entry.employee?.lastName ?? ""}`.trim(),
+        employeeName:
+          `${entry.employee?.firstName ?? ""} ${entry.employee?.lastName ?? ""}`.trim(),
         employeeGender: entry.employee?.gender || null,
         balances: {},
       };
@@ -182,7 +187,11 @@ const EmployeeLeaveBalances = () => {
   const queryKey = ["leaveBalances", debouncedQuery, currentYear, currentPage];
 
   // ─── useQuery — fetches & caches data per unique key ───
-  const { data: queryResult, isLoading, isFetching } = useQuery({
+  const {
+    data: queryResult,
+    isLoading,
+    isFetching,
+  } = useQuery({
     queryKey,
     queryFn: () =>
       fetchLeaveBalances({
@@ -191,9 +200,9 @@ const EmployeeLeaveBalances = () => {
         page: currentPage,
         rowsPerPage,
       }),
-    keepPreviousData: true,    // ✅ show stale data while fetching next page
-    staleTime: 1000 * 60 * 2,  // ✅ cache fresh for 2 minutes
-    cacheTime: 1000 * 60 * 5,  // ✅ cache kept in memory for 5 minutes
+    keepPreviousData: true, // ✅ show stale data while fetching next page
+    staleTime: 1000 * 60 * 2, // ✅ cache fresh for 2 minutes
+    cacheTime: 1000 * 60 * 5, // ✅ cache kept in memory for 5 minutes
     onError: () => toast.error("Failed to fetch leave balances"),
   });
 
@@ -214,7 +223,9 @@ const EmployeeLeaveBalances = () => {
       queryClient.invalidateQueries({ queryKey: ["leaveBalances"] });
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.message || "Failed to update leave balances");
+      toast.error(
+        err?.response?.data?.message || "Failed to update leave balances",
+      );
     },
   });
 
@@ -253,7 +264,12 @@ const EmployeeLeaveBalances = () => {
   useEffect(() => {
     if (currentPage < totalPages) {
       queryClient.prefetchQuery({
-        queryKey: ["leaveBalances", debouncedQuery, currentYear, currentPage + 1],
+        queryKey: [
+          "leaveBalances",
+          debouncedQuery,
+          currentYear,
+          currentPage + 1,
+        ],
         queryFn: () =>
           fetchLeaveBalances({
             query: debouncedQuery,
@@ -276,7 +292,11 @@ const EmployeeLeaveBalances = () => {
       try {
         const res = await axios.get(
           `${BASE_URL}/api/leave-balance/autocomplete?query=${encodeURIComponent(searchQuery)}`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
         );
         setSuggestions(res.data);
         setShowSuggestions(true);
@@ -306,8 +326,11 @@ const EmployeeLeaveBalances = () => {
       })
       .map(({ leaveTypeName, leaveTypeId }) => ({
         leaveTypeId,
-        remainingLeaves: selectedEmployee.balances[leaveTypeName]?.remainingLeaves ?? 0,
-        year: selectedEmployee.balances[leaveTypeName]?.year ?? new Date().getFullYear(),
+        remainingLeaves:
+          selectedEmployee.balances[leaveTypeName]?.remainingLeaves ?? 0,
+        year:
+          selectedEmployee.balances[leaveTypeName]?.year ??
+          new Date().getFullYear(),
       }));
 
     updateMutation.mutate({
@@ -330,7 +353,8 @@ const EmployeeLeaveBalances = () => {
   };
 
   const handlePrevious = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
-  const handleNext = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  const handleNext = () =>
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
 
   return (
     <div className="p-6 overflow-auto">
@@ -343,7 +367,9 @@ const EmployeeLeaveBalances = () => {
 
       {/* Title & Back Button */}
       <div className="flex items-center justify-between px-6 mb-4">
-        <h2 className="text-xl font-bold text-gray-800">Employee Leave Balances</h2>
+        <h2 className="text-xl font-bold text-gray-800">
+          Employee Leave Balances
+        </h2>
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -526,12 +552,18 @@ const EmployeeLeaveBalances = () => {
 
                 const gender = selectedEmployee?.employeeGender?.toLowerCase();
                 const totalLeaves =
-                  selectedEmployee.balances[leaveTypeName]?.leaveType?.maxDaysPerYear ?? "N/A";
+                  selectedEmployee.balances[leaveTypeName]?.leaveType
+                    ?.maxDaysPerYear ?? "N/A";
                 const currentValue =
-                  selectedEmployee.balances[leaveTypeName]?.remainingLeaves ?? "";
+                  selectedEmployee.balances[leaveTypeName]?.remainingLeaves ??
+                  "";
 
-                const isMaternity = leaveTypeName.toLowerCase().includes("maternity");
-                const isPaternity = leaveTypeName.toLowerCase().includes("paternity");
+                const isMaternity = leaveTypeName
+                  .toLowerCase()
+                  .includes("maternity");
+                const isPaternity = leaveTypeName
+                  .toLowerCase()
+                  .includes("paternity");
 
                 const isDisabled =
                   (isMaternity && gender === "male") ||
@@ -543,13 +575,17 @@ const EmployeeLeaveBalances = () => {
                     key={leaveTypeId || leaveTypeName}
                     className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                   >
-                    <label className="font-medium min-w-[150px]">{leaveTypeName}</label>
+                    <label className="font-medium min-w-[150px]">
+                      {leaveTypeName}
+                    </label>
                     <div className="flex items-center gap-2 w-full sm:w-[300px]">
                       <input
                         type="number"
                         disabled={isDisabled}
                         className={`border px-3 py-2 w-full rounded shadow-sm ${
-                          isDisabled ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""
+                          isDisabled
+                            ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                            : ""
                         }`}
                         value={isDisabled ? 0 : currentValue}
                         onChange={(e) => {
@@ -557,7 +593,8 @@ const EmployeeLeaveBalances = () => {
                           const updated = { ...selectedEmployee };
                           if (!updated.balances[leaveTypeName])
                             updated.balances[leaveTypeName] = {};
-                          updated.balances[leaveTypeName].remainingLeaves = parseFloat(e.target.value);
+                          updated.balances[leaveTypeName].remainingLeaves =
+                            parseFloat(e.target.value);
                           setSelectedEmployee(updated);
                         }}
                       />

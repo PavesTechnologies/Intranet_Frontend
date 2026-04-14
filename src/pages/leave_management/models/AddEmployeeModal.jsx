@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { X, User } from "lucide-react";
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const AddEmployeeModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
@@ -15,7 +15,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
     role: "",
     managerId: "",
     password: "",
-    jobTitle:"",
+    jobTitle: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -37,7 +37,6 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
       hireDate: formData.hireDate,
       role: formData.role,
       password: formData.password,
-
     };
 
     // 🔥 FIX: send as nested object
@@ -71,7 +70,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Failed to add employee. Please try again!"
+          "Failed to add employee. Please try again!",
       );
     }
   };

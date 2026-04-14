@@ -14,8 +14,6 @@ const IssueTracker = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { projectId: paramProjectId } = useParams(); // 2. Keep this for fallback
-  
-
 
   // 3. Extract your variables from the router state
   const projectId = location.state?.projectId || paramProjectId;
@@ -29,7 +27,11 @@ const IssueTracker = () => {
 
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
-  const [editModal, setEditModal] = useState({ visible: false, type: null, id: null });
+  const [editModal, setEditModal] = useState({
+    visible: false,
+    type: null,
+    id: null,
+  });
 
   const [openEpics, setOpenEpics] = useState([]);
   const [openStories, setOpenStories] = useState([]);
@@ -64,9 +66,18 @@ const IssueTracker = () => {
     try {
       setLoading(true);
       const [epicsRes, storiesRes, tasksRes] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`, { headers }),
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`, { headers }),
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/tasks`, { headers }),
+        axios.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+          { headers },
+        ),
+        axios.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
+          { headers },
+        ),
+        axios.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
+          { headers },
+        ),
       ]);
 
       const epicsData = epicsRes.data.map((e) => ({
@@ -76,7 +87,7 @@ const IssueTracker = () => {
         reporterName: e.reporterName || e.reporter?.name || "Not Applicable",
         assigneeName: e.assigneeName || e.assignee?.name || "Not Applicable",
         priority: (e.priority || "MEDIUM").toUpperCase(),
-        status: e.status  || e.statusName || "BACKLOG",
+        status: e.status || e.statusName || "BACKLOG",
       }));
 
       const storiesData = storiesRes.data.map((s) => ({
@@ -94,8 +105,8 @@ const IssueTracker = () => {
         const normalizedStatus = t.statusName
           ? String(t.statusName).toUpperCase().replace(/\s+/g, "_")
           : t.status
-          ? String(t.status).toUpperCase().replace(/\s+/g, "_")
-          : "BACKLOG";
+            ? String(t.status).toUpperCase().replace(/\s+/g, "_")
+            : "BACKLOG";
 
         return {
           ...t,
@@ -122,7 +133,10 @@ const IssueTracker = () => {
 
   const fetchProjects = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`, { headers });
+      const res = await axios.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
+        { headers },
+      );
       setProjects(res.data || []);
     } catch (err) {
       toast.error("Failed to load projects");
@@ -144,7 +158,9 @@ const IssueTracker = () => {
     if (issue.type === "Task") endpoint = `/api/tasks/${issue.id}`;
 
     try {
-      await axios.delete(`${import.meta.env.VITE_PMS_BASE_URL}${endpoint}`, { headers });
+      await axios.delete(`${window.__APP_CONFIG__.PMS_BASE_URL}${endpoint}`, {
+        headers,
+      });
       fetchIssues();
       toast.success(`${issue.type} deleted successfully!`);
     } catch (err) {
@@ -182,15 +198,16 @@ const IssueTracker = () => {
     // Trigger the custom toast
     toast.warn(<ConfirmToast />, {
       position: "top-center",
-      autoClose: false,      // Stays open until they click a button
-      closeOnClick: false,   // Clicking the toast body won't close it
-      draggable: false,      // Prevents accidental swiping
-      closeButton: false,    // Hides the default 'X' button
-      icon: false,           // Hides the default warning icon to save space
+      autoClose: false, // Stays open until they click a button
+      closeOnClick: false, // Clicking the toast body won't close it
+      draggable: false, // Prevents accidental swiping
+      closeButton: false, // Hides the default 'X' button
+      icon: false, // Hides the default warning icon to save space
     });
   };
 
-  const handleEdit = (issue) => setEditModal({ visible: true, type: issue.type, id: issue.id });
+  const handleEdit = (issue) =>
+    setEditModal({ visible: true, type: issue.type, id: issue.id });
 
   const handleUpdated = (msg) => {
     setEditModal({ visible: false });
@@ -202,9 +219,12 @@ const IssueTracker = () => {
   };
 
   const handleView = (issue) => {
-    navigate(`/projects/${projectId}/issues/${issue.type.toLowerCase()}/${issue.id}/view`, {
-      state: { issue },
-    });
+    navigate(
+      `/projects/${projectId}/issues/${issue.type.toLowerCase()}/${issue.id}/view`,
+      {
+        state: { issue },
+      },
+    );
   };
 
   // const currentProject = projects.find((p) => p.id === Number(projectId));
@@ -233,23 +253,32 @@ const IssueTracker = () => {
   };
 
   const toggleEpic = (id) =>
-    setOpenEpics((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+    setOpenEpics((p) =>
+      p.includes(id) ? p.filter((x) => x !== id) : [...p, id],
+    );
 
   const toggleStory = (id) =>
-    setOpenStories((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+    setOpenStories((p) =>
+      p.includes(id) ? p.filter((x) => x !== id) : [...p, id],
+    );
 
   const isFiltersEmpty = () =>
-    filters.types.length === 0 && filters.statuses.length === 0 && filters.priorities.length === 0;
+    filters.types.length === 0 &&
+    filters.statuses.length === 0 &&
+    filters.priorities.length === 0;
 
   const matchesFilters = (issue) => {
     if (isFiltersEmpty()) return true;
-    if (filters.types.length > 0 && !filters.types.includes(issue.type)) return false;
+    if (filters.types.length > 0 && !filters.types.includes(issue.type))
+      return false;
     if (filters.priorities.length > 0) {
       const pr = (issue.priority || "").toUpperCase();
       if (!filters.priorities.includes(pr)) return false;
     }
     if (filters.statuses.length > 0) {
-      const st = String(issue.status || "").toUpperCase().replace(/\s+/g, "_");
+      const st = String(issue.status || "")
+        .toUpperCase()
+        .replace(/\s+/g, "_");
       if (!filters.statuses.includes(st)) return false;
     }
     return true;
@@ -281,16 +310,20 @@ const IssueTracker = () => {
   const TableRow = ({ issue, level }) => {
     const isEpic = issue.type === "Epic";
     const isStory = issue.type === "Story";
-    const rowBg = level === 0 ? "bg-white" : level === 1 ? "bg-slate-50/50" : "bg-white";
+    const rowBg =
+      level === 0 ? "bg-white" : level === 1 ? "bg-slate-50/50" : "bg-white";
 
     return (
-      <tr 
-        className={`${rowBg} hover:bg-indigo-50/60 border-b border-gray-100 cursor-pointer transition-all duration-200 group`} 
+      <tr
+        className={`${rowBg} hover:bg-indigo-50/60 border-b border-gray-100 cursor-pointer transition-all duration-200 group`}
         onClick={() => handleView(issue)}
       >
         <td className="py-3 px-4">
-          <div className="flex items-center gap-2" style={{ paddingLeft: `${level * 28}px` }}>
-            {(isEpic || isStory) ? (
+          <div
+            className="flex items-center gap-2"
+            style={{ paddingLeft: `${level * 28}px` }}
+          >
+            {isEpic || isStory ? (
               <button
                 className="p-1 rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors focus:outline-none"
                 onClick={(e) => {
@@ -308,32 +341,44 @@ const IssueTracker = () => {
             ) : (
               <div className="w-6" /> // spacer
             )}
-            <span className={`truncate text-gray-800 group-hover:text-indigo-700 transition-colors ${level === 0 ? "font-semibold" : "font-medium"}`}>
+            <span
+              className={`truncate text-gray-800 group-hover:text-indigo-700 transition-colors ${level === 0 ? "font-semibold" : "font-medium"}`}
+            >
               {issue.title}
             </span>
           </div>
         </td>
 
         <td className="px-3">
-          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${typeColors[issue.type]}`}>
+          <span
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${typeColors[issue.type]}`}
+          >
             {issue.type}
           </span>
         </td>
 
         <td className="px-3">
-          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${priorityColors[issue.priority] || "bg-gray-100 text-gray-700"}`}>
+          <span
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${priorityColors[issue.priority] || "bg-gray-100 text-gray-700"}`}
+          >
             {issue.priority}
           </span>
         </td>
 
         <td className="px-3">
-          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase whitespace-nowrap ${statusColors[issue.status] || "bg-gray-100 text-gray-700"}`}>
+          <span
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase whitespace-nowrap ${statusColors[issue.status] || "bg-gray-100 text-gray-700"}`}
+          >
             {String(issue.status).replace("_", " ")}
           </span>
         </td>
 
-        <td className="px-3 text-sm text-gray-600 truncate max-w-[130px]">{issue.assigneeName}</td>
-        <td className="px-3 text-sm text-gray-600 truncate max-w-[130px]">{issue.reporterName}</td>
+        <td className="px-3 text-sm text-gray-600 truncate max-w-[130px]">
+          {issue.assigneeName}
+        </td>
+        <td className="px-3 text-sm text-gray-600 truncate max-w-[130px]">
+          {issue.reporterName}
+        </td>
 
         <td className="px-4 py-3">
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -397,7 +442,11 @@ const IssueTracker = () => {
                             .filter((t) => t.storyId === story.id)
                             .filter((t) => matchesFilters(t))
                             .map((task) => (
-                              <TableRow key={`T-${task.id}`} issue={task} level={2} />
+                              <TableRow
+                                key={`T-${task.id}`}
+                                issue={task}
+                                level={2}
+                              />
                             ))}
                       </React.Fragment>
                     ))}
@@ -413,7 +462,10 @@ const IssueTracker = () => {
             return (
               <React.Fragment>
                 <tr className="bg-slate-50">
-                  <td colSpan={7} className="px-4 py-3 border-y border-gray-200">
+                  <td
+                    colSpan={7}
+                    className="px-4 py-3 border-y border-gray-200"
+                  >
                     <div className="flex items-center gap-2 text-sm font-semibold text-gray-500 uppercase tracking-wider">
                       Stories Unassigned to Epics
                     </div>
@@ -426,7 +478,13 @@ const IssueTracker = () => {
                       issues.tasksData
                         .filter((t) => t.storyId === story.id)
                         .filter((t) => matchesFilters(t))
-                        .map((task) => <TableRow key={`T2-${task.id}`} issue={task} level={1} />)}
+                        .map((task) => (
+                          <TableRow
+                            key={`T2-${task.id}`}
+                            issue={task}
+                            level={1}
+                          />
+                        ))}
                   </React.Fragment>
                 ))}
               </React.Fragment>
@@ -442,7 +500,10 @@ const IssueTracker = () => {
             return (
               <React.Fragment>
                 <tr className="bg-slate-50">
-                  <td colSpan={7} className="px-4 py-3 border-y border-gray-200">
+                  <td
+                    colSpan={7}
+                    className="px-4 py-3 border-y border-gray-200"
+                  >
                     <div className="flex items-center gap-2 text-sm font-semibold text-gray-500 uppercase tracking-wider">
                       Tasks Unassigned to Stories
                     </div>
@@ -479,7 +540,8 @@ const IssueTracker = () => {
     });
   };
 
-  const clearFilters = () => setFilters({ types: [], statuses: [], priorities: [] });
+  const clearFilters = () =>
+    setFilters({ types: [], statuses: [], priorities: [] });
 
   return (
     <div className="max-w-7xl mx-auto mt-8 px-6 pb-12 space-y-6">
@@ -493,7 +555,8 @@ const IssueTracker = () => {
             Issue Tracker
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Project: <span className="font-medium text-gray-800">{projectName}</span>
+            Project:{" "}
+            <span className="font-medium text-gray-800">{projectName}</span>
           </p>
         </div>
 
@@ -505,9 +568,13 @@ const IssueTracker = () => {
             >
               <FiFilter size={16} />
               Filter
-              {(filters.types.length > 0 || filters.statuses.length > 0 || filters.priorities.length > 0) && (
+              {(filters.types.length > 0 ||
+                filters.statuses.length > 0 ||
+                filters.priorities.length > 0) && (
                 <span className="flex items-center justify-center w-5 h-5 ml-1 text-xs text-white bg-indigo-600 rounded-full">
-                  {filters.types.length + filters.statuses.length + filters.priorities.length}
+                  {filters.types.length +
+                    filters.statuses.length +
+                    filters.priorities.length}
                 </span>
               )}
             </button>
@@ -515,7 +582,9 @@ const IssueTracker = () => {
             {filterOpen && (
               <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-4 z-30">
                 <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-                  <strong className="text-sm font-semibold text-gray-800">Filter Issues</strong>
+                  <strong className="text-sm font-semibold text-gray-800">
+                    Filter Issues
+                  </strong>
                   <button
                     onClick={clearFilters}
                     className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
@@ -526,51 +595,74 @@ const IssueTracker = () => {
 
                 <div className="space-y-4 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
                   <div>
-                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Issue Type</div>
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                      Issue Type
+                    </div>
                     <div className="space-y-2">
                       {TYPE_OPTIONS.map((t) => (
-                        <label key={t} className="flex items-center gap-3 cursor-pointer group">
+                        <label
+                          key={t}
+                          className="flex items-center gap-3 cursor-pointer group"
+                        >
                           <input
                             type="checkbox"
                             checked={filters.types.includes(t)}
                             onChange={() => toggleFilterValue("types", t)}
                             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                           />
-                          <span className="text-sm text-gray-700 group-hover:text-gray-900">{t}</span>
+                          <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                            {t}
+                          </span>
                         </label>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Status</div>
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                      Status
+                    </div>
                     <div className="space-y-2">
                       {STATUS_OPTIONS.map((s) => (
-                        <label key={s.value} className="flex items-center gap-3 cursor-pointer group">
+                        <label
+                          key={s.value}
+                          className="flex items-center gap-3 cursor-pointer group"
+                        >
                           <input
                             type="checkbox"
                             checked={filters.statuses.includes(s.value)}
-                            onChange={() => toggleFilterValue("statuses", s.value)}
+                            onChange={() =>
+                              toggleFilterValue("statuses", s.value)
+                            }
                             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                           />
-                          <span className="text-sm text-gray-700 group-hover:text-gray-900">{s.label}</span>
+                          <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                            {s.label}
+                          </span>
                         </label>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Priority</div>
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                      Priority
+                    </div>
                     <div className="space-y-2">
                       {PRIORITY_OPTIONS.map((p) => (
-                        <label key={p} className="flex items-center gap-3 cursor-pointer group">
+                        <label
+                          key={p}
+                          className="flex items-center gap-3 cursor-pointer group"
+                        >
                           <input
                             type="checkbox"
                             checked={filters.priorities.includes(p)}
                             onChange={() => toggleFilterValue("priorities", p)}
                             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                           />
-                          <span className="text-sm text-gray-700 group-hover:text-gray-900 capitalize">{p.toLowerCase()}</span>
+                          <span className="text-sm text-gray-700 group-hover:text-gray-900 capitalize">
+                            {p.toLowerCase()}
+                          </span>
                         </label>
                       ))}
                     </div>

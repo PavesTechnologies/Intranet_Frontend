@@ -41,13 +41,13 @@ const AdminApprovalPage = () => {
     try {
       const response = await fetch(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheets/internal/summary`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error("Failed to fetch timesheets");
@@ -76,12 +76,12 @@ const AdminApprovalPage = () => {
   const fetchEmailUsers = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/users`,
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/users`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       setEmailOptions(res.data);
     } catch (err) {
@@ -93,12 +93,12 @@ const AdminApprovalPage = () => {
   const fetchEmail = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/emailSettings`,
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/emailSettings`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       console.log(res);
       setEmailData(res.data[0]);
@@ -152,9 +152,9 @@ const AdminApprovalPage = () => {
                 entry.otherDescription?.toLowerCase().includes(lowerSearch) ||
                 entry.workLocation?.toLowerCase().includes(lowerSearch) ||
                 entry.projectName?.toLowerCase().includes(lowerSearch) ||
-                entry.taskName?.toLowerCase().includes(lowerSearch)
-            )
-          )
+                entry.taskName?.toLowerCase().includes(lowerSearch),
+            ),
+          ),
         );
 
         if (!userMatch && !nestedMatch) return false;
@@ -163,7 +163,7 @@ const AdminApprovalPage = () => {
       // 🔹 3️⃣ Date Filter — match selected date exactly
       if (selectedDate) {
         const hasDate = user.weeklySummary?.some((week) =>
-          week.timesheets?.some((ts) => ts.workDate === selectedDate)
+          week.timesheets?.some((ts) => ts.workDate === selectedDate),
         );
         if (!hasDate) return false;
       }
@@ -177,9 +177,9 @@ const AdminApprovalPage = () => {
               (ts) =>
                 ts.status?.toLowerCase() === statusFilter.toLowerCase() ||
                 ts.actionStatus?.some(
-                  (a) => a.status?.toLowerCase() === statusFilter.toLowerCase()
-                )
-            )
+                  (a) => a.status?.toLowerCase() === statusFilter.toLowerCase(),
+                ),
+            ),
         );
         if (!hasStatus) return false;
       }
@@ -209,7 +209,7 @@ const AdminApprovalPage = () => {
     }
     try {
       await axios.put(
-        `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/emailSettings/${
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/emailSettings/${
           emailData.id
         }`,
         { email: editValue },
@@ -217,7 +217,7 @@ const AdminApprovalPage = () => {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       setIsEditing(false);
       setEmailData({ ...emailData, email: editValue });
@@ -282,7 +282,10 @@ const AdminApprovalPage = () => {
               /> */}
               <select
                 value={selectedEmail}
-                onChange={(e) => {setSelectedEmail(e.target.value), setEditValue(e.target.value)}}
+                onChange={(e) => {
+                  (setSelectedEmail(e.target.value),
+                    setEditValue(e.target.value));
+                }}
                 className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring focus:ring-blue-300"
               >
                 {emailOptions.map((m) => (

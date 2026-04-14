@@ -3,7 +3,7 @@ import axios from "axios";
 
 // Detect / load backend base URL
 const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+  window.__APP_CONFIG__.API_BASE_URL || "http://localhost:8080/api";
 
 // Create instance
 const axiosInstance = axios.create({
@@ -18,7 +18,7 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config) => {
     // IMPORTANT: your real token key is `"token"` (NOT authToken)
-    const token = localStorage.getItem("token"); 
+    const token = localStorage.getItem("token");
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -26,7 +26,7 @@ axiosInstance.interceptors.request.use(
 
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 // 🔥 RESPONSE INTERCEPTOR — Handle 401 errors
@@ -37,11 +37,11 @@ axiosInstance.interceptors.response.use(
       console.warn("⚠️ 401 Unauthorized — Redirecting to login...");
 
       // OPTIONAL:
-       localStorage.removeItem("token");
+      localStorage.removeItem("token");
       // window.location.href = "/login";
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default axiosInstance;

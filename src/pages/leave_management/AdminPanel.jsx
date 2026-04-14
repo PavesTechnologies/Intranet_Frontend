@@ -10,7 +10,7 @@ import { toast } from "react-toastify";
 import { se } from "date-fns/locale";
 import { useWebSocket } from "./websockets/WebSocketProvider.jsx";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const AdminPanel = ({ employeeId }) => {
   // const [searchTerm, setSearchTerm] = useState("");
@@ -52,7 +52,7 @@ const AdminPanel = ({ employeeId }) => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       )
       .then((res) => {
         const arr = Array.isArray(res.data) ? res.data : res.data?.data || [];
@@ -74,7 +74,7 @@ const AdminPanel = ({ employeeId }) => {
         `${BASE_URL}/api/leave-revoke/pending/${employeeId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        },
       );
 
       if (res.data.success && Array.isArray(res.data.data)) {
@@ -90,7 +90,7 @@ const AdminPanel = ({ employeeId }) => {
       }
     } catch (err) {
       toast.error(
-        err.response?.data?.message || "Failed to fetch Revoke Requests."
+        err.response?.data?.message || "Failed to fetch Revoke Requests.",
       );
       setRevokeRequests([]);
     }
@@ -119,30 +119,30 @@ const AdminPanel = ({ employeeId }) => {
   //   return unsub;
   // }, [subscribe, fetchRevokeRequests]);
 
-  useEffect(()=>{
-    const sub1 = subscribe("leave-updated",()=>{
-      handleRefresh()
-    })
-    const sub2 = subscribe("data-updated",()=>{
-      handleRefresh()
-    })
+  useEffect(() => {
+    const sub1 = subscribe("leave-updated", () => {
+      handleRefresh();
+    });
+    const sub2 = subscribe("data-updated", () => {
+      handleRefresh();
+    });
 
-    return ()=>{
+    return () => {
       sub1();
       sub2();
-    }
-  }, [subscribe, fetchRevokeRequests])
-  const handleRefresh = ()=>{
+    };
+  }, [subscribe, fetchRevokeRequests]);
+  const handleRefresh = () => {
     if (refreshCooldown.current) return; // ⛔ already refreshing
     refreshCooldown.current = true;
-    fetchRevokeRequests()
+    fetchRevokeRequests();
     console.log("WS EVENT → refreshing admin data");
     leaveApprovalRef.current?.refreshData();
 
     setTimeout(() => {
       refreshCooldown.current = false;
     }, 2000);
-  }
+  };
 
   // const filteredAdminRequests = adminLeaveRequests.filter((request) => {
   //   const matchesSearch =

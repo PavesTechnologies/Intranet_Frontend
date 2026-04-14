@@ -22,7 +22,7 @@ const CreateEpic = ({ onClose }) => {
 
   useEffect(() => {
     axios
-      .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`)
+      .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`)
       .then((response) => {
         const content = response.data.content || response.data;
         if (Array.isArray(content)) {
@@ -56,7 +56,7 @@ const CreateEpic = ({ onClose }) => {
     };
 
     axios
-      .post(`${import.meta.env.VITE_PMS_BASE_URL}/api/epics`, payload)
+      .post(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/epics`, payload)
       .then((res) => {
         console.log("Epic created:", res.data);
         setShowSuccess(true);
@@ -162,7 +162,10 @@ const CreateEpic = ({ onClose }) => {
 
         {/* Progress Percentage */}
         <div>
-          <label htmlFor="progressPercentage" className="block font-semibold mb-1">
+          <label
+            htmlFor="progressPercentage"
+            className="block font-semibold mb-1"
+          >
             Progress (%)
           </label>
           <input
