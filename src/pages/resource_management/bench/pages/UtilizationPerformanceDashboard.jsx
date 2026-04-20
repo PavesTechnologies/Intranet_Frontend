@@ -350,23 +350,7 @@ const UtilizationPerformanceDashboard = () => {
    return (
       <div className="min-h-screen bg-[#FDFDFE] p-6 font-sans select-none">
 
-         {/* Confidence Banner */}
-         {OVERALL_CONFIDENCE_SCORE < 100 && (
-            <div className="mb-6 flex items-center justify-between p-3 bg-amber-50/50 border border-amber-100 rounded-xl">
-               <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white text-amber-500 rounded-lg shadow-sm border border-amber-50">
-                     <ShieldAlert size={18} />
-                  </div>
-                  <div>
-                     <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest leading-none">Historical Data Confidence (Story 5 & 11)</span>
-                     <p className="text-[11px] font-medium text-amber-600/80 mt-0.5 font-serif">Trend preservation active. Metrics based on 94% verified historical actuals.</p>
-                  </div>
-               </div>
-               <div className="flex items-center gap-2 px-3 py-1 bg-white border border-rose-100 rounded-lg text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">
-                  <ZapOff size={12} /> Sync Restricted
-               </div>
-            </div>
-         )}
+
 
          {/* Header — Unified Command Strip */}
          <div className="mb-6 flex items-center justify-between">
@@ -406,14 +390,6 @@ const UtilizationPerformanceDashboard = () => {
                   </div>
                </div>
 
-               <div className="hidden sm:flex items-center gap-2 px-4 bg-slate-900 text-white rounded-xl border border-slate-800 shadow-sm text-[12px] font-bold uppercase tracking-wider h-[42px]">
-                  <ShieldCheck size={16} className="text-emerald-400" />
-                  PASSED
-               </div>
-               <button className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-[12px] font-bold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98] h-[42px]">
-                  <Download className="h-4 w-4" />
-                  <span className="hidden sm:inline">EXPORT AUDIT</span>
-               </button>
             </div>
          </div>
 
