@@ -186,7 +186,7 @@ const UtilizationPerformanceDashboard = () => {
    const [searchQuery, setSearchQuery] = useState('');
    const [currentPage, setCurrentPage] = useState(1);
    const ITEMS_PER_PAGE = 8;
-   
+
    const [resourceMetrics, setResourceMetrics] = useState([]);
    const [isResourceLoading, setIsResourceLoading] = useState(false);
    const [dateRange, setDateRange] = useState({
@@ -340,10 +340,10 @@ const UtilizationPerformanceDashboard = () => {
             </div>
 
             <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest">
-               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg border border-slate-800 shadow-xl shadow-slate-900/10">
+               {/* <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg border border-slate-800 shadow-xl shadow-slate-900/10">
                   <ShieldCheck size={14} className="text-emerald-400" />
                   Readiness Gate: PASSED
-               </div>
+               </div> */}
                <button className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
                   <Download size={14} className="text-indigo-600" />
                   Full Audit Export
@@ -374,7 +374,7 @@ const UtilizationPerformanceDashboard = () => {
                   { id: 'portfolio', label: 'Portfolio Analytics', icon: <PieIcon size={14} /> },
                   { id: 'projects', label: 'Operational Projects', icon: <Monitor size={14} /> },
                   { id: 'resource', label: 'Resource Capability', icon: <BrainCircuit size={14} /> },
-                  { id: 'governance', label: 'Governance & Readiness', icon: <ShieldAlert size={14} /> }
+                  // { id: 'governance', label: 'Governance & Readiness', icon: <ShieldAlert size={14} /> }
                ].map((tab) => {
                   const isActive = activeTab === tab.id;
                   return (
@@ -505,8 +505,8 @@ const UtilizationPerformanceDashboard = () => {
                               key={tab.id}
                               onClick={() => setProjectCategoryTab(tab.id)}
                               className={`rounded-lg px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${projectCategoryTab === tab.id
-                                    ? 'bg-white text-indigo-600 shadow-sm border border-slate-200'
-                                    : 'text-slate-500 hover:text-slate-700'
+                                 ? 'bg-white text-indigo-600 shadow-sm border border-slate-200'
+                                 : 'text-slate-500 hover:text-slate-700'
                                  }`}
                            >
                               {tab.label}
@@ -590,8 +590,8 @@ const UtilizationPerformanceDashboard = () => {
                                     <div className="flex flex-col items-end">
                                        <span className={`text-[16px] font-black ${project.health === 'Critical' ? 'text-rose-600' : 'text-slate-900'}`}>{formatMetric(project.util, '%')}</span>
                                        <span className={`inline-flex rounded-md border px-2 py-0.5 text-[8px] font-black uppercase tracking-widest mt-1 ${project.severity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-100' :
-                                             project.severity === 'Warning' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                                'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                          project.severity === 'Warning' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                             'bg-emerald-50 text-emerald-700 border-emerald-100'
                                           }`}>
                                           {project.health}
                                        </span>
@@ -739,7 +739,7 @@ const UtilizationPerformanceDashboard = () => {
             )}
 
             {/* TAB 4: GOVERNANCE & READINESS */}
-            {activeTab === 'governance' && (
+            {/* {activeTab === 'governance' && (
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 flex flex-col items-center text-center">
                      <div className="h-20 w-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center border border-emerald-100 mb-6 shadow-xl shadow-emerald-500/10">
@@ -791,7 +791,7 @@ const UtilizationPerformanceDashboard = () => {
                      </div>
                   </div>
                </div>
-            )}
+            )} */}
          </div>
 
          {/* RESOURCE PROJECTS DRAWER */}
