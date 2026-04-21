@@ -11,11 +11,12 @@ import {
    AlertTriangle, ArrowUpRight, ArrowDownRight, History, Bell, CheckCircle2,
    Share2, RefreshCcw, Info, Database, Fingerprint, Lock, ShieldAlert,
    Verified, ZapOff, Scale, LayoutGrid, CalendarRange, Clock, PieChart as PieChartIcon,
-   TrendingUp as TrendingUpIcon, MoveUpRight
+   TrendingUp as TrendingUpIcon, MoveUpRight, X, User, BarChart2
 } from 'lucide-react';
-import { getBillNonBillable } from '../../services/utilizationService';
+import { getBillNonBillable, getResourceProjects } from '../../services/utilizationService';
 import Pagination from '../../../../components/Pagination/pagination';
 import LoadingSpinner from "../../../../components/LoadingSpinner";
+import ResourceVisualizationDrawer from '../components/ResourceVisualizationDrawer';
 
 // --- INTEGRATED MOCK DATA MODELS FOR ALL 12 STORIES ---
 
@@ -87,6 +88,11 @@ const UtilizationPerformanceDashboard = () => {
       endDate: new Date().toISOString().split('T')[0]
    });
 
+   const [selectedResource, setSelectedResource] = useState(null);
+   const [resourceProjectsData, setResourceProjectsData] = useState([]);
+   const [isProjectsLoading, setIsProjectsLoading] = useState(false);
+   const [projectsDrawerTab, setProjectsDrawerTab] = useState('overall'); // 'overall' or 'projects'
+
    const [searchQuery, setSearchQuery] = useState('');
    const [currentPage, setCurrentPage] = useState(1);
    const ITEMS_PER_PAGE = 8;
@@ -130,6 +136,21 @@ const UtilizationPerformanceDashboard = () => {
    const activeChartData = useMemo(() => {
       return PORTFOLIO_DATA[granularity] || [];
    }, [granularity]);
+
+   const handleRowClick = async (res) => {
+      setSelectedResource(res);
+      setProjectsDrawerTab('overall');
+      setIsProjectsLoading(true);
+      try {
+         const data = await getResourceProjects(res.userId);
+         setResourceProjectsData(data);
+      } catch (err) {
+         console.error(err);
+         setResourceProjectsData([]);
+      } finally {
+         setIsProjectsLoading(false);
+      }
+   };
 
    return (
       <div className="min-h-screen bg-[#FDFDFE] p-6 font-sans select-none">
@@ -452,7 +473,7 @@ const UtilizationPerformanceDashboard = () => {
                               </tr>
                            ) : (
                               filteredAndPaginatedResources.paginated.map((res, idx) => (
-                                 <tr key={res.userId || idx} className="hover:bg-slate-50/40 transition-colors group">
+                                 <tr key={res.userId || idx} className="hover:bg-slate-50/40 transition-colors group cursor-pointer" onClick={() => handleRowClick(res)}>
                                     <td className="px-6 py-4">
                                        <div className="flex flex-col">
                                           <span className="text-[13px] font-bold text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{res.userName}</span>
@@ -554,9 +575,21 @@ const UtilizationPerformanceDashboard = () => {
                </div>
             )}
          </div>
+
+         {/* RESOURCE PROJECTS DRAWER */}
+         <ResourceVisualizationDrawer
+             selectedResource={selectedResource}
+             onClose={() => setSelectedResource(null)}
+             projectsDrawerTab={projectsDrawerTab}
+             setProjectsDrawerTab={setProjectsDrawerTab}
+             isProjectsLoading={isProjectsLoading}
+             resourceProjectsData={resourceProjectsData}
+         />
       </div>
    );
 };
+
+
 
 const PerformanceTooltip = ({ active, payload, label }) => {
    if (active && payload && payload.length) {
