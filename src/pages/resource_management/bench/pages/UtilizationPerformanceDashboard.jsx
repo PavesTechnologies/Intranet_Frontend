@@ -1,5 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+﻿import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { getOperationalProjects } from '../services/operationalProjectsService';
+import LoadingSpinner from '../../../../components/LoadingSpinner';
+import Pagination from '../../../../components/Pagination/pagination';
 import {
    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
    BarChart, Bar, Cell, PieChart, Pie, Sector, Legend, LineChart, Line, ComposedChart
@@ -55,12 +58,99 @@ const PORTFOLIO_DATA = {
    ]
 };
 
-const PROJECT_SQUAD = [
-   { id: 'P-101', name: 'Alpha-X Cloud', client: 'Nexus Corp', actualHours: 320, plannedHours: 350, util: 91.4, billable: 90, nonBillable: 5, internal: 5, health: 'Optimal', severity: 'Low', breach: 'None' },
-   { id: 'P-102', name: 'E-Commerce', client: 'RetailFlow', actualHours: 410, plannedHours: 430, util: 95.3, billable: 80, nonBillable: 15, internal: 5, health: 'Warning', severity: 'Critical', breach: 'Sustained (4w)' },
-   { id: 'P-103', name: 'FinServe AI', client: 'FinServe', actualHours: 140, plannedHours: 350, util: 40.0, billable: 40, nonBillable: 50, internal: 10, health: 'Critical', severity: 'Critical', breach: 'Sustained (6w)' },
-   { id: 'P-104', name: 'Search Engine', client: 'Visionary', actualHours: 392, plannedHours: 400, util: 98.0, billable: 95, nonBillable: 0, internal: 5, health: 'Optimal', severity: 'Low', breach: 'None' },
-];
+const extractOperationalProjects = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.projects)) return payload.projects;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.projectHoursSummaries)) return payload.projectHoursSummaries;
+  if (Array.isArray(payload?.projectSummaries)) return payload.projectSummaries;
+  if (Array.isArray(payload?.content)) return payload.content;
+  return [];
+};
+
+const normalizeString = (value) => String(value ?? '').trim().toLowerCase();
+
+const isInternalProject = (project) => {
+  const explicitInternalFlag = [
+    project.isInternal,
+    project.internalProject,
+    project.isInternalProject,
+  ].find((value) => typeof value === 'boolean');
+
+  if (typeof explicitInternalFlag === 'boolean') {
+    return explicitInternalFlag;
+  }
+
+  const typeSignals = [
+    project.projectType,
+    project.type,
+    project.category,
+    project.projectCategory,
+    project.engagementType,
+  ].map(normalizeString);
+
+  if (typeSignals.some((value) => value.includes('internal'))) {
+    return true;
+  }
+
+  const clientSignals = [
+    project.client,
+    project.clientName,
+    project.customer,
+    project.accountName,
+  ].map(normalizeString);
+
+  if (clientSignals.some((value) => value === 'internal' || value.includes('internal project'))) {
+    return true;
+  }
+
+  return false;
+};
+
+const mapProjectCatalogEntry = (project) => {
+  const billableHours = Number(
+    project.billableHours ?? project.billable ?? project.billableHour ?? 0,
+  );
+  const nonBillableHours = Number(
+    project.nonBillableHours ?? project.nonBillable ?? project.nonBillableHour ?? 0,
+  );
+  const resourceHours = Number(
+    project.resourceHours ?? project.totalResourceHours ?? project.totalHours ?? billableHours + nonBillableHours,
+  );
+  const internalHours = Math.max(resourceHours - billableHours - nonBillableHours, 0);
+  const billingBase = billableHours + nonBillableHours + internalHours;
+  const billable = billingBase > 0 ? Number(((billableHours / billingBase) * 100).toFixed(1)) : 0;
+  const nonBillable = billingBase > 0 ? Number(((nonBillableHours / billingBase) * 100).toFixed(1)) : 0;
+  const internal = billingBase > 0 ? Number(((internalHours / billingBase) * 100).toFixed(1)) : 0;
+  const util = Number(
+    project.utilization ?? project.utilizationPercentage ?? project.utilizationPercent ?? 0,
+  );
+
+  return {
+    id: project.projectId || project.id || 'N/A',
+    name: project.project || project.projectName || project.name || 'Unnamed Project',
+    client: project.clientName || project.client || project.customer || `${resourceHours}h total`,
+    actualHours: Number(project.actualHours ?? project.actual ?? 0),
+    plannedHours: Number(project.plannedHours ?? project.planned ?? 0),
+    pendingHours: Number(project.pendingHours ?? project.pending ?? 0),
+    util,
+    billable,
+    nonBillable,
+    internal,
+    billableHours,
+    nonBillableHours,
+    internalHours,
+    resourceHours,
+    health: util >= 90 ? 'Optimal' : util >= 70 ? 'Warning' : 'Critical',
+    severity: util >= 90 ? 'Low' : util >= 70 ? 'Warning' : 'Critical',
+    breach: Number(project.pendingHours ?? project.pending ?? 0) > 0 ? 'Pending Hours' : 'None',
+    isInternal: isInternalProject(project),
+  };
+};
+
+const formatMetric = (value, suffix = '') => (
+  typeof value === 'number' ? `${value}${suffix}` : '--'
+);
 
 const RESOURCE_DATABASE = [
    { id: 'E-004', name: 'Arun Kumar', role: 'Sr. Dev', util: 92.5, actual: 148, allocated: 160, billable: 140, nonBillable: 8, internal: 0, trend: 'up', lineage: 'TS-4421', confidence: 'High' },
@@ -75,61 +165,73 @@ const ALERT_INTELLIGENCE = [
 ];
 
 const UtilizationPerformanceDashboard = () => {
-   const navigate = useNavigate();
-   const [activeTab, setActiveTab] = useState('portfolio');
-   const [granularity, setGranularity] = useState('WEEKLY');
-   const [OVERALL_CONFIDENCE_SCORE] = useState(94);
+  const PROJECTS_PER_PAGE = 5;
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'portfolio');
+  const [projectCategoryTab, setProjectCategoryTab] = useState('active');
+  const [projectPage, setProjectPage] = useState(1);
+  const [granularity, setGranularity] = useState('WEEKLY');
+  const [OVERALL_CONFIDENCE_SCORE] = useState(94);
+  const [operationalProjects, setOperationalProjects] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState('');
 
-   const [resourceMetrics, setResourceMetrics] = useState([]);
-   const [isResourceLoading, setIsResourceLoading] = useState(false);
-   const [dateRange, setDateRange] = useState({
-      startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0]
-   });
+  const activeChartData = useMemo(() => {
+    return PORTFOLIO_DATA[granularity] || [];
+  }, [granularity]);
 
-   const [searchQuery, setSearchQuery] = useState('');
-   const [currentPage, setCurrentPage] = useState(1);
-   const ITEMS_PER_PAGE = 8;
+  const visibleOperationalProjects = useMemo(() => (
+    operationalProjects.filter((project) => (
+      projectCategoryTab === 'internal' ? project.isInternal : !project.isInternal
+    ))
+  ), [operationalProjects, projectCategoryTab]);
 
-   const filteredAndPaginatedResources = useMemo(() => {
-      let filtered = Array.isArray(resourceMetrics) ? resourceMetrics : [];
-      if (searchQuery) {
-         const lowerQuery = searchQuery.toLowerCase();
-         filtered = filtered.filter(res =>
-            res.userName?.toLowerCase().includes(lowerQuery)
-         );
+  const totalProjectPages = Math.max(
+    1,
+    Math.ceil(visibleOperationalProjects.length / PROJECTS_PER_PAGE),
+  );
+
+  const paginatedOperationalProjects = useMemo(() => {
+    const startIndex = (projectPage - 1) * PROJECTS_PER_PAGE;
+    return visibleOperationalProjects.slice(startIndex, startIndex + PROJECTS_PER_PAGE);
+  }, [visibleOperationalProjects, projectPage, PROJECTS_PER_PAGE]);
+
+  useEffect(() => {
+    const fetchOperationalProjects = async () => {
+      setProjectsLoading(true);
+      setProjectsError('');
+
+      try {
+        const data = await getOperationalProjects();
+        const normalizedProjects = extractOperationalProjects(data).map(mapProjectCatalogEntry);
+
+        if (normalizedProjects.length > 0) {
+          setOperationalProjects(normalizedProjects);
+        } else {
+          setProjectsError('Project hours summary is empty for this user.');
+          setOperationalProjects([]);
+        }
+      } catch (error) {
+        setProjectsError('Unable to fetch project hours summary right now.');
+        setOperationalProjects([]);
+      } finally {
+        setProjectsLoading(false);
       }
+    };
 
-      const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1;
-      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-      const paginated = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    fetchOperationalProjects();
+  }, []);
 
-      return { paginated, totalPages };
-   }, [resourceMetrics, searchQuery, currentPage]);
+  useEffect(() => {
+    setProjectPage(1);
+  }, [projectCategoryTab]);
 
-   useEffect(() => {
-      const fetchResourceMetrics = async () => {
-         if (!dateRange.startDate || !dateRange.endDate) return;
-         if (new Date(dateRange.startDate) > new Date(dateRange.endDate)) return;
-         try {
-            setIsResourceLoading(true);
-            const data = await getBillNonBillable(dateRange.startDate, dateRange.endDate);
-            console.log("Data from tms: ", data);
-            setResourceMetrics(data);
-         } catch (err) {
-            console.error(err);
-            setResourceMetrics([]);
-         } finally {
-            setIsResourceLoading(false);
-         }
-      };
-
-      fetchResourceMetrics();
-   }, [dateRange.startDate, dateRange.endDate]);
-
-   const activeChartData = useMemo(() => {
-      return PORTFOLIO_DATA[granularity] || [];
-   }, [granularity]);
+  useEffect(() => {
+    if (projectPage > totalProjectPages) {
+      setProjectPage(totalProjectPages);
+    }
+  }, [projectPage, totalProjectPages]);
 
    return (
       <div className="min-h-screen bg-[#FDFDFE] p-6 font-sans select-none">
@@ -152,34 +254,34 @@ const UtilizationPerformanceDashboard = () => {
             </div>
          )}
 
-         {/* Header — Unified Command Strip */}
-         <div className="mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-               <button
-                  onClick={() => navigate('/resource-management/bench')}
-                  className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
-               >
-                  <ArrowLeft size={18} />
-               </button>
-               <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-none">Utilization Intelligence Hub</h1>
-                  <p className="mt-1.5 text-xs sm:text-sm text-slate-500 font-medium tracking-normal italic opacity-80 underline decoration-indigo-200 decoration-2 underline-offset-4 font-serif">
-                     Governed Command Hub — Identifying Directional Trends & Patterns (Story 5)
-                  </p>
-               </div>
-            </div>
-
-            <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest">
-               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg border border-slate-800 shadow-xl shadow-slate-900/10">
-                  <ShieldCheck size={14} className="text-emerald-400" />
-                  Readiness Gate: PASSED
-               </div>
-               <button className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
-                  <Download size={14} className="text-indigo-600" />
-                  Full Audit Export
-               </button>
-            </div>
-         </div>
+      {/* Header â€” Unified Command Strip */}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/resource-management/bench')}
+            className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-none">Utilization Intelligence Hub</h1>
+            <p className="mt-1.5 text-xs sm:text-sm text-slate-500 font-medium tracking-normal italic opacity-80 underline decoration-indigo-200 decoration-2 underline-offset-4 font-serif">
+               Governed Command Hub â€” Identifying Directional Trends & Patterns (Story 5)
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg border border-slate-800 shadow-xl shadow-slate-900/10">
+             <ShieldCheck size={14} className="text-emerald-400" />
+             Readiness Gate: PASSED
+          </div>
+          <button className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
+            <Download size={14} className="text-indigo-600" />
+            Full Audit Export
+          </button>
+        </div>
+      </div>
 
          {/* KPI Stats Grid */}
          <div className="flex flex-nowrap gap-3 overflow-x-auto mb-6 pb-1 no-scrollbar">
@@ -273,113 +375,184 @@ const UtilizationPerformanceDashboard = () => {
                      </div>
                   </div>
 
-                  {/* STORY 3 — DEDICATED BILLING CLASSIFICATION BREAKDOWN */}
-                  <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 flex flex-col group overflow-hidden">
-                     <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest opacity-60">Portfolio Yield Index</h3>
-                        <PieChartIcon size={14} className="text-indigo-400" />
-                     </div>
-                     <div className="flex-1 h-48 w-full mt-2">
-                        <ResponsiveContainer width="100%" height="100%">
-                           <PieChart>
-                              <Pie
-                                 data={BILLING_PIE_DATA}
-                                 innerRadius={55}
-                                 outerRadius={75}
-                                 paddingAngle={5}
-                                 dataKey="value"
-                                 stroke="none"
-                              >
-                                 {BILLING_PIE_DATA.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                 ))}
-                              </Pie>
-                              <RechartsTooltip />
-                           </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute inset-x-0 top-36 flex flex-col items-center justify-center pointer-events-none">
-                           <span className="text-[18px] font-black text-slate-900 leading-none">72%</span>
-                           <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Billable</span>
-                        </div>
-                     </div>
-                     <div className="mt-4 space-y-2">
-                        {BILLING_PIE_DATA.map((item) => (
-                           <div key={item.name} className="flex items-center justify-between p-2 bg-slate-50/50 rounded-lg border border-slate-100">
-                              <div className="flex items-center gap-2">
-                                 <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{item.name}</span>
-                              </div>
-                              <span className="text-[11px] font-black text-slate-900">{item.value}%</span>
-                           </div>
-                        ))}
-                     </div>
-                  </div>
-               </div>
-            )}
+            {/* STORY 3 â€” DEDICATED BILLING CLASSIFICATION BREAKDOWN */}
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 flex flex-col group overflow-hidden">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest opacity-60">Portfolio Yield Index</h3>
+                  <PieChartIcon size={14} className="text-indigo-400" />
+                </div>
+                <div className="flex-1 h-48 w-full mt-2">
+                   <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                         <Pie
+                            data={BILLING_PIE_DATA}
+                            innerRadius={55}
+                            outerRadius={75}
+                            paddingAngle={5}
+                            dataKey="value"
+                            stroke="none"
+                         >
+                            {BILLING_PIE_DATA.map((entry, index) => (
+                               <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                         </Pie>
+                         <RechartsTooltip />
+                      </PieChart>
+                   </ResponsiveContainer>
+                   <div className="absolute inset-x-0 top-36 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-[18px] font-black text-slate-900 leading-none">72%</span>
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Billable</span>
+                   </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                   {BILLING_PIE_DATA.map((item) => (
+                      <div key={item.name} className="flex items-center justify-between p-2 bg-slate-50/50 rounded-lg border border-slate-100">
+                         <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{item.name}</span>
+                         </div>
+                         <span className="text-[11px] font-black text-slate-900">{item.value}%</span>
+                      </div>
+                   ))}
+                </div>
+            </div>
+          </div>
+        )}
 
-            {/* TAB 2: PROJECTS & BREACHES (Story 3, 4, 6) */}
-            {activeTab === 'projects' && (
-               <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden animate-in">
-                  <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
-                     <div>
-                        <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest leading-none">Project-Level Consumption Matrix</h3>
-                        <p className="text-[10px] font-medium text-slate-400 mt-1 uppercase tracking-widest opacity-70 italic font-serif">Measuring billable yield against planned engagement targets (Story 3)</p>
-                     </div>
-                  </div>
-                  <div className="overflow-x-auto no-scrollbar">
-                     <table className="w-full text-left">
-                        <thead>
-                           <tr className="bg-slate-50/50 border-b border-slate-50">
-                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Project / Engagement</th>
-                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Billing Strip</th>
-                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Hours (Act / Plan)</th>
-                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-right">Utilization %</th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                           {PROJECT_SQUAD.map((project) => (
-                              <tr key={project.id} className="hover:bg-slate-50/40 transition-colors group">
-                                 <td className="px-6 py-4">
-                                    <div className="flex flex-col">
-                                       <span className="text-[13px] font-bold text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{project.name}</span>
-                                       <span className="text-[10px] font-medium text-slate-400 mt-1.5 uppercase tracking-widest italic">{project.client} | {project.id}</span>
-                                    </div>
-                                 </td>
-                                 <td className="px-6 py-4 text-center">
-                                    <div className="flex items-center justify-center gap-0.5 max-w-[140px] mx-auto overflow-hidden rounded-full h-2 bg-slate-100 border border-slate-200">
-                                       <div className="h-full bg-indigo-600" style={{ width: `${project.billable}%` }} />
-                                       <div className="h-full bg-indigo-300" style={{ width: `${project.nonBillable}%` }} />
-                                       <div className="h-full bg-slate-300" style={{ width: `${project.internal}%` }} />
-                                    </div>
-                                    <div className="flex justify-center gap-3 mt-1.5">
-                                       <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-600" /><span className="text-[8px] font-black text-slate-400 uppercase">{project.billable}% B</span></div>
-                                       <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-300" /><span className="text-[8px] font-black text-slate-400 uppercase">{project.nonBillable}% NB</span></div>
-                                    </div>
-                                 </td>
-                                 <td className="px-6 py-4 text-center">
-                                    <span className="text-[12px] font-bold text-slate-900">{project.actualHours} / {project.plannedHours}h</span>
-                                    <div className="h-1 w-12 bg-slate-100 rounded-full mt-2 mx-auto overflow-hidden">
-                                       <div className="h-full bg-indigo-500" style={{ width: `${project.util}%` }} />
-                                    </div>
-                                 </td>
-                                 <td className="px-6 py-4 text-right">
-                                    <div className="flex flex-col items-end">
-                                       <span className={`text-[16px] font-black ${project.health === 'Critical' ? 'text-rose-600' : 'text-slate-900'}`}>{project.util}%</span>
-                                       <span className={`inline-flex rounded-md border px-2 py-0.5 text-[8px] font-black uppercase tracking-widest mt-1 ${project.severity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-100' :
-                                          project.severity === 'Warning' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                             'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                          }`}>
-                                          {project.health}
-                                       </span>
-                                    </div>
-                                 </td>
-                              </tr>
-                           ))}
-                        </tbody>
-                     </table>
-                  </div>
+        {/* TAB 2: PROJECTS & BREACHES (Story 3, 4, 6) */}
+        {activeTab === 'projects' && (
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden animate-in">
+             <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
+                <div>
+                   <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest leading-none">Project-Level Consumption Matrix</h3>
+                </div>
+             </div>
+             <div className="px-6 py-3 border-b border-slate-100 bg-white">
+               <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                 {[
+                   { id: 'active', label: 'Active Projects' },
+                   { id: 'internal', label: 'Internal Projects' },
+                 ].map((tab) => (
+                   <button
+                     key={tab.id}
+                     onClick={() => setProjectCategoryTab(tab.id)}
+                     className={`rounded-lg px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                       projectCategoryTab === tab.id
+                         ? 'bg-white text-indigo-600 shadow-sm border border-slate-200'
+                         : 'text-slate-500 hover:text-slate-700'
+                     }`}
+                   >
+                     {tab.label}
+                   </button>
+                 ))}
                </div>
-            )}
+             </div>
+             {projectsLoading && (
+               <div className="border-b border-slate-100 bg-white px-6 py-8">
+                 <LoadingSpinner text="Projects Loading..." />
+               </div>
+             )}
+             {projectsError && (
+               <div className="px-6 py-4 text-[11px] font-semibold text-amber-700 border-b border-amber-100 bg-amber-50/60">
+                 {projectsError}
+               </div>
+             )}
+             <div className="overflow-x-auto no-scrollbar">
+                <table className="w-full text-left">
+                  <thead>
+                     <tr className="bg-slate-50/50 border-b border-slate-50">
+                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Project / Engagement</th>
+                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Billing Strip</th>
+                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Hours (Act / Plan)</th>
+                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-right">Utilization %</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                     {!projectsLoading && visibleOperationalProjects.length === 0 && (
+                       <tr>
+                          <td colSpan="4" className="px-6 py-8 text-center text-[11px] font-semibold text-slate-500">
+                            {projectCategoryTab === 'internal'
+                              ? 'No internal projects were returned by the backend hours summary endpoint.'
+                              : 'No active client projects were returned by the backend hours summary endpoint.'}
+                          </td>
+                       </tr>
+                     )}
+                     {paginatedOperationalProjects.map((project) => (
+                       <tr
+                          key={project.id}
+                          className="hover:bg-slate-50/40 transition-colors group cursor-pointer"
+                          onClick={() => navigate(`/resource-management/bench/utilization-performance/projects/${project.id}`)}
+                       >
+                          <td className="px-6 py-4">
+                             <div className="flex flex-col">
+                                <span className="text-[13px] font-bold text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{project.name}</span>
+                                <span className="text-[10px] font-medium text-slate-400 mt-1.5 uppercase tracking-widest italic">
+                                  {projectCategoryTab === 'internal' ? 'Internal Project' : project.client} | {project.id}
+                                </span>
+                                <span className="text-[9px] font-semibold text-slate-500 mt-2">
+                                  Pending: {formatMetric(project.pendingHours, 'h')}
+                                </span>
+                             </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                             {project.resourceHours > 0 ? (
+                               <>
+                                 <div className="flex items-center justify-center gap-0.5 max-w-[140px] mx-auto overflow-hidden rounded-full h-2 bg-slate-100 border border-slate-200">
+                                    <div className="h-full bg-indigo-600" style={{ width: `${project.billable}%` }} />
+                                    <div className="h-full bg-indigo-300" style={{ width: `${project.nonBillable}%` }} />
+                                    <div className="h-full bg-slate-300" style={{ width: `${project.internal}%` }} />
+                                 </div>
+                                 <div className="flex justify-center gap-3 mt-1.5">
+                                    <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-600"/><span className="text-[8px] font-black text-slate-400 uppercase">{formatMetric(project.billableHours, 'h')} B</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-300"/><span className="text-[8px] font-black text-slate-400 uppercase">{formatMetric(project.nonBillableHours, 'h')} NB</span></div>
+                                 </div>
+                               </>
+                             ) : (
+                               <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                                 No billed hours
+                               </span>
+                             )}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                             <span className="text-[12px] font-bold text-slate-900">{formatMetric(project.actualHours)} / {formatMetric(project.plannedHours, 'h')}</span>
+                             <div className="h-1 w-12 bg-slate-100 rounded-full mt-2 mx-auto overflow-hidden">
+                                <div className="h-full bg-indigo-500" style={{ width: `${typeof project.util === 'number' ? project.util : 0}%` }} />
+                             </div>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                             <div className="flex flex-col items-end">
+                                <span className={`text-[16px] font-black ${project.health === 'Critical' ? 'text-rose-600' : 'text-slate-900'}`}>{formatMetric(project.util, '%')}</span>
+                                <span className={`inline-flex rounded-md border px-2 py-0.5 text-[8px] font-black uppercase tracking-widest mt-1 ${
+                                  project.severity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                                  project.severity === 'Warning' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                  'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                }`}>
+                                   {project.health}
+                                </span>
+                             </div>
+                          </td>
+                       </tr>
+                     ))}
+                  </tbody>
+                </table>
+             </div>
+             {!projectsLoading && visibleOperationalProjects.length > 0 && (
+               <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/40">
+                 <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                   Showing {Math.min((projectPage - 1) * PROJECTS_PER_PAGE + 1, visibleOperationalProjects.length)}-
+                   {Math.min(projectPage * PROJECTS_PER_PAGE, visibleOperationalProjects.length)} of {visibleOperationalProjects.length}
+                 </div>
+                 <Pagination
+                   currentPage={projectPage}
+                   totalPages={totalProjectPages}
+                   onPrevious={() => setProjectPage((prev) => Math.max(prev - 1, 1))}
+                   onNext={() => setProjectPage((prev) => Math.min(prev + 1, totalProjectPages))}
+                   className="justify-end py-0"
+                 />
+               </div>
+             )}
+          </div>
+        )}
 
             {/* TAB 3: RESOURCE CAPABILITIES (Story 3, 4, 5, 10) */}
             {activeTab === 'resource' && (

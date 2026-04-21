@@ -1,6 +1,6 @@
 // src/pages/resource_management/projects/ProjectDetails.jsx
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import ResourceList from "./RMSProjectList";
 import ProjectResourcesTable from "./ProjectResourcesTable";
 import axios from "axios";
@@ -44,6 +44,7 @@ import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 const RMSProjectDetails = () => {
   const { getEnumValues } = useEnums();
   const { user } = useAuth();
+  const location = useLocation();
   const roles = user?.roles;
   const isRM = roles?.includes("RESOURCE-MANAGER");
   const PROJECT_STATUSES = getEnumValues("ProjectStatus");
@@ -64,7 +65,7 @@ const RMSProjectDetails = () => {
   );
 
   const [project, setProject] = useState(null);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(location.state?.initialTab || "overview");
   const [overlaps, setOverlaps] = useState([]);
   const [overlapsPage, setOverlapsPage] = useState(1);
   const OVERLAPS_PER_PAGE = 3;
@@ -104,6 +105,12 @@ const RMSProjectDetails = () => {
     activeFlag: true,
   };
   const [formData, setFormData] = useState(DEFAULT_FORM_STATE);
+
+  useEffect(() => {
+    if (location.state?.initialTab) {
+      setActiveTab(location.state.initialTab);
+    }
+  }, [location.state]);
 
   // 1. Fetch Client SLAs when entering Inherit Mode
   const handleInheritClick = async () => {
@@ -567,13 +574,14 @@ const RMSProjectDetails = () => {
   // ================= Fetch Deliverable Role Data on Modal Open =================
   useEffect(() => {
     if (openDeliverableRoleModal) {
-      loadProficiencyLevels();
+      if (proficiencyLevels.length === 0) {
+        loadProficiencyLevels();
+      }
+      if (categories.length === 0) {
+        loadCategoryTree();
+      }
     }
-  }, [openDeliverableRoleModal]);
-
-  useEffect(() => {
-    loadCategoryTree();
-  }, []);
+  }, [openDeliverableRoleModal, proficiencyLevels.length, categories.length]);
 
   const saveInheritedEscalations = async () => {
     try {
