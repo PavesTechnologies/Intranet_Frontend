@@ -1,359 +1,308 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+
+const createInitialFormData = (initialData) => {
+  const data = initialData || {}; // ✅ THIS FIXES NULL ERROR
+
+  return {
+    title: data.task_title || "",
+    taskType: data.task_type || "Onboarding",
+    user_uuid: data.user_uuid || "",
+    assigned_to: data.assigned_to || "",
+    assigned_team: data.assigned_team || "HR Team",
+    priority: data.priority || "Medium",
+    status: data.status || "To Do",
+    progress: data.progress || 0,
+    dueDate: data.due_date || "",
+    reminderDate: data.reminder_date || "",
+    description: data.description || "",
+  };
+};
+
+const labelStyle = {
+  display: "block",
+  marginBottom: 6,
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#334155",
+};
+
+const inputStyle = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: 10,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  fontSize: 14,
+  color: "#0f172a",
+};
+
+const actionButtonStyle = {
+  border: "none",
+  padding: "10px 18px",
+  borderRadius: 10,
+  cursor: "pointer",
+  fontWeight: 600,
+};
 
 export default function AddTaskModal({
   isOpen,
   onClose,
   onSave,
+  employees = [],
+  assignees = [],
+  loadingOptions = false,
+  initialData = null,
+  mode = "create",
 }) {
-  const [formData, setFormData] = useState({
-    title: "",
-    taskType: "Onboarding",
-    employee: "",
-    assignedTo: "",
-    priority: "medium",
-    dueDate: "",
-    reminderDate: "",
-    description: "",
-  });
+  const [formData, setFormData] = useState(createInitialFormData(initialData));
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(createInitialFormData(initialData));
+    }
+  }, [isOpen, initialData]);
 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
+    setFormData((current) => ({
+      ...current,
       [e.target.name]: e.target.value,
-    });
+    }));
   };
 
   const handleSubmit = () => {
-    onSave({
-      ...formData,
-      id: Date.now(),
-      progress: 0,
-      status: "todo",
-      createdBy: "HR Manager",
-      createdDate: new Date().toISOString().split("T")[0],
-      sendNotification: true,
-      attachment: "",
-      escalationOwner: "",
-      internalNotes: "",
-      comments: "",
-    });
+    if (!formData.title || !formData.employee_uuid || !formData.assigned_to) {
+      return;
+    }
+
+    onSave(formData);
   };
 
-  const inputStyle = {
-    width: "100%",
-    padding: "10px",
-    borderRadius: 8,
-    border: "1px solid #cbd5e1",
-    marginTop: 6,
-  };
+  const actionLabel = mode === "edit" ? "Update Task" : "Save Task";
+  const titleLabel = mode === "edit" ? "Edit Task" : "Create New Task";
+  const subtitleLabel =
+    mode === "edit"
+      ? "Update task ownership, status, and due dates in one place."
+      : "Create a new onboarding task and assign it from the core employee table.";
+
+  const saveDisabled =
+    loadingOptions ||
+    !formData.title ||
+    !formData.employee_uuid ||
+    !formData.assigned_to;
 
   return (
     <div
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.35)",
+        background: "rgba(15,23,42,0.45)",
+        backdropFilter: "blur(4px)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
         zIndex: 999,
+        padding: 20,
       }}
     >
       <div
         style={{
-          width: 500,
-          background: "white",
-          borderRadius: 14,
+          width: "min(720px, 100%)",
+          background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+          borderRadius: 20,
           padding: 24,
+          boxShadow: "0 24px 70px rgba(15,23,42,0.18)",
+          border: "1px solid rgba(148,163,184,0.2)",
         }}
       >
-        <h2>Create New Task</h2>
-
-        <input
-          name="title"
-          placeholder="Task Title"
-          value={formData.title}
-          onChange={handleChange}
-          style={inputStyle}
-        />
-
-        <input
-          name="employee"
-          placeholder="Employee Name"
-          value={formData.employee}
-          onChange={handleChange}
-          style={inputStyle}
-        />
-
-        <input
-          name="assignedTo"
-          placeholder="Assigned To Team"
-          value={formData.assignedTo}
-          onChange={handleChange}
-          style={inputStyle}
-        />
-
-        <select
-          name="priority"
-          value={formData.priority}
-          onChange={handleChange}
-          style={inputStyle}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 16,
+            marginBottom: 20,
+          }}
         >
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22, color: "#0f172a" }}>
+              {titleLabel}
+            </h2>
+            <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 14 }}>
+              {subtitleLabel}
+            </p>
+          </div>
 
-        <input
-          type="date"
-          name="dueDate"
-          value={formData.dueDate}
-          onChange={handleChange}
-          style={inputStyle}
-        />
+          <button
+            onClick={onClose}
+            style={{
+              border: "1px solid #cbd5e1",
+              background: "#fff",
+              borderRadius: 10,
+              padding: "8px 12px",
+              cursor: "pointer",
+              color: "#334155",
+            }}
+          >
+            Close
+          </button>
+        </div>
 
-        <textarea
-          name="description"
-          rows={3}
-          placeholder="Task Description"
-          value={formData.description}
-          onChange={handleChange}
-          style={inputStyle}
-        />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gap: 16,
+          }}
+        >
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={labelStyle}>Task Title</label>
+            <input
+              name="title"
+              placeholder="Enter task title"
+              value={formData.title}
+              onChange={handleChange}
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Employee</label>
+            <select
+              name="employee_uuid"
+              value={formData.employee_uuid}
+              onChange={handleChange}
+              style={inputStyle}
+            >
+              <option value="">
+                {loadingOptions
+                  ? "Loading core employee details..."
+                  : "Select employee"}
+              </option>
+              {employees.map((employee) => (
+                <option key={employee.value} value={employee.value}>
+                  {employee.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Assigned To</label>
+            <select
+              name="assigned_to"
+              value={formData.assigned_to}
+              onChange={handleChange}
+              style={inputStyle}
+            >
+              <option value="">
+                {loadingOptions ? "Loading assignees..." : "Select assignee"}
+              </option>
+              {assignees.map((assignee) => (
+                <option key={assignee.value} value={assignee.value}>
+                  {assignee.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Priority</label>
+            <select
+              name="priority"
+              value={formData.priority}
+              onChange={handleChange}
+              style={inputStyle}
+            >
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Status</label>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              style={inputStyle}
+            >
+              <option value="todo">To Do</option>
+              <option value="progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Due Date</label>
+            <input
+              type="date"
+              name="dueDate"
+              value={formData.dueDate}
+              onChange={handleChange}
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Reminder Date</label>
+            <input
+              type="date"
+              name="reminderDate"
+              value={formData.reminderDate}
+              onChange={handleChange}
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={labelStyle}>Description</label>
+            <textarea
+              name="description"
+              rows={4}
+              placeholder="Describe the task and expected completion"
+              value={formData.description}
+              onChange={handleChange}
+              style={{ ...inputStyle, resize: "vertical" }}
+            />
+          </div>
+        </div>
 
         <div
           style={{
             display: "flex",
             justifyContent: "flex-end",
             gap: 10,
-            marginTop: 20,
+            marginTop: 22,
           }}
         >
-          <button onClick={onClose}>Cancel</button>
           <button
-            onClick={handleSubmit}
+            onClick={onClose}
             style={{
-              background: "#2563eb",
-              color: "white",
-              border: "none",
-              padding: "10px 16px",
-              borderRadius: 8,
+              ...actionButtonStyle,
+              background: "#e2e8f0",
+              color: "#334155",
             }}
           >
-            Save Task
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saveDisabled}
+            style={{
+              ...actionButtonStyle,
+              background: mode === "edit" ? "#2563eb" : "#0f172a",
+              color: "white",
+              opacity: saveDisabled ? 0.7 : 1,
+              cursor: saveDisabled ? "not-allowed" : "pointer",
+            }}
+          >
+            {actionLabel}
           </button>
         </div>
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-// "use client";
-
-// import React, { useState } from "react";
-
-// export default function AddTaskModal({ isOpen, onClose, onSave }) {
-//   const [formData, setFormData] = useState({
-//     title: "",
-//     employee: "",
-//     priority: "medium",
-//     dueDate: "",
-//     description: "",
-//   });
-
-//   if (!isOpen) return null;
-
-//   const handleChange = (e) => {
-//     setFormData({ ...formData, [e.target.name]: e.target.value });
-//   };
-
-//   const handleSubmit = () => {
-//     if (!formData.title) return;
-
-//     onSave({
-//       ...formData,
-//       id: Date.now(),
-//       progress: 0,
-//       status: "todo",
-//     });
-
-//     setFormData({
-//       title: "",
-//       employee: "",
-//       priority: "medium",
-//       dueDate: "",
-//       description: "",
-//     });
-
-//     onClose();
-//   };
-
-//   const inputStyle = {
-//     width: "100%",
-//     border: "1px solid #e2e8f0",
-//     borderRadius: 8,
-//     padding: "8px 10px",
-//     fontSize: 13,
-//     outline: "none",
-//   };
-
-//   const labelStyle = {
-//     fontSize: 12,
-//     fontWeight: 600,
-//     marginBottom: 4,
-//     display: "block",
-//     color: "#334155",
-//   };
-
-//   return (
-//     <div
-//       style={{
-//         position: "fixed",
-//         inset: 0,
-//         background: "rgba(0,0,0,0.35)",
-//         backdropFilter: "blur(2px)",
-//         display: "flex",
-//         alignItems: "center",
-//         justifyContent: "center",
-//         zIndex: 50,
-//       }}
-//     >
-//       {/* Modal Card */}
-//       <div
-//         style={{
-//           background: "#ffffff",
-//           borderRadius: 14,
-//           width: "92%",
-//           maxWidth: 520,
-//           padding: 24,
-//           boxShadow: "0 18px 40px rgba(0,0,0,0.18)",
-//           animation: "fadeIn 0.18s ease",
-//         }}
-//       >
-//         {/* Header */}
-//         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>
-//           Create New Task
-//         </h2>
-//         <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16 }}>
-//           Fill the details to create onboarding task.
-//         </p>
-
-//         {/* Form */}
-//         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-
-//           {/* Title */}
-//           <div>
-//             <label style={labelStyle}>Task Title</label>
-//             <input
-//               name="title"
-//               value={formData.title}
-//               onChange={handleChange}
-//               style={inputStyle}
-//             />
-//           </div>
-
-//           {/* Employee */}
-//           <div>
-//             <label style={labelStyle}>Assign Employee</label>
-//             <input
-//               name="employee"
-//               value={formData.employee}
-//               onChange={handleChange}
-//               style={inputStyle}
-//             />
-//           </div>
-
-//           {/* Priority + Date */}
-//           <div style={{ display: "flex", gap: 10 }}>
-//             <div style={{ flex: 1 }}>
-//               <label style={labelStyle}>Priority</label>
-//               <select
-//                 name="priority"
-//                 value={formData.priority}
-//                 onChange={handleChange}
-//                 style={inputStyle}
-//               >
-//                 <option value="high">High</option>
-//                 <option value="medium">Medium</option>
-//                 <option value="low">Low</option>
-//               </select>
-//             </div>
-
-//             <div style={{ flex: 1 }}>
-//               <label style={labelStyle}>Due Date</label>
-//               <input
-//                 type="date"
-//                 name="dueDate"
-//                 value={formData.dueDate}
-//                 onChange={handleChange}
-//                 style={inputStyle}
-//               />
-//             </div>
-//           </div>
-
-//           {/* Description */}
-//           <div>
-//             <label style={labelStyle}>Task Description</label>
-//             <textarea
-//               name="description"
-//               value={formData.description}
-//               onChange={handleChange}
-//               rows={3}
-//               style={{ ...inputStyle, resize: "none" }}
-//             />
-//           </div>
-//         </div>
-
-//         {/* Buttons */}
-//         <div
-//           style={{
-//             display: "flex",
-//             justifyContent: "flex-end",
-//             gap: 10,
-//             marginTop: 16,
-//           }}
-//         >
-//           <button
-//             onClick={onClose}
-//             style={{
-//               background: "#e2e8f0",
-//               border: "none",
-//               padding: "8px 14px",
-//               borderRadius: 6,
-//               cursor: "pointer",
-//             }}
-//           >
-//             Cancel
-//           </button>
-
-//           <button
-//             onClick={handleSubmit}
-//             style={{
-//               background: "#4f6df5",
-//               color: "white",
-//               border: "none",
-//               padding: "8px 14px",
-//               borderRadius: 6,
-//               cursor: "pointer",
-//             }}
-//           >
-//             Save Task
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-
