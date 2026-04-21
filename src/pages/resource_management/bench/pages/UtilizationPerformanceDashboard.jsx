@@ -305,7 +305,7 @@ const UtilizationPerformanceDashboard = () => {
       <div className="min-h-screen bg-[#FDFDFE] p-6 font-sans select-none">
 
          {/* Confidence Banner */}
-         {OVERALL_CONFIDENCE_SCORE < 100 && (
+         {/* {OVERALL_CONFIDENCE_SCORE < 100 && (
             <div className="mb-6 flex items-center justify-between p-3 bg-amber-50/50 border border-amber-100 rounded-xl">
                <div className="flex items-center gap-3">
                   <div className="p-2 bg-white text-amber-500 rounded-lg shadow-sm border border-amber-50">
@@ -320,17 +320,17 @@ const UtilizationPerformanceDashboard = () => {
                   <ZapOff size={12} /> Sync Restricted
                </div>
             </div>
-         )}
+         )} */}
 
          {/* Header â€” Unified Command Strip */}
          <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
-               <button
+               {/* <button
                   onClick={() => navigate('/resource-management/bench')}
                   className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
                >
                   <ArrowLeft size={18} />
-               </button>
+               </button> */}
                <div>
                   <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-none">Utilization Intelligence Hub</h1>
                   <p className="mt-1.5 text-xs sm:text-sm text-slate-500 font-medium tracking-normal italic opacity-80 underline decoration-indigo-200 decoration-2 underline-offset-4 font-serif">
@@ -467,10 +467,10 @@ const UtilizationPerformanceDashboard = () => {
                               <RechartsTooltip />
                            </PieChart>
                         </ResponsiveContainer>
-                        <div className="absolute inset-x-0 top-36 flex flex-col items-center justify-center pointer-events-none">
+                        {/* <div className="absolute inset-x-0 top-36 flex flex-col items-center justify-center pointer-events-none">
                            <span className="text-[18px] font-black text-slate-900 leading-none">72%</span>
                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Billable</span>
-                        </div>
+                        </div> */}
                      </div>
                      <div className="mt-4 space-y-2">
                         {BILLING_PIE_DATA.map((item) => (
