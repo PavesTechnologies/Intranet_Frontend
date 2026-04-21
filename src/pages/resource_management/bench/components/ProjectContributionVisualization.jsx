@@ -1,71 +1,205 @@
-import React from 'react';
-import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend, Bar } from 'recharts';
+import React, { useEffect, useRef } from 'react';
+import { Chart, registerables } from 'chart.js';
+Chart.register(...registerables);
+
+const utilizationClass = (u) => {
+  if (u >= 80) return { bg: '#E1F5EE', color: '#1D9E75', bar: '#1D9E75' };
+  if (u >= 60) return { bg: '#FAEEDA', color: '#BA7517', bar: '#BA7517' };
+  return { bg: '#FCEBEB', color: '#A32D2D', bar: '#A32D2D' };
+};
 
 const ProjectContributionVisualization = ({ projects }) => {
-    const data = projects.map(p => ({
-        name: p.projectName.length > 15 ? p.projectName.substring(0, 15) + '...' : p.projectName,
-        fullName: p.projectName,
-        Billable: p.billableHours,
-        'Non-Billable': p.nonBillableHours
-    }));
+  const chartRef = useRef(null);
+  const chartInstance = useRef(null);
 
-    return (
-        <div className="mt-12 mb-16 flex flex-col gap-12 px-4">
-            <h3 className="text-[12px] font-black text-slate-400 uppercase tracking-widest text-center">Project Hour Distribution</h3>
-            <div className="w-full h-64 px-2">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 50 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis
-                            dataKey="name"
-                            axisLine={false}
-                            tickLine={false}
-                            tickMargin={10}
-                            tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600, dy: 8, dx: -7 }}
-                            angle={-45}
-                            textAnchor="end"
-                        />
-                        <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }}
-                        />
-                        <RechartsTooltip
-                            cursor={{ fill: '#f8fafc' }}
-                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                            labelStyle={{ fontWeight: 'bold', color: '#0f172a' }}
-                        />
-                        <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '20px' }} iconType="circle" />
-                        <Bar dataKey="Billable" stackId="a" fill="#4f46e5" radius={[0, 0, 4, 4]} maxBarSize={40} />
-                        <Bar dataKey="Non-Billable" stackId="a" fill="#818cf8" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
+  const totalBillable = projects.reduce((s, p) => s + p.billableHours, 0);
+  const totalNonBillable = projects.reduce((s, p) => s + p.nonBillableHours, 0);
+  const totalHours = totalBillable + totalNonBillable;
+  const overallUtil = Math.round((totalBillable / totalHours) * 100);
 
-            <div className="overflow-x-auto border border-slate-100 rounded-xl mx-2 shadow-sm">
-                <table className="w-full text-left">
-                    <thead className="bg-slate-50">
-                        <tr>
-                            <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Project</th>
-                            <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Billable</th>
-                            <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Non-Billable</th>
-                            <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Util %</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                        {projects.map((p, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50/50">
-                                <td className="px-4 py-3 text-[11px] font-bold text-slate-700">{p.projectName}</td>
-                                <td className="px-4 py-3 text-[11px] font-medium text-slate-600 text-right">{p.billableHours}h</td>
-                                <td className="px-4 py-3 text-[11px] font-medium text-slate-600 text-right">{p.nonBillableHours}h</td>
-                                <td className="px-4 py-3 text-[11px] font-black text-indigo-600 text-right">{p.utilizationPercentage}%</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+  const summaryCards = [
+    { label: 'Total', value: `${totalHours}h` },
+    { label: 'Billable', value: `${totalBillable}h` },
+    { label: 'Non-billable', value: `${totalNonBillable}h` },
+    { label: 'Utilization', value: `${overallUtil}%` },
+  ];
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    if (chartInstance.current) chartInstance.current.destroy();
+
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
+    const tickColor = isDark ? '#9ca3af' : '#94a3b8';
+
+    chartInstance.current = new Chart(chartRef.current, {
+      type: 'bar',
+      data: {
+        labels: projects.map(p =>
+          p.projectName.length > 12 ? p.projectName.slice(0, 12) + '…' : p.projectName
+        ),
+        datasets: [
+          {
+            label: 'Billable',
+            data: projects.map(p => p.billableHours),
+            backgroundColor: '#534AB7',
+            borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 3, bottomRight: 3 },
+            borderSkipped: false,
+            stack: 'a',
+            maxBarThickness: 28,
+          },
+          {
+            label: 'Non-billable',
+            data: projects.map(p => p.nonBillableHours),
+            backgroundColor: '#AFA9EC',
+            borderRadius: { topLeft: 3, topRight: 3, bottomLeft: 0, bottomRight: 0 },
+            borderSkipped: false,
+            stack: 'a',
+            maxBarThickness: 28,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: isDark ? '#1e1e2e' : '#fff',
+            titleColor: isDark ? '#e2e8f0' : '#0f172a',
+            bodyColor: isDark ? '#94a3b8' : '#475569',
+            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+            borderWidth: 1,
+            padding: 8,
+            cornerRadius: 6,
+            titleFont: { size: 11 },
+            bodyFont: { size: 11 },
+            callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}h` },
+          },
+        },
+        scales: {
+          x: {
+            stacked: true,
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              font: { size: 9 },
+              color: tickColor,
+              maxRotation: 35,
+              minRotation: 35,
+            },
+          },
+          y: {
+            stacked: true,
+            grid: { color: gridColor },
+            border: { display: false },
+            ticks: {
+              font: { size: 9 },
+              color: tickColor,
+              callback: v => `${v}h`,
+              maxTicksLimit: 5,
+            },
+          },
+        },
+      },
+    });
+
+    return () => chartInstance.current?.destroy();
+  }, [projects]);
+
+  return (
+    <div className="flex flex-col gap-4">
+
+      {/* Summary metric cards */}
+      <div className="grid grid-cols-4 gap-2">
+        {summaryCards.map((c, i) => (
+          <div key={i} className="bg-slate-50 rounded-lg px-3 py-2.5">
+            <p className="text-[10px] text-slate-400 mb-0.5">{c.label}</p>
+            <p className="text-base font-semibold text-slate-700">{c.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Chart card */}
+      <div className="bg-white border border-slate-100 rounded-xl p-3.5">
+        <div className="flex gap-3 mb-3 flex-wrap">
+          {[{ label: 'Billable', color: '#534AB7' }, { label: 'Non-billable', color: '#AFA9EC' }].map(l => (
+            <span key={l.label} className="flex items-center gap-1 text-[10px] text-slate-400">
+              <span className="w-2 h-2 rounded-sm inline-block" style={{ background: l.color }} />
+              {l.label}
+            </span>
+          ))}
         </div>
-    )
+        <div className="relative w-full h-44">
+          <canvas
+            ref={chartRef}
+            role="img"
+            aria-label="Stacked bar chart showing billable and non-billable hours per project"
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="border border-slate-100 rounded-xl overflow-hidden">
+        <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+          <thead>
+            <tr className="bg-slate-50">
+              {[
+                { label: 'Project', align: 'left', width: '38%' },
+                { label: 'Bill.', align: 'right', width: '16%' },
+                { label: 'Non-bill.', align: 'right', width: '18%' },
+                { label: 'Util.', align: 'right', width: '28%' },
+              ].map(h => (
+                <th
+                  key={h.label}
+                  className="px-3 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider"
+                  style={{ textAlign: h.align, width: h.width }}
+                >
+                  {h.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {projects.map((p, idx) => {
+              const u = p.utilizationPercentage;
+              const { bg, color, bar } = utilizationClass(u);
+              return (
+                <tr key={idx} className="border-t border-slate-100 hover:bg-slate-50/70 transition-colors">
+                  <td className="px-3 py-2 text-[11px] font-medium text-slate-700 truncate">
+                    {p.projectName}
+                  </td>
+                  <td className="px-3 py-2 text-[11px] text-slate-500 text-right">
+                    {p.billableHours}h
+                  </td>
+                  <td className="px-3 py-2 text-[11px] text-slate-500 text-right">
+                    {p.nonBillableHours}h
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <div className="w-8 h-1 rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${u}%`, background: bar }}
+                        />
+                      </div>
+                      <span
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{ background: bg, color }}
+                      >
+                        {u}%
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  );
 };
 
 export default ProjectContributionVisualization;
