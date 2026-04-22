@@ -37,6 +37,8 @@ const Dashboard = () => {
   const isGeneral = user?.roles?.includes("General");
   const isDeveloper = roles.includes("Developer");
   const isManager = roles.includes("Manager");
+  const isHR = roles.includes("HR");
+  const isAdmin = roles.includes("Admin");
 
   // ✅ Fetch total employees
   useEffect(() => {
@@ -308,11 +310,12 @@ const Dashboard = () => {
   ];
 
   const filteredModuleCards = moduleCards.filter((card) => {
-    if (isGeneral && card.title === "Employee Onbording") {
-      return false;
-    }
-    return true;
-  });
+  // If it's the Onboarding card AND the user is General (but not HR)
+  if (card.title === "Employee Onbording" && !isGeneral && !isHR && !isManager && !isAdmin) {
+    return false; // Hide it
+  }
+  return true; // Show everything else (including for HR)
+});
 
   const recentActivity = [
     {
