@@ -218,9 +218,6 @@ export default function TaskBoard({ tasks, onCardClick, onDelete }) {
                           <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
                             {task.assignedTo || "Unassigned"}
                           </div>
-                          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>
-                            {task.assigned_to || "No assignee key"}
-                          </div>
                         </div>
 
                         <div
