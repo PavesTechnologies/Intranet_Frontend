@@ -17,15 +17,31 @@ import { fetchOfferDetailsList } from "./components/fetchOfferDetails";
 
 export default function EmployeeOnboardingDashboard() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const roles = user?.roles || [];
-  const isAdmin = roles.includes("Admin");
+
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [employeeUserIds, setEmployeeUserIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [viewRole, setViewRole] = useState("HR"); // HR | ADMIN
+
+const { user } = useAuth();
+const rawRoles = user?.roles || "";
+
+const userRoles = useMemo(() => {
+  return Array.isArray(rawRoles) 
+    ? rawRoles 
+    : typeof rawRoles === 'string' ? rawRoles.split(',').map(r => r.trim()) : [];
+}, [rawRoles]);
+
+const isHR = userRoles.includes("HR");
+const isManager = userRoles.includes("Manager");
+const isAdmin = userRoles.includes("Admin");
+
+// Determine if the "Admin View" (Manager Portal) should even be an option
+const hasApprovalPrivileges = isManager || isAdmin;
+
+// State to control which view is currently active
+const [viewRole, setViewRole] = useState(hasApprovalPrivileges && !isHR ? "ADMIN" : "HR");
 
   const handleKpiClick = (status) => {
     setStatusFilter(status);
@@ -96,95 +112,121 @@ export default function EmployeeOnboardingDashboard() {
     });
   }, [offers, searchTerm, statusFilter, employeeUserIds]);
 
-  return (
-    <div className="p-1 space-y-6">
-      {/* Top Tabs - Always Visible */}
-      {isAdmin ? (
-        <AdminApprovalDashboard />
-      ) : (
-        <>
-          {/* Header */}
-          {/* <OnboardingNavBar /> */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Employee Onboarding
-              </h1>
-              <p className="text-gray-500">
-                Manage offer letters and onboarding workflow
-              </p>
-            </div>
-          </div>
+ return (
+  <div className="p-1 space-y-6">
+    {/* Header Section */}
+    <div className="flex justify-between items-center px-4">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {viewRole === "HR" ? "Employee Onboarding" : "Manager Approval Portal"}
+        </h1>
+        <p className="text-gray-500">
+          {viewRole === "HR" 
+            ? "Manage offer letters and onboarding workflow" 
+            : "Review and action pending offer letters"}
+        </p>
+      </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <StatCard title="Total Offers" value={offers.length} icon={Users} onClick={() => handleKpiClick("ALL")} />
-            <StatCard
-              title="Accepted Offers"
-              value={acceptCount}
-              icon={Handshake}
-              color="text-orange-600"
-              onClick={() => handleKpiClick("ACCEPTED")}
-            />
-            <StatCard
+      {/* THE TOGGLE: Only shows if user has BOTH HR and (Manager or Admin) roles */}
+      {isHR && hasApprovalPrivileges && (
+        <div className="flex rounded-lg border border-gray-300 overflow-hidden shadow-sm">
+          <button
+            onClick={() => setViewRole("HR")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              viewRole === "HR" ? "bg-blue-700 text-white" : "bg-white text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            HR View
+          </button>
+          <button
+            onClick={() => setViewRole("ADMIN")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              viewRole === "ADMIN" ? "bg-blue-700 text-white" : "bg-white text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            Admin View
+          </button>
+        </div>
+      )}
+    </div>
+
+    {/* CONTENT AREA */}
+    {viewRole === "ADMIN" ? (
+      /* This calls the Manager endpoint inside this component */
+      <AdminApprovalDashboard /> 
+    ) : (
+      <>
+        {/* STAT CARDS SECTION */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-4">
+           <StatCard title="Total Offers" value={offers.length} icon={Users} onClick={() => handleKpiClick("ALL")} />
+           {/* ... Keep all your existing StatCards here ... */}
+           <StatCard
               title="Sent Offers"
               value={sentCount}
-              icon={Send}
-              color="text-green-600"
+              icon={Users}
+              color="text-blue-600"
               onClick={() => handleKpiClick("OFFERED")}
             />
-            <StatCard
-              title="Draft Offers"
-              value={draftCount}
-              icon={FileEdit}
-              color="text-blue-600"
-              onClick={() => handleKpiClick("CREATED")}
-            />
-            <StatCard
-              title="Submitted Offers"
-              value={submittedCount}
-              icon={FileText}
-              color="text-purple-600"
-              onClick={() => handleKpiClick("SUBMITTED")}
-            />
-            <StatCard
-              title="Verified Offers"
-              value={verifiedCount}
-              icon={ShieldCheck}
-              color="text-teal-600"
-              onClick={() => handleKpiClick("VERIFIED")}
-            />
-            <StatCard
-              title="Joining Offers"
-              value={joiningCount}
-              icon={Send}
-              color="text-sky-600"
-              onClick={() => handleKpiClick("JOINING")}
-            />
-            <StatCard
-              title="Joining Pending"
-              value={joiningPendingCount}
-              icon={XCircle}
-              color="text-amber-600"
-              onClick={() => handleKpiClick("JOINING_PENDING")}
-            />
-            <StatCard
-              title="Completed Offers"
-              value={completedCount}
-              icon={Users}
-              color="text-emerald-600"
-              onClick={() => handleKpiClick("COMPLETED")}
-            />
-            <StatCard
+           <StatCard
               title="Rejected Offers"
               value={rejectedCount}
               icon={XCircle}
               color="text-red-600"
               onClick={() => handleKpiClick("REJECTED")}
             />
-          </div>
+            <StatCard
+              title="Accepted Offers"
+              value={acceptCount}
+              icon={Users}
+              color="text-green-600"
+              onClick={() => handleKpiClick("ACCEPTED")}
+            />
+            <StatCard
+              title="Draft Offers"
+              value={draftCount}
+              icon={Users}
+              color="text-blue-600"
+              onClick={() => handleKpiClick("CREATED")}
+            />
+            <StatCard
+              title="Submitted Offers"
+              value={submittedCount}
+              icon={Users}
+              color="text-blue-600"
+              onClick={() => handleKpiClick("SUBMITTED")}
+            />
+            <StatCard
+              title="Verified Offers"
+              value={verifiedCount}
+              icon={Users}
+              color="text-blue-600"
+              onClick={() => handleKpiClick("VERIFIED")}
+            />
+            <StatCard
+              title="Joining Offers"
+              value={joiningCount}
+              icon={Users}
+              color="text-blue-600"
+              onClick={() => handleKpiClick("JOINING")}
+            />
+            <StatCard
+              title="Joining Pending Offers"
+              value={joiningPendingCount}
+              icon={Users}
+              color="text-blue-600"
+              onClick={() => handleKpiClick("JOINING_PENDING")}
+            />
+            <StatCard
+              title="Completed Offers"
+              value={completedCount}
+              icon={Users}
+              color="text-blue-600"
+              onClick={() => handleKpiClick("COMPLETED")}
+            />
+        </div>
 
-          {/* Search + Filter */}
+        {/* SEARCH & TABLE SECTION */}
+        <div className="px-4 space-y-4">
           <div className="flex flex-col md:flex-row md:items-center gap-4">
             <input
               type="text"
@@ -193,94 +235,22 @@ export default function EmployeeOnboardingDashboard() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full md:w-1/3 px-3 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
-
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full md:w-1/4 px-3 py-2 border rounded-lg shadow-sm 
-             focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option
-                value="ALL"
-                className="hover:bg-blue-500 hover:text-white"
-              >
-                All Status
-              </option>
-              <option
-                value="ACCEPTED"
-                className="hover:bg-blue-500 hover:text-white"
-              >
-                Accepted
-              </option>
-              <option
-                value="OFFERED"
-                className="hover:bg-blue-500 hover:text-white"
-              >
-                Offered
-              </option>
-              <option
-                value="CREATED"
-                className="hover:bg-blue-500 hover:text-white"
-              >
-                Created
-              </option>
-              <option
-                value="REJECTED"
-                className="hover:bg-blue-500 hover:text-white"
-              >
-                Rejected
-              </option>
-              <option
-                value="VERIFIED"
-                className="hover:bg-blue-500 hover:text-white"
-              >
-                Verified
-              </option>
-              <option
-                value="JOINING"
-                className="hover:bg-blue-500 hover:text-white"
-              >
-                Joining
-              </option>
-              <option
-                value="JOINING_PENDING"
-                className="hover:bg-blue-500 hover:text-white"
-              >
-                Joining Pending
-              </option>
-              <option
-                value="COMPLETED"
-                className="hover:bg-blue-500 hover:text-white"
-              >
-                Completed
-              </option>
-              <option
-                value="SUBMITTED"
-                className="hover:bg-blue-500 hover:text-white"
-              >
-                Submitted
-              </option>
-            </select>
+            {/* ... Keep your existing Status Select dropdown here ... */}
           </div>
 
-          {/* Table */}
-          {viewRole === "HR" ? (
-            <EmpTable
-              key={`${searchTerm}-${statusFilter}`}
-              offers={filteredOffers}
-              employeeUserIds={employeeUserIds}
-              loading={loading}
-              stage="HR_VIEW"
-            />
-          ) : (
-            <AdminApprovalView />
-          )}
-        </>
-      )}
-    </div>
-  );
+          <EmpTable
+            key={`${searchTerm}-${statusFilter}`}
+            offers={filteredOffers}
+            employeeUserIds={employeeUserIds}
+            loading={loading}
+            stage="HR_VIEW"
+          />
+        </div>
+      </>
+    )}
+  </div>
+);
 }
-
 /* Reusable Stat Card */
 function StatCard({ title, value, icon: Icon, color = "text-gray-700", onClick }) {
   return (

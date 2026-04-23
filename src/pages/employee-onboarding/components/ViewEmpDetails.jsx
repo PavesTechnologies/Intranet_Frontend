@@ -5,6 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import StatusBadge from "../../../components/status/statusbadge";
+import { useAuth } from "../../../contexts/AuthContext";
 import {
   ArrowLeft,
   Mail,
@@ -27,7 +28,7 @@ import {
 export default function ViewEmpDetails() {
   const { user_uuid } = useParams();
   const navigate = useNavigate();
-
+  
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -48,6 +49,20 @@ export default function ViewEmpDetails() {
 const [deleteOfferModal, setDeleteOfferModal] = useState(false);
 const [deletingOffer, setDeletingOffer] = useState(false);
 const [showConfirmModal, setShowConfirmModal] = useState(false);
+const { user } = useAuth();
+const rawRoles = user?.roles || "";
+  const userRoles = Array.isArray(rawRoles) 
+    ? rawRoles 
+    : rawRoles.split(',').map(r => r.trim());
+
+  const isHR = userRoles.includes("HR");
+  const isAdmin = userRoles.includes("Admin");
+  const isManager = userRoles.includes("Manager");
+
+  // Define Permissions based on Roles
+  const canEditOrDelete = isHR || isAdmin; 
+  const canRequestApproval = isHR || isAdmin;
+  // ---------------------------
 
 
 const selectedApproverName =
@@ -165,45 +180,6 @@ const actionTaken =
 
     null;
 
-  /* ---------------- PREVIEW OFFER ---------------- */
-
-  // const handlePreviewOffer = () => {
-  //   navigate(`/employee-onboarding/offer-preview/${user_uuid}`);
-  // };
-
-  // /* ---------------- FINAL PREVIEW OFFER ---------------- */
-
-  // const handleFinalPreviewOffer = () => {
-  //   navigate(`/employee-onboarding/final-offer-preview/${user_uuid}`);
-  // };
-
-  // const handleGeneratedPreview = () => {
-
-  //   window.open(
-  // `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/${user_uuid}/generate-preview`,
-  // "_blank"
-  // );
-  //     // navigate(`/employee-onboarding/offer-generated-preview/${user_uuid}`);
-
-  // };
-
-  // const handleGeneratedPreview = async () => {
-
-  //   const token = localStorage.getItem("token");
-
-    // const res = await axios.get(
-    // `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/${user_uuid}/generate-preview`,
-    // {
-    // headers:{ Authorization:`Bearer ${token}` },
-    // responseType:"blob"
-    // }
-    // );
-
-    // const fileURL = window.URL.createObjectURL(res.data);
-
-    // window.open(fileURL, "_blank");
-
-    // };
   /* ---------------- PREVIEW GENERATED OFFER ---------------- */
 
   const handlePreviewOffer = async () => {
@@ -441,7 +417,7 @@ finally {
           </div>
 
           <div className="flex items-center gap-2">
-          {isNoRequest && (
+          {(isHR || isAdmin) && isNoRequest && (
           <button
             onClick={() => {
               setEditData(employee);
@@ -553,6 +529,7 @@ className="border p-2 rounded"
           {canModifyOfferApprovalRequest && (
             <div className="relative ">
               <div className="flex items-center gap-2">
+                {canModifyOfferApprovalRequest && canRequestApproval && (
                   <button
                     onClick={() => {
                       setOpenMenu(false);
@@ -565,6 +542,7 @@ className="border p-2 rounded"
                   >
                     Edit Approval Request
                   </button>
+                )}
                 </div>
             </div>
           )}
@@ -613,7 +591,7 @@ className="border p-2 rounded"
         <div className="flex gap-4 mt-10">
 
           
-
+{(isHR || isAdmin) && (
             <button
   onClick={handleSendOffer}
   disabled={
@@ -636,40 +614,9 @@ className="border p-2 rounded"
     ? "Sending..."
     : "Send Offer"}
 </button>
-        {/* PREVIEW OFFER */}
-
-          {/* <button
-            onClick={handlePreviewOffer}
-            className="px-6 py-2 rounded-lg text-white bg-indigo-700 hover:bg-indigo-800
-            transition-all duration-100 ease-in-out active:translate-y-[1px]
-            flex items-center justify-center gap-2"
-          >
-            <Eye size={16}/>
-            Preview Offer
-          </button> */}
-
-          {/* <button
-              onClick={handleFinalPreviewOffer}
-              className="px-6 py-2 rounded-lg text-white bg-purple-700 hover:bg-purple-800
-              transition-all duration-100 ease-in-out active:translate-y-[1px]
-              flex items-center justify-center gap-2"
-            >
-              <Eye size={16}/>
-              Final Preview
-          </button> */}
-
-          {/* <button
-                        onClick={handleGeneratedPreview}
-                        className="px-6 py-2 rounded-lg text-white bg-blue-800 hover:bg-blue-900
-                        flex items-center gap-2"
-                        >
-
-                        <Eye size={16}/>
-
-                        Generated PDF
-
-          </button> */}
-          <button
+)}
+{(isHR || isManager) && (
+        <button
               onClick={handlePreviewOffer}
               className="px-6 py-2 rounded-lg text-white bg-indigo-700 hover:bg-indigo-800
               transition-all duration-100 ease-in-out active:translate-y-[1px]
@@ -678,13 +625,8 @@ className="border p-2 rounded"
               <Eye size={16}/>
               Preview Offer
           </button>
-
-
-
-          
-
-        
-
+)}
+          {(isHR || isAdmin) && (
           <button
             onClick={() => setOpenApprovalModal(true)}
             disabled={!isNoRequest}
@@ -699,8 +641,10 @@ className="border p-2 rounded"
           >
             Request Approval
           </button>
+          )}
           {/* 🔴 DELETE OFFER BUTTON */}
-            { (
+            
+              {canEditOrDelete && (
               <button
                 onClick={() => setDeleteOfferModal(true)}
                 className="px-6 py-2 rounded-lg text-white bg-red-700 hover:bg-red-800
@@ -708,7 +652,7 @@ className="border p-2 rounded"
               >
                 Delete Offer
               </button>
-
+              
     
             )}
 
