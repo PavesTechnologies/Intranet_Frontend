@@ -11,7 +11,9 @@ import {
   Handshake,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLocation } from "react-router-dom";
 // import Button from "../../components/Button/Button";
 import EmpTable from "./components/EmpTable";
 import axios from "axios";
@@ -22,11 +24,17 @@ import {
 } from "./components/offerStatus";
 import { fetchOfferDetailsList } from "./components/fetchOfferDetails";
 
+
+
 export default function EmployeeOnboardingDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const roles = user?.roles || [];
   const isAdmin = roles.includes("Admin");
+  const  isOnlyGeneral =
+  roles.length === 1 && roles.includes("General");
+
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [employeeUserIds, setEmployeeUserIds] = useState([]);
@@ -123,6 +131,12 @@ export default function EmployeeOnboardingDashboard() {
     });
   }, [offers, searchTerm, statusFilter, employeeUserIds]);
 
+  if (
+  isOnlyGeneral &&
+  location.pathname === "/employee-onboarding"
+) {
+  return <Navigate to="/employee-onboarding/employee-directory" />;
+}
   return (
     <div className="p-1 space-y-6">
       {/* Top Tabs - Always Visible */}

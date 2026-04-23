@@ -34,9 +34,11 @@ const Dashboard = () => {
     roles.includes("Super Admin") || roles.includes("Admin");
   const isRM = roles.includes("RESOURCE-MANAGER");
   // const isPM = roles.includes("PROJECT-MANAGER");
-  const isGeneral = user?.roles?.includes("General");
+  const isHR = roles.includes("HR");
+  const isGeneral = roles?.includes("General");
   const isDeveloper = roles.includes("Developer");
   const isManager = roles.includes("Manager");
+  const isAdmin = roles.includes("Admin");
 
   // ✅ Fetch total employees
   useEffect(() => {
@@ -308,13 +310,13 @@ const Dashboard = () => {
       stats: "2 exits this month",
     },
   ];
-
   const filteredModuleCards = moduleCards.filter((card) => {
-    if (isGeneral && card.title === "Employee Onbording") {
-      return false;
-    }
-    return true;
-  });
+  // If it's the Onboarding card AND the user is General (but not HR)
+  if (card.title === "Employee Onbording" && !isGeneral && !isHR && !isManager) {
+    return false; // Hide it
+  }
+  return true; // Show everything else (including for HR)
+});
 
   const recentActivity = [
     {
