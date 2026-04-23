@@ -71,7 +71,7 @@ const parentNav = [
       "/employee-onboarding/employeedocuments",
       "/employee-onboarding/document-templates",
       "/employee-onboarding/organization-documents",
-      "/employee-onboarding/hr/backgroundcheck"
+      "/employee-onboarding/backgroundcheck"
     ],
     redirect: "/employee-onboarding/employeedocuments",
   },

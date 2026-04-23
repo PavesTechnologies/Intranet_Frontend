@@ -1,7 +1,7 @@
 // src/pages/Projects/MyWork/api/myWorkApi.js
 import axios from "axios";
 
-const BASE = import.meta.env.VITE_PMS_BASE_URL;
+const BASE = window.__APP_CONFIG__.PMS_BASE_URL;
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -47,7 +47,7 @@ export const updateTaskStatus = async ({ taskId, statusId }) => {
   const res = await axios.patch(
     `${BASE}/api/tasks/${taskId}/status`,
     { statusId },
-    { headers: authHeaders() }
+    { headers: authHeaders() },
   );
   return res.data;
 };
@@ -56,7 +56,7 @@ export const updateStoryStatus = async ({ storyId, statusId }) => {
   const res = await axios.patch(
     `${BASE}/api/stories/${storyId}/status`,
     { statusId },
-    { headers: authHeaders() }
+    { headers: authHeaders() },
   );
   return res.data;
 };
@@ -65,7 +65,7 @@ export const updateBugStatus = async ({ bugId, status }) => {
   const res = await axios.put(
     `${BASE}/api/testing/bugs/${bugId}/status`,
     { status },
-    { headers: authHeaders() }
+    { headers: authHeaders() },
   );
   return res.data;
 };

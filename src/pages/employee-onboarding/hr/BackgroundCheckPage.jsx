@@ -22,7 +22,6 @@ const STATIC_CHECKS = [
   { key: "global_compliance",      label: "Global Compliance Screening",               icon: ShieldCheck,    group: "Compliance" },
   { key: "criminal_record",        label: "Criminal Court Record Check",               icon: AlertTriangle,  group: "Compliance" },
   { key: "cibil_check",            label: "CIBIL Check",                               icon: CreditCard,     group: "Financial" },
-  { key: "address_physical",       label: "Address Verification (Physical)",           icon: MapPin,         group: "Address" },
   { key: "bank_statement",         label: "Bank Statement (Last 3 Months)",            icon: Clock3,         group: "Financial" },
 ];
 
@@ -90,16 +89,21 @@ const SectionCard = ({ title, icon: Icon, children }) => (
   </div>
 );
 
-const StatCard = ({ label, count, color, Icon }) => (
-  <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
-    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color}`}>
+const StatCard = ({ label, count, color, Icon, onClick, isActive, activeColor }) => (
+  <button
+    onClick={onClick}
+    className={`bg-white rounded-xl border p-4 flex items-center gap-3 transition-all hover:shadow-md hover:-translate-y-0.5 w-full text-left ${
+      isActive ? `ring-2 ${activeColor} border-transparent shadow-md` : "border-gray-200 shadow-sm"
+    }`}
+  >
+    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
       <Icon className="w-4 h-4 text-white" />
     </div>
-    <div>
-      <p className="text-lg font-bold text-gray-800">{count}</p>
-      <p className="text-[11px] text-gray-500">{label}</p>
+    <div className="min-w-0">
+      <p className="text-lg font-bold text-gray-800 leading-tight">{count}</p>
+      <p className="text-[11px] text-gray-500 font-medium truncate">{label}</p>
     </div>
-  </div>
+  </button>
 );
 
 const CandidateItem = ({ emp, isSelected, bgStatus, onClick }) => {
@@ -160,49 +164,14 @@ const DocPreviewModal = ({ doc, onClose }) => {
           <div className="text-center">
             <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-sm font-semibold text-gray-500">{name}</p>
-            <p className="text-xs text-gray-400 mt-2">
-              Preview will be available once integrated with the API.<br />
-              Endpoint: <code className="bg-gray-200 px-1 rounded text-indigo-600">GET /hr/view_documents?file_path=...</code>
+            <p className="text-xs text-gray-400 mt-2 max-w-sm mx-auto leading-relaxed">
+              The document preview is currently unavailable. This feature will be active once the file is fully processed by the system.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Confirmation Modal for Finalizing */}
-      <ConfirmationModal
-        isOpen={showFinalizeConf}
-        title="Finalize Verification?"
-        message={`Are you sure you want to mark the background verification for ${selectedEmp?.first_name} as COMPLETED? This will clear the candidate from the active verification queue.`}
-        onConfirm={async () => {
-          setUpdatingId("finalize");
-          await new Promise(r => setTimeout(r, 800));
-          setEmpBgMap(prev => ({ ...prev, [selectedEmp.user_uuid]: "VERIFIED" }));
-          setShowFinalizeConf(false);
-          showStatusToast("Verification Process Completed!", "success");
-          setUpdatingId(null);
-        }}
-        onCancel={() => setShowFinalizeConf(false)}
-        isLoading={updatingId === "finalize"}
-        confirmText="Finalize"
-      />
 
-      {/* Confirmation Modal for Deletion */}
-      <ConfirmationModal
-        isOpen={deleteConf.isOpen}
-        title="Delete Document?"
-        message="Are you sure you want to delete this document? This action cannot be undone."
-        onConfirm={async () => {
-          setUpdatingId("delete");
-          await new Promise(r => setTimeout(r, 600));
-          // TODO: Real API call here
-          showStatusToast("Document deleted successfully", "success");
-          setDeleteConf({ isOpen: false, docId: null });
-          setUpdatingId(null);
-        }}
-        onCancel={() => setDeleteConf({ isOpen: false, docId: null })}
-        isLoading={updatingId === "delete"}
-        confirmText="Delete"
-      />
     </div>
   );
 };
@@ -340,6 +309,8 @@ export default function BackgroundCheckPage() {
 
   useEffect(() => { loadEmployees(); }, [loadEmployees]);
 
+
+
   /* ─── Load profile + checks ─── */
   const loadProfileAndChecks = useCallback(async (emp) => {
     if (!emp) return;
@@ -435,12 +406,19 @@ export default function BackgroundCheckPage() {
     // 4. Static checks (non-document-linked)
     STATIC_CHECKS.forEach(ct => {
       const api = raw.find(c => c.check_type === ct.key) || {};
+      
+      let docRef = null;
+      if (ct.key === "bank_statement" && prof.bank_documents?.[0]) {
+        docRef = prof.bank_documents[0];
+      }
+
       dynamicChecks.push({
         id:         api.check_uuid || ct.key,
         check_type: ct.key,
         label:      ct.label,
         icon:       ct.icon,
         group:      ct.group,
+        docRef:     docRef,
         status:     normalizeStatus(api.status || "PENDING"),
         details:    api.details || {},
         notes:      api.notes || "",
@@ -465,6 +443,8 @@ export default function BackgroundCheckPage() {
     loadProfileAndChecks(emp);
   };
 
+
+
   /* ─── Analytics ─── */
   const analytics = useMemo(() => ({
     VERIFIED:  checks.filter(c => c.status === "VERIFIED").length,
@@ -473,12 +453,17 @@ export default function BackgroundCheckPage() {
     REJECTED:  checks.filter(c => c.status === "REJECTED").length,
   }), [checks]);
 
-  const globalStats = useMemo(() => ({
-    pending:  Object.values(empBgMap).filter(s => s === "PENDING").length,
-    review:   Object.values(empBgMap).filter(s => s === "IN_REVIEW").length,
-    verified: Object.values(empBgMap).filter(s => s === "VERIFIED").length,
-    rejected: Object.values(empBgMap).filter(s => s === "REJECTED").length,
-  }), [empBgMap]);
+  const globalStats = useMemo(() => {
+    const stats = { pending: 0, review: 0, verified: 0, rejected: 0 };
+    employees.forEach(emp => {
+      const status = empBgMap[emp.user_uuid] || emp.bg_status || "PENDING";
+      if (status === "IN_REVIEW") stats.review++;
+      else if (status === "VERIFIED") stats.verified++;
+      else if (status === "REJECTED") stats.rejected++;
+      else stats.pending++;
+    });
+    return stats;
+  }, [employees, empBgMap]);
 
   const progress = checks.length ? Math.round((analytics.VERIFIED / checks.length) * 100) : 0;
 
@@ -487,7 +472,8 @@ export default function BackgroundCheckPage() {
     const q = search.toLowerCase();
     return employees.filter(emp => {
       const matchS = !q || `${emp.first_name} ${emp.last_name} ${emp.work_email} ${emp.employee_id}`.toLowerCase().includes(q);
-      const matchB = bgFilter === "ALL" || (empBgMap[emp.user_uuid] || "PENDING") === bgFilter;
+      const status = empBgMap[emp.user_uuid] || emp.bg_status || "PENDING";
+      const matchB = bgFilter === "ALL" || status === bgFilter;
       return matchS && matchB;
     });
   }, [employees, search, bgFilter, empBgMap]);
@@ -596,6 +582,9 @@ export default function BackgroundCheckPage() {
     (profile.identity_documents || []).forEach(d =>
       docs.push({ ...d, _cat: "Identity", _title: d.identity_type })
     );
+    (profile.bank_documents || []).forEach(d =>
+      docs.push({ ...d, _cat: "Bank Statement", _title: d.document_name || "Bank Statement" })
+    );
     return docs;
   }, [profile]);
 
@@ -614,12 +603,25 @@ export default function BackgroundCheckPage() {
         </button>
       </div>
 
-      {/* Global stats */}
+      {/* Global stats / KPI Filters */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="Pending"   count={globalStats.pending}  color="bg-gray-400"  Icon={Clock3} />
-        <StatCard label="In Review" count={globalStats.review}   color="bg-blue-500"  Icon={Clock} />
-        <StatCard label="Verified"  count={globalStats.verified} color="bg-green-500" Icon={CheckCircle2} />
-        <StatCard label="Rejected"  count={globalStats.rejected} color="bg-red-500"   Icon={AlertTriangle} />
+        {[
+          { key: "PENDING",   label: "Pending",   count: globalStats.pending,  color: "bg-gray-400",  ring: "ring-gray-300",  icon: Clock3 },
+          { key: "IN_REVIEW", label: "In Review", count: globalStats.review,   color: "bg-blue-500",  ring: "ring-blue-300",  icon: Clock },
+          { key: "VERIFIED",  label: "Verified",  count: globalStats.verified, color: "bg-green-500", ring: "ring-green-300", icon: CheckCircle2 },
+          { key: "REJECTED",  label: "Rejected",  count: globalStats.rejected, color: "bg-red-500",   ring: "ring-red-300",   icon: AlertTriangle },
+        ].map(kpi => (
+          <StatCard
+            key={kpi.key}
+            label={kpi.label}
+            count={kpi.count}
+            color={kpi.color}
+            Icon={kpi.icon}
+            isActive={bgFilter === kpi.key}
+            activeColor={kpi.ring}
+            onClick={() => setBgFilter(prev => prev === kpi.key ? "ALL" : kpi.key)}
+          />
+        ))}
       </div>
 
       {/* Two panel */}
@@ -631,6 +633,14 @@ export default function BackgroundCheckPage() {
             <Users className="w-4 h-4 text-indigo-700" />
             <span className="text-sm font-bold text-gray-800">Candidates</span>
             <span className="text-[11px] text-gray-400 ml-1">({filteredEmployees.length})</span>
+            {bgFilter !== "ALL" && (
+              <button
+                onClick={() => setBgFilter("ALL")}
+                className="ml-auto text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+              >
+                <X className="w-3 h-3" /> Clear
+              </button>
+            )}
           </div>
           <div className="px-3 py-2 border-b border-gray-100">
             <div className="relative">
@@ -672,7 +682,7 @@ export default function BackgroundCheckPage() {
                 key={emp.user_uuid}
                 emp={emp}
                 isSelected={selectedEmp?.user_uuid === emp.user_uuid}
-                bgStatus={empBgMap[emp.user_uuid] || "PENDING"}
+                bgStatus={empBgMap[emp.user_uuid] || emp.bg_status || "PENDING"}
                 onClick={() => handleSelectEmployee(emp)}
               />
             ))}
@@ -898,7 +908,19 @@ export default function BackgroundCheckPage() {
                                           {check.notes && (
                                             <p className="text-xs bg-amber-50 border border-amber-100 text-amber-800 rounded px-3 py-2 mb-3">📝 {check.notes}</p>
                                           )}
-                                          <div className="flex flex-wrap gap-2">
+                                          {!check.docRef && ["Identity", "Education", "Experience", "Financial"].includes(check.group) && check.check_type !== "cibil_check" && (
+                                            <div className="flex items-start gap-1.5 px-3 py-2 bg-amber-50 border-l-2 border-amber-500 text-amber-800 text-xs rounded mb-3">
+                                              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                              <span><span className="font-semibold">Document expected.</span> Please instruct candidate to upload the document.</span>
+                                            </div>
+                                          )}
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            {check.docRef && (
+                                              <Button variant="secondary" size="small" onClick={() => setActiveTab("documents")}>
+                                                <Folder className="w-3.5 h-3.5 inline-block mr-1" />
+                                                View Document in Docs Tab
+                                              </Button>
+                                            )}
                                             <Button variant="success" size="small"
                                               disabled={updatingId === check.id || check.status === "VERIFIED"}
                                               onClick={() => updateCheckStatus(check.id, "Verified")}>

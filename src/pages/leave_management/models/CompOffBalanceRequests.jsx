@@ -3,7 +3,7 @@ import { Check, X } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const CompOffBalanceRequests = ({ managerId }) => {
   const [pendingCompOffs, setPendingCompOffs] = useState([]);
@@ -15,13 +15,15 @@ const CompOffBalanceRequests = ({ managerId }) => {
     try {
       const res = await axios.post(
         `${BASE_URL}/api/compoff/pending`,
-        { managerId},
-        {headers:{
-          Authorization: `Bearer ${localStorage.getItem("token")}`
-        }}
+        { managerId },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
       );
       setPendingCompOffs(
-        Array.isArray(res.data) ? res.data : (res.data?.data || [])
+        Array.isArray(res.data) ? res.data : res.data?.data || [],
       );
     } catch (err) {
       toast.error("Failed to fetch Comp-Off requests.");
@@ -35,13 +37,18 @@ const CompOffBalanceRequests = ({ managerId }) => {
   const handleApprove = async (compoffId) => {
     try {
       // setLoading(true);
-      await axios.put(`${BASE_URL}/api/compoff/approve`, {
-        managerId,
-        compoffId,
-      },
-      {headers:{
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      }});
+      await axios.put(
+        `${BASE_URL}/api/compoff/approve`,
+        {
+          managerId,
+          compoffId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
       toast.success("Comp-Off approved.");
       fetchCompOffs();
     } catch {
@@ -55,11 +62,14 @@ const CompOffBalanceRequests = ({ managerId }) => {
   const handleReject = async (compoffId) => {
     try {
       // setLoading(true);
-      await axios.put(`${BASE_URL}/api/compoff/reject`,
+      await axios.put(
+        `${BASE_URL}/api/compoff/reject`,
         { managerId, compoffId },
-        {headers:{
-          Authorization: `Bearer ${localStorage.getItem("token")}`
-        }}
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
       );
       toast.success("Comp-Off rejected.");
       fetchCompOffs();
@@ -76,10 +86,14 @@ const CompOffBalanceRequests = ({ managerId }) => {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500 mb-6">
-      <h3 className="text-lg font-semibold text-blue-900 mb-2">Comp-Off Balance Requests</h3>
+      <h3 className="text-lg font-semibold text-blue-900 mb-2">
+        Comp-Off Balance Requests
+      </h3>
       <div className="border-b-2 border-blue-500 w-16 mb-4"></div>
       {pendingCompOffs.length === 0 ? (
-        <p className="text-gray-500 italic font-semibold">No pending Comp-Off requests for your team.</p>
+        <p className="text-gray-500 italic font-semibold">
+          No pending Comp-Off requests for your team.
+        </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse rounded-lg overflow-hidden shadow-sm">
@@ -95,14 +109,21 @@ const CompOffBalanceRequests = ({ managerId }) => {
             </thead>
             <tbody className="bg-white divide-y divide-blue-100 text-center">
               {pendingCompOffs.map((req) => (
-                <tr key={req.idleaveCompoff} className="hover:bg-blue-50 transition-colors text-xs">
+                <tr
+                  key={req.idleaveCompoff}
+                  className="hover:bg-blue-50 transition-colors text-xs"
+                >
                   <td className="p-3">{req.employeeName}</td>
                   <td className="p-3">
                     {req.startDate}
-                    {req.endDate && req.endDate !== req.startDate ? ` to ${req.endDate}` : ""}
+                    {req.endDate && req.endDate !== req.startDate
+                      ? ` to ${req.endDate}`
+                      : ""}
                   </td>
                   <td className="p-3">
-                    {req.halfDay ? "Half Day" : `${req.duration} ${req.duration <= 1 ? "Day" : "Days"}`}
+                    {req.halfDay
+                      ? "Half Day"
+                      : `${req.duration} ${req.duration <= 1 ? "Day" : "Days"}`}
                   </td>
                   <td className="p-3">{req.note}</td>
                   <td className="p-3 capitalize">{req.status}</td>

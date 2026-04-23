@@ -9,7 +9,8 @@ import {
   ClipboardCheck,
   CreditCard,
   MessageSquare,
-  ClipboardList
+  ClipboardList,
+  CalendarDays
 } from 'lucide-react';
 import { exit_list, employees } from './data/mockData';
 
@@ -19,9 +20,11 @@ import DocumentsTab from './tabs/DocumentsTab';
 import SettlementTab from './tabs/SettlementTab';
 import InterviewTab from './tabs/InterviewTab';
 import FeedbackSurveyTab from './tabs/FeedbackSurveyTab';
+import NoticePeriodTab from './tabs/NoticePeriodTab';
 
 const TABS = [
   { id: 'approvals', label: 'Approvals', icon: UserCheck },
+  { id: 'notice_period', label: 'Notice Period', icon: CalendarDays },
   { id: 'clearance', label: 'Clearance', icon: ClipboardCheck },
   { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'settlement', label: 'Settlement', icon: CreditCard },
@@ -48,6 +51,7 @@ export default function ExitDetailsPage() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'approvals': return <ApprovalsTab exit_uuid={exit_uuid} employee_uuid={exitData.employee_uuid} />;
+      case 'notice_period': return <NoticePeriodTab exit_uuid={exit_uuid} employee_uuid={exitData.employee_uuid} />;
       case 'clearance': return <ClearanceTab exit_uuid={exit_uuid} employee_uuid={exitData.employee_uuid} />;
       case 'documents': return <DocumentsTab exit_uuid={exit_uuid} employee_uuid={exitData.employee_uuid} />;
       case 'settlement': return <SettlementTab exit_uuid={exit_uuid} employee_uuid={exitData.employee_uuid} />;

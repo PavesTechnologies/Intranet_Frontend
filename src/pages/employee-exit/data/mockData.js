@@ -210,3 +210,48 @@ export const exit_interview = [
     submitted_at: "2026-03-25T14:30:00Z"
   }
 ];
+
+export const notice_period = [
+  {
+    notice_id: 1,
+    exit_uuid: "exit-101",
+    start_date: "2026-03-15",
+    end_date: "2026-04-15",
+    notice_period_days: 30,
+    served_days: 30,
+    remaining_days: 0,
+    buyout_option: false,
+    buyout_amount: 0.00,
+    kt_status: "In Progress",
+    kt_notes: "Handover to team members started. Need to document the remaining APIs.",
+    created_at: "2026-03-10T10:00:00Z"
+  },
+  {
+    notice_id: 2,
+    exit_uuid: "exit-102",
+    start_date: "2026-03-20",
+    end_date: "2026-04-20",
+    notice_period_days: 30,
+    served_days: 20,
+    remaining_days: 10,
+    buyout_option: true,
+    buyout_amount: 5000.00,
+    kt_status: "Not Started",
+    kt_notes: "KT scheduled for next week.",
+    created_at: "2026-03-15T11:30:00Z"
+  },
+  {
+    notice_id: 3,
+    exit_uuid: "exit-103",
+    start_date: "2026-03-01",
+    end_date: "2026-03-30",
+    notice_period_days: 30,
+    served_days: 30,
+    remaining_days: 0,
+    buyout_option: false,
+    buyout_amount: 0.00,
+    kt_status: "Completed",
+    kt_notes: "All tasks and knowledge fully transferred.",
+    created_at: "2026-02-28T09:15:00Z"
+  }
+];

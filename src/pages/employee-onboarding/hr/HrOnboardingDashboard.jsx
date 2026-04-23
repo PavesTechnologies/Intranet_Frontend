@@ -33,7 +33,7 @@ import StatCard from "./components/StatCard";
 export default function HrOnboardingDashboard() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const [data, setData] = useState([]);
   const [employeeUserIds, setEmployeeUserIds] = useState([]);
@@ -100,7 +100,7 @@ export default function HrOnboardingDashboard() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       const ids = (res.data || []).map((emp) => emp.user_uuid);
@@ -146,26 +146,24 @@ export default function HrOnboardingDashboard() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       const detail = res.data || {};
 
       setEditJoinForm({
         joining_date: String(
-          detail.joining_date || employee.joining_date || ""
+          detail.joining_date || employee.joining_date || "",
         ).trim(),
         reporting_time: String(
-          detail.reporting_time || employee.reporting_time || ""
+          detail.reporting_time || employee.reporting_time || "",
         ).trim(),
-        location: String(
-          detail.location || employee.location || ""
-        ).trim(),
+        location: String(detail.location || employee.location || "").trim(),
         department: String(
-          detail.department || employee.department || ""
+          detail.department || employee.department || "",
         ).trim(),
         reporting_manager: String(
-          detail.reporting_manager || employee.reporting_manager || ""
+          detail.reporting_manager || employee.reporting_manager || "",
         ).trim(),
         joining_comments: String(
           detail.joining_comments || employee.joining_comments || ""
@@ -204,10 +202,9 @@ export default function HrOnboardingDashboard() {
     setLoadingManagers(true);
 
     try {
-      const res = await axios.get(
-        `${BASE_URL}/offer-approval/admin-users`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await axios.get(`${BASE_URL}/offer-approval/admin-users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       const managers = (res.data || []).map((u) => ({
         value: String(u.name || "").trim(),
@@ -259,20 +256,19 @@ const fetchJoiningCommentForUser = async (userUuid) => {
   getNormalizedStatus(getOfferDisplayStatus(offer, employeeUserIds));
 
   const pageData = useMemo(() => {
-    return data.filter((emp) =>
-      editDisabledUserIds.includes(emp?.user_uuid) ||
-      isTrackedOnboardingStatus(emp, employeeUserIds)
+    return data.filter(
+      (emp) =>
+        editDisabledUserIds.includes(emp?.user_uuid) ||
+        isTrackedOnboardingStatus(emp, employeeUserIds),
     );
   }, [data, employeeUserIds, editDisabledUserIds]);
 
   const filteredData = useMemo(() => {
     return pageData.filter((emp) => {
-      const searchText = `${emp.first_name} ${emp.last_name} ${emp.designation}`
-        .toLowerCase();
+      const searchText =
+        `${emp.first_name} ${emp.last_name} ${emp.designation}`.toLowerCase();
 
-      const matchesSearch = searchText.includes(
-        searchTerm.toLowerCase()
-      );
+      const matchesSearch = searchText.includes(searchTerm.toLowerCase());
 
       const status = getHrDisplayStatus(emp);
       const filter = statusFilter.trim().toUpperCase();
@@ -283,13 +279,17 @@ const fetchJoiningCommentForUser = async (userUuid) => {
 
       return matchesSearch && status === filter;
     });
-  }, [pageData, searchTerm, statusFilter, employeeUserIds, editDisabledUserIds]);
+  }, [
+    pageData,
+    searchTerm,
+    statusFilter,
+    employeeUserIds,
+    editDisabledUserIds,
+  ]);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
-      prev.includes(id)
-        ? prev.filter((x) => x !== id)
-        : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -330,7 +330,7 @@ const fetchJoiningCommentForUser = async (userUuid) => {
     }
 
     const selectedEmployees = filteredData.filter((e) =>
-      selectedIds.includes(e.user_uuid)
+      selectedIds.includes(e.user_uuid),
     );
 
     const emails = selectedEmployees
@@ -368,8 +368,8 @@ const fetchJoiningCommentForUser = async (userUuid) => {
                     ? "JOINING"
                     : emp.status,
               }
-            : emp
-        )
+            : emp,
+        ),
       );
 
       selectedEmployees.forEach((employee) =>
@@ -377,7 +377,7 @@ const fetchJoiningCommentForUser = async (userUuid) => {
           ...employee,
           ...joinForm,
           status: "JOINING",
-        })
+        }),
       );
 
       await fetchEmployees();
@@ -465,8 +465,8 @@ const fetchJoiningCommentForUser = async (userUuid) => {
                 reporting_manager,
                 joining_comments,
               }
-            : emp
-        )
+            : emp,
+        ),
       );
       console.log("UPDATED STATUS:",updatedStatus);
       fetchEmployees();
@@ -474,7 +474,7 @@ const fetchJoiningCommentForUser = async (userUuid) => {
       setEditDisabledUserIds((prev) =>
         prev.includes(editingEmployee.user_uuid)
           ? prev
-          : [...prev, editingEmployee.user_uuid]
+          : [...prev, editingEmployee.user_uuid],
       );
 
       showStatusToast("Joining date updated");
@@ -582,13 +582,9 @@ const rows = useMemo(() => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">
-          HR Onboarding Dashboard
-        </h1>
+        <h1 className="text-2xl font-bold">HR Onboarding Dashboard</h1>
 
-        <p className="text-gray-500">
-          Verify employee documents & profiles
-        </p>
+        <p className="text-gray-500">Verify employee documents & profiles</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -604,11 +600,8 @@ const rows = useMemo(() => {
           value={
             loading
               ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "VERIFIED"
-                ).length
+              : pageData.filter((e) => getHrDisplayStatus(e) === "VERIFIED")
+                  .length
           }
           icon={ShieldCheck}
           onClick={() => handleKpiClick("VERIFIED")}
@@ -619,11 +612,8 @@ const rows = useMemo(() => {
           value={
             loading
               ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "JOINING"
-                ).length
+              : pageData.filter((e) => getHrDisplayStatus(e) === "JOINING")
+                  .length
           }
           icon={MailCheck}
           onClick={() => handleKpiClick("JOINING")}
@@ -635,9 +625,7 @@ const rows = useMemo(() => {
             loading
               ? "0"
               : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "JOINING_PENDING"
+                  (e) => getHrDisplayStatus(e) === "JOINING_PENDING",
                 ).length
           }
           icon={Clock}
@@ -649,11 +637,8 @@ const rows = useMemo(() => {
           value={
             loading
               ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "COMPLETED"
-                ).length
+              : pageData.filter((e) => getHrDisplayStatus(e) === "COMPLETED")
+                  .length
           }
           icon={Users}
           onClick={() => handleKpiClick("COMPLETED")}
@@ -675,7 +660,7 @@ const rows = useMemo(() => {
         />
 
         <StatCard
-          title="Rejected"
+          title="Rescheduled"
           value={
             loading
               ? "0"
@@ -684,6 +669,18 @@ const rows = useMemo(() => {
                     getHrDisplayStatus(e) ===
                     "REJECTED"
                 ).length
+          }
+          icon={Clock}
+          onClick={() => handleKpiClick("RESCHEDULED")}
+        />
+
+        <StatCard
+          title="Rejected"
+          value={
+            loading
+              ? "0"
+              : pageData.filter((e) => getHrDisplayStatus(e) === "REJECTED")
+                  .length
           }
           icon={XCircle}
           onClick={() => handleKpiClick("REJECTED")}
@@ -721,9 +718,7 @@ const rows = useMemo(() => {
       </div>
 
       <div className="bg-white p-4 rounded-xl shadow-sm flex justify-between">
-        <h2 className="font-semibold text-gray-700">
-          Recent Offer Letters
-        </h2>
+        <h2 className="font-semibold text-gray-700">Recent Offer Letters</h2>
 
         {!bulkJoinMode ? (
           <Button
@@ -731,14 +726,12 @@ const rows = useMemo(() => {
             size="small"
             onClick={() => {
               const hasVerified = filteredData.some(
-                (e) =>
-                  getHrDisplayStatus(e) ===
-                  "VERIFIED"
+                (e) => getHrDisplayStatus(e) === "VERIFIED",
               );
 
               if (!hasVerified) {
                 showStatusToast(
-                  "No verified candidates available for bulk join"
+                  "No verified candidates available for bulk join",
                 );
                 return;
               }
@@ -759,11 +752,7 @@ const rows = useMemo(() => {
               Send ({selectedIds.length})
             </Button>
 
-            <Button
-              varient="secondary"
-              size="small"
-              onClick={resetBulk}
-            >
+            <Button varient="secondary" size="small" onClick={resetBulk}>
               Cancel
             </Button>
           </div>
@@ -782,16 +771,8 @@ const rows = useMemo(() => {
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
-            onPrevious={() =>
-              setCurrentPage((p) =>
-                Math.max(p - 1, 1)
-              )
-            }
-            onNext={() =>
-              setCurrentPage((p) =>
-                Math.min(p + 1, totalPages)
-              )
-            }
+            onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+            onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
           />
         )}
       </div>

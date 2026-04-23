@@ -37,6 +37,7 @@ import { skillService } from "../../../services/skillService";
 
 export default function EmployeeProfileView() {
   const { employee_uuid } = useParams();
+  // const { employee_uuid } = useParams();
 
   const [activeTab, setActiveTab] = useState("about");
   const [docTabConfig, setDocTabConfig] = useState({ folder: "education", search: "" });
@@ -80,7 +81,11 @@ export default function EmployeeProfileView() {
 
       if (!coreRes.ok) throw new Error("Failed to fetch employee");
       const coreData = await coreRes.json();
+      // if (!coreRes.ok) throw new Error("Failed to fetch employee");
+      // const coreData = await coreRes.json();
 
+      // 2. Fire department, designation, and HR profile calls IN PARALLEL
+      // const parallelPromises = [];
       // 2. Fire department, designation, and HR profile calls IN PARALLEL
       const parallelPromises = [];
 
@@ -259,12 +264,24 @@ export default function EmployeeProfileView() {
       {editingField === fieldKey ? (
         <div className="border border-indigo-100 rounded-xl bg-white shadow-md w-full">
           <div className="flex flex-wrap gap-4 p-3 border-b bg-indigo-50 text-indigo-700">
-            <button onClick={() => formatText("bold")}><Bold size={16} /></button>
-            <button onClick={() => formatText("italic")}><Italic size={16} /></button>
-            <button onClick={() => formatText("underline")}><Underline size={16} /></button>
-            <button onClick={() => formatText("insertUnorderedList")}><List size={16} /></button>
-            <button onClick={() => formatText("insertOrderedList")}><ListOrdered size={16} /></button>
-            <button onClick={() => formatText("createLink")}><Link size={16} /></button>
+            <button onClick={() => formatText("bold")}>
+              <Bold size={16} />
+            </button>
+            <button onClick={() => formatText("italic")}>
+              <Italic size={16} />
+            </button>
+            <button onClick={() => formatText("underline")}>
+              <Underline size={16} />
+            </button>
+            <button onClick={() => formatText("insertUnorderedList")}>
+              <List size={16} />
+            </button>
+            <button onClick={() => formatText("insertOrderedList")}>
+              <ListOrdered size={16} />
+            </button>
+            <button onClick={() => formatText("createLink")}>
+              <Link size={16} />
+            </button>
           </div>
           <div
             ref={editorRef}
@@ -288,7 +305,6 @@ export default function EmployeeProfileView() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 px-3 sm:px-6 lg:px-10 py-6 sm:py-10">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8">
-
         {/* LEFT SIDEBAR */}
         <div className="space-y-6 lg:col-span-1">
           <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md p-6 text-center border border-indigo-100 overflow-hidden">
@@ -316,7 +332,10 @@ export default function EmployeeProfileView() {
             <Info icon={<Mail size={14} />} text={mappedEmployee.email} />
             <Info icon={<Phone size={14} />} text={mappedEmployee.phone} />
             <Info icon={<Building2 size={14} />} text={mappedEmployee.office} />
-            <Info icon={<User size={14} />} text={`ID: ${mappedEmployee.empId}`} />
+            <Info
+              icon={<User size={14} />}
+              text={`ID: ${mappedEmployee.empId}`}
+            />
           </div>
 
           <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md p-5 text-sm border border-indigo-100">
@@ -334,18 +353,44 @@ export default function EmployeeProfileView() {
         {/* RIGHT SIDE */}
         <div className="lg:col-span-2 xl:col-span-3 min-w-0">
           <div className="border-b border-indigo-100 mb-6 flex gap-1 sm:gap-6 text-sm overflow-x-auto scrollbar-hide">
-            <Tab active={activeTab === "about"} onClick={() => handleTabChange("about")}>About</Tab>
-            <Tab active={activeTab === "profile"} onClick={() => handleTabChange("profile")}>Profile</Tab>
-            <Tab active={activeTab === "job"} onClick={() => handleTabChange("job")}>Job</Tab>
-            <Tab active={activeTab === "documents"} onClick={() => handleTabChange("documents")}>Documents</Tab>
+            <Tab
+              active={activeTab === "about"}
+              onClick={() => handleTabChange("about")}
+            >
+              About
+            </Tab>
+            <Tab
+              active={activeTab === "profile"}
+              onClick={() => handleTabChange("profile")}
+            >
+              Profile
+            </Tab>
+            <Tab
+              active={activeTab === "job"}
+              onClick={() => handleTabChange("job")}
+            >
+              Job
+            </Tab>
+            <Tab
+              active={activeTab === "documents"}
+              onClick={() => handleTabChange("documents")}
+            >
+              Documents
+            </Tab>
           </div>
 
           {activeTab === "about" && (
             <div className="space-y-6">
               <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md p-6 border border-indigo-100">
                 <AboutBlock title="About" fieldKey="summary" />
-                <AboutBlock title="What I love about my job?" fieldKey="loveJob" />
-                <AboutBlock title="My interests and hobbies" fieldKey="hobbies" />
+                <AboutBlock
+                  title="What I love about my job?"
+                  fieldKey="loveJob"
+                />
+                <AboutBlock
+                  title="My interests and hobbies"
+                  fieldKey="hobbies"
+                />
               </div>
 
               <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md p-6 border border-indigo-100">
@@ -564,3 +609,4 @@ const SkillTag = ({ name }) => (
     {name}
   </div>
 );
+

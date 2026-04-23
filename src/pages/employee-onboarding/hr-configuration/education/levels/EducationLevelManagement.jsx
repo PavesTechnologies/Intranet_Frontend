@@ -17,7 +17,7 @@ export default function EducationLevelManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState(null);
 
-  const BASE = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const token = localStorage.getItem("token");
 
   /* -------------------- FETCH -------------------- */
@@ -56,9 +56,7 @@ export default function EducationLevelManagement() {
       await axios.delete(`${BASE}/masters/education-level/${uuid}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setLevels((prev) =>
-        prev.filter((l) => l.education_uuid !== uuid)
-      );
+      setLevels((prev) => prev.filter((l) => l.education_uuid !== uuid));
       toast.success("Education level deleted");
     } catch {
       toast.error("Failed to delete education level");
@@ -111,7 +109,10 @@ export default function EducationLevelManagement() {
             <tbody>
               {levels.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-6 text-center text-gray-500">
+                  <td
+                    colSpan="4"
+                    className="px-6 py-6 text-center text-gray-500"
+                  >
                     No education levels found
                   </td>
                 </tr>
@@ -172,13 +173,13 @@ export default function EducationLevelManagement() {
           onSuccess={(savedLevel) => {
             setLevels((prev) => {
               const exists = prev.some(
-                (l) => l.education_uuid === savedLevel.education_uuid
+                (l) => l.education_uuid === savedLevel.education_uuid,
               );
               return exists
                 ? prev.map((l) =>
                     l.education_uuid === savedLevel.education_uuid
                       ? savedLevel
-                      : l
+                      : l,
                   )
                 : [savedLevel, ...prev];
             });
@@ -194,12 +195,10 @@ export default function EducationLevelManagement() {
 function LevelModal({ editData, onClose, onSuccess }) {
   const [name, setName] = useState(editData?.education_name || "");
   const [desc, setDesc] = useState(editData?.description || "");
-  const [isActive, setIsActive] = useState(
-    editData?.is_active ?? true
-  );
+  const [isActive, setIsActive] = useState(editData?.is_active ?? true);
   const [saving, setSaving] = useState(false);
 
-  const BASE = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const token = localStorage.getItem("token");
 
   const save = async () => {
@@ -226,21 +225,17 @@ function LevelModal({ editData, onClose, onSuccess }) {
           {
             headers: { Authorization: `Bearer ${token}` },
             responseType: "text",
-          }
+          },
         );
       } else {
-        res = await axios.post(
-          `${BASE}/masters/education-level/`,
-          payload,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: "text",
-          }
-        );
+        res = await axios.post(`${BASE}/masters/education-level/`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "text",
+        });
       }
 
       toast.success(
-        `Education level ${editData ? "updated" : "created"} successfully`
+        `Education level ${editData ? "updated" : "created"} successfully`,
       );
 
       onSuccess({
@@ -263,18 +258,14 @@ function LevelModal({ editData, onClose, onSuccess }) {
           {editData ? "Edit" : "Add"} Education Level
         </h2>
 
-        <label className="block text-sm font-medium mb-1">
-          Education Name
-        </label>
+        <label className="block text-sm font-medium mb-1">Education Name</label>
         <input
           className="w-full border rounded-lg px-3 py-2 mb-3"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
 
-        <label className="block text-sm font-medium mb-1">
-          Description
-        </label>
+        <label className="block text-sm font-medium mb-1">Description</label>
         <textarea
           className="w-full border rounded-lg px-3 py-2 mb-3"
           value={desc}

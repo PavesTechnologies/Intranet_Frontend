@@ -5,12 +5,12 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 import EpicFields from "./Fields/EpicFields";
-import StoryFields from "./Fields/StoryFields"; 
+import StoryFields from "./Fields/StoryFields";
 import TaskFields from "./Fields/TaskFields";
 import BugFields from "./Fields/BugFields";
 
 import { normalizeId } from "./helpers/normalize";
-import { toISODate } from "./helpers/dataParser"; 
+import { toISODate } from "./helpers/dataParser";
 
 // import FormInput from "@/components/forms/FormInput";
 // import FormTextArea from "@/components/forms/FormTextArea";
@@ -73,11 +73,14 @@ const CreateIssueForm = ({
       try {
         const pid = initialProjectId;
         const [projectsRes, usersRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`, axiosConfig),
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
+            axiosConfig,
+          ),
           pid
             ? axios.get(
-                `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${pid}/members-with-owner`,
-                axiosConfig
+                `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${pid}/members-with-owner`,
+                axiosConfig,
               )
             : Promise.resolve({ data: [] }),
         ]);
@@ -98,7 +101,7 @@ const CreateIssueForm = ({
       if (!pid) return;
 
       setLoading(true);
-      const base = import.meta.env.VITE_PMS_BASE_URL;
+      const base = window.__APP_CONFIG__.PMS_BASE_URL;
 
       const deps = issueDependencyMap[issueType];
       const requests = [];
@@ -107,31 +110,31 @@ const CreateIssueForm = ({
       deps.forEach((dep) => {
         if (dep === "statuses") {
           requests.push(
-            axios.get(`${base}/api/projects/${pid}/statuses`, axiosConfig)
+            axios.get(`${base}/api/projects/${pid}/statuses`, axiosConfig),
           );
           setters.push((res) => setStatuses(res.data || []));
         }
         if (dep === "epics") {
           requests.push(
-            axios.get(`${base}/api/projects/${pid}/epics`, axiosConfig)
+            axios.get(`${base}/api/projects/${pid}/epics`, axiosConfig),
           );
           setters.push((res) => setEpics(res.data || []));
         }
         if (dep === "stories") {
           requests.push(
-            axios.get(`${base}/api/projects/${pid}/stories`, axiosConfig)
+            axios.get(`${base}/api/projects/${pid}/stories`, axiosConfig),
           );
           setters.push((res) => setStories(res.data || []));
         }
         if (dep === "tasks") {
           requests.push(
-            axios.get(`${base}/api/projects/${pid}/tasks`, axiosConfig)
+            axios.get(`${base}/api/projects/${pid}/tasks`, axiosConfig),
           );
           setters.push((res) => setTasks(res.data || []));
         }
         if (dep === "sprints") {
           requests.push(
-            axios.get(`${base}/api/projects/${pid}/sprints`, axiosConfig)
+            axios.get(`${base}/api/projects/${pid}/sprints`, axiosConfig),
           );
           setters.push((res) => setSprints(res.data || []));
         }
@@ -187,7 +190,7 @@ const CreateIssueForm = ({
 
         if (name === "storyId") {
           const st = stories.find((s) => s.id === Number(value));
-          updated.sprintId = st ? st.sprint?.id ?? st.sprintId ?? null : null;
+          updated.sprintId = st ? (st.sprint?.id ?? st.sprintId ?? null) : null;
         }
 
         return updated;
@@ -207,11 +210,11 @@ const CreateIssueForm = ({
 
     if (issueType === "Epic") {
       if (formData.startDate && formData.dueDate) {
-         if (new Date(formData.dueDate) < new Date(formData.startDate)) {
-    toast.error("Due date cannot be earlier than start date");
-    return;
-  }
-}
+        if (new Date(formData.dueDate) < new Date(formData.startDate)) {
+          toast.error("Due date cannot be earlier than start date");
+          return;
+        }
+      }
       err = validateEpic(fd);
       if (!err) payload = buildEpicPayload(fd);
       endpoint = "/api/epics";
@@ -219,12 +222,12 @@ const CreateIssueForm = ({
 
     if (issueType === "Story") {
       if (formData.startDate && formData.dueDate) {
-         if (new Date(formData.dueDate) < new Date(formData.startDate)) {
-                 toast.error("Due date cannot be earlier than start date");
-                        return;
-                     }
-                  }
-      
+        if (new Date(formData.dueDate) < new Date(formData.startDate)) {
+          toast.error("Due date cannot be earlier than start date");
+          return;
+        }
+      }
+
       err = validateStory(fd);
       if (!err) payload = buildStoryPayload(fd);
       endpoint = "/api/stories";
@@ -232,11 +235,11 @@ const CreateIssueForm = ({
 
     if (issueType === "Task") {
       if (formData.startDate && formData.dueDate) {
-         if (new Date(formData.dueDate) < new Date(formData.startDate)) {
-    toast.error("Due date cannot be earlier than start date");
-    return;
-  }
-}
+        if (new Date(formData.dueDate) < new Date(formData.startDate)) {
+          toast.error("Due date cannot be earlier than start date");
+          return;
+        }
+      }
       err = validateTask(fd);
       if (!err) payload = buildTaskPayload(fd, selectedStorySprint);
       endpoint = "/api/tasks";
@@ -252,9 +255,9 @@ const CreateIssueForm = ({
 
     try {
       await axios.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}${endpoint}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}${endpoint}`,
         payload,
-        axiosConfig
+        axiosConfig,
       );
       toast.success(`${issueType} created successfully!`);
       setTimeout(() => {
@@ -262,33 +265,33 @@ const CreateIssueForm = ({
         onClose?.();
       }, 500);
     } catch (e) {
-  console.error(e);
+      console.error(e);
 
-  const data = e.response?.data;
+      const data = e.response?.data;
 
-  // Case 1: structured validation errors
-  if (data?.errors) {
-  Object.entries(data.errors).forEach(([field, message]) => {
-    toast.error(`${field}: ${message}`);
-  });
-  return;
-}
+      // Case 1: structured validation errors
+      if (data?.errors) {
+        Object.entries(data.errors).forEach(([field, message]) => {
+          toast.error(`${field}: ${message}`);
+        });
+        return;
+      }
 
-  // Case 2: old hibernate interpolatedMessage error
-  const msg = data?.message;
-  if (msg && msg.includes("interpolatedMessage")) {
-    const extracted = msg.match(/interpolatedMessage='([^']+)'/);
-    toast.error(extracted ? extracted[1] : "Validation error");
-    return;
-  }
+      // Case 2: old hibernate interpolatedMessage error
+      const msg = data?.message;
+      if (msg && msg.includes("interpolatedMessage")) {
+        const extracted = msg.match(/interpolatedMessage='([^']+)'/);
+        toast.error(extracted ? extracted[1] : "Validation error");
+        return;
+      }
 
-  // Case 3: normal backend error message
-  toast.error(msg || "Error creating issue");
-}
+      // Case 3: normal backend error message
+      toast.error(msg || "Error creating issue");
+    }
   };
 
   const selectedProject = projects.find(
-    (p) => p.id === formData.projectId || p.id === initialProjectId
+    (p) => p.id === formData.projectId || p.id === initialProjectId,
   );
 
   const today = new Date().toISOString().split("T")[0];
@@ -299,18 +302,19 @@ const CreateIssueForm = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
       <div className="bg-white w-[85%] h-[85%] rounded-xl shadow-xl flex flex-col overflow-hidden">
-
         {/* ------ HEADER ------ */}
         <div className="border-b px-6 py-4 flex justify-between items-center bg-gray-50">
           <h2 className="text-xl font-semibold">Create {issueType}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800">
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
 
         {/* -------- BODY -------- */}
         <div className="flex flex-1 overflow-hidden">
-          
           {/* LEFT SIDEBAR */}
           <div className="w-[28%] border-r p-6 bg-gray-50 overflow-y-auto space-y-6">
             <FormSelect
@@ -337,7 +341,9 @@ const CreateIssueForm = ({
             />
 
             <div>
-              <label className="text-sm font-medium text-gray-700">Project *</label>
+              <label className="text-sm font-medium text-gray-700">
+                Project *
+              </label>
               <div className="mt-1 px-3 py-2 bg-gray-200 rounded-md">
                 {selectedProject ? selectedProject.name : "--"}
               </div>

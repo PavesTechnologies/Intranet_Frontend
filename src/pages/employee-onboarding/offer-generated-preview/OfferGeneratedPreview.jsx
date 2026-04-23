@@ -4,63 +4,45 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 
-export default function OfferGeneratedPreview(){
+export default function OfferGeneratedPreview() {
+  const { offerId } = useParams();
 
-const {offerId}=useParams();
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-const [pdfUrl,setPdfUrl]=useState(null);
-const [loading,setLoading]=useState(true);
+  useEffect(() => {
+    const loadPreview = async () => {
+      try {
+        const token = localStorage.getItem("token");
 
-useEffect(()=>{
+        const res = await axios.get(
+          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${offerId}/generate-preview`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            responseType: "blob",
+          },
+        );
 
-const loadPreview=async()=>{
+        const fileURL = window.URL.createObjectURL(res.data);
 
-try{
+        setPdfUrl(fileURL);
+      } catch (err) {
+        console.error("Preview failed", err);
 
-const token=localStorage.getItem("token");
+        alert("Failed to load preview");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-const res=await axios.get(
-`${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/${offerId}/generate-preview`,
-{
-headers:{Authorization:`Bearer ${token}`},
-responseType:"blob"
-}
-);
+    if (offerId) loadPreview();
+  }, [offerId]);
 
-const fileURL=window.URL.createObjectURL(res.data);
+  if (loading) {
+    return <div className="p-10">Loading Offer Preview...</div>;
+  }
 
-setPdfUrl(fileURL);
-
-}catch(err){
-
-console.error("Preview failed",err);
-
-alert("Failed to load preview");
-
-}finally{
-
-setLoading(false);
-
-}
-
-};
-
-if(offerId) loadPreview();
-
-},[offerId]);
-
-if(loading){
-return <div className="p-10">Loading Offer Preview...</div>;
-}
-
-return(
-
-<iframe
-src={pdfUrl}
-className="w-full h-screen"
-title="Offer Preview"
-/>
-
-);
-
+  return (
+    <iframe src={pdfUrl} className="w-full h-screen" title="Offer Preview" />
+  );
 }

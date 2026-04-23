@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Tooltip from "../../../components/status/Tooltip";
 
-const PMS_BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const PMS_BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const token = localStorage.getItem("token");
 
 // Generate a color based on employee name
@@ -66,7 +66,6 @@ const EmployeeAvatar = ({ employee }) => {
   );
 };
 
-
 const ProjectMembersOnLeave = ({ employeeId, leaveId }) => {
   const [projectMembersOnLeave, setProjectMembersOnLeave] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +82,11 @@ const ProjectMembersOnLeave = ({ employeeId, leaveId }) => {
         // 1️⃣ Fetch active projects of the employee
         const projectsRes = await axios.get(
           `${PMS_BASE_URL}/api/projects/member/${employeeId}/active-projects`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
         );
         const projects = projectsRes.data || [];
 
@@ -95,7 +98,11 @@ const ProjectMembersOnLeave = ({ employeeId, leaveId }) => {
         // 2️⃣ Fetch current leave dates
         const empLeaveRes = await axios.get(
           `${BASE_URL}/api/leave-requests/${leaveId}`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
         );
         const currentLeave = empLeaveRes.data?.data;
         if (!currentLeave) {
@@ -109,14 +116,18 @@ const ProjectMembersOnLeave = ({ employeeId, leaveId }) => {
           projects.map(async (project) => {
             const empRes = await axios.get(
               `${PMS_BASE_URL}/api/projects/${project.id}/members`,
-              { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+              {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+              },
             );
             const employees = empRes.data || [];
 
             const leaveCache = {};
 
-            console.log("employees in projects",employees);
-            console.log("employeeId",employeeId);
+            console.log("employees in projects", employees);
+            console.log("employeeId", employeeId);
             const membersWithLeaves = await Promise.all(
               employees
                 .filter((emp) => emp.id != employeeId) // exclude current employee
@@ -125,25 +136,27 @@ const ProjectMembersOnLeave = ({ employeeId, leaveId }) => {
                     const leaveRes = await axios.get(
                       `${BASE_URL}/api/leave-requests/employee/pendingAndApproved-leave/${emp.id}`,
                       {
-                        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+                        headers: {
+                          Authorization: `Bearer ${localStorage.getItem("token")}`,
+                        },
                         params: { startDate, endDate },
-                      }
+                      },
                     );
                     leaveCache[emp.id] = Array.isArray(leaveRes.data?.data)
                       ? leaveRes.data.data
                       : [];
                   }
                   return { ...emp, leaves: leaveCache[emp.id] };
-                })
+                }),
             );
 
             return {
               ...project,
               membersOnLeave: membersWithLeaves.filter(
-                (emp) => emp.leaves && emp.leaves.length > 0
+                (emp) => emp.leaves && emp.leaves.length > 0,
               ), // only employees with leaves
             };
-          })
+          }),
         );
 
         setProjectMembersOnLeave(results);

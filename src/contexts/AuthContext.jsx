@@ -60,19 +60,22 @@ export const AuthProvider = ({ children }) => {
     if (token) {
       axios
         .post(
-          `${import.meta.env.VITE_USER_MANAGEMENT_URL}/auth/logout`,
+          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
           {},
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         )
         .then((response) => {
           console.log("Logout response:", response.data);
         })
         .catch((error) => {
-          console.error("Logout failed:", error.response?.data || error.message);
+          console.error(
+            "Logout failed:",
+            error.response?.data || error.message,
+          );
         });
     }
 
@@ -98,7 +101,6 @@ export const AuthProvider = ({ children }) => {
       isLoggingOut.current = false;
     }, 2000);
   };
-  
 
   // ✅ Check and auto logout when token expires
   useEffect(() => {
@@ -127,10 +129,10 @@ export const AuthProvider = ({ children }) => {
         }
       }
     } catch (err) {
-      if(err.response?.status === 401){
+      if (err.response?.status === 401) {
         showStatusToast("Token tampered", "error");
         logout();
-      }else {
+      } else {
         showStatusToast("Invalid token detected. Please login again.");
         logout(true);
       }
@@ -146,7 +148,9 @@ export const AuthProvider = ({ children }) => {
       jwtDecode(token);
       loadUser(token);
     } catch {
-      showStatusToast("Invalid or tampered token detected. Please login again.");
+      showStatusToast(
+        "Invalid or tampered token detected. Please login again.",
+      );
       logout(true);
     }
   }, []);

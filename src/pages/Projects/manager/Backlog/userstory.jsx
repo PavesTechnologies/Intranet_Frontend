@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 
 const CreateUserStory = ({ onClose }) => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
   const [storyPoints, setStoryPoints] = useState(1);
-  const [priority, setPriority] = useState('MEDIUM');
+  const [priority, setPriority] = useState("MEDIUM");
 
   const [projectId, setProjectId] = useState(null);
   const [epicId, setEpicId] = useState(null);
@@ -28,9 +28,15 @@ const CreateUserStory = ({ onClose }) => {
     const loadInitialData = async () => {
       try {
         const [usersRes, projectsRes, sprintsRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/sprints`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
 
         setUsers(usersRes.data?.content ?? usersRes.data ?? []);
@@ -49,9 +55,12 @@ const CreateUserStory = ({ onClose }) => {
     if (!projectId) return;
 
     axios
-      .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      .get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      )
       .then((res) => setEpics(res.data?.content ?? res.data ?? []))
       .catch(() => setEpics([]));
   }, [projectId, token]);
@@ -61,9 +70,12 @@ const CreateUserStory = ({ onClose }) => {
     if (!projectId) return;
 
     axios
-      .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/statuses`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      .get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      )
       .then((res) => setStatuses(res.data?.content ?? res.data ?? []))
       .catch(() => setStatuses([]));
   }, [projectId, token]);
@@ -87,9 +99,9 @@ const CreateUserStory = ({ onClose }) => {
 
     try {
       const res = await axios.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/stories`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories`,
         payload,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       console.log("Story created:", res.data);
@@ -147,7 +159,9 @@ const CreateUserStory = ({ onClose }) => {
         >
           <option value="">Select Project</option>
           {projects.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
           ))}
         </select>
 
@@ -160,7 +174,9 @@ const CreateUserStory = ({ onClose }) => {
         >
           <option value="">Select Epic</option>
           {epics.map((epic) => (
-            <option key={epic.id} value={epic.id}>{epic.name}</option>
+            <option key={epic.id} value={epic.id}>
+              {epic.name}
+            </option>
           ))}
         </select>
 
@@ -173,7 +189,9 @@ const CreateUserStory = ({ onClose }) => {
         >
           <option value="">Select Reporter</option>
           {users.map((u) => (
-            <option key={u.id} value={u.id}>{u.name}</option>
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
           ))}
         </select>
 
@@ -186,7 +204,9 @@ const CreateUserStory = ({ onClose }) => {
         >
           <option value="">Select Assignee</option>
           {users.map((u) => (
-            <option key={u.id} value={u.id}>{u.name}</option>
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
           ))}
         </select>
 
@@ -198,7 +218,9 @@ const CreateUserStory = ({ onClose }) => {
         >
           <option value="">Select Sprint (Optional)</option>
           {sprints.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
           ))}
         </select>
 
@@ -211,7 +233,9 @@ const CreateUserStory = ({ onClose }) => {
         >
           <option value="">Select Status</option>
           {statuses.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
           ))}
         </select>
 

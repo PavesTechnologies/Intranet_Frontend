@@ -23,8 +23,8 @@ export default function CreateTestRunForm({ projectId, onSuccess, onClose }) {
       try {
         const res = await axiosInstance.get(
           `${
-            import.meta.env.VITE_PMS_BASE_URL
-          }/api/test-execution/test-cycles/projects/${projectId}`
+            window.__APP_CONFIG__.PMS_BASE_URL
+          }/api/test-execution/test-cycles/projects/${projectId}`,
         );
         setCycles(res.data || []);
       } catch (err) {
@@ -67,8 +67,8 @@ export default function CreateTestRunForm({ projectId, onSuccess, onClose }) {
     try {
       setLoadingSubmit(true);
       await axiosInstance.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-execution/test-runs`,
-        payload
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-runs`,
+        payload,
       );
 
       toast.success("Test Run Created Successfully");
@@ -93,7 +93,7 @@ export default function CreateTestRunForm({ projectId, onSuccess, onClose }) {
         >
           ✕
         </button>
-      </div>  
+      </div>
 
       {/* If cycles are loading */}
       {loadingCycles ? (

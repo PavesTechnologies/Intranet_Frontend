@@ -6,7 +6,7 @@ import { useAuth } from "../../../../../contexts/AuthContext";
 
 
 export default function CountryEducationMapping() {
-  const BASE = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const token = localStorage.getItem("token");
   const { user } = useAuth();
   const roles = user?.roles?.map(r => r.toUpperCase()) || [];
@@ -61,7 +61,7 @@ export default function CountryEducationMapping() {
     try {
       const res = await axios.get(
         `${BASE}/education/country-mapping/${countryUuid}`,
-        axiosConfig
+        axiosConfig,
       );
       setMappings(res.data || []);
     } catch {
@@ -91,64 +91,57 @@ export default function CountryEducationMapping() {
       setLoadingFormData(false);
     }
   };
- /* ================= ADD NEW MAPPING ================= */
+  /* ================= ADD NEW MAPPING ================= */
   const addMapping = async () => {
-  if (!selectedLevel || !selectedDocument || !selectedCountry) return;
+    if (!selectedLevel || !selectedDocument || !selectedCountry) return;
 
-  setSubmitting(true);
-  setError("");
+    setSubmitting(true);
+    setError("");
 
-  try {
-    const res = await axios.post(
-      `${BASE}/masters/${selectedLevel}/${selectedDocument}/${selectedCountry}`,
-      null,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    try {
+      const res = await axios.post(
+        `${BASE}/masters/${selectedLevel}/${selectedDocument}/${selectedCountry}`,
+        null,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
-    const levelObj = levels.find(
-      (l) => l.education_uuid === selectedLevel
-    );
+      const levelObj = levels.find((l) => l.education_uuid === selectedLevel);
 
-    const docObj = documents.find(
-      (d) => d.education_document_uuid === selectedDocument
-    );
+      const docObj = documents.find(
+        (d) => d.education_document_uuid === selectedDocument,
+      );
 
-    const newMapping = {
-      mapping_uuid: res.data.mapping_uuid,
-      education_name: levelObj?.education_name,
-      document_name: docObj?.document_name,
-      is_mandatory: mandatory,
-    };
+      const newMapping = {
+        mapping_uuid: res.data.mapping_uuid,
+        education_name: levelObj?.education_name,
+        document_name: docObj?.document_name,
+        is_mandatory: mandatory,
+      };
 
-    setMappings((prev) => [...prev, newMapping]);
+      setMappings((prev) => [...prev, newMapping]);
 
-    setSelectedLevel("");
-    setSelectedDocument("");
-    setMandatory(true);
-    setShowAddForm(false);
-
-  } catch (err) {
-    setError(err?.response?.data?.detail || "Failed to create mapping");
-  } finally {
-    setSubmitting(false);
-  }
-};
+      setSelectedLevel("");
+      setSelectedDocument("");
+      setMandatory(true);
+      setShowAddForm(false);
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Failed to create mapping");
+    } finally {
+      setSubmitting(false);
+    }
+  };
   /* ================= UI ================= */
   return (
     <div className="max-w-6xl mx-auto mt-8">
-      <h1 className="text-2xl font-semibold mb-1">
-        Education Country Mapping
-      </h1>
+      <h1 className="text-2xl font-semibold mb-1">Education Country Mapping</h1>
       <p className="text-sm text-gray-500 mb-6">
         Configure education document requirements per country
       </p>
 
       <div className="bg-white shadow rounded p-6">
-        {error && (
-          <div className="mb-4 text-red-600 text-sm">{error}</div>
-        )}
+        {error && <div className="mb-4 text-red-600 text-sm">{error}</div>}
 
         {/* Country Selection */}
         <div className="mb-6">
@@ -191,9 +184,7 @@ export default function CountryEducationMapping() {
             </div>
 
             {loadingMappings ? (
-              <div className="text-gray-500 py-4">
-                Loading mappings...
-              </div>
+              <div className="text-gray-500 py-4">Loading mappings...</div>
             ) : (
               <table className="w-full border">
                 <thead className="bg-gray-100">
@@ -206,10 +197,7 @@ export default function CountryEducationMapping() {
                 <tbody>
                   {mappings.length === 0 ? (
                     <tr>
-                      <td
-                        colSpan="3"
-                        className="text-center p-4 text-gray-500"
-                      >
+                      <td colSpan="3" className="text-center p-4 text-gray-500">
                         No mappings found
                       </td>
                     </tr>
@@ -218,9 +206,7 @@ export default function CountryEducationMapping() {
                       <tr key={m.mapping_uuid} className="border-t">
                         <td className="p-3">{m.education_name}</td>
                         <td className="p-3">{m.document_name}</td>
-                        <td className="p-3">
-                          {m.is_mandatory ? "Yes" : "No"}
-                        </td>
+                        <td className="p-3">{m.is_mandatory ? "Yes" : "No"}</td>
                       </tr>
                     ))
                   )}
@@ -233,15 +219,11 @@ export default function CountryEducationMapping() {
         {/* Add Mapping Form */}
         {showAddForm && (
           <div className="mt-6 border-t pt-6">
-            <h3 className="text-lg font-medium mb-4">
-              Add New Mapping
-            </h3>
+            <h3 className="text-lg font-medium mb-4">Add New Mapping</h3>
 
             <div className="flex items-end gap-4">
               <div>
-                <label className="block text-sm mb-1">
-                  Education Level
-                </label>
+                <label className="block text-sm mb-1">Education Level</label>
                 <select
                   className="border rounded px-3 py-2"
                   value={selectedLevel}
@@ -249,10 +231,7 @@ export default function CountryEducationMapping() {
                 >
                   <option value="">Select Level</option>
                   {levels.map((l) => (
-                    <option
-                      key={l.education_uuid}
-                      value={l.education_uuid}
-                    >
+                    <option key={l.education_uuid} value={l.education_uuid}>
                       {l.education_name}
                     </option>
                   ))}
@@ -260,9 +239,7 @@ export default function CountryEducationMapping() {
               </div>
 
               <div>
-                <label className="block text-sm mb-1">
-                  Document
-                </label>
+                <label className="block text-sm mb-1">Document</label>
                 <select
                   className="border rounded px-3 py-2"
                   value={selectedDocument}
