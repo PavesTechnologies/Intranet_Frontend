@@ -94,13 +94,9 @@ export default function ViewEmpDetails() {
   const selectedApproverName =
     adminUsers.find((a) => String(a.user_id) === String(selectedAdmin))?.name ||
     "";
-  const selectedApproverName =
-    adminUsers.find((a) => String(a.user_id) === String(selectedAdmin))?.name ||
-    "";
 
   const [editData, setEditData] = useState({
     first_name: "",
-    middle_name: "",
     middle_name: "",
     last_name: "",
     mail: "",
@@ -179,7 +175,6 @@ export default function ViewEmpDetails() {
   const actionTaken = ["APPROVED", "REJECTED", "ON_HOLD"].includes(approvalStatus);
 
   const effectiveApprover =
-    employee?.approver_name || approvalHistory?.[0]?.action_taker_name || null;
     employee?.approver_name || approvalHistory?.[0]?.action_taker_name || null;
 
   /* ── PREVIEW ── */

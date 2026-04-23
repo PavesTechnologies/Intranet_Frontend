@@ -165,83 +165,84 @@ export default function EmployeeOnboardingPage() {
         },
       );
 
-    const data = await res.json();
-    setDesignations(data || []);
+      const data = await res.json();
+      setDesignations(data || []);
 
-  } catch (err) {
-    console.error("Failed to fetch designations", err);
-  }
-};
-const handleBulkUpload = async (event) => {
-  try {
+    } catch (err) {
+      console.error("Failed to fetch designations", err);
+    }
+  };
 
-    const file = event.target.files[0];
+  const handleBulkUpload = async (event) => {
+    try {
 
-    if (!file) return;
+      const file = event.target.files[0];
 
-    const token = localStorage.getItem("token");
+      if (!file) return;
 
-    const formData = new FormData();
-    formData.append("file", file);
+      const token = localStorage.getItem("token");
 
-    setUploadLoading(true);
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const response = await fetch(
-      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/bulk-direct-upload`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        body: formData
-      }
-    );
+      setUploadLoading(true);
 
-    const data = await response.json();
+      const response = await fetch(
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/bulk-direct-upload`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: formData
+        }
+      );
 
-    if (response.ok) {
+      const data = await response.json();
 
-      // Success toast
-      if (data.success_count > 0) {
-        showStatusToast(
-          `${data.success_count} employees uploaded successfully`,
-          "success"
-        );
-      }
+      if (response.ok) {
 
-      // Error toasts
-      if (data.failed_records?.length > 0) {
-
-        data.failed_records.forEach((item) => {
-
+        // Success toast
+        if (data.success_count > 0) {
           showStatusToast(
-            `Row ${item.row}: ${formatError(item.reason)}`,
-            "error"
+            `${data.success_count} employees uploaded successfully`,
+            "success"
           );
+        }
 
-        });
+        // Error toasts
+        if (data.failed_records?.length > 0) {
+
+          data.failed_records.forEach((item) => {
+
+            showStatusToast(
+              `Row ${item.row}: ${formatError(item.reason)}`,
+              "error"
+            );
+
+          });
+
+        }
+
+        fetchEmployees();
+
+      } else {
+
+        showStatusToast("Upload failed", "error");
 
       }
 
-      fetchEmployees();
+    } catch (error) {
 
-    } else {
-
+      console.error(error);
       showStatusToast("Upload failed", "error");
 
+    } finally {
+
+      setUploadLoading(false);
+
     }
-
-  } catch (error) {
-
-    console.error(error);
-    showStatusToast("Upload failed", "error");
-
-  } finally {
-
-    setUploadLoading(false);
-
-  }
-};
+  };
 
   useEffect(() => {
     fetchEmployees();
