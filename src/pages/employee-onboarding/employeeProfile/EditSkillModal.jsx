@@ -320,10 +320,20 @@ export default function EditSkillModal({ employeeId, skillData, onClose, onSaveS
     }));
   }, [formState.skillId, availableSkills, isHydrating]);
 
-    setFormState(p => ({
-      ...p,
-      subSkills: [...p.subSkills, { subSkillId: "", otherSubSkillName: "", proficiencyId: "" }]
-    }));
+    // setFormState(p => ({
+    //   ...p,
+    //   subSkills: [...p.subSkills, { subSkillId: "", otherSubSkillName: "", proficiencyId: "" }]
+    // }));
+
+  const addSubSkillRow = () => {
+  setFormState(p => ({
+    ...p,
+    subSkills: [
+      ...p.subSkills,
+      { subSkillId: "", otherSubSkillName: "", proficiencyId: "" }
+    ]
+  }));
+};
 
   const removeSubSkillRow = (index) => {
     setFormState(p => ({ ...p, subSkills: p.subSkills.filter((_, i) => i !== index) }));
