@@ -38,7 +38,7 @@ export default function BugReportModal({ step, runCaseId, onClose }) {
   const submitBug = async () => {
     try {
       await axiosInstance.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/testing/bugs`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/testing/bugs`,
         {
           runCaseId,
           runCaseStepId: step.id,
@@ -50,7 +50,7 @@ export default function BugReportModal({ step, runCaseId, onClose }) {
           priority,
           severity,
           type,
-        }
+        },
       );
 
       toast.success("Bug created successfully!");
@@ -154,7 +154,7 @@ export default function BugReportModal({ step, runCaseId, onClose }) {
               <Select
                 className="mt-1 text-sm"
                 value={bugPrioritiesOptions.find(
-                  (opt) => opt.value === priority
+                  (opt) => opt.value === priority,
                 )}
                 onChange={(selected) => setPriority(selected.value)}
                 options={bugPrioritiesOptions}
@@ -166,7 +166,7 @@ export default function BugReportModal({ step, runCaseId, onClose }) {
               <Select
                 className="mt-1 text-sm"
                 value={bugSeveritiesOptions.find(
-                  (opt) => opt.value === severity
+                  (opt) => opt.value === severity,
                 )}
                 onChange={(selected) => setSeverity(selected.value)}
                 options={bugSeveritiesOptions}

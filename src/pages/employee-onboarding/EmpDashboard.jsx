@@ -3,7 +3,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { FileEdit, Send, Users, ShieldCheck, XCircle, FileText, Handshake, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLocation } from "react-router-dom";
 // import Button from "../../components/Button/Button";
 import EmpTable from "./components/EmpTable";
 import axios from "axios";
@@ -13,6 +15,7 @@ import {
   getOfferDisplayStatus,
 } from "./components/offerStatus";
 import { fetchOfferDetailsList } from "./components/fetchOfferDetails";
+
 
 
 export default function EmployeeOnboardingDashboard() {
@@ -52,8 +55,8 @@ const [viewRole, setViewRole] = useState(hasApprovalPrivileges && !isHR ? "ADMIN
 
     const fetchOffers = async () => {
       const detailedOffers = await fetchOfferDetailsList(
-        import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL,
-        token
+        window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL,
+        token,
       );
 
       setOffers(detailedOffers);
@@ -61,13 +64,15 @@ const [viewRole, setViewRole] = useState(hasApprovalPrivileges && !isHR ? "ADMIN
 
     const fetchCoreEmployees = async () => {
       const res = await axios.get(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
 
-      setEmployeeUserIds((res.data || []).map((employee) => employee.user_uuid));
+      setEmployeeUserIds(
+        (res.data || []).map((employee) => employee.user_uuid),
+      );
     };
 
     const fetchData = async () => {
@@ -83,15 +88,33 @@ const [viewRole, setViewRole] = useState(hasApprovalPrivileges && !isHR ? "ADMIN
     fetchData();
   }, []);
 
-  const acceptCount = offers.filter((o) => getNormalizedStatus(o.status) === "ACCEPTED").length;
-  const sentCount = offers.filter((o) => getNormalizedStatus(o.status) === "OFFERED").length;
-  const draftCount = offers.filter((o) => getNormalizedStatus(o.status) === "CREATED").length;
-  const submittedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "SUBMITTED").length;
-  const verifiedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "VERIFIED").length;
-  const joiningCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING").length;
-  const joiningPendingCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING_PENDING").length;
-  const completedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "COMPLETED").length;
-  const rejectedCount = offers.filter((o) => getOfferDisplayStatus(o, employeeUserIds) === "REJECTED").length;
+  const acceptCount = offers.filter(
+    (o) => getNormalizedStatus(o.status) === "ACCEPTED",
+  ).length;
+  const sentCount = offers.filter(
+    (o) => getNormalizedStatus(o.status) === "OFFERED",
+  ).length;
+  const draftCount = offers.filter(
+    (o) => getNormalizedStatus(o.status) === "CREATED",
+  ).length;
+  const submittedCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "SUBMITTED",
+  ).length;
+  const verifiedCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "VERIFIED",
+  ).length;
+  const joiningCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING",
+  ).length;
+  const joiningPendingCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING_PENDING",
+  ).length;
+  const completedCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "COMPLETED",
+  ).length;
+  const rejectedCount = offers.filter(
+    (o) => getOfferDisplayStatus(o, employeeUserIds) === "REJECTED",
+  ).length;
 
   // ✅ Filter offers based on search term (case-insensitive)
   const filteredOffers = useMemo(() => {

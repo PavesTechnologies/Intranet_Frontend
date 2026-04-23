@@ -77,7 +77,7 @@ export default function TaskSubCard({ task, anchorRef, onClose, onSave }) {
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
           {!editMode ? (
-            <div style={{ fontSize: 18, fontWeight: 600 }}>{task.title}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{task.title}</div>
           ) : (
             <input name="title" value={form.title} onChange={handleChange} style={inputStyle} />
           )}

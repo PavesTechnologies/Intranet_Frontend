@@ -4,11 +4,11 @@ import { toast } from "react-toastify";
 import ApprovalQueue from "./ApprovalQueue";
 import { ChevronRight } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import clearingDesk from "../../../components/icons/clearing-desk_emmv.svg"
+import clearingDesk from "../../../components/icons/clearing-desk_emmv.svg";
 import ConfirmationModal from "./ConfirmationModal";
 import axios from "axios";
 
-const RMS_BASE_URL = import.meta.env.VITE_RMS_BASE_URL;
+const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
 const ApprovalDashboard = () => {
   const [requests, setRequests] = useState([]);
@@ -84,15 +84,16 @@ const ApprovalDashboard = () => {
 
   const handleHolidayChange = async () => {
     try {
-      const res = axios.post(`${RMS_BASE_URL}/api/availability/trigger/holiday-change`, 
+      const res = axios.post(
+        `${RMS_BASE_URL}/api/availability/trigger/holiday-change`,
         {},
         {
           params: {
-            year: new Date().getFullYear()
+            year: new Date().getFullYear(),
           },
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`
-          }
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         },
       );
       console.log("Holiday change response: ", res);
@@ -103,14 +104,18 @@ const ApprovalDashboard = () => {
 
   const handleApprove = async (request) => {
     const { id } = request;
-    console.log("Request: ",request);
+    console.log("Request: ", request);
     const actionType = request.actionType;
     const comment = actionState[id]?.comment || "";
     try {
       setActionLoading(true);
       await approvalService.approveRequest(id, comment);
       toast.success("Request Approved successfully");
-      if ((actionType === "ADD_HOLIDAY") || (actionType === "UPDATE_HOLIDAY") || (actionType === "DELETE_HOLIDAY")) {
+      if (
+        actionType === "ADD_HOLIDAY" ||
+        actionType === "UPDATE_HOLIDAY" ||
+        actionType === "DELETE_HOLIDAY"
+      ) {
         handleHolidayChange();
       }
       await loadPendingApprovals();
@@ -234,7 +239,7 @@ const ApprovalDashboard = () => {
                               handleStateChange(
                                 request.id,
                                 "reason",
-                                e.target.value
+                                e.target.value,
                               )
                             }
                             className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
@@ -264,9 +269,7 @@ const ApprovalDashboard = () => {
         </div>
       )}
 
-      {isConfirmationOpen && (
-        console.log("Request: ", request)
-      )}
+      {isConfirmationOpen && console.log("Request: ", request)}
 
       <ConfirmationModal
         isOpen={isConfirmationOpen}

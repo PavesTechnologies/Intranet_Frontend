@@ -62,7 +62,7 @@ export default function AdminOfferView() {
   const navigate = useNavigate();
 
   const token = localStorage.getItem("token");
-  const BASE = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const [offer, setOffer] = useState(null);
   const [approval, setApproval] = useState(null);
@@ -101,11 +101,13 @@ export default function AdminOfferView() {
       action: found.action,
       approver_name: found.approver_name || null,
       comments: found.message || found.comments || "",
+      comments: found.message || found.comments || "",
       mail: found.mail || "",
     };
     setApproval(mapped);
     console.log("Mapped Approval:", mapped);
   };
+
 
   useEffect(() => {
     Promise.all([fetchOffer(), fetchApproval()])

@@ -24,19 +24,15 @@ const Wrapper = ({ children, mode, onClose }) => {
       </div>
     );
   }
-  return (
-    <div className="w-full h-full flex flex-col bg-white">
-      {children}
-    </div>
-  );
+  return <div className="w-full h-full flex flex-col bg-white">{children}</div>;
 };
 
-const EditEpicForm = ({ 
-  epicId, 
-  projectId, 
-  onClose, 
+const EditEpicForm = ({
+  epicId,
+  projectId,
+  onClose,
   onUpdated,
-  mode = "modal" // Preserved your default preference for this one based on previous implementation
+  mode = "modal", // Preserved your default preference for this one based on previous implementation
 }) => {
   const [formData, setFormData] = useState({
     name: "",
@@ -70,12 +66,23 @@ const EditEpicForm = ({
     const loadData = async () => {
       try {
         const requests = [
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`, axiosConfig),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/statuses`, axiosConfig),
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
+            axiosConfig,
+          ),
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
+            axiosConfig,
+          ),
         ];
 
         if (epicId) {
-          requests.push(axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/epics/${epicId}`, axiosConfig));
+          requests.push(
+            axios.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/epics/${epicId}`,
+              axiosConfig,
+            ),
+          );
         }
 
         const responses = await Promise.all(requests);
@@ -172,12 +179,12 @@ const EditEpicForm = ({
     try {
       if (epicId) {
         await axios.put(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/epics/${epicId}`,
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/epics/${epicId}`,
           updatedPayload,
-          axiosConfig
+          axiosConfig,
         );
         toast.success("Epic updated successfully!");
-      } 
+      }
       // Add POST logic here later if needed when creating
 
       setTimeout(() => {
@@ -210,46 +217,101 @@ const EditEpicForm = ({
         <h2 className="text-xl font-semibold text-gray-800">
           {epicId ? "Edit Epic" : "Create Epic"}
         </h2>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 transition-colors">
+        <button
+          onClick={onClose}
+          className="text-gray-500 hover:text-gray-800 transition-colors"
+        >
           <X size={20} />
         </button>
       </div>
 
       {/* BODY */}
       <div className="p-6 overflow-y-auto flex-1 space-y-6">
-        <FormInput label="Project" name="projectName" value={projectName} readOnly disabled />
-        
-        <FormInput label="Epic Name *" name="name" value={formData.name} onChange={handleChange} required />
-        
-        <FormTextArea label="Description" name="description" value={formData.description} onChange={handleChange} />
+        <FormInput
+          label="Project"
+          name="projectName"
+          value={projectName}
+          readOnly
+          disabled
+        />
+
+        <FormInput
+          label="Epic Name *"
+          name="name"
+          value={formData.name}
+          onChange={handleChange}
+          required
+        />
+
+        <FormTextArea
+          label="Description"
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <FormSelect
-            label="Priority" name="priority" value={formData.priority} onChange={handleChange}
-            options={[{ label: "Low", value: "LOW" }, { label: "Medium", value: "MEDIUM" }, { label: "High", value: "HIGH" }, { label: "Critical", value: "CRITICAL" }]}
+            label="Priority"
+            name="priority"
+            value={formData.priority}
+            onChange={handleChange}
+            options={[
+              { label: "Low", value: "LOW" },
+              { label: "Medium", value: "MEDIUM" },
+              { label: "High", value: "HIGH" },
+              { label: "Critical", value: "CRITICAL" },
+            ]}
           />
           <FormSelect
-            label="Status *" name="statusId" value={formData.statusId} onChange={handleChange}
-            options={[{ label: "Select Status", value: "" }, ...statuses.map((s) => ({ label: s.name, value: String(s.id) }))]}
+            label="Status *"
+            name="statusId"
+            value={formData.statusId}
+            onChange={handleChange}
+            options={[
+              { label: "Select Status", value: "" },
+              ...statuses.map((s) => ({ label: s.name, value: String(s.id) })),
+            ]}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <FormDatePicker label="Start Date" name="startDate" value={formData.startDate} onChange={handleChange} />
-          <FormDatePicker label="Due Date" name="dueDate" value={formData.dueDate} onChange={handleChange} />
+          <FormDatePicker
+            label="Start Date"
+            name="startDate"
+            value={formData.startDate}
+            onChange={handleChange}
+          />
+          <FormDatePicker
+            label="Due Date"
+            name="dueDate"
+            value={formData.dueDate}
+            onChange={handleChange}
+          />
         </div>
 
         {createdDate && (
-          <p className="text-sm text-gray-500 italic">Created On: {createdDate}</p>
+          <p className="text-sm text-gray-500 italic">
+            Created On: {createdDate}
+          </p>
         )}
       </div>
 
       {/* FOOTER */}
       <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3 shrink-0">
-        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+        >
           Cancel
         </button>
-        <button type="button" onClick={handleSubmit} disabled={isSubmitting} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+        >
           {isSubmitting ? "Saving..." : epicId ? "Save Changes" : "Create Epic"}
         </button>
       </div>

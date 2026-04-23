@@ -1,5 +1,4 @@
-
-export const BASE = import.meta.env.VITE_PMS_BASE_URL || "";
+export const BASE = window.__APP_CONFIG__.PMS_BASE_URL || "";
 
 export const WIP_WARNING_THRESHOLD = 8;
 
@@ -28,4 +27,3 @@ export const stableColorClass = (k) => {
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 1000;
   return PALETTE[Math.abs(h) % PALETTE.length];
 };
-

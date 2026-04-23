@@ -13,10 +13,7 @@ const FileUpload = React.forwardRef(
     return (
       <div className="flex flex-col space-y-2">
         {label && (
-          <label
-            htmlFor={name}
-            className="text-sm font-medium text-gray-700"
-          >
+          <label htmlFor={name} className="text-sm font-medium text-gray-700">
             {label}
           </label>
         )}
@@ -32,7 +29,7 @@ const FileUpload = React.forwardRef(
         />
       </div>
     );
-  }
+  },
 );
 
 FileUpload.displayName = "FileUpload";
@@ -122,14 +119,14 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
       // );
 
       const response = await axios.post(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/access-points/bulk-access-points-create`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/access-points/bulk-access-points-create`,
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       console.log({ r: response.data });
@@ -138,15 +135,14 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
       if (failed === 0) {
         showStatusToast(
           `✅ ${successful} access points created successfully.`,
-          "success"
+          "success",
         );
       } else {
         showStatusToast(
           `⚠️ ${successful} access points created, ${failed} failed.`,
-          "error"
+          "error",
         );
       }
-      
 
       // Reset form after successful upload
       setFile(null);
@@ -176,8 +172,8 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
           </h2>
 
           <p className="text-sm text-gray-600 text-center mb-4">
-            Upload an Excel file (<strong>.xlsx</strong>) containing access point
-            details. Ensure your file follows the required format.
+            Upload an Excel file (<strong>.xlsx</strong>) containing access
+            point details. Ensure your file follows the required format.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">

@@ -24,8 +24,7 @@ function ActionMenu({ onEdit, onDelete }) {
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
@@ -104,14 +103,14 @@ export default function EmployeeOnboardingPage() {
       const token = localStorage.getItem("token");
 
       const response = await fetch(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       const data = await response.json();
@@ -129,43 +128,42 @@ export default function EmployeeOnboardingPage() {
   ============================ */
 
   const fetchDepartments = async () => {
-  try {
-    const token = localStorage.getItem("token");
+    try {
+      const token = localStorage.getItem("token");
 
-    const response = await fetch(
-      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         },
-      }
-    );
+      );
 
-    const data = await response.json();
+      const data = await response.json();
 
-    setDepartments(Array.isArray(data) ? data : data.data || []);
+      setDepartments(Array.isArray(data) ? data : data.data || []);
+    } catch (error) {
+      console.error("Failed to fetch departments", error);
+    }
+  };
 
-  } catch (error) {
-    console.error("Failed to fetch departments", error);
-  }
-};
+  const fetchDesignations = async () => {
+    try {
+      const token = localStorage.getItem("token");
 
-const fetchDesignations = async () => {
-  try {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(
-      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/masters/designations/`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         },
-      }
-    );
+      );
 
     const data = await res.json();
     setDesignations(data || []);
@@ -251,17 +249,16 @@ const handleBulkUpload = async (event) => {
     fetchDesignations();
     handleBulkUpload;
   }, []);
-  
-   /* ============================
+
+  /* ============================
      CREATE UUID → NAME MAPS
   ============================ */
-   const departmentMap = Object.fromEntries(
-    departments.map((d) => [d.department_uuid, d.department_name])
-    );
+  const departmentMap = Object.fromEntries(
+    departments.map((d) => [d.department_uuid, d.department_name]),
+  );
   const designationMap = Object.fromEntries(
-      designations.map((d) => [d.designation_uuid, d.designation_name])
-    );
-
+    designations.map((d) => [d.designation_uuid, d.designation_name]),
+  );
 
   const handleCloseModal = () => {
     setIsCreateOpen(false);
@@ -277,15 +274,15 @@ const handleBulkUpload = async (event) => {
   const totalEmployees = employees.length;
 
   const probation = employees.filter(
-    (e) => e.employment_status === "Probation"
+    (e) => e.employment_status === "Probation",
   ).length;
 
   const active = employees.filter(
-    (e) => e.employment_status === "Active"
+    (e) => e.employment_status === "Active",
   ).length;
 
   const noticePeriod = employees.filter(
-    (e) => e.employment_status === "Notice Period"
+    (e) => e.employment_status === "Notice Period",
   ).length;
 
   /* ============================
@@ -308,8 +305,7 @@ const handleBulkUpload = async (event) => {
 
       const status = (emp.employment_status || "").toUpperCase();
 
-      const statusMatch =
-        statusFilter === "ALL" || status === statusFilter;
+      const statusMatch = statusFilter === "ALL" || status === statusFilter;
 
       const departmentMatch =
         departmentFilter === "ALL" ||
@@ -317,75 +313,70 @@ const handleBulkUpload = async (event) => {
 
       return matchesSearch && statusMatch && departmentMatch;
     });
-  }, [employees, searchTerm, statusFilter, departmentFilter,]);
+  }, [employees, searchTerm, statusFilter, departmentFilter]);
 
-const handleExportPreview = async () => {
-  setExportLoading(true);
+  const handleExportPreview = async () => {
+    setExportLoading(true);
 
-  try {
+    try {
+      // const excelData = filteredEmployees.map(emp => ({
+      //   "Employee ID": emp.employee_id,
+      //   "Name": `${emp.first_name} ${emp.last_name}`,
+      //   "Email": emp.work_email,
+      //   "Contact": emp.contact_number,
+      //   "Department": departmentMap[emp.department_uuid],
+      //   "Designation": designationMap[emp.designation_uuid],
+      //   "Joining Date": emp.joining_date,
+      //   "Status": emp.employment_status
+      // }));
 
-    // const excelData = filteredEmployees.map(emp => ({
-    //   "Employee ID": emp.employee_id,
-    //   "Name": `${emp.first_name} ${emp.last_name}`,
-    //   "Email": emp.work_email,
-    //   "Contact": emp.contact_number,
-    //   "Department": departmentMap[emp.department_uuid],
-    //   "Designation": designationMap[emp.designation_uuid],
-    //   "Joining Date": emp.joining_date,
-    //   "Status": emp.employment_status
-    // }));
+      const newEmployees = filteredEmployees.filter(
+        (emp) => !exportedEmails.includes(emp.work_email?.toLowerCase()),
+      );
 
-  const newEmployees = filteredEmployees.filter(
-  emp => !exportedEmails.includes(emp.work_email?.toLowerCase())
-); 
+      if (newEmployees.length === 0) {
+        showStatusToast("No new employees to export", "info");
+        setExportLoading(false);
+        return;
+      }
 
-if (newEmployees.length === 0) {
-  showStatusToast("No new employees to export", "info");
-  setExportLoading(false);
-  return;
-}
+      const excelData = newEmployees.map((emp) => ({
+        "Employee ID": emp.employee_id,
+        Name: `${emp.first_name} ${emp.last_name}`,
+        Email: emp.work_email,
+        Contact: emp.contact_number,
+        Department: departmentMap[emp.department_uuid],
+        Designation: designationMap[emp.designation_uuid],
+        "Joining Date": emp.joining_date,
+        Status: emp.employment_status,
+      }));
+      setExcelPreview(excelData);
+      setShowPreview(true);
+    } catch (error) {
+      console.error("Excel preview error", error);
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
-const excelData = newEmployees.map(emp => ({
-  "Employee ID": emp.employee_id,
-  "Name": `${emp.first_name} ${emp.last_name}`,
-  "Email": emp.work_email,
-  "Contact": emp.contact_number,
-  "Department": departmentMap[emp.department_uuid],
-  "Designation": designationMap[emp.designation_uuid],
-  "Joining Date": emp.joining_date,
-  "Status": emp.employment_status
-}));
-    setExcelPreview(excelData);
-    setShowPreview(true);
+  const downloadExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(excelPreview);
 
-  } catch (error) {
-    console.error("Excel preview error", error);
-  } finally {
-    setExportLoading(false);
-  }
-};
+    const workbook = XLSX.utils.book_new();
 
-const downloadExcel = () => {
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
 
-  const worksheet = XLSX.utils.json_to_sheet(excelPreview);
+    // Auto column width
+    const cols = Object.keys(excelPreview[0]).map(() => ({ wch: 25 }));
+    worksheet["!cols"] = cols;
 
-  const workbook = XLSX.utils.book_new();
+    XLSX.writeFile(workbook, "Employee_Report.xlsx");
 
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
+    const newEmails = excelPreview.map((emp) => emp.Email.toLowerCase());
+    setExportedEmails((prev) => [...new Set([...prev, ...newEmails])]);
 
-  // Auto column width
-  const cols = Object.keys(excelPreview[0]).map(() => ({ wch: 25 }));
-  worksheet["!cols"] = cols;
-
-  XLSX.writeFile(workbook, "Employee_Report.xlsx");
-
-  const newEmails = excelPreview.map(emp => emp.Email.toLowerCase());
-  setExportedEmails(prev => [
-  ...new Set([...prev, ...newEmails])
-]);
-
-  setShowPreview(false);
-};
+    setShowPreview(false);
+  };
   /* ============================
      TABLE CONFIG
   ============================ */
@@ -422,13 +413,11 @@ const downloadExcel = () => {
     return filteredEmployees
       .slice(startIndex, startIndex + PAGE_SIZE)
       .map((emp) => ({
-
         employee_id: emp.employee_id || "—",
 
-        name:
-          `${emp.first_name || ""} ${emp.middle_name || ""} ${emp.last_name || ""}`
-            .toLowerCase()
-            .replace(/\b\w/g, (c) => c.toUpperCase()),
+        name: `${emp.first_name || ""} ${emp.middle_name || ""} ${emp.last_name || ""}`
+          .toLowerCase()
+          .replace(/\b\w/g, (c) => c.toUpperCase()),
 
         email: emp.work_email || "—",
 
@@ -448,31 +437,31 @@ const downloadExcel = () => {
 
         action: (
           <ActionMenu
-            onEdit={() =>
-            {
+            onEdit={() => {
               setEditEmployeeUuid(emp.employee_uuid);
               setSelectedUserUuid(emp.user_uuid);
               setIsCreateOpen(true);
-            }
-            }
+            }}
             onDelete={() => handleDelete(emp.employee_uuid)}
           />
         ),
       }));
-
-  }, [employees, currentPage, filteredEmployees, departments, designations, designationMap]);
+  }, [
+    employees,
+    currentPage,
+    filteredEmployees,
+    departments,
+    designations,
+    designationMap,
+  ]);
 
   return (
     <div className="p-6 space-y-6">
-
       {/* HEADER */}
 
       <div className="flex justify-between items-center">
-
-      <div>
-        <h1 className="text-2xl font-bold">
-          Employee Dashboard
-        </h1>
+        <div>
+          <h1 className="text-2xl font-bold">Employee Dashboard</h1>
 
         <p className="text-gray-500">
           Manage employee records
@@ -547,21 +536,22 @@ const downloadExcel = () => {
     {/* SUMMARY CARDS */}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-
         <StatCard title="Total Employees" value={totalEmployees} icon={Users} />
 
         <StatCard title="Probation" value={probation} icon={Clock} />
 
         <StatCard title="Active" value={active} icon={CheckCircle} />
 
-        <StatCard title="Notice Period" value={noticePeriod} icon={AlertCircle} />
-
+        <StatCard
+          title="Notice Period"
+          value={noticePeriod}
+          icon={AlertCircle}
+        />
       </div>
 
       {/* SEARCH + FILTERS */}
 
       <div className="flex flex-col md:flex-row gap-4">
-
         <input
           placeholder="Search by Name, Email or Employee ID..."
           value={searchTerm}
@@ -597,17 +587,16 @@ const downloadExcel = () => {
           <option value="ALL">All Departments</option>
 
           {departments.map((dept) => (
-          <option key={dept.department_uuid} value={dept.department_name}>
-            {dept.department_name}
-          </option>
-        ))}
+            <option key={dept.department_uuid} value={dept.department_name}>
+              {dept.department_name}
+            </option>
+          ))}
         </select>
       </div>
 
       {/* TABLE */}
 
       <div className="bg-white rounded-xl shadow-sm relative overflow-visible">
-
         <Table
           headers={headers}
           columns={columns}
@@ -619,29 +608,26 @@ const downloadExcel = () => {
           <Pagination
             currentPage={currentPage}
             totalPages={Math.ceil(filteredEmployees.length / PAGE_SIZE)}
-            onPrevious={() =>
-              setCurrentPage((p) => Math.max(p - 1, 1))
-            }
+            onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
             onNext={() =>
               setCurrentPage((p) =>
-                Math.min(p + 1, Math.ceil(employees.length / PAGE_SIZE))
+                Math.min(p + 1, Math.ceil(employees.length / PAGE_SIZE)),
               )
             }
           />
         )}
-
       </div>
 
       {/* ============================
    EXCEL PREVIEW
 ============================ */}
 
-<ExcelPreviewModal
-  showPreview={showPreview}
-  excelPreview={excelPreview}
-  onClose={() => setShowPreview(false)}
-  onSend={downloadExcel}
-/>
+      <ExcelPreviewModal
+        showPreview={showPreview}
+        excelPreview={excelPreview}
+        onClose={() => setShowPreview(false)}
+        onSend={downloadExcel}
+      />
 
       {/* MODAL */}
 
@@ -651,7 +637,6 @@ const downloadExcel = () => {
         userUuid={selectedUserUuid}
         employeeUuid={editEmployeeUuid}
       />
-
     </div>
   );
 }
@@ -688,13 +673,9 @@ function StatCard({ title, value, icon: Icon }) {
       <Icon className="text-indigo-600" />
 
       <div>
-        <p className="text-sm text-gray-500">
-          {title}
-        </p>
+        <p className="text-sm text-gray-500">{title}</p>
 
-        <p className="text-xl font-semibold text-gray-900">
-          {value}
-        </p>
+        <p className="text-xl font-semibold text-gray-900">{value}</p>
       </div>
     </div>
   );

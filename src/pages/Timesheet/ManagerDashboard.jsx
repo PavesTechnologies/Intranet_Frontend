@@ -72,7 +72,7 @@ const ManagerDashboard = ({ data, loading, setStatusFilter, handleScroll }) => {
       // ✅ FIXED URL: removed extra brace and ensured correct base URL usage
       const response = await fetch(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheet/send_reminder`,
         {
           method: "POST",
@@ -81,19 +81,19 @@ const ManagerDashboard = ({ data, loading, setStatusFilter, handleScroll }) => {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(emails),
-        }
+        },
       );
 
       if (response.ok) {
         showStatusToast(
           `Reminder emails sent to ${emails.length} users successfully!`,
-          "success"
+          "success",
         );
       } else {
         const errMsg = await response.text();
         showStatusToast(
           `Failed to send reminders. Server response: ${errMsg}`,
-          "error"
+          "error",
         );
       }
     } catch (error) {
@@ -207,7 +207,9 @@ const ManagerDashboard = ({ data, loading, setStatusFilter, handleScroll }) => {
               ))}
             </ul>
             <div className="text-gray-500 font-semibold text-xs mt-2 italic">
-              <span className="text-red-600">*</span>{" "} If the date is before the 15th, use 1st of month. If on/after the 15th, use the last 15 days.
+              <span className="text-red-600">*</span> If the date is before the
+              15th, use 1st of month. If on/after the 15th, use the last 15
+              days.
             </div>
           </div>
         ) : (

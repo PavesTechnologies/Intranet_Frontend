@@ -13,8 +13,8 @@ import DateRangePicker from "./DateRangePicker";
 import { format } from "date-fns";
 
 const skeleton = "animate-pulse bg-gray-400 rounded hover:cursor-wait";
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-const PMS_BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+const PMS_BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 
 const Toggle = ({ checked, onChange, label, hint, id }) => (
   <div className="flex items-start gap-3">
@@ -263,7 +263,7 @@ export default function BlockLeaveDates({ employeeId }) {
 
         if (!active) return;
         const leaveIdMap = new Map(
-          ltIdsJson.map((item) => [item.leaveName, item.leaveTypeId])
+          ltIdsJson.map((item) => [item.leaveName, item.leaveTypeId]),
         );
         const mergedLeaveTypes = ltJson
           .filter((leaveType) => leaveIdMap.get(leaveType.name) !== undefined)
@@ -285,12 +285,17 @@ export default function BlockLeaveDates({ employeeId }) {
       try {
         const year = new Date().getFullYear();
         console.log("yeaer", year);
-        const res = await axios.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
-          params: { state: "All", country: "India" }, // Adjust params if needed
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        const res = await axios.get(
+          `${BASE_URL}/api/holidays/by-location/${year}`,
+          {
+            params: { state: "All", country: "India" }, // Adjust params if needed
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
+        );
         const holidayDates = res.data.map(
-          (holiday) => new Date(holiday.holidayDate + "T00:00:00")
+          (holiday) => new Date(holiday.holidayDate + "T00:00:00"),
         );
         setHolidays(holidayDates);
       } catch (err) {
@@ -319,12 +324,12 @@ export default function BlockLeaveDates({ employeeId }) {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         );
         const json = await res.data;
         if (!active) return;
         setMembers(
-          (json || []).map((m) => ({ value: m.id, label: `${m.name}` }))
+          (json || []).map((m) => ({ value: m.id, label: `${m.name}` })),
         );
       } catch (e) {
         toast.error(e.message || "Failed to fetch project members");
@@ -370,7 +375,7 @@ export default function BlockLeaveDates({ employeeId }) {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       if (!res.data.success) {
         throw new Error(res.data.message || "Failed to create leave block");
@@ -383,7 +388,7 @@ export default function BlockLeaveDates({ employeeId }) {
       toast.success(res.data.message || "Leave block created successfully");
     } catch (err) {
       toast.error(
-        err?.response?.data?.message || "Could not save. Please try again."
+        err?.response?.data?.message || "Could not save. Please try again.",
       );
     } finally {
       setSubmitting(false);
@@ -669,7 +674,7 @@ export default function BlockLeaveDates({ employeeId }) {
                   </span>
                   <span className=" ">
                     {projectOptions.find(
-                      (p) => p.value.toString() === projectId
+                      (p) => p.value.toString() === projectId,
                     )?.label || "—"}
                   </span>
                 </div>

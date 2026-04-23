@@ -94,9 +94,13 @@ export default function ViewEmpDetails() {
   const selectedApproverName =
     adminUsers.find((a) => String(a.user_id) === String(selectedAdmin))?.name ||
     "";
+  const selectedApproverName =
+    adminUsers.find((a) => String(a.user_id) === String(selectedAdmin))?.name ||
+    "";
 
   const [editData, setEditData] = useState({
     first_name: "",
+    middle_name: "",
     middle_name: "",
     last_name: "",
     mail: "",
@@ -122,8 +126,8 @@ export default function ViewEmpDetails() {
     const token = localStorage.getItem("token");
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/offer/${user_uuid}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/offer/${user_uuid}`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       const offerData = getOfferWithJoiningStatus(res.data);
       setEmployee(offerData);
@@ -143,8 +147,8 @@ export default function ViewEmpDetails() {
   const fetchAdminUsers = async () => {
     const token = localStorage.getItem("token");
     const res = await axios.get(
-      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offer-approval/admin-users`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/admin-users`,
+      { headers: { Authorization: `Bearer ${token}` } },
     );
     setAdminUsers(res.data || []);
   };
@@ -152,8 +156,8 @@ export default function ViewEmpDetails() {
   const fetchApprovalHistory = async () => {
     const token = localStorage.getItem("token");
     const res = await axios.get(
-      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offer-approval/status/${user_uuid}`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/status/${user_uuid}`,
+      { headers: { Authorization: `Bearer ${token}` } },
     );
     const data = Array.isArray(res.data) ? res.data : [res.data];
     const mapped = data.map((item) => ({
@@ -175,6 +179,7 @@ export default function ViewEmpDetails() {
   const actionTaken = ["APPROVED", "REJECTED", "ON_HOLD"].includes(approvalStatus);
 
   const effectiveApprover =
+    employee?.approver_name || approvalHistory?.[0]?.action_taker_name || null;
     employee?.approver_name || approvalHistory?.[0]?.action_taker_name || null;
 
   /* ── PREVIEW ── */
@@ -199,9 +204,9 @@ export default function ViewEmpDetails() {
     try {
       setSending(true);
       await axios.post(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/bulk-send`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/bulk-send`,
         { user_uuid_list: [user_uuid] },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       showStatusToast("Offer sent successfully");
       fetchEmployee();
@@ -229,9 +234,9 @@ export default function ViewEmpDetails() {
     try {
       if (isNoRequest) {
         await axios.post(
-          `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offer-approval-requests/request`,
+          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval-requests/request`,
           [{ user_uuid, action_taker_id: Number(selectedAdmin) }],
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         showStatusToast("Approval request sent");
       } else if (isPending) {
@@ -268,9 +273,9 @@ export default function ViewEmpDetails() {
     try {
       setUpdating(true);
       await axios.put(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/${user_uuid}`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${user_uuid}`,
         payload,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       showStatusToast("Offer updated successfully");
       setIsEditing(false);

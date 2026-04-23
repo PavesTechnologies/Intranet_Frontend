@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Users, CheckCircle, XCircle, PauseCircle, Clock, Loader2 } from "lucide-react";
+import {
+  Users,
+  CheckCircle,
+  XCircle,
+  PauseCircle,
+  Clock,
+  Loader2,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Pagination from "../../../components/Pagination/pagination";
@@ -50,10 +57,9 @@ const isAuthorizedManager = isManager || isAdmin;
     setStatusFilter(status);
   };
 
-   const getStatus = (row) => {
+  const getStatus = (row) => {
     return row.action ? row.action.toUpperCase() : "PENDING";
   };
-
 
   /* ---------- FETCH DATA (ONE API) ---------- */
   useEffect(() => {
@@ -62,15 +68,12 @@ const isAuthorizedManager = isManager || isAdmin;
     const fetchApprovals = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(
-          `${BASE_URL}/offer-approval/my-actions`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await axios.get(`${BASE_URL}/offer-approval/my-actions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         setData(res.data || []);
-        setCurrentPage(1); 
+        setCurrentPage(1);
       } catch (error) {
         console.error("Failed to load admin approvals", error);
       } finally {
@@ -87,13 +90,10 @@ if (!authLoading && !isAuthorizedManager) {
 
   /* ---------- STATS ---------- */
   const totalRequests = data.length;
-  const approvedCount = data.filter(d => getStatus(d) === "APPROVED").length;
-  const rejectedCount = data.filter(d => getStatus(d) === "REJECTED").length;
-  const onHoldCount = data.filter(d => getStatus(d) === "ON_HOLD").length;
-  const pendingCount = data.filter(d => getStatus(d) === "PENDING").length;
-  
-
- 
+  const approvedCount = data.filter((d) => getStatus(d) === "APPROVED").length;
+  const rejectedCount = data.filter((d) => getStatus(d) === "REJECTED").length;
+  const onHoldCount = data.filter((d) => getStatus(d) === "ON_HOLD").length;
+  const pendingCount = data.filter((d) => getStatus(d) === "PENDING").length;
 
   /* ---------- FILTERED DATA ---------- */
   const filteredData = useMemo(() => {
@@ -115,10 +115,10 @@ if (!authLoading && !isAuthorizedManager) {
 
   const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
 
-const paginatedData = filteredData.slice(
-  (currentPage - 1) * PAGE_SIZE,
-  currentPage * PAGE_SIZE
-);
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   // if (loading) {
   //   return <div className="p-10 text-center">Loading admin approvals...</div>;
@@ -126,7 +126,6 @@ const paginatedData = filteredData.slice(
 
   return (
     <div className="p-6 space-y-6">
-
       {/* Header */}
 <div className="flex justify-between items-center">
   
@@ -136,11 +135,40 @@ const paginatedData = filteredData.slice(
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard title="Total Requests" value={totalRequests} icon={Users} onClick={() => handleKpiClick("ALL")} />
-        <StatCard title="Approved" value={approvedCount} icon={CheckCircle} color="text-green-600" onClick={() => handleKpiClick("APPROVED")} />
-        <StatCard title="Rejected" value={rejectedCount} icon={XCircle} color="text-red-600" onClick={() => handleKpiClick("REJECTED")} />
-        <StatCard title="On Hold" value={onHoldCount} icon={PauseCircle} color="text-yellow-600" onClick={() => handleKpiClick("ON_HOLD")} />
-        <StatCard title="Pending" value={pendingCount} icon={Clock} color="text-gray-600" onClick={() => handleKpiClick("PENDING")} />
+        <StatCard
+          title="Total Requests"
+          value={totalRequests}
+          icon={Users}
+          onClick={() => handleKpiClick("ALL")}
+        />
+        <StatCard
+          title="Approved"
+          value={approvedCount}
+          icon={CheckCircle}
+          color="text-green-600"
+          onClick={() => handleKpiClick("APPROVED")}
+        />
+        <StatCard
+          title="Rejected"
+          value={rejectedCount}
+          icon={XCircle}
+          color="text-red-600"
+          onClick={() => handleKpiClick("REJECTED")}
+        />
+        <StatCard
+          title="On Hold"
+          value={onHoldCount}
+          icon={PauseCircle}
+          color="text-yellow-600"
+          onClick={() => handleKpiClick("ON_HOLD")}
+        />
+        <StatCard
+          title="Pending"
+          value={pendingCount}
+          icon={Clock}
+          color="text-gray-600"
+          onClick={() => handleKpiClick("PENDING")}
+        />
       </div>
 
       {/* Search & Filter */}
@@ -151,7 +179,7 @@ const paginatedData = filteredData.slice(
           value={searchTerm}
           onChange={(e) => {
             setSearchTerm(e.target.value);
-            setCurrentPage(1); 
+            setCurrentPage(1);
           }}
           className="w-full md:w-1/3 px-3 py-2 border rounded-lg"
         />
@@ -160,7 +188,7 @@ const paginatedData = filteredData.slice(
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);
-            setCurrentPage(1); 
+            setCurrentPage(1);
           }}
           className="w-full md:w-1/4 px-3 py-2 border rounded-lg"
         >
@@ -183,7 +211,6 @@ const paginatedData = filteredData.slice(
               <th className="px-4 py-3 text-center">Approval Status</th>
               <th className="px-4 py-3">requested by</th>
               <th className="px-4 py-3 text-center">Action</th>
-              
             </tr>
           </thead>
 
@@ -203,27 +230,29 @@ const paginatedData = filteredData.slice(
             ) : (
               paginatedData.map((row) => (
                 <tr key={row.id} className="border-b">
-                    <td className="px-4 py-3">
-                  {row.first_name} {row.last_name}
-                </td>
-                <td className="px-4 py-3">{row.mail}</td>
-                <td className="px-4 py-3">{row.designation}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={getStatus(row)} />
-                </td>
-                <td className="px-4 py-3">{row.requested_by_name}</td>
-                <td className="px-4 py-3 text-indigo-600 cursor-pointer">
-                  <span
-                    onClick={() =>
-                      navigate(`/employee-onboarding/admin/offer/${row.user_uuid}`)
-                    }
-                  >
-                    View
-                  </span>
-                </td>
-              </tr>
-              )
-            ))}
+                  <td className="px-4 py-3">
+                    {row.first_name} {row.last_name}
+                  </td>
+                  <td className="px-4 py-3">{row.mail}</td>
+                  <td className="px-4 py-3">{row.designation}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={getStatus(row)} />
+                  </td>
+                  <td className="px-4 py-3">{row.requested_by_name}</td>
+                  <td className="px-4 py-3 text-indigo-600 cursor-pointer">
+                    <span
+                      onClick={() =>
+                        navigate(
+                          `/employee-onboarding/admin/offer/${row.user_uuid}`,
+                        )
+                      }
+                    >
+                      View
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
 
             {/* {! loading && filteredData.length === 0 && (
               <tr>
@@ -239,12 +268,8 @@ const paginatedData = filteredData.slice(
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          onPrevious={() =>
-            setCurrentPage((p) => Math.max(p - 1, 1))
-          }
-          onNext={() =>
-            setCurrentPage((p) => Math.min(p + 1, totalPages))
-          }
+          onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+          onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
         />
       )}
     </div>
@@ -252,7 +277,13 @@ const paginatedData = filteredData.slice(
 }
 
 /* ---------- STAT CARD ---------- */
-function StatCard({ title, value, icon: Icon, color = "text-gray-700", onClick }) {
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  color = "text-gray-700",
+  onClick,
+}) {
   return (
     <div
       onClick={onClick}
@@ -279,7 +310,9 @@ function StatusBadge({ status }) {
   };
 
   return (
-    <span className={`px-3 py-1 rounded-full text-sm font-medium ${styles[status]}`}>
+    <span
+      className={`px-3 py-1 rounded-full text-sm font-medium ${styles[status]}`}
+    >
       {status}
     </span>
   );

@@ -10,7 +10,7 @@ import DateRangePicker from "./DateRangePicker";
 // import {useLeaveConsumption} from "../hooks/useLeaveConsumption";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 // const token = localStorage.getItem("token");
 
 // -- Helper: Massage leaves to dropdown options --
@@ -94,7 +94,7 @@ function formatDateForDisplay(dateStr) {
 
 // --- MODIFIED ---
 // Updated function signature to accept leaveTypeId
-function countWeekdaysBetween(
+export function countWeekdaysBetween(
   fromDate,
   toDate,
   halfDayConfig,
@@ -170,7 +170,7 @@ function countWeekdaysBetween(
 }
 
 // -- The HeadlessUI Leave Type Dropdown -- (Unchanged)
-function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
+export function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
   const sel = options.find((o) => o.leaveTypeId === selectedId) ?? null;
   return (
     <Listbox value={sel} onChange={(opt) => setSelectedId(opt.leaveTypeId)}>
@@ -298,8 +298,6 @@ export default function RequestLeaveModal({
     leaveTypeId,
   );
 
- 
-
   const shouldShowDriveLink = () => {
     if (!selectedLeaveType) return false;
     const requiredDocs = selectedLeaveType.requiresDocumentation === true;
@@ -330,8 +328,6 @@ export default function RequestLeaveModal({
       }, 200); // 200ms delay
     }
   }, [isOpen]);
-
-  
 
   useEffect(() => {
     if (!shouldShowDriveLink()) {

@@ -32,12 +32,21 @@ const CreateTaskModal = ({ onTaskCreated }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [usersRes, projectsRes, storiesRes, sprintsRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/stories`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/sprints`, { headers: { Authorization: `Bearer ${token}` } }),
-        ]);
+        const [usersRes, projectsRes, storiesRes, sprintsRes] =
+          await Promise.all([
+            axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ]);
 
         setUsers(usersRes.data.content || []);
         setProjects(projectsRes.data.content || []);
@@ -57,8 +66,8 @@ const CreateTaskModal = ({ onTaskCreated }) => {
     const fetchStatuses = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${formData.projectId}/statuses`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${formData.projectId}/statuses`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         setStatuses(res.data);
@@ -72,7 +81,10 @@ const CreateTaskModal = ({ onTaskCreated }) => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -89,12 +101,18 @@ const CreateTaskModal = ({ onTaskCreated }) => {
         sprintId: formData.sprintId ? Number(formData.sprintId) : null,
         storyId: formData.storyId ? Number(formData.storyId) : null,
         statusId: Number(formData.statusId),
-        dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+        dueDate: formData.dueDate
+          ? new Date(formData.dueDate).toISOString()
+          : null,
       };
 
-      await axios.post(`${import.meta.env.VITE_PMS_BASE_URL}/api/tasks`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.post(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       alert("Task created successfully!");
       onTaskCreated && onTaskCreated();
@@ -124,7 +142,9 @@ const CreateTaskModal = ({ onTaskCreated }) => {
         ×
       </button>
 
-      <h2 className="text-2xl font-bold text-center text-gray-800">Create New Task</h2>
+      <h2 className="text-2xl font-bold text-center text-gray-800">
+        Create New Task
+      </h2>
 
       {/* Title */}
       <input
@@ -156,7 +176,9 @@ const CreateTaskModal = ({ onTaskCreated }) => {
       >
         <option value="">Select Project *</option>
         {projects.map((p) => (
-          <option key={p.id} value={p.id}>{p.name}</option>
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
         ))}
       </select>
 
@@ -184,7 +206,9 @@ const CreateTaskModal = ({ onTaskCreated }) => {
         className="w-full border rounded px-4 py-2"
       >
         {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((p) => (
-          <option key={p} value={p}>{p}</option>
+          <option key={p} value={p}>
+            {p}
+          </option>
         ))}
       </select>
 
@@ -218,7 +242,9 @@ const CreateTaskModal = ({ onTaskCreated }) => {
       >
         <option value="">Select Reporter *</option>
         {users.map((u) => (
-          <option key={u.id} value={u.id}>{u.name}</option>
+          <option key={u.id} value={u.id}>
+            {u.name}
+          </option>
         ))}
       </select>
 
@@ -231,7 +257,9 @@ const CreateTaskModal = ({ onTaskCreated }) => {
       >
         <option value="">Select Assignee (Optional)</option>
         {users.map((u) => (
-          <option key={u.id} value={u.id}>{u.name}</option>
+          <option key={u.id} value={u.id}>
+            {u.name}
+          </option>
         ))}
       </select>
 
@@ -244,7 +272,9 @@ const CreateTaskModal = ({ onTaskCreated }) => {
       >
         <option value="">Select Story</option>
         {stories.map((s) => (
-          <option key={s.id} value={s.id}>{s.title}</option>
+          <option key={s.id} value={s.id}>
+            {s.title}
+          </option>
         ))}
       </select>
 
@@ -257,7 +287,9 @@ const CreateTaskModal = ({ onTaskCreated }) => {
       >
         <option value="">Select Sprint</option>
         {sprints.map((s) => (
-          <option key={s.id} value={s.id}>{s.name}</option>
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
         ))}
       </select>
 

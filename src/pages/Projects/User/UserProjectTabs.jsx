@@ -32,9 +32,12 @@ const ProjectTabs = () => {
   useEffect(() => {
     if (projectId) {
       axios
-        .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        .get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        )
         .then((res) => {
           setProjectName(res.data.name);
           setNotFound(false);

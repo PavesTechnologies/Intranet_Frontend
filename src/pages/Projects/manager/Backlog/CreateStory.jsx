@@ -6,7 +6,13 @@ import FormInput from "../../../../components/forms/FormInput";
 import FormTextArea from "../../../../components/forms/FormTextArea";
 import FormSelect from "../../../../components/forms/FormSelect";
 
-const CreateStoryForm = ({ projectId, onClose, onCreated, defaultStatusId, defaultSprintId }) => {
+const CreateStoryForm = ({
+  projectId,
+  onClose,
+  onCreated,
+  defaultStatusId,
+  defaultSprintId,
+}) => {
   const [formData, setFormData] = useState({
     projectId,
     statusId: defaultStatusId,
@@ -35,8 +41,14 @@ const CreateStoryForm = ({ projectId, onClose, onCreated, defaultStatusId, defau
     const loadData = async () => {
       try {
         const [epicsRes, usersRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`, axiosConfig),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`, axiosConfig),
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+            axiosConfig,
+          ),
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+            axiosConfig,
+          ),
         ]);
         setEpics(epicsRes.data || []);
         setUsers(usersRes.data || []);
@@ -74,7 +86,11 @@ const CreateStoryForm = ({ projectId, onClose, onCreated, defaultStatusId, defau
 
     try {
       setLoading(true);
-      await axios.post(`${import.meta.env.VITE_PMS_BASE_URL}/api/stories`, payload, axiosConfig);
+      await axios.post(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories`,
+        payload,
+        axiosConfig,
+      );
       toast.success("Story created successfully!");
       onCreated?.();
       onClose?.();
@@ -99,11 +115,36 @@ const CreateStoryForm = ({ projectId, onClose, onCreated, defaultStatusId, defau
 
         <h2 className="text-xl font-bold mb-4 text-center">Create Story</h2>
 
-        <form onSubmit={submit} className="space-y-4 max-h-[80vh] overflow-y-auto pr-2">
-          <FormInput label="Title *" name="title" value={formData.title || ""} onChange={handleChange} required />
-          <FormTextArea label="Description" name="description" value={formData.description || ""} onChange={handleChange} />
-          <FormTextArea label="Acceptance Criteria" name="acceptanceCriteria" value={formData.acceptanceCriteria || ""} onChange={handleChange} />
-          <FormInput label="Story Points" name="storyPoints" type="number" value={formData.storyPoints || ""} onChange={handleChange} />
+        <form
+          onSubmit={submit}
+          className="space-y-4 max-h-[80vh] overflow-y-auto pr-2"
+        >
+          <FormInput
+            label="Title *"
+            name="title"
+            value={formData.title || ""}
+            onChange={handleChange}
+            required
+          />
+          <FormTextArea
+            label="Description"
+            name="description"
+            value={formData.description || ""}
+            onChange={handleChange}
+          />
+          <FormTextArea
+            label="Acceptance Criteria"
+            name="acceptanceCriteria"
+            value={formData.acceptanceCriteria || ""}
+            onChange={handleChange}
+          />
+          <FormInput
+            label="Story Points"
+            name="storyPoints"
+            type="number"
+            value={formData.storyPoints || ""}
+            onChange={handleChange}
+          />
 
           <FormSelect
             label="Priority"
@@ -126,7 +167,11 @@ const CreateStoryForm = ({ projectId, onClose, onCreated, defaultStatusId, defau
             options={epics.map((e) => ({ label: e.name, value: e.id }))}
           />
 
-          <input type="hidden" name="sprintId" value={formData.sprintId || ""} />
+          <input
+            type="hidden"
+            name="sprintId"
+            value={formData.sprintId || ""}
+          />
 
           <FormSelect
             label="Assignee"

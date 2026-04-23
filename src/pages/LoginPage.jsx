@@ -55,9 +55,9 @@ export default function LoginPage() {
       setLoading(true);
       try {
         const response = await axios.get(
-          `${import.meta.env.VITE_USER_MANAGEMENT_URL}/auth/callback?code=${encodeURIComponent(
-            code
-          )}`
+          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/callback?code=${encodeURIComponent(
+            code,
+          )}`,
         );
         const { access_token, redirect: redirectPath } = response.data;
 
@@ -68,7 +68,11 @@ export default function LoginPage() {
           login(access_token, false);
         }
         localStorage.setItem("user", JSON.stringify({ access_token }));
-        window.history.replaceState({}, document.title, window.location.pathname);
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname,
+        );
       } catch (err) {
         const errDetail =
           err.response?.data?.error_description ||
@@ -77,7 +81,11 @@ export default function LoginPage() {
         console.error("OAuth login failed:", err);
         showStatusToast("OAuth login failed: " + errDetail, "error");
 
-        window.history.replaceState({}, document.title, window.location.pathname);
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname,
+        );
         navigate("/", { replace: true });
       } finally {
         setLoading(false);
@@ -97,11 +105,11 @@ export default function LoginPage() {
 
     try {
       const res = await axios.post(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/auth/login`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/login`,
         {
           email,
           password,
-        }
+        },
       );
       const token = res.data.access_token;
 
@@ -116,7 +124,7 @@ export default function LoginPage() {
     } catch (err) {
       showStatusToast(
         "Login failed: " + (err.response?.data?.detail || err.message),
-        "error"
+        "error",
       );
     } finally {
       setLoading(false);
@@ -124,7 +132,7 @@ export default function LoginPage() {
   };
 
   const handleMicrosoftLogin = () => {
-    window.location.href = `${import.meta.env.VITE_USER_MANAGEMENT_URL}/auth/ms-login`;
+    window.location.href = `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/ms-login`;
   };
 
   // 🔹 Handle Enter key press for both inputs
@@ -218,7 +226,7 @@ export default function LoginPage() {
             className="hover:underline hover:text-blue-600"
             type="button"
           > */}
-            {/* Create Account
+          {/* Create Account
           </button> */}
           <button
             onClick={() => navigate("/reset-password")}

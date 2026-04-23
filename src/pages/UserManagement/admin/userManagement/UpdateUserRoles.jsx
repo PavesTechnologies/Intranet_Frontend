@@ -2,16 +2,16 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { showStatusToast } from "../../../../components/toastfy/toast";
- 
+
 import SearchInput from "../../../../components/filter/Searchbar";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
- 
+
 const ITEMS_PER_PAGE = 10;
 const SORT_DIRECTIONS = { ASC: "asc", DESC: "desc" };
- 
+
 export default function UpdateUserRole() {
   const [users, setUsers] = useState([]);
   const [totalUsers, setTotalUsers] = useState(0);
@@ -21,26 +21,26 @@ export default function UpdateUserRole() {
   const [sortDirection, setSortDirection] = useState(SORT_DIRECTIONS.ASC);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser_uuId, setSelectedUser_uuId] = useState(null);
- 
+
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
- 
+
   const axiosInstance = useMemo(() => {
     const headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
     return axios.create({
-      baseURL: import.meta.env.VITE_USER_MANAGEMENT_URL,
+      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
       headers,
     });
   }, [token]);
- 
+
   useEffect(() => {
     if (!token) {
       showStatusToast("Session expired. Please login again.", "warning");
       navigate("/");
     }
   }, [token, navigate]);
- 
+
   // ✅ Fetch users from backend with pagination
   const fetchUsers = async () => {
     setLoading(true);
@@ -74,20 +74,20 @@ export default function UpdateUserRole() {
       setLoading(false);
     }
   };
- 
+
   useEffect(() => {
     fetchUsers();
   }, [currentPage, searchTerm]);
- 
+
   const totalPages = Math.ceil(totalUsers / ITEMS_PER_PAGE);
- 
+
   const toggleSort = () => {
     setSortDirection((prev) =>
-      prev === SORT_DIRECTIONS.ASC ? SORT_DIRECTIONS.DESC : SORT_DIRECTIONS.ASC
+      prev === SORT_DIRECTIONS.ASC ? SORT_DIRECTIONS.DESC : SORT_DIRECTIONS.ASC,
     );
     setUsers((prev) => [...prev].reverse());
   };
- 
+
   const headers = [
     "S.no",
     <span key="name" className="cursor-pointer" onClick={toggleSort}>
@@ -98,7 +98,7 @@ export default function UpdateUserRole() {
     "Actions",
   ];
   const columns = ["Serial no", "name", "mail", "roles", "actions"];
- 
+
   const tableRows = users.map((user, index) => ({
     "Serial no": ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
     name: `${user.name || ""}`,
@@ -122,15 +122,15 @@ export default function UpdateUserRole() {
       </Button>
     ),
   }));
- 
+
   const handleRolesSaved = (userUuid, updatedRoleNames) => {
     setUsers((prev) =>
       prev.map((u) =>
-        u.user_uuid === userUuid ? { ...u, roles: updatedRoleNames } : u
-      )
+        u.user_uuid === userUuid ? { ...u, roles: updatedRoleNames } : u,
+      ),
     );
   };
- 
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* ✅ Top Bar */}
@@ -146,7 +146,7 @@ export default function UpdateUserRole() {
           ← Back
         </Button>
       </div>
- 
+
       {/* ✅ Search Bar */}
       <SearchInput
         onSearch={(value) => {
@@ -157,7 +157,7 @@ export default function UpdateUserRole() {
         delay={300}
         className="mb-4 max-w-md"
       />
- 
+
       {/* ✅ Table */}
       <GenericTable
         headers={headers}
@@ -165,17 +165,19 @@ export default function UpdateUserRole() {
         columns={columns}
         loading={loading}
       />
- 
+
       {/* ✅ Pagination */}
       {!loading && totalPages > 1 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
           onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          onNext={() =>
+            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+          }
         />
       )}
- 
+
       {/* ✅ Modal */}
       {isModalOpen && selectedUser_uuId && (
         <EditUserRoleModal
@@ -193,7 +195,7 @@ export default function UpdateUserRole() {
     </div>
   );
 }
- 
+
 /* ------------------------------
    Modal component (internal)
    ------------------------------ */
@@ -223,7 +225,12 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
           axiosInstance.get(`/admin/roles`, authHeader),
           axiosInstance.get(`/admin/users/uuid/${user_uuId}/roles`, authHeader),
         ]);
-        console.log("Fetched user, roles, assigned:", userRes, rolesRes, assignedRes);
+        console.log(
+          "Fetched user, roles, assigned:",
+          userRes,
+          rolesRes,
+          assignedRes,
+        );
 
         if (!mounted) return;
 
@@ -261,7 +268,7 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
     setSelectedRoleIds((prev) =>
       prev.includes(roleId)
         ? prev.filter((id) => id !== roleId)
-        : [...prev, roleId]
+        : [...prev, roleId],
     );
   };
 
@@ -272,7 +279,7 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
       const response = await axiosInstance.put(
         `/admin/users/uuid/${user_uuId}/role`,
         { role_ids: selectedRoleIds },
-        authHeader
+        authHeader,
       );
 
       const updatedRoleNames = roles
@@ -283,7 +290,7 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
 
       showStatusToast(
         response?.data?.message || "Roles updated successfully!",
-        "success"
+        "success",
       );
       if (typeof onSaved === "function") onSaved(updatedRoleNames);
       console.log("Updated roles:", updatedRoleNames);

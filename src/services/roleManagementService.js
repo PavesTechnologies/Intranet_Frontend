@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Create axios instance with base configuration
 const axiosInstance = axios.create({
-  baseURL: `${import.meta.env.VITE_USER_MANAGEMENT_URL}`,
+  baseURL: `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}`,
   timeout: 10000,
 });
 
@@ -15,7 +15,7 @@ axiosInstance.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 const ROLE_URL = "/admin/roles";
@@ -56,7 +56,8 @@ export const removeAccessPointFromRole = (roleId, accessId) =>
   axiosInstance.delete(`${ROLE_URL}/${roleId}/access-points/${accessId}`);
 // export const getAllAccessPoints = () =>
 //   axiosInstance.get(`${ROLE_URL}/access-points/all`);
-export const removePermissionGroupsFromRole = (roleId,groupIds) =>{
+export const removePermissionGroupsFromRole = (roleId, groupIds) => {
   axiosInstance.post(`${ROLE_URL}/uuid/${roleId}/groups/remove`, {
     group_uuids: groupIds,
-  })};
+  });
+};

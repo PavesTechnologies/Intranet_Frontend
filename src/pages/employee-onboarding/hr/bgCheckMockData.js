@@ -11,6 +11,7 @@ export const MOCK_EMPLOYEES = [
     work_email: "sathwik.patel@pavesnetworks.com", contact_number: "+91 98765 43210",
     department_name: "Engineering", designation_name: "Software Engineer",
     employment_status: "Probation", joining_date: "2024-01-15",
+    bg_status: "IN_REVIEW",
   },
   {
     employee_uuid: "emp-002", user_uuid: "usr-002",
@@ -18,6 +19,7 @@ export const MOCK_EMPLOYEES = [
     work_email: "priya.sharma@pavesnetworks.com", contact_number: "+91 91234 56789",
     department_name: "HR", designation_name: "HR Executive",
     employment_status: "Active", joining_date: "2023-08-01",
+    bg_status: "VERIFIED",
   },
   {
     employee_uuid: "emp-003", user_uuid: "usr-003",
@@ -25,6 +27,7 @@ export const MOCK_EMPLOYEES = [
     work_email: "rahul.verma@pavesnetworks.com", contact_number: "+91 87654 32109",
     department_name: "Finance", designation_name: "Finance Analyst",
     employment_status: "Probation", joining_date: "2024-03-10",
+    bg_status: "PENDING",
   },
   {
     employee_uuid: "emp-004", user_uuid: "usr-004",
@@ -32,6 +35,7 @@ export const MOCK_EMPLOYEES = [
     work_email: "anjali.reddy@pavesnetworks.com", contact_number: "+91 77777 88888",
     department_name: "Marketing", designation_name: "Marketing Manager",
     employment_status: "Active", joining_date: "2022-05-20",
+    bg_status: "VERIFIED",
   },
   {
     employee_uuid: "emp-005", user_uuid: "usr-005",
@@ -39,6 +43,7 @@ export const MOCK_EMPLOYEES = [
     work_email: "kiran.kumar@pavesnetworks.com", contact_number: "+91 99900 11122",
     department_name: "Engineering", designation_name: "DevOps Engineer",
     employment_status: "Probation", joining_date: "2024-02-01",
+    bg_status: "PENDING",
   },
 ];
 
@@ -170,41 +175,47 @@ export const MOCK_CHECKS = {
     { check_uuid: "chk-1-01", check_type: "identity_aadhaar",       status: "VERIFIED",  details: { "ID Type": "Aadhaar", "Number": "1234 5678 9012" }, notes: "" },
     { check_uuid: "chk-1-01b", check_type: "identity_pan",          status: "VERIFIED",  details: { "ID Type": "PAN", "Number": "ABCDE1234F" }, notes: "" },
     { check_uuid: "chk-1-01c", check_type: "identity_passport",     status: "PENDING",   details: { "ID Type": "Passport", "Number": "N1234567" }, notes: "" },
-    { check_uuid: "chk-1-02", check_type: "professional_reference",  status: "PENDING",   details: { "Name": "Rajesh Kumar", "Email": "rajesh@tcs.com" }, notes: "" },
+    { check_uuid: "chk-1-02", check_type: "professional_reference",  status: "PENDING",   details: { "Name": "Rajesh Kumar", "Email": "rajesh@tcs.com", "Reference Number": "+91 98888 77777" }, notes: "" },
     { check_uuid: "chk-1-03", check_type: "address_digital",         status: "IN_REVIEW", details: { "Address": "Flat 302, Green Residency, Hyderabad" }, notes: "" },
-    { check_uuid: "chk-1-04", check_type: "global_compliance",       status: "PENDING",   details: { "Result": "Awaiting" }, notes: "" },
+    { check_uuid: "chk-1-04", check_type: "global_compliance",       status: "PENDING",   details: { "Match Found": "Awaiting", "Risk Level": "Pending", "Database": "Global Watchlist" }, notes: "" },
     { check_uuid: "chk-1-05", check_type: "experience_0",            status: "VERIFIED",  details: { "Company": "TCS", "Period": "2022-07-01 – 2023-12-31" }, notes: "" },
-    { check_uuid: "chk-1-06", check_type: "criminal_record",         status: "PENDING",   details: { "Result": "Pending" }, notes: "" },
+    { check_uuid: "chk-1-06", check_type: "criminal_record",         status: "PENDING",   details: { "Court Action": "Pending", "Police Verification": "Initiated" }, notes: "" },
     { check_uuid: "chk-1-07", check_type: "education_0",             status: "VERIFIED",  details: { "Degree": "B.Tech", "Institution": "JNTU Hyderabad" }, notes: "" },
     { check_uuid: "chk-1-08", check_type: "cibil_check",             status: "IN_REVIEW", details: { "Score": "Checking..." }, notes: "" },
-    { check_uuid: "chk-1-09", check_type: "address_physical",        status: "PENDING",   details: { "Agent": "Not Assigned" }, notes: "" },
     { check_uuid: "chk-1-10", check_type: "bank_statement",          status: "PENDING",   details: { "Bank": "SBI" }, notes: "Awaiting statement upload." },
   ],
   "usr-002": [
     { check_uuid: "chk-2-01", check_type: "identity_aadhaar",       status: "VERIFIED",  details: { "ID Type": "Aadhaar" }, notes: "" },
     { check_uuid: "chk-2-01b", check_type: "identity_pan",          status: "VERIFIED",  details: { "ID Type": "PAN" }, notes: "" },
     { check_uuid: "chk-2-01c", check_type: "identity_passport",     status: "VERIFIED",  details: { "ID Type": "Passport" }, notes: "" },
-    { check_uuid: "chk-2-02", check_type: "professional_reference",  status: "VERIFIED",  details: { "Name": "Amit Roy" }, notes: "" },
+    { check_uuid: "chk-2-02", check_type: "professional_reference",  status: "VERIFIED",  details: { "Name": "Amit Roy", "Reference Number": "+91 91234 56780" }, notes: "" },
     { check_uuid: "chk-2-03", check_type: "address_digital",         status: "VERIFIED",  details: { "Status": "Verified" }, notes: "" },
-    { check_uuid: "chk-2-04", check_type: "global_compliance",       status: "VERIFIED",  details: { "Result": "Clear" }, notes: "" },
+    { check_uuid: "chk-2-04", check_type: "global_compliance",       status: "VERIFIED",  details: { "Match Found": "None", "Risk Level": "Low", "Database": "Global Watchlist" }, notes: "" },
+    { check_uuid: "chk-2-06", check_type: "criminal_record",         status: "VERIFIED",  details: { "Court Action": "Clear", "Police Verification": "Verified" }, notes: "" },
     // Education: MBA, Degree at usr-002 (Education tab index 0)
     { check_uuid: "chk-2-07", check_type: "education_0",             status: "VERIFIED",  details: { "Degree": "MBA", "Institution": "Symbiosis" }, notes: "" },
     { check_uuid: "chk-2-08", check_type: "cibil_check",             status: "VERIFIED",  details: { "Score": "780" }, notes: "" },
-    { check_uuid: "chk-2-09", check_type: "address_physical",        status: "VERIFIED",  details: { "Status": "Verified" }, notes: "" },
     { check_uuid: "chk-2-10", check_type: "bank_statement",          status: "VERIFIED",  details: { "Bank": "HDFC" }, notes: "" },
+  ],
+  "usr-004": [
+    { check_uuid: "chk-4-02", check_type: "professional_reference",  status: "VERIFIED",  details: { "Name": "Jane Doe", "Email": "jane@example.com", "Reference Number": "+91 88888 77777" }, notes: "" },
+    { check_uuid: "chk-4-03", check_type: "address_digital",         status: "VERIFIED",  details: { "Status": "Verified" }, notes: "" },
+    { check_uuid: "chk-4-04", check_type: "global_compliance",       status: "VERIFIED",  details: { "Match Found": "None", "Risk Level": "Low", "Database": "Global Watchlist" }, notes: "" },
+    { check_uuid: "chk-4-06", check_type: "criminal_record",         status: "VERIFIED",  details: { "Court Action": "Clear", "Police Verification": "Verified" }, notes: "" },
+    { check_uuid: "chk-4-08", check_type: "cibil_check",             status: "VERIFIED",  details: { "Score": "820" }, notes: "" },
+    { check_uuid: "chk-4-10", check_type: "bank_statement",          status: "VERIFIED",  details: { "Bank": "ICICI" }, notes: "" },
   ],
 };
 
 // Default checks for employees not in MOCK_CHECKS
 export const DEFAULT_CHECKS = [
   { check_uuid: "d-01", check_type: "id_verification",        status: "PENDING", details: {}, notes: "" },
-  { check_uuid: "d-02", check_type: "professional_reference",  status: "PENDING", details: {}, notes: "" },
+  { check_uuid: "d-02", check_type: "professional_reference",  status: "PENDING", details: { "Name": "—", "Email": "—", "Reference Number": "—" }, notes: "" },
   { check_uuid: "d-03", check_type: "address_digital",         status: "PENDING", details: {}, notes: "" },
-  { check_uuid: "d-04", check_type: "global_compliance",       status: "PENDING", details: {}, notes: "" },
+  { check_uuid: "d-04", check_type: "global_compliance",       status: "PENDING", details: { "Match Found": "—", "Risk Level": "—", "Database": "Global Watchlist" }, notes: "" },
   { check_uuid: "d-05", check_type: "employment_record",       status: "PENDING", details: {}, notes: "" },
-  { check_uuid: "d-06", check_type: "criminal_record",         status: "PENDING", details: {}, notes: "" },
+  { check_uuid: "d-06", check_type: "criminal_record",         status: "PENDING", details: { "Court Action": "—", "Police Verification": "—" }, notes: "" },
   { check_uuid: "d-07", check_type: "education_record",        status: "PENDING", details: {}, notes: "" },
   { check_uuid: "d-08", check_type: "cibil_check",             status: "PENDING", details: {}, notes: "" },
-  { check_uuid: "d-09", check_type: "address_physical",        status: "PENDING", details: {}, notes: "" },
   { check_uuid: "d-10", check_type: "bank_statement",          status: "PENDING", details: {}, notes: "" },
 ];

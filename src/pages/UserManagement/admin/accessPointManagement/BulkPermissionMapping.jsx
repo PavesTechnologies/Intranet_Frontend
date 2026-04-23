@@ -89,14 +89,14 @@ const BulkPermissionMapping = ({ onClose, onSuccess }) => {
 
       // 🔗 API endpoint for bulk permission mapping
       const response = await axios.post(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/access-points/access-point-map-permission-bulk`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/access-points/access-point-map-permission-bulk`,
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       const { mapped_count, failed_count } = response.data;
@@ -194,10 +194,19 @@ const BulkPermissionMapping = ({ onClose, onSuccess }) => {
             <div className="mt-4 bg-blue-50 border border-blue-200 text-blue-700 text-sm rounded-lg p-3">
               <p className="font-semibold mb-1">Instructions:</p>
               <ul className="list-disc  space-y-1 list m-2">
-                <li>Accepted format: <strong>.xlsx</strong></li>
-                <li>Ensure Access Point IDs and Permission IDs match existing records.</li>
-                <li>Duplicate or invalid mappings will be skipped automatically.</li>
-                <li>Download a sample file from the admin panel for reference.</li>
+                <li>
+                  Accepted format: <strong>.xlsx</strong>
+                </li>
+                <li>
+                  Ensure Access Point IDs and Permission IDs match existing
+                  records.
+                </li>
+                <li>
+                  Duplicate or invalid mappings will be skipped automatically.
+                </li>
+                <li>
+                  Download a sample file from the admin panel for reference.
+                </li>
               </ul>
             </div>
           </form>

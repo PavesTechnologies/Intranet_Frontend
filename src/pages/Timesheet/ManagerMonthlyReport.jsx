@@ -36,7 +36,7 @@ ChartJS.register(
   BarElement,
   PointElement,
   LineElement,
-  Title
+  Title,
 );
 
 const EMPLOYEE_PALETTE = [
@@ -86,7 +86,7 @@ function reducer(state, action) {
       return {
         ...state,
         pendingTimesheets: state.pendingTimesheets.filter(
-          (p) => p.name !== action.name
+          (p) => p.name !== action.name,
         ),
       };
     default:
@@ -105,7 +105,7 @@ const projectColors = [
   "#14b8a6",
 ];
 const getProjectColor = (index) => projectColors[index % projectColors.length];
-const TS_BASE_URL = import.meta.env.VITE_TIMESHEET_API_ENDPOINT;
+const TS_BASE_URL = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
 
 const ManagerMonthlyReport = () => {
   // --- STATE FOR API DATA ---
@@ -165,7 +165,7 @@ const ManagerMonthlyReport = () => {
               month: appliedMonth,
               year: appliedYear,
             },
-          }
+          },
         );
         setApiData(response.data);
         setSelectedMonth(response.data.month);
@@ -204,9 +204,9 @@ const ManagerMonthlyReport = () => {
   const totalNonBillable = apiData?.nonBillableHours ?? 0;
 
   const filteredMonths =
-  selectedYear === currentYear
-    ? monthOptions.filter((m) => m.value <= appliedMonth)
-    : monthOptions;
+    selectedYear === currentYear
+      ? monthOptions.filter((m) => m.value <= appliedMonth)
+      : monthOptions;
 
   const underutilized = useMemo(() => {
     if (!apiData) return [];
@@ -242,17 +242,17 @@ const ManagerMonthlyReport = () => {
 
   const billableMembers = useMemo(
     () => apiData?.billableContribution?.members || [],
-    [apiData]
+    [apiData],
   );
 
   const nonBillableMembers = useMemo(
     () => apiData?.nonBillableContribution?.members || [],
-    [apiData]
+    [apiData],
   );
 
   const employeeMonthlyData = useMemo(
     () => apiData?.userEntriesSummary || [],
-    [apiData]
+    [apiData],
   );
 
   // reducer state for modals / selected employee
@@ -283,7 +283,7 @@ const ManagerMonthlyReport = () => {
             month: appliedMonth,
             year: appliedYear,
           },
-        }
+        },
       );
       toast.success(res?.data || "Mail sent successfully");
     } catch (err) {
@@ -292,546 +292,616 @@ const ManagerMonthlyReport = () => {
       setMailLoading(false);
     }
   };
-const generateManagerPDF = async (apiData) => {
-  const { jsPDF } = await import("jspdf");
-  const autoTable = (await import("jspdf-autotable")).default;
+  const generateManagerPDF = async (apiData) => {
+    const { jsPDF } = await import("jspdf");
+    const autoTable = (await import("jspdf-autotable")).default;
 
-  // ----------------------
-  // Visual constants (tweak these for a pixel-perfect match)
-  // If you want me to sample exact values, upload the exact page image to sample.
-  // ----------------------
-  const COLORS = {
-    sectionTitle: [14, 56, 133],        // blue for section headings (adjust RGB as needed)
-    tableHeaderBg: [225, 225, 225],     // header background (light gray)
-    alternateRowBg: [245, 245, 245],    // zebra row color
-    notesBoxFill: [235, 245, 255],      // light-blue for the notes box
-    text: [20, 20, 20],                 // default text color
-    mutedText: [100, 100, 100],         // muted / smaller text
-  };
-  const PAGE = {
-    width: 210, // A4 width mm
-    height: 297, // A4 height mm
-    margin: 14, // default margin in mm - tweak if you want exact match
-    bottomLimit: 280, // bottom threshold for adding pages (safe)
-  };
+    // ----------------------
+    // Visual constants (tweak these for a pixel-perfect match)
+    // If you want me to sample exact values, upload the exact page image to sample.
+    // ----------------------
+    const COLORS = {
+      sectionTitle: [14, 56, 133], // blue for section headings (adjust RGB as needed)
+      tableHeaderBg: [225, 225, 225], // header background (light gray)
+      alternateRowBg: [245, 245, 245], // zebra row color
+      notesBoxFill: [235, 245, 255], // light-blue for the notes box
+      text: [20, 20, 20], // default text color
+      mutedText: [100, 100, 100], // muted / smaller text
+    };
+    const PAGE = {
+      width: 210, // A4 width mm
+      height: 297, // A4 height mm
+      margin: 14, // default margin in mm - tweak if you want exact match
+      bottomLimit: 280, // bottom threshold for adding pages (safe)
+    };
 
-  // ----------------------
-  // doc setup
-  // ----------------------
-  const doc = new jsPDF("p", "mm", "a4");
-  doc.setProperties({ title: "Manager Monthly Report" });
+    // ----------------------
+    // doc setup
+    // ----------------------
+    const doc = new jsPDF("p", "mm", "a4");
+    doc.setProperties({ title: "Manager Monthly Report" });
 
-  // internal cursor (y position)
-  let cursorY = 14;
+    // internal cursor (y position)
+    let cursorY = 14;
 
-  // helpers
-  const ensureSpace = (needed = 30) => {
-    if (cursorY + needed > PAGE.bottomLimit) {
-      doc.addPage();
-      cursorY = 20;
-    }
-  };
+    // helpers
+    const ensureSpace = (needed = 30) => {
+      if (cursorY + needed > PAGE.bottomLimit) {
+        doc.addPage();
+        cursorY = 20;
+      }
+    };
 
-  const addTitle = (text) => {
-    doc.setFontSize(18);
-    doc.setTextColor(...COLORS.sectionTitle);
-    doc.text(text, PAGE.margin, cursorY);
-    cursorY += 10;
-  };
+    const addTitle = (text) => {
+      doc.setFontSize(18);
+      doc.setTextColor(...COLORS.sectionTitle);
+      doc.text(text, PAGE.margin, cursorY);
+      cursorY += 10;
+    };
 
-  const addSubTitle = (text) => {
-    doc.setFontSize(13);
-    doc.setTextColor(...COLORS.sectionTitle);
-    doc.text(text, PAGE.margin, cursorY);
-    cursorY += 8;
-  };
+    const addSubTitle = (text) => {
+      doc.setFontSize(13);
+      doc.setTextColor(...COLORS.sectionTitle);
+      doc.text(text, PAGE.margin, cursorY);
+      cursorY += 8;
+    };
 
-  const addMutedText = (text) => {
-    doc.setFontSize(10);
+    const addMutedText = (text) => {
+      doc.setFontSize(10);
+      doc.setTextColor(...COLORS.mutedText);
+      doc.text(text, PAGE.margin, cursorY);
+      cursorY += 6;
+    };
+
+    // shared table defaults for consistent look
+    const tableDefaults = {
+      theme: "grid",
+      styles: {
+        fontSize: 10,
+        cellPadding: 3,
+        textColor: COLORS.text,
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: COLORS.tableHeaderBg,
+        textColor: [0, 0, 0],
+        fontStyle: "bold",
+      },
+      alternateRowStyles: {
+        fillColor: COLORS.alternateRowBg,
+      },
+      margin: { left: PAGE.margin, right: PAGE.margin },
+    };
+
+    // ----------------------
+    // Header area
+    // ----------------------
+    addTitle("Manager Monthly Report");
+
+    doc.setFontSize(11);
     doc.setTextColor(...COLORS.mutedText);
-    doc.text(text, PAGE.margin, cursorY);
+    doc.text(
+      `${apiData.monthName || ""} ${apiData.year || ""}`,
+      PAGE.margin,
+      cursorY,
+    );
     cursorY += 6;
-  };
-
-  // shared table defaults for consistent look
-  const tableDefaults = {
-    theme: "grid",
-    styles: {
-      fontSize: 10,
-      cellPadding: 3,
-      textColor: COLORS.text,
-      lineWidth: 0.1,
-    },
-    headStyles: {
-      fillColor: COLORS.tableHeaderBg,
-      textColor: [0, 0, 0],
-      fontStyle: "bold",
-    },
-    alternateRowStyles: {
-      fillColor: COLORS.alternateRowBg,
-    },
-    margin: { left: PAGE.margin, right: PAGE.margin },
-  };
-
-  // ----------------------
-  // Header area
-  // ----------------------
-  addTitle("Manager Monthly Report");
-
-  doc.setFontSize(11);
-  doc.setTextColor(...COLORS.mutedText);
-  doc.text(`${apiData.monthName || ""} ${apiData.year || ""}`, PAGE.margin, cursorY);
-  cursorY += 6;
-  doc.setFontSize(11);
-  doc.setTextColor(...COLORS.text);
-  doc.text(`Manager: ${apiData.managerName || "—"}`, PAGE.margin, cursorY);
-  cursorY += 10;
-
-  // ----------------------
-  // Summary (boxed table style like reference)
-  // ----------------------
-  addSubTitle("Summary");
-
-  autoTable(doc, {
-    ...tableDefaults,
-    startY: cursorY,
-    head: [["Metric", "Value"]],
-    body: [
-      ["Month / Year", `${apiData.month || apiData.monthName || ""} / ${apiData.year || ""}`],
-      ["Total Hours", (apiData.totalHours ?? 0).toFixed(2)],
-      ["Billable Hours", (apiData.billableHours ?? 0).toFixed(2)],
-      ["Non-Billable Hours", (apiData.nonBillableHours ?? 0).toFixed(2)],
-      ["Auto-Generated Hours", (apiData.autoGeneratedHours ?? 0).toFixed(2)],
-      ["Billable %", `${(apiData.billablePercentage ?? 0)}`],
-      ["Pending Timesheets", apiData.pending ?? (apiData.pendingUsers?.length ?? 0)],
-    ],
-    styles: { halign: "left", valign: "middle" },
-    columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 80 } },
-  });
-
-  cursorY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 12 : cursorY + 12;
-
-  // ----------------------
-  // Missing Timesheets (always shown — if empty show 'All users submitted...' like reference)
-  // ----------------------
-  addSubTitle("Missing Timesheets (Last 15 Days)");
-
-const missing = apiData.missingTimesheets || [];
-
-if (missing.length === 0) {
-  doc.setFontSize(10);
-  doc.setTextColor(...COLORS.mutedText);
-  doc.text("None", PAGE.margin, cursorY);   // << clean text
-  cursorY += 10;
-} else {
-  autoTable(doc, {
-    ...tableDefaults,
-    startY: cursorY,
-    head: [["User", "User ID", "Pending Weeks"]],
-    body: missing.map(m => [
-      m.userName || "-",
-      m.userId ?? "-",
-      m.pendingWeeks ?? "-"
-    ]),
-  });
-  cursorY = doc.lastAutoTable.finalY + 12;
-}
-  // ----------------------
-  // Weekly Summary (Day-wise)
-  // ----------------------
-  addSubTitle("Weekly Summary (Day-wise)");
-
-  autoTable(doc, {
-    ...tableDefaults,
-    startY: cursorY,
-    head: [["Day", "Total Hours"]],
-    body: Object.entries(apiData.weeklySummary || {}).map(([d, h]) => [d, (typeof h === "number" ? h.toFixed(2) : h)]),
-    styles: { fontSize: 10 },
-  });
-
-  cursorY = doc.lastAutoTable.finalY + 12;
-
-  // ----------------------
-  // Pending Users (table)
-  // ----------------------
-  addSubTitle("Pending Users");
-
-  if (!apiData.pendingUsers || apiData.pendingUsers.length === 0) {
-    doc.setFontSize(10);
-    doc.setTextColor(...COLORS.mutedText);
-    doc.text("None", PAGE.margin, cursorY);
-    cursorY += 10;
-  } else {
-    autoTable(doc, {
-      ...tableDefaults,
-      startY: cursorY,
-      head: [["User", "User ID", "Pending Weeks"]],
-      body: apiData.pendingUsers.map(u => [u.userName, u.userId ?? "-", u.pendingWeeks ?? "-"]),
-    });
-    cursorY = doc.lastAutoTable.finalY + 12;
-  }
-
-  // ----------------------
-  // Project Breakdown (summary table)
-  // ----------------------
-  addSubTitle("Project Breakdown");
-
-  autoTable(doc, {
-    ...tableDefaults,
-    startY: cursorY,
-    head: [["Project", "Total Hours", "Billable", "Non-Billable", "Billable %"]],
-    body: (apiData.projectBreakdown || []).map(p => [
-      p.projectName || `Project ${p.projectId || "-"}`,
-      (p.totalHours ?? 0).toFixed(2),
-      (p.billableHours ?? 0).toFixed(2),
-      (p.nonBillableHours ?? 0).toFixed(2),
-      (p.billablePercentage ?? 0).toFixed(2),
-    ]),
-    styles: { fontSize: 10 },
-  });
-
-  cursorY = doc.lastAutoTable.finalY + 12;
-
-  // ----------------------
-  // Project Breakdown (per-project details with member contributions)
-  // ----------------------
-  // Add a heading similar to the PDF that says: Project Breakdown (With Member Contributions)
-  addSubTitle("Project Breakdown (With Member Contributions)");
-
-  (apiData.projectBreakdown || []).forEach((proj, pIdx) => {
-    ensureSpace(40);
-
-    // Project title
-    doc.setFontSize(13);
+    doc.setFontSize(11);
     doc.setTextColor(...COLORS.text);
-    doc.text(proj.projectName || `Project ${proj.projectId || pIdx + 1}`, PAGE.margin, cursorY);
-    cursorY += 8;
+    doc.text(`Manager: ${apiData.managerName || "—"}`, PAGE.margin, cursorY);
+    cursorY += 10;
 
-    // Project summary small table
+    // ----------------------
+    // Summary (boxed table style like reference)
+    // ----------------------
+    addSubTitle("Summary");
+
     autoTable(doc, {
       ...tableDefaults,
       startY: cursorY,
       head: [["Metric", "Value"]],
       body: [
-        ["Total Hours", (proj.totalHours ?? 0).toFixed(2)],
-        ["Billable Hours", (proj.billableHours ?? 0).toFixed(2)],
-        ["Non-Billable Hours", (proj.nonBillableHours ?? 0).toFixed(2)],
-        ["Billable %", (proj.billablePercentage ?? 0).toFixed(2)],
+        [
+          "Month / Year",
+          `${apiData.month || apiData.monthName || ""} / ${apiData.year || ""}`,
+        ],
+        ["Total Hours", (apiData.totalHours ?? 0).toFixed(2)],
+        ["Billable Hours", (apiData.billableHours ?? 0).toFixed(2)],
+        ["Non-Billable Hours", (apiData.nonBillableHours ?? 0).toFixed(2)],
+        ["Auto-Generated Hours", (apiData.autoGeneratedHours ?? 0).toFixed(2)],
+        ["Billable %", `${apiData.billablePercentage ?? 0}`],
+        [
+          "Pending Timesheets",
+          apiData.pending ?? apiData.pendingUsers?.length ?? 0,
+        ],
       ],
-      styles: { fontSize: 10 },
+      styles: { halign: "left", valign: "middle" },
+      columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 80 } },
     });
 
-    cursorY = doc.lastAutoTable.finalY + 8;
+    cursorY =
+      doc.lastAutoTable && doc.lastAutoTable.finalY
+        ? doc.lastAutoTable.finalY + 12
+        : cursorY + 12;
 
-    // Member Contributions
-    doc.setFontSize(12);
-    doc.setTextColor(...COLORS.sectionTitle);
-    doc.text("Member Contributions", PAGE.margin, cursorY);
-    cursorY += 8;
+    // ----------------------
+    // Missing Timesheets (always shown — if empty show 'All users submitted...' like reference)
+    // ----------------------
+    addSubTitle("Missing Timesheets (Last 15 Days)");
 
-    const members = proj.membersContribution || proj.members || [];
-    if (!members || members.length === 0) {
+    const missing = apiData.missingTimesheets || [];
+
+    if (missing.length === 0) {
       doc.setFontSize(10);
       doc.setTextColor(...COLORS.mutedText);
-      doc.text("No members assigned", PAGE.margin, cursorY);
+      doc.text("None", PAGE.margin, cursorY); // << clean text
       cursorY += 10;
     } else {
       autoTable(doc, {
         ...tableDefaults,
         startY: cursorY,
-        head: [["Member", "User ID", "Hours", "Contribution %"]],
-        body: members.map(m => [
-          m.userName || m.name || "-",
-          m.userId ?? m.id ?? "-",
-          (m.totalHours ?? m.hours ?? 0).toFixed(2),
-          (m.contribution ?? 0).toFixed(2),
+        head: [["User", "User ID", "Pending Weeks"]],
+        body: missing.map((m) => [
+          m.userName || "-",
+          m.userId ?? "-",
+          m.pendingWeeks ?? "-",
         ]),
-        styles: { fontSize: 10 },
+      });
+      cursorY = doc.lastAutoTable.finalY + 12;
+    }
+    // ----------------------
+    // Weekly Summary (Day-wise)
+    // ----------------------
+    addSubTitle("Weekly Summary (Day-wise)");
+
+    autoTable(doc, {
+      ...tableDefaults,
+      startY: cursorY,
+      head: [["Day", "Total Hours"]],
+      body: Object.entries(apiData.weeklySummary || {}).map(([d, h]) => [
+        d,
+        typeof h === "number" ? h.toFixed(2) : h,
+      ]),
+      styles: { fontSize: 10 },
+    });
+
+    cursorY = doc.lastAutoTable.finalY + 12;
+
+    // ----------------------
+    // Pending Users (table)
+    // ----------------------
+    addSubTitle("Pending Users");
+
+    if (!apiData.pendingUsers || apiData.pendingUsers.length === 0) {
+      doc.setFontSize(10);
+      doc.setTextColor(...COLORS.mutedText);
+      doc.text("None", PAGE.margin, cursorY);
+      cursorY += 10;
+    } else {
+      autoTable(doc, {
+        ...tableDefaults,
+        startY: cursorY,
+        head: [["User", "User ID", "Pending Weeks"]],
+        body: apiData.pendingUsers.map((u) => [
+          u.userName,
+          u.userId ?? "-",
+          u.pendingWeeks ?? "-",
+        ]),
       });
       cursorY = doc.lastAutoTable.finalY + 12;
     }
 
-    // horizontal rule separation (thin)
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.5);
-    doc.line(PAGE.margin, cursorY - 4, PAGE.width - PAGE.margin, cursorY - 4);
-    cursorY += 4;
-  });
+    // ----------------------
+    // Project Breakdown (summary table)
+    // ----------------------
+    addSubTitle("Project Breakdown");
 
-  // ----------------------
-  // User Contributions
-  // ----------------------
-  addSubTitle("User Contributions");
-
-  // Billable
-  addSubTitle("Billable Contribution");
-  autoTable(doc, {
-    ...tableDefaults,
-    startY: cursorY,
-    head: [["User", "User ID", "Hours", "Contribution %"]],
-    body: (apiData.billableContribution?.members || []).map(m => [
-      m.userName, m.userId, (m.billableHours ?? 0).toFixed(2), (m.contribution ?? 0).toFixed(2)
-    ]),
-  });
-  cursorY = doc.lastAutoTable.finalY + 12;
-
-  // Non-Billable
-  addSubTitle("Non-Billable Contribution");
-  autoTable(doc, {
-    ...tableDefaults,
-    startY: cursorY,
-    head: [["User", "User ID", "Hours", "Contribution %"]],
-    body: (apiData.nonBillableContribution?.members || []).map(m => [
-      m.userName, m.userId, (m.nonBillableHours ?? 0).toFixed(2), (m.contribution ?? 0).toFixed(2)
-    ]),
-  });
-  cursorY = doc.lastAutoTable.finalY + 12;
-
-  // Auto-Generated
-  addSubTitle("Auto-Generated Contribution");
-  autoTable(doc, {
-    ...tableDefaults,
-    startY: cursorY,
-    head: [["User", "User ID", "Hours", "Contribution %"]],
-    body: (apiData.autoGeneratedContribution?.members || []).map(m => [
-      m.userName, m.userId, (m.autoHours ?? 0).toFixed(2), (m.contribution ?? 0).toFixed(2)
-    ]),
-  });
-  cursorY = doc.lastAutoTable.finalY + 12;
-
-  // ----------------------
-  // Insights (Underutilized, Overworked, Multi-Project)
-  // ----------------------
-  addSubTitle("Insights");
-
- // Underutilized Employees (Heading with Expected Hours)
-const expectedHours = apiData.expectedHours ?? "-";
-
-// Custom heading instead of addSubTitle
-doc.setFontSize(13);
-doc.setTextColor(...COLORS.sectionTitle);
-doc.text(`Underutilized Employees (Expected Hours: ${expectedHours})`, PAGE.margin, cursorY);
-cursorY += 8;
-
-const under = apiData.underutilizedInsight?.underutilized || [];
-
-if (under.length === 0) {
-  doc.setFontSize(10);
-  doc.setTextColor(...COLORS.mutedText);
-  doc.text("None", PAGE.margin, cursorY);
-  cursorY += 8;
-} else {
-  autoTable(doc, {
-    ...tableDefaults,
-    startY: cursorY,
-    head: [["User", "User ID", "Total Hours"]],
-    body: under.map(u => [
-      u.userName,
-      u.userId,
-      (u.totalHours ?? 0).toFixed(2)
-    ]),
-  });
-
-  cursorY = doc.lastAutoTable.finalY + 12;
-}
-
-  // Overworked
-  addSubTitle("Overworked Employees");
-  const over = apiData.overworkedInsight?.overworked || [];
-  if (over.length === 0) {
-    doc.setFontSize(10);
-    doc.setTextColor(...COLORS.mutedText);
-    doc.text("None", PAGE.margin, cursorY);
-    cursorY += 8;
-  } else {
     autoTable(doc, {
       ...tableDefaults,
       startY: cursorY,
-      head: [["User", "User ID", "totalHours"]],
-      body: over.map(u => [u.userName, u.userId, (u.totalHours ?? 0).toFixed(2)]),
+      head: [
+        ["Project", "Total Hours", "Billable", "Non-Billable", "Billable %"],
+      ],
+      body: (apiData.projectBreakdown || []).map((p) => [
+        p.projectName || `Project ${p.projectId || "-"}`,
+        (p.totalHours ?? 0).toFixed(2),
+        (p.billableHours ?? 0).toFixed(2),
+        (p.nonBillableHours ?? 0).toFixed(2),
+        (p.billablePercentage ?? 0).toFixed(2),
+      ]),
+      styles: { fontSize: 10 },
     });
+
     cursorY = doc.lastAutoTable.finalY + 12;
-  }
 
-  // Multi-Project Workers
-  addSubTitle("Multi-Project Workers");
-  const multi = apiData.multiProjectWorkersInsight?.multiProjectWorkers || [];
-  if (multi.length === 0) {
-    doc.setFontSize(10);
-    doc.setTextColor(...COLORS.mutedText);
-    doc.text("None", PAGE.margin, cursorY);
-    cursorY += 8;
-  } else {
-    autoTable(doc, {
-      ...tableDefaults,
-      startY: cursorY,
-      head: [["User", "User ID", "projectCount"]],
-      body: multi.map(u => [u.userName, u.userId, u.projectCount]),
-    });
-    cursorY = doc.lastAutoTable.finalY + 12;
-  }
+    // ----------------------
+    // Project Breakdown (per-project details with member contributions)
+    // ----------------------
+    // Add a heading similar to the PDF that says: Project Breakdown (With Member Contributions)
+    addSubTitle("Project Breakdown (With Member Contributions)");
 
-  // ----------------------
-  // User Weekly Timesheet Summaries (detailed per user)
-  // ----------------------
-  addSubTitle("User Weekly Timesheet Summaries");
-
-  (apiData.userEntriesSummary || []).forEach((usr) => {
-    ensureSpace(30);
-    doc.setFontSize(12);
-    doc.setTextColor(...COLORS.text);
-    doc.text(`${usr.userName} (${usr.userId})`, PAGE.margin, cursorY);
-    cursorY += 8;
-
-    doc.setFontSize(10);
-    doc.setTextColor(...COLORS.mutedText);
-    doc.text(`Total Hours: ${(usr.totalHours ?? 0).toFixed(2)}`, PAGE.margin, cursorY);
-    cursorY += 8;
-
-    (usr.weeklySummary || []).forEach((week) => {
+    (apiData.projectBreakdown || []).forEach((proj, pIdx) => {
       ensureSpace(40);
-      // week heading box style
-      doc.setFillColor(245, 245, 245);
-      doc.rect(PAGE.margin, cursorY, PAGE.width - PAGE.margin * 2, 8, "F");
-      doc.setFontSize(11);
+
+      // Project title
+      doc.setFontSize(13);
       doc.setTextColor(...COLORS.text);
-      doc.text(`Week ${week.weekId}: ${week.startDate} # ${week.endDate} (${week.weeklyStatus || "-"})`, PAGE.margin + 2, cursorY + 6);
-      cursorY += 12;
+      doc.text(
+        proj.projectName || `Project ${proj.projectId || pIdx + 1}`,
+        PAGE.margin,
+        cursorY,
+      );
+      cursorY += 8;
 
-      // table of timesheets for the week
-      const rows = (week.timesheets || []).map((t) => {
-        // if is holiday / default timesheet and no entries, show combined description row
-        if ((t.defaultHolidayTimesheet || t.isHolidayTimesheet) && (!t.entries || t.entries.length === 0)) {
-          return [t.workDate || "-", `Auto/holiday/default timesheet (hours=${(t.hoursWorked ?? t.hours ?? t.totalHours ?? 0).toFixed(2)})`, "", "", ""];
-        }
-        // otherwise expand entries if present
-        if (t.entries && t.entries.length > 0) {
-          // join entries for display as multiple rows
-          return t.entries.map((e) => [
-            t.workDate || e.workDate || "-",
-            e.projectId ?? e.projectName ?? "-",
-            e.taskId ?? e.taskName ?? "-",
-            (e.hoursWorked ?? e.hours ?? 0).toFixed(2),
-            e.isBillable ? "true" : "false",
-            e.description || "",
-          ]);
-        }
-        // fallback row
-        return [t.workDate || "-", "-", "-", (t.hoursWorked ?? t.hours ?? 0).toFixed(2), t.status || "-", ""];
-      });
-
-      // rows may be nested arrays if we returned arrays of arrays; flatten appropriately
-      const flatRows = [];
-      rows.forEach(r => {
-        if (Array.isArray(r[0])) {
-          r.forEach(rr => flatRows.push(rr));
-        } else flatRows.push(r);
-      });
-
-      // Choose header depending on whether we have description column
-      const hasDescription = flatRows.some(r => r.length >= 6);
-      const headRow = hasDescription ? ["Date", "Project", "Task", "Hours", "Billable", "Description"] : ["Date", "Project", "Task", "Hours", "Billable"];
-
+      // Project summary small table
       autoTable(doc, {
         ...tableDefaults,
         startY: cursorY,
-        head: [headRow],
-        body: flatRows,
+        head: [["Metric", "Value"]],
+        body: [
+          ["Total Hours", (proj.totalHours ?? 0).toFixed(2)],
+          ["Billable Hours", (proj.billableHours ?? 0).toFixed(2)],
+          ["Non-Billable Hours", (proj.nonBillableHours ?? 0).toFixed(2)],
+          ["Billable %", (proj.billablePercentage ?? 0).toFixed(2)],
+        ],
         styles: { fontSize: 10 },
-        columnStyles: { 0: { cellWidth: 30 } }
       });
 
-      cursorY = doc.lastAutoTable.finalY + 10;
+      cursorY = doc.lastAutoTable.finalY + 8;
+
+      // Member Contributions
+      doc.setFontSize(12);
+      doc.setTextColor(...COLORS.sectionTitle);
+      doc.text("Member Contributions", PAGE.margin, cursorY);
+      cursorY += 8;
+
+      const members = proj.membersContribution || proj.members || [];
+      if (!members || members.length === 0) {
+        doc.setFontSize(10);
+        doc.setTextColor(...COLORS.mutedText);
+        doc.text("No members assigned", PAGE.margin, cursorY);
+        cursorY += 10;
+      } else {
+        autoTable(doc, {
+          ...tableDefaults,
+          startY: cursorY,
+          head: [["Member", "User ID", "Hours", "Contribution %"]],
+          body: members.map((m) => [
+            m.userName || m.name || "-",
+            m.userId ?? m.id ?? "-",
+            (m.totalHours ?? m.hours ?? 0).toFixed(2),
+            (m.contribution ?? 0).toFixed(2),
+          ]),
+          styles: { fontSize: 10 },
+        });
+        cursorY = doc.lastAutoTable.finalY + 12;
+      }
+
+      // horizontal rule separation (thin)
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.line(PAGE.margin, cursorY - 4, PAGE.width - PAGE.margin, cursorY - 4);
+      cursorY += 4;
     });
-  });
 
-  // ----------------------
-  // Report Notes (boxed, blue background)
-  // ----------------------
-  // ------------------------------------------------------------
-// REPORT NOTES (Fully Dynamic — No Text Overflow)
-// ------------------------------------------------------------
-if (cursorY + 50 > 270) {
-  doc.addPage();
-  cursorY = 20;
-}
+    // ----------------------
+    // User Contributions
+    // ----------------------
+    addSubTitle("User Contributions");
 
-const notes = [
-  "Billable Hours: Total hours spent by team members on tasks classified as billable across all assigned projects.",
-  "Non-Billable Hours: Total hours logged on tasks marked as non-billable across all projects.",
-  "Total Hours: Sum of Billable Hours and Non-Billable Hours.",
-  "Billable Utilization (%): (Billable Hours ÷ Total Hours) × 100.",
-  "Minimum Monthly Hours Requirement: 176 hours per employee (22 working days × 8 hours/day).",
-  "Active Projects: Total number of projects that had at least one timesheet entry during the selected month.",
-  "Project Allocation Hours: Total hours contributed to each project by all associated team members.",
-  "Daily Contribution: Distribution of total hours logged by the team for each day of the selected month.",
-  "Billable vs Non-Billable (Overall): Normalized ratio showing how the team's total hours split across billable and non-billable work.",
-  "Underutilized Employees: Team members whose logged hours are below the expected minimum monthly threshold.",
-  "Overworked Employees: Team members whose hours exceed acceptable capacity (e.g., > 176 hours/month).",
-  "Pending Timesheets: Number of employees who have not submitted timesheets for last 15 days within the selected month.",
-  "Billing Data Accuracy: Hours in this report are based on submitted timesheets only.",
-  "Average Billable Percentage: Average of the billable percentage values of all projects for the selected month."
-];
+    // Billable
+    addSubTitle("Billable Contribution");
+    autoTable(doc, {
+      ...tableDefaults,
+      startY: cursorY,
+      head: [["User", "User ID", "Hours", "Contribution %"]],
+      body: (apiData.billableContribution?.members || []).map((m) => [
+        m.userName,
+        m.userId,
+        (m.billableHours ?? 0).toFixed(2),
+        (m.contribution ?? 0).toFixed(2),
+      ]),
+    });
+    cursorY = doc.lastAutoTable.finalY + 12;
 
-// ---- Box Layout ----
-const boxX = 12;
-const boxWidth = 186;
-const padding = 10;
-let startY = cursorY;
+    // Non-Billable
+    addSubTitle("Non-Billable Contribution");
+    autoTable(doc, {
+      ...tableDefaults,
+      startY: cursorY,
+      head: [["User", "User ID", "Hours", "Contribution %"]],
+      body: (apiData.nonBillableContribution?.members || []).map((m) => [
+        m.userName,
+        m.userId,
+        (m.nonBillableHours ?? 0).toFixed(2),
+        (m.contribution ?? 0).toFixed(2),
+      ]),
+    });
+    cursorY = doc.lastAutoTable.finalY + 12;
 
-// Compute wrapped notes + total height
-let lineHeight = 6;
-let totalHeight = padding + 10; // Title
+    // Auto-Generated
+    addSubTitle("Auto-Generated Contribution");
+    autoTable(doc, {
+      ...tableDefaults,
+      startY: cursorY,
+      head: [["User", "User ID", "Hours", "Contribution %"]],
+      body: (apiData.autoGeneratedContribution?.members || []).map((m) => [
+        m.userName,
+        m.userId,
+        (m.autoHours ?? 0).toFixed(2),
+        (m.contribution ?? 0).toFixed(2),
+      ]),
+    });
+    cursorY = doc.lastAutoTable.finalY + 12;
 
-const wrappedNotes = notes.map(note => {
-  const wrapped = doc.splitTextToSize(note, boxWidth - 20);
-  totalHeight += wrapped.length * lineHeight + 6;
-  return wrapped;
-});
-totalHeight += padding;
+    // ----------------------
+    // Insights (Underutilized, Overworked, Multi-Project)
+    // ----------------------
+    addSubTitle("Insights");
 
-// Page break if needed
-if (startY + totalHeight > 280) {
-  doc.addPage();
-  startY = 20;
-}
+    // Underutilized Employees (Heading with Expected Hours)
+    const expectedHours = apiData.expectedHours ?? "-";
 
-// Draw dynamic rounded box
-doc.setFillColor(230, 240, 255);
-doc.roundedRect(boxX, startY, boxWidth, totalHeight, 6, 6, "F");
+    // Custom heading instead of addSubTitle
+    doc.setFontSize(13);
+    doc.setTextColor(...COLORS.sectionTitle);
+    doc.text(
+      `Underutilized Employees (Expected Hours: ${expectedHours})`,
+      PAGE.margin,
+      cursorY,
+    );
+    cursorY += 8;
 
-// Title
-let y = startY + 16;
-doc.setFontSize(13);
-doc.setTextColor(20, 60, 160);
-doc.text("Report Notes", boxX + 6, y);
+    const under = apiData.underutilizedInsight?.underutilized || [];
 
-y += 10;
+    if (under.length === 0) {
+      doc.setFontSize(10);
+      doc.setTextColor(...COLORS.mutedText);
+      doc.text("None", PAGE.margin, cursorY);
+      cursorY += 8;
+    } else {
+      autoTable(doc, {
+        ...tableDefaults,
+        startY: cursorY,
+        head: [["User", "User ID", "Total Hours"]],
+        body: under.map((u) => [
+          u.userName,
+          u.userId,
+          (u.totalHours ?? 0).toFixed(2),
+        ]),
+      });
 
-// Reset font for notes
-doc.setFontSize(10);
-doc.setTextColor(0, 0, 0);
+      cursorY = doc.lastAutoTable.finalY + 12;
+    }
 
-// Render bullet + wrapped note
-wrappedNotes.forEach(lines => {
-  doc.setFillColor(0, 0, 0);
-  doc.circle(boxX + 6, y + 1.5, 1.6, "F");
-  doc.text(lines, boxX + 12, y);
-  y += lines.length * lineHeight + 4;
-});
+    // Overworked
+    addSubTitle("Overworked Employees");
+    const over = apiData.overworkedInsight?.overworked || [];
+    if (over.length === 0) {
+      doc.setFontSize(10);
+      doc.setTextColor(...COLORS.mutedText);
+      doc.text("None", PAGE.margin, cursorY);
+      cursorY += 8;
+    } else {
+      autoTable(doc, {
+        ...tableDefaults,
+        startY: cursorY,
+        head: [["User", "User ID", "totalHours"]],
+        body: over.map((u) => [
+          u.userName,
+          u.userId,
+          (u.totalHours ?? 0).toFixed(2),
+        ]),
+      });
+      cursorY = doc.lastAutoTable.finalY + 12;
+    }
 
-cursorY = y + 10;
+    // Multi-Project Workers
+    addSubTitle("Multi-Project Workers");
+    const multi = apiData.multiProjectWorkersInsight?.multiProjectWorkers || [];
+    if (multi.length === 0) {
+      doc.setFontSize(10);
+      doc.setTextColor(...COLORS.mutedText);
+      doc.text("None", PAGE.margin, cursorY);
+      cursorY += 8;
+    } else {
+      autoTable(doc, {
+        ...tableDefaults,
+        startY: cursorY,
+        head: [["User", "User ID", "projectCount"]],
+        body: multi.map((u) => [u.userName, u.userId, u.projectCount]),
+      });
+      cursorY = doc.lastAutoTable.finalY + 12;
+    }
 
-  // footer timestamp
-  doc.setFontSize(8);
-  doc.setTextColor(130, 130, 130);
-  const footerTxt = `Report generated by Timesheet Management System on ${new Date().toISOString()}`;
-  doc.text(footerTxt, PAGE.margin, PAGE.height - 8);
+    // ----------------------
+    // User Weekly Timesheet Summaries (detailed per user)
+    // ----------------------
+    addSubTitle("User Weekly Timesheet Summaries");
 
-  // Save final file
-  doc.save(`Manager_Report_${apiData.month || apiData.monthName}_${apiData.year}.pdf`);
-};
+    (apiData.userEntriesSummary || []).forEach((usr) => {
+      ensureSpace(30);
+      doc.setFontSize(12);
+      doc.setTextColor(...COLORS.text);
+      doc.text(`${usr.userName} (${usr.userId})`, PAGE.margin, cursorY);
+      cursorY += 8;
 
+      doc.setFontSize(10);
+      doc.setTextColor(...COLORS.mutedText);
+      doc.text(
+        `Total Hours: ${(usr.totalHours ?? 0).toFixed(2)}`,
+        PAGE.margin,
+        cursorY,
+      );
+      cursorY += 8;
+
+      (usr.weeklySummary || []).forEach((week) => {
+        ensureSpace(40);
+        // week heading box style
+        doc.setFillColor(245, 245, 245);
+        doc.rect(PAGE.margin, cursorY, PAGE.width - PAGE.margin * 2, 8, "F");
+        doc.setFontSize(11);
+        doc.setTextColor(...COLORS.text);
+        doc.text(
+          `Week ${week.weekId}: ${week.startDate} # ${week.endDate} (${week.weeklyStatus || "-"})`,
+          PAGE.margin + 2,
+          cursorY + 6,
+        );
+        cursorY += 12;
+
+        // table of timesheets for the week
+        const rows = (week.timesheets || []).map((t) => {
+          // if is holiday / default timesheet and no entries, show combined description row
+          if (
+            (t.defaultHolidayTimesheet || t.isHolidayTimesheet) &&
+            (!t.entries || t.entries.length === 0)
+          ) {
+            return [
+              t.workDate || "-",
+              `Auto/holiday/default timesheet (hours=${(t.hoursWorked ?? t.hours ?? t.totalHours ?? 0).toFixed(2)})`,
+              "",
+              "",
+              "",
+            ];
+          }
+          // otherwise expand entries if present
+          if (t.entries && t.entries.length > 0) {
+            // join entries for display as multiple rows
+            return t.entries.map((e) => [
+              t.workDate || e.workDate || "-",
+              e.projectId ?? e.projectName ?? "-",
+              e.taskId ?? e.taskName ?? "-",
+              (e.hoursWorked ?? e.hours ?? 0).toFixed(2),
+              e.isBillable ? "true" : "false",
+              e.description || "",
+            ]);
+          }
+          // fallback row
+          return [
+            t.workDate || "-",
+            "-",
+            "-",
+            (t.hoursWorked ?? t.hours ?? 0).toFixed(2),
+            t.status || "-",
+            "",
+          ];
+        });
+
+        // rows may be nested arrays if we returned arrays of arrays; flatten appropriately
+        const flatRows = [];
+        rows.forEach((r) => {
+          if (Array.isArray(r[0])) {
+            r.forEach((rr) => flatRows.push(rr));
+          } else flatRows.push(r);
+        });
+
+        // Choose header depending on whether we have description column
+        const hasDescription = flatRows.some((r) => r.length >= 6);
+        const headRow = hasDescription
+          ? ["Date", "Project", "Task", "Hours", "Billable", "Description"]
+          : ["Date", "Project", "Task", "Hours", "Billable"];
+
+        autoTable(doc, {
+          ...tableDefaults,
+          startY: cursorY,
+          head: [headRow],
+          body: flatRows,
+          styles: { fontSize: 10 },
+          columnStyles: { 0: { cellWidth: 30 } },
+        });
+
+        cursorY = doc.lastAutoTable.finalY + 10;
+      });
+    });
+
+    // ----------------------
+    // Report Notes (boxed, blue background)
+    // ----------------------
+    // ------------------------------------------------------------
+    // REPORT NOTES (Fully Dynamic — No Text Overflow)
+    // ------------------------------------------------------------
+    if (cursorY + 50 > 270) {
+      doc.addPage();
+      cursorY = 20;
+    }
+
+    const notes = [
+      "Billable Hours: Total hours spent by team members on tasks classified as billable across all assigned projects.",
+      "Non-Billable Hours: Total hours logged on tasks marked as non-billable across all projects.",
+      "Total Hours: Sum of Billable Hours and Non-Billable Hours.",
+      "Billable Utilization (%): (Billable Hours ÷ Total Hours) × 100.",
+      "Minimum Monthly Hours Requirement: 176 hours per employee (22 working days × 8 hours/day).",
+      "Active Projects: Total number of projects that had at least one timesheet entry during the selected month.",
+      "Project Allocation Hours: Total hours contributed to each project by all associated team members.",
+      "Daily Contribution: Distribution of total hours logged by the team for each day of the selected month.",
+      "Billable vs Non-Billable (Overall): Normalized ratio showing how the team's total hours split across billable and non-billable work.",
+      "Underutilized Employees: Team members whose logged hours are below the expected minimum monthly threshold.",
+      "Overworked Employees: Team members whose hours exceed acceptable capacity (e.g., > 176 hours/month).",
+      "Pending Timesheets: Number of employees who have not submitted timesheets for last 15 days within the selected month.",
+      "Billing Data Accuracy: Hours in this report are based on submitted timesheets only.",
+      "Average Billable Percentage: Average of the billable percentage values of all projects for the selected month.",
+    ];
+
+    // ---- Box Layout ----
+    const boxX = 12;
+    const boxWidth = 186;
+    const padding = 10;
+    let startY = cursorY;
+
+    // Compute wrapped notes + total height
+    let lineHeight = 6;
+    let totalHeight = padding + 10; // Title
+
+    const wrappedNotes = notes.map((note) => {
+      const wrapped = doc.splitTextToSize(note, boxWidth - 20);
+      totalHeight += wrapped.length * lineHeight + 6;
+      return wrapped;
+    });
+    totalHeight += padding;
+
+    // Page break if needed
+    if (startY + totalHeight > 280) {
+      doc.addPage();
+      startY = 20;
+    }
+
+    // Draw dynamic rounded box
+    doc.setFillColor(230, 240, 255);
+    doc.roundedRect(boxX, startY, boxWidth, totalHeight, 6, 6, "F");
+
+    // Title
+    let y = startY + 16;
+    doc.setFontSize(13);
+    doc.setTextColor(20, 60, 160);
+    doc.text("Report Notes", boxX + 6, y);
+
+    y += 10;
+
+    // Reset font for notes
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+
+    // Render bullet + wrapped note
+    wrappedNotes.forEach((lines) => {
+      doc.setFillColor(0, 0, 0);
+      doc.circle(boxX + 6, y + 1.5, 1.6, "F");
+      doc.text(lines, boxX + 12, y);
+      y += lines.length * lineHeight + 4;
+    });
+
+    cursorY = y + 10;
+
+    // footer timestamp
+    doc.setFontSize(8);
+    doc.setTextColor(130, 130, 130);
+    const footerTxt = `Report generated by Timesheet Management System on ${new Date().toISOString()}`;
+    doc.text(footerTxt, PAGE.margin, PAGE.height - 8);
+
+    // Save final file
+    doc.save(
+      `Manager_Report_${apiData.month || apiData.monthName}_${apiData.year}.pdf`,
+    );
+  };
 
   // weekly selection state (No longer used for modal, but keeping structure if needed)
   // const [selectedWeekIdx, setSelectedWeekIdx] = useState(null);
@@ -889,7 +959,7 @@ cursorY = y + 10;
         },
       ],
     }),
-    [projectsWithTotals]
+    [projectsWithTotals],
   );
 
   const totalHoursBarOptions = useMemo(
@@ -938,14 +1008,14 @@ cursorY = y + 10;
         },
       },
     }),
-    []
+    [],
   );
 
   // Daily contribution (bar) - shows daily contribution hours
   const dailyBarData = useMemo(() => {
     if (!apiData) return { labels: [], datasets: [] };
     const labels = Object.keys(apiData.weeklySummary).map(
-      (d) => d.charAt(0) + d.slice(1).toLowerCase()
+      (d) => d.charAt(0) + d.slice(1).toLowerCase(),
     );
     const data = Object.values(apiData.weeklySummary);
 
@@ -995,7 +1065,7 @@ cursorY = y + 10;
         },
       },
     }),
-    []
+    [],
   );
 
   // handleLineClick (REMOVED)
@@ -1019,11 +1089,11 @@ cursorY = y + 10;
               nativeEvt,
               "nearest",
               { intersect: true },
-              true
+              true,
             )
           : typeof chart.getElementsAtEvent === "function"
-          ? chart.getElementsAtEvent(nativeEvt)
-          : [];
+            ? chart.getElementsAtEvent(nativeEvt)
+            : [];
 
       if (!elems || elems.length === 0) {
         return;
@@ -1048,7 +1118,7 @@ cursorY = y + 10;
     const labels = p.members.map((m) => m.name);
     const data = p.members.map((m) => m.hours);
     const backgroundColor = p.members.map(
-      (_, i) => EMPLOYEE_PALETTE[i % EMPLOYEE_PALETTE.length]
+      (_, i) => EMPLOYEE_PALETTE[i % EMPLOYEE_PALETTE.length],
     );
     return {
       labels,
@@ -1080,7 +1150,7 @@ cursorY = y + 10;
         },
       },
     }),
-    [selectedProjectIdx, projectsWithTotals]
+    [selectedProjectIdx, projectsWithTotals],
   );
 
   const selectedProject =
@@ -1154,7 +1224,7 @@ cursorY = y + 10;
         },
       },
     }),
-    []
+    [],
   );
 
   // map projectStackedData into a full-width data shape for the larger stacked bar
@@ -1164,7 +1234,7 @@ cursorY = y + 10;
     const billable = Math.max(0, selectedProject.billableHours || 0);
     const nonBillable = Math.max(
       0,
-      (selectedProject.totalHours || 0) - billable
+      (selectedProject.totalHours || 0) - billable,
     );
     const tot = billable + nonBillable || 1;
     const billablePerc = +((billable / tot) * 100).toFixed(1);
@@ -1248,7 +1318,7 @@ cursorY = y + 10;
       },
     }),
     // 3. Important: Add selectedProject to dependencies so title updates
-    [selectedProject]
+    [selectedProject],
   );
 
   // (Export CSV helper removed — not required in this variant)
@@ -1259,7 +1329,7 @@ cursorY = y + 10;
 
   const showUserList = useCallback(
     (title, users) => dispatch({ type: "OPEN_USERLIST", title, users }),
-    [dispatch]
+    [dispatch],
   );
   const closeUserList = () => dispatch({ type: "CLOSE_USERLIST" });
 
@@ -1270,9 +1340,9 @@ cursorY = y + 10;
         name: e.userName,
         hours: e.billableHours,
         meta: `${e.billableHours}h billable • ${e.contribution.toFixed(
-          1
+          1,
         )}% of total`,
-      }))
+      })),
     );
   };
 
@@ -1283,9 +1353,9 @@ cursorY = y + 10;
         name: e.userName,
         hours: e.nonBillableHours,
         meta: `${e.nonBillableHours}h non-billable • ${e.contribution.toFixed(
-          1
+          1,
         )}% of total`,
-      }))
+      })),
     );
   };
 
@@ -1296,7 +1366,7 @@ cursorY = y + 10;
         name: p.name,
         hours: null,
         meta: p.reason,
-      }))
+      })),
     );
   };
 
@@ -1306,10 +1376,10 @@ cursorY = y + 10;
       underutilized.map((u) => ({
         name: u.name,
         hours: u.hours,
-        rank: u.rank, 
+        rank: u.rank,
         expectedHours: u.expectedHours,
         meta: `• ${u.hours} hours less than monthly ${u.expectedHours} hours`,
-      }))
+      })),
     );
   };
 
@@ -1328,9 +1398,9 @@ cursorY = y + 10;
         overworked.map((o) => ({
           name: o.name,
           hours: o.hours,
-          expectedHours: o.expectedHours, 
+          expectedHours: o.expectedHours,
           meta: `• ${o.hours} hours over than monthly ${o.expectedHours} hours`,
-        }))
+        })),
       );
     }
   };
@@ -1348,7 +1418,7 @@ cursorY = y + 10;
         meta: `Billable: ${m.billableHours}h, Non-billable: ${
           m.nonBillableHours
         }h Contribution: ${m.contribution.toFixed(1)}%`,
-      }))
+      })),
     );
   };
 
@@ -1365,7 +1435,7 @@ cursorY = y + 10;
         showNonBillableUsers();
       }
     },
-    [billableMembers, nonBillableMembers, showUserList] // Dependencies updated
+    [billableMembers, nonBillableMembers, showUserList], // Dependencies updated
   );
 
   // click handler for the per-project stacked bar (works like overall but scoped to selectedProject)
@@ -1382,7 +1452,7 @@ cursorY = y + 10;
             name: m.name,
             hours: m.hours,
             meta: `${m.hours}h on ${selectedProject.project}`,
-          }))
+          })),
         );
       } else {
         // For Non-billable — show same members but mark as non-billable
@@ -1392,11 +1462,11 @@ cursorY = y + 10;
             name: m.name,
             hours: 0,
             meta: `Non-billable details not available per member`,
-          }))
+          })),
         );
       }
     },
-    [selectedProject, showUserList]
+    [selectedProject, showUserList],
   );
 
   // --- KPI Card handler functions ---
@@ -1409,7 +1479,7 @@ cursorY = y + 10;
         name: m.userName,
         hours: m.billableHours,
         meta: `${m.billableHours}h billable`,
-      }))
+      })),
     );
   };
 
@@ -1422,7 +1492,7 @@ cursorY = y + 10;
         meta: `${p.members.length} member${
           p.members.length !== 1 ? "s" : ""
         } • ${p.totalHours}h total`,
-      }))
+      })),
     );
   };
 
@@ -1929,7 +1999,7 @@ cursorY = y + 10;
                         {Math.max(
                           0,
                           (selectedProject.totalHours || 0) -
-                            (selectedProject.billableHours || 0)
+                            (selectedProject.billableHours || 0),
                         ).toFixed(1)}
                         h
                       </span>
@@ -1974,7 +2044,7 @@ cursorY = y + 10;
                     }
                     tabIndex={0}
                     className={`p-6 rounded-xl text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg border-2 ${getTileClass(
-                      employee.totalHours
+                      employee.totalHours,
                     )}`}
                   >
                     <div className="text-sm font-semibold text-gray-900 mb-2">
@@ -2052,7 +2122,9 @@ cursorY = y + 10;
                     Underutilized
                   </h3>
                 </div>
-                <div className={`mb-3 ${underutilized.length > 5 ? "h-24 overflow-y-auto" : ""}`}>
+                <div
+                  className={`mb-3 ${underutilized.length > 5 ? "h-24 overflow-y-auto" : ""}`}
+                >
                   {underutilized.length > 0 ? (
                     <ul className="text-sm text-gray-700 space-y-1">
                       {underutilized.map((u, idx) => (
@@ -2081,7 +2153,9 @@ cursorY = y + 10;
                     Overworked
                   </h3>
                 </div>
-                <div className={`mb-3 ${overworked.length > 5 ? "h-24 overflow-y-auto" : ""}`}>
+                <div
+                  className={`mb-3 ${overworked.length > 5 ? "h-24 overflow-y-auto" : ""}`}
+                >
                   {overworked.length > 0 ? (
                     <ul className="text-sm text-gray-700 space-y-1">
                       {overworked.map((o, idx) => (
@@ -2240,8 +2314,8 @@ cursorY = y + 10;
                   status.toLowerCase() === "submitted"
                     ? "bg-yellow-100 text-yellow-800"
                     : status.toLowerCase() === "approved"
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800"
                 }`}
               >
                 {status || "Draft"}
@@ -2316,7 +2390,7 @@ cursorY = y + 10;
                             workDate: ts.workDate,
                             status: ts.status,
                             isHoliday: ts.isHolidayTimesheet,
-                          }))
+                          })),
                       );
 
                       return (
@@ -2354,8 +2428,8 @@ cursorY = y + 10;
                                   week.weeklyStatus === "APPROVED"
                                     ? "bg-green-100 text-green-800"
                                     : week.weeklyStatus === "REJECTED"
-                                    ? "bg-red-100 text-red-800"
-                                    : "bg-yellow-100 text-yellow-800"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-yellow-100 text-yellow-800"
                                 }
                                 `}
                               >
