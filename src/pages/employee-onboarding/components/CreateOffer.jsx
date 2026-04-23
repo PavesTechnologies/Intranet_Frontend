@@ -10,6 +10,17 @@ import { User, Briefcase, FileText, Plus, Trash2 } from "lucide-react";
 export default function CreateOffer() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
+  // --- ADD THESE LINES HERE ---
+  // This decodes the JWT payload to get the roles
+  const userPayload = token ? JSON.parse(atob(token.split('.')[1])) : {};
+  const rawRoles = userPayload.roles || "";
+  
+  // This turns "HR, General" into ["HR", "General"] so it's easy to check
+  const userRoles = Array.isArray(rawRoles) 
+    ? rawRoles 
+    : rawRoles.split(',').map(r => r.trim());
+
+  const isHR = userRoles.includes("HR");
 
   /* ================= STATE ================= */
 
@@ -466,18 +477,20 @@ export default function CreateOffer() {
             </div>
 
             <div className="flex justify-between">
-              <button
-                onClick={() => setActiveStep(2)}
-                className="px-6 py-2 bg-gray-200 rounded-lg"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleCreateOffer}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg"
-              >
-                Create Offer & Preview
-              </button>
+              <button onClick={()=>setActiveStep(2)} className="px-6 py-2 bg-gray-200 rounded-lg">Back</button>
+              {isHR ? (
+  <button 
+    onClick={handleCreateOffer} 
+    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+  >
+    Create Offer & Preview
+  </button>
+) : (
+  <div className="text-red-500 font-medium px-4 py-2 bg-red-50 border border-red-100 rounded-lg">
+    ⚠️ You do not have permission to generate this document.
+  </div>
+)}
+      
             </div>
           </>
         )}
