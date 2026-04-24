@@ -154,10 +154,29 @@ export const AuthProvider = ({ children }) => {
       logout(true);
     }
   }, []);
+const getUserRoles = () => {
+  if (!user) return [];
+
+  const roles = user.roles || user.role || [];
+
+  if (!roles) return [];
+
+  if (Array.isArray(roles)) {
+    return roles.map((r) => r.toUpperCase());
+  }
+
+  return roles.split(",").map((r) => r.trim().toUpperCase());
+};
+
+const hasRole = (allowedRoles) => {
+  const userRoles = getUserRoles();
+  return allowedRoles.some((role) => userRoles.includes(role.toUpperCase()));
+};
+
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, login, logout, isfirsttlogin }}
+      value={{ user, isAuthenticated, login, logout, isfirsttlogin,  hasRole }}
     >
       {children}
     </AuthContext.Provider>
