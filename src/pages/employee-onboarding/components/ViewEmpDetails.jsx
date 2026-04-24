@@ -182,7 +182,7 @@ export default function ViewEmpDetails() {
     const token = localStorage.getItem("token");
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/${user_uuid}/generate-preview`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${user_uuid}/generate-preview`,
         { headers: { Authorization: `Bearer ${token}` }, responseType: "blob" }
       );
       const file = new Blob([res.data], { type: "application/pdf" });
@@ -236,7 +236,7 @@ export default function ViewEmpDetails() {
         showStatusToast("Approval request sent");
       } else if (isPending) {
         await axios.put(
-          `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offer-approval/reassign`,
+          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/reassign`,
           { user_uuid, new_approver_id: Number(selectedAdmin), comments: "Reassigned from UI" },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -288,7 +288,7 @@ export default function ViewEmpDetails() {
     try {
       setDeletingOffer(true);
       await axios.delete(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/delete/${user_uuid}`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/delete/${user_uuid}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       showStatusToast("Offer deleted successfully");

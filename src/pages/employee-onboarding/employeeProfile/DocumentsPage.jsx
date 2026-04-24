@@ -135,7 +135,7 @@
 //   /* ---- Resolve signed URL from file_path ---- */
 //   const getSignedUrl = async (filePath) => {
 //     const token = localStorage.getItem("token");
-//     const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+//     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
 //     const response = await fetch(
 //       `${BASE_URL}/hr/view_documents?file_path=${encodeURIComponent(filePath)}`,
@@ -204,7 +204,7 @@
 //     try {
 //       setUploading(true);
 //       const token = localStorage.getItem("token");
-//       const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+//       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
 //       const targetUserUuid = user_uuid;
 
@@ -274,7 +274,7 @@
 //         try {
 //           setDeletingDoc(docId);
 //           const token = localStorage.getItem("token");
-//           const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+//           const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
 //           const response = await fetch(
 //             `${BASE_URL}/hr/delete-document/${docId}?category=${encodeURIComponent(category)}`,
@@ -1317,7 +1317,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
     const fetchSkills = async () => {
       try {
         const token = localStorage.getItem("token");
-        const BASE_URL = import.meta.env.VITE_RESOURCE_MS;
+        const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
         const res = await fetch(`${BASE_URL}/api/skills/active`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -1345,7 +1345,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
     const fetchCertificates = async () => {
       try {
         const token = localStorage.getItem("token");
-        const BASE_URL = import.meta.env.VITE_RESOURCE_MS;
+        const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
         const res = await fetch(`${BASE_URL}/api/certificates`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -1402,7 +1402,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
     const fetchProficiencies = async () => {
       try {
         const token = localStorage.getItem("token");
-        const BASE_URL = import.meta.env.VITE_RESOURCE_MS;
+        const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
         const res = await fetch(
           `${BASE_URL}/api/proficiency/get-all-proficiency-levels`,
@@ -1455,7 +1455,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   const fetchCertifications = async () => {
     try {
       const token = localStorage.getItem("token");
-      const BASE_URL = import.meta.env.VITE_RESOURCE_MS;
+      const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
       const res = await fetch(
         `${BASE_URL}/api/resource-certificates/resource/${employee?.empId}`,
@@ -1632,7 +1632,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   //   try {
   //     setUploading(true);
   //     const token = localStorage.getItem("token");
-  //     const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  //     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   //     const targetUserUuid = user_uuid;
 
@@ -1692,7 +1692,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
   //     // 🔥 1. CERTIFICATIONS → RMS
   //     if (uploadModal.category === "certifications") {
-  //       const BASE_URL = import.meta.env.VITE_RESOURCE_MS;
+  //       const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
   //       const formData = new FormData();
 
@@ -1769,7 +1769,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   //     }
 
   //     // 🔥 2. OTHER DOCUMENTS → EMPLOYEE ONBOARDING
-  //     const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  //     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   //     const formData = new FormData();
 
@@ -1825,7 +1825,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
     // 🔥 1. CERTIFICATIONS → RMS API
     if (uploadModal.category === "certifications") {
-      const BASE_URL = import.meta.env.VITE_RESOURCE_MS;
+      const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
       // ✅ VALIDATION
       if (!employee?.empId) {
@@ -1954,7 +1954,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
     }
 
     // 🔥 2. OTHER DOCUMENTS (UNCHANGED)
-    const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+    const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
     const formData = new FormData();
     formData.append("file", uploadFile);
@@ -2014,7 +2014,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   //       try {
   //         setDeletingDoc(docId);
   //         const token = localStorage.getItem("token");
-  //         const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  //         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   //         const response = await fetch(
   //           `${BASE_URL}/hr/delete-document/${docId}?category=${encodeURIComponent(category)}`,
@@ -2068,7 +2068,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
         // 🔥 1. CERTIFICATIONS → RMS API
         if (category === "certifications") {
-          const BASE_URL = import.meta.env.VITE_RESOURCE_MS;
+          const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
           response = await fetch(
             `${BASE_URL}/api/resource-certificates/${docId}`,
@@ -2083,7 +2083,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
         // 🔥 2. OTHER DOCUMENTS → EMPLOYEE ONBOARDING
         else {
-          const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+          const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
           response = await fetch(
             `${BASE_URL}/hr/delete-document/${docId}?category=${encodeURIComponent(category)}`,

@@ -50,7 +50,7 @@ export default function EmployeeProfileView() {
   const [profileImg, setProfileImg] = useState(null);
   const profileRef = useRef(null);
   const [employee, setEmployee] = useState(null);
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   
   const [hrData, setHrData] = useState(null);
   const [identityTypes, setIdentityTypes] = useState([]);

@@ -6,7 +6,7 @@ const EmployeeDocumentsTemplate = () => {
   const [loading, setLoading] = useState(false);
 
   const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const downloadBulkTemplate = async () => {
     try {

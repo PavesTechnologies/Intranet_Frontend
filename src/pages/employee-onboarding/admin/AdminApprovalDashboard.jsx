@@ -42,7 +42,7 @@ const isManager = userRoles.includes("Manager");
 
 // Permission flag for this specific page
 const isAuthorizedManager = isManager || isAdmin;
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);

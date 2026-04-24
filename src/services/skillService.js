@@ -1,4 +1,4 @@
-// const BASE_URL = import.meta.env.VITE_RESOURCE_MS;
+// const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
 // const getAuthHeaders = () => {
 //   const token = localStorage.getItem("token");
@@ -168,7 +168,7 @@
 
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_RESOURCE_MS + "/api";
+const API_URL = window.__APP_CONFIG__.RMS_BASE_URL + "/api";
 
 export const skillService = {
   // ✅ GET Categories

@@ -38,7 +38,7 @@ const Dashboard = () => {
   const isGeneral = roles?.includes("General");
   const isDeveloper = roles.includes("Developer");
   const isManager = roles.includes("Manager");
-  const isHR = roles.includes("HR");
+  // const isHR = roles.includes("HR");
   const isAdmin = roles.includes("Admin");
 
   // ✅ Fetch total employees
