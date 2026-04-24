@@ -12,6 +12,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Pagination from "../../../components/Pagination/pagination";
+import {useAuth} from "../../../contexts/AuthContext";
 
 /* ============================
    ADMIN APPROVAL DASHBOARD
@@ -20,7 +21,28 @@ import Pagination from "../../../components/Pagination/pagination";
 export default function AdminApprovalDashboard() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
-  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+
+ /* ---------- ROLE LOGIC ---------- */
+const { user, loading: authLoading } = useAuth();
+
+const userRoles = useMemo(() => {
+  const rawRoles = user?.roles || [];
+  // Handle both Array and comma-separated string formats
+  const rolesArray = Array.isArray(rawRoles) 
+    ? rawRoles 
+    : typeof rawRoles === 'string' ? rawRoles.split(',').map(r => r.trim()) : [];
+  
+  return rolesArray;
+}, [user]);
+
+// Match the casing used in ViewEmpDetails
+const isHR = userRoles.includes("HR");
+const isAdmin = userRoles.includes("Admin");
+const isManager = userRoles.includes("Manager");
+
+// Permission flag for this specific page
+const isAuthorizedManager = isManager || isAdmin;
+  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -41,6 +63,8 @@ export default function AdminApprovalDashboard() {
 
   /* ---------- FETCH DATA (ONE API) ---------- */
   useEffect(() => {
+    if (!isAuthorizedManager) return;
+
     const fetchApprovals = async () => {
       setLoading(true);
       try {
@@ -58,7 +82,11 @@ export default function AdminApprovalDashboard() {
     };
 
     fetchApprovals();
-  }, [BASE_URL, token]);
+  }, [BASE_URL, token, isAuthorizedManager]);
+  // Redirect if not authorized
+if (!authLoading && !isAuthorizedManager) {
+  return <Navigate to="/unauthorized" replace />;
+}
 
   /* ---------- STATS ---------- */
   const totalRequests = data.length;
@@ -99,28 +127,11 @@ export default function AdminApprovalDashboard() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Employee Onboarding
-          </h1>
-          <p className="text-gray-500">Manage approval requests</p>
-        </div>
+<div className="flex justify-between items-center">
+  
 
-        {/* Role Switch */}
-        <div className="flex rounded-lg border overflow-hidden">
-          <button
-            onClick={() => navigate("/employee-onboarding")}
-            className="px-4 py-2 text-sm font-medium bg-white text-gray-700 "
-          >
-            HR View
-          </button>
-
-          <button className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white">
-            Admin View
-          </button>
-        </div>
-      </div>
+  
+</div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

@@ -1,4 +1,5 @@
 "use client";
+import { useAuth } from '../../../contexts/AuthContext'; // Ensure this path matches your project structure
 
 import React, { useState } from "react";
 import axios from "axios";
@@ -9,6 +10,19 @@ import { Download } from "lucide-react";
 
 export default function BulkUpload() {
   const navigate = useNavigate();
+  // --- ADD THIS LINE ---
+  const { user } = useAuth(); 
+
+  // --- ADD THIS ROLE LOGIC ---
+  const rawRoles = user?.roles || "";
+  const userRoles = Array.isArray(rawRoles) 
+    ? rawRoles 
+    : rawRoles.split(',').map(r => r.trim());
+
+  const isHR = userRoles.includes("HR");
+  // const isAdmin = userRoles.includes("Admin");
+  const canUpload = isHR; // Only HR or Admin can perform this action
+  // -------------------------
 
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -55,6 +69,12 @@ export default function BulkUpload() {
   // Submit File to API (Client-side translation)
   // ---------------------------
   const handleUpload = async () => {
+    // --- ADD THIS SECURITY CHECK ---
+  if (!canUpload) {
+    toast.error("You do not have the required role to perform bulk uploads.");
+    return;
+  }
+  // -------------------------------
     if (!previewData || previewData.length === 0) {
       toast.error("No valid data found in file to upload");
       return;
@@ -364,16 +384,20 @@ export default function BulkUpload() {
           Reset
         </button>
 
-        <button
-          onClick={handleUpload}
-          disabled={uploading}
-          className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400  active:translate-y-[1px]
-        disabled:opacity-60 disabled:cursor-not-allowed
-        flex items-center justify-center gap-2"
-        >
-          {uploading ? "Uploading..." : "Upload"}
-        </button>
-      </div>
+       {canUpload ? (
+    <button
+      onClick={handleUpload}
+      disabled={uploading}
+      className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 active:translate-y-[1px] flex items-center justify-center gap-2"
+    >
+      {uploading ? "Uploading..." : "Upload"}
+    </button>
+  ) : (
+    <div className="text-sm text-red-500 bg-red-50 p-2 rounded border border-red-200">
+      ⚠️ Access Restricted: Only HR can perform bulk uploads.
+    </div>
+  )}
+  </div>
 
       {/* Results Summary */}
       {result && (
