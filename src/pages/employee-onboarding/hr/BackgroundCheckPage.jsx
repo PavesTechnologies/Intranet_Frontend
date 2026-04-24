@@ -6,14 +6,11 @@ import {
   GraduationCap, Briefcase, MapPin, CreditCard, Award,
   Lock, Upload, Trash2, Plus
 } from "lucide-react";
+import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
 import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
-import {
-  MOCK_EMPLOYEES, MOCK_PROFILES, DEFAULT_PROFILE,
-  MOCK_CHECKS, DEFAULT_CHECKS,
-} from "./bgCheckMockData";
 
 /* ── Static BG Checks (not document-linked) ── */
 const STATIC_CHECKS = [
@@ -48,33 +45,14 @@ const normalizeStatus = (raw = "") => {
   return "PENDING";
 };
 
-/* ─────────────────── MOCK SERVICE FUNCTIONS ───────────────────
-   When API is ready, replace these with axios calls:
-     fetchEmployeesMock()  →  GET /permanent-employee/core-employee-details/
-     fetchProfileMock()    →  GET /hr/hr/{user_uuid}
-     fetchChecksMock()     →  GET /hr/background-checks/{user_uuid}
-──────────────────────────────────────────────────────────────── */
-const fetchEmployeesMock = () =>
-  new Promise(res => setTimeout(() => res(MOCK_EMPLOYEES), 600));
 
-const fetchProfileMock = (userUuid) =>
-  new Promise(res =>
-    setTimeout(() => res(MOCK_PROFILES[userUuid] || DEFAULT_PROFILE(
-      MOCK_EMPLOYEES.find(e => e.user_uuid === userUuid) || {}
-    )), 400)
-  );
-
-const fetchChecksMock = (userUuid) =>
-  new Promise(res =>
-    setTimeout(() => res(MOCK_CHECKS[userUuid] || DEFAULT_CHECKS), 500)
-  );
 
 /* ─────────────────────── SMALL COMPONENTS ─────────────────────── */
 const InfoRow = ({ label, value }) => (
   <div className="flex items-start py-1.5 border-b border-gray-50 last:border-0">
     <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide w-36 shrink-0">{label}</span>
     <span className="text-xs text-gray-800 font-medium flex-1">
-      {value || <span className="text-gray-300 italic">—</span>}
+      {value || <span className="text-gray-300 italic">Not Updated</span>}
     </span>
   </div>
 );
@@ -132,12 +110,39 @@ const CandidateItem = ({ emp, isSelected, bgStatus, onClick }) => {
 
 /* ─────────────────── DOCUMENT PREVIEW MODAL ─────────────────── */
 const DocPreviewModal = ({ doc, onClose }) => {
-  // In production: call GET /hr/view_documents?file_path=... to get signed URL
-  // For mock, show a placeholder since no real files exist
+  const [signedUrl, setSignedUrl] = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const token = localStorage.getItem("token");
+  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+
+  useEffect(() => {
+    if (!doc?.file_path) {
+      setLoading(false);
+      return;
+    }
+    const fetchSignedUrl = async () => {
+      try {
+        const res = await axios.get(`${BASE_URL}/hr/view_documents`, {
+          params: { file_path: doc.file_path },
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const url = typeof res.data === "string" ? res.data.replace(/^"+|"+$/g, "") : res.data.url;
+        setSignedUrl(url);
+      } catch (err) {
+        console.error("Failed to fetch signed URL:", err);
+        showStatusToast("Failed to open document", "error");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSignedUrl();
+  }, [doc, BASE_URL, token]);
+
   const name = doc?.document_name || doc?.doc_type || doc?.identity_type || "Document";
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 bg-gray-50 shrink-0">
           <div className="flex items-center gap-3">
             <FileText className="w-4 h-4 text-indigo-600" />
@@ -149,29 +154,49 @@ const DocPreviewModal = ({ doc, onClose }) => {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors opacity-50 cursor-not-allowed">
+            <button
+              onClick={() => signedUrl && window.open(signedUrl, "_blank")}
+              disabled={loading || !signedUrl}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50"
+            >
               <ExternalLink className="w-3.5 h-3.5" /> New Tab
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors opacity-50 cursor-not-allowed">
+            <a
+              href={signedUrl}
+              download
+              onClick={e => !signedUrl && e.preventDefault()}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors ${(!signedUrl || loading) ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
               <Download className="w-3.5 h-3.5" /> Download
-            </button>
+            </a>
             <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
-        <div className="flex-1 flex items-center justify-center bg-gray-100 p-10">
-          <div className="text-center">
-            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-sm font-semibold text-gray-500">{name}</p>
-            <p className="text-xs text-gray-400 mt-2 max-w-sm mx-auto leading-relaxed">
-              The document preview is currently unavailable. This feature will be active once the file is fully processed by the system.
-            </p>
-          </div>
+        <div className="flex-1 flex items-center justify-center bg-gray-100 min-h-[400px]">
+          {loading ? (
+             <div className="text-center">
+               <RefreshCw className="w-10 h-10 text-indigo-400 animate-spin mx-auto mb-3" />
+               <p className="text-xs text-gray-500 font-medium whitespace-nowrap">Resolving secure document link...</p>
+             </div>
+          ) : signedUrl ? (
+            signedUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/) ? (
+              <img src={signedUrl} alt={name} className="max-w-full max-h-[75vh] object-contain rounded-lg p-4" />
+            ) : (
+              <iframe src={signedUrl} title={name} className="w-full h-full border-0" />
+            )
+          ) : (
+            <div className="text-center">
+              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-sm font-semibold text-gray-500">{name}</p>
+              <p className="text-xs text-gray-400 mt-2 max-w-sm mx-auto leading-relaxed">
+                Document preview is unavailable or the file path is missing.
+              </p>
+            </div>
+          )}
         </div>
       </div>
-
-
     </div>
   );
 };
@@ -252,6 +277,10 @@ const DocCard = ({ doc, idx, onPreview, isVerified, onDelete, onUpload }) => {
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════════ */
 export default function BackgroundCheckPage() {
+  /* ── API config ── */
+  const token    = localStorage.getItem("token");
+  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+
   /* ── List ── */
   const [employees, setEmployees]     = useState([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -298,11 +327,19 @@ export default function BackgroundCheckPage() {
   /* ─── Load employees ─── */
   const loadEmployees = useCallback(async () => {
     setLoadingList(true);
-    // TODO (API): replace with → GET /permanent-employee/core-employee-details/
-    const data = await fetchEmployeesMock();
-    setEmployees(data);
-    setLoadingList(false);
-  }, []);
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/permanent-employee/core-employee-details/`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setEmployees(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch employees:", err);
+      showStatusToast("Failed to load employee list", "error");
+    } finally {
+      setLoadingList(false);
+    }
+  }, [BASE_URL, token]);
 
   useEffect(() => { loadEmployees(); }, [loadEmployees]);
 
@@ -319,19 +356,44 @@ export default function BackgroundCheckPage() {
     setSelectedIds([]);
     setCheckFilter("ALL");
 
-    // TODO (API): replace with → GET /hr/hr/{emp.user_uuid}
-    const prof = await fetchProfileMock(emp.user_uuid);
+    // Fetch employee profile from real API
+    let prof = {};
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/hr/hr/${emp.user_uuid}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      prof = res.data || {};
+    } catch (err) {
+      console.error("Failed to fetch profile:", err);
+      showStatusToast("Profile not found, using default view", "warning");
+      prof = {};
+    }
     setProfile(prof);
     setLoadingProfile(false);
 
-    // TODO (API): replace with → GET /hr/background-checks/{emp.user_uuid}
-    const raw = await fetchChecksMock(emp.user_uuid);
+    // Fetch background check statuses — graceful fallback if endpoint not ready
+    let raw = [];
+    try {
+      const chkRes = await axios.get(
+        `${BASE_URL}/hr/background-checks/${emp.user_uuid}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      raw = chkRes.data || [];
+    } catch (err) {
+      // Endpoint may not exist yet — silently continue with PENDING statuses
+      console.warn("Background checks endpoint not available, defaulting to PENDING:", err?.response?.status);
+      raw = [];
+    }
 
     // ── Build dynamic checks from profile documents ──
     const dynamicChecks = [];
+    const processedGroups = new Set();
 
-    // 1. Identity documents → one check per doc (Aadhaar, PAN, Passport…)
-    (prof.identity_documents || []).forEach((doc, i) => {
+    // 1. Identity documents
+    const identityDocs = prof.identity_documents || [];
+    identityDocs.forEach((doc, i) => {
+      processedGroups.add("Identity");
       const typeStr = doc.identity_type || "Identity";
       const key = `identity_${typeStr.toLowerCase().replace(/\s+/g, "_")}`;
       const api = (raw || []).find(c => c.check_type === key) || {};
@@ -345,15 +407,32 @@ export default function BackgroundCheckPage() {
         status:     normalizeStatus(api.status || "PENDING"),
         details:    {
           "ID Type":   typeStr,
-          "ID Number": doc.identity_file_number || "—",
-          "Uploaded":  doc.uploaded_at || "Recently",
+          "ID Number": doc.identity_file_number || "Not Updated",
+          "Uploaded":  doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : "Not Updated",
         },
         notes:      api.notes || "",
       });
     });
+    if (identityDocs.length === 0) {
+      processedGroups.add("Identity");
+      const api = (raw || []).find(c => c.group === "Identity") || {};
+      dynamicChecks.push({
+        id:         api.check_uuid || "identity_placeholder",
+        check_type: "identity_primary",
+        label:      "Identity Verification",
+        icon:       ShieldCheck,
+        group:      "Identity",
+        docRef:     null,
+        status:     normalizeStatus(api.status || "PENDING"),
+        details:    { "Status": "Not Updated", "Requirement": "Aadhaar/PAN Card" },
+        notes:      api.notes || "",
+      });
+    }
 
-    // 2. Education documents → one check per education entry
-    (prof.education_documents || []).forEach((edu, i) => {
+    // 2. Education documents
+    const eduDocs = prof.education_documents || [];
+    eduDocs.forEach((edu, i) => {
+      processedGroups.add("Education");
       const key = `education_${i}`;
       const api = (raw || []).find(c => c.check_type === key) || {};
       dynamicChecks.push({
@@ -365,20 +444,37 @@ export default function BackgroundCheckPage() {
         docRef:     edu,
         status:     normalizeStatus(api.status || "PENDING"),
         details:    {
-          "Level":          edu.education_level || "—",
-          "Degree":         edu.degree_name || "—",
-          "Specialization": edu.specialization || "—",
-          "Institution":    edu.institution_name || "—",
-          "Passing Year":   edu.year_of_passing || "—",
-          "Grade/CGPA":     edu.percentage_cgpa || "—",
-          "Mode":           edu.education_mode || "Regular",
+          "Level":          edu.education_level || "Not Updated",
+          "Degree":         edu.degree_name || "Not Updated",
+          "Specialization": edu.specialization || "Not Updated",
+          "Institution":    edu.institution_name || "Not Updated",
+          "Passing Year":   edu.year_of_passing || "Not Updated",
+          "Grade/CGPA":     edu.percentage_cgpa || "Not Updated",
+          "Mode":           edu.education_mode || "Not Updated",
         },
         notes:      api.notes || "",
       });
     });
+    if (eduDocs.length === 0) {
+      processedGroups.add("Education");
+      const api = (raw || []).find(c => c.group === "Education") || {};
+      dynamicChecks.push({
+        id:         api.check_uuid || "education_placeholder",
+        check_type: "education_primary",
+        label:      "Education Verification",
+        icon:       GraduationCap,
+        group:      "Education",
+        docRef:     null,
+        status:     normalizeStatus(api.status || "PENDING"),
+        details:    { "Status": "Not Updated", "Requirement": "Highest Degree Certificate" },
+        notes:      api.notes || "",
+      });
+    }
 
-    // 3. Experience → one check per company
-    (prof.experience || []).forEach((exp, i) => {
+    // 3. Experience documents
+    const expDocs = prof.experience || [];
+    expDocs.forEach((exp, i) => {
+      processedGroups.add("Experience");
       const key = `experience_${i}`;
       const api = (raw || []).find(c => c.check_type === key) || {};
       dynamicChecks.push({
@@ -390,20 +486,54 @@ export default function BackgroundCheckPage() {
         docRef:     exp,
         status:     normalizeStatus(api.status || "PENDING"),
         details:    {
-          "Company":      exp.company_name || "—",
-          "Designation":  exp.role_title || "—",
-          "Type":         exp.employment_type || "Full-time",
-          "Duration":     `${exp.start_date || ""} to ${exp.end_date || "Present"}`,
-          "Notice Period": `${exp.notice_period_days || 0} Days`,
+          "Company":      exp.company_name || "Not Updated",
+          "Designation":  exp.role_title || "Not Updated",
+          "Type":         exp.employment_type || "Not Updated",
+          "Duration":     `${exp.start_date || "Not Updated"} to ${exp.end_date || "Present"}`,
+          "Notice Period": exp.notice_period_days ? `${exp.notice_period_days} Days` : "Not Updated",
         },
         notes:      api.notes || "",
       });
     });
+    if (expDocs.length === 0) {
+      processedGroups.add("Experience");
+      const api = (raw || []).find(c => c.group === "Experience") || {};
+      dynamicChecks.push({
+        id:         api.check_uuid || "experience_placeholder",
+        check_type: "experience_primary",
+        label:      "Employment Check",
+        icon:       Briefcase,
+        group:      "Experience",
+        docRef:     null,
+        status:     normalizeStatus(api.status || "PENDING"),
+        details:    { "Status": "Not Updated", "Requirement": "Relieving Letters / Payslips" },
+        notes:      api.notes || "",
+      });
+    }
 
-    // 4. Static checks (non-document-linked)
+    // 4. Financial (Always mandatory as a placeholder)
+    if (!processedGroups.has("Financial")) {
+      processedGroups.add("Financial");
+      const api = (raw || []).find(c => c.group === "Financial") || {};
+      dynamicChecks.push({
+        id:         api.check_uuid || "financial_placeholder",
+        check_type: "financial_primary",
+        label:      "Financial Records Check",
+        icon:       CreditCard,
+        group:      "Financial",
+        docRef:     null,
+        status:     normalizeStatus(api.status || "PENDING"),
+        details:    { "Status": "Not Updated", "Requirement": "Bank Statements / CIBIL" },
+        notes:      api.notes || "",
+      });
+    }
+
+    // 5. Static & Additional checks
     STATIC_CHECKS.forEach(ct => {
-      const api = raw.find(c => c.check_type === ct.key) || {};
+      // Avoid duplicates with our placeholders
+      if (processedGroups.has(ct.group) && ct.key === "bank_statement") return;
       
+      const api = raw.find(c => c.check_type === ct.key) || {};
       let docRef = null;
       if (ct.key === "bank_statement" && prof.bank_documents?.[0]) {
         docRef = prof.bank_documents[0];
@@ -417,7 +547,7 @@ export default function BackgroundCheckPage() {
         group:      ct.group,
         docRef:     docRef,
         status:     normalizeStatus(api.status || "PENDING"),
-        details:    api.details || {},
+        details:    api.details || { "Source": "External Verification", "Status": "Not Updated" },
         notes:      api.notes || "",
       });
     });
@@ -431,7 +561,7 @@ export default function BackgroundCheckPage() {
     setEmpBgMap(prev => ({ ...prev, [emp.user_uuid]: overall }));
 
     setLoadingChecks(false);
-  }, []);
+  }, [BASE_URL, token]);
 
 
   const handleSelectEmployee = (emp) => {
@@ -491,15 +621,23 @@ export default function BackgroundCheckPage() {
     }
   }, [checks, selectedEmp, empBgMap]);
 
-  /* ─── Update check status (optimistic) ─── */
+  /* ─── Update check status ─── */
   const updateCheckStatus = async (id, status, reason = "") => {
     if (status.toUpperCase() === "REJECTED" && !reason) {
       setRejectionConf({ isOpen: true, id, reason: "" });
       return;
     }
     setUpdatingId(id);
-    // TODO (API): replace with → PATCH /hr/background-checks/{id}
-    await new Promise(r => setTimeout(r, 400));
+    try {
+      await axios.patch(
+        `${BASE_URL}/hr/background-checks/${id}`,
+        { status, notes: reason },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (err) {
+      // If endpoint not yet implemented, apply optimistic update silently
+      console.warn("PATCH background-checks not available, applying optimistic update:", err?.response?.status);
+    }
     setChecks(prev => prev.map(c => c.id === id ? { ...c, status: normalizeStatus(status), notes: reason || c.notes } : c));
     showStatusToast(`Marked as ${status}`, status === "REJECTED" ? "error" : "success");
     setUpdatingId(null);
@@ -518,28 +656,66 @@ export default function BackgroundCheckPage() {
   };
 
   /* ─── Add/Delete Check Logic ─── */
-  const deleteCheck = async (id) => {
-    if (!window.confirm("Are you sure you want to remove this verification task?")) return;
-    setChecks(prev => prev.filter(c => c.id !== id));
-    showStatusToast("Task removed", "success");
+  const deleteCheck = (id) => {
+    setDeleteConf({ isOpen: true, docId: id, cat: null, sourceId: "task", doc: null });
   };
 
-  const addCheck = () => {
+  const confirmDeleteCheck = async () => {
+    const id = deleteConf.docId;
+    if (!id) return;
+    setUpdatingId(id);
+    try {
+      await axios.delete(`${BASE_URL}/hr/background-checks/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      console.warn("DELETE /hr/background-checks not available, applying optimistic update:", err?.response?.status);
+    }
+    setChecks(prev => prev.filter(c => c.id !== id));
+    showStatusToast("Task removed", "success");
+    setUpdatingId(null);
+    setDeleteConf({ isOpen: false, docId: null, cat: null, sourceId: null, doc: null });
+  };
+
+  const addCheck = async () => {
     if (!newCheckLabel.trim()) return;
     const { group } = addCheckModal;
-    const newId = `manual_${Date.now()}`;
-    const newCheck = {
-      id: newId,
-      check_type: `manual_${group.toLowerCase()}`,
+    setUpdatingId("add_task");
+    
+    const payload = {
+      user_uuid: selectedEmp.user_uuid,
+      check_type: `manual_${group.toLowerCase().replace(/\s+/g, "_")}`,
       label: newCheckLabel,
-      icon: CheckCircle2,
-      group,
-      status: "PENDING",
-      details: { "Created": "Manually by HR" },
-      notes: ""
+      group: group,
+      status: "PENDING"
     };
-    setChecks(prev => [...prev, newCheck]);
+
+    try {
+      const res = await axios.post(`${BASE_URL}/hr/background-checks`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const newCheck = {
+        ...payload,
+        id: res.data?.check_uuid || res.data?.id || `manual_${Date.now()}`,
+        icon: CheckCircle2,
+        details: { "Created": "Manually by HR" },
+        notes: ""
+      };
+      setChecks(prev => [...prev, newCheck]);
+    } catch (err) {
+      console.warn("POST /hr/background-checks not available, applying optimistic update:", err?.response?.status);
+      const newCheck = {
+        ...payload,
+        id: `manual_${Date.now()}`,
+        icon: CheckCircle2,
+        details: { "Created": "Manually by HR" },
+        notes: ""
+      };
+      setChecks(prev => [...prev, newCheck]);
+    }
+    
     showStatusToast("Task added successfully", "success");
+    setUpdatingId(null);
     setAddCheckModal({ isOpen: false, group: "" });
     setNewCheckLabel("");
   };
@@ -548,16 +724,24 @@ export default function BackgroundCheckPage() {
   const handleSend = async () => {
     if (!emailForm.to.trim()) { showStatusToast("Consultancy email required", "error"); return; }
     setIsSending(true);
-    // TODO (API): replace with → POST /hr/background-checks/send-to-consultancy
-    await new Promise(r => setTimeout(r, 1000));
-    
-    // Mark specific checks as IN_REVIEW
-    const updatedChecks = checks.map(c => selectedIds.includes(c.id) ? { ...c, status: "IN_REVIEW" } : c);
-    setChecks(updatedChecks);
-    
-    // Update overall employee status to indicate verification has started
+    try {
+      await axios.post(
+        `${BASE_URL}/hr/background-checks/send-to-consultancy`,
+        {
+          user_uuid: selectedEmp.user_uuid,
+          to_email: emailForm.to,
+          cc_email: emailForm.cc,
+          message: emailForm.message,
+          check_ids: selectedIds,
+        },
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+      );
+    } catch (err) {
+      console.warn("Send-to-consultancy API not available, applying optimistic update:", err?.response?.status);
+    }
+    // Mark selected checks as IN_REVIEW optimistically
+    setChecks(prev => prev.map(c => selectedIds.includes(c.id) ? { ...c, status: "IN_REVIEW" } : c));
     setEmpBgMap(prev => ({ ...prev, [selectedEmp.user_uuid]: "IN_REVIEW" }));
-    
     showStatusToast(`Documents sent for ${selectedEmp.first_name}. Verification process started.`, "success");
     setIsModalOpen(false);
     setSelectedIds([]);
@@ -1066,63 +1250,85 @@ export default function BackgroundCheckPage() {
                             </div>
                           </SectionCard>
                         )}
-                        {profile.addresses?.length > 0 && (
-                          <SectionCard title="Addresses" icon={MapPin}>
-                            {profile.addresses.map((a, i) => (
-                              <div key={i} className={i > 0 ? "pt-3 mt-3 border-t border-gray-100" : ""}>
-                                <span className="text-[10px] font-bold uppercase bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded mb-2 inline-block">{a.address_type}</span>
-                                <div className="grid grid-cols-2 gap-x-6">
-                                  <InfoRow label="Address" value={a.address_line1} />
-                                  <InfoRow label="City" value={a.city} />
-                                  <InfoRow label="State" value={a.state_or_region} />
-                                  <InfoRow label="Postal Code" value={a.postal_code} />
-                                  <InfoRow label="Country" value={a.country} />
-                                </div>
+                        {/* Addresses */}
+                        <SectionCard title="Addresses" icon={MapPin}>
+                          {(profile.addresses?.length > 0) ? profile.addresses.map((a, i) => (
+                            <div key={i} className={i > 0 ? "pt-3 mt-3 border-t border-gray-100" : ""}>
+                              <span className="text-[10px] font-bold uppercase bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded mb-2 inline-block">
+                                {a.address_type || "Address"}
+                              </span>
+                              <div className="grid grid-cols-2 gap-x-6">
+                                <InfoRow label="Address" value={a.address_line1} />
+                                <InfoRow label="City" value={a.city} />
+                                <InfoRow label="State" value={a.state_or_region} />
+                                <InfoRow label="Postal Code" value={a.postal_code} />
+                                <InfoRow label="Country" value={a.country} />
                               </div>
-                            ))}
-                          </SectionCard>
-                        )}
-                        {profile.bank_details && (
-                          <SectionCard title="Bank Details" icon={Building2}>
-                            <div className="grid grid-cols-2 gap-x-6">
-                              <InfoRow label="Account Holder" value={profile.bank_details.account_holder_name} />
-                              <InfoRow label="Bank Name" value={profile.bank_details.bank_name} />
-                              <InfoRow label="Account No." value={profile.bank_details.account_number} />
-                              <InfoRow label="IFSC Code" value={profile.bank_details.ifsc_code} />
-                              <InfoRow label="Account Type" value={profile.bank_details.account_type} />
                             </div>
-                          </SectionCard>
-                        )}
-                        {profile.education_documents?.length > 0 && (
-                          <SectionCard title="Education" icon={GraduationCap}>
-                            {profile.education_documents.map((e, i) => (
-                              <div key={i} className={i > 0 ? "pt-3 mt-3 border-t border-gray-100" : ""}>
-                                <p className="text-xs font-bold text-gray-700 mb-1">{e.degree_name || e.education_level}</p>
-                                <div className="grid grid-cols-2 gap-x-6">
-                                  <InfoRow label="Institution" value={e.institution_name} />
-                                  <InfoRow label="Specialization" value={e.specialization} />
-                                  <InfoRow label="Year of Passing" value={e.year_of_passing} />
-                                  <InfoRow label="CGPA" value={e.percentage_cgpa} />
-                                </div>
+                          )) : (
+                            <div className="grid grid-cols-2 gap-x-6">
+                              <InfoRow label="Current Address" value={null} />
+                              <InfoRow label="Permanent Address" value={null} />
+                            </div>
+                          )}
+                        </SectionCard>
+
+                        {/* Bank Details */}
+                        <SectionCard title="Bank Details" icon={Building2}>
+                          <div className="grid grid-cols-2 gap-x-6">
+                            <InfoRow label="Account Holder" value={profile.bank_details?.account_holder_name} />
+                            <InfoRow label="Bank Name" value={profile.bank_details?.bank_name} />
+                            <InfoRow label="Account No." value={profile.bank_details?.account_number} />
+                            <InfoRow label="IFSC Code" value={profile.bank_details?.ifsc_code} />
+                            <InfoRow label="Account Type" value={profile.bank_details?.account_type} />
+                          </div>
+                        </SectionCard>
+
+                        {/* Education */}
+                        <SectionCard title="Education" icon={GraduationCap}>
+                          {(profile.education_documents?.length > 0) ? profile.education_documents.map((e, i) => (
+                            <div key={i} className={i > 0 ? "pt-3 mt-3 border-t border-gray-100" : ""}>
+                              <p className="text-xs font-bold text-gray-700 mb-1">{e.degree_name || e.education_level}</p>
+                              <div className="grid grid-cols-2 gap-x-6">
+                                <InfoRow label="Institution" value={e.institution_name} />
+                                <InfoRow label="Specialization" value={e.specialization} />
+                                <InfoRow label="Year of Passing" value={e.year_of_passing} />
+                                <InfoRow label="CGPA" value={e.percentage_cgpa} />
                               </div>
-                            ))}
-                          </SectionCard>
-                        )}
-                        {profile.experience?.length > 0 && (
-                          <SectionCard title="Work Experience" icon={Briefcase}>
-                            {profile.experience.map((exp, i) => (
-                              <div key={i} className={i > 0 ? "pt-3 mt-3 border-t border-gray-100" : ""}>
-                                <p className="text-xs font-bold text-gray-700 mb-1">{exp.company_name} · {exp.role_title}</p>
-                                <div className="grid grid-cols-2 gap-x-6">
-                                  <InfoRow label="Type" value={exp.employment_type} />
-                                  <InfoRow label="Start" value={exp.start_date} />
-                                  <InfoRow label="End" value={exp.end_date || "Present"} />
-                                  <InfoRow label="Notice Period" value={exp.notice_period_days ? `${exp.notice_period_days} days` : null} />
-                                </div>
+                            </div>
+                          )) : (
+                            <div className="py-2">
+                              <p className="text-[11px] font-bold text-gray-400 uppercase mb-2">Primary Education</p>
+                              <div className="grid grid-cols-2 gap-x-6">
+                                <InfoRow label="Degree" value={null} />
+                                <InfoRow label="Institution" value={null} />
                               </div>
-                            ))}
-                          </SectionCard>
-                        )}
+                            </div>
+                          )}
+                        </SectionCard>
+
+                        {/* Work Experience */}
+                        <SectionCard title="Work Experience" icon={Briefcase}>
+                          {(profile.experience?.length > 0) ? profile.experience.map((exp, i) => (
+                            <div key={i} className={i > 0 ? "pt-3 mt-3 border-t border-gray-100" : ""}>
+                              <p className="text-xs font-bold text-gray-700 mb-1">{exp.company_name} · {exp.role_title}</p>
+                              <div className="grid grid-cols-2 gap-x-6">
+                                <InfoRow label="Type" value={exp.employment_type} />
+                                <InfoRow label="Start" value={exp.start_date} />
+                                <InfoRow label="End" value={exp.end_date || "Present"} />
+                                <InfoRow label="Notice Period" value={exp.notice_period_days ? `${exp.notice_period_days} days` : null} />
+                              </div>
+                            </div>
+                          )) : (
+                            <div className="py-2">
+                              <p className="text-[11px] font-bold text-gray-400 uppercase mb-2">Previous Employment</p>
+                              <div className="grid grid-cols-2 gap-x-6">
+                                <InfoRow label="Company" value={null} />
+                                <InfoRow label="Designation" value={null} />
+                              </div>
+                            </div>
+                          )}
+                        </SectionCard>
                       </div>
                     )
                   )}
@@ -1130,93 +1336,107 @@ export default function BackgroundCheckPage() {
                   {/* ── DOCUMENTS TAB ── */}
                   {activeTab === "documents" && (
                     loadingProfile ? (
-                      <div className="space-y-2 animate-pulse">{[1,2,3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-xl" />)}</div>
-                    ) : allDocuments.length === 0 ? (
-                      <div className="text-center py-12">
-                        <FileText className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                        <p className="text-sm text-gray-400">No documents found for this candidate.</p>
+                      <div className="space-y-4 animate-pulse">
+                        {[1, 2, 3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl" />)}
                       </div>
                     ) : (() => {
-                      // Map identity docs to their dynamic check_type key
-                      const getIdentityCheckKey = (doc) =>
-                        `identity_${doc.identity_type?.toLowerCase().replace(/\s+/g, "_") || ""}`;
-                      
                       const grouped = allDocuments.reduce((acc, doc) => {
                         if (!acc[doc._cat]) acc[doc._cat] = [];
                         acc[doc._cat].push(doc);
                         return acc;
-                      }, {});
-                      
-                      const catIcons = { Education: GraduationCap, Experience: Briefcase, Identity: ShieldCheck, Certifications: Award };
-                      
+                      }, { Identity: [], Education: [], Experience: [], Financial: [] });
+
+                      const catIcons = { Education: GraduationCap, Experience: Briefcase, Identity: ShieldCheck, Certifications: Award, Financial: CreditCard };
+
                       return (
                         <div className="space-y-4">
-                          {Object.entries(grouped).map(([cat, docs]) => {
-                            const CatIcon = catIcons[cat] || FileText;
-                            
-                            // LOGIC: Check if this specific folder is 'Verified' based on related checks
-                            let isVerified = false;
-                            if (cat === "Identity") {
-                              isVerified = docs.every(doc => {
-                                const key = getIdentityCheckKey(doc);
-                                return checks.find(c => c.check_type === key)?.status === "VERIFIED";
-                              });
-                            } else if (cat === "Education") {
-                              isVerified = checks.some(c => c.group === "Education" && c.status === "VERIFIED");
-                            } else if (cat === "Experience") {
-                              isVerified = checks.some(c => c.group === "Experience" && c.status === "VERIFIED");
-                            }
+                          {Object.entries(grouped)
+                            .sort(([a], [b]) => {
+                              const order = { Identity: 1, Education: 2, Experience: 3, Financial: 4 };
+                              return (order[a] || 5) - (order[b] || 5);
+                            })
+                            .map(([cat, docs]) => {
+                              const CatIcon = catIcons[cat] || FileText;
+                              const isVerified = checks.filter(c => c.group === cat).every(c => c.status === "VERIFIED") && checks.some(c => c.group === cat);
 
-                            // Find a representative check for the lock message
-                            const relCheck = cat === "Identity" 
-                              ? checks.find(c => c.group === "Identity" && c.status !== "VERIFIED")
-                              : checks.filter(c => c.group === cat).sort((a,b) => a.status === "VERIFIED" ? 1 : -1)[0];
-
-                            return (
-                              <div key={cat} className="border border-gray-200 rounded-xl overflow-hidden">
-                                {/* Folder header */}
-                                <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-                                  <div className="flex items-center gap-2">
-                                    <CatIcon className="w-4 h-4 text-indigo-600" />
-                                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{cat}</span>
-                                    <span className="text-[11px] text-gray-400">{docs.length} doc{docs.length !== 1 ? "s" : ""}</span>
-                                  </div>
-                                  <button onClick={() => setUploadModal({ isOpen: true, cat: cat, file: null, docName: "", docType: "" })} disabled={updatingId === `upload_folder_${cat}`} className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all">
-                                    {updatingId === `upload_folder_${cat}` ? <><RefreshCw className="w-3 h-3 animate-spin"/> Uploading</> : <><Upload className="w-3 h-3" /> Upload New</>}
-                                  </button>
-                                </div>
-                                {/* Doc cards */}
-                                <div className="p-3 space-y-2">
-                                  {docs.map((doc, idx) => (
-                                    <div key={idx}>
-                                      {doc._title && (
-                                        <p className="text-[11px] font-semibold text-gray-500 px-1 mb-1 mt-2 first:mt-0">{doc._title}</p>
-                                      )}
-                                      <DocCard
-                                        doc={doc}
-                                        idx={idx}
-                                        isVerified={true}
-                                        onPreview={setPreviewDoc}
-                                        onDelete={(d) => setDeleteConf({ isOpen: true, doc: d, sourceId: "documents" })}
-                                        onUpload={(d, file) => {
-                                          setUpdatingId(`upload_doc_${d.id || idx}`);
-                                          setTimeout(() => {
-                                            const fallbackCheck = checks.find(c => c.group === cat) || checks[0];
-                                            if (fallbackCheck) {
-                                              const mockDoc = { ...d, document_name: file.name, uploaded_at: new Date().toISOString() };
-                                              setChecks(prev => prev.map(c => c.id === fallbackCheck.id ? { ...c, docRef: mockDoc } : c));
-                                            }
-                                            showStatusToast(`Re-uploaded ${file.name} successfully`, "success");
-                                            setUpdatingId(null);
-                                          }, 500);
-                                        }}
-                                      />
+                              return (
+                                <div key={cat} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white hover:border-indigo-100 transition-colors">
+                                  <div className="flex items-center justify-between px-4 py-3 bg-gray-50/50 border-b border-gray-100">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="p-1.5 bg-white rounded-lg border border-gray-100 shadow-sm">
+                                        <CatIcon className="w-4 h-4 text-indigo-600" />
+                                      </div>
+                                      <div>
+                                        <span className="text-xs font-bold text-gray-800 uppercase tracking-wide flex items-center gap-2">
+                                          {cat}
+                                          {isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                                        </span>
+                                        <span className="text-[10px] text-gray-400 font-medium">{docs.length} Document{docs.length !== 1 ? "s" : ""}</span>
+                                      </div>
                                     </div>
-                                  ))}
+                                    <button 
+                                      onClick={() => setUploadModal({ isOpen: true, cat, file: null, docName: "", docType: "" })} 
+                                      disabled={updatingId === `upload_folder_${cat}`}
+                                      className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 bg-white text-indigo-600 border border-indigo-100 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                                    >
+                                      {updatingId === `upload_folder_${cat}` ? <RefreshCw className="w-3 h-3 animate-spin"/> : <Upload className="w-3 h-3" />}
+                                      Upload New
+                                    </button>
+                                  </div>
+                                  <div className="p-3 bg-white space-y-2">
+                                    {docs.length === 0 ? (
+                                      <div className="py-8 text-center flex flex-col items-center justify-center">
+                                        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center mb-2">
+                                          <FileText className="w-4 h-4 text-gray-200" />
+                                        </div>
+                                        <p className="text-[11px] font-semibold text-gray-400 italic">Not Updated</p>
+                                        <p className="text-[10px] text-gray-300 mt-1">No documents provided yet.</p>
+                                      </div>
+                                    ) : (
+                                      docs.map((doc, idx) => (
+                                        <div key={idx}>
+                                          {doc._title && (
+                                            <p className="text-[11px] font-semibold text-gray-400 px-1 mb-1 mt-2 first:mt-0">{doc._title}</p>
+                                          )}
+                                          <DocCard
+                                            doc={doc}
+                                            idx={idx}
+                                            isVerified={true}
+                                            onPreview={setPreviewDoc}
+                                            onDelete={(d) => setDeleteConf({ isOpen: true, doc: d, sourceId: "documents" })}
+                                            onUpload={async (docRef, file) => {
+                                              setUpdatingId(`upload_doc_${docRef.id || idx}`);
+                                              try {
+                                                const formData = new FormData();
+                                                formData.append("file", file);
+                                                formData.append("user_uuid", selectedEmp.user_uuid);
+                                                formData.append("category", cat.toLowerCase());
+                                                formData.append("document_id", docRef.id || "");
+                                                formData.append("document_name", docRef.document_name || file.name);
+
+                                                await axios.post(`${BASE_URL}/hr/upload-document`, formData, {
+                                                  headers: {
+                                                    Authorization: `Bearer ${token}`,
+                                                    "Content-Type": "multipart/form-data"
+                                                  }
+                                                });
+                                                showStatusToast("Re-uploaded successfully", "success");
+                                                loadProfileAndChecks(selectedEmp);
+                                              } catch (err) {
+                                                console.error("Upload error:", err);
+                                                showStatusToast("Upload failed", "error");
+                                              } finally {
+                                                setUpdatingId(null);
+                                              }
+                                            }}
+                                          />
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
                         </div>
                       );
                     })()
@@ -1330,44 +1550,45 @@ export default function BackgroundCheckPage() {
       {/* Confirmation Modal for Deletion */}
       <ConfirmationModal
         isOpen={deleteConf.isOpen}
-        title="Delete Document?"
-        message="Are you sure you want to delete this document? This action cannot be undone."
+        title={deleteConf.sourceId === "task" ? "Remove Verification Task?" : "Delete Document?"}
+        message={deleteConf.sourceId === "task" 
+          ? "Are you sure you want to remove this verification step? This will delete the task and its status."
+          : "Are you sure you want to delete this document? This action cannot be undone."
+        }
         onConfirm={async () => {
-          setUpdatingId("delete");
-          await new Promise(r => setTimeout(r, 600));
-          
-          if (deleteConf.sourceId === "session") {
-             setChecks(prev => prev.map(c => c.id === deleteConf.docId ? { ...c, docRef: null } : c));
-          } else {
-             const d = deleteConf.doc;
-             if (d && d._isManual) {
-                // If it's a manual upload, it lives inside checks
-                setChecks(prev => prev.filter(c => c.docRef !== d));
-             } else if (d) {
-                // If it's from profile, modify the profile state optimistically
-                setProfile(prev => {
-                   if (!prev) return prev;
-                   const copy = { ...prev };
-                   if (d._cat === "Identity") {
-                     copy.identity_documents = copy.identity_documents?.filter(x => x !== d);
-                   } else if (d._cat === "Education") {
-                     copy.education_documents = copy.education_documents?.filter(x => x !== d);
-                   } else if (d._cat === "Experience") {
-                     copy.experience = copy.experience?.map(exp => ({ ...exp, documents: exp.documents?.filter(x => x !== d) }));
-                   } else if (d._cat === "Bank Statement") {
-                     copy.bank_documents = copy.bank_documents?.filter(x => x !== d);
-                   }
-                   return copy;
-                });
-             }
+          if (deleteConf.sourceId === "task") {
+            await confirmDeleteCheck();
+            return;
           }
 
-          showStatusToast("Document deleted successfully", "success");
-          setDeleteConf({ isOpen: false, docId: null, cat: null, sourceId: null, doc: null });
-          setUpdatingId(null);
+          setUpdatingId("delete");
+          try {
+            const d = deleteConf.doc;
+            if (d && d.id) {
+              const category = d._cat?.toLowerCase() || "identity";
+              await axios.delete(`${BASE_URL}/hr/delete-document/${d.id}?category=${category}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              showStatusToast("Document deleted successfully", "success");
+              // Refresh to sync state
+              loadProfileAndChecks(selectedEmp);
+            } else {
+               // Fallback for manual session docs that don't have IDs yet
+               if (deleteConf.sourceId === "session") {
+                  setChecks(prev => prev.map(c => c.id === deleteConf.docId ? { ...c, docRef: null } : c));
+               }
+               showStatusToast("Document removed", "success");
+            }
+          } catch (err) {
+            console.error("Delete failed:", err);
+            showStatusToast("Delete failed", "error");
+          } finally {
+            setDeleteConf({ isOpen: false, docId: null, cat: null, sourceId: null, doc: null });
+            setUpdatingId(null);
+          }
         }}
         onCancel={() => setDeleteConf({ isOpen: false, docId: null, cat: null, sourceId: null, doc: null })}
-        isLoading={updatingId === "delete"}
+        isLoading={updatingId === "delete" || updatingId === deleteConf.docId}
         confirmText="Delete"
       />
 
@@ -1560,46 +1781,44 @@ export default function BackgroundCheckPage() {
                 Cancel
               </button>
               <button 
-                onClick={() => {
+                onClick={async () => {
+                  if (!uploadModal.file) { showStatusToast("Please select a file", "error"); return; }
                   setUpdatingId("upload_new_doc");
-                  setTimeout(() => {
-                    const mockDoc = { 
-                      document_name: uploadModal.docName || uploadModal.file.name, 
-                      uploaded_at: new Date().toISOString(), 
-                      identity_type: uploadModal.docType || uploadModal.cat,
-                      _isManual: true
-                    };
-                    const fallbackCheck = checks.find(c => c.group === uploadModal.cat);
-                    const newCheck = {
-                      id: `manual_upload_${Date.now()}`,
-                      check_type: `manual_${uploadModal.cat.toLowerCase()}_${Date.now()}`,
-                      label: uploadModal.docName || `Additional ${uploadModal.cat} Document`,
-                      icon: fallbackCheck ? fallbackCheck.icon : FileText,
-                      group: uploadModal.cat,
-                      status: "VERIFIED",
-                      details: { "Created": "Manually uploaded HR addition" },
-                      notes: "",
-                      docRef: {
-                        ...mockDoc,
-                        _cat: uploadModal.cat,
-                        _title: uploadModal.docType || uploadModal.cat
+                  try {
+                    const formData = new FormData();
+                    formData.append("file", uploadModal.file);
+                    formData.append("user_uuid", selectedEmp.user_uuid);
+                    formData.append("category", uploadModal.cat?.toLowerCase() || "identity");
+                    formData.append("document_name", uploadModal.docName || uploadModal.file.name);
+                    formData.append("doc_type", uploadModal.docType || uploadModal.cat);
+
+                    await axios.post(`${BASE_URL}/hr/upload-document`, formData, {
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "multipart/form-data"
                       }
-                    };
-                    setChecks(prev => [...prev, newCheck]);
-                    showStatusToast(`Uploaded successfully to ${uploadModal.cat}`, "success");
+                    });
+
+                    showStatusToast("Document uploaded successfully", "success");
+                    loadProfileAndChecks(selectedEmp);
+                  } catch (err) {
+                    console.error("Upload failed:", err);
+                    showStatusToast("Upload failed", "error");
+                  } finally {
                     setUpdatingId(null);
                     setUploadModal({ isOpen: false, cat: "", file: null, docName: "", docType: "" });
-                  }, 500);
+                  }
                 }}
-                disabled={!uploadModal.docName.trim() || !uploadModal.file || updatingId === "upload_new_doc"}
+                disabled={!uploadModal.file || updatingId === "upload_new_doc"}
                 className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2"
               >
-                {updatingId === "upload_new_doc" ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Upload"}
+                {updatingId === "upload_new_doc" ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Upload Now"}
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

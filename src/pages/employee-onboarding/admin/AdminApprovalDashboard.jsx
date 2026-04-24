@@ -70,7 +70,7 @@ export default function AdminApprovalDashboard() {
   /* ---------- FILTERED DATA ---------- */
   const filteredData = useMemo(() => {
     return data.filter((row) => {
-      const name = `${row.first_name} ${row.last_name}`.toLowerCase();
+      const name = `${row.first_name} ${row.middle_name ? row.middle_name + " " : ""}${row.last_name}`.toLowerCase();
       const role = row.designation?.toLowerCase() || "";
 
       const matchesSearch =
@@ -197,7 +197,7 @@ const paginatedData = filteredData.slice(
               paginatedData.map((row) => (
                 <tr key={row.id} className="border-b">
                     <td className="px-4 py-3">
-                  {row.first_name} {row.last_name}
+                  {row.first_name}{row.middle_name ? ` ${row.middle_name}` : ""} {row.last_name}
                 </td>
                 <td className="px-4 py-3">{row.mail}</td>
                 <td className="px-4 py-3">{row.designation}</td>
