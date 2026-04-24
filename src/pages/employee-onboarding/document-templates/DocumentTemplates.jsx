@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import axios from "axios";
 import {
   FileText,
   FileSignature,
@@ -105,6 +106,34 @@ export default function DocumentTemplates() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState({});
   const iframeRef = useRef(null);
+
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const token = localStorage.getItem("token");
+  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+
+  const downloadBulkTemplate = async () => {
+    try {
+      setBulkLoading(true);
+      const response = await axios.get(
+        `${BASE_URL}/permanent-employee/core-employee-details/bulk-template/`,
+        {
+          responseType: "blob",
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "employee_bulk_template.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Download error:", error);
+    } finally {
+      setBulkLoading(false);
+    }
+  };
 
   const filteredTemplates = TEMPLATES.filter(t => 
     t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -305,6 +334,48 @@ export default function DocumentTemplates() {
             <p className="text-sm text-slate-500 max-w-sm">Try adjusting your search to find what you're looking for or clear the search field.</p>
           </div>
         )}
+
+        {/* Bulk Employee Upload Template Section */}
+        <div className="mt-10">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+              <Download size={16} />
+            </span>
+            <h2 className="text-lg font-bold text-slate-900">Employee Document Templates</h2>
+          </div>
+
+          <div className="inline-flex flex-col gap-4 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm w-[340px] hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <FileText size={22} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Bulk Employee Upload Template</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Download Excel template to upload employees in bulk</p>
+              </div>
+            </div>
+            <button
+              onClick={downloadBulkTemplate}
+              disabled={bulkLoading}
+              className="flex items-center justify-center gap-2 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all disabled:opacity-70 disabled:cursor-wait"
+            >
+              {bulkLoading ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Downloading...</span>
+                </>
+              ) : (
+                <>
+                  <Download size={16} />
+                  <span>Download Template</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
 
         {/* Dynamic Modals / Overlays */}
         {viewState !== "gallery" && selectedTemplate && (
