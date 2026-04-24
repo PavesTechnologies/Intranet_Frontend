@@ -10,6 +10,7 @@ export default function OnboardingNavBar() {
 
   const isAdmin = hasRole(["ADMIN"]);
   const isManager = hasRole(["MANAGER"]);
+  const isGeneral = hasRole(["GENERAL"]);
   const isHR = hasRole(["HR"]);
  const isOnlyGeneral =
   hasRole(["GENERAL"]) &&
@@ -61,7 +62,9 @@ export default function OnboardingNavBar() {
         // "/employee-onboarding/admin",
       ],
       exactRoot: true,
-      redirect: "/employee-onboarding",
+      redirect: isManager && isGeneral
+      ? "/employee-onboarding/admin/approval-dashboard"
+      :"/employee-onboarding",
     }] : []),
 
     // ✅ Directory → ALL
@@ -140,9 +143,6 @@ export default function OnboardingNavBar() {
       { label: "HR Configuration", path: "/employee-onboarding/hr-configuration" }
     ] : []),
 
-    // ...(hasRole(["MANAGER"]) ? [
-    //   { label: "Approval Dashboard", path: "/employee-onboarding/admin/approval-dashboard" }
-    // ] : []),
 
     ...(isManager && !isAdmin ? [
       { label: "Approval Dashboard", path: "/employee-onboarding/admin/approval-dashboard" }
@@ -158,11 +158,6 @@ export default function OnboardingNavBar() {
 
   /* ================= DIRECTORY NAV ================= */
 
-  // const directoryNav = [
-  //   { label: "Employee Directory", path: "/employee-onboarding/employee-directory" },
-  //   { label: "Employee List", path: "/employee-onboarding/employeelist" },
-  //   { label: "Organization Tree", path: "/employee-onboarding/organization-tree" },
-  // ];
   const directoryNav = [
   // ✅ ALL
   {
@@ -263,34 +258,11 @@ export default function OnboardingNavBar() {
     {/* ================= PARENT NAVBAR (TOP) ================= */}
 
     <div className="relative border-b bg-white z-30">
-      <div className="flex gap-12 px-6 pt-3">
+      <div className="flex gap-6 px-6 py-1">
 
         {parentNav.map((item) => {
-//           const isActive = (() => {
 
-//   // ✅ Case 1: Items with match (normal tabs)
-//   if (item.match) {
-//     return item.match.some((path) => {
-//       if (item.exactRoot && path === "/employee-onboarding") {
-//         return location.pathname === "/employee-onboarding";
-//       }
-//       return (
-//         location.pathname === path ||
-//         location.pathname.startsWith(path + "/")
-//       );
-//     });
-//   }
 
-//   // ✅ Case 2: Items with children (Employee Verification)
-//   if (item.children) {
-//     return item.children.some((child) =>
-//       location.pathname === child.path ||
-//       location.pathname.startsWith(child.path + "/")
-//     );
-//   }
-
-//   return false;
-// })();
 const isActive = (() => {
 
   if (item.match) {
@@ -326,7 +298,7 @@ const isActive = (() => {
             <div
               key={item.label}
               onClick={() => navigate(item.redirect)}
-              className="relative cursor-pointer pb-3 text-sm font-semibold"
+              className="relative cursor-pointer py-1 text-sm font-semibold"
             >
               <span
                 className={
@@ -341,7 +313,7 @@ const isActive = (() => {
               {/* Green triangle indicator */}
               {isActive && (
                 <span
-                 className="absolute left-1/2 -bottom-[10px] -translate-x-1/2
+                 className="absolute left-1/2 -bottom-[6px] -translate-x-1/2
                   h-0 w-0 z-40
                   border-l-8 border-r-8 border-b-8
                   border-l-transparent border-r-transparent border-b-blue-700"
@@ -354,7 +326,7 @@ const isActive = (() => {
     </div>
 
      <div className="relative border-b bg-gray-200 mt-4 z-10">
-       <div className="flex gap-10 px-6">
+       <div className="flex gap-6 px-6">
          {navToRender.map((item) => {
 
           let isActive = false;
@@ -372,7 +344,7 @@ const isActive = (() => {
             <div
               key={item.label}
               onClick={() => navigate(item.path)}
-              className="relative cursor-pointer py-3 text-sm font-medium"
+              className="relative cursor-pointer py-1 text-sm font-medium"
             >
               <span
                 className={
