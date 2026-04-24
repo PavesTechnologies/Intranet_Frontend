@@ -32,7 +32,6 @@ import { useParams } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
 import JobPage from "./JobPage";
 import DocumentsPage from "./DocumentsPage";
-import { showStatusToast } from "../../../components/toastfy/toast";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import SkillModal from "./SkillModal";
 import EditSkillModal from "./EditSkillModal";
