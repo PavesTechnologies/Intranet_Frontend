@@ -24,7 +24,7 @@
 //   FiUser,
 // } from "react-icons/fi";
 // import { FaBug } from "react-icons/fa";
-// import { Card, Avatar, Typography, Spin, Tooltip } from "antd"; 
+// import { Card, Avatar, Typography, Spin, Tooltip } from "antd";
 // import { motion, AnimatePresence, useInView } from "framer-motion";
 
 // const { Title, Text, Link } = Typography;
@@ -48,8 +48,8 @@
 // };
 
 // const DASHBOARD_COLORS = [
-//   "#4f46e5", "#7c3aed", "#0d9488", "#db2777", 
-//   "#ea580c", "#2563eb", "#be185d", "#65a30d", 
+//   "#4f46e5", "#7c3aed", "#0d9488", "#db2777",
+//   "#ea580c", "#2563eb", "#be185d", "#65a30d",
 //   "#0891b2", "#c026d3", "#d97706", "#4338ca",
 // ];
 
@@ -129,7 +129,7 @@
 //             ))}
 //           </div>
 //           <div className="flex flex-col items-center justify-center">
-//             <Text strong className="mb-2 text-xs uppercase tracking-wide font-bold">Overall Progress</Text> 
+//             <Text strong className="mb-2 text-xs uppercase tracking-wide font-bold">Overall Progress</Text>
 //             <div className="w-36 h-36 relative">
 //               <ResponsiveContainer width="100%" height="100%">
 //                 <PieChart>
@@ -197,7 +197,7 @@
 //           <div className="relative h-64 min-h-0">
 //             <ResponsiveContainer width="100%" height="100%">
 //               <PieChart>
-//                 <Pie 
+//                 <Pie
 //                   data={chartData} cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={4} dataKey="value"
 //                   onClick={(data, index) => { setActiveIndex(activeIndex === index ? null : index); setHoveredIndex(null); }}
 //                   onMouseEnter={(_, index) => setHoveredIndex(index)}
@@ -208,7 +208,7 @@
 //                   {chartData.map((entry, index) => (
 //                     <Cell key={`cell-${entry.name}`} fill={entry.value > 0 ? entry.color : "#f3f4f6"} style={{ cursor: 'pointer' }} opacity={(activeIndex !== null && activeIndex !== index) || (hoveredIndex !== null && hoveredIndex !== index) ? 0.4 : 1} />
 //                   ))}
-//                 </Pie> 
+//                 </Pie>
 //               </PieChart>
 //             </ResponsiveContainer>
 //             {(activeIndex === null && hoveredIndex === null) && (
@@ -268,7 +268,7 @@
 //   useEffect(() => {
 //     const userMap = new Map(users.map(u => [u.id, { ...u, count: 0 }]));
 //     const unassigned = { id: null, name: "Unassigned", count: 0, color: "#9ca3af", initials: <FiUser /> };
-    
+
 //     workItems.forEach(item => {
 //       const assignedTo = item.assigneeId || item.assignee?.id;
 //       if (assignedTo && userMap.has(assignedTo)) {
@@ -419,15 +419,15 @@
 //         <div className="space-y-3">
 //           {epicProgressData.map(epic => (
 //             <div key={epic.id}>
-//                <Tooltip 
-//                 title={<EpicTooltipContent epic={epic} />} 
+//                <Tooltip
+//                 title={<EpicTooltipContent epic={epic} />}
 //                 placement="top"
 //                 arrow={false}
 //                 styles={{
 //                   popup: {
-//                     backgroundColor: 'rgba(23, 23, 23, 0.9)', 
-//                     borderRadius: '6px', 
-//                     padding: '8px 10px' 
+//                     backgroundColor: 'rgba(23, 23, 23, 0.9)',
+//                     borderRadius: '6px',
+//                     padding: '8px 10px'
 //                   }
 //                 }}
 //               >
@@ -532,7 +532,7 @@
 //     bugs: null,
 //     statuses: null,
 //     users: null,
-//     stage: null, 
+//     stage: null,
 //   });
 
 //   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -540,7 +540,7 @@
 //   useEffect(() => {
 //     if (!projectId || !token) return;
 
-//     const base = import.meta.env.VITE_PMS_BASE_URL;
+//     const base = window.__APP_CONFIG__.PMS_BASE_URL;
 //     const headers = { Authorization: `Bearer ${token}` };
 
 //     // Helper to fetch and update state independently
@@ -582,13 +582,12 @@
 //   const isWorkItemsReady = projectData.stories && projectData.tasks && projectData.bugs && projectData.epics;
 //   const isStatusesReady = projectData.statuses;
 //   const isUsersReady = projectData.users;
-  
+
 //   // Combine all items only when available
 //   const allWorkItems = useMemo(() => {
 //     if (!isWorkItemsReady) return [];
 //     return [...projectData.tasks, ...projectData.stories, ...projectData.bugs];
 //   }, [projectData.tasks, projectData.stories, projectData.bugs, isWorkItemsReady]);
-
 
 //   return (
 //     <motion.div

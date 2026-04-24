@@ -27,7 +27,9 @@ const KanbanCard = ({ task }) => {
         isDragging ? "opacity-50" : "opacity-100"
       }`}
     >
-      <p className="text-xs text-indigo-500 uppercase tracking-wide mb-1">Task</p>
+      <p className="text-xs text-indigo-500 uppercase tracking-wide mb-1">
+        Task
+      </p>
       <p className="font-semibold text-gray-800">{task.title}</p>
     </div>
   );
@@ -75,19 +77,19 @@ const Board = ({ projectId, projectName }) => {
       try {
         // Load statuses dynamically
         const statusRes = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/statuses`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         const sortedStatuses = statusRes.data.sort(
-          (a, b) => a.sortOrder - b.sortOrder
+          (a, b) => a.sortOrder - b.sortOrder,
         );
         setStatuses(sortedStatuses);
 
         // Load tasks
         const taskRes = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/tasks`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         setTasks(taskRes.data);
@@ -109,14 +111,12 @@ const Board = ({ projectId, projectName }) => {
 
     try {
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/tasks/${taskId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}`,
         updatedTask,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? updatedTask : t))
-      );
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
     } catch (err) {
       console.error("Failed to update task:", err);
     }

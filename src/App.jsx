@@ -39,6 +39,8 @@ import DMRoleOffPage from "./pages/resource_management/pages/roleoff/dm.js";
 import BenchPage from "./pages/resource_management/bench/pages/BenchPage.jsx";
 import RoleOffDashboard from "./pages/resource_management/pages/roleoff/RoleOffDashboard.jsx";
 import BenchPoolDashboard from "./pages/resource_management/bench/pages/BenchPoolDashboard.jsx";
+import UtilizationPerformanceDashboard from "./pages/resource_management/bench/pages/UtilizationPerformanceDashboard.jsx";
+import OperationalProjectDetailPage from "./pages/resource_management/bench/pages/OperationalProjectDetailPage.jsx";
 
 // Timesheets
 
@@ -114,7 +116,7 @@ import DepartmentsMappingDashboard from "./pages/employee-onboarding/hr-configur
 import DepartmentsList from "./pages/employee-onboarding/hr-configuration/departments/departmentsList/DepartmentsList.jsx";
 import DesignationsList from "./pages/employee-onboarding/hr-configuration/departments/designationsList/DesignationsList.jsx";
 import WeeklyJoiningDashboard from "./pages/employee-onboarding/weekly-joining-report-dashboard/WeeklyJoiningDashboard.jsx";
-
+import DocumentTemplates from "./pages/employee-onboarding/document-templates/DocumentTemplates.jsx";
 
 import EmployeeDocuments from "./pages/employee-onboarding/employeedocuments/EmployeeDocuments.jsx";
 
@@ -162,8 +164,10 @@ import ManageBlockLeave from "./pages/leave_management/models/ManageBlockLeave";
 import ApprovalRulesPage from "./pages/leave_management/models/ApprovalRulesPage.jsx";
 import RiskRegisterPage from "./pages/Projects/manager/riskManagement/RiskRegisterPage.jsx";
 import LeaveUploadWizard from "./pages/leave_management/models/LeaveUploadWizard.jsx";
+import ApplyLeaveOnBehalf from "./pages/leave_management/models/ApplyLeaveOnBehalf.jsx";
 
-
+import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.jsx";
+import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -171,14 +175,7 @@ import OnboardingDashboard from "./pages/employee-onboarding/onboarding-task/Onb
 import OnboardingSummaryPage from "./pages/employee-onboarding/summary-page/SummaryPage.jsx";
 
 
-// function App() {
-//   return (
-//     <>
-//       {/* ... your routes or components ... */}
-//       <Toaster position="top-right" reverseOrder={false} />
-//     </>
-//   );
-// }
+
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, user, logout } = useAuth();
   const location = useLocation();
@@ -464,6 +461,7 @@ const AppRoutes = () => {
 
             <Route path="hr" element={<HrOnboardingDashboard />} />
             <Route path="hr/profile/:user_uuid" element={<HrProfileView />} />
+            <Route path="backgroundcheck" element={<BackgroundCheckPage />} />
 
             <Route path="admin/approval-dashboard" element={<AdminApprovalDashboard />} />
             <Route path="admin/offer/:user_uuid" element={<AdminOfferView />} />
@@ -486,7 +484,7 @@ const AppRoutes = () => {
             <Route path="analytics" element={<HeadcountDemographicsPage />} />
 
             <Route path="weekly-joining-report-dashboard" element={< WeeklyJoiningDashboard/>} />
-
+            <Route path="document-templates" element={< DocumentTemplates/>} />
             <Route path="offer/:user_uuid" element={<ViewEmpDetails />} />
             <Route path ="offer-preview/:offerId" element ={<OfferPreview/>} />
             <Route path ="final-offer-preview/:offerId" element={<FinalOfferPreview/>} />
@@ -750,6 +748,16 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+
+            <Route
+              path="/behalf-leave"
+              element={
+                <ProtectedRoute allowedRoles={["HR", "Hr-Manager", "Manager"]}>
+                  <ApplyLeaveOnBehalf />
+                </ProtectedRoute>
+              }
+            />
+
           <Route
             path="/leave-policies"
             element={
@@ -781,6 +789,22 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
                 <BenchPoolDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resource-management/bench/utilization-performance"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+                <UtilizationPerformanceDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resource-management/bench/utilization-performance/projects/:projectId"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+                <OperationalProjectDetailPage />
               </ProtectedRoute>
             }
           />
@@ -887,6 +911,11 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+          {/* employee exit routes*/}
+          <Route element={<EmployeeOnboardingLayout />}>
+            <Route path="/employee-exit" element={<EmployeeExitDashboard />} />
+            <Route path="/employee-exit/:exit_uuid" element={<ExitDetailsPage />} />
+          </Route>
         </Route>
       </Routes>
       <SaveLastPath />
@@ -899,7 +928,7 @@ function App() {
   return (
     <>
       <ToastContainer position="top-right" autoClose={3000} />
-      <Router>
+      <Router basename={window.__APP_CONFIG__.basePath}>
         <></>
         <AuthProvider>
           <NotificationProvider>

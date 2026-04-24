@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const RMS_BASE_URL = import.meta.env.VITE_RMS_BASE_URL;
+const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
 const getAuthHeader = () => ({
   headers: {
@@ -32,12 +32,15 @@ export const getAdminKPI = async () => {
 export const getClientPageData = async (clientId) => {
   // Assuming you have an axios instance or fetch wrapper
   // const response = await axios.get(`api/client/${clientId}/page-data`);
-  // return response.data; 
+  // return response.data;
 
   // Mocking the call based on your request for now:
   // return fetch(`/api/client/${clientId}/page-data`).then(res => res.json());
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/client/${clientId}/page-data`, getAuthHeader());
+    const response = await axios.get(
+      `${RMS_BASE_URL}/api/client/${clientId}/page-data`,
+      getAuthHeader(),
+    );
     return response.data;
   } catch (error) {
     throw error;
@@ -278,11 +281,14 @@ export const updateClientContact = async (complianceData) => {
 
 export const deleteClientContact = async (contactId) => {
   try {
-    const response = await axios.delete(`${RMS_BASE_URL}/api/client-contact/delete/${contactId}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
+    const response = await axios.delete(
+      `${RMS_BASE_URL}/api/client-contact/delete/${contactId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       },
-    });
+    );
     return response.data;
   } catch (error) {
     throw error;
@@ -315,7 +321,7 @@ export const createClientAsset = async (assetData, clientId) => {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "multipart/form-data",
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -335,9 +341,9 @@ export const updateClientAsset = async (assetId, assetData) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -403,11 +409,11 @@ export const getAssetsByClient = async (clientId) => {
 export const getClientAssetAssignments = async (assetId) => {
   try {
     // 1. Ensure this URL matches your @GetMapping in Java EXACTLY
-    // 2. Double check if your backend expects /api/client-assets/54 
+    // 2. Double check if your backend expects /api/client-assets/54
     //    or perhaps /api/assets/54
     const response = await axios.get(
       `${RMS_BASE_URL}/api/client-asset-assignments/by-asset/${assetId}`,
-      getAuthHeader()
+      getAuthHeader(),
     );
     return response.data;
   } catch (error) {
@@ -424,7 +430,7 @@ export const getAssetById = async (assetId) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -433,7 +439,6 @@ export const getAssetById = async (assetId) => {
   }
 };
 
-
 /* ===============================
    ASSIGN ASSET TO RESOURCE
    =============================== */
@@ -441,12 +446,15 @@ export const assignClientAsset = async (assignmentData) => {
   console.log("Assignment Data:", assignmentData);
   try {
     // FIX: Using the nested ID safely
-    const id = assignmentData.asset?.assetId || assignmentData.asset?.id || assignmentData.assetId;
+    const id =
+      assignmentData.asset?.assetId ||
+      assignmentData.asset?.id ||
+      assignmentData.assetId;
 
     const response = await axios.post(
       `${RMS_BASE_URL}/api/client-asset-assignments/${id}`,
       assignmentData,
-      getAuthHeader()
+      getAuthHeader(),
     );
     return response.data;
   } catch (error) {
@@ -456,12 +464,14 @@ export const assignClientAsset = async (assignmentData) => {
 };
 export const updateClient = async (clientData) => {
   try {
-    const response = await axios.put(`${RMS_BASE_URL}/api/client/update-client`, clientData,
+    const response = await axios.put(
+      `${RMS_BASE_URL}/api/client/update-client`,
+      clientData,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        }
-      }
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -474,25 +484,28 @@ export const updateClient = async (clientData) => {
  */
 export const updateClientStatus = async (clientId, clientData) => {
   try {
-    const response = await axios.put(`${RMS_BASE_URL}/api/client/update-client`, {
-      clientId: clientId,
-      ...clientData
-    }, getAuthHeader());
+    const response = await axios.put(
+      `${RMS_BASE_URL}/api/client/update-client`,
+      {
+        clientId: clientId,
+        ...clientData,
+      },
+      getAuthHeader(),
+    );
 
     return response.data;
   } catch (error) {
-    console.error('Error updating client status:', error);
+    console.error("Error updating client status:", error);
     throw error;
   }
 };
-
 
 export const assignUpdateClientAsset = async (assignmentId, assignmentData) => {
   try {
     const response = await axios.put(
       `${RMS_BASE_URL}/api/client-asset-assignments/${assignmentId}`,
       assignmentData,
-      getAuthHeader()
+      getAuthHeader(),
     );
     return response.data;
   } catch (error) {
@@ -501,7 +514,11 @@ export const assignUpdateClientAsset = async (assignmentId, assignmentData) => {
   }
 };
 
-export const returnAssetAssignment = async (assignmentId, actualReturnDate, remarks) => {
+export const returnAssetAssignment = async (
+  assignmentId,
+  actualReturnDate,
+  remarks,
+) => {
   try {
     const response = await axios.put(
       `${RMS_BASE_URL}/api/client-asset-assignments/return/${assignmentId}`,
@@ -514,7 +531,7 @@ export const returnAssetAssignment = async (assignmentId, actualReturnDate, rema
           actualReturnDate: actualReturnDate,
           remarks: remarks,
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -524,12 +541,13 @@ export const returnAssetAssignment = async (assignmentId, actualReturnDate, rema
 
 export const getAssignmentKPI = async (assetId) => {
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/client-asset-assignments/kpi/${assetId}`,
+    const response = await axios.get(
+      `${RMS_BASE_URL}/api/client-asset-assignments/kpi/${assetId}`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -560,7 +578,7 @@ export const deleteClientAssignment = async (assignmentId) => {
   try {
     const response = await axios.delete(
       `${RMS_BASE_URL}/api/client-asset-assignments/${assignmentId}`,
-      getAuthHeader()
+      getAuthHeader(),
     );
     return response.data;
   } catch (error) {
@@ -572,7 +590,7 @@ export const deleteClientAssignment = async (assignmentId) => {
 export const getAssetDashboard = async () => {
   const res = await axios.get(
     `${RMS_BASE_URL}/api/client-assets/dashboard`,
-    getAuthHeader()
+    getAuthHeader(),
   );
   return res.data;
 };
@@ -585,7 +603,7 @@ export const getAssetDashboardByClient = async (clientId) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data.data;
   } catch (error) {
@@ -604,7 +622,7 @@ export const getProjectOverlaps = async (projectId) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -620,7 +638,7 @@ export const getProjectsByClient = async (clientId) => {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
 
   return res.data; // { success, message, data: [...] }
@@ -633,12 +651,10 @@ export const getProjectSLA = async (projectId) => {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
   return res.data;
 };
-
-
 
 export const getProjectCompliance = async (projectId) => {
   const res = await axios.get(
@@ -647,11 +663,10 @@ export const getProjectCompliance = async (projectId) => {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
   return res.data;
 };
-
 
 export const getProjectEscalations = async (projectId) => {
   const res = await axios.get(
@@ -660,7 +675,7 @@ export const getProjectEscalations = async (projectId) => {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
   return res.data;
 };
@@ -672,7 +687,7 @@ export const getAssetsByProjectId = async (projectId) => {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
 
   return res.data;
@@ -683,7 +698,7 @@ export const getSkills = async () => {
     const response = await axios.get(`${RMS_BASE_URL}/api/skills/active`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
-      }
+      },
     });
     return response.data;
   } catch (error) {
@@ -696,14 +711,13 @@ export const getCertificates = async () => {
     const response = await axios.get(`${RMS_BASE_URL}/api/certificates`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
-      }
+      },
     });
     return response.data;
   } catch (error) {
     throw error;
   }
 };
-
 
 /* ===============================
    GET AVAILABLE SERIAL NUMBERS BY ASSET ID
@@ -716,7 +730,7 @@ export const getAvailableSerialsByAssetId = async (assetId) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data; // [{ serialNumber, status }]
   } catch (error) {
@@ -732,7 +746,7 @@ export function formatCurrency(value) {
     notation: "compact",
     maximumFractionDigits: 2,
   }).format(value);
-};
+}
 
 /**
  * ===============================
@@ -745,7 +759,7 @@ export const createCompanyContact = async (companyContactData) => {
     const response = await axios.post(
       `${RMS_BASE_URL}/api/company-contact/create`,
       companyContactData,
-      getAuthHeader()
+      getAuthHeader(),
     );
     return response.data;
   } catch (error) {
@@ -763,7 +777,7 @@ export const getCompanyContactsByCompanyId = async () => {
   try {
     const response = await axios.get(
       `${RMS_BASE_URL}/api/company-contact/all`,
-      getAuthHeader()
+      getAuthHeader(),
     );
     return response.data;
   } catch (error) {
@@ -782,7 +796,7 @@ export const updateCompanyContact = async (companyContactData) => {
     const response = await axios.put(
       `${RMS_BASE_URL}/api/company-contact/update/${companyContactData.contactId}`,
       companyContactData,
-      getAuthHeader()
+      getAuthHeader(),
     );
     return response.data;
   } catch (error) {
@@ -800,7 +814,7 @@ export const deleteCompanyContact = async (contactId) => {
   try {
     const response = await axios.delete(
       `${RMS_BASE_URL}/api/company-contact/delete/${contactId}`,
-      getAuthHeader()
+      getAuthHeader(),
     );
     return response.data;
   } catch (error) {

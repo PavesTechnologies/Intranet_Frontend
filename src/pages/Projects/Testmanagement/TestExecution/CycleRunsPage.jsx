@@ -22,7 +22,7 @@ export default function CycleRunsPage() {
 
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases/getcases/${projectId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/getcases/${projectId}`,
       );
       setAvailableCases(res.data || []);
       setShowAddCasesModal(true);
@@ -35,8 +35,8 @@ export default function CycleRunsPage() {
   const handleAddCasesSubmit = async (ids) => {
     try {
       await axiosInstance.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-execution/test-runs/${selectedRunId}/add-cases`,
-        { testCaseIds: ids }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-runs/${selectedRunId}/add-cases`,
+        { testCaseIds: ids },
       );
       toast.success("Test cases added!");
       setShowAddCasesModal(false);
@@ -48,7 +48,6 @@ export default function CycleRunsPage() {
 
   return (
     <div className="p-6">
-
       {/* Back button */}
       <button
         className="mb-4 bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
@@ -107,7 +106,6 @@ export default function CycleRunsPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

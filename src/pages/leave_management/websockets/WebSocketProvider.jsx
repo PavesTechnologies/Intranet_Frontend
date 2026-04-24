@@ -8,8 +8,8 @@ export const useWebSocket = () => useContext(WebSocketContext);
 export default function WebSocketProvider({ children }) {
   // 🛑 FIX 1: Safe fallback URL
   const BASE_URL =
-    import.meta.env.VITE_BASE_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
+    window.__APP_CONFIG__.BASE_URL ||
+    window.__APP_CONFIG__.API_BASE_URL ||
     "http://localhost:8080";
 
   const stompClientRef = useRef(null);
@@ -22,7 +22,7 @@ export default function WebSocketProvider({ children }) {
 
     return () => {
       listeners.current[event] = listeners.current[event].filter(
-        (cb) => cb !== callback
+        (cb) => cb !== callback,
       );
     };
   };
@@ -51,21 +51,21 @@ export default function WebSocketProvider({ children }) {
           // console.log("WS CONNECTED");
 
           stomp.subscribe("/topic/data-updated", (msg) =>
-            emitEvent("data-updated", msg.body)
+            emitEvent("data-updated", msg.body),
           );
 
           stomp.subscribe("/topic/leave-updated", (msg) =>
-            emitEvent("leave-updated", msg.body)
+            emitEvent("leave-updated", msg.body),
           );
 
-          stomp.subscribe("/topic/update-on-leaveRequestStatus", (msg) =>{
-            emitEvent("update-on-leaveRequestStatus", msg.body)
-          })
+          stomp.subscribe("/topic/update-on-leaveRequestStatus", (msg) => {
+            emitEvent("update-on-leaveRequestStatus", msg.body);
+          });
         },
         (err) => {
           // 🛑 FIX 3: Do not crash React
           console.warn("WS connection failed (non-blocking)", err);
-        }
+        },
       );
     } catch (err) {
       console.error("WS init error", err);

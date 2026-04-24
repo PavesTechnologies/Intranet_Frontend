@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import CommentBox from './UserCommentBox';
-import ExpandableList from '../../../components/List/List';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { X } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import CommentBox from "./UserCommentBox";
+import ExpandableList from "../../../components/List/List";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { X } from "lucide-react";
 import { useAuth } from "../../../contexts/AuthContext";
 
 const Lists = ({ projectId }) => {
@@ -14,22 +14,31 @@ const Lists = ({ projectId }) => {
   const [selectedEntity, setSelectedEntity] = useState(null);
   const { user } = useAuth();
   const currentUser = user;
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
 
   const fetchData = async () => {
     setLoading(true);
     try {
       // ✅ Fetch epics, stories, and tasks (only once)
       const [epicRes, storyRes, taskRes] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/tasks`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        axios.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        ),
+        axios.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        ),
+        axios.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        ),
       ]);
 
       const stories = storyRes.data;
@@ -55,14 +64,14 @@ const Lists = ({ projectId }) => {
 
       // ✅ Filter stories without epic
       const noEpic = enrichedStories.filter(
-        (story) => !story.epic && !story.epicId
+        (story) => !story.epic && !story.epicId,
       );
 
       setEpics(enrichedEpics);
       setNoEpicStories(noEpic);
     } catch (err) {
-      console.error('Error loading project data:', err);
-      toast.error('Failed to load project data.', { position: 'top-right' });
+      console.error("Error loading project data:", err);
+      toast.error("Failed to load project data.", { position: "top-right" });
     } finally {
       setLoading(false);
     }
@@ -73,14 +82,16 @@ const Lists = ({ projectId }) => {
   }, [projectId]);
 
   useEffect(() => {
-    document.body.style.overflow = selectedEntity ? 'hidden' : '';
+    document.body.style.overflow = selectedEntity ? "hidden" : "";
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     };
   }, [selectedEntity]);
 
   if (loading)
-    return <div className="p-6 text-xl text-slate-500">Loading project data...</div>;
+    return (
+      <div className="p-6 text-xl text-slate-500">Loading project data...</div>
+    );
 
   return (
     <div className="p-6 space-y-6">
@@ -96,7 +107,11 @@ const Lists = ({ projectId }) => {
             count={epic.stories.length}
             headerRight={
               <div className="flex items-center">
-                <button onClick={() => setSelectedEntity({ id: epic.id, type: 'epic' })}>
+                <button
+                  onClick={() =>
+                    setSelectedEntity({ id: epic.id, type: "epic" })
+                  }
+                >
                   💬
                 </button>
               </div>
@@ -107,7 +122,7 @@ const Lists = ({ projectId }) => {
                 <ExpandableList
                   title={
                     <span>
-                      {story.title}{' '}
+                      {story.title}{" "}
                       <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
                         Story
                       </span>
@@ -116,22 +131,33 @@ const Lists = ({ projectId }) => {
                   count={story.tasks.length}
                   headerRight={
                     <div className="flex items-center">
-                      <button onClick={() => setSelectedEntity({ id: story.id, type: 'story' })}>
+                      <button
+                        onClick={() =>
+                          setSelectedEntity({ id: story.id, type: "story" })
+                        }
+                      >
                         💬
                       </button>
                     </div>
                   }
                 >
                   {story.tasks.map((task) => (
-                    <li key={task.id} className="flex justify-between items-center px-2">
+                    <li
+                      key={task.id}
+                      className="flex justify-between items-center px-2"
+                    >
                       <span className="text-sm font-medium text-gray-700">
-                        {task.title}{' '}
+                        {task.title}{" "}
                         <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">
                           Task
                         </span>
                       </span>
                       <div className="flex items-center">
-                        <button onClick={() => setSelectedEntity({ id: task.id, type: 'task' })}>
+                        <button
+                          onClick={() =>
+                            setSelectedEntity({ id: task.id, type: "task" })
+                          }
+                        >
                           💬
                         </button>
                       </div>
@@ -149,14 +175,19 @@ const Lists = ({ projectId }) => {
       {/* No Epic Stories */}
       {noEpicStories.length > 0 && (
         <div className="mt-8">
-          <h2 className="text-xl font-bold text-orange-600">Stories Assigned to No Epic</h2>
-          <ExpandableList title="Unassigned Stories" count={noEpicStories.length}>
+          <h2 className="text-xl font-bold text-orange-600">
+            Stories Assigned to No Epic
+          </h2>
+          <ExpandableList
+            title="Unassigned Stories"
+            count={noEpicStories.length}
+          >
             {noEpicStories.map((story) => (
               <li key={story.id}>
                 <ExpandableList
                   title={
                     <span>
-                      {story.title}{' '}
+                      {story.title}{" "}
                       <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
                         Story
                       </span>
@@ -165,22 +196,33 @@ const Lists = ({ projectId }) => {
                   count={story.tasks.length}
                   headerRight={
                     <div className="flex items-center">
-                      <button onClick={() => setSelectedEntity({ id: story.id, type: 'story' })}>
+                      <button
+                        onClick={() =>
+                          setSelectedEntity({ id: story.id, type: "story" })
+                        }
+                      >
                         💬
                       </button>
                     </div>
                   }
                 >
                   {story.tasks.map((task) => (
-                    <li key={task.id} className="flex justify-between items-center px-2">
+                    <li
+                      key={task.id}
+                      className="flex justify-between items-center px-2"
+                    >
                       <span className="text-sm font-medium text-gray-700">
-                        {task.title}{' '}
+                        {task.title}{" "}
                         <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">
                           Task
                         </span>
                       </span>
                       <div className="flex items-center">
-                        <button onClick={() => setSelectedEntity({ id: task.id, type: 'task' })}>
+                        <button
+                          onClick={() =>
+                            setSelectedEntity({ id: task.id, type: "task" })
+                          }
+                        >
                           💬
                         </button>
                       </div>

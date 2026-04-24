@@ -20,7 +20,13 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-export default function DocumentsPage({ employee, user_uuid, hrData = {}, identityTypes = [], config = null }) {
+export default function DocumentsPage({
+  employee,
+  user_uuid,
+  hrData = {},
+  identityTypes = [],
+  config = null,
+}) {
   const { employee_uuid } = useParams();
 
   const [educationDocs, setEducationDocs] = useState([]);
@@ -64,7 +70,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   const [uploadModal, setUploadModal] = useState({
     open: false,
     category: "", // "education", "experience", "identity", "certifications"
-    docId: null,   // if replacing a specific document
+    docId: null, // if replacing a specific document
   });
   const [uploadFile, setUploadFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -86,7 +92,11 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       year_of_completion: doc.year_of_passing || "NA",
       cgpa: doc.cgpa || doc.percentage || "NA",
       file_path: doc.file_path || null,
-      documents: doc.documents || (doc.file_path ? [{ doc_type: "certificate", file_path: doc.file_path }] : []),
+      documents:
+        doc.documents ||
+        (doc.file_path
+          ? [{ doc_type: "certificate", file_path: doc.file_path }]
+          : []),
     }));
     setEducationDocs(eduDocs);
 
@@ -100,7 +110,11 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       end_date: doc.end_date || "Present",
       description: doc.description || "",
       file_path: doc.file_path || null,
-      documents: doc.documents || (doc.file_path ? [{ doc_type: "experience_letter", file_path: doc.file_path }] : []),
+      documents:
+        doc.documents ||
+        (doc.file_path
+          ? [{ doc_type: "experience_letter", file_path: doc.file_path }]
+          : []),
     }));
     setExperienceDocs(expDocs);
 
@@ -111,7 +125,16 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       number: doc.identity_file_number || "NA",
       name: doc.name_on_document || employee?.name || "NA",
       file_path: doc.file_path || null,
-      documents: doc.documents || (doc.file_path ? [{ doc_type: doc.identity_type || "identity", file_path: doc.file_path }] : []),
+      documents:
+        doc.documents ||
+        (doc.file_path
+          ? [
+              {
+                doc_type: doc.identity_type || "identity",
+                file_path: doc.file_path,
+              },
+            ]
+          : []),
     }));
     setIdentityDocs(idDocs);
 
@@ -125,7 +148,11 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       credential_id: doc.credential_id || "",
       credential_url: doc.credential_url || "",
       file_path: doc.file_path || null,
-      documents: doc.documents || (doc.file_path ? [{ doc_type: "certificate", file_path: doc.file_path }] : []),
+      documents:
+        doc.documents ||
+        (doc.file_path
+          ? [{ doc_type: "certificate", file_path: doc.file_path }]
+          : []),
     }));
     setCertificationDocs(certDocs);
 
@@ -135,11 +162,11 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   /* ---- Resolve signed URL from file_path ---- */
   const getSignedUrl = async (filePath) => {
     const token = localStorage.getItem("token");
-    const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+    const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
     const response = await fetch(
       `${BASE_URL}/hr/view_documents?file_path=${encodeURIComponent(filePath)}`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` } },
     );
 
     const textResult = await response.text();
@@ -204,7 +231,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
     try {
       setUploading(true);
       const token = localStorage.getItem("token");
-      const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+      const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
       const targetUserUuid = user_uuid;
 
@@ -222,16 +249,13 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
         if (value) formData.append(key, value);
       });
 
-      const response = await fetch(
-        `${BASE_URL}/hr/upload-document`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        }
-      );
+      const response = await fetch(`${BASE_URL}/hr/upload-document`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
       if (response.ok) {
         setUploadSuccess(true);
@@ -245,7 +269,10 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
         }, 1500);
       } else {
         const errData = await response.json().catch(() => ({}));
-        showStatusToast(errData.detail || "Upload failed. Please try again.", "error");
+        showStatusToast(
+          errData.detail || "Upload failed. Please try again.",
+          "error",
+        );
       }
     } catch (error) {
       console.error("Error uploading document:", error);
@@ -268,13 +295,19 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
     setConfirmModal({
       open: true,
       title: "Delete Document",
-      message: "Are you sure you want to delete this document? This action cannot be undone.",
+      message:
+        "Are you sure you want to delete this document? This action cannot be undone.",
       onConfirm: async () => {
-        setConfirmModal({ open: false, title: "", message: "", onConfirm: null });
+        setConfirmModal({
+          open: false,
+          title: "",
+          message: "",
+          onConfirm: null,
+        });
         try {
           setDeletingDoc(docId);
           const token = localStorage.getItem("token");
-          const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+          const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
           const response = await fetch(
             `${BASE_URL}/hr/delete-document/${docId}?category=${encodeURIComponent(category)}`,
@@ -284,7 +317,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
               },
-            }
+            },
           );
 
           if (response.ok) {
@@ -296,11 +329,16 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
             } else if (category === "identity") {
               setIdentityDocs((prev) => prev.filter((d) => d.id !== docId));
             } else if (category === "certifications") {
-              setCertificationDocs((prev) => prev.filter((d) => d.id !== docId));
+              setCertificationDocs((prev) =>
+                prev.filter((d) => d.id !== docId),
+              );
             }
           } else {
             const errData = await response.json().catch(() => ({}));
-            showStatusToast(errData.detail || "Delete failed. Please try again.", "error");
+            showStatusToast(
+              errData.detail || "Delete failed. Please try again.",
+              "error",
+            );
           }
         } catch (error) {
           console.error("Error deleting document:", error);
@@ -321,8 +359,10 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
         degree_name: doc.degree !== "NA" ? doc.degree : "",
         specialization: doc.specialization !== "NA" ? doc.specialization : "",
         institution_name: doc.institution !== "NA" ? doc.institution : "",
-        year_of_joining: doc.year_of_joining !== "NA" ? doc.year_of_joining : "",
-        year_of_passing: doc.year_of_completion !== "NA" ? doc.year_of_completion : "",
+        year_of_joining:
+          doc.year_of_joining !== "NA" ? doc.year_of_joining : "",
+        year_of_passing:
+          doc.year_of_completion !== "NA" ? doc.year_of_completion : "",
         cgpa: doc.cgpa !== "NA" ? doc.cgpa : "",
       };
     } else if (category === "experience") {
@@ -330,7 +370,10 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
         company_name: doc.company !== "NA" ? doc.company : "",
         role_title: doc.role !== "NA" ? doc.role : "",
         start_date: doc.start_date !== "NA" ? doc.start_date : "",
-        end_date: doc.end_date !== "Present" && doc.end_date !== "NA" ? doc.end_date : "",
+        end_date:
+          doc.end_date !== "Present" && doc.end_date !== "NA"
+            ? doc.end_date
+            : "",
         description: doc.description || "",
       };
     } else if (category === "identity") {
@@ -344,7 +387,10 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
         certification_name: doc.name !== "NA" ? doc.name : "",
         issuing_organization: doc.issuing_org !== "NA" ? doc.issuing_org : "",
         issue_date: doc.issue_date !== "NA" ? doc.issue_date : "",
-        expiry_date: doc.expiry_date !== "No Expiry" && doc.expiry_date !== "NA" ? doc.expiry_date : "",
+        expiry_date:
+          doc.expiry_date !== "No Expiry" && doc.expiry_date !== "NA"
+            ? doc.expiry_date
+            : "",
         credential_id: doc.credential_id || "",
         credential_url: doc.credential_url || "",
       };
@@ -373,15 +419,36 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   const filterDocs = (docs, keys) => {
     if (!searchQuery.trim()) return docs;
     const q = searchQuery.toLowerCase().trim();
-    return docs.filter(doc =>
-      keys.some(key => String(doc[key] || "").toLowerCase().includes(q))
+    return docs.filter((doc) =>
+      keys.some((key) =>
+        String(doc[key] || "")
+          .toLowerCase()
+          .includes(q),
+      ),
     );
   };
 
-  const filteredEducation = filterDocs(educationDocs, ["degree", "specialization", "institution", "year_of_joining", "year_of_completion"]);
-  const filteredExperience = filterDocs(experienceDocs, ["company", "role", "start_date", "end_date", "description"]);
+  const filteredEducation = filterDocs(educationDocs, [
+    "degree",
+    "specialization",
+    "institution",
+    "year_of_joining",
+    "year_of_completion",
+  ]);
+  const filteredExperience = filterDocs(experienceDocs, [
+    "company",
+    "role",
+    "start_date",
+    "end_date",
+    "description",
+  ]);
   const filteredIdentity = filterDocs(identityDocs, ["type", "number", "name"]);
-  const filteredCertifications = filterDocs(certificationDocs, ["name", "issuing_org", "issue_date", "credential_id"]);
+  const filteredCertifications = filterDocs(certificationDocs, [
+    "name",
+    "issuing_org",
+    "issue_date",
+    "credential_id",
+  ]);
 
   /* ---- Folder Definitions ---- */
   const folders = [
@@ -389,14 +456,18 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       key: "education",
       label: "Degrees & Certificates",
       icon: <GraduationCap size={16} />,
-      count: searchQuery.trim() ? filteredEducation.length : educationDocs.length,
+      count: searchQuery.trim()
+        ? filteredEducation.length
+        : educationDocs.length,
       hasMatches: filteredEducation.length > 0,
     },
     {
       key: "experience",
       label: "Previous Experience",
       icon: <Briefcase size={16} />,
-      count: searchQuery.trim() ? filteredExperience.length : experienceDocs.length,
+      count: searchQuery.trim()
+        ? filteredExperience.length
+        : experienceDocs.length,
       hasMatches: filteredExperience.length > 0,
     },
     {
@@ -410,22 +481,24 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       key: "certifications",
       label: "Certifications",
       icon: <Award size={16} />,
-      count: searchQuery.trim() ? filteredCertifications.length : certificationDocs.length,
+      count: searchQuery.trim()
+        ? filteredCertifications.length
+        : certificationDocs.length,
       hasMatches: filteredCertifications.length > 0,
     },
   ];
 
-  const visibleFolders = folders.filter(folder => {
+  const visibleFolders = folders.filter((folder) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
     return folder.label.toLowerCase().includes(q) || folder.hasMatches;
   });
 
-  const currentFolderKey = visibleFolders.some(f => f.key === activeFolder)
+  const currentFolderKey = visibleFolders.some((f) => f.key === activeFolder)
     ? activeFolder
     : visibleFolders.length > 0
-    ? visibleFolders[0].key
-    : activeFolder;
+      ? visibleFolders[0].key
+      : activeFolder;
 
   return (
     <div className="space-y-6">
@@ -453,11 +526,12 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
             )}
           </div>
 
-
           {/* Folders */}
           <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md border border-indigo-100 overflow-hidden">
             <div className="px-4 py-3 border-b border-indigo-100 bg-indigo-50/60">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Folders</span>
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Folders
+              </span>
             </div>
             <div className="p-2 space-y-0.5">
               {visibleFolders.map((folder) => (
@@ -470,7 +544,13 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       : "text-gray-600 hover:bg-gray-50 hover:text-gray-800"
                   }`}
                 >
-                  <span className={currentFolderKey === folder.key ? "text-indigo-500" : "text-gray-400"}>
+                  <span
+                    className={
+                      currentFolderKey === folder.key
+                        ? "text-indigo-500"
+                        : "text-gray-400"
+                    }
+                  >
                     {folder.icon}
                   </span>
                   <span className="flex-1 text-left">{folder.label}</span>
@@ -498,12 +578,30 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
               icon={<GraduationCap size={18} />}
               count={filteredEducation.length}
               description="This section contains details about all the Degrees & Certificates of an employee."
-              onUpload={() => { setUploadFormData({}); setUploadModal({ open: true, category: "education", docId: null }); }}
+              onUpload={() => {
+                setUploadFormData({});
+                setUploadModal({
+                  open: true,
+                  category: "education",
+                  docId: null,
+                });
+              }}
             >
               {filteredEducation.length === 0 ? (
                 <EmptyState
-                  message={searchQuery ? "No matching education documents found." : "No education documents found."}
-                  onUpload={() => { setUploadFormData({}); setUploadModal({ open: true, category: "education", docId: null }); }}
+                  message={
+                    searchQuery
+                      ? "No matching education documents found."
+                      : "No education documents found."
+                  }
+                  onUpload={() => {
+                    setUploadFormData({});
+                    setUploadModal({
+                      open: true,
+                      category: "education",
+                      docId: null,
+                    });
+                  }}
                 />
               ) : (
                 <div className="space-y-4">
@@ -513,7 +611,9 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       title="Degrees & Certificates"
                       hasFile={doc.documents.length > 0}
                       documents={doc.documents}
-                      onViewDocument={(filePath, docTitle) => viewDocument(filePath, doc.id, docTitle)}
+                      onViewDocument={(filePath, docTitle) =>
+                        viewDocument(filePath, doc.id, docTitle)
+                      }
                       cardTitle={`${doc.degree} - ${doc.institution}`}
                       onUpload={() => openReuploadModal(doc, "education")}
                       onDelete={() => deleteDocument(doc.id, "education")}
@@ -522,11 +622,23 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
                         <DocField label="Degree" value={doc.degree} />
-                        <DocField label="Branch / Specialization" value={doc.specialization} />
-                        <DocField label="Year of Joining" value={doc.year_of_joining} />
-                        <DocField label="Year of Completion" value={doc.year_of_completion} />
+                        <DocField
+                          label="Branch / Specialization"
+                          value={doc.specialization}
+                        />
+                        <DocField
+                          label="Year of Joining"
+                          value={doc.year_of_joining}
+                        />
+                        <DocField
+                          label="Year of Completion"
+                          value={doc.year_of_completion}
+                        />
                         <DocField label="CGPA / Percentage" value={doc.cgpa} />
-                        <DocField label="University / College" value={doc.institution} />
+                        <DocField
+                          label="University / College"
+                          value={doc.institution}
+                        />
                       </div>
                     </DocumentCard>
                   ))}
@@ -542,12 +654,30 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
               icon={<Briefcase size={18} />}
               count={filteredExperience.length}
               description="This section contains details about all the previous work experience of an employee."
-              onUpload={() => { setUploadFormData({}); setUploadModal({ open: true, category: "experience", docId: null }); }}
+              onUpload={() => {
+                setUploadFormData({});
+                setUploadModal({
+                  open: true,
+                  category: "experience",
+                  docId: null,
+                });
+              }}
             >
               {filteredExperience.length === 0 ? (
                 <EmptyState
-                  message={searchQuery ? "No matching experience records found." : "No experience records found."}
-                  onUpload={() => { setUploadFormData({}); setUploadModal({ open: true, category: "experience", docId: null }); }}
+                  message={
+                    searchQuery
+                      ? "No matching experience records found."
+                      : "No experience records found."
+                  }
+                  onUpload={() => {
+                    setUploadFormData({});
+                    setUploadModal({
+                      open: true,
+                      category: "experience",
+                      docId: null,
+                    });
+                  }}
                 />
               ) : (
                 <div className="space-y-4">
@@ -557,7 +687,9 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       title="Previous Experience"
                       hasFile={doc.documents.length > 0}
                       documents={doc.documents}
-                      onViewDocument={(filePath, docTitle) => viewDocument(filePath, doc.id, docTitle)}
+                      onViewDocument={(filePath, docTitle) =>
+                        viewDocument(filePath, doc.id, docTitle)
+                      }
                       cardTitle={`${doc.company} - ${doc.role}`}
                       onUpload={() => openReuploadModal(doc, "experience")}
                       onDelete={() => deleteDocument(doc.id, "experience")}
@@ -567,10 +699,18 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
                         <DocField label="Company" value={doc.company} />
                         <DocField label="Role / Designation" value={doc.role} />
-                        <DocField label="Employment Type" value={doc.employment_type} />
+                        <DocField
+                          label="Employment Type"
+                          value={doc.employment_type}
+                        />
                         <DocField label="Start Date" value={doc.start_date} />
                         <DocField label="End Date" value={doc.end_date} />
-                        {doc.description && <DocField label="Description" value={doc.description} />}
+                        {doc.description && (
+                          <DocField
+                            label="Description"
+                            value={doc.description}
+                          />
+                        )}
                       </div>
                     </DocumentCard>
                   ))}
@@ -586,12 +726,30 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
               icon={<ShieldCheck size={18} />}
               count={filteredIdentity.length}
               description="This section contains identity documents such as Aadhaar, PAN, Passport, etc."
-              onUpload={() => { setUploadFormData({}); setUploadModal({ open: true, category: "identity", docId: null }); }}
+              onUpload={() => {
+                setUploadFormData({});
+                setUploadModal({
+                  open: true,
+                  category: "identity",
+                  docId: null,
+                });
+              }}
             >
               {filteredIdentity.length === 0 ? (
                 <EmptyState
-                  message={searchQuery ? "No matching identity documents found." : "No identity documents found."}
-                  onUpload={() => { setUploadFormData({}); setUploadModal({ open: true, category: "identity", docId: null }); }}
+                  message={
+                    searchQuery
+                      ? "No matching identity documents found."
+                      : "No identity documents found."
+                  }
+                  onUpload={() => {
+                    setUploadFormData({});
+                    setUploadModal({
+                      open: true,
+                      category: "identity",
+                      docId: null,
+                    });
+                  }}
                 />
               ) : (
                 <div className="space-y-4">
@@ -601,7 +759,9 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       title={doc.type}
                       hasFile={doc.documents.length > 0}
                       documents={doc.documents}
-                      onViewDocument={(filePath, docTitle) => viewDocument(filePath, doc.id, docTitle)}
+                      onViewDocument={(filePath, docTitle) =>
+                        viewDocument(filePath, doc.id, docTitle)
+                      }
                       cardTitle={doc.type}
                       onUpload={() => openReuploadModal(doc, "identity")}
                       onDelete={() => deleteDocument(doc.id, "identity")}
@@ -627,12 +787,30 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
               icon={<Award size={18} />}
               count={filteredCertifications.length}
               description="This section contains course certificates, online certifications, credits, and other professional certifications."
-              onUpload={() => { setUploadFormData({}); setUploadModal({ open: true, category: "certifications", docId: null }); }}
+              onUpload={() => {
+                setUploadFormData({});
+                setUploadModal({
+                  open: true,
+                  category: "certifications",
+                  docId: null,
+                });
+              }}
             >
               {filteredCertifications.length === 0 ? (
                 <EmptyState
-                  message={searchQuery ? "No matching certifications found." : "No certifications found."}
-                  onUpload={() => { setUploadFormData({}); setUploadModal({ open: true, category: "certifications", docId: null }); }}
+                  message={
+                    searchQuery
+                      ? "No matching certifications found."
+                      : "No certifications found."
+                  }
+                  onUpload={() => {
+                    setUploadFormData({});
+                    setUploadModal({
+                      open: true,
+                      category: "certifications",
+                      docId: null,
+                    });
+                  }}
                 />
               ) : (
                 <div className="space-y-4">
@@ -642,7 +820,9 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       title={doc.name}
                       hasFile={doc.documents.length > 0}
                       documents={doc.documents}
-                      onViewDocument={(filePath, docTitle) => viewDocument(filePath, doc.id, docTitle)}
+                      onViewDocument={(filePath, docTitle) =>
+                        viewDocument(filePath, doc.id, docTitle)
+                      }
                       cardTitle={doc.name}
                       onUpload={() => openReuploadModal(doc, "certifications")}
                       onDelete={() => deleteDocument(doc.id, "certifications")}
@@ -651,11 +831,24 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                         <DocField label="Certificate Name" value={doc.name} />
-                        <DocField label="Issuing Organization" value={doc.issuing_org} />
+                        <DocField
+                          label="Issuing Organization"
+                          value={doc.issuing_org}
+                        />
                         <DocField label="Issue Date" value={doc.issue_date} />
                         <DocField label="Expiry Date" value={doc.expiry_date} />
-                        {doc.credential_id && <DocField label="Credential ID" value={doc.credential_id} />}
-                        {doc.credential_url && <DocField label="Credential URL" value={doc.credential_url} />}
+                        {doc.credential_id && (
+                          <DocField
+                            label="Credential ID"
+                            value={doc.credential_id}
+                          />
+                        )}
+                        {doc.credential_url && (
+                          <DocField
+                            label="Credential URL"
+                            value={doc.credential_url}
+                          />
+                        )}
                       </div>
                     </DocumentCard>
                   ))}
@@ -663,7 +856,6 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
               )}
             </FolderContent>
           )}
-
         </div>
       </div>
 
@@ -675,7 +867,9 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-white shrink-0">
               <div className="flex items-center gap-3">
                 <FileText size={18} className="text-indigo-600" />
-                <h3 className="text-base font-semibold text-gray-900">{previewModal.title}</h3>
+                <h3 className="text-base font-semibold text-gray-900">
+                  {previewModal.title}
+                </h3>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -694,7 +888,14 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                   Download
                 </a>
                 <button
-                  onClick={() => setPreviewModal({ open: false, url: null, title: "", type: "" })}
+                  onClick={() =>
+                    setPreviewModal({
+                      open: false,
+                      url: null,
+                      title: "",
+                      type: "",
+                    })
+                  }
                   className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <X size={20} />
@@ -767,36 +968,141 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                   <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center">
                     <CheckCircle size={32} className="text-emerald-500" />
                   </div>
-                  <p className="text-base font-semibold text-gray-900">Upload Successful!</p>
-                  <p className="text-sm text-gray-500">Your document has been uploaded.</p>
+                  <p className="text-base font-semibold text-gray-900">
+                    Upload Successful!
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Your document has been uploaded.
+                  </p>
                 </div>
               ) : (
                 <>
                   {/* ---- Category-Specific Form Fields ---- */}
                   {uploadModal.category === "education" && (
                     <div className="space-y-4">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Degree / Certificate Details</p>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Degree / Certificate Details
+                      </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <UploadField label="Degree / Certificate Name" placeholder="e.g. B.Tech, Internship Certificate" value={uploadFormData.degree_name || ""} onChange={(v) => setUploadFormData(d => ({ ...d, degree_name: v }))} />
-                        <UploadField label="Specialization" placeholder="e.g. Computer Science" value={uploadFormData.specialization || ""} onChange={(v) => setUploadFormData(d => ({ ...d, specialization: v }))} />
-                        <UploadField label="Institution / Organization" placeholder="e.g. JNTU, Coursera" value={uploadFormData.institution_name || ""} onChange={(v) => setUploadFormData(d => ({ ...d, institution_name: v }))} />
-                        <UploadField label="Year of Joining" placeholder="e.g. 2020" value={uploadFormData.year_of_joining || ""} onChange={(v) => setUploadFormData(d => ({ ...d, year_of_joining: v }))} />
-                        <UploadField label="Year of Completion" placeholder="e.g. 2024" value={uploadFormData.year_of_passing || ""} onChange={(v) => setUploadFormData(d => ({ ...d, year_of_passing: v }))} />
-                        <UploadField label="CGPA / Percentage" placeholder="e.g. 8.5 or 85%" value={uploadFormData.cgpa || ""} onChange={(v) => setUploadFormData(d => ({ ...d, cgpa: v }))} />
+                        <UploadField
+                          label="Degree / Certificate Name"
+                          placeholder="e.g. B.Tech, Internship Certificate"
+                          value={uploadFormData.degree_name || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({ ...d, degree_name: v }))
+                          }
+                        />
+                        <UploadField
+                          label="Specialization"
+                          placeholder="e.g. Computer Science"
+                          value={uploadFormData.specialization || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              specialization: v,
+                            }))
+                          }
+                        />
+                        <UploadField
+                          label="Institution / Organization"
+                          placeholder="e.g. JNTU, Coursera"
+                          value={uploadFormData.institution_name || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              institution_name: v,
+                            }))
+                          }
+                        />
+                        <UploadField
+                          label="Year of Joining"
+                          placeholder="e.g. 2020"
+                          value={uploadFormData.year_of_joining || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              year_of_joining: v,
+                            }))
+                          }
+                        />
+                        <UploadField
+                          label="Year of Completion"
+                          placeholder="e.g. 2024"
+                          value={uploadFormData.year_of_passing || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              year_of_passing: v,
+                            }))
+                          }
+                        />
+                        <UploadField
+                          label="CGPA / Percentage"
+                          placeholder="e.g. 8.5 or 85%"
+                          value={uploadFormData.cgpa || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({ ...d, cgpa: v }))
+                          }
+                        />
                       </div>
                     </div>
                   )}
 
                   {uploadModal.category === "experience" && (
                     <div className="space-y-4">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Experience Details</p>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Experience Details
+                      </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <UploadField label="Company Name" placeholder="e.g. TCS, Google" value={uploadFormData.company_name || ""} onChange={(v) => setUploadFormData(d => ({ ...d, company_name: v }))} />
-                        <UploadField label="Role / Designation" placeholder="e.g. Software Intern" value={uploadFormData.role_title || ""} onChange={(v) => setUploadFormData(d => ({ ...d, role_title: v }))} />
-                        <UploadField label="Start Date" placeholder="e.g. 2023-01-15" type="date" value={uploadFormData.start_date || ""} onChange={(v) => setUploadFormData(d => ({ ...d, start_date: v }))} />
-                        <UploadField label="End Date" placeholder="Leave empty if present" type="date" value={uploadFormData.end_date || ""} onChange={(v) => setUploadFormData(d => ({ ...d, end_date: v }))} />
+                        <UploadField
+                          label="Company Name"
+                          placeholder="e.g. TCS, Google"
+                          value={uploadFormData.company_name || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              company_name: v,
+                            }))
+                          }
+                        />
+                        <UploadField
+                          label="Role / Designation"
+                          placeholder="e.g. Software Intern"
+                          value={uploadFormData.role_title || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({ ...d, role_title: v }))
+                          }
+                        />
+                        <UploadField
+                          label="Start Date"
+                          placeholder="e.g. 2023-01-15"
+                          type="date"
+                          value={uploadFormData.start_date || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({ ...d, start_date: v }))
+                          }
+                        />
+                        <UploadField
+                          label="End Date"
+                          placeholder="Leave empty if present"
+                          type="date"
+                          value={uploadFormData.end_date || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({ ...d, end_date: v }))
+                          }
+                        />
                         <div className="sm:col-span-2">
-                          <UploadField label="Description (Optional)" placeholder="Brief description of your role" value={uploadFormData.description || ""} onChange={(v) => setUploadFormData(d => ({ ...d, description: v }))} />
+                          <UploadField
+                            label="Description (Optional)"
+                            placeholder="Brief description of your role"
+                            value={uploadFormData.description || ""}
+                            onChange={(v) =>
+                              setUploadFormData((d) => ({
+                                ...d,
+                                description: v,
+                              }))
+                            }
+                          />
                         </div>
                       </div>
                     </div>
@@ -804,53 +1110,141 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
                   {uploadModal.category === "identity" && (
                     <div className="space-y-4">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Identity Document Details</p>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Identity Document Details
+                      </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Document Type</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Document Type
+                          </label>
                           <select
                             value={uploadFormData.identity_type_uuid || ""}
                             onChange={(e) => {
-                              const selected = identityTypes.find(t => t.identity_type_uuid === e.target.value);
-                              setUploadFormData(d => ({
+                              const selected = identityTypes.find(
+                                (t) => t.identity_type_uuid === e.target.value,
+                              );
+                              setUploadFormData((d) => ({
                                 ...d,
                                 identity_type_uuid: e.target.value,
-                                identity_type: selected?.identity_type_name || "",
+                                identity_type:
+                                  selected?.identity_type_name || "",
                               }));
                             }}
                             className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 bg-white"
                           >
                             <option value="">Select type</option>
                             {identityTypes.map((idType) => (
-                              <option key={idType.identity_type_uuid} value={idType.identity_type_uuid}>
+                              <option
+                                key={idType.identity_type_uuid}
+                                value={idType.identity_type_uuid}
+                              >
                                 {idType.identity_type_name}
                               </option>
                             ))}
                           </select>
                         </div>
-                        <UploadField label="Document Number" placeholder="e.g. XXXX-XXXX-1234" value={uploadFormData.identity_file_number || ""} onChange={(v) => setUploadFormData(d => ({ ...d, identity_file_number: v }))} />
-                        <UploadField label="Name on Document" placeholder="Name as on the document" value={uploadFormData.name_on_document || ""} onChange={(v) => setUploadFormData(d => ({ ...d, name_on_document: v }))} />
+                        <UploadField
+                          label="Document Number"
+                          placeholder="e.g. XXXX-XXXX-1234"
+                          value={uploadFormData.identity_file_number || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              identity_file_number: v,
+                            }))
+                          }
+                        />
+                        <UploadField
+                          label="Name on Document"
+                          placeholder="Name as on the document"
+                          value={uploadFormData.name_on_document || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              name_on_document: v,
+                            }))
+                          }
+                        />
                       </div>
                     </div>
                   )}
 
                   {uploadModal.category === "certifications" && (
                     <div className="space-y-4">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Certification Details</p>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Certification Details
+                      </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <UploadField label="Certificate Name" placeholder="e.g. AWS Cloud Practitioner, Python Course" value={uploadFormData.certification_name || ""} onChange={(v) => setUploadFormData(d => ({ ...d, certification_name: v }))} />
-                        <UploadField label="Issuing Organization" placeholder="e.g. Coursera, Udemy, AWS" value={uploadFormData.issuing_organization || ""} onChange={(v) => setUploadFormData(d => ({ ...d, issuing_organization: v }))} />
-                        <UploadField label="Issue Date" type="date" value={uploadFormData.issue_date || ""} onChange={(v) => setUploadFormData(d => ({ ...d, issue_date: v }))} />
-                        <UploadField label="Expiry Date (if any)" type="date" value={uploadFormData.expiry_date || ""} onChange={(v) => setUploadFormData(d => ({ ...d, expiry_date: v }))} />
-                        <UploadField label="Credential ID (Optional)" placeholder="e.g. ABC123XYZ" value={uploadFormData.credential_id || ""} onChange={(v) => setUploadFormData(d => ({ ...d, credential_id: v }))} />
-                        <UploadField label="Credential URL (Optional)" placeholder="e.g. https://verify.coursera.org/..." value={uploadFormData.credential_url || ""} onChange={(v) => setUploadFormData(d => ({ ...d, credential_url: v }))} />
+                        <UploadField
+                          label="Certificate Name"
+                          placeholder="e.g. AWS Cloud Practitioner, Python Course"
+                          value={uploadFormData.certification_name || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              certification_name: v,
+                            }))
+                          }
+                        />
+                        <UploadField
+                          label="Issuing Organization"
+                          placeholder="e.g. Coursera, Udemy, AWS"
+                          value={uploadFormData.issuing_organization || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              issuing_organization: v,
+                            }))
+                          }
+                        />
+                        <UploadField
+                          label="Issue Date"
+                          type="date"
+                          value={uploadFormData.issue_date || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({ ...d, issue_date: v }))
+                          }
+                        />
+                        <UploadField
+                          label="Expiry Date (if any)"
+                          type="date"
+                          value={uploadFormData.expiry_date || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({ ...d, expiry_date: v }))
+                          }
+                        />
+                        <UploadField
+                          label="Credential ID (Optional)"
+                          placeholder="e.g. ABC123XYZ"
+                          value={uploadFormData.credential_id || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              credential_id: v,
+                            }))
+                          }
+                        />
+                        <UploadField
+                          label="Credential URL (Optional)"
+                          placeholder="e.g. https://verify.coursera.org/..."
+                          value={uploadFormData.credential_url || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              credential_url: v,
+                            }))
+                          }
+                        />
                       </div>
                     </div>
                   )}
 
                   {/* ---- File Drop Zone ---- */}
                   <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Upload File</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                      Upload File
+                    </p>
                     <div
                       onClick={() => fileInputRef.current?.click()}
                       onDrop={handleDrop}
@@ -871,8 +1265,13 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
                       {uploadFile ? (
                         <div className="space-y-2">
-                          <FileText size={28} className="text-indigo-500 mx-auto" />
-                          <p className="text-sm font-medium text-gray-800">{uploadFile.name}</p>
+                          <FileText
+                            size={28}
+                            className="text-indigo-500 mx-auto"
+                          />
+                          <p className="text-sm font-medium text-gray-800">
+                            {uploadFile.name}
+                          </p>
                           <p className="text-xs text-gray-400">
                             {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
                           </p>
@@ -922,8 +1321,10 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       {uploadModal.docId ? "Updating..." : "Uploading..."}
                     </span>
+                  ) : uploadModal.docId ? (
+                    "Update Document"
                   ) : (
-                    uploadModal.docId ? "Update Document" : "Upload Document"
+                    "Upload Document"
                   )}
                 </button>
               </div>
@@ -942,14 +1343,23 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                 <AlertTriangle size={28} className="text-red-500" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">{confirmModal.title}</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  {confirmModal.title}
+                </h3>
                 <p className="text-sm text-gray-500">{confirmModal.message}</p>
               </div>
             </div>
             {/* Footer */}
             <div className="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
               <button
-                onClick={() => setConfirmModal({ open: false, title: "", message: "", onConfirm: null })}
+                onClick={() =>
+                  setConfirmModal({
+                    open: false,
+                    title: "",
+                    message: "",
+                    onConfirm: null,
+                  })
+                }
                 className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-all"
               >
                 Cancel
@@ -971,7 +1381,14 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 /* ==================== UI COMPONENTS ==================== */
 
 /* ---- Folder Content Wrapper ---- */
-const FolderContent = ({ title, icon, count, description, onUpload, children }) => (
+const FolderContent = ({
+  title,
+  icon,
+  count,
+  description,
+  onUpload,
+  children,
+}) => (
   <div className="space-y-4">
     {/* Header */}
     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -987,7 +1404,11 @@ const FolderContent = ({ title, icon, count, description, onUpload, children }) 
             Restricted access
           </span>
         </div>
-        {description && <p className="text-sm text-gray-500 mt-2 hidden sm:block">{description}</p>}
+        {description && (
+          <p className="text-sm text-gray-500 mt-2 hidden sm:block">
+            {description}
+          </p>
+        )}
       </div>
       {onUpload && (
         <button
@@ -1006,13 +1427,22 @@ const FolderContent = ({ title, icon, count, description, onUpload, children }) 
 );
 
 /* ---- Document Card ---- */
-const DocumentCard = ({ title, hasFile, documents = [], onViewDocument, cardTitle, onUpload, onDelete, loading, deleting, children }) => {
+const DocumentCard = ({
+  title,
+  hasFile,
+  documents = [],
+  onViewDocument,
+  cardTitle,
+  onUpload,
+  onDelete,
+  loading,
+  deleting,
+  children,
+}) => {
   /* Helper: format doc_type to readable name */
   const formatDocType = (docType) => {
     if (!docType) return "Document";
-    return docType
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
+    return docType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   /* Helper: extract filename from file_path */
@@ -1028,7 +1458,9 @@ const DocumentCard = ({ title, hasFile, documents = [], onViewDocument, cardTitl
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-indigo-100 bg-indigo-50/60">
         <div className="flex items-center gap-3 min-w-0">
           <FileText size={16} className="text-indigo-600 shrink-0" />
-          <h4 className="text-sm font-semibold text-indigo-800 truncate">{title}</h4>
+          <h4 className="text-sm font-semibold text-indigo-800 truncate">
+            {title}
+          </h4>
         </div>
         <div className="flex items-center gap-2">
           {onUpload && (
@@ -1092,7 +1524,12 @@ const DocumentCard = ({ title, hasFile, documents = [], onViewDocument, cardTitl
                     </div>
                   </div>
                   <button
-                    onClick={() => onViewDocument(file.file_path, `${cardTitle} — ${formatDocType(file.doc_type)}`)}
+                    onClick={() =>
+                      onViewDocument(
+                        file.file_path,
+                        `${cardTitle} — ${formatDocType(file.doc_type)}`,
+                      )
+                    }
                     disabled={loading}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50 shrink-0"
                   >
@@ -1121,7 +1558,9 @@ const DocumentCard = ({ title, hasFile, documents = [], onViewDocument, cardTitl
 /* ---- Document Field ---- */
 const DocField = ({ label, value }) => (
   <div>
-    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+      {label}
+    </p>
     <p className="text-sm font-medium text-gray-800">{value || "NA"}</p>
   </div>
 );
@@ -1144,9 +1583,17 @@ const EmptyState = ({ message, onUpload }) => (
 );
 
 /* ---- Upload Form Field ---- */
-const UploadField = ({ label, placeholder, value, onChange, type = "text" }) => (
+const UploadField = ({
+  label,
+  placeholder,
+  value,
+  onChange,
+  type = "text",
+}) => (
   <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+      {label}
+    </label>
     <input
       type={type}
       value={value}

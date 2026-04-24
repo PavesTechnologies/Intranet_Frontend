@@ -23,12 +23,12 @@ const TestPlansList = ({ projectId }) => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/test-plans`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/test-plans`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
       setTestPlans(res.data);
     } catch (err) {
@@ -44,13 +44,14 @@ const TestPlansList = ({ projectId }) => {
 
   // Handle delete
   const handleDelete = async (planId) => {
-    if (!window.confirm("Are you sure you want to delete this Test Plan?")) return;
+    if (!window.confirm("Are you sure you want to delete this Test Plan?"))
+      return;
     try {
       await axios.delete(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/test-plans/${planId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/test-plans/${planId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       toast.success("Test Plan deleted successfully.");
       fetchTestPlans();
@@ -122,10 +123,7 @@ const TestPlansList = ({ projectId }) => {
 
       {/* Edit Modal */}
       {editPlanData && (
-        <Modal
-          title="Edit Test Plan"
-          onClose={() => setEditPlanData(null)}
-        >
+        <Modal title="Edit Test Plan" onClose={() => setEditPlanData(null)}>
           <EditTestPlan
             projectId={projectId}
             planData={editPlanData}

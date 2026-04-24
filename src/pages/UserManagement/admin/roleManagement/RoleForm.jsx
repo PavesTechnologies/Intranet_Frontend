@@ -8,7 +8,12 @@ import Modal from "../../../../components/Modal/modal";
 import SearchInput from "../../../../components/filter/Searchbar";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
-export default function RoleForm({ roles, setRoles, onRoleUpdate, refreshRoles }) {
+export default function RoleForm({
+  roles,
+  setRoles,
+  onRoleUpdate,
+  refreshRoles,
+}) {
   const [localRoles, setLocalRoles] = useState([]);
   const [filteredRoles, setFilteredRoles] = useState([]);
 
@@ -28,24 +33,24 @@ export default function RoleForm({ roles, setRoles, onRoleUpdate, refreshRoles }
 
   const token = localStorage.getItem("token") || "";
   const axiosInstance = axios.create({
-    baseURL: `${import.meta.env.VITE_USER_MANAGEMENT_URL}`,
+    baseURL: `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}`,
     headers: { Authorization: `Bearer ${token}` },
   });
 
   useEffect(() => {
-  if (roles?.length) {
-    setLocalRoles(roles);
-    setFilteredRoles(roles);
-  }
-}, [roles]);
+    if (roles?.length) {
+      setLocalRoles(roles);
+      setFilteredRoles(roles);
+    }
+  }, [roles]);
 
   useEffect(() => {
     setFilteredRoles(
       searchTerm
         ? localRoles.filter((r) =>
-            r.role_name.toLowerCase().includes(searchTerm.toLowerCase())
+            r.role_name.toLowerCase().includes(searchTerm.toLowerCase()),
           )
-        : localRoles
+        : localRoles,
     );
     setCurrentPage(1);
   }, [searchTerm, localRoles]);
@@ -53,7 +58,7 @@ export default function RoleForm({ roles, setRoles, onRoleUpdate, refreshRoles }
   const totalPages = Math.ceil(filteredRoles.length / itemsPerPage);
   const paginatedRoles = filteredRoles.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   const fetchRoles = async () => {
@@ -80,7 +85,9 @@ export default function RoleForm({ roles, setRoles, onRoleUpdate, refreshRoles }
 
     setSaving(true);
     try {
-      const res = await axiosInstance.post("/admin/roles", { role_name: newRoleName });
+      const res = await axiosInstance.post("/admin/roles", {
+        role_name: newRoleName,
+      });
       if (res.status === 201 || res.status === 200) {
         showStatusToast("Role created successfully!", "success");
         setAddModalOpen(false);
@@ -110,7 +117,7 @@ export default function RoleForm({ roles, setRoles, onRoleUpdate, refreshRoles }
     if (mandatoryRoles.includes(editRole.original_name)) {
       showStatusToast(
         `Role '${editRole.original_name}' is mandatory and cannot be renamed`,
-        "error"
+        "error",
       );
       setEditModalOpen(false);
       return;
@@ -120,7 +127,7 @@ export default function RoleForm({ roles, setRoles, onRoleUpdate, refreshRoles }
     try {
       const res = await axiosInstance.put(
         `/admin/roles/uuid/${editRole.role_uuid}`,
-        { role_name: editRole.role_name }
+        { role_name: editRole.role_name },
       );
 
       if (res.status === 200) {
@@ -147,7 +154,7 @@ export default function RoleForm({ roles, setRoles, onRoleUpdate, refreshRoles }
       if (["Admin", "HR", "HR-Manager"].includes(roleToDelete?.role_name)) {
         showStatusToast(
           `Role '${roleToDelete.role_name}' is mandatory and cannot be deleted`,
-          "error"
+          "error",
         );
         setDeleteModalOpen(false);
         return;
@@ -173,7 +180,9 @@ export default function RoleForm({ roles, setRoles, onRoleUpdate, refreshRoles }
       <div className="mb-6 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-semibold">Role Management</h2>
-          <p className="text-sm text-gray-600">Create, edit, and manage roles</p>
+          <p className="text-sm text-gray-600">
+            Create, edit, and manage roles
+          </p>
         </div>
         <Button onClick={() => setAddModalOpen(true)}>Add Role</Button>
       </div>
@@ -195,10 +204,7 @@ export default function RoleForm({ roles, setRoles, onRoleUpdate, refreshRoles }
             <Button onClick={handleAddRole} disabled={saving}>
               {saving ? "Saving..." : "Add Role"}
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setAddModalOpen(false)}
-            >
+            <Button variant="secondary" onClick={() => setAddModalOpen(false)}>
               Cancel
             </Button>
           </div>
@@ -262,7 +268,9 @@ export default function RoleForm({ roles, setRoles, onRoleUpdate, refreshRoles }
           currentPage={currentPage}
           totalPages={totalPages}
           onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          onNext={() =>
+            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+          }
         />
       </div>
 
@@ -285,10 +293,7 @@ export default function RoleForm({ roles, setRoles, onRoleUpdate, refreshRoles }
             <Button onClick={handleEditRole} disabled={saving}>
               {saving ? "Updating..." : "Update"}
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setEditModalOpen(false)}
-            >
+            <Button variant="secondary" onClick={() => setEditModalOpen(false)}>
               Cancel
             </Button>
           </div>

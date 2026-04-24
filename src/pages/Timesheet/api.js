@@ -1,7 +1,7 @@
 // utils/timesheetApi.js
 import { showStatusToast } from "../../components/toastfy/toast";
 
-const apiEndpoint = import.meta.env.VITE_TIMESHEET_API_ENDPOINT;
+const apiEndpoint = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
 
 export const fetchProjectTaskInfo = async () => {
   try {
@@ -33,7 +33,7 @@ export const reviewTimesheet = async (timesheetId, comment, status) => {
   try {
     const res = await fetch(
       `${apiEndpoint}/api/timesheets/review?status=${encodeURIComponent(
-        status
+        status,
       )}`,
       {
         method: "PUT",
@@ -45,7 +45,7 @@ export const reviewTimesheet = async (timesheetId, comment, status) => {
           timesheetId,
           comment: comment,
         }),
-      }
+      },
     );
 
     if (!res.ok) {
@@ -72,7 +72,7 @@ export async function updateTimesheet(timesheetId, payload) {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify(payload),
-      }
+      },
     );
 
     // Try parsing JSON first; if not possible, fallback to text
@@ -108,8 +108,6 @@ export async function updateTimesheet(timesheetId, payload) {
     throw err;
   }
 }
-
-
 
 export async function fetchTimesheetHistory() {
   try {
@@ -147,20 +145,17 @@ export async function addEntryToTimesheet(timesheetId, workdate, payload) {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
-        }
+        },
       );
     } else {
-      res = await fetch(
-        `${apiEndpoint}/api/timesheet/addEntries`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({timeSheetId:timesheetId, entries:payload}),
-        }
-      );
+      res = await fetch(`${apiEndpoint}/api/timesheet/addEntries`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ timeSheetId: timesheetId, entries: payload }),
+      });
     }
 
     if (!res.ok) {
@@ -221,13 +216,13 @@ export async function fetchDashboardSummary() {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
-      }
+      },
     });
 
     if (!response.ok) {
       const errorData = await response.text();
       throw new Error(
-        errorData || `Error ${response.status}: ${response.statusText}`
+        errorData || `Error ${response.status}: ${response.statusText}`,
       );
     }
 
@@ -253,7 +248,7 @@ export async function filterByRange(startDate, endDate) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
 
     if (!res.ok) {
@@ -271,21 +266,18 @@ export async function filterByRange(startDate, endDate) {
 
 export async function getManagerDashboardData(startDate, endDate) {
   try {
-    const res = await fetch(
-      `${apiEndpoint}/api/manager/summary`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
+    const res = await fetch(`${apiEndpoint}/api/manager/summary`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
 
     if (!res.ok) {
       const errorData = await res.json();
       throw new Error(
-        errorData.message || "Failed to fetch manager dashboard data"
+        errorData.message || "Failed to fetch manager dashboard data",
       );
     }
 
@@ -294,7 +286,7 @@ export async function getManagerDashboardData(startDate, endDate) {
   } catch (err) {
     showStatusToast(
       err.message || "Failed to fetch manager dashboard data",
-      "error"
+      "error",
     );
     throw err;
   }
@@ -325,7 +317,6 @@ export async function getManagerDashboardData(startDate, endDate) {
 
 //       throw new Error(errorMessage);
 //     }
-
 
 //     // Handle both JSON and text responses
 //     let responseMessage = "Weekly timesheet submitted successfully";
@@ -398,7 +389,7 @@ export async function submitWeeklyTimesheet(timesheetIds) {
   } catch (err) {
     showStatusToast(
       err.message || "Failed to submit weekly timesheet",
-      "error"
+      "error",
     );
     throw err;
   }
@@ -414,7 +405,7 @@ export async function fetchCalendarHolidays() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -451,18 +442,17 @@ export async function fetchProjects() {
     showStatusToast("Failed to fetch timesheets", "error");
     return [];
   }
-} 
-
+}
 
 export const handleBulkReview = async (
   userId,
   timesheetIds,
   status,
-  comments = ""
+  comments = "",
 ) => {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/timesheets/review`,
+      `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/timesheets/review`,
       {
         method: "POST",
         headers: {
@@ -475,7 +465,7 @@ export const handleBulkReview = async (
           status,
           comments: comments || (status === "APPROVED" ? "approved" : ""),
         }),
-      }
+      },
     );
 
     // Read the response body as JSON
@@ -494,24 +484,27 @@ export const handleBulkReview = async (
     console.error("❌ Error reviewing timesheets:", err);
     showStatusToast(
       err.message || "Failed to update timesheet status",
-      "error"
+      "error",
     );
   }
 };
 export async function fetchDashboardLastMonth() {
   try {
-    const response = await fetch(`${apiEndpoint}/api/dashboard/summary/lastMonth`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      }
-    });
+    const response = await fetch(
+      `${apiEndpoint}/api/dashboard/summary/lastMonth`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    );
 
     if (!response.ok) {
       const errorData = await response.text();
       throw new Error(
-        errorData || `Error ${response.status}: ${response.statusText}`
+        errorData || `Error ${response.status}: ${response.statusText}`,
       );
     }
 
@@ -528,18 +521,21 @@ export async function fetchDashboardLastMonth() {
 }
 export async function fetchDashboardLast3Months() {
   try {
-    const response = await fetch(`${apiEndpoint}/api/dashboard/summary/last3Months`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      }
-    });
+    const response = await fetch(
+      `${apiEndpoint}/api/dashboard/summary/last3Months`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    );
 
     if (!response.ok) {
       const errorData = await response.text();
       throw new Error(
-        errorData || `Error ${response.status}: ${response.statusText}`
+        errorData || `Error ${response.status}: ${response.statusText}`,
       );
     }
 
@@ -555,16 +551,15 @@ export async function fetchDashboardLast3Months() {
   }
 }
 
-
 export const handleBulkReviewAdmin = async (
   userId,
   timesheetIds,
   status,
-  comments = ""
+  comments = "",
 ) => {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/timesheets/review/internal`,
+      `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/timesheets/review/internal`,
       {
         method: "POST",
         headers: {
@@ -577,7 +572,7 @@ export const handleBulkReviewAdmin = async (
           status,
           comments: comments || (status === "APPROVED" ? "approved" : ""),
         }),
-      }
+      },
     );
 
     // Read the response body as JSON
@@ -596,7 +591,7 @@ export const handleBulkReviewAdmin = async (
     console.error("❌ Error reviewing timesheets:", err);
     showStatusToast(
       err.message || "Failed to update timesheet status",
-      "error"
+      "error",
     );
   }
 };

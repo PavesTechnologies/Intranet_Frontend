@@ -1,13 +1,8 @@
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_RMS_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
-export const getProjects = async ({
-  page,
-  size,
-  search,
-  filters,
-}) => {
+export const getProjects = async ({ page, size, search, filters }) => {
   const params = {
     page,
     size,
@@ -20,18 +15,14 @@ export const getProjects = async ({
   // if (filters.riskLevel) params.riskLevel = filters.riskLevel;
 
   try {
-    const res = await axios.get(
-      `${BASE_URL}/api/projects/get-projects`,
-      {
-        params,
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
+    const res = await axios.get(`${BASE_URL}/api/projects/get-projects`, {
+      params,
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
     return res.data;
-  }
-  catch (err) {
+  } catch (err) {
     throw err;
   }
 };
@@ -44,7 +35,7 @@ export const getProjectById = async (projectId) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return res.data;
   } catch (err) {
@@ -60,7 +51,7 @@ export const checkDemandCreation = async (projectId) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return res.data;
   } catch (err) {
@@ -70,7 +61,8 @@ export const checkDemandCreation = async (projectId) => {
 
 export const createDemand = async (demandData) => {
   try {
-    const response = await axios.post(`${BASE_URL}/api/demand/create`,
+    const response = await axios.post(
+      `${BASE_URL}/api/demand/create`,
       demandData,
       {
         headers: {
@@ -86,13 +78,14 @@ export const createDemand = async (demandData) => {
 
 export const statusUpdate = async (readinessData) => {
   try {
-    const response = await axios.put(`${BASE_URL}/api/projects/readiness-status-update`,
+    const response = await axios.put(
+      `${BASE_URL}/api/projects/readiness-status-update`,
       readinessData,
       {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data;
   } catch (err) {
@@ -108,7 +101,7 @@ export const getProjectEscalations = async (projectId) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
 
     return res.data;
@@ -128,7 +121,7 @@ export const createProjectEscalation = async (payload) => {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     return res.data;
@@ -146,7 +139,7 @@ export const deleteProjectEscalation = async (escalationId) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
 
     return res.data;
@@ -157,14 +150,11 @@ export const deleteProjectEscalation = async (escalationId) => {
 
 export const getLocations = async () => {
   try {
-    const res = await axios.get(
-      `${BASE_URL}/api/projects/get-locations`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
+    const res = await axios.get(`${BASE_URL}/api/projects/get-locations`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
     return res.data;
   } catch (err) {
     throw err;
@@ -180,7 +170,7 @@ export const updateDemandStatus = async (payload) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data;
   } catch (err) {
@@ -190,14 +180,11 @@ export const updateDemandStatus = async (payload) => {
 
 export const getProjectKPIs = async () => {
   try {
-    const res = await axios.get(
-      `${BASE_URL}/api/projects/kpi`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
+    const res = await axios.get(`${BASE_URL}/api/projects/kpi`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
     return res.data;
   } catch (err) {
     throw err;

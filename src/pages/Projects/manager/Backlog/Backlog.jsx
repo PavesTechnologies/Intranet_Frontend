@@ -38,7 +38,7 @@
 
 //   const fetchProjects = () => {
 //     axios
-//       .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`, { headers })
+//       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`, { headers })
 //       .then((res) => setProjects(res.data.content || res.data || []))
 //       .catch((err) => console.error("Failed to fetch projects", err));
 //   };
@@ -46,7 +46,7 @@
 //   const fetchStories = () => {
 //     axios
 //       .get(
-//         `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`,
+//         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
 //         { headers }
 //       )
 //       .then((res) => setStories(res.data))
@@ -55,7 +55,7 @@
 
 //   const fetchNoEpicStories = () => {
 //     axios
-//       .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/stories/no-epic`, {
+//       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/no-epic`, {
 //         params: { projectId },
 //         headers,
 //       })
@@ -66,7 +66,7 @@
 //   const fetchSprints = () => {
 //     axios
 //       .get(
-//         `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`,
+//         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
 //         { headers }
 //       )
 //       .then((res) => setSprints(res.data))
@@ -83,7 +83,7 @@
 //   const handleDropStory = (storyId, sprintId) => {
 //     axios
 //       .put(
-//         `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/${storyId}/assign-sprint`,
+//         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}/assign-sprint`,
 //         { sprintId },
 //         { headers }
 //       )

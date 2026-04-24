@@ -12,6 +12,19 @@ const toDateInputValue = (date) => {
     const matchedDate = String(date).trim().match(/^(\d{4}-\d{2}-\d{2})/);
     return matchedDate ? matchedDate[1] : "";
 };
+const getTodayLocalDate = () => {
+    const today = new Date();
+    return new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+        .toISOString()
+        .split("T")[0];
+};
+
+const getAllocationStartDate = (demandStartDate) => {
+    const today = getTodayLocalDate();
+    const demandDate = toDateInputValue(demandStartDate);
+
+    return demandDate && demandDate > today ? demandDate : today;
+};
 
 const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = [], isBenchMode = false, benchMatches = [], onSuccess }) => {
     const [resources, setResources] = useState([]);
@@ -23,7 +36,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = [], isB
     const [formData, setFormData] = useState({
         resourceId: [],
         demandId: demand?.demandId || demand?.id || '',
-        allocationStartDate: toDateInputValue(demand?.demandStartDate),
+        allocationStartDate: getAllocationStartDate(demand?.demandStartDate),
         allocationEndDate: toDateInputValue(demand?.demandEndDate),
         allocationPercentage: demand?.allocationPercentage || 100,
         allocationStatus: 'ACTIVE',
@@ -82,7 +95,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = [], isB
             setFormData(prev => ({
                 ...prev,
                 demandId: demand?.demandId || demand?.id || '',
-                allocationStartDate: toDateInputValue(demand?.demandStartDate),
+                allocationStartDate: getAllocationStartDate(demand?.demandStartDate),
                 allocationEndDate: toDateInputValue(demand?.demandEndDate),
                 resourceId: initialResourceIds,
                 skipValidation: false,
@@ -419,20 +432,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = [], isB
 
                     {/* Dates Row */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                <Calendar className="h-3 w-3 text-indigo-500" /> Start Date
-                            </label>
-                            <Input
-                                type="date"
-                                value={formData.allocationStartDate}
-                                min={minStart}
-                                max={maxEnd}
-                                onChange={(e) => setFormData({ ...formData, allocationStartDate: e.target.value })}
-                                className={cn("h-10 rounded-xl border-slate-200 font-bold text-slate-900 text-xs", errors.allocationStartDate && "border-rose-500")}
-                            />
-                            {errors.allocationStartDate && <p className="text-[9px] font-bold text-rose-500 mt-0.5">{errors.allocationStartDate}</p>}
-                        </div>
+                        
                         <div className="space-y-1">
                             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                 <Calendar className="h-3 w-3 text-indigo-500" /> End Date
