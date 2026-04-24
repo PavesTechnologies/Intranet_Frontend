@@ -34,8 +34,8 @@ const ProjectList = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       const data = Array.isArray(res.data) ? res.data : res.data.content || [];
       setProjects(data);
@@ -47,12 +47,12 @@ const ProjectList = () => {
   };
 
   // Fetch all users
-  
+
   const fetchUsers = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/users?page=0&size=100`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/users?page=0&size=100`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       const data = Array.isArray(res.data) ? res.data : res.data.content || [];
       setUsers(data);
@@ -99,7 +99,7 @@ const ProjectList = () => {
     if (formData.status === "ARCHIVED" && name !== "status") {
       toast.warn(
         "Archived projects can only have their status changed to ACTIVE.",
-        { position: "top-right" }
+        { position: "top-right" },
       );
       return;
     }
@@ -115,7 +115,7 @@ const ProjectList = () => {
     if (formData.status === "ARCHIVED") {
       toast.warn(
         "Archived projects can only have their status changed to ACTIVE.",
-        { position: "top-right" }
+        { position: "top-right" },
       );
       return;
     }
@@ -131,13 +131,13 @@ const ProjectList = () => {
     try {
       setIsSubmitting(true);
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
         {
           ...formData,
           ownerId: formData.ownerId ? parseInt(formData.ownerId) : null,
           memberIds: formData.memberIds || [],
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       toast.success("Project updated successfully!", { position: "top-right" });
       setEditingProjectId(null);
@@ -150,11 +150,12 @@ const ProjectList = () => {
   };
 
   const handleDelete = async (projectId) => {
-    if (!window.confirm("Are you sure you want to delete this project?")) return;
+    if (!window.confirm("Are you sure you want to delete this project?"))
+      return;
     try {
       await axios.delete(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       toast.success("Project deleted successfully!", { position: "top-right" });
       fetchProjects();
@@ -166,7 +167,7 @@ const ProjectList = () => {
   const filteredProjects = projects.filter(
     (p) =>
       p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.projectKey?.toLowerCase().includes(searchTerm.toLowerCase())
+      p.projectKey?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   // Pagination
@@ -174,7 +175,7 @@ const ProjectList = () => {
   const indexOfFirstProject = indexOfLastProject - projectsPerPage;
   const currentProjects = filteredProjects.slice(
     indexOfFirstProject,
-    indexOfLastProject
+    indexOfLastProject,
   );
   const totalPages = Math.ceil(filteredProjects.length / projectsPerPage);
 
@@ -205,7 +206,11 @@ const ProjectList = () => {
                 onClick={() => toggleExpand(project.id)}
               >
                 <div className="flex items-center gap-2">
-                  {expandedId === project.id ? <ChevronDown /> : <ChevronRight />}
+                  {expandedId === project.id ? (
+                    <ChevronDown />
+                  ) : (
+                    <ChevronRight />
+                  )}
                   <h2 className="text-xl font-semibold">{project.name}</h2>
                   <span className="text-gray-500 text-sm">
                     ({project.projectKey})
@@ -369,7 +374,9 @@ const ProjectList = () => {
           currentPage={currentPage}
           totalPages={totalPages}
           onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          onNext={() =>
+            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+          }
         />
       )}
 

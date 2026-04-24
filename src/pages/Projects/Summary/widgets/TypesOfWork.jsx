@@ -16,7 +16,6 @@ const TypesOfWork = ({ tasks, stories, epics, bugs }) => {
     () => [
       { name: "Tasks", items: tasks, icon: <FiCheckSquare className="text-blue-500" /> },
       { name: "Stories", items: stories, icon: <FiBookmark className="text-green-500" /> },
-      { name: "Epics", items: epics, icon: <FiZap className="text-purple-500" /> },
       { name: "Bugs", items: bugs, icon: <FaBug className="text-red-500" /> },
     ],
     [tasks, stories, epics, bugs]

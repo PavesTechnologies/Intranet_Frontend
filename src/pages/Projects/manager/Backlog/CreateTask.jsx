@@ -35,7 +35,7 @@ const CreateTaskForm = ({
   const [stories, setStories] = useState([]);
   const [users, setUsers] = useState([]);
   const [selectedStorySprint, setSelectedStorySprint] = useState(
-    defaultSprintId || null
+    defaultSprintId || null,
   );
   const [loading, setLoading] = useState(false);
 
@@ -55,8 +55,8 @@ const CreateTaskForm = ({
             axiosConfig
           ),
           axios.get(
-            `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
-            axiosConfig
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+            axiosConfig,
           ),
         ]);
         setStories(storyRes.data || []);
@@ -71,10 +71,10 @@ const CreateTaskForm = ({
 
   useEffect(() => {
     const selectedStory = stories.find(
-      (s) => s.id === Number(formData.storyId)
+      (s) => s.id === Number(formData.storyId),
     );
     setSelectedStorySprint(
-      selectedStory?.sprint?.id ?? selectedStory?.sprintId ?? defaultSprintId
+      selectedStory?.sprint?.id ?? selectedStory?.sprintId ?? defaultSprintId,
     );
   }, [formData.storyId, stories, defaultSprintId]);
 
@@ -105,9 +105,9 @@ const CreateTaskForm = ({
     try {
       setLoading(true);
       const res = await axios.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/tasks`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks`,
         payload,
-        axiosConfig
+        axiosConfig,
       );
       toast.success("Task created successfully!");
       setTimeout(() => {

@@ -28,10 +28,10 @@ export default function ForgotPassword() {
     setSendingOtp(true);
     try {
       await axios.post(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/auth/send-otp`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/send-otp`,
         {
           email: email.trim(),
-        }
+        },
       );
       setOtpSent(true);
       showStatusToast("OTP sent to your email. Check inbox/spam.", "success");
@@ -39,7 +39,7 @@ export default function ForgotPassword() {
       console.error("sendOtp error:", err);
       showStatusToast(
         "Failed to send OTP: " + (err.response?.data?.detail || err.message),
-        "error"
+        "error",
       );
     } finally {
       setSendingOtp(false);
@@ -58,12 +58,12 @@ export default function ForgotPassword() {
     setResetting(true);
     try {
       await axios.post(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/auth/forgot-password`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/forgot-password`,
         {
           email: email.trim(),
           otp: otp.trim(),
           new_password: newPassword,
-        }
+        },
       );
       showStatusToast("Password reset successfully!", "success");
       navigate("/");
@@ -72,7 +72,7 @@ export default function ForgotPassword() {
       showStatusToast(
         "Error resetting password: " +
           (err.response?.data?.detail || err.message),
-        "error"
+        "error",
       );
     } finally {
       setResetting(false);

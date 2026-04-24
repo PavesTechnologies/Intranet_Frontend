@@ -1,4 +1,5 @@
 "use client";
+import { useAuth } from '../../../contexts/AuthContext'; // Ensure this path matches your project structure
 
 import React, { useState } from "react";
 import axios from "axios";
@@ -9,6 +10,19 @@ import { Download } from "lucide-react";
 
 export default function BulkUpload() {
   const navigate = useNavigate();
+  // --- ADD THIS LINE ---
+  const { user } = useAuth(); 
+
+  // --- ADD THIS ROLE LOGIC ---
+  const rawRoles = user?.roles || "";
+  const userRoles = Array.isArray(rawRoles) 
+    ? rawRoles 
+    : rawRoles.split(',').map(r => r.trim());
+
+  const isHR = userRoles.includes("HR");
+  // const isAdmin = userRoles.includes("Admin");
+  const canUpload = isHR; // Only HR or Admin can perform this action
+  // -------------------------
 
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -55,6 +69,12 @@ export default function BulkUpload() {
   // Submit File to API (Client-side translation)
   // ---------------------------
   const handleUpload = async () => {
+    // --- ADD THIS SECURITY CHECK ---
+  if (!canUpload) {
+    toast.error("You do not have the required role to perform bulk uploads.");
+    return;
+  }
+  // -------------------------------
     if (!previewData || previewData.length === 0) {
       toast.error("No valid data found in file to upload");
       return;
@@ -68,126 +88,155 @@ export default function BulkUpload() {
     const failedOffers = [];
 
     for (let i = 0; i < previewData.length; i++) {
-        const row = previewData[i];
+      const row = previewData[i];
 
-          // 1. All unknown columns are treated as Compensation Components
-          const standardColumns = new Set([
-            "First Name", "Middle Name", "Last Name", "Email", 
-            "Country Code", "Contact Number", "Designation", 
-            "Employee Type", "CC Mails", "Annual CTC"
-          ]);
+      // 1. All unknown columns are treated as Compensation Components
+      const standardColumns = new Set([
+        "First Name",
+        "Middle Name",
+        "Last Name",
+        "Email",
+        "Country Code",
+        "Contact Number",
+        "Designation",
+        "Employee Type",
+        "CC Mails",
+        "Annual CTC",
+      ]);
 
-          const compensation_components = [];
-          
-          for (const key of Object.keys(row)) {
-            if (!standardColumns.has(key)) {
-              const val = row[key];
-              // Only process if they entered a valid number
-              if (val !== "" && val !== null && !isNaN(Number(val))) {
-                let cName = key.trim();
-                let cType = "Fixed";
-                let cFreq = "Monthly";
+      const compensation_components = [];
 
-                // Support advanced syntax like "Bonus (Variable, Yearly)"
-                const match = cName.match(/^(.*?)\s*\((.*?),\s*(.*?)\)$/i);
-                if (match) {
-                  cName = match[1].trim();
-                  cType = match[2].trim();
-                  cFreq = match[3].trim();
-                }
+      for (const key of Object.keys(row)) {
+        if (!standardColumns.has(key)) {
+          const val = row[key];
+          // Only process if they entered a valid number
+          if (val !== "" && val !== null && !isNaN(Number(val))) {
+            let cName = key.trim();
+            let cType = "Fixed";
+            let cFreq = "Monthly";
 
-                compensation_components.push({
-                  name: String(cName),
-                  type: cType,
-                  frequency: cFreq,
-                  amount: Number(val)
-                });
-              }
-            }
-          }
-
-          // Validate Employee Type before hitting the backend
-          const empType = row["Employee Type"] || "Full-Time";
-          const validTypes = ["Full-Time", "Part-Time", "Contractor", "Intern"];
-          if (!validTypes.includes(empType)) {
-            failedCount++;
-            failedOffers.push({ 
-              row: i + 2, 
-              error: `Invalid Employee Type '${empType}'. Must be exactly: ${validTypes.join(", ")}` 
-            });
-            continue;
-          }
-
-          // 2. Build the exact payload schema that /offerletters/create expects
-          const payload = {
-            first_name: row["First Name"] || "",
-            middle_name: row["Middle Name"] || "",
-            last_name: row["Last Name"] || "",
-            mail: row["Email"] || "",
-            country_code: row["Country Code"] ? String(row["Country Code"]) : "+91",
-            contact_number: row["Contact Number"] ? String(row["Contact Number"]) : "",
-            designation: row["Designation"] || "",
-            employee_type: empType,
-            cc_mails: row["CC Mails"] ? String(row["CC Mails"]).split(",").map((m) => m.trim()).filter(Boolean) : [],
-            total_ctc: Number(row["Annual CTC"] || 0),
-            compensation_components: compensation_components
-          };
-
-          try {
-            await axios.post(
-              `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/create`,
-              payload,
-              { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-            );
-            successCount++;
-          } catch (err) {
-            failedCount++;
-
-            let rawError = err.response?.data?.detail?.[0]?.msg || err.response?.data?.detail || "Failed to create";
-            if (typeof rawError !== "string") rawError = JSON.stringify(rawError);
-
-            // User-friendly error translations
-            let friendlyError = rawError;
-            if (rawError.includes("Data truncated for column 'employee_type'")) {
-              friendlyError = "Invalid Employee Type. Check for typos (Use Full-Time, Part-Time, Contractor, Intern).";
-            } else if (rawError.includes("Duplicate entry")) {
-              friendlyError = "An offer with this Email or Details already exists in the system.";
-            } else if (rawError.includes("not a valid email")) {
-              friendlyError = "Invalid Email Address format.";
-            } else if (rawError.includes("Field required")) {
-              friendlyError = "A required field is missing. Please ensure all mandatory fields are filled.";
-            } else if (rawError.includes("Data truncated for column")) {
-               const fieldMatch = rawError.match(/column '(.+?)'/);
-               friendlyError = `The text entered for '${fieldMatch ? fieldMatch[1] : "a field"}' is too long or invalid.`;
-            } else if (rawError.includes("FOREIGN KEY constraint failed")) {
-               friendlyError = "Invalid reference. Please check fields like Country Code.";
+            // Support advanced syntax like "Bonus (Variable, Yearly)"
+            const match = cName.match(/^(.*?)\s*\((.*?),\s*(.*?)\)$/i);
+            if (match) {
+              cName = match[1].trim();
+              cType = match[2].trim();
+              cFreq = match[3].trim();
             }
 
-            failedOffers.push({ 
-              row: i + 2, 
-              error: friendlyError 
+            compensation_components.push({
+              name: String(cName),
+              type: cType,
+              frequency: cFreq,
+              amount: Number(val),
             });
           }
         }
+      }
 
-        const resData = {
-          total_rows: previewData.length,
-          processed_rows: successCount + failedCount,
-          successful_count: successCount,
-          failed_count: failedCount,
-          failed_offers: failedOffers,
-          skipped_rows: 0
-        };
-        setResult(resData);
+      // Validate Employee Type before hitting the backend
+      const empType = row["Employee Type"] || "Full-Time";
+      const validTypes = ["Full-Time", "Part-Time", "Contractor", "Intern"];
+      if (!validTypes.includes(empType)) {
+        failedCount++;
+        failedOffers.push({
+          row: i + 2,
+          error: `Invalid Employee Type '${empType}'. Must be exactly: ${validTypes.join(", ")}`,
+        });
+        continue;
+      }
 
-        if (failedCount > 0 && successCount === 0) {
-          toast.error("Bulk upload failed for all rows.", { autoClose: 2000 });
-        } else if (failedCount > 0) {
-          toast.warning(`Completed with ${failedCount} errors.`, { autoClose: 2500 });
-        } else {
-          toast.success("✔ Bulk upload completed successfully!", { autoClose: 1500 });
+      // 2. Build the exact payload schema that /offerletters/create expects
+      const payload = {
+        first_name: row["First Name"] || "",
+        middle_name: row["Middle Name"] || "",
+        last_name: row["Last Name"] || "",
+        mail: row["Email"] || "",
+        country_code: row["Country Code"] ? String(row["Country Code"]) : "+91",
+        contact_number: row["Contact Number"]
+          ? String(row["Contact Number"])
+          : "",
+        designation: row["Designation"] || "",
+        employee_type: empType,
+        cc_mails: row["CC Mails"]
+          ? String(row["CC Mails"])
+              .split(",")
+              .map((m) => m.trim())
+              .filter(Boolean)
+          : [],
+        total_ctc: Number(row["Annual CTC"] || 0),
+        compensation_components: compensation_components,
+      };
+
+      try {
+        await axios.post(
+          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/create`,
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
+        );
+        successCount++;
+      } catch (err) {
+        failedCount++;
+
+        let rawError =
+          err.response?.data?.detail?.[0]?.msg ||
+          err.response?.data?.detail ||
+          "Failed to create";
+        if (typeof rawError !== "string") rawError = JSON.stringify(rawError);
+
+        // User-friendly error translations
+        let friendlyError = rawError;
+        if (rawError.includes("Data truncated for column 'employee_type'")) {
+          friendlyError =
+            "Invalid Employee Type. Check for typos (Use Full-Time, Part-Time, Contractor, Intern).";
+        } else if (rawError.includes("Duplicate entry")) {
+          friendlyError =
+            "An offer with this Email or Details already exists in the system.";
+        } else if (rawError.includes("not a valid email")) {
+          friendlyError = "Invalid Email Address format.";
+        } else if (rawError.includes("Field required")) {
+          friendlyError =
+            "A required field is missing. Please ensure all mandatory fields are filled.";
+        } else if (rawError.includes("Data truncated for column")) {
+          const fieldMatch = rawError.match(/column '(.+?)'/);
+          friendlyError = `The text entered for '${fieldMatch ? fieldMatch[1] : "a field"}' is too long or invalid.`;
+        } else if (rawError.includes("FOREIGN KEY constraint failed")) {
+          friendlyError =
+            "Invalid reference. Please check fields like Country Code.";
         }
-        
+
+        failedOffers.push({
+          row: i + 2,
+          error: friendlyError,
+        });
+      }
+    }
+
+    const resData = {
+      total_rows: previewData.length,
+      processed_rows: successCount + failedCount,
+      successful_count: successCount,
+      failed_count: failedCount,
+      failed_offers: failedOffers,
+      skipped_rows: 0,
+    };
+    setResult(resData);
+
+    if (failedCount > 0 && successCount === 0) {
+      toast.error("Bulk upload failed for all rows.", { autoClose: 2000 });
+    } else if (failedCount > 0) {
+      toast.warning(`Completed with ${failedCount} errors.`, {
+        autoClose: 2500,
+      });
+    } else {
+      toast.success("✔ Bulk upload completed successfully!", {
+        autoClose: 1500,
+      });
+    }
+
     setUploading(false);
   };
 
@@ -203,24 +252,32 @@ export default function BulkUpload() {
         "First Name": "",
         "Middle Name": "",
         "Last Name": "",
-        "Email": "",
+        Email: "",
         "Country Code": "",
         "Contact Number": "",
-        "Designation": "",
+        Designation: "",
         "Employee Type": "",
         "CC Mails": "",
         "Annual CTC": "",
-        "Basic Pay": ""
-      }
+        "Basic Pay": "",
+      },
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
-    
+
     // Add some styling or adjust column widths to make it readable
     worksheet["!cols"] = [
-      { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, 
-      { wch: 20 }, { wch: 15 }, { wch: 30 }, { wch: 15 }, 
-      { wch: 15 }
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 30 },
+      { wch: 15 },
+      { wch: 15 },
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -230,12 +287,14 @@ export default function BulkUpload() {
 
   return (
     <div className="max-w-3xl mx-auto bg-white shadow-lg rounded-xl p-8">
-
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h1 className="text-2xl font-semibold mb-2">Bulk Upload Offer Letters</h1>
+          <h1 className="text-2xl font-semibold mb-2">
+            Bulk Upload Offer Letters
+          </h1>
           <p className="text-gray-600">
-            Upload an Excel file (.xlsx / .xls / .csv) to create multiple offers at once.
+            Upload an Excel file (.xlsx / .xls / .csv) to create multiple offers
+            at once.
           </p>
         </div>
         <button
@@ -273,7 +332,9 @@ export default function BulkUpload() {
       {previewData && previewData.length > 0 && (
         <div className="mt-6 border rounded-xl overflow-x-auto shadow-sm">
           <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
-            <h3 className="font-medium text-gray-700">Previewing {previewData.length} Records</h3>
+            <h3 className="font-medium text-gray-700">
+              Previewing {previewData.length} Records
+            </h3>
           </div>
           <table className="w-full text-sm text-left text-gray-600">
             <thead className="text-xs text-gray-500 uppercase bg-gray-100 border-b">
@@ -287,15 +348,22 @@ export default function BulkUpload() {
             <tbody>
               {previewData.slice(0, 5).map((row, idx) => (
                 <tr key={idx} className="bg-white border-b hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium text-gray-900">{row["First Name"] || "-"} {row["Last Name"] || ""}</td>
+                  <td className="px-4 py-2 font-medium text-gray-900">
+                    {row["First Name"] || "-"} {row["Last Name"] || ""}
+                  </td>
                   <td className="px-4 py-2">{row["Email"] || "-"}</td>
                   <td className="px-4 py-2">{row["Designation"] || "-"}</td>
-                  <td className="px-4 py-2 text-right">₹ {Number(row["Annual CTC"] || 0).toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right">
+                    ₹ {Number(row["Annual CTC"] || 0).toLocaleString()}
+                  </td>
                 </tr>
               ))}
               {previewData.length > 5 && (
                 <tr className="bg-gray-50">
-                  <td colSpan="4" className="px-4 py-3 text-center text-gray-500 text-xs font-medium">
+                  <td
+                    colSpan="4"
+                    className="px-4 py-3 text-center text-gray-500 text-xs font-medium"
+                  >
                     + {previewData.length - 5} more records ready for upload
                   </td>
                 </tr>
@@ -316,16 +384,20 @@ export default function BulkUpload() {
           Reset
         </button>
 
-        <button
-          onClick={handleUpload}
-          disabled={uploading}
-          className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400  active:translate-y-[1px]
-        disabled:opacity-60 disabled:cursor-not-allowed
-        flex items-center justify-center gap-2"
-        >
-          {uploading ? "Uploading..." : "Upload"}
-        </button>
-      </div>
+       {canUpload ? (
+    <button
+      onClick={handleUpload}
+      disabled={uploading}
+      className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 active:translate-y-[1px] flex items-center justify-center gap-2"
+    >
+      {uploading ? "Uploading..." : "Upload"}
+    </button>
+  ) : (
+    <div className="text-sm text-red-500 bg-red-50 p-2 rounded border border-red-200">
+      ⚠️ Access Restricted: Only HR can perform bulk uploads.
+    </div>
+  )}
+  </div>
 
       {/* Results Summary */}
       {result && (
@@ -333,17 +405,33 @@ export default function BulkUpload() {
           <h2 className="text-xl font-semibold mb-3">Upload Summary</h2>
 
           <div className="grid grid-cols-2 gap-4 text-gray-800">
-            <p>Total Rows: <strong>{result.total_rows}</strong></p>
-            <p>Processed Rows: <strong>{result.processed_rows}</strong></p>
-            <p>Success Count: <strong className="text-green-600">{result.successful_count}</strong></p>
-            <p>Failed Count: <strong className="text-red-600">{result.failed_count}</strong></p>
-            <p>Skipped Rows: <strong>{result.skipped_rows}</strong></p>
+            <p>
+              Total Rows: <strong>{result.total_rows}</strong>
+            </p>
+            <p>
+              Processed Rows: <strong>{result.processed_rows}</strong>
+            </p>
+            <p>
+              Success Count:{" "}
+              <strong className="text-green-600">
+                {result.successful_count}
+              </strong>
+            </p>
+            <p>
+              Failed Count:{" "}
+              <strong className="text-red-600">{result.failed_count}</strong>
+            </p>
+            <p>
+              Skipped Rows: <strong>{result.skipped_rows}</strong>
+            </p>
           </div>
 
           {/* Failed List */}
           {result.failed_offers?.length > 0 && (
             <div className="mt-4">
-              <h3 className="font-semibold text-red-600 mb-2">Failed Entries</h3>
+              <h3 className="font-semibold text-red-600 mb-2">
+                Failed Entries
+              </h3>
               <ul className="text-sm text-gray-700 bg-white p-3 rounded-lg border max-h-40 overflow-auto">
                 {result.failed_offers.map((fail, idx) => (
                   <li key={idx} className="py-1 border-b last:border-0">

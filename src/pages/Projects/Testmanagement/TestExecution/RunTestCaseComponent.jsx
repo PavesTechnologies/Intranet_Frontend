@@ -19,8 +19,8 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
       setIsLoading(true);
       const res = await axiosInstance.get(
         `${
-          import.meta.env.VITE_PMS_BASE_URL
-        }/api/test-execution/run-cases/${testCaseId}/steps`
+          window.__APP_CONFIG__.PMS_BASE_URL
+        }/api/test-execution/run-cases/${testCaseId}/steps`,
       );
       setSteps(res.data);
       setTestCase({ title: `Executing Test Case ${testCaseId}` });
@@ -45,22 +45,22 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
       const stepObj = steps.find((s) => s.id === stepId);
       setFailingStep(stepObj);
       setShowBugModal(true);
-    //   return;
+      //   return;
     }
 
     try {
       await axiosInstance.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-execution/steps/execute`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/steps/execute`,
         {
           runCaseId: testCaseId,
           stepId,
           status: apiStatus,
           actualResult: "",
-        }
+        },
       );
 
       setSteps((prev) =>
-        prev.map((s) => (s.id === stepId ? { ...s, status: apiStatus } : s))
+        prev.map((s) => (s.id === stepId ? { ...s, status: apiStatus } : s)),
       );
 
       setStepResults((prev) => ({ ...prev, [stepId]: apiStatus }));
@@ -81,13 +81,13 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
       let apiStatus = "";
 
       if (action === "PASS") {
-        endpoint =`${
-          import.meta.env.VITE_PMS_BASE_URL
+        endpoint = `${
+          window.__APP_CONFIG__.PMS_BASE_URL
         }/api/test-execution/test-runs/${runId}/bulk-pass`;
         apiStatus = "PASSED";
       } else if (action === "SKIP") {
         endpoint = `${
-          import.meta.env.VITE_PMS_BASE_URL
+          window.__APP_CONFIG__.PMS_BASE_URL
         }/api/test-execution/test-runs/${runId}/bulk-skip`;
         apiStatus = "SKIPPED";
       }
@@ -100,8 +100,8 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
 
       setSteps((prev) =>
         prev.map((s) =>
-          selectedSteps.includes(s.id) ? { ...s, status: apiStatus } : s
-        )
+          selectedSteps.includes(s.id) ? { ...s, status: apiStatus } : s,
+        ),
       );
 
       setSelectedSteps([]);
@@ -233,7 +233,7 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
                           setSelectedSteps((prev) => [...prev, step.id]);
                         } else {
                           setSelectedSteps((prev) =>
-                            prev.filter((id) => id !== step.id)
+                            prev.filter((id) => id !== step.id),
                           );
                         }
                       }}

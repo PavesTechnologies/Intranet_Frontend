@@ -2,12 +2,12 @@ export const fetchEmployees = async () => {
   const token = localStorage.getItem("token");
 
   const res = await fetch(
-    `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
+    `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
       },
-    }
+    },
   );
 
   if (!res.ok) throw new Error("Failed to fetch employees");
@@ -133,7 +133,7 @@ export const fetchEmployees = async () => {
 //     location: "Hyderabad",
 //     workmode: "Remote",
 //     email: "rangaswamy.dama@pavestechnologies.com",
-//     emailStatus: "Active",    
+//     emailStatus: "Active",
 //     designation: "Graduate Software Engineer",
 //     manager: "Sathish",
 //     doj: "08 Dec 2025",
@@ -151,7 +151,7 @@ export const fetchEmployees = async () => {
 //     location: "Hyderabad",
 //     workmode: "hybrid",
 //     email: "thejas.gajula@pavestechnologies.com",
-//     emailStatus: "Active",    
+//     emailStatus: "Active",
 //     designation: "Graduate Software Engineer",
 //     manager: "Sathish",
 //     doj: "08 Dec 2025",
@@ -169,7 +169,7 @@ export const fetchEmployees = async () => {
 //     location: "Hyderabad",
 //     workmode: "hybrid",
 //     email: "venkatesh.gali@pavestechnologies.com",
-//     emailStatus: "Active",   
+//     emailStatus: "Active",
 //     designation: "Graduate Software Engineer",
 //     manager: "Sathish",
 //     doj: "08 Dec 2025",
@@ -187,7 +187,7 @@ export const fetchEmployees = async () => {
 //     location: "Hyderabad",
 //     workmode: "hybrid",
 //     email: "ajay.korada@pavestechnologies.com",
-//     emailStatus: "Active",    
+//     emailStatus: "Active",
 //     designation: "Graduate Software Engineer",
 //     manager: "Sathish",
 //     doj: "08 Dec 2025",
@@ -205,7 +205,7 @@ export const fetchEmployees = async () => {
 //     location: "Hyderabad",
 //     workmode: "hybrid",
 //     email: "niharika.kandukoori@pavestechnologies.com",
-//     emailStatus: "Active",    
+//     emailStatus: "Active",
 //     designation: "Graduate Software Engineer",
 //     manager: "Sathish",
 //     doj: "08 Dec 2025",
@@ -231,4 +231,3 @@ export const fetchEmployees = async () => {
 //     experience: "0-1 Years",
 //   },
 // ];
-

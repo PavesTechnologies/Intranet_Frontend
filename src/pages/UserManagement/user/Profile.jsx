@@ -16,12 +16,12 @@ export default function Profile() {
     if (token) {
       axios
         .get(
-          `${import.meta.env.VITE_USER_MANAGEMENT_URL}/general_user/profile`,
+          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/general_user/profile`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         )
         .then((res) => {
           setProfile(res.data);

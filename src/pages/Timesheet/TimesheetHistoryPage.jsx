@@ -103,8 +103,8 @@ const TimesheetHistoryPage = () => {
                 entry.isBillable !== undefined ? entry.isBillable : true,
             }));
           }
-          //map holiday flag from API response 
-          timesheet.isHoliday=!!timesheet.isHolidayTimesheet;
+          //map holiday flag from API response
+          timesheet.isHoliday = !!timesheet.isHolidayTimesheet;
           // Merge action status from individual timesheets
           if (timesheet.actionStatus) {
             weekGroup.actionStatus = [
@@ -164,14 +164,14 @@ const TimesheetHistoryPage = () => {
   const fetchAndStoreProjectTaskInfo = async () => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/project-info`,
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/project-info`,
         {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -227,7 +227,7 @@ const TimesheetHistoryPage = () => {
 
   // Fetch user info
   // useEffect(() => {
-  //   fetch(`${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/me`)
+  //   fetch(`${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/me`)
   //     .then((res) => {
   //       if (!res.ok) throw new Error("Failed to fetch user");
   //       return res.json();
@@ -237,7 +237,7 @@ const TimesheetHistoryPage = () => {
   // }, []);
 
   const projectIdToName = Object.fromEntries(
-    projectInfo.map((p) => [p.projectId, p.projectName])
+    projectInfo.map((p) => [p.projectId, p.projectName]),
   );
 
   useEffect(() => {
@@ -307,7 +307,7 @@ const TimesheetHistoryPage = () => {
   // Filter entries
   const filteredEntries = entries.filter((weekGroup) => {
     const matchesSearch = weekGroup.timesheets.map((timesheet) => {
-      return timesheet?.entries.map((entry) => {  
+      return timesheet?.entries.map((entry) => {
         // Use the mapped project name instead of looking up by ID
         const projectName =
           entry?.projectName || projectIdToName[entry.projectId] || "";
@@ -332,7 +332,7 @@ const TimesheetHistoryPage = () => {
   const totalPages = Math.ceil(filteredEntries.length / rowsPerPage);
   const paginatedData = filteredEntries.slice(
     (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage
+    currentPage * rowsPerPage,
   );
 
   return (
@@ -370,7 +370,7 @@ const TimesheetHistoryPage = () => {
               // Then fetch timesheet history
               const response = await fetch(
                 `${
-                  import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+                  window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
                 }/api/timesheet/history`,
                 {
                   method: "GET",
@@ -378,7 +378,7 @@ const TimesheetHistoryPage = () => {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${localStorage.getItem("token")}`,
                   },
-                }
+                },
               );
 
               const data = await response.json();
@@ -386,7 +386,7 @@ const TimesheetHistoryPage = () => {
               // Map API response to our expected format using the mapping data
               const weeklyEntries = mapApiResponseToEntries(
                 data,
-                projectTaskMapping
+                projectTaskMapping,
               );
 
               // Calculate week-to-week differences
@@ -412,7 +412,7 @@ const TimesheetHistoryPage = () => {
                     isFirstWeek: index === 0,
                     isLastWeek: index === weeklyEntries.length - 1,
                   };
-                }
+                },
               );
 
               setEntries(entriesWithDifferences);
@@ -430,7 +430,3 @@ const TimesheetHistoryPage = () => {
 
 // Named export for fetchAndStoreProjectTaskInfo
 export default TimesheetHistoryPage;
-
-
-
-
