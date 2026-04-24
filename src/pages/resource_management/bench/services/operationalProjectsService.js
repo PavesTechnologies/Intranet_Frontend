@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const TSM_BASE_URL = import.meta.env.VITE_TIMESHEET_API_ENDPOINT;
+const TSM_BASE_URL = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
 
 const getAuthHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
