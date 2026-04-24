@@ -22,7 +22,8 @@ import {
   Trash2,
   Search,
   AlertCircle,
-  ChevronDown
+  ChevronDown,
+  PencilLine
 } from "lucide-react";
 import { showStatusToast } from "../../../components/toastfy/toast";
 
@@ -31,6 +32,8 @@ import { useParams } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
 import JobPage from "./JobPage";
 import DocumentsPage from "./DocumentsPage";
+import { showStatusToast } from "../../../components/toastfy/toast";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import SkillModal from "./SkillModal";
 import EditSkillModal from "./EditSkillModal";
 import { skillService } from "../../../services/skillService";
@@ -49,6 +52,8 @@ export default function EmployeeProfileView() {
 
   const [profileImg, setProfileImg] = useState(null);
   const profileRef = useRef(null);
+  const initialCoreFetchDoneRef = useRef(false);
+  const initialAboutFetchDoneRef = useRef(false);
   const [employee, setEmployee] = useState(null);
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   
@@ -205,8 +210,15 @@ export default function EmployeeProfileView() {
   };
 
   useEffect(() => {
-    if (employee_uuid) fetchAllData();
-  }, [employee_uuid, BASE_URL]);
+    initialCoreFetchDoneRef.current = false;
+    initialAboutFetchDoneRef.current = false;
+  }, [employee_uuid]);
+
+  useEffect(() => {
+    if (!employee_uuid || initialCoreFetchDoneRef.current) return;
+    initialCoreFetchDoneRef.current = true;
+    fetchAllData();
+  }, [employee_uuid]);
 
   useEffect(() => {
     if (!employee?.employee_id) return;
@@ -217,16 +229,96 @@ export default function EmployeeProfileView() {
   }, [employee?.employee_id]);
 
   const [about, setAbout] = useState({
-    summary: "",
-    loveJob: "",
-    hobbies: "",
+    about_me: "",
+    work_enjoyment: "",
+    interests_hobbies: "",
   });
+  const [aboutUuid, setAboutUuid] = useState(null);
+  const [savingAbout, setSavingAbout] = useState(false);
+
+  const normalizeAboutData = (data = {}) => ({
+    about_me: data.about_me || "",
+    work_enjoyment: data.work_enjoyment || "",
+    interests_hobbies: data.interests_hobbies || "",
+  });
+
+  const getPlainTextFromHtml = (html = "") => {
+    if (typeof document === "undefined") return html.replace(/<[^>]*>/g, "").trim();
+    const temp = document.createElement("div");
+    temp.innerHTML = html;
+    return (temp.textContent || temp.innerText || "").trim();
+  };
+
+  const hasMeaningfulContent = (html = "") => getPlainTextFromHtml(html).length > 0;
+
+  const parseApiErrorMessage = (rawText = "") => {
+    if (!rawText) return "";
+    try {
+      const json = JSON.parse(rawText);
+      return json?.detail || json?.message || rawText;
+    } catch {
+      return rawText;
+    }
+  };
+
+  const formatAboutApiError = (rawText = "", fallback = "Failed to save changes") => {
+    const message = parseApiErrorMessage(rawText);
+    if (message.includes("Unknown column") && message.includes("employee_about.links")) {
+      return "Backend issue: employee_about.links column is missing. Please apply DB migration.";
+    }
+    return message || fallback;
+  };
+
+  // ✅ DELETE STATES
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [fieldToDelete, setFieldToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // ✅ FETCH ABOUT DATA
+  const fetchAboutData = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const responseData = await res.json();
+        const rawData = responseData.data || responseData;
+        const data = Array.isArray(rawData) ? rawData[0] : rawData;
+        if (data) {
+          setAbout(normalizeAboutData(data));
+          setAboutUuid(data.employee_about_uuid);
+        }
+      } else {
+        const errorText = await res.text();
+        const displayMessage = formatAboutApiError(errorText, "Failed to fetch about data");
+        console.error("Failed to fetch about data:", displayMessage);
+        showStatusToast(displayMessage, "error");
+      }
+    } catch (err) {
+      console.error("Failed to fetch about data:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (!employee_uuid || initialAboutFetchDoneRef.current) return;
+    initialAboutFetchDoneRef.current = true;
+    fetchAboutData();
+  }, [employee_uuid]);
+
+  const [skills] = useState([
+    "Java",
+    "Spring Boot",
+    "React",
+    "SQL",
+    "Microservices",
+  ]);
 
   const [editingField, setEditingField] = useState(null);
   const editorRef = useRef(null);
 
   if (!employee || hrData === null) {
-    return <div className="p-10 text-center">Loading employee data...</div>;
+    return <div className="p-10 text-center text-indigo-900 font-medium">Loading employee data...</div>;
   }
 
   const mappedEmployee = {
@@ -250,17 +342,148 @@ export default function EmployeeProfileView() {
     document.execCommand(cmd, false, null);
   };
 
-  const saveField = (key) => {
-    setAbout({
+  const saveField = async (key) => {
+    const newContent = editorRef.current?.innerHTML ?? "";
+    const updatedAbout = {
       ...about,
-      [key]: editorRef.current.innerHTML,
-    });
-    setEditingField(null);
+      [key]: newContent,
+    };
+
+    setSavingAbout(true);
+    try {
+      const token = localStorage.getItem("token");
+      const method = aboutUuid ? "PUT" : "POST";
+      const url = aboutUuid
+        ? `${BASE_URL}/employee-details/about/${employee_uuid}`
+        : `${BASE_URL}/employee-details/about`;
+
+      const payload = {
+        employee_uuid: employee_uuid,
+        ...(aboutUuid ? { employee_about_uuid: aboutUuid } : {}),
+        about_me: updatedAbout.about_me,
+        work_enjoyment: updatedAbout.work_enjoyment,
+        interests_hobbies: updatedAbout.interests_hobbies,
+      };
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(formatAboutApiError(errorText, "Failed to save data"));
+      }
+
+      const responseData = await res.json();
+      const serverData = responseData.data || responseData;
+      
+      setAbout(prev => ({
+        ...prev,
+        ...normalizeAboutData({
+          about_me: serverData.about_me !== undefined ? serverData.about_me : updatedAbout.about_me,
+          work_enjoyment: serverData.work_enjoyment !== undefined ? serverData.work_enjoyment : updatedAbout.work_enjoyment,
+          interests_hobbies: serverData.interests_hobbies !== undefined ? serverData.interests_hobbies : updatedAbout.interests_hobbies,
+        }),
+      }));
+
+      const newUuid = serverData.employee_about_uuid;
+      if (newUuid) setAboutUuid(newUuid);
+      
+      showStatusToast("Changes saved successfully", "success");
+      setEditingField(null);
+    } catch (err) {
+      console.error("Save failed:", err);
+      showStatusToast(err.message || "Failed to save changes", "error");
+    } finally {
+      setSavingAbout(false);
+    }
   };
 
-  const AboutBlock = ({ title, fieldKey }) => (
+  const handleDeleteClick = (fieldKey) => {
+    setFieldToDelete(fieldKey);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!fieldToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const updatedAbout = {
+        ...about,
+        [fieldToDelete]: "",
+      };
+
+      // Since the API uses PUT for update, we just send the cleared content
+      const res = await fetch(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          employee_uuid: employee_uuid,
+          ...(aboutUuid ? { employee_about_uuid: aboutUuid } : {}),
+          about_me: updatedAbout.about_me,
+          work_enjoyment: updatedAbout.work_enjoyment,
+          interests_hobbies: updatedAbout.interests_hobbies,
+        }),
+      });
+
+      if (res.ok) {
+        setAbout(updatedAbout);
+        showStatusToast("Content deleted successfully", "success");
+      } else {
+        const errorText = await res.text();
+        throw new Error(formatAboutApiError(errorText, "Failed to delete content"));
+      }
+    } catch (err) {
+      console.error("Delete failed:", err);
+      showStatusToast("Failed to delete content", "error");
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteModalOpen(false);
+      setFieldToDelete(null);
+    }
+  };
+
+  const AboutBlock = ({ title, fieldKey }) => {
+    const placeholderMap = {
+      about_me: "Share a short introduction about yourself",
+      work_enjoyment: "Describe what you enjoy most in your day-to-day work",
+      interests_hobbies: "Tell others about your interests and hobbies",
+    };
+
+    return (
     <div className="mb-8 w-full">
-      <h4 className="font-semibold text-indigo-800 mb-3">{title}</h4>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-semibold text-indigo-900 border-l-4 border-indigo-500 pl-3">{title}</h4>
+        {!editingField && about[fieldKey] && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setEditingField(fieldKey)}
+              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+              title="Edit Section"
+            >
+              <PencilLine size={16} />
+            </button>
+            <button
+              onClick={() => handleDeleteClick(fieldKey)}
+              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              title="Delete Section"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+
       {editingField === fieldKey ? (
         <div className="border border-indigo-100 rounded-xl bg-white shadow-md w-full">
           <div className="flex flex-wrap gap-4 p-3 border-b bg-indigo-50 text-indigo-700">
@@ -286,21 +509,51 @@ export default function EmployeeProfileView() {
           <div
             ref={editorRef}
             contentEditable
-            className="p-4 min-h-[140px] text-sm outline-none break-words whitespace-pre-wrap overflow-auto max-w-full"
+            onFocus={(e) => e.target.parentElement.classList.add('rich-editor-active')}
+            onBlur={(e) => e.target.parentElement.classList.remove('rich-editor-active')}
+            className="p-5 min-h-[160px] text-sm outline-none break-words overflow-auto max-w-full editor-content leading-relaxed"
             dangerouslySetInnerHTML={{ __html: about[fieldKey] }}
           />
-          <div className="flex justify-end gap-3 p-3 border-t bg-indigo-50">
-            <button onClick={() => setEditingField(null)} className="px-4 py-1 text-sm border border-indigo-200 rounded-md text-indigo-600">Cancel</button>
-            <button onClick={() => saveField(fieldKey)} className="px-4 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">Save</button>
+
+          <div className="flex items-center justify-between gap-3 p-4 border-t bg-gray-50/50">
+            <p className="text-xs text-gray-500">Tip: Add key points so teammates can quickly know you better.</p>
+            <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-5 py-1.5 text-sm font-medium text-gray-600 hover:bg-white hover:shadow transition-all rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => saveField(fieldKey)}
+              disabled={savingAbout}
+              className={`px-5 py-1.5 text-sm font-bold bg-indigo-600 text-white rounded-xl shadow-md transition-all ${savingAbout ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700 hover:shadow-indigo-200 hover:-translate-y-0.5"}`}
+            >
+              {savingAbout ? "Saving..." : "Save Content"}
+            </button>
+            </div>
           </div>
         </div>
-      ) : about[fieldKey] ? (
-        <div className="text-sm text-gray-700 break-words whitespace-pre-wrap overflow-hidden" dangerouslySetInnerHTML={{ __html: about[fieldKey] }} />
+      ) : hasMeaningfulContent(about[fieldKey]) ? (
+        <div className="bg-white rounded-2xl p-5 border border-indigo-100 transition-all shadow-sm relative">
+          <div
+            className="text-sm text-gray-700 break-words editor-content leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: about[fieldKey] }}
+          />
+        </div>
       ) : (
-        <button onClick={() => setEditingField(fieldKey)} className="text-sm text-indigo-500 hover:text-indigo-700">+ Add your response</button>
+        <button
+          onClick={() => setEditingField(fieldKey)}
+          className="group/btn flex items-center gap-2 px-5 py-4 w-full border-2 border-dashed border-indigo-200 rounded-2xl text-sm font-medium text-indigo-500 hover:border-indigo-300 hover:text-indigo-700 hover:bg-indigo-50/30 transition-all duration-300"
+        >
+          <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center group-hover/btn:scale-110 transition-transform">
+            <span className="text-lg">+</span>
+          </div>
+          {placeholderMap[fieldKey] || `Add your ${title.toLowerCase()}`}
+        </button>
       )}
     </div>
-  );
+  )};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 px-3 sm:px-6 lg:px-10 py-6 sm:py-10">
@@ -382,15 +635,15 @@ export default function EmployeeProfileView() {
           {activeTab === "about" && (
             <div className="space-y-6">
               <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md p-6 border border-indigo-100">
-                <AboutBlock title="About" fieldKey="summary" />
-                <AboutBlock
-                  title="What I love about my job?"
-                  fieldKey="loveJob"
-                />
-                <AboutBlock
-                  title="My interests and hobbies"
-                  fieldKey="hobbies"
-                />
+                <div className="mb-5 rounded-xl bg-indigo-50/70 border border-indigo-100 px-4 py-3">
+                  <p className="text-sm font-semibold text-indigo-900">About Profile</p>
+                  <p className="text-xs text-indigo-700 mt-1">
+                    Keep these sections short and specific so others can quickly understand your background and interests.
+                  </p>
+                </div>
+                <AboutBlock title="About Me" fieldKey="about_me" />
+                <AboutBlock title="What I Enjoy Most About My Work" fieldKey="work_enjoyment" />
+                <AboutBlock title="Interests & Hobbies" fieldKey="interests_hobbies" />
               </div>
 
               <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md p-6 border border-indigo-100">
@@ -610,3 +863,38 @@ const SkillTag = ({ name }) => (
   </div>
 );
 
+// Ad-hoc CSS for rich text content
+if (typeof document !== "undefined") {
+  const styleId = "editor-content-styles";
+  if (!document.getElementById(styleId)) {
+    const styleTag = document.createElement("style");
+    styleTag.id = styleId;
+    styleTag.innerHTML = `
+      .editor-content a {
+    color: #4f46e5 !important;
+    text-decoration: underline !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    transition: all 0.2s ease !important;
+  }
+  .editor-content a:hover {
+    color: #3730a3 !important;
+    text-decoration: none !important;
+    background-color: #eef2ff !important;
+    padding: 2px 4px !important;
+    margin: -2px -4px !important;
+    border-radius: 4px !important;
+  }
+  .rich-editor-active {
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15) !important;
+    border-color: #4f46e5 !important;
+    transform: scale(1.002);
+  }
+  .rich-editor-container {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+`;
+    document.head.appendChild(styleTag);
+  }
+}

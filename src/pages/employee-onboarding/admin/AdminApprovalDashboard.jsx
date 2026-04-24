@@ -98,7 +98,7 @@ if (!authLoading && !isAuthorizedManager) {
   /* ---------- FILTERED DATA ---------- */
   const filteredData = useMemo(() => {
     return data.filter((row) => {
-      const name = `${row.first_name} ${row.last_name}`.toLowerCase();
+      const name = `${row.first_name} ${row.middle_name ? row.middle_name + " " : ""}${row.last_name}`.toLowerCase();
       const role = row.designation?.toLowerCase() || "";
 
       const matchesSearch =
@@ -230,29 +230,27 @@ if (!authLoading && !isAuthorizedManager) {
             ) : (
               paginatedData.map((row) => (
                 <tr key={row.id} className="border-b">
-                  <td className="px-4 py-3">
-                    {row.first_name} {row.last_name}
-                  </td>
-                  <td className="px-4 py-3">{row.mail}</td>
-                  <td className="px-4 py-3">{row.designation}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={getStatus(row)} />
-                  </td>
-                  <td className="px-4 py-3">{row.requested_by_name}</td>
-                  <td className="px-4 py-3 text-indigo-600 cursor-pointer">
-                    <span
-                      onClick={() =>
-                        navigate(
-                          `/employee-onboarding/admin/offer/${row.user_uuid}`,
-                        )
-                      }
-                    >
-                      View
-                    </span>
-                  </td>
-                </tr>
-              ))
-            )}
+                    <td className="px-4 py-3">
+                  {row.first_name}{row.middle_name ? ` ${row.middle_name}` : ""} {row.last_name}
+                </td>
+                <td className="px-4 py-3">{row.mail}</td>
+                <td className="px-4 py-3">{row.designation}</td>
+                <td className="px-4 py-3">
+                  <StatusBadge status={getStatus(row)} />
+                </td>
+                <td className="px-4 py-3">{row.requested_by_name}</td>
+                <td className="px-4 py-3 text-indigo-600 cursor-pointer">
+                  <span
+                    onClick={() =>
+                      navigate(`/employee-onboarding/admin/offer/${row.user_uuid}`)
+                    }
+                  >
+                    View
+                  </span>
+                </td>
+              </tr>
+              )
+            ))}
 
             {/* {! loading && filteredData.length === 0 && (
               <tr>
