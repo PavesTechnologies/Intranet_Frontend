@@ -2,16 +2,26 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
+import { useAuth } from "../../../../../contexts/AuthContext";
+
 export default function EducationLevelManagement() {
+  const { user } = useAuth();
+  const roles = user?.roles?.map(r => r.toUpperCase()) || [];
+  const canView = roles.includes("ADMIN") || roles.includes("HR");
+
+
+  
+
   const [levels, setLevels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState(null);
 
-  const BASE = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const token = localStorage.getItem("token");
 
   /* -------------------- FETCH -------------------- */
+
   const fetchLevels = async () => {
     try {
       setLoading(true);
@@ -26,10 +36,18 @@ export default function EducationLevelManagement() {
     }
   };
 
-  useEffect(() => {
+ useEffect(() => {
+  if (canView) {
     fetchLevels();
-  }, []);
-
+  }
+}, [canView]);
+ if (!canView) {
+  return (
+    <div className="p-6 text-center text-red-600">
+      You are not authorized to view Education Levels
+    </div>
+  );
+}
   /* -------------------- DELETE -------------------- */
   const deleteLevel = async (uuid) => {
     if (!window.confirm("Delete education level?")) return;
@@ -38,14 +56,13 @@ export default function EducationLevelManagement() {
       await axios.delete(`${BASE}/masters/education-level/${uuid}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setLevels((prev) =>
-        prev.filter((l) => l.education_uuid !== uuid)
-      );
+      setLevels((prev) => prev.filter((l) => l.education_uuid !== uuid));
       toast.success("Education level deleted");
     } catch {
       toast.error("Failed to delete education level");
     }
   };
+   
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -59,7 +76,7 @@ export default function EducationLevelManagement() {
             Manage education levels used in onboarding
           </p>
         </div>
-
+        {(roles.includes("ADMIN") || roles.includes("HR"))&& (
         <button
           onClick={() => {
             setEditData(null);
@@ -69,6 +86,7 @@ export default function EducationLevelManagement() {
         >
           + Add Education Level
         </button>
+        )}
       </div>
 
       {/* Table */}
@@ -91,7 +109,10 @@ export default function EducationLevelManagement() {
             <tbody>
               {levels.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-6 text-center text-gray-500">
+                  <td
+                    colSpan="4"
+                    className="px-6 py-6 text-center text-gray-500"
+                  >
                     No education levels found
                   </td>
                 </tr>
@@ -115,6 +136,8 @@ export default function EducationLevelManagement() {
                       </span>
                     </td>
                     <td className="px-6 py-3 text-right space-x-4">
+                      {(roles.includes("ADMIN") || roles.includes("HR"))&& (
+
                       <button
                         className="text-blue-700 hover:underline"
                         onClick={() => {
@@ -124,12 +147,15 @@ export default function EducationLevelManagement() {
                       >
                         Edit
                       </button>
+                      )}
+                        {(roles.includes("ADMIN") || roles.includes("HR")) && (
                       <button
                         className="text-red-600 hover:underline"
                         onClick={() => deleteLevel(l.education_uuid)}
                       >
                         Delete
                       </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -147,13 +173,13 @@ export default function EducationLevelManagement() {
           onSuccess={(savedLevel) => {
             setLevels((prev) => {
               const exists = prev.some(
-                (l) => l.education_uuid === savedLevel.education_uuid
+                (l) => l.education_uuid === savedLevel.education_uuid,
               );
               return exists
                 ? prev.map((l) =>
                     l.education_uuid === savedLevel.education_uuid
                       ? savedLevel
-                      : l
+                      : l,
                   )
                 : [savedLevel, ...prev];
             });
@@ -169,12 +195,10 @@ export default function EducationLevelManagement() {
 function LevelModal({ editData, onClose, onSuccess }) {
   const [name, setName] = useState(editData?.education_name || "");
   const [desc, setDesc] = useState(editData?.description || "");
-  const [isActive, setIsActive] = useState(
-    editData?.is_active ?? true
-  );
+  const [isActive, setIsActive] = useState(editData?.is_active ?? true);
   const [saving, setSaving] = useState(false);
 
-  const BASE = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const token = localStorage.getItem("token");
 
   const save = async () => {
@@ -201,21 +225,17 @@ function LevelModal({ editData, onClose, onSuccess }) {
           {
             headers: { Authorization: `Bearer ${token}` },
             responseType: "text",
-          }
+          },
         );
       } else {
-        res = await axios.post(
-          `${BASE}/masters/education-level/`,
-          payload,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: "text",
-          }
-        );
+        res = await axios.post(`${BASE}/masters/education-level/`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "text",
+        });
       }
 
       toast.success(
-        `Education level ${editData ? "updated" : "created"} successfully`
+        `Education level ${editData ? "updated" : "created"} successfully`,
       );
 
       onSuccess({
@@ -238,18 +258,14 @@ function LevelModal({ editData, onClose, onSuccess }) {
           {editData ? "Edit" : "Add"} Education Level
         </h2>
 
-        <label className="block text-sm font-medium mb-1">
-          Education Name
-        </label>
+        <label className="block text-sm font-medium mb-1">Education Name</label>
         <input
           className="w-full border rounded-lg px-3 py-2 mb-3"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
 
-        <label className="block text-sm font-medium mb-1">
-          Description
-        </label>
+        <label className="block text-sm font-medium mb-1">Description</label>
         <textarea
           className="w-full border rounded-lg px-3 py-2 mb-3"
           value={desc}

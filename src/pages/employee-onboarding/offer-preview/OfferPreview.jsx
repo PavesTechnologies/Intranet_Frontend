@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -13,12 +12,12 @@ export default function OfferPreview() {
     const fetchPreview = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/${offerId}/docusign-preview`,
+          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${offerId}/docusign-preview`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         );
 
         setPreviewUrl(res.data.preview_url);
@@ -30,11 +29,11 @@ export default function OfferPreview() {
     if (offerId) fetchPreview();
   }, [offerId]);
 
-  if (!previewUrl) return <div className="p-10">Loading DocuSign preview...</div>;
+  if (!previewUrl)
+    return <div className="p-10">Loading DocuSign preview...</div>;
 
   return (
     <div className="h-screen w-full bg-gray-100 flex flex-col">
-
       <div className="p-4 bg-white shadow flex justify-between">
         <h2 className="text-lg font-semibold">DocuSign Preview</h2>
 
@@ -51,7 +50,6 @@ export default function OfferPreview() {
         title="DocuSign Preview"
         className="flex-1 w-full"
       />
-
     </div>
   );
 }

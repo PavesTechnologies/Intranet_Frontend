@@ -29,14 +29,14 @@ export default function EmployeeCreateModal({
   const fetchDepartments = async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
         {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       const data = await res.json();
@@ -49,14 +49,14 @@ export default function EmployeeCreateModal({
   const fetchDesignations = async (departmentUuid) => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/masters/designations/department/${departmentUuid}`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/department/${departmentUuid}`,
         {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       const data = await res.json();
@@ -83,12 +83,12 @@ export default function EmployeeCreateModal({
     const fetchEmployee = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
+          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
 
         const data = await res.json();
@@ -178,7 +178,7 @@ export default function EmployeeCreateModal({
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
           method: "POST",
           headers: {
@@ -205,7 +205,7 @@ export default function EmployeeCreateModal({
             marital_status: form.maritalStatus || "",
             total_experience: Number(form.totalExperience) || 0,
           }),
-        }
+        },
       );
 
       if (response.status === 422) {
@@ -260,7 +260,7 @@ export default function EmployeeCreateModal({
       };
 
       const response = await fetch(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
         {
           method: "PUT",
           headers: {
@@ -268,7 +268,7 @@ export default function EmployeeCreateModal({
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(payload),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -352,11 +352,7 @@ export default function EmployeeCreateModal({
                   Cancel
                 </Button>
 
-                <Button
-                  varient="primary"
-                  size="small"
-                  onClick={handleUpdate}
-                >
+                <Button varient="primary" size="small" onClick={handleUpdate}>
                   Update
                 </Button>
               </>

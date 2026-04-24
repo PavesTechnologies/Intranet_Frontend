@@ -2,12 +2,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import axios from "axios";
 
-export default function AddMitigationForm({
-  riskId,
-  members,
-  onAdd,
-  onClose,
-}) {
+export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
   const [form, setForm] = useState({
     mitigation: "",
     contingency: "",
@@ -18,7 +13,7 @@ export default function AddMitigationForm({
   const [showNotes, setShowNotes] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
   const token = localStorage.getItem("token");
 
   async function submit(e) {
@@ -36,7 +31,7 @@ export default function AddMitigationForm({
           used: false,
           effective: false,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       onAdd(res.data);
@@ -83,9 +78,7 @@ export default function AddMitigationForm({
         </label>
         <textarea
           value={form.mitigation}
-          onChange={(e) =>
-            setForm({ ...form, mitigation: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, mitigation: e.target.value })}
           placeholder="Describe how this risk will be mitigated"
           className="mt-1 border rounded-lg p-2 w-full text-sm resize-none focus:ring-2 focus:ring-indigo-200"
           rows={3}
@@ -100,9 +93,7 @@ export default function AddMitigationForm({
         </label>
         <textarea
           value={form.contingency}
-          onChange={(e) =>
-            setForm({ ...form, contingency: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, contingency: e.target.value })}
           placeholder="Fallback if mitigation fails"
           className="mt-1 border rounded-lg p-2 w-full text-sm resize-none"
           rows={2}
@@ -111,14 +102,10 @@ export default function AddMitigationForm({
 
       {/* Owner */}
       <div>
-        <label className="text-xs font-semibold text-slate-600">
-          Owner
-        </label>
+        <label className="text-xs font-semibold text-slate-600">Owner</label>
         <select
           value={form.ownerId}
-          onChange={(e) =>
-            setForm({ ...form, ownerId: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, ownerId: e.target.value })}
           className="mt-1 border rounded-lg p-2 w-full text-sm bg-white"
         >
           <option value="">Unassigned</option>
@@ -143,9 +130,7 @@ export default function AddMitigationForm({
       {showNotes && (
         <textarea
           value={form.notes}
-          onChange={(e) =>
-            setForm({ ...form, notes: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
           placeholder="Optional internal notes"
           className="border rounded-lg p-2 w-full text-sm resize-none"
           rows={2}

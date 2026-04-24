@@ -26,18 +26,20 @@ export default function Register() {
       // ✅ Normalize contact with "+"
       const payload = {
         ...form,
-        contact: form.contact.startsWith("+") ? form.contact : `+${form.contact.replace(/\D/g, "")}`,
+        contact: form.contact.startsWith("+")
+          ? form.contact
+          : `+${form.contact.replace(/\D/g, "")}`,
       };
       await axios.post(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/auth/register`,
-        payload
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/register`,
+        payload,
       );
       showStatusToast("Registered successfully!", "success");
       navigate("/");
     } catch (err) {
       showStatusToast(
         "Registration failed: " + (err.response?.data?.detail || err.message),
-        "error"
+        "error",
       );
     }
   };

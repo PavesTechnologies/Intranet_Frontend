@@ -33,7 +33,7 @@ const Backlog = ({ projectId, projectName }) => {
 
   const fetchProjects = () => {
     axios
-      .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`, { headers })
+      .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`, { headers })
       .then((res) => setProjects(res.data.content || res.data || []))
       .catch((err) => console.error("Failed to fetch projects", err));
   };
@@ -41,8 +41,8 @@ const Backlog = ({ projectId, projectName }) => {
   const fetchStories = () => {
     axios
       .get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`,
-        { headers }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
+        { headers },
       )
       .then((res) => setStories(res.data))
       .catch((err) => console.error("Failed to fetch stories", err));
@@ -50,7 +50,7 @@ const Backlog = ({ projectId, projectName }) => {
 
   const fetchNoEpicStories = () => {
     axios
-      .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/stories/no-epic`, {
+      .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/no-epic`, {
         params: { projectId },
         headers,
       })
@@ -61,8 +61,8 @@ const Backlog = ({ projectId, projectName }) => {
   const fetchSprints = () => {
     axios
       .get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`,
-        { headers }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
+        { headers },
       )
       .then((res) => setSprints(res.data))
       .catch((err) => console.error("Failed to fetch sprints", err));
@@ -78,23 +78,21 @@ const Backlog = ({ projectId, projectName }) => {
   const handleDropStory = (storyId, sprintId) => {
     axios
       .put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/${storyId}/assign-sprint`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}/assign-sprint`,
         { sprintId },
-        { headers }
+        { headers },
       )
       .then(() => {
         // ✅ Update story’s sprintId locally
-        setStories(prev =>
-          prev.map(s =>
-            s.id === storyId ? { ...s, sprintId } : s
-          )
+        setStories((prev) =>
+          prev.map((s) => (s.id === storyId ? { ...s, sprintId } : s)),
         );
 
         // ✅ Optional: remove it from no-epic list if you maintain it separately
-        setNoEpicStories(prev => prev.filter(s => s.id !== storyId));
+        setNoEpicStories((prev) => prev.filter((s) => s.id !== storyId));
       })
-      .catch(err => console.error("Failed to assign story to sprint", err));
-    };
+      .catch((err) => console.error("Failed to assign story to sprint", err));
+  };
 
   const selectedProject = projects.find((p) => p.id === projectId);
 
@@ -110,7 +108,7 @@ const Backlog = ({ projectId, projectName }) => {
 
   // ✅ Sort sprints by createdAt (latest first)
   const sortedSprints = [...sprints].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
   );
 
   return (
@@ -130,13 +128,11 @@ const Backlog = ({ projectId, projectName }) => {
             >
               <List size={18} /> Issue Tracker
             </Button>
-
-           
           </div>
         </div>
 
         {/* ✅ Modal: Create Issue */}
-       
+
         {/* ✅ Modal: Create Sprint */}
         {showSprintForm && (
           <div className="fixed inset-0 bg-black/50 z-50 flex justify-center items-center">
@@ -144,9 +140,7 @@ const Backlog = ({ projectId, projectName }) => {
               <button
                 onClick={handleCloseForms}
                 className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
-              >
-               
-              </button>
+              ></button>
               <CreateSprint onClose={handleCloseForms} projectId={projectId} />
             </div>
           </div>
@@ -182,10 +176,9 @@ const Backlog = ({ projectId, projectName }) => {
                 key={sprint.id}
                 sprint={sprint}
                 stories={filteredStories.filter(
-                  (s) => s.sprintId === sprint.id
+                  (s) => s.sprintId === sprint.id,
                 )}
                 onDropStory={handleDropStory}
-
                 onChangeStatus={() => {}}
               />
             ))}

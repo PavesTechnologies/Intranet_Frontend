@@ -64,14 +64,14 @@ const CreateTestPlan = ({ projectId, onClose, onSuccess, mode = "modal" }) => {
 
     try {
       await axios.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/plans`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans`,
         payload,
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       toast.success("Test Plan created successfully");

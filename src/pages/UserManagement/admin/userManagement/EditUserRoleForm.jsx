@@ -5,7 +5,6 @@ import { useAuth } from "../../../../contexts/AuthContext";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import SearchInput from "../../../../components/filter/Searchbar";
 
-
 export default function EditUserRoleForm() {
   const { userId } = useParams();
   const navigate = useNavigate();
@@ -39,24 +38,24 @@ export default function EditUserRoleForm() {
 
   const fetchUser = async () => {
     const res = await axios.get(
-      `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/users/${userId}`,
-      authHeader
+      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/${userId}`,
+      authHeader,
     );
     setUser(res.data);
   };
 
   const fetchAllRoles = async () => {
     const res = await axios.get(
-      `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/roles`,
-      authHeader
+      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/roles`,
+      authHeader,
     );
     setRoles(res.data);
   };
 
   const fetchAssignedRoles = async () => {
     const res = await axios.get(
-      `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/users/${userId}/roles`,
-      authHeader
+      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/${userId}/roles`,
+      authHeader,
     );
     setSelectedRoleIds(res.data.map((r) => r.role_id));
   };
@@ -65,16 +64,16 @@ export default function EditUserRoleForm() {
     setSelectedRoleIds((prev) =>
       prev.includes(roleId)
         ? prev.filter((id) => id !== roleId)
-        : [...prev, roleId]
+        : [...prev, roleId],
     );
   };
 
   const handleSave = async () => {
     try {
       await axios.put(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/admin/users/${userId}/role`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/${userId}/role`,
         { role_ids: selectedRoleIds },
-        authHeader
+        authHeader,
       );
       showStatusToast("Roles updated successfully!", "success");
       navigate(`/user-management/users/roles`);
@@ -86,7 +85,7 @@ export default function EditUserRoleForm() {
 
   // Filter roles by search term
   const filteredRoles = roles.filter((role) =>
-    role.role_name.toLowerCase().includes(searchTerm.toLowerCase())
+    role.role_name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   if (loading || !user) {
@@ -102,9 +101,9 @@ export default function EditUserRoleForm() {
       <div className="bg-white p-6 rounded-2xl shadow-lg">
         {/* Modal Header */}
         <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">
-          Edit Roles for{" "} gadu
+          Edit Roles for gadu
           <span className="text-blue-600">
-            {user.first_name} {user.last_name} {'gadu'}
+            {user.first_name} {user.last_name} {"gadu"}
           </span>
         </h2>
         <p className="mb-4 text-gray-500 text-center">

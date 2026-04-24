@@ -33,7 +33,7 @@ const ViewSheet = () => {
     if (type === "task") return `/api/tasks/${id}`;
     if (type === "story") return `/api/stories/${id}`;
     if (type === "epic") return `/api/epics/${id}`;
-    if (type === "bug") return `/api/bugs/${id}`; 
+    if (type === "bug") return `/api/bugs/${id}`;
     return null;
   };
 
@@ -45,7 +45,7 @@ const ViewSheet = () => {
 
       setLoading(true);
       axios
-        .get(`${import.meta.env.VITE_PMS_BASE_URL}${endpoint}`, { headers })
+        .get(`${window.__APP_CONFIG__.PMS_BASE_URL}${endpoint}`, { headers })
         .then((res) => setIssue(res.data))
         .catch((err) => console.error("Failed to fetch issue:", err))
         .finally(() => setLoading(false));
@@ -55,12 +55,17 @@ const ViewSheet = () => {
   // Fetch related entity names
   useEffect(() => {
     if (!issue) return;
-    const base = import.meta.env.VITE_PMS_BASE_URL;
+    const base = window.__APP_CONFIG__.PMS_BASE_URL;
 
     const fetchName = async (endpoint, field) => {
       try {
         const res = await axios.get(`${base}${endpoint}`, { headers });
-        return res.data.name || res.data.title || res.data.sprintName || res.data.fullName;
+        return (
+          res.data.name ||
+          res.data.title ||
+          res.data.sprintName ||
+          res.data.fullName
+        );
       } catch (err) {
         console.warn(`Failed to fetch ${field}:`, err);
         return null;
@@ -70,18 +75,35 @@ const ViewSheet = () => {
     const fetchRelated = async () => {
       const names = {};
 
-      if (issue.epicId) names.epicName = await fetchName(`/api/epics/${issue.epicId}`, "epic");
-      if (issue.storyId) names.storyName = await fetchName(`/api/stories/${issue.storyId}`, "story");
-      
+      if (issue.epicId)
+        names.epicName = await fetchName(`/api/epics/${issue.epicId}`, "epic");
+      if (issue.storyId)
+        names.storyName = await fetchName(
+          `/api/stories/${issue.storyId}`,
+          "story",
+        );
+
       const sId = issue.sprintId || issue.sprint?.id;
       if (sId) {
         // Fetching from a general sprints endpoint or via project if needed
-        names.sprintName = await fetchName(`/api/sprints/${sId}`, "sprint"); 
+        names.sprintName = await fetchName(`/api/sprints/${sId}`, "sprint");
       }
-      
-      if (issue.reporterId) names.reporterName = await fetchName(`/api/users/${issue.reporterId}`, "reporter");
-      if (issue.assigneeId) names.assigneeName = await fetchName(`/api/users/${issue.assigneeId}`, "assignee");
-      if (issue.projectId) names.projectName = await fetchName(`/api/projects/${issue.projectId}`, "project");
+
+      if (issue.reporterId)
+        names.reporterName = await fetchName(
+          `/api/users/${issue.reporterId}`,
+          "reporter",
+        );
+      if (issue.assigneeId)
+        names.assigneeName = await fetchName(
+          `/api/users/${issue.assigneeId}`,
+          "assignee",
+        );
+      if (issue.projectId)
+        names.projectName = await fetchName(
+          `/api/projects/${issue.projectId}`,
+          "project",
+        );
 
       setRelatedNames(names);
     };
@@ -92,7 +114,9 @@ const ViewSheet = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64 mt-10">
-        <p className="text-indigo-600 font-medium animate-pulse">Loading {type} details...</p>
+        <p className="text-indigo-600 font-medium animate-pulse">
+          Loading {type} details...
+        </p>
       </div>
     );
   }
@@ -100,13 +124,16 @@ const ViewSheet = () => {
   if (!issue) {
     return (
       <div className="flex justify-center items-center h-64 mt-10">
-        <p className="text-red-500 font-medium">Failed to load {type} details.</p>
+        <p className="text-red-500 font-medium">
+          Failed to load {type} details.
+        </p>
       </div>
     );
   }
 
   // Safely extract status string to prevent crashes
-  const statusString = issue.status?.name || issue.statusName || issue.status || "Unknown";
+  const statusString =
+    issue.status?.name || issue.statusName || issue.status || "Unknown";
 
   return (
     <div className="max-w-5xl mx-auto mt-8 px-4 sm:px-6 space-y-8 pb-12">
@@ -117,34 +144,39 @@ const ViewSheet = () => {
             <span className="text-indigo-600">{type}</span> Details
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            {relatedNames.projectName || projectId ? `Project: ${relatedNames.projectName || projectId}` : ""}
+            {relatedNames.projectName || projectId
+              ? `Project: ${relatedNames.projectName || projectId}`
+              : ""}
           </p>
         </div>
-       <Button
-  size="medium"
-  variant="secondary"
-  onClick={() => navigate(-1)}
-  className="flex items-center gap-2 bg-blue-600 border border-blue-600 text-white hover:bg-blue-700"
->
-  &larr; Back
-</Button>
+        <Button
+          size="medium"
+          variant="secondary"
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 bg-blue-600 border border-blue-600 text-white hover:bg-blue-700"
+        >
+          &larr; Back
+        </Button>
       </div>
 
       {/* MAIN ISSUE CARD */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 sm:p-8 space-y-8">
-        
         {/* Title & Description */}
         <div className="space-y-4">
           <h2 className="text-2xl font-bold text-gray-900 leading-tight">
             {issue.title || issue.name || "Untitled"}
           </h2>
           <div>
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Description</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Description
+            </h3>
             <div className="text-gray-700 leading-relaxed bg-gray-50/50 p-4 rounded-lg border border-gray-100 min-h-[80px]">
               {issue.description ? (
                 <span className="whitespace-pre-wrap">{issue.description}</span>
               ) : (
-                <span className="text-gray-400 italic">No description available.</span>
+                <span className="text-gray-400 italic">
+                  No description available.
+                </span>
               )}
             </div>
           </div>
@@ -154,33 +186,50 @@ const ViewSheet = () => {
 
         {/* DETAILS GRID */}
         <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6 text-sm">
-          
           {/* --- COMMON FIELDS --- */}
           <Detail label="Status">
-            <Badge color="blue">{String(statusString).replace(/_/g, " ")}</Badge>
+            <Badge color="blue">
+              {String(statusString).replace(/_/g, " ")}
+            </Badge>
           </Detail>
-          
+
           <Detail label="Priority">
             <Badge color="red">{issue.priority || "Not set"}</Badge>
           </Detail>
 
           <Detail
             label="Assignee"
-            value={relatedNames.assigneeName || issue.assignee?.name || issue.assignedTo || "Unassigned"}
+            value={
+              relatedNames.assigneeName ||
+              issue.assignee?.name ||
+              issue.assignedTo ||
+              "Unassigned"
+            }
           />
           <Detail
             label="Reporter"
-            value={relatedNames.reporterName || issue.reporter?.name || issue.reporterName || "Unassigned"}
+            value={
+              relatedNames.reporterName ||
+              issue.reporter?.name ||
+              issue.reporterName ||
+              "Unassigned"
+            }
           />
 
           <Detail
             label="Start Date"
-            value={issue.startDate ? new Date(issue.startDate).toLocaleDateString() : "-"}
+            value={
+              issue.startDate
+                ? new Date(issue.startDate).toLocaleDateString()
+                : "-"
+            }
           />
 
           <Detail
             label="Due Date"
-            value={issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : "-"}
+            value={
+              issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : "-"
+            }
           />
 
           <Detail
@@ -189,8 +238,8 @@ const ViewSheet = () => {
               issue.createdOn
                 ? new Date(issue.createdOn).toLocaleDateString()
                 : issue.createdAt
-                ? new Date(issue.createdAt).toLocaleDateString()
-                : "-"
+                  ? new Date(issue.createdAt).toLocaleDateString()
+                  : "-"
             }
           />
 
@@ -206,8 +255,14 @@ const ViewSheet = () => {
           {/* --- STORY SPECIFIC --- */}
           {type === "story" && (
             <>
-              <Detail label="Epic" value={relatedNames.epicName || issue.epic?.name || "-"} />
-              <Detail label="Sprint" value={relatedNames.sprintName || issue.sprint?.name || "-"} />
+              <Detail
+                label="Epic"
+                value={relatedNames.epicName || issue.epic?.name || "-"}
+              />
+              <Detail
+                label="Sprint"
+                value={relatedNames.sprintName || issue.sprint?.name || "-"}
+              />
               <Detail label="Story Points">
                 {issue.storyPoints ? (
                   <span className="font-semibold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md">
@@ -223,11 +278,25 @@ const ViewSheet = () => {
           {/* --- TASK SPECIFIC --- */}
           {type === "task" && (
             <>
-              <Detail label="Story" value={relatedNames.storyName || issue.storyTitle || "-"} />
-              <Detail label="Sprint" value={relatedNames.sprintName || issue.sprintName || "-"} />
+              <Detail
+                label="Story"
+                value={relatedNames.storyName || issue.storyTitle || "-"}
+              />
+              <Detail
+                label="Sprint"
+                value={relatedNames.sprintName || issue.sprintName || "-"}
+              />
               <Detail label="Billable">
-                <Badge color={issue.billable || String(issue.isBillable) === "true" ? "green" : "gray"}>
-                  {issue.billable || String(issue.isBillable) === "true" ? "Yes" : "No"}
+                <Badge
+                  color={
+                    issue.billable || String(issue.isBillable) === "true"
+                      ? "green"
+                      : "gray"
+                  }
+                >
+                  {issue.billable || String(issue.isBillable) === "true"
+                    ? "Yes"
+                    : "No"}
                 </Badge>
               </Detail>
             </>
@@ -236,12 +305,21 @@ const ViewSheet = () => {
           {/* --- BUG SPECIFIC --- */}
           {type === "bug" && (
             <>
-              <Detail label="Story" value={relatedNames.storyName || issue.storyTitle || "-"} />
-              <Detail label="Sprint" value={relatedNames.sprintName || issue.sprintName || "-"} />
+              <Detail
+                label="Story"
+                value={relatedNames.storyName || issue.storyTitle || "-"}
+              />
+              <Detail
+                label="Sprint"
+                value={relatedNames.sprintName || issue.sprintName || "-"}
+              />
               <Detail label="Severity">
                 <Badge color="red">{issue.severity || "-"}</Badge>
               </Detail>
-              <Detail label="Bug Type" value={issue.bugType || issue.type || "-"} />
+              <Detail
+                label="Bug Type"
+                value={issue.bugType || issue.type || "-"}
+              />
             </>
           )}
         </dl>
@@ -249,9 +327,13 @@ const ViewSheet = () => {
         {/* ACCEPTANCE CRITERIA (Stories & Tasks) */}
         {(type === "story" || type === "task") && issue.acceptanceCriteria && (
           <div className="pt-4">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Acceptance Criteria</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Acceptance Criteria
+            </h3>
             <div className="text-gray-700 leading-relaxed bg-amber-50/50 p-4 rounded-lg border border-amber-100">
-              <span className="whitespace-pre-wrap">{issue.acceptanceCriteria}</span>
+              <span className="whitespace-pre-wrap">
+                {issue.acceptanceCriteria}
+              </span>
             </div>
           </div>
         )}
@@ -271,8 +353,12 @@ const ViewSheet = () => {
 // ===== HELPER COMPONENTS =====
 const Detail = ({ label, value, children }) => (
   <div className="flex flex-col gap-1.5">
-    <dt className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</dt>
-    <dd className="text-sm font-medium text-gray-900">{children || value || "-"}</dd>
+    <dt className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+      {label}
+    </dt>
+    <dd className="text-sm font-medium text-gray-900">
+      {children || value || "-"}
+    </dd>
   </div>
 );
 

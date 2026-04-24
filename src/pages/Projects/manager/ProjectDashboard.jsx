@@ -57,17 +57,17 @@ const ProjectMenu = ({ project, onEdit, onDelete }) => {
 
 // ------------------ MAIN COMPONENT ------------------
 const ProjectDashboard = () => {
-  const [projects,         setProjects]         = useState([]);
+  const [projects, setProjects] = useState([]);
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
-  const [loading,          setLoading]          = useState(true);
-  const [searchTerm,       setSearchTerm]       = useState("");
-  const [filterStatus,     setFilterStatus]     = useState("All");
-  const [currentPage,      setCurrentPage]      = useState(1);
-  const [projectsPerPage]                       = useState(6);
-  const [roleFilter,       setRoleFilter]       = useState("ALL");
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [projectsPerPage] = useState(6);
+  const [roleFilter, setRoleFilter] = useState("ALL");
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -76,8 +76,8 @@ const ProjectDashboard = () => {
   const userRole = user?.roles?.includes("Manager")
     ? "MANAGER"
     : user?.roles?.includes("Admin")
-    ? "ADMIN"
-    : "EMPLOYEE";
+      ? "ADMIN"
+      : "EMPLOYEE";
 
   const canManageProjects = userRole === "MANAGER" || userRole === "ADMIN";
 
@@ -85,7 +85,7 @@ const ProjectDashboard = () => {
   const fetchProjects = async (status) => {
     setLoading(true);
     try {
-      const base = import.meta.env.VITE_PMS_BASE_URL;
+      const base = window.__APP_CONFIG__.PMS_BASE_URL;
       const headers = { Authorization: `Bearer ${token}` };
 
       let url = `${base}/api/projects/my-projects`;
@@ -116,19 +116,25 @@ const ProjectDashboard = () => {
         <div className="flex flex-col gap-3">
           <p className="font-semibold text-red-600">Delete this project?</p>
           <div className="flex justify-end gap-2">
-            <button className="px-3 py-1 rounded bg-gray-200" onClick={closeToast}>
+            <button
+              className="px-3 py-1 rounded bg-gray-200"
+              onClick={closeToast}
+            >
               Cancel
             </button>
             <button
               className="px-3 py-1 rounded bg-red-600 text-white"
-              onClick={() => { onConfirm(); closeToast(); }}
+              onClick={() => {
+                onConfirm();
+                closeToast();
+              }}
             >
               Delete
             </button>
           </div>
         </div>
       ),
-      { closeOnClick: false, autoClose: false, position: "top-center" }
+      { closeOnClick: false, autoClose: false, position: "top-center" },
     );
   };
 
@@ -136,8 +142,8 @@ const ProjectDashboard = () => {
     confirmDeleteToast(async () => {
       try {
         await axios.delete(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         setProjects((prev) => prev.filter((p) => p.project.id !== projectId));
         toast.success("Project deleted successfully!");
@@ -162,7 +168,8 @@ const ProjectDashboard = () => {
       p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.projectKey?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = filterStatus === "All" ? true : p.status === filterStatus;
+    const matchesStatus =
+      filterStatus === "All" ? true : p.status === filterStatus;
 
     let matchesRole = true;
     if (roleFilter === "OWNER") {
@@ -174,10 +181,10 @@ const ProjectDashboard = () => {
     return matchesSearch && matchesStatus && matchesRole;
   });
 
-  const indexOfLast    = currentPage * projectsPerPage;
-  const indexOfFirst   = indexOfLast - projectsPerPage;
+  const indexOfLast = currentPage * projectsPerPage;
+  const indexOfFirst = indexOfLast - projectsPerPage;
   const currentProjects = filteredProjects.slice(indexOfFirst, indexOfLast);
-  const totalPages     = Math.ceil(filteredProjects.length / projectsPerPage);
+  const totalPages = Math.ceil(filteredProjects.length / projectsPerPage);
 
   // ------------------ RENDER ------------------
   return (
@@ -291,7 +298,9 @@ const ProjectDashboard = () => {
                     {p.name}
                   </h3>
 
-                  <p className="text-sm text-gray-500 mb-3">Key: {p.projectKey}</p>
+                  <p className="text-sm text-gray-500 mb-3">
+                    Key: {p.projectKey}
+                  </p>
 
                   <p className="text-gray-700 text-sm line-clamp-3">
                     {p.description || "No description available."}
@@ -303,10 +312,10 @@ const ProjectDashboard = () => {
                         p.status === "ACTIVE"
                           ? "bg-green-100 text-green-700"
                           : p.status === "PLANNING"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : p.status === "COMPLETED"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-gray-100 text-gray-700"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : p.status === "COMPLETED"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-gray-100 text-gray-700"
                       }`}
                     >
                       {p.status}

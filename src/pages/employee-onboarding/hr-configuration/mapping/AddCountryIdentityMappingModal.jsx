@@ -12,7 +12,7 @@ export default function AddCountryIdentityMappingModal({
   const [mandatory, setMandatory] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -51,12 +51,12 @@ export default function AddCountryIdentityMappingModal({
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       // ✅ Build mapping object for parent (NO reload)
       const identity = identities.find(
-        (i) => i.identity_type_uuid === identityUuid
+        (i) => i.identity_type_uuid === identityUuid,
       );
 
       const newMapping = {
@@ -79,9 +79,7 @@ export default function AddCountryIdentityMappingModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold mb-4">
-          Add Identity to Country
-        </h2>
+        <h2 className="text-xl font-semibold mb-4">Add Identity to Country</h2>
 
         <label className="block text-sm mb-1">Identity Type</label>
         <select
