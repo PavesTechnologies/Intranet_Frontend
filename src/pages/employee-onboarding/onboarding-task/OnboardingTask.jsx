@@ -36,17 +36,37 @@ const getAssigneeName = (assignee = {}) =>
   assignee.name || assignee.full_name || assignee.mail || assignee.email || "Unassigned";
 
 const getAssigneeValue = (assignee = {}) =>
+  assignee.user_uuid ||
   assignee.user_id ||
   assignee.id ||
-  assignee.user_uuid ||
-  assignee.mail ||
-  assignee.email ||
-  assignee.name ||
   "";
+// const normalizeTask = (task, employeeMap, assigneeMap) => {
+//   const employeeRecord = employeeMap.get(String(task.user_uuid || ""));
+//   const assigneeRecord = assigneeMap.get(String(task.assigned_to || ""));
 
+//   return {
+//     ...task,
+//     task_uuid: task.task_uuid,
+//     title: task.task_title,
+//     description: task.description || "",
+//     status: normalizeStatus(task.status),
+//     priority: String(task.priority || "medium").toLowerCase(),
+//     dueDate: task.due_date || "",
+//     reminderDate: task.reminder_date || "",
+//     taskType: task.task_type || "Onboarding",
+//     user_uuid: task.user_uuid,
+//     employee: employeeRecord ? getEmployeeName(employeeRecord) : task.employee,
+//    assignedTo:
+//   employees.find(e => String(e.user_uuid) === String(task.assigned_to))
+//     ? getEmployeeName(
+//         employees.find(e => String(e.user_uuid) === String(task.assigned_to))
+//       )
+//     : "Unassigned",
+//   };
+// };
 const normalizeTask = (task, employeeMap, assigneeMap) => {
   const employeeRecord = employeeMap.get(String(task.user_uuid || ""));
-  const assigneeRecord = assigneeMap.get(String(task.assigned_to || ""));
+  const assignee = employeeMap.get(String(task.assigned_to || ""));
 
   return {
     ...task,
@@ -59,9 +79,14 @@ const normalizeTask = (task, employeeMap, assigneeMap) => {
     reminderDate: task.reminder_date || "",
     taskType: task.task_type || "Onboarding",
     user_uuid: task.user_uuid,
-    employee: employeeRecord ? getEmployeeName(employeeRecord) : "",
-    assigned_to: task.assigned_to,
-    assignedTo: assigneeRecord ? getAssigneeName(assigneeRecord) : "",
+
+    employee: employeeRecord
+      ? getEmployeeName(employeeRecord)
+      : task.employee,
+
+    assignedTo: assignee
+      ? getEmployeeName(assignee)
+      : "Unassigned",
   };
 };
 
@@ -83,29 +108,29 @@ export default function OnboardingTask() {
   const ASSIGNEES_API = `${BASE_URL}/offer-approval/admin-users`;
 
   const employeeMap = useMemo(() => {
-    const map = new Map();
-    employees.forEach((e) => {
-      if (e.user_uuid) map.set(String(e.user_uuid), e);
-    });
-    return map;
-  }, [employees]);
+  const map = new Map();
+  employees.forEach((e) => {
+    if (e.user_uuid) {
+      map.set(String(e.user_uuid), e);   // ✅ ONLY UUID
+    }
+  });
+  return map;
+}, [employees]);
 
-  const assigneeMap = useMemo(() => {
-    const map = new Map();
-    assignees.forEach((a) => {
-      [
-        a.user_id,
-        a.id,
-        a.user_uuid,
-        a.mail,
-        a.email,
-        a.name,
-      ]
-        .filter(Boolean)
-        .forEach((key) => map.set(String(key), a));
-    });
-    return map;
-  }, [assignees]);
+const assigneeMap = useMemo(() => {
+  const map = new Map();
+
+  assignees.forEach((a) => {
+    const key =
+      a.user_uuid
+
+    if (key) {
+      map.set(String(key), a);
+    }
+  });
+
+  return map;
+}, [assignees]);
 
   const fetchTasks = async () => {
     try {
@@ -124,13 +149,10 @@ export default function OnboardingTask() {
   const fetchOptions = async () => {
     try {
       setOptionsLoading(true);
-      const [empRes, assRes] = await Promise.all([
-        axios.get(EMPLOYEES_API, { headers }),
-        axios.get(ASSIGNEES_API, { headers }),
-      ]);
+      const empRes = await axios.get(EMPLOYEES_API, { headers });
 
-      setEmployees(empRes.data || []);
-      setAssignees(assRes.data || []);
+    setEmployees(empRes.data || []);
+    setAssignees(empRes.data || []); // ✅ SAME DATA
     } catch {
       showStatusToast("Failed to load options", "error");
     } finally {
@@ -148,8 +170,8 @@ export default function OnboardingTask() {
 const buildTaskPayload = (task) => {
   return {
     user_uuid: task.user_uuid,
-    task_title: task.title,
-    task_type: task.taskType,
+    task_title: task.task_title,
+    task_type: task.task_type || task.taskType, 
     description: task.description || "",
 
     assigned_to: task.assigned_to, // ✅ FIXED
@@ -165,24 +187,37 @@ const buildTaskPayload = (task) => {
         : "Completed",
 
     progress: task.progress || 0,
-    due_date: task.dueDate || null,
-    reminder_date: task.reminderDate || null,
-  };
-};
-  const handleCreateTask = async (task) => {
-    try {
-      setSaving(true);
-      await axios.post(`${TASKS_API}/create`, buildTaskPayload(task), { headers });
-      await fetchTasks();
-      showStatusToast("Task created successfully", "success");
-      setShowModal(false);
-    } catch {
-      showStatusToast("Failed to create task", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
+    due_date:
+      task.dueDate ||
+      new Date().toISOString().split("T")[0],
 
+    reminder_date:
+      task.reminderDate ||
+      task.dueDate ||
+      new Date().toISOString().split("T")[0],
+      updated_by: "Admin",
+      };
+    
+};
+ const handleCreateTask = async (task) => {
+  try {
+    setSaving(true);
+
+    console.log("🚀 FINAL PAYLOAD:", task);
+    console.log("🧾 HEADERS:", headers);
+
+    await axios.post(`${TASKS_API}/create`, task, { headers });
+
+    await fetchTasks();
+    showStatusToast("Task created successfully", "success");
+    setShowModal(false);
+  } catch (err) {
+    console.log("❌ ERROR:", err.response?.data);
+    showStatusToast("Failed to create task", "error");
+  } finally {
+    setSaving(false);
+  }
+};
   const handleUpdateTask = async (task) => {
     try {
       setSaving(true);
@@ -202,6 +237,7 @@ const buildTaskPayload = (task) => {
     }
   };
 
+
   const deleteTask = async (id) => {
     await axios.delete(`${TASKS_API}/delete/${id}`, { headers });
     fetchTasks();
@@ -213,11 +249,52 @@ const buildTaskPayload = (task) => {
     completed: tasks.filter((t) => t.status === "completed"),
   };
 
+  useEffect(() => {
+  if (tasks.length && (employees.length || assignees.length)) {
+    setTasks((prev) =>
+      prev.map((t) => normalizeTask(t, employeeMap, assigneeMap))
+    );
+  }
+}, [employees, assignees]);
+
+
+
   return (
     <div style={{ padding: 24 }}>
-      <button onClick={() => { setSelectedTask(null); setShowModal(true); }}>
+      {/* <button onClick={() => { setSelectedTask(null); setShowModal(true); }}>
         + Add Task
-      </button>
+      </button> */}
+      <div style={{
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px"
+}}>
+  <h1 style={{ margin: 0, fontSize: "28px", fontWeight: "bold" }}>Task Management</h1>
+
+  <button
+    onClick={() => {
+      setSelectedTask(null);
+      setShowModal(true);
+    }}
+    style={{
+      background: "#3b82f6",
+      color: "#fff",
+      padding: "10px 18px",
+      border: "none",
+      borderRadius: "8px",
+      fontSize: "14px",
+      fontWeight: "600",
+      cursor: "pointer",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+      transition: "all 0.2s ease"
+    }}
+    onMouseEnter={(e) => e.target.style.background = "#2563eb"}
+    onMouseLeave={(e) => e.target.style.background = "#3b82f6"}
+  >
+    + Add Task
+  </button>
+</div>
 
       <TaskBoard
         tasks={groupedTasks}
@@ -235,15 +312,7 @@ const buildTaskPayload = (task) => {
           selectedTask
             ? {
                 ...selectedTask,
-
-                // ✅ FIX: convert backend value → dropdown value
-                assigned_to:
-                  assignees.find(
-                    (a) =>
-                      a.name === selectedTask.assigned_to ||
-                      a.mail === selectedTask.assigned_to ||
-                      a.email === selectedTask.assigned_to
-                  )?.user_id || "",
+                assigned_to: selectedTask.assigned_to, // ✅ FIXED
               }
             : null
         }
@@ -255,9 +324,9 @@ const buildTaskPayload = (task) => {
           value: e.user_uuid,
           label: getEmployeeName(e),
         }))}
-        assignees={assignees.map((a) => ({
-          value: getAssigneeValue(a),
-          label: getAssigneeName(a),
+       assignees={employees.map((e) => ({
+          value: e.user_uuid,           
+          label: getEmployeeName(e),    
         }))}
         onSave={(task) => {
           if (selectedTask) handleUpdateTask(task);
