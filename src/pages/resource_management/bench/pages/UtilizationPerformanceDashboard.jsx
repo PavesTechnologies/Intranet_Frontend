@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+﻿import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getOperationalProjects } from '../services/operationalProjectsService';
 // import LoadingSpinner from '../../../../components/LoadingSpinner';

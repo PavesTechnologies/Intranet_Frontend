@@ -38,6 +38,7 @@ const Dashboard = () => {
   const isGeneral = roles?.includes("General");
   const isDeveloper = roles.includes("Developer");
   const isManager = roles.includes("Manager");
+  // const isHR = roles.includes("HR");
   const isAdmin = roles.includes("Admin");
 
   // ✅ Fetch total employees
@@ -312,7 +313,7 @@ const Dashboard = () => {
   ];
   const filteredModuleCards = moduleCards.filter((card) => {
   // If it's the Onboarding card AND the user is General (but not HR)
-  if (card.title === "Employee Onbording" && !isGeneral && !isHR && !isManager) {
+  if (card.title === "Employee Onbording" && !isGeneral && !isHR && !isManager && !isAdmin) {
     return false; // Hide it
   }
   return true; // Show everything else (including for HR)
