@@ -128,3 +128,17 @@ export const getBillNonBillable = async (startDate, endDate) => {
         throw error;
     }
 };
+
+export const getResourceProjects = async (resourceId) => {
+    try {
+        const response = await axios.get(`${TMS_API_BASE_URL}/api/users/${resourceId}/project-details`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching resource projects:", error);
+        throw error;
+    }
+};

@@ -1,6 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { format, subDays, subWeeks, subMonths, startOfDay, endOfDay } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { getOperationalProjects } from '../services/operationalProjectsService';
+// import LoadingSpinner from '../../../../components/LoadingSpinner';
+// import Pagination from '../../../../components/Pagination/pagination';
 import {
    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
    BarChart, Bar, Cell, PieChart, Pie, Sector, Legend, LineChart, Line, ComposedChart
@@ -13,13 +16,14 @@ import {
    Share2, RefreshCcw, Info, Fingerprint, Lock, ShieldAlert,
    Scale, LayoutGrid, PieChart as PieChartIcon,
    TrendingUp as TrendingUpIcon, MoveUpRight, Circle, CalendarRange,
-   ZapOff, Database, Clock
+   ZapOff, Database, Clock, X, User, BarChart2
 } from 'lucide-react';
-import { getBillNonBillable } from '../../services/utilizationService';
+import { getBillNonBillable, getResourceProjects } from '../../services/utilizationService';
 import Pagination from '../../../../components/Pagination/pagination';
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { utilizationService } from '../../services/utilizationService';
 import { fetchResources } from '../../services/resource';
+import ResourceVisualizationDrawer from '../components/ResourceVisualizationDrawer';
 
 // --- INTEGRATED MOCK DATA MODELS FOR ALL 12 STORIES ---
 
@@ -30,21 +34,166 @@ const KPI_STATS = [
    { label: 'Confidence Score', value: '100%', trend: 'Verified', icon: <Fingerprint />, color: 'text-blue-600', bg: 'bg-blue-50' },
 ];
 
-const THRESHOLD_RULES = [
-   { name: 'Optimal', range: '75% - 90%', color: 'bg-emerald-500', note: 'Standard Performance' },
-   { name: 'Warning', range: '90% - 95%', color: 'bg-amber-500', note: 'Approaching Breach' },
-   { name: 'Critical', range: '> 95% or < 40%', color: 'bg-rose-500', note: 'Requires Intervention' },
+const BILLING_PIE_DATA = [
+   { name: 'Billable', value: 72, color: '#4f46e5' },
+   { name: 'Non-Billable', value: 18, color: '#818cf8' },
+   { name: 'Internal', value: 10, color: '#cbd5e1' },
+];
+
+const PORTFOLIO_DATA = {
+   DAILY: [
+      { period: 'Mon', actual: 7.2, planned: 8, util: 90 },
+      { period: 'Tue', actual: 8.5, planned: 8, util: 106.2 },
+      { period: 'Wed', actual: 7.8, planned: 8, util: 97.5 },
+      { period: 'Thu', actual: 6.4, planned: 8, util: 80 },
+      { period: 'Fri', actual: 4.8, planned: 8, util: 60 },
+   ],
+   WEEKLY: [
+      { period: 'W11', actual: 115, planned: 160, util: 71.8 },
+      { period: 'W12', actual: 120, planned: 160, util: 75.0 },
+      { period: 'W13', actual: 132, planned: 160, util: 82.5 },
+      { period: 'W14', actual: 140, planned: 160, util: 87.5 },
+      { period: 'W15', actual: 104, planned: 160, util: 65.0 },
+      { period: 'W16', actual: 102, planned: 160, util: 63.8 },
+   ],
+   MONTHLY: [
+      { period: 'Jan', actual: 480, planned: 640, util: 75 },
+      { period: 'Feb', actual: 520, planned: 640, util: 81.2 },
+      { period: 'Mar', actual: 544, planned: 640, util: 85.0 },
+   ]
+};
+
+const extractOperationalProjects = (payload) => {
+   if (Array.isArray(payload)) return payload;
+   if (Array.isArray(payload?.projects)) return payload.projects;
+   if (Array.isArray(payload?.data)) return payload.data;
+   if (Array.isArray(payload?.projectHoursSummaries)) return payload.projectHoursSummaries;
+   if (Array.isArray(payload?.projectSummaries)) return payload.projectSummaries;
+   if (Array.isArray(payload?.content)) return payload.content;
+   return [];
+};
+
+const normalizeString = (value) => String(value ?? '').trim().toLowerCase();
+
+const isInternalProject = (project) => {
+   const explicitInternalFlag = [
+      project.isInternal,
+      project.internalProject,
+      project.isInternalProject,
+   ].find((value) => typeof value === 'boolean');
+
+   if (typeof explicitInternalFlag === 'boolean') {
+      return explicitInternalFlag;
+   }
+
+   const typeSignals = [
+      project.projectType,
+      project.type,
+      project.category,
+      project.projectCategory,
+      project.engagementType,
+   ].map(normalizeString);
+
+   if (typeSignals.some((value) => value.includes('internal'))) {
+      return true;
+   }
+
+   const clientSignals = [
+      project.client,
+      project.clientName,
+      project.customer,
+      project.accountName,
+   ].map(normalizeString);
+
+   if (clientSignals.some((value) => value === 'internal' || value.includes('internal project'))) {
+      return true;
+   }
+
+   return false;
+};
+
+const mapProjectCatalogEntry = (project) => {
+   const billableHours = Number(
+      project.billableHours ?? project.billable ?? project.billableHour ?? 0,
+   );
+   const nonBillableHours = Number(
+      project.nonBillableHours ?? project.nonBillable ?? project.nonBillableHour ?? 0,
+   );
+   const resourceHours = Number(
+      project.resourceHours ?? project.totalResourceHours ?? project.totalHours ?? billableHours + nonBillableHours,
+   );
+   const internalHours = Math.max(resourceHours - billableHours - nonBillableHours, 0);
+   const billingBase = billableHours + nonBillableHours + internalHours;
+   const billable = billingBase > 0 ? Number(((billableHours / billingBase) * 100).toFixed(1)) : 0;
+   const nonBillable = billingBase > 0 ? Number(((nonBillableHours / billingBase) * 100).toFixed(1)) : 0;
+   const internal = billingBase > 0 ? Number(((internalHours / billingBase) * 100).toFixed(1)) : 0;
+   const util = Number(
+      project.utilization ?? project.utilizationPercentage ?? project.utilizationPercent ?? 0,
+   );
+
+   return {
+      id: project.projectId || project.id || 'N/A',
+      name: project.project || project.projectName || project.name || 'Unnamed Project',
+      client: project.clientName || project.client || project.customer || `${resourceHours}h total`,
+      actualHours: Number(project.actualHours ?? project.actual ?? 0),
+      plannedHours: Number(project.plannedHours ?? project.planned ?? 0),
+      pendingHours: Number(project.pendingHours ?? project.pending ?? 0),
+      util,
+      billable,
+      nonBillable,
+      internal,
+      billableHours,
+      nonBillableHours,
+      internalHours,
+      resourceHours,
+      health: util >= 90 ? 'Optimal' : util >= 70 ? 'Warning' : 'Critical',
+      severity: util >= 90 ? 'Low' : util >= 70 ? 'Warning' : 'Critical',
+      breach: Number(project.pendingHours ?? project.pending ?? 0) > 0 ? 'Pending Hours' : 'None',
+      isInternal: isInternalProject(project),
+   };
+};
+
+const formatMetric = (value, suffix = '') => (
+   typeof value === 'number' ? `${value}${suffix}` : '--'
+);
+
+const RESOURCE_DATABASE = [
+   { id: 'E-004', name: 'Arun Kumar', role: 'Sr. Dev', util: 92.5, actual: 148, allocated: 160, billable: 140, nonBillable: 8, internal: 0, trend: 'up', lineage: 'TS-4421', confidence: 'High' },
+   { id: 'E-221', name: 'Sarah Wing', role: 'QA Lead', util: 98.1, actual: 160, allocated: 163, billable: 150, nonBillable: 10, internal: 0, trend: 'volatile', lineage: 'TS-4452', confidence: 'Partial' },
+   { id: 'E-056', name: 'Mike Ross', role: 'Backend', util: 42.5, actual: 68, allocated: 160, billable: 30, nonBillable: 20, internal: 18, trend: 'down', lineage: 'TS-4410', confidence: 'Low' },
+   { id: 'E-334', name: 'Donna Paul', role: 'Designer', util: 87.5, actual: 140, allocated: 160, billable: 120, nonBillable: 10, internal: 10, trend: 'stable', lineage: 'TS-4433', confidence: 'High' },
+];
+
+const ALERT_INTELLIGENCE = [
+   { id: 'AL-109', scope: 'Project Alpha-X', message: 'Sustained over-utilization (+18%) detected over 4 weeks.', stakeholder: 'Delivery Head', status: 'Pending', severity: 'Critical' },
+   { id: 'AL-110', scope: 'Resource Mike Ross', message: 'Allocation exists (100%) but utilization is < 40%.', stakeholder: 'Resource Manager', status: 'Acknowledged', severity: 'Warning' },
 ];
 
 
 
 
 const UtilizationPerformanceDashboard = () => {
+   const PROJECTS_PER_PAGE = 5;
    const navigate = useNavigate();
-   const [activeTab, setActiveTab] = useState('portfolio');
+   const location = useLocation();
+   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'portfolio');
+   const [projectCategoryTab, setProjectCategoryTab] = useState('active');
+   const [projectPage, setProjectPage] = useState(1);
    const [granularity, setGranularity] = useState('WEEKLY');
    const [selectedResourceId, setSelectedResourceId] = useState(null);
    const [OVERALL_CONFIDENCE_SCORE] = useState(94);
+   const [operationalProjects, setOperationalProjects] = useState([]);
+   const [projectsLoading, setProjectsLoading] = useState(true);
+   const [projectsError, setProjectsError] = useState('');
+
+   const [selectedResource, setSelectedResource] = useState(null);
+   const [resourceProjectsData, setResourceProjectsData] = useState([]);
+   const [isProjectsLoading, setIsProjectsLoading] = useState(false);
+   const [projectsDrawerTab, setProjectsDrawerTab] = useState('overall'); // 'overall' or 'projects'
+
+   const [searchQuery, setSearchQuery] = useState('');
+   const [currentPage, setCurrentPage] = useState(1);
+   const ITEMS_PER_PAGE = 8;
    const [liveData, setLiveData] = useState(null);
    const [allResources, setAllResources] = useState([]);
    const [rmsUsers, setRmsUsers] = useState([]);
@@ -118,10 +267,6 @@ const UtilizationPerformanceDashboard = () => {
       endDate: new Date().toISOString().split('T')[0]
    });
 
-   const [searchQuery, setSearchQuery] = useState('');
-   const [currentPage, setCurrentPage] = useState(1);
-   const ITEMS_PER_PAGE = 8;
-
    const filteredAndPaginatedResources = useMemo(() => {
       let filtered = Array.isArray(resourceMetrics) ? resourceMetrics : [];
       if (searchQuery) {
@@ -181,7 +326,7 @@ const UtilizationPerformanceDashboard = () => {
    const handleGenerateReport = async () => {
       setIsGenerating(true);
       setReportError(null);
-      
+
       // TELEMETRY: Print outgoing payload to console for verification
       console.log('[Utilization Engine] Dispatching Report Request:', reportParams);
 
@@ -262,7 +407,7 @@ const UtilizationPerformanceDashboard = () => {
             const b = liveData.billablePercentage || 0;
             const nb = liveData.otherNonBillablePercentage || liveData.nonBillablePercentage || 0;
             const i = liveData.internalNonBillablePercentage || liveData.internalPercentage || 0;
-            
+
             return [
                { name: 'Billable', value: Number(parseFloat(b).toFixed(2)), color: '#4f46e5' },
                { name: 'Non-Billable', value: Number(parseFloat(nb).toFixed(2)), color: '#818cf8' },
@@ -414,54 +559,73 @@ const UtilizationPerformanceDashboard = () => {
       return b ? b.value : 0;
    }, [activeBillingData]);
    return (
-      <div className="min-h-screen bg-slate-50/50 p-6 font-sans select-none selection:bg-indigo-100 selection:text-indigo-900">
+      <div className="min-h-screen bg-[#FDFDFE] p-6 font-sans select-none">
+
+         {/* Confidence Banner */}
+         {/* {OVERALL_CONFIDENCE_SCORE < 100 && (
+            <div className="mb-6 flex items-center justify-between p-3 bg-amber-50/50 border border-amber-100 rounded-xl">
+               <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white text-amber-500 rounded-lg shadow-sm border border-amber-50">
+                     <ShieldAlert size={18} />
+                  </div>
+                  <div>
+                     <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest leading-none">Historical Data Confidence (Story 5 & 11)</span>
+                     <p className="text-[11px] font-medium text-amber-600/80 mt-0.5 font-serif">Trend preservation active. Metrics based on 94% verified historical actuals.</p>
+                  </div>
+               </div>
+               <div className="flex items-center gap-2 px-3 py-1 bg-white border border-rose-100 rounded-lg text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">
+                  <ZapOff size={12} /> Sync Restricted
+               </div>
+            </div>
+         )} */}
+
+         {/* Header â€” Unified Command Strip */}
+         <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+               {/* <button
+                  onClick={() => navigate('/resource-management/bench')}
+                  className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+               >
+                  <ArrowLeft size={18} />
+               </button> */}
+               <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-none">Utilization Intelligence Hub</h1>
+
+               </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+               <button
+                  type="button"
+                  onClick={() => navigate('/resource-management/bench/utilization-reporting')}
+                  className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm h-[42px]"
+               >
+                  <BarChart3 className="h-4 w-4 text-emerald-600" />
+                  UTILIZATION REPORTING & DASHBOARDS
+               </button>
+               {/* Unified Calendar / Date Range Picker */}
+               <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm h-[42px] hover:border-indigo-500 transition-all focus-within:ring-1 focus-within:ring-indigo-500 group">
+                  <CalendarRange size={16} className="text-indigo-600 shrink-0 group-hover:scale-110 transition-transform" />
+                  <div className="flex items-center gap-1">
+                     <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="text-[12px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[125px]"
+                     />
+                     <span className="text-slate-300 mx-1">—</span>
+                     <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="text-[12px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[125px]"
+                     />
+                  </div>
+               </div>
 
 
-
-
-
-          <div className="mb-6 flex items-center justify-between">
-             <div className="flex items-center gap-4">
-                <div className="flex-1">
-                   <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-none">Utilization Intelligence Hub</h1>
-                   <p className="mt-1 text-xs sm:text-sm font-medium text-slate-500 capitalize tracking-normal flex items-center gap-2">
-                      <ShieldCheck size={14} className="text-indigo-600" /> Governed Command Hub — Detecting Sustained Breaches
-                   </p>
-                </div>
-             </div>
-
-             <div className="flex items-center gap-3">
-                <button
-                   type="button"
-                   onClick={() => navigate('/resource-management/bench/utilization-reporting')}
-                   className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm h-[42px]"
-                >
-                   <BarChart3 className="h-4 w-4 text-emerald-600" />
-                   UTILIZATION REPORTING & DASHBOARDS
-                </button>
-                {/* Unified Calendar / Date Range Picker */}
-                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm h-[42px] hover:border-indigo-500 transition-all focus-within:ring-1 focus-within:ring-indigo-500 group">
-                   <CalendarRange size={16} className="text-indigo-600 shrink-0 group-hover:scale-110 transition-transform" />
-                   <div className="flex items-center gap-1">
-                      <input
-                         type="date"
-                         value={startDate}
-                         onChange={(e) => setStartDate(e.target.value)}
-                         className="text-[12px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[125px]"
-                      />
-                      <span className="text-slate-300 mx-1">—</span>
-                      <input
-                         type="date"
-                         value={endDate}
-                         onChange={(e) => setEndDate(e.target.value)}
-                         className="text-[12px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[125px]"
-                      />
-                   </div>
-                </div>
-
-
-             </div>
-          </div>
+            </div>
+         </div>
          {/* KPI Stats Grid */}
          <div className="flex flex-nowrap gap-4 overflow-x-auto no-scrollbar mb-6">
             {(liveData ? dynamicKPIs : KPI_STATS).map((stat, idx) => {
@@ -493,7 +657,7 @@ const UtilizationPerformanceDashboard = () => {
                         { id: 'portfolio', label: 'Portfolio Analytics', icon: PieIcon },
                         { id: 'resource', label: 'Resource Capability', icon: Users },
                         { id: 'projects', label: 'Operational Projects', icon: Monitor },
-                        { id: 'governance', label: 'Governance & Readiness', icon: ShieldAlert }
+                        // { id: 'governance', label: 'Governance & Readiness', icon: ShieldAlert }
                      ].map((tab) => {
                         const isActive = activeTab === tab.id;
                         const Icon = tab.icon;
@@ -1175,7 +1339,7 @@ const UtilizationPerformanceDashboard = () => {
                         )}
                      </div>
                   )}
-                                       {activeTab === 'portfolio' && (
+                  {activeTab === 'portfolio' && (
                      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
 
                         <div className="xl:col-span-2 bg-white rounded-3xl border border-slate-100 shadow-sm p-8 overflow-hidden">
@@ -1294,72 +1458,136 @@ const UtilizationPerformanceDashboard = () => {
                      </div>
                   )}
 
-                  {/* TAB 2: PROJECTS & BREACHES */}
+                  {/* TAB 2: PROJECTS & BREACHES (Story 3, 4, 6) */}
                   {activeTab === 'projects' && (
-                     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden animate-in fade-in duration-500">
-                        <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                           <div className="flex flex-col gap-1.5">
-                              <div className="flex items-center gap-3">
-                                 <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none">Operational Performance Registry</h3>
-                                 <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${selectedResourceId ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-50 text-slate-500 border border-slate-100'}`}>
-                                    {selectedResourceId ? `FOCUS: ${selectedResourceName}` : 'REAL-TIME: ALL ENGAGEMENTS'}
-                                 </span>
-                              </div>
-                              <p className="text-[11px] font-medium text-slate-400 italic">Tracking sustained workload breaches across project squads</p>
+                     <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden animate-in">
+                        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
+                           <div>
+                              <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest leading-none">Project-Level Consumption Matrix</h3>
                            </div>
                         </div>
+                        <div className="px-6 py-3 border-b border-slate-100 bg-white">
+                           <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                              {[
+                                 { id: 'active', label: 'Active Projects' },
+                                 { id: 'internal', label: 'Internal Projects' },
+                              ].map((tab) => (
+                                 <button
+                                    key={tab.id}
+                                    onClick={() => setProjectCategoryTab(tab.id)}
+                                    className={`rounded-lg px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${projectCategoryTab === tab.id
+                                       ? 'bg-white text-indigo-600 shadow-sm border border-slate-200'
+                                       : 'text-slate-500 hover:text-slate-700'
+                                       }`}
+                                 >
+                                    {tab.label}
+                                 </button>
+                              ))}
+                           </div>
+                        </div>
+                        {projectsLoading && (
+                           <div className="border-b border-slate-100 bg-white px-6 py-8">
+                              <LoadingSpinner text="Projects Loading..." />
+                           </div>
+                        )}
+                        {projectsError && (
+                           <div className="px-6 py-4 text-[11px] font-semibold text-amber-700 border-b border-amber-100 bg-amber-50/60">
+                              {projectsError}
+                           </div>
+                        )}
                         <div className="overflow-x-auto no-scrollbar">
-                           <table className="w-full text-left border-collapse">
+                           <table className="w-full text-left">
                               <thead>
-                                 <tr className="bg-slate-50/50">
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 border-b border-slate-100">Project / Engagement</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 text-center border-b border-slate-100">Billing Strip</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 text-center border-b border-slate-100">Health Signal (Threshold)</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.15em] text-rose-600 text-right border-b border-slate-100">Breach Status</th>
+                                 <tr className="bg-slate-50/50 border-b border-slate-50">
+                                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Project / Engagement</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Billing Strip</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Hours (Act / Plan)</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-right">Utilization %</th>
                                  </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-50">
-                                 {(liveData?.projects || []).map((proj) => (
-                                    <tr key={proj.id || proj.projectId} className="hover:bg-indigo-50/30 transition-all group cursor-default">
-                                       <td className="px-8 py-6">
-                                          <div className="flex flex-col gap-1">
-                                             <span className="text-[14px] font-bold text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">{proj.name}</span>
-                                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">ID: {proj.id || proj.projectId}</span>
+                                 {!projectsLoading && visibleOperationalProjects.length === 0 && (
+                                    <tr>
+                                       <td colSpan="4" className="px-6 py-8 text-center text-[11px] font-semibold text-slate-500">
+                                          {projectCategoryTab === 'internal'
+                                             ? 'No internal projects were returned by the backend hours summary endpoint.'
+                                             : 'No active client projects were returned by the backend hours summary endpoint.'}
+                                       </td>
+                                    </tr>
+                                 )}
+                                 {paginatedOperationalProjects.map((project) => (
+                                    <tr
+                                       key={project.id}
+                                       className="hover:bg-slate-50/40 transition-colors group cursor-pointer"
+                                       onClick={() => navigate(`/resource-management/bench/utilization-performance/projects/${project.id}`)}
+                                    >
+                                       <td className="px-6 py-4">
+                                          <div className="flex flex-col">
+                                             <span className="text-[13px] font-bold text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{project.name}</span>
+                                             <span className="text-[10px] font-medium text-slate-400 mt-1.5 uppercase tracking-widest italic">
+                                                {projectCategoryTab === 'internal' ? 'Internal Project' : project.client} | {project.id}
+                                             </span>
+                                             <span className="text-[9px] font-semibold text-slate-500 mt-2">
+                                                Pending: {formatMetric(project.pendingHours, 'h')}
+                                             </span>
                                           </div>
                                        </td>
-                                       <td className="px-8 py-6">
-                                          <div className="flex items-center justify-center gap-6">
-                                             <div className="flex flex-col items-center">
-                                                <span className="text-[12px] font-black text-indigo-600">{Number(proj.billable).toFixed(1)}%</span>
-                                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Billable</span>
-                                             </div>
-                                             <div className="flex flex-col items-center">
-                                                <span className="text-[12px] font-black text-slate-500">{Number(proj.nonBillable).toFixed(1)}%</span>
-                                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Internal</span>
-                                             </div>
+                                       <td className="px-6 py-4 text-center">
+                                          {project.resourceHours > 0 ? (
+                                             <>
+                                                <div className="flex items-center justify-center gap-0.5 max-w-[140px] mx-auto overflow-hidden rounded-full h-2 bg-slate-100 border border-slate-200">
+                                                   <div className="h-full bg-indigo-600" style={{ width: `${project.billable}%` }} />
+                                                   <div className="h-full bg-indigo-300" style={{ width: `${project.nonBillable}%` }} />
+                                                   <div className="h-full bg-slate-300" style={{ width: `${project.internal}%` }} />
+                                                </div>
+                                                <div className="flex justify-center gap-3 mt-1.5">
+                                                   <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-600" /><span className="text-[8px] font-black text-slate-400 uppercase">{formatMetric(project.billableHours, 'h')} B</span></div>
+                                                   <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-300" /><span className="text-[8px] font-black text-slate-400 uppercase">{formatMetric(project.nonBillableHours, 'h')} NB</span></div>
+                                                </div>
+                                             </>
+                                          ) : (
+                                             <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                                                No billed hours
+                                             </span>
+                                          )}
+                                       </td>
+                                       <td className="px-6 py-4 text-center">
+                                          <span className="text-[12px] font-bold text-slate-900">{formatMetric(project.actualHours)} / {formatMetric(project.plannedHours, 'h')}</span>
+                                          <div className="h-1 w-12 bg-slate-100 rounded-full mt-2 mx-auto overflow-hidden">
+                                             <div className="h-full bg-indigo-500" style={{ width: `${typeof project.util === 'number' ? project.util : 0}%` }} />
                                           </div>
                                        </td>
-                                       <td className="px-8 py-6">
-                                          <div className="flex items-center justify-center">
-                                             <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border shadow-sm ${proj.health === 'Optimal' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                                proj.health === 'Warning' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                                   'bg-rose-50 text-rose-700 border-rose-100'
+                                       <td className="px-6 py-4 text-right">
+                                          <div className="flex flex-col items-end">
+                                             <span className={`text-[16px] font-black ${project.health === 'Critical' ? 'text-rose-600' : 'text-slate-900'}`}>{formatMetric(project.util, '%')}</span>
+                                             <span className={`inline-flex rounded-md border px-2 py-0.5 text-[8px] font-black uppercase tracking-widest mt-1 ${project.severity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                                                project.severity === 'Warning' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                   'bg-emerald-50 text-emerald-700 border-emerald-100'
                                                 }`}>
-                                                {proj.health === 'Optimal' ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
-                                                {proj.healthSignal || `${proj.health} (${Number(proj.util || proj.utilizationPercentage || 0).toFixed(1)}%)`}
-                                             </div>
+                                                {project.health}
+                                             </span>
                                           </div>
-                                       </td>
-                                       <td className="px-8 py-6 text-right">
-                                          <span className={`text-[11px] font-black uppercase tracking-tight ${proj.breach === 'None' || !proj.breach ? 'text-slate-300' : 'text-rose-600'}`}>
-                                             {proj.breach || 'None Identified'}
-                                          </span>
                                        </td>
                                     </tr>
                                  ))}
                               </tbody>
                            </table>
                         </div>
+                        {!projectsLoading && visibleOperationalProjects.length > 0 && (
+                           <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/40">
+                              <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                 Showing {Math.min((projectPage - 1) * PROJECTS_PER_PAGE + 1, visibleOperationalProjects.length)}-
+                                 {Math.min(projectPage * PROJECTS_PER_PAGE, visibleOperationalProjects.length)} of {visibleOperationalProjects.length}
+                              </div>
+                              <Pagination
+                                 currentPage={projectPage}
+                                 totalPages={totalProjectPages}
+                                 onPrevious={() => setProjectPage((prev) => Math.max(prev - 1, 1))}
+                                 onNext={() => setProjectPage((prev) => Math.min(prev + 1, totalProjectPages))}
+                                 className="justify-end py-0"
+                              />
+                           </div>
+                        )}
                      </div>
                   )}
 
@@ -1429,7 +1657,7 @@ const UtilizationPerformanceDashboard = () => {
                                     </tr>
                                  ) : (
                                     filteredAndPaginatedResources.paginated.map((res, idx) => (
-                                       <tr key={res.userId || idx} className="hover:bg-indigo-50/30 transition-all group cursor-default">
+                                       <tr key={res.userId || idx} className="hover:bg-indigo-50/30 transition-all group cursor-default cursor-pointer" onClick={() => handleRowClick(res)}>
                                           <td className="px-8 py-6">
                                              <div className="flex items-center gap-4">
                                                 <div className="h-10 w-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-black text-[12px] transition-transform group-hover:scale-110 duration-300 uppercase">
@@ -1492,7 +1720,7 @@ const UtilizationPerformanceDashboard = () => {
                   )}
 
                   {/* TAB 4: GOVERNANCE & READINESS */}
-                  {activeTab === 'governance' && (
+                  {/* {activeTab === 'governance' && (
                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in duration-500">
                         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 flex flex-col items-center text-center group overflow-hidden relative">
                            <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:scale-125 transition-transform duration-700">
@@ -1581,13 +1809,25 @@ const UtilizationPerformanceDashboard = () => {
                            </div>
                         </div>
                      </div>
-                  )}
+                  )} */}
                </div>
             </div>
          </div>
+
+         {/* RESOURCE PROJECTS DRAWER */}
+         <ResourceVisualizationDrawer
+            selectedResource={selectedResource}
+            onClose={() => setSelectedResource(null)}
+            projectsDrawerTab={projectsDrawerTab}
+            setProjectsDrawerTab={setProjectsDrawerTab}
+            isProjectsLoading={isProjectsLoading}
+            resourceProjectsData={resourceProjectsData}
+         />
       </div>
    );
 };
+
+
 
 const PerformanceTooltip = ({ active, payload, label }) => {
    if (active && payload && payload.length) {

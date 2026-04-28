@@ -390,7 +390,7 @@ export default function WeeklyDashboard() {
         setLoading(true);
 
         const response = await fetch(
-          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/weekly-joining-report/dashboard/?start_date=${formatDateSafe(dateRange.start)}&end_date=${formatDateSafe(dateRange.end)}`,
+          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/weekly-dashboard/?start_date=${formatDateSafe(dateRange.start)}&end_date=${formatDateSafe(dateRange.end)}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -416,6 +416,7 @@ export default function WeeklyDashboard() {
     pending: apiData?.summary?.pending || 0,
     total: apiData?.joinedCandidates?.length || 0,
   };
+  const isNoData = !apiData || summary.total === 0;
 
   const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -536,8 +537,22 @@ export default function WeeklyDashboard() {
             )}
           </div>
         </div>
+        {!loading && isNoData && (
+          <div className="flex items-center justify-center h-[60vh]">
+            <div className="text-center">
+              <h2 className="text-2xl font-semibold text-slate-700">
+                No data available for the selected week
+              </h2>
+              <p className="text-sm text-slate-400 mt-2">
+                Try selecting a different date range
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* KPI CARDS */}
+        {!loading && !isNoData && (
+        <>
         <div className="grid gap-5 md:grid-cols-2">
           {/* COMPLETED */}
           <div className="relative rounded-2xl bg-white shadow-md border border-slate-200 p-6 hover:shadow-lg transition">
@@ -716,6 +731,8 @@ export default function WeeklyDashboard() {
             ))}
           </div>
         </Section>
+        </>
+        )}
       </div>
     </div>
   );

@@ -2,7 +2,16 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
+import { useAuth } from "../../../../../contexts/AuthContext";
+
 export default function EducationLevelManagement() {
+  const { user } = useAuth();
+  const roles = user?.roles?.map(r => r.toUpperCase()) || [];
+  const canView = roles.includes("ADMIN") || roles.includes("HR");
+
+
+  
+
   const [levels, setLevels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -12,6 +21,7 @@ export default function EducationLevelManagement() {
   const token = localStorage.getItem("token");
 
   /* -------------------- FETCH -------------------- */
+
   const fetchLevels = async () => {
     try {
       setLoading(true);
@@ -26,10 +36,18 @@ export default function EducationLevelManagement() {
     }
   };
 
-  useEffect(() => {
+ useEffect(() => {
+  if (canView) {
     fetchLevels();
-  }, []);
-
+  }
+}, [canView]);
+ if (!canView) {
+  return (
+    <div className="p-6 text-center text-red-600">
+      You are not authorized to view Education Levels
+    </div>
+  );
+}
   /* -------------------- DELETE -------------------- */
   const deleteLevel = async (uuid) => {
     if (!window.confirm("Delete education level?")) return;
@@ -44,6 +62,7 @@ export default function EducationLevelManagement() {
       toast.error("Failed to delete education level");
     }
   };
+   
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -57,7 +76,7 @@ export default function EducationLevelManagement() {
             Manage education levels used in onboarding
           </p>
         </div>
-
+        {(roles.includes("ADMIN") || roles.includes("HR"))&& (
         <button
           onClick={() => {
             setEditData(null);
@@ -67,6 +86,7 @@ export default function EducationLevelManagement() {
         >
           + Add Education Level
         </button>
+        )}
       </div>
 
       {/* Table */}
@@ -116,6 +136,8 @@ export default function EducationLevelManagement() {
                       </span>
                     </td>
                     <td className="px-6 py-3 text-right space-x-4">
+                      {(roles.includes("ADMIN") || roles.includes("HR"))&& (
+
                       <button
                         className="text-blue-700 hover:underline"
                         onClick={() => {
@@ -125,12 +147,15 @@ export default function EducationLevelManagement() {
                       >
                         Edit
                       </button>
+                      )}
+                        {(roles.includes("ADMIN") || roles.includes("HR")) && (
                       <button
                         className="text-red-600 hover:underline"
                         onClick={() => deleteLevel(l.education_uuid)}
                       >
                         Delete
                       </button>
+                      )}
                     </td>
                   </tr>
                 ))

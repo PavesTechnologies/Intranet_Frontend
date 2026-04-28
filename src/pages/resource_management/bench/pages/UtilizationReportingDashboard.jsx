@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart
 } from 'recharts';
 import {
   Download, Filter, Search, Users, Activity,
-  Briefcase, FileText, ChevronRight, TrendingUp, AlertTriangle, RefreshCcw, Monitor, ShieldCheck, Clock, Award, ShieldAlert, ArrowUpRight, ArrowDownRight, Zap
+  Briefcase, FileText, ChevronRight, TrendingUp, AlertTriangle, RefreshCcw, Monitor, ShieldCheck, Clock, Award, ShieldAlert, ArrowUpRight, ArrowDownRight, Zap, ArrowLeft
 } from 'lucide-react';
 import { utilizationService } from '../../services/utilizationService';
 import toast from 'react-hot-toast';
@@ -49,6 +50,7 @@ const getLastYearStr = () => {
 };
 
 const UtilizationReportingDashboard = () => {
+  const navigate = useNavigate();
   const [reportParams, setReportParams] = useState({
     startDate: getLastYearStr(),
     endDate: getTodayStr(),
@@ -62,6 +64,8 @@ const UtilizationReportingDashboard = () => {
   });
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isExportingCSV, setIsExportingCSV] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('ANOMALIES');
@@ -98,28 +102,40 @@ const UtilizationReportingDashboard = () => {
   };
 
   const handleExportCSV = async () => {
+    setIsExportingCSV(true);
     try {
       toast.loading('Exporting CSV...', { id: 'csv-export' });
       await utilizationService.exportUtilizationCSV(reportParams);
       toast.success('Export successful', { id: 'csv-export' });
     } catch (err) {
       toast.error('Export failed', { id: 'csv-export' });
+    } finally {
+      setIsExportingCSV(false);
     }
   };
 
   const handleExportExcel = async () => {
+    setIsExportingExcel(true);
     try {
       toast.loading('Exporting Excel...', { id: 'excel-export' });
       await utilizationService.exportUtilizationExcel(reportParams);
       toast.success('Export successful', { id: 'excel-export' });
     } catch (err) {
       toast.error('Export failed', { id: 'excel-export' });
+    } finally {
+      setIsExportingExcel(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50/50 p-6 font-sans select-none selection:bg-indigo-100 selection:text-indigo-900">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center gap-4">
+        <button
+          onClick={() => navigate('/resource-management/bench/utilization-performance')}
+          className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+        >
+          <ArrowLeft size={18} />
+        </button>
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-none">Utilization Reporting & Dashboards</h1>
           <p className="mt-1 text-xs sm:text-sm font-medium text-slate-500 capitalize tracking-normal flex items-center gap-2">
@@ -225,19 +241,19 @@ const UtilizationReportingDashboard = () => {
             <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
               <button
                 onClick={handleExportCSV}
-                disabled={!reportData}
-                className="h-10 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
+                disabled={!reportData || isExportingCSV}
+                className="h-10 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm min-w-[85px] justify-center"
               >
-                <Download size={18} />
-                <span className="text-[10px] font-black uppercase">CSV</span>
+                {isExportingCSV ? <RefreshCcw size={16} className="animate-spin text-emerald-600" /> : <Download size={18} />}
+                <span className="text-[10px] font-black uppercase">{isExportingCSV ? 'Processing' : 'CSV'}</span>
               </button>
               <button
                 onClick={handleExportExcel}
-                disabled={!reportData}
-                className="h-10 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
+                disabled={!reportData || isExportingExcel}
+                className="h-10 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm min-w-[85px] justify-center"
               >
-                <FileText size={18} />
-                <span className="text-[10px] font-black uppercase">Excel</span>
+                {isExportingExcel ? <RefreshCcw size={16} className="animate-spin text-emerald-600" /> : <FileText size={18} />}
+                <span className="text-[10px] font-black uppercase">{isExportingExcel ? 'Processing' : 'Excel'}</span>
               </button>
             </div>
           </div>

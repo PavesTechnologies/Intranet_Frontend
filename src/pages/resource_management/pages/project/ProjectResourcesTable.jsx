@@ -15,7 +15,7 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
 import { cn } from "@/lib/utils";
 
-const ProjectResourcesTable = ({ projectId }) => {
+const ProjectResourcesTable = ({ projectId, resources = null }) => {
     const [allocations, setAllocations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -23,7 +23,21 @@ const ProjectResourcesTable = ({ projectId }) => {
     const [page, setPage] = useState(1);
     const itemsPerPage = 5;
 
+    const getResourceName = (item) =>
+        item.fullName || item.resourceName || item.employeeName || item.name || `Resource ${item.resourceId || ""}`.trim();
+
+    const getResourceEmail = (item) =>
+        item.email || item.employeeEmail || item.mail || "--";
+
     useEffect(() => {
+        if (Array.isArray(resources)) {
+            setAllocations(resources);
+            setError(null);
+            setLoading(false);
+            setPage(1);
+            return;
+        }
+
         const loadResources = async () => {
             try {
                 setLoading(true);
@@ -45,17 +59,23 @@ const ProjectResourcesTable = ({ projectId }) => {
             loadResources();
             setPage(1); // Reset page on project change
         }
-    }, [projectId]);
+    }, [projectId, resources]);
 
     useEffect(() => {
         setPage(1); // Reset page on search
     }, [searchTerm]);
 
     const filteredAllocations = allocations.filter(item =>
-        item.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getResourceName(item).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getResourceEmail(item).toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.demandName && item.demandName.toLowerCase().includes(searchTerm.toLowerCase()))
     );
+
+    const getBillableHours = (item) =>
+        item.billableHours ?? item.billableHour ?? item.billable ?? item.billableUtilization ?? null;
+
+    const getNonBillableHours = (item) =>
+        item.nonBillableHours ?? item.nonBillableHour ?? item.nonBillable ?? item.nonBillableUtilization ?? null;
 
     const totalPages = Math.ceil(filteredAllocations.length / itemsPerPage);
     const paginatedAllocations = filteredAllocations.slice(
@@ -119,6 +139,8 @@ const ProjectResourcesTable = ({ projectId }) => {
                                 <tr>
                                     <th className="p-4 whitespace-nowrap">Resource</th>
                                     <th className="p-4 whitespace-nowrap text-center">Allocation</th>
+                                    <th className="p-4 whitespace-nowrap text-center">Billable Hours</th>
+                                    <th className="p-4 whitespace-nowrap text-center">Non-Billable Hours</th>
                                     <th className="p-4 whitespace-nowrap text-center">Demand</th>
                                     <th className="p-4 whitespace-nowrap text-center">Period</th>
                                     <th className="p-4 whitespace-nowrap text-center">Status</th>
@@ -131,11 +153,11 @@ const ProjectResourcesTable = ({ projectId }) => {
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-700 font-bold text-xs shrink-0 border border-blue-100">
-                                                    {item.fullName.split(" ").map(n => n[0]).join("")}
+                                                    {getResourceName(item).split(" ").map(n => n[0]).join("").slice(0, 2)}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="font-bold text-gray-900 truncate">{item.fullName}</p>
-                                                    <p className="text-[10px] text-gray-500 truncate">{item.email}</p>
+                                                    <p className="font-bold text-gray-900 truncate">{getResourceName(item)}</p>
+                                                    <p className="text-[10px] text-gray-500 truncate">{getResourceEmail(item)}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -155,6 +177,16 @@ const ProjectResourcesTable = ({ projectId }) => {
                                                     />
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <span className="text-xs font-bold text-indigo-700">
+                                                {getBillableHours(item) ?? "--"}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <span className="text-xs font-bold text-slate-700">
+                                                {getNonBillableHours(item) ?? "--"}
+                                            </span>
                                         </td>
                                         <td className="p-4 text-center">
                                             {item.demandName ? (
