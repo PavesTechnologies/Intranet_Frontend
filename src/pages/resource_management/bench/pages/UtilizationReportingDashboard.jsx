@@ -300,13 +300,13 @@ const UtilizationReportingDashboard = () => {
               { label: 'Total Resources', value: reportData.totalResources, icon: <Users />, color: 'text-blue-600' },
               { label: 'Confidence Score', value: `${reportData.confidenceScore}%`, icon: <ShieldCheck />, color: 'text-amber-600' }
             ].map((kpi) => (
-              <div key={kpi.label} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-5 hover:shadow-md transition-shadow">
-                <div className={`h-14 w-14 rounded-2xl bg-slate-50 border border-slate-100 shadow-inner flex items-center justify-center ${kpi.color}`}>
-                  {React.cloneElement(kpi.icon, { size: 28, strokeWidth: 2.5 })}
+              <div key={kpi.label} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                <div className={`h-11 w-11 rounded-xl bg-slate-50 border border-slate-100 shadow-inner flex items-center justify-center ${kpi.color}`}>
+                  {React.cloneElement(kpi.icon, { size: 20, strokeWidth: 2.5 })}
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{kpi.label}</p>
-                  <p className="text-2xl font-black text-slate-900 tracking-tight">{kpi.value}</p>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">{kpi.label}</p>
+                  <p className="text-xl font-black text-slate-900 tracking-tight">{kpi.value}</p>
                 </div>
               </div>
             ))}
