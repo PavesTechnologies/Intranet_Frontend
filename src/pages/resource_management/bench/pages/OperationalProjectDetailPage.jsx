@@ -9,6 +9,9 @@ import {
   Search,
   PieChart as PieChartIcon,
   BarChart3,
+  History,
+  Scale,
+  Circle,
 } from "lucide-react";
 import {
   Area,
@@ -27,7 +30,7 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
 import { getOperationalProjectDetail } from "../services/operationalProjectsService";
 
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 4;
 const BILLING_COLORS = {
   billable: "#4f46e5",
   nonBillable: "#818cf8",
@@ -138,6 +141,57 @@ const buildProjectPortfolioTrend = (projectDetail) => {
   ];
 };
 
+const PerformanceTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    const pointData = payload[0].payload;
+    const planned = pointData.planned !== undefined ? pointData.planned : pointData.plannedHours;
+
+    return (
+      <div className="bg-[#081534]/95 backdrop-blur-md border border-slate-700/50 rounded-2xl shadow-2xl p-5 flex flex-col gap-3 min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between border-b border-slate-700/50 pb-2 mb-1">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{label || 'Period'}</p>
+          <Circle size={8} className="text-indigo-400 fill-indigo-400 animate-pulse" />
+        </div>
+        <div className="space-y-3">
+          {payload.map((p, idx) => (
+            <div key={`${p.name}-${idx}`} className="flex items-center justify-between gap-6 group">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="h-2 w-2 rounded-full border border-white/20"
+                  style={{
+                    backgroundColor: p.color || p.payload?.fill || p.stroke || '#4f46e5',
+                    boxShadow: `0 0 8px ${(p.color || p.payload?.fill || p.stroke || '#4f46e5')}66`
+                  }}
+                />
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-tight group-hover:text-white transition-colors">{p.name}:</span>
+              </div>
+              <span className="text-[12px] font-black text-white tabular-nums">
+                {typeof p.value === 'number' ? p.value.toFixed(1) : p.value}{p.name.toLowerCase().includes('%') ? '%' : 'h'}
+              </span>
+            </div>
+          ))}
+
+          {planned !== undefined && (
+            <div className="flex items-center justify-between gap-6 pt-3 mt-1 border-t border-slate-700/30">
+              <div className="flex items-center gap-2.5">
+                <div className="h-2 w-2 rounded-full bg-slate-500 border border-white/10" />
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">Planned Hours:</span>
+              </div>
+              <span className="text-[12px] font-black text-slate-300 tabular-nums">{Number(planned).toFixed(1)}h</span>
+            </div>
+          )}
+        </div>
+        <div className="mt-2 flex items-center gap-2 opacity-50">
+          <div className="h-px flex-1 bg-slate-700" />
+          <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Validated</span>
+          <div className="h-px flex-1 bg-slate-700" />
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 const OperationalProjectDetailPage = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -194,7 +248,7 @@ const OperationalProjectDetailPage = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, activeDetailView]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -204,10 +258,8 @@ const OperationalProjectDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FDFDFE] p-6">
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <LoadingSpinner text="Projects Loading..." />
-        </div>
+      <div className="min-h-screen bg-[#FDFDFE] flex items-center justify-center p-6">
+        <LoadingSpinner text="Projects Loading..." />
       </div>
     );
   }
@@ -225,236 +277,293 @@ const OperationalProjectDetailPage = () => {
   const project = projectDetail?.project;
 
   return (
-    <div className="min-h-screen bg-[#FDFDFE] p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-screen bg-[#FDFDFE] p-6 font-sans select-none">
+      {/* Header â€” Unified Command Strip */}
+      <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/resource-management/bench/utilization-performance", { state: { activeTab: "projects" } })}
-            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition-all hover:bg-slate-50"
+            className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
           >
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">{project?.name}</h1>
-            <p className="mt-1 text-sm font-medium text-slate-500">
-              {project?.clientName}
-            </p>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-none">{project?.name}</h1>
+            <p className="mt-1.5 text-xs font-semibold text-slate-400 uppercase tracking-widest">{project?.clientName}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/resource-management/bench/utilization-reporting')}
+            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm h-[42px]"
+          >
+            <BarChart3 className="h-4 w-4 text-emerald-600" />
+            REPORT & DASHBOARD
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Stats Grid */}
+      <div className="flex flex-nowrap gap-4 overflow-x-auto no-scrollbar mb-8">
+        {[
+          { label: "Project Health", value: project?.utilization >= 90 ? "Optimal" : project?.utilization >= 70 ? "Warning" : "Critical", icon: Briefcase, color: "text-indigo-600", bg: "bg-indigo-50" },
+          { label: "Hours (Act / Plan)", value: `${formatMetric(project?.actualHours)} / ${formatMetric(project?.plannedHours, "h")}`, icon: Clock3, color: "text-rose-600", bg: "bg-rose-50" },
+          { label: "Utilization", value: formatMetric(project?.utilization, "%"), icon: Users, color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "Billable Strip", value: `${formatMetric(project?.billableHours, "h")} B / ${formatMetric(project?.nonBillableHours, "h")} NB`, icon: DollarSign, color: "text-blue-600", bg: "bg-blue-50" },
+        ].map((card) => (
+          <div key={card.label} className="flex min-w-[240px] flex-1 items-center gap-4 rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:border-indigo-100 hover:shadow-md group">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-sm ${card.bg} ${card.color} group-hover:scale-105 transition-transform`}>
+              <card.icon size={18} strokeWidth={2.5} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">{card.label}</p>
+              <p className="text-lg font-black tracking-tight text-slate-900 truncate">{card.value || "--"}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-6 border-b border-slate-200 flex items-center justify-between">
+        <div className="flex items-end gap-10 overflow-x-auto no-scrollbar">
           {[
-            { label: "Project Name", value: project?.name, icon: Briefcase },
-            { label: "Hours (Act / Plan)", value: `${formatMetric(project?.actualHours)} / ${formatMetric(project?.plannedHours, "h")}`, icon: Clock3 },
-            { label: "Utilization", value: formatMetric(project?.utilization, "%"), icon: Users },
-            { label: "Billing Strip", value: `${formatMetric(project?.billableHours, "h")} B / ${formatMetric(project?.nonBillableHours, "h")} NB`, icon: DollarSign },
-          ].map((card) => (
-            <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                <card.icon size={18} />
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{card.label}</p>
-              <p className="mt-2 text-sm font-bold text-slate-900">{card.value || "--"}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">Project Utilization View</h2>
-              <p className="text-sm text-slate-500">Switch between project portfolio analytics and resource-level contribution.</p>
-            </div>
-            <div className="inline-flex w-full items-center rounded-xl border border-slate-200 bg-slate-50 p-1 md:w-auto">
-              {[
-                { id: "portfolio", label: "Portfolio", icon: PieChartIcon },
-                { id: "resources", label: "Resources", icon: Users },
-              ].map((view) => (
-                <button
-                  key={view.id}
-                  onClick={() => setActiveDetailView(view.id)}
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all md:flex-none ${
-                    activeDetailView === view.id
-                      ? "border border-slate-200 bg-white text-indigo-600 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
+            { id: "portfolio", label: "Portfolio Analytics", icon: PieChartIcon },
+            { id: "resources", label: "Resource Contributions", icon: Users },
+          ].map((tab) => {
+            const isActive = activeDetailView === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveDetailView(tab.id)}
+                className={`group relative flex items-center gap-2 pb-3.5 pt-2 whitespace-nowrap transition-all ${isActive ? "text-[#081534]" : "text-slate-400 hover:text-slate-600"
                   }`}
-                >
-                  <view.icon size={14} />
-                  {view.label}
-                </button>
-              ))}
-            </div>
-          </div>
+              >
+                <tab.icon size={14} />
+                <span className={`text-sm font-semibold tracking-tight ${isActive ? "text-[#081534]" : "text-slate-600"}`}>
+                  {tab.label}
+                </span>
+                <span className={`absolute bottom-0 left-0 h-0.5 rounded-full bg-[#081534] transition-all ${isActive ? "w-full opacity-100" : "w-0 opacity-0"}`} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-          {activeDetailView === "portfolio" && (
-            <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/50 lg:grid-cols-3 lg:divide-x lg:divide-slate-200">
-              <div className="border-b border-slate-200 bg-white p-6 lg:col-span-2 lg:border-b-0">
-                <div className="mb-6 flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] font-black uppercase tracking-widest text-[#081534] opacity-60">Project Portfolio Trend</p>
-                    <p className="mt-1 text-[10px] font-medium text-slate-400 italic">Utilization pattern from approved project timesheet actuals.</p>
-                  </div>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600">
-                    <BarChart3 size={16} />
-                  </div>
-                </div>
-                <div className="h-72 w-full rounded-xl border border-slate-100 bg-slate-50/40 p-3">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={portfolioTrendData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="period" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 600 }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 600 }} />
-                      <RechartsTooltip />
-                      <Area type="monotone" dataKey="util" fill="#EEF2FF" stroke="#4f46e5" strokeWidth={3} name="Utilization %" />
-                      <Line type="monotone" dataKey="actual" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" name="Actual Hours" />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
-                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">Overall Billing Strip</p>
-                  <div className="mt-4 overflow-hidden rounded-full bg-slate-100">
-                    <div className="flex h-3 w-full">
-                      <div className="bg-indigo-600" style={{ width: `${project?.billablePercentage || 0}%` }} />
-                      <div className="bg-indigo-300" style={{ width: `${project?.nonBillablePercentage || 0}%` }} />
-                      <div className="bg-slate-300" style={{ width: `${project?.internalPercentage || 0}%` }} />
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] font-bold text-slate-600">
-                    <span>{formatMetric(project?.billableHours, "h")} Billable</span>
-                    <span>{formatMetric(project?.nonBillableHours, "h")} Non-Billable</span>
-                    <span>{formatMetric(project?.pendingHours, "h")} Pending</span>
+      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {activeDetailView === "portfolio" && (
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            <div className="xl:col-span-2 bg-white rounded-3xl border border-slate-100 shadow-sm p-8 overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none">Project Performance Overview</h3>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white p-6">
-                <div className="mb-6 flex items-center justify-between">
-                  <p className="text-[11px] font-black uppercase tracking-widest text-[#081534] opacity-60">Billing Yield Index</p>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600">
-                    <PieChartIcon size={16} />
-                  </div>
+              <div className="h-80 w-full overflow-x-auto no-scrollbar">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={portfolioTrendData} margin={{ bottom: 30, right: 20 }}>
+                    <defs>
+                      <linearGradient id="utilGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f8fafc" />
+                    <XAxis
+                      dataKey="period"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 800 }}
+                      interval={0}
+                    />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 800 }} domain={[0, 100]} />
+                    <RechartsTooltip
+                      content={<PerformanceTooltip />}
+                    />
+                    <Area type="monotone" dataKey="util" fill="url(#utilGradient)" stroke="#4f46e5" strokeWidth={4} name="Utilization %" animationDuration={1500} />
+                    <Line type="monotone" dataKey="actual" stroke="#94a3b8" strokeWidth={2} strokeDasharray="6 6" dot={false} name="Actual Hours" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-6 border-t border-slate-50 pt-6">
+                <div className="flex items-center gap-2.5">
+                  <History size={14} className="text-indigo-500" />
+                  <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Trend Preservation Active</span>
                 </div>
-                {billingPieData.length === 0 ? (
-                  <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-slate-200 text-sm font-medium text-slate-500">
-                    No billing data available.
-                  </div>
-                ) : (
-                  <>
-                    <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-3">
-                      <div className="h-48 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={billingPieData} innerRadius={54} outerRadius={78} paddingAngle={5} dataKey="value" stroke="#ffffff" strokeWidth={3}>
-                            {billingPieData.map((entry, index) => (
-                              <Cell key={`billing-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <RechartsTooltip
-                            cursor={false}
-                            contentStyle={{
-                              backgroundColor: "#081534",
-                              border: "1px solid #1e293b",
-                              borderRadius: "10px",
-                              boxShadow: "0 16px 40px rgba(15, 23, 42, 0.18)",
-                              color: "#fff",
-                              fontSize: "11px",
-                              fontWeight: 700,
-                            }}
-                            itemStyle={{ color: "#fff" }}
-                            formatter={(value, name, item) => [
-                              `${value}h (${formatMetric(item?.payload?.percent, "%")})`,
-                              name,
-                            ]}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      </div>
-                      <div className="mt-2 flex items-center justify-center rounded-lg border border-white bg-white px-3 py-2 shadow-sm">
-                        <span className="text-[18px] font-black leading-none text-slate-900">{formatMetric(project?.billablePercentage, "%")}</span>
-                        <span className="ml-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Billable</span>
-                      </div>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {billingPieData.map((item) => (
-                        <div key={item.name} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 p-2">
-                          <div className="flex items-center gap-2">
-                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-                            <span className="text-[10px] font-bold uppercase tracking-tight text-slate-500">{item.name}</span>
-                          </div>
-                          <span className="text-[11px] font-black text-slate-900">{formatMetric(item.value, "h")} / {formatMetric(item.percent, "%")}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
+                <div className="flex items-center gap-2.5 border-l border-slate-200 pl-6">
+                  <Scale size={14} className="text-slate-400" />
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic opacity-70">Comparison: Planned vs Realized</span>
+                </div>
               </div>
             </div>
-          )}
 
-          {activeDetailView === "resources" && (
-            <div>
-              <div className="mb-5 rounded-xl border border-slate-100 bg-slate-50/50 p-3">
-                <div className="relative w-full">
-                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder={`Search ${projectDetail?.resources?.length || 0} resources...`}
-                    className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-medium text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                  />
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 flex flex-col group overflow-hidden">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex flex-col gap-1.5">
+                  <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none mb-1">Billing Yield Index</h3>
+                </div>
+                <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner group-hover:scale-110 transition-transform">
+                  <PieChartIcon size={20} />
                 </div>
               </div>
 
-              {filteredResources.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-6 py-12 text-center text-sm font-medium text-slate-500">
-                  No resources available for this project.
+              {billingPieData.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 rounded-2xl border border-dashed border-slate-100">
+                  <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+                    <PieChartIcon className="text-slate-300" size={24} />
+                  </div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No Intelligence Data</p>
                 </div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[640px] text-left text-sm">
-                      <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
-                        <tr>
-                          <th className="px-4 py-3 font-bold">Resource</th>
-                          <th className="px-4 py-3 font-bold text-center">Billable Hours</th>
-                          <th className="px-4 py-3 font-bold text-center">Non-Billable Hours</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {paginatedResources.map((resource, index) => (
-                          <tr key={resource.resourceId || resource.id || `${getResourceName(resource)}-${index}`} className="hover:bg-slate-50/60">
-                            <td className="px-4 py-4">
-                              <div>
-                                <p className="font-bold text-slate-900">{getResourceName(resource)}</p>
-                                <p className="text-[11px] text-slate-500">{getResourceEmail(resource)}</p>
-                              </div>
-                            </td>
-                            <td className="px-4 py-4 text-center font-bold text-indigo-700">
-                              {formatMetric(getBillableHours(resource), "h")}
-                            </td>
-                            <td className="px-4 py-4 text-center font-bold text-slate-700">
-                              {formatMetric(getNonBillableHours(resource), "h")}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="flex-1 h-60 w-full relative">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={billingPieData}
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={6}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          {billingPieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} cornerRadius={4} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none pt-1">
+                      <span className="text-[20px] font-black text-slate-900 leading-none">{formatMetric(project?.billablePercentage, "%")}</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Billable</span>
+                    </div>
                   </div>
 
-                  <div className="mt-4 border-t border-slate-100 pt-4">
-                    <Pagination
-                      currentPage={page}
-                      totalPages={totalPages}
-                      onPrevious={() => setPage((prev) => Math.max(prev - 1, 1))}
-                      onNext={() => setPage((prev) => Math.min(prev + 1, totalPages))}
-                      className="justify-end py-0"
-                    />
+                  <div className="mt-8 space-y-3">
+                    {billingPieData.map((item) => (
+                      <div key={item.name} className="flex items-center justify-between rounded-xl border border-slate-50 bg-slate-50/30 p-3 hover:bg-white hover:shadow-sm transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: item.color }} />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{item.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-black text-[#081534]">{item.value}%</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {activeDetailView === "resources" && (
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-8 border-b border-slate-50 bg-slate-50/20">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex flex-col gap-1.5">
+                  <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none">Resource Capability Ledger</h3>
+                  <p className="text-[11px] font-medium text-slate-400 italic">Contribution breakdown of {projectDetail?.resources?.length || 0} active project members</p>
+                </div>
+                <div className="relative w-full md:w-80">
+                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search resources..."
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-11 pr-4 text-[12px] font-bold text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px] text-left">
+                <thead>
+                  <tr className="border-b border-slate-50 bg-slate-50/50">
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Resource Profile</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Billable Contribution</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Non-Billable Log</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Intensity</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {paginatedResources.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="px-8 py-20 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <Users className="text-slate-200 mb-4" size={40} />
+                          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No matching resource found</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedResources.map((resource, index) => {
+                      const bHours = getNumber(getBillableHours(resource));
+                      const nbHours = getNumber(getNonBillableHours(resource));
+                      const total = bHours + nbHours;
+                      const intensity = total > 0 ? Math.min(100, (total / 40) * 100) : 0; // Relative to 40h week for intensity measure
+
+                      return (
+                        <tr key={resource.resourceId || resource.id || index} className="hover:bg-slate-50/50 transition-colors group">
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-4">
+                              <div className="h-10 w-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-xs shadow-sm group-hover:scale-110 transition-transform">
+                                {getResourceName(resource).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                              </div>
+                              <div>
+                                <p className="text-sm font-black text-[#081534] group-hover:text-indigo-600 transition-colors">{getResourceName(resource)}</p>
+                                <p className="text-[11px] font-bold text-slate-400">{getResourceEmail(resource)}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5 text-center">
+                            <span className="inline-flex items-center justify-center h-8 min-w-[60px] rounded-lg bg-emerald-50 text-emerald-600 text-[12px] font-black border border-emerald-100">
+                              {formatMetric(bHours, "h")}
+                            </span>
+                          </td>
+                          <td className="px-8 py-5 text-center">
+                            <span className="inline-flex items-center justify-center h-8 min-w-[60px] rounded-lg bg-slate-50 text-slate-500 text-[12px] font-black border border-slate-100">
+                              {formatMetric(nbHours, "h")}
+                            </span>
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="flex flex-col items-end gap-2">
+                              <div className="w-24 h-1.5 rounded-full bg-slate-100 overflow-hidden shadow-inner">
+                                <div
+                                  className={`h-full transition-all duration-700 ${intensity > 90 ? 'bg-rose-500' : intensity > 70 ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                                  style={{ width: `${intensity}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{formatMetric(total, "h")} logged</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="py-6 border-t border-slate-100">
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPrevious={() => setPage((prev) => Math.max(prev - 1, 1))}
+                  onNext={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

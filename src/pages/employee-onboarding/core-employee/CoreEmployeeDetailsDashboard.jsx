@@ -360,24 +360,106 @@ export default function EmployeeOnboardingPage() {
     }
   };
 
-  const downloadExcel = () => {
+  // const downloadExcel = () => {
+  //   const worksheet = XLSX.utils.json_to_sheet(excelPreview);
+
+  //   const workbook = XLSX.utils.book_new();
+
+  //   XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
+
+  //   // Auto column width
+  //   const cols = Object.keys(excelPreview[0]).map(() => ({ wch: 25 }));
+  //   worksheet["!cols"] = cols;
+
+  //   XLSX.writeFile(workbook, "Employee_Report.xlsx");
+
+  //   const newEmails = excelPreview.map((emp) => emp.Email.toLowerCase());
+  //   setExportedEmails((prev) => [...new Set([...prev, ...newEmails])]);
+
+  //   setShowPreview(false);
+  // };
+const downloadExcel = async () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    // Create worksheet
     const worksheet = XLSX.utils.json_to_sheet(excelPreview);
 
+    // Create workbook
     const workbook = XLSX.utils.book_new();
-
     XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
 
     // Auto column width
     const cols = Object.keys(excelPreview[0]).map(() => ({ wch: 25 }));
     worksheet["!cols"] = cols;
 
-    XLSX.writeFile(workbook, "Employee_Report.xlsx");
+    // Convert workbook to buffer
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
 
-    const newEmails = excelPreview.map((emp) => emp.Email.toLowerCase());
-    setExportedEmails((prev) => [...new Set([...prev, ...newEmails])]);
+    // Create Blob
+    const blob = new Blob(
+      [excelBuffer],
+      {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }
+    );
 
-    setShowPreview(false);
-  };
+    // Create File
+    const file = new File(
+      [blob],
+      "Employee_Report.xlsx",
+      {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }
+    );
+
+    // FormData
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // API call
+    const response = await fetch(
+      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/multiple-users`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      }
+    );
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showStatusToast("Excel sent successfully", "success");
+
+      const newEmails = excelPreview.map((emp) =>
+        emp.Email.toLowerCase()
+      );
+
+      setExportedEmails((prev) => [
+        ...new Set([...prev, ...newEmails]),
+      ]);
+
+      setShowPreview(false);
+
+    } else {
+      showStatusToast(
+        data.message || "Failed to send excel",
+        "error"
+      );
+    }
+
+  } catch (error) {
+    console.error("Send excel error:", error);
+
+    showStatusToast("Failed to send excel", "error");
+  }
+};
   /* ============================
      TABLE CONFIG
   ============================ */
