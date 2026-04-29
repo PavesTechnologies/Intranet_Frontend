@@ -101,6 +101,7 @@ export default function AdminOfferView() {
       action: found.action,
       approver_name: found.approver_name || null,
       comments: found.message || found.comments || "",
+    
       mail: found.mail || "",
     };
     setApproval(mapped);
@@ -138,16 +139,16 @@ export default function AdminOfferView() {
           action,
           comments: comment ?? (
             action === "APPROVED" ? "Approved by admin" :
-            action === "REJECTED" ? "Rejected by admin" :
-            "Kept on hold by admin"
+              action === "REJECTED" ? "Rejected by admin" :
+                "Kept on hold by admin"
           ),
         },
         { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
       );
       toast.success(
         action === "APPROVED" ? "Offer approved" :
-        action === "REJECTED" ? "Offer rejected" :
-        "Offer put on hold"
+          action === "REJECTED" ? "Offer rejected" :
+            "Offer put on hold"
       );
       await fetchOffer();
       await fetchApproval();
@@ -329,11 +330,11 @@ export default function AdminOfferView() {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
-                { icon: <Mail size={16} />,        label: "Email",         value: offer.mail,                                    delay: 60  },
-                { icon: <Phone size={16} />,       label: "Contact",       value: `+${offer.country_code} ${offer.contact_number}`, delay: 120 },
-                { icon: <Briefcase size={16} />,   label: "Designation",   value: offer.designation,                             delay: 180 },
-                { icon: <IndianRupee size={16} />, label: "CTC",           value: `${offer.package} ${offer.currency}`,          delay: 240 },
-                { icon: <UserCheck size={16} />,   label: "Employee Type", value: offer.employee_type,                           delay: 300 },
+                { icon: <Mail size={16} />, label: "Email", value: offer.mail, delay: 60 },
+                { icon: <Phone size={16} />, label: "Contact", value: `+${offer.country_code} ${offer.contact_number}`, delay: 120 },
+                { icon: <Briefcase size={16} />, label: "Designation", value: offer.designation, delay: 180 },
+                { icon: <IndianRupee size={16} />, label: "CTC", value: `${offer.package} ${offer.currency}`, delay: 240 },
+                { icon: <UserCheck size={16} />, label: "Employee Type", value: offer.employee_type, delay: 300 },
                 {
                   icon: <Mail size={16} />,
                   label: "CC Emails",
@@ -505,7 +506,7 @@ function ModalOverlay({ children }) {
 
 function CommentModal({ title, description, comment, setComment, acting, onCancel, onConfirm, confirmText, confirmVariant }) {
   const confirmStyles = {
-    red:   "bg-red-600 hover:bg-red-700",
+    red: "bg-red-600 hover:bg-red-700",
     amber: "bg-amber-500 hover:bg-amber-600",
     emerald: "bg-emerald-600 hover:bg-emerald-700",
   };
@@ -575,11 +576,11 @@ function GhostCard({ icon, label, value, delay = 0 }) {
 
 function ActionBtn({ onClick, disabled, variant, icon, label }) {
   const variants = {
-    emerald:    "bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-slate-200 disabled:text-slate-400",
-    indigo:     "bg-indigo-600 hover:bg-indigo-700 text-white disabled:bg-slate-200 disabled:text-slate-400",
-    slate:      "bg-slate-800 hover:bg-slate-900 text-white",
-    red:        "bg-red-600 hover:bg-red-700 text-white disabled:bg-slate-200 disabled:text-slate-400",
-    amber:      "bg-amber-500 hover:bg-amber-600 text-white disabled:bg-slate-200 disabled:text-slate-400",
+    emerald: "bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-slate-200 disabled:text-slate-400",
+    indigo: "bg-indigo-600 hover:bg-indigo-700 text-white disabled:bg-slate-200 disabled:text-slate-400",
+    slate: "bg-slate-800 hover:bg-slate-900 text-white",
+    red: "bg-red-600 hover:bg-red-700 text-white disabled:bg-slate-200 disabled:text-slate-400",
+    amber: "bg-amber-500 hover:bg-amber-600 text-white disabled:bg-slate-200 disabled:text-slate-400",
     redOutline: "bg-white border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50",
   };
   return (
@@ -595,10 +596,10 @@ function ActionBtn({ onClick, disabled, variant, icon, label }) {
 }
 
 const TIMELINE_STEPS = [
-  { key: "pending",  label: "Pending"  },
+  { key: "pending", label: "Pending" },
   { key: "approved", label: "Approved" },
   { key: "rejected", label: "Rejected" },
-  { key: "hold",     label: "On Hold"  },
+  { key: "hold", label: "On Hold" },
 ];
 
 function HorizontalTimeline({ status }) {
@@ -606,18 +607,18 @@ function HorizontalTimeline({ status }) {
   // Highlight just the current/final state
   const stateMap = {
     APPROVED: { index: 1, isRejected: false, isHold: false },
-    REJECTED: { index: 2, isRejected: true,  isHold: false },
-    ON_HOLD:  { index: 3, isRejected: false, isHold: true  },
+    REJECTED: { index: 2, isRejected: true, isHold: false },
+    ON_HOLD: { index: 3, isRejected: false, isHold: true },
   };
 
   const current = stateMap[status] || null;
   const isPending = !current;
 
   const steps = [
-    { label: "Pending",  active: isPending,               done: !!current,              reject: false, hold: false },
-    { label: "Approved", active: status === "APPROVED",   done: false,                  reject: false, hold: false },
-    { label: "Rejected", active: status === "REJECTED",   done: false,                  reject: status === "REJECTED", hold: false },
-    { label: "On Hold",  active: status === "ON_HOLD",    done: false,                  reject: false, hold: status === "ON_HOLD" },
+    { label: "Pending", active: isPending, done: !!current, reject: false, hold: false },
+    { label: "Approved", active: status === "APPROVED", done: false, reject: false, hold: false },
+    { label: "Rejected", active: status === "REJECTED", done: false, reject: status === "REJECTED", hold: false },
+    { label: "On Hold", active: status === "ON_HOLD", done: false, reject: false, hold: status === "ON_HOLD" },
   ];
 
   return (
@@ -625,28 +626,28 @@ function HorizontalTimeline({ status }) {
       {steps.map((step, i) => {
         const dotClass =
           step.reject ? "bg-red-100 ring-2 ring-red-300" :
-          step.hold   ? "bg-amber-100 ring-2 ring-amber-300" :
-          step.active && !step.done ? "bg-indigo-50 ring-2 ring-indigo-300" :
-          step.active ? "bg-emerald-100" :
-          step.done   ? "bg-emerald-100" :
-          "bg-slate-100";
+            step.hold ? "bg-amber-100 ring-2 ring-amber-300" :
+              step.active && !step.done ? "bg-indigo-50 ring-2 ring-indigo-300" :
+                step.active ? "bg-emerald-100" :
+                  step.done ? "bg-emerald-100" :
+                    "bg-slate-100";
 
         const labelClass =
           step.reject ? "text-red-600" :
-          step.hold   ? "text-amber-600" :
-          step.active && !step.done ? "text-indigo-700 font-bold" :
-          step.active ? "text-emerald-700 font-bold" :
-          step.done   ? "text-emerald-600" :
-          "text-slate-400";
+            step.hold ? "text-amber-600" :
+              step.active && !step.done ? "text-indigo-700 font-bold" :
+                step.active ? "text-emerald-700 font-bold" :
+                  step.done ? "text-emerald-600" :
+                    "text-slate-400";
 
         return (
           <div key={step.label} className="flex items-center flex-1 last:flex-none">
             <div className="flex flex-col items-center gap-1 flex-shrink-0">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${dotClass}`}>
                 {step.reject ? (
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 ) : step.hold ? (
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
                 ) : step.active && !step.done ? (
                   <span className="pulse-dot w-2 h-2 rounded-full bg-indigo-500 block" />
                 ) : step.done || (step.active && step.label === "Approved") ? (
@@ -673,10 +674,10 @@ function ApprovalPill({ status, approver }) {
   if (!status) return null;
 
   const configs = {
-    APPROVED: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", pulse: false, label: "Approved"        },
-    REJECTED: { bg: "bg-red-50",     text: "text-red-700",     dot: "bg-red-500",     pulse: false, label: "Rejected"        },
-    ON_HOLD:  { bg: "bg-amber-50",   text: "text-amber-700",   dot: "bg-amber-500",   pulse: false, label: "On Hold"         },
-    PENDING:  { bg: "bg-indigo-50",  text: "text-indigo-700",  dot: "bg-indigo-500",  pulse: true,  label: "Pending Review"  },
+    APPROVED: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", pulse: false, label: "Approved" },
+    REJECTED: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500", pulse: false, label: "Rejected" },
+    ON_HOLD: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500", pulse: false, label: "On Hold" },
+    PENDING: { bg: "bg-indigo-50", text: "text-indigo-700", dot: "bg-indigo-500", pulse: true, label: "Pending Review" },
   };
 
   const key = Object.keys(configs).find((k) => status.includes(k)) || "PENDING";
