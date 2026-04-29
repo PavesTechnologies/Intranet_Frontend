@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, LayoutGrid, AlertCircle, ShieldAlert } from "lucide-react";
+import { Plus } from "lucide-react";
 import axios from "axios";
 
 import CreateRiskModal from "./createRiskModal";
@@ -7,18 +7,28 @@ import IssuesPanel from "./IssuesPanel";
 import RisksPanel from "./RisksPanel";
 import RiskDetailModal from "./RiskDetailModal";
 
+/* =========================
+   Page
+========================= */
+
 export default function RiskRegisterPage({ projectId = "P-123" }) {
   const RISKS_PAGE_SIZE = 10;
 
   /* ---------- UI State ---------- */
+
   const [showCreateRisk, setShowCreateRisk] = useState(false);
   const [showRiskModal, setShowRiskModal] = useState(false);
+
+  /* ---------- Refresh Trigger ---------- */
+
   const [refreshKey, setRefreshKey] = useState(0);
 
   /* ---------- Issue Summary ---------- */
+
   const [issueTypeSummary, setIssueTypeSummary] = useState([]);
   const [activeIssueType, setActiveIssueType] = useState("All");
   const [issuePage, setIssuePage] = useState(1);
+
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [selectedRisk, setSelectedRisk] = useState(null);
 
@@ -26,31 +36,46 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
   const [isLoadingRisks, setIsLoadingRisks] = useState(false);
 
   /* ---------- Risks ---------- */
+
   const [riskData, setRiskData] = useState(null);
   const [riskPage, setRiskPage] = useState(1);
 
   /* =========================
-      Logic (Unchanged)
+     Fetch Issue-Type Summary
   ========================= */
+
   useEffect(() => {
     async function fetchSummary() {
       try {
         const token = localStorage.getItem("token");
         const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
+
         const res = await axios.get(
           `${BASE_URL}/api/risk-links/${projectId}/risk-summary/by-issue-type`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
         );
+
         setIssueTypeSummary(res.data || []);
       } catch (err) {
         console.error("Failed to fetch issue summary", err);
       }
     }
+
     fetchSummary();
   }, [projectId, refreshKey]);
 
+  /* =========================
+     Issue Type Cards
+  ========================= */
+
   const issueTypeCards = useMemo(() => {
-    const total = issueTypeSummary.reduce((sum, it) => sum + (it.riskCount || 0), 0);
+    const total = issueTypeSummary.reduce(
+      (sum, it) => sum + (it.riskCount || 0),
+      0,
+    );
+
     return [
       { issueType: "All", riskCount: total },
       ...issueTypeSummary.map((it) => ({
@@ -70,13 +95,20 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
     return raw;
   }
 
+  /* =========================
+     Load Risks (ALL + Specific)
+  ========================= */
+
   useEffect(() => {
     let cancelled = false;
+
     async function loadRisks() {
       setIsLoadingRisks(true);
+
       try {
         const token = localStorage.getItem("token");
         const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
+
         const params = {
           projectId,
           page: riskPage,
@@ -84,14 +116,17 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
           linkedType: null,
           linkedId: null,
         };
+
         if (selectedIssue) {
           params.linkedType = selectedIssue.linkedType;
           params.linkedId = selectedIssue.linkedId;
         }
+
         const res = await axios.get(`${BASE_URL}/api/risks/linked`, {
           params,
           headers: { Authorization: `Bearer ${token}` },
         });
+
         if (!cancelled) setRiskData(res.data);
       } catch (err) {
         console.error("Failed loading risks", err);
@@ -100,13 +135,15 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
         if (!cancelled) setIsLoadingRisks(false);
       }
     }
+
     loadRisks();
     return () => (cancelled = true);
   }, [selectedIssue, activeIssueType, riskPage, projectId, refreshKey]);
 
   /* =========================
-      Visual Improvements
+     Render
   ========================= */
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
@@ -116,11 +153,22 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
 
           <button
             onClick={() => setShowCreateRisk(true)}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-sm hover:shadow-md flex items-center gap-2 active:scale-95"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             New Risk
           </button>
+
+          <CreateRiskModal
+            projectId={projectId}
+            isOpen={showCreateRisk}
+            onClose={() => setShowCreateRisk(false)}
+            onCreate={() => {
+              setShowCreateRisk(false);
+              setRiskPage(1);
+              setRefreshKey((prev) => prev + 1); // 🔥 refresh summary + risks
+            }}
+          />
         </div>
       {/* </div> */}
 
@@ -130,104 +178,53 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
           const label = issueTypeLabel(t.issueType);
           const active = activeIssueType === label;
 
-              return (
-                <button
-                  key={label}
-                  onClick={() => {
-                    setActiveIssueType(label);
-                    setIssuePage(1);
-                    setRiskPage(1);
-                    setSelectedIssue(null);
-                    setRiskData(null);
-                  }}
-                  className={`group relative flex items-center gap-4 px-6 py-3 rounded-2xl transition-all duration-200 border-2 ${
-                    active 
-                      ? "bg-white border-indigo-600 shadow-lg shadow-indigo-100" 
-                      : "bg-white border-transparent hover:border-slate-200 shadow-sm"
-                  }`}
-                >
-                  <div className={`text-sm font-bold ${active ? "text-indigo-600" : "text-slate-600"}`}>
-                    {label}
-                  </div>
-                  <div className={`px-2 py-0.5 rounded-md text-xs font-black ${
-                    active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
-                  }`}>
-                    {t.riskCount}
-                  </div>
-                  {active && (
-                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-indigo-600 rounded-full" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          return (
+            <button
+              key={label}
+              onClick={() => {
+                setActiveIssueType(label);
+                setIssuePage(1);
+                setRiskPage(1);
+                setSelectedIssue(null);
+                setRiskData(null);
+              }}
+              className={`p-4 rounded-lg ${
+                active ? "bg-indigo-600 text-white" : "bg-white border"
+              }`}
+            >
+              <div className="font-semibold">{label}</div>
+              <div className="text-xs opacity-80">{t.riskCount} items</div>
+            </button>
+          );
+        })}
+      </div>
 
-        {/* Dynamic Panels */}
-        <div className="grid grid-cols-12 gap-8">
-          {/* Issues Selection List */}
-          <div className="col-span-12 lg:col-span-4 xl:col-span-4 h-fit">
-             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                   <h3 className="text-sm font-bold text-slate-700 uppercase tracking-tighter">Issues List</h3>
-                   {selectedIssue && (
-                     <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold uppercase">Selected</span>
-                   )}
-                </div>
-                <div className="max-h-[600px] overflow-y-auto">
-                  <IssuesPanel
-                    projectId={projectId}
-                    activeIssueType={activeIssueType}
-                    issuePage={issuePage}
-                    selectedIssue={selectedIssue}
-                    isLoadingIssues={isLoadingIssues}
-                    onSelectIssue={(issue) => {
-                      setSelectedIssue(issue);
-                      setRiskPage(1);
-                      setRiskData(null);
-                    }}
-                  />
-                </div>
-             </div>
-          </div>
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-3 gap-6">
+        <IssuesPanel
+          projectId={projectId}
+          activeIssueType={activeIssueType}
+          issuePage={issuePage}
+          selectedIssue={selectedIssue}
+          isLoadingIssues={isLoadingIssues}
+          onSelectIssue={(issue) => {
+            setSelectedIssue(issue);
+            setRiskPage(1);
+            setRiskData(null);
+          }}
+        />
 
-          {/* Risks Details List */}
-          <div className="col-span-12 lg:col-span-8 xl:col-span-8 h-fit">
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
-                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-                   <AlertCircle className="w-4 h-4 text-slate-500" />
-                   <h3 className="text-sm font-bold text-slate-700 uppercase tracking-tighter">
-                     {selectedIssue ? `Risks linked to ${selectedIssue.linkedId}` : "All Risks"}
-                   </h3>
-                </div>
-                <div className="p-2">
-                  <RisksPanel
-                    selectedIssue={selectedIssue}
-                    data={riskData}
-                    isLoadingRisks={isLoadingRisks}
-                    onPageChange={setRiskPage}
-                    onSelectRisk={(risk) => {
-                      setSelectedRisk(risk);
-                      setShowRiskModal(true);
-                    }}
-                  />
-                </div>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Modals */}
-      <CreateRiskModal
-        projectId={projectId}
-        isOpen={showCreateRisk}
-        onClose={() => setShowCreateRisk(false)}
-        onCreate={() => {
-          setShowCreateRisk(false);
-          setRiskPage(1);
-          setRefreshKey((prev) => prev + 1);
-        }}
-      />
+        <RisksPanel
+          selectedIssue={selectedIssue}
+          data={riskData}
+          isLoadingRisks={isLoadingRisks}
+          onPageChange={setRiskPage}
+          onSelectRisk={(risk) => {
+            setSelectedRisk(risk);
+            setShowRiskModal(true);
+          }}
+        />
+      </div>
 
       <RiskDetailModal
         risk={showRiskModal ? selectedRisk : null}
