@@ -101,7 +101,7 @@ export default function AdminOfferView() {
       action: found.action,
       approver_name: found.approver_name || null,
       comments: found.message || found.comments || "",
-      comments: found.message || found.comments || "",
+      // comments: found.message || found.comments || "",
       mail: found.mail || "",
     };
     setApproval(mapped);

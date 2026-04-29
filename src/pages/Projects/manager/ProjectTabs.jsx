@@ -1,26 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { lazy, Suspense } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus, ChevronDown, Settings, UserMinus, TrendingUp } from "lucide-react";
 
 import Summary from "../Summary/Summary.jsx";
 import BacklogAndSprints from "./BacklogAndSprints";
 import Board from "../../Projects/manager/Board.jsx";
-import Timeline from "./Timeline";
-
 import Navbar from "../../../components/Navbar/Navbar";
 import TestManagement from "../Testmanagement/TestManagementHome";
 import RiskRegisterPage from "./riskManagement/RiskRegisterPage";
 import RiskHealthModal from "./riskManagement/RiskHealthModal.jsx";
 
 const ProjectDemandManagement = lazy(() => import("./ProjectDemandManagement"));
-const ProjectConfigurations = lazy(
-  () => import("./project/ProjectConfigurations"),
-);
-const ProjectRoleOffManagement = lazy(
-  () => import("./ProjectRoleOffManagement"),
-);
+const ProjectConfigurations = lazy(() => import("./project/ProjectConfigurations"));
+const ProjectRoleOffManagement = lazy(() => import("./ProjectRoleOffManagement"));
 
 const ProjectTabs = () => {
   const { projectId } = useParams();
@@ -30,9 +23,9 @@ const ProjectTabs = () => {
 
   const [projectName, setProjectName] = useState("");
   const [notFound, setNotFound] = useState(false);
-  const [showRiskModal, setShowRiskModal] = useState(false); // ✅ NEW
+  const [showRiskModal, setShowRiskModal] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
-  // Get tab from URL OR default to summary
   const getSelectedTabFromLocation = () => {
     const params = new URLSearchParams(location.search);
     return params.get("tab") || "summary";
@@ -40,187 +33,174 @@ const ProjectTabs = () => {
 
   const [selectedTab, setSelectedTab] = useState(getSelectedTabFromLocation());
 
-  // Update selected tab when URL changes
   useEffect(() => {
     setSelectedTab(getSelectedTabFromLocation());
+    setShowMoreMenu(false);
   }, [location.search]);
 
-  // ⭐ Auto redirect test-management → overview
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
-
     if (tab === "test-management") {
-      navigate(`/projects/${projectId}?tab=test-management/overview`, {
-        replace: true,
-      });
+      navigate(`/projects/${projectId}?tab=test-management/overview`, { replace: true });
     }
   }, [location.search, navigate, projectId]);
 
-  // Fetch project details
   useEffect(() => {
     if (projectId && token) {
       axios
-        .get(
-          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        )
+        .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         .then((res) => {
           setProjectName(res.data.name);
           setNotFound(false);
         })
-        .catch(() => {
-          setNotFound(true);
-        });
+        .catch(() => setNotFound(true));
     }
   }, [projectId, token]);
 
-  // ⭐ AUTO SHOW RISK MODAL WHEN PAGE LOADS
   useEffect(() => {
-    if (projectId) {
-      setShowRiskModal(true);
-    }
+    if (projectId) setShowRiskModal(true);
   }, [projectId]);
-  console.log(projectName);
 
-  // Render tab content
-  const renderTabContent = () => {
-    if (!projectId) return null;
-    const pid = parseInt(projectId, 10);
-
-    if (selectedTab === "risk-management") {
-      return <RiskRegisterPage projectId={pid} />;
-    }
-    if (selectedTab === "summary") {
-      return <Summary projectId={pid} projectName={projectName} />;
-    }
-    if (selectedTab === "backlog") {
-      return <BacklogAndSprints projectId={pid} projectName={projectName} />;
-    }
-    if (selectedTab === "board") {
-      return <Board projectId={pid} projectName={projectName} />;
-    }
-    // if (selectedTab === "status-report") {
-    //   return <ProjectStatusReportWrapper projectId={pid} />;
-    // }
-    // if (selectedTab === "timelines") {
-    //   return <Timeline projectId={pid} />;
-    // }
-    if (selectedTab.startsWith("test-management")) {
-      return <TestManagement projectId={pid} />;
-    }
-    if (selectedTab === "demand-management") {
-      return (
-        <Suspense
-          fallback={
-            <div className="p-12 text-center text-slate-400">
-              Loading Demand Management...
-            </div>
-          }
-        >
-          <ProjectDemandManagement projectId={pid} projectName={projectName} />
-        </Suspense>
-      );
-    }
-
-    if (selectedTab === "roleoff-management") {
-      return (
-        <Suspense
-          fallback={
-            <div className="p-12 text-center text-slate-400">
-              Loading Role-Off Management...
-            </div>
-          }
-        >
-          <ProjectRoleOffManagement projectId={pid} projectName={projectName} />
-        </Suspense>
-      );
-    }
-
-    if (selectedTab === "configurations") {
-      return (
-        <Suspense
-          fallback={
-            <div className="p-12 text-center text-slate-400">
-              Loading Configurations...
-            </div>
-          }
-        >
-          <ProjectConfigurations projectId={pid} />
-        </Suspense>
-      );
-    }
-
-    return null;
-  };
-
-  if (!projectId) {
-    return <div className="p-6 text-slate-400">No project selected.</div>;
-  }
-
-  if (notFound) {
-    return <div className="p-6 text-red-500">Project not found.</div>;
-  }
-
-  const navItems = [
+  const mainNavItems = [
     { name: "Summary", tab: "summary" },
     { name: "Backlog", tab: "backlog" },
     { name: "Board", tab: "board" },
     { name: "Risk Management", tab: "risk-management" },
     { name: "Test Management", tab: "test-management" },
-    { name: "Demand Management", tab: "demand-management" },
-    { name: "RoleOff Management", tab: "roleoff-management" },
-    { name: "Configurations", tab: "configurations" },
-    //  { name: "Timelines", tab:"timelines" },
-    // { name: "Calendar", tab: "calendar" },
   ];
 
-  const navItemsWithActive = navItems.map((item) => ({
+  const moreOptions = [
+    { name: "Demand Management", tab: "demand-management", icon: <TrendingUp size={14} /> },
+    { name: "RoleOff Management", tab: "roleoff-management", icon: <UserMinus size={14} /> },
+    { name: "Configurations", tab: "configurations", icon: <Settings size={14} /> },
+  ];
+
+  const navItemsWithActive = mainNavItems.map((item) => ({
     name: item.name,
     onClick: () => navigate(`/projects/${projectId}?tab=${item.tab}`),
-    isActive: selectedTab === item.tab,
+    isActive: selectedTab === item.tab || (item.tab === "test-management" && selectedTab.startsWith("test-management")),
   }));
 
+  const renderTabContent = () => {
+    if (!projectId) return null;
+    const pid = parseInt(projectId, 10);
+    if (selectedTab === "risk-management") return <RiskRegisterPage projectId={pid} />;
+    if (selectedTab === "summary") return <Summary projectId={pid} projectName={projectName} />;
+    if (selectedTab === "backlog") return <BacklogAndSprints projectId={pid} projectName={projectName} />;
+    if (selectedTab === "board") return <Board projectId={pid} projectName={projectName} />;
+    if (selectedTab.startsWith("test-management")) return <TestManagement projectId={pid} />;
+    
+    if (selectedTab === "demand-management") {
+      return (
+        <Suspense fallback={<div className="p-12 text-center text-slate-400">Loading Demand...</div>}>
+          <ProjectDemandManagement projectId={pid} projectName={projectName} />
+        </Suspense>
+      );
+    }
+    if (selectedTab === "roleoff-management") {
+      return (
+        <Suspense fallback={<div className="p-12 text-center text-slate-400">Loading Role-Off...</div>}>
+          <ProjectRoleOffManagement projectId={pid} projectName={projectName} />
+        </Suspense>
+      );
+    }
+    if (selectedTab === "configurations") {
+      return (
+        <Suspense fallback={<div className="p-12 text-center text-slate-400">Loading Configs...</div>}>
+          <ProjectConfigurations projectId={pid} />
+        </Suspense>
+      );
+    }
+    return null;
+  };
+
+  if (notFound) return <div className="p-6 text-red-500">Project not found.</div>;
+
   return (
-    <div>
-      {/* Header */}
-      <header className="bg-white mb-4 px-4 py-3 flex items-center justify-between border-b">
-        {/* LEFT SIDE */}
-        <div className="flex items-center gap-6">
-          {/* Project Name */}
+    <div className="min-h-screen bg-white">
+      {/* Header Container */}
+      <header className="bg-white px-6 py-2 flex items-center justify-between ">
+        
+        {/* Left Section: Project Title */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white font-bold text-sm">
+            {projectName?.charAt(0) || "P"}
+          </div>
           <button
             onClick={() => navigate("/projects")}
-            className="text-xl font-semibold text-slate-700 hover:text-indigo-600 transition"
+            className="text-md font-semibold text-slate-800 hover:text-indigo-600 transition"
           >
             {projectName || "Project"}
           </button>
-
-          {/* Back Button */}
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-4">
-          {/* Round Back Button (Positioned right before the Summary tab) */}
+        {/* Right Section: Navigation Items Aligned Right */}
+        <div className="flex items-center gap-1 ml-auto">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center justify-center w-5 h-5 bg-white border border-gray-200 text-gray-600 rounded-full shadow-sm hover:bg-gray-50 hover:text-gray-900 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 shrink-0"
+            className="flex items-center justify-center w-8 h-8 hover:bg-slate-100 rounded-full transition-all "
             title="Go Back"
           >
-            <ArrowLeft className="w-3 h-3" strokeWidth={2.5} />
+            <ArrowLeft className="w-4 h-4" />
           </button>
 
-          {/* Tab Navigation */}
-          <Navbar logo={null} navItems={navItemsWithActive} />
+          {/* Standard Tabs - Aligned right by parent flex */}
+          <div className="flex items-center border-none">
+            <Navbar 
+                logo={null} 
+                navItems={navItemsWithActive} 
+                className="!border-none !shadow-none bg-transparent" // Removing lines/borders
+            />
+          </div>
+
+          {/* Jira-style "+" Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                  moreOptions.some(opt => opt.tab === selectedTab) 
+                  ? "text-indigo-600 bg-indigo-50" 
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <Plus className="w-4 h-4" />
+              <ChevronDown className={`w-3 h-3 transition-transform ${showMoreMenu ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showMoreMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowMoreMenu(false)} />
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-xl z-20 py-2">
+                  {moreOptions.map((option) => (
+                    <button
+                      key={option.tab}
+                      onClick={() => navigate(`/projects/${projectId}?tab=${option.tab}`)}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${
+                        selectedTab === option.tab 
+                        ? "bg-indigo-50 text-indigo-700 font-semibold" 
+                        : "text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className={selectedTab === option.tab ? "text-indigo-600" : "text-slate-400"}>
+                        {option.icon}
+                      </span>
+                      {option.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
-      {/* Tab Content */}
-      <div>{renderTabContent()}</div>
 
-      {/* ✅ AUTO TRIGGER RISK HEALTH MODAL */}
+      <main className="p-0 overflow-auto">
+        {renderTabContent()}
+      </main>
+
       <RiskHealthModal
         projectId={parseInt(projectId, 10)}
         open={showRiskModal}
