@@ -130,9 +130,9 @@ const BenchTable = ({
               </th> */}
               <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Consultant Details</th>
               <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Core Expertise</th>
-              <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
+              <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 min-w-[130px]">Status</th>
               <th className="px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Availability</th>
-              <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Aging</th>
+              <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 min-w-[100px]">Aging</th>
               <th className="px-4 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Daily Exposure</th>
               <th className="px-5 py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Actions</th>
             </tr>
@@ -221,12 +221,43 @@ const BenchTable = ({
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-4 align-middle" onClick={(event) => event.stopPropagation()}>
-                    <div className="flex flex-col gap-1.5">
-                      <div>
-                        {renderPill((row.category || "").replace(/_/g, " "), `${categoryStyles[row.category] || "border-slate-200 bg-slate-50 text-slate-600"} !px-2 !py-0.5 text-[9px] uppercase tracking-tighter`)}
+                  <td className="px-4 py-4 align-middle min-w-[130px]" onClick={(event) => event.stopPropagation()}>
+                    {editingRowId === row.id ? (
+                      <div className="flex flex-col gap-2 min-w-[150px] py-1">
+                        <div className="relative">
+                          <select
+                            value={editStatus}
+                            onChange={(e) => setEditStatus(e.target.value)}
+                            disabled={isSaving}
+                            className="h-9 w-full rounded-lg border border-slate-300 bg-white pl-3 pr-8 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 appearance-none transition-all cursor-pointer"
+                          >
+                            <option value="" disabled>Select Status</option>
+                            {SUB_STATES.map((state) => (
+                              <option key={state} value={state}>{state.replace("_", " ")}</option>
+                            ))}
+                          </select>
+                          <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </div>
+                        <input
+                          type="text"
+                          value={editReason}
+                          onChange={(e) => setEditReason(e.target.value)}
+                          placeholder="Reason..."
+                          disabled={isSaving}
+                          className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-[11px] font-medium text-slate-600 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 transition-all"
+                        />
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-wrap gap-1">
+                          {renderPill((row.category || "").replace(/_/g, " "), `${categoryStyles[row.category] || "border-slate-200 bg-slate-50 text-slate-600"} !px-2.5 !py-1 text-[10px] uppercase whitespace-nowrap`)}
+                        </div>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-4 align-middle text-center">
                     <div className="flex flex-col items-center gap-1">
@@ -241,8 +272,8 @@ const BenchTable = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 align-middle">
-                    {renderPill(agingTone.label, `${agingTone.className} !px-2 !py-0.5 text-[9px] uppercase tracking-tighter`)}
+                  <td className={`px-4 py-4 align-middle min-w-[100px] ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`}>
+                    {renderPill(agingTone.label, `${agingTone.className} !px-2.5 !py-1 text-[10px] uppercase whitespace-nowrap`)}
                   </td>
                   <td className="px-4 py-4 align-middle text-right">
                     <div className="flex flex-col">

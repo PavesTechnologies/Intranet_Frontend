@@ -118,7 +118,7 @@ export default function ResourceIntelligenceCenter() {
                             {/* Allocation circular/tiny view for mobile */}
                             <div className="flex flex-col gap-0.5 w-16 sm:w-32">
                                 <div className="flex justify-between items-center text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                    <span className="hidden xs:inline">Allocaion </span>
+                                    <span className="sm:inline capitalize">Allocation </span>
                                     <span className="text-slate-900">{alloc}%</span>
                                 </div>
                                 <div className="h-1 sm:h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">

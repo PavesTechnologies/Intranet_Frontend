@@ -200,7 +200,7 @@ const DemandWorkspacePage = () => {
                                     {[
                                         { id: 'breached', label: 'Breached', icon: ShieldAlert, color: 'text-rose-600' },
                                         { id: 'at_risk', label: 'At Risk', icon: AlertTriangle, color: 'text-orange-600' },
-                                        { id: 'active', label: 'Active', icon: Activity, color: 'text-indigo-600' },
+                                        { id: 'active', label: 'Approved', icon: Activity, color: 'text-indigo-600' },
                                         { id: 'soft', label: 'Soft', icon: Zap, color: 'text-slate-600' },
                                         ...(isRMView
                                             ? [{ id: 'fulfilled', label: 'Fulfilled', icon: CheckCircle2, color: 'text-emerald-600' }]

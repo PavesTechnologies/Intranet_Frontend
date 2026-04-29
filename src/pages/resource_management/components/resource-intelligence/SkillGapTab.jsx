@@ -71,7 +71,7 @@ export default function SkillGapTab({ resource, demand }) {
 
     // Pagination state
     const [page, setPage] = useState(1);
-    const ITEMS_PER_PAGE = 3;
+    const ITEMS_PER_PAGE = 5;
 
     useEffect(() => {
         let c = false;
@@ -222,20 +222,20 @@ export default function SkillGapTab({ resource, demand }) {
             ) : null}
 
             {/* ── ROW 3: DETAILED ANALYSIS (Split Layout) ───────────────── */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
                 {/* Main Content: Table */}
                 <div className="lg:col-span-8 space-y-4">
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                         <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                            <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wider">
+                            <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2 capitalize tracking-wider">
                                 <Activity className="h-4 w-4 text-indigo-500" /> Skill Comparison Workbench
                             </h4>
-                            {analysis && (
+                            {/* {analysis && (
                                 <Badge variant="secondary" className="bg-white text-slate-500 text-[10px] font-bold border-slate-200">
                                     Ref: {resource ? `ID-${selectedItem?.demandId || "000"}` : `Res-${selectedItem?.resourceId || "000"}`}
                                 </Badge>
-                            )}
+                            )} */}
                         </div>
 
                         {analysis ? (
@@ -362,7 +362,7 @@ export default function SkillGapTab({ resource, demand }) {
                             )}
 
                             {/* Strategic Upskilling Sprint */}
-                            {analysis && gapsCount > 0 && (
+                            {/* {analysis && gapsCount > 0 && (
                                 <div className="bg-slate-900 p-5 rounded-xl text-white relative overflow-hidden group shadow-lg shadow-slate-200">
                                     <div className="absolute -right-4 -top-4 text-white/5 group-hover:scale-125 transition-transform duration-500">
                                         <Zap className="h-20 w-20 fill-current" />
@@ -380,7 +380,7 @@ export default function SkillGapTab({ resource, demand }) {
                                         </Button>
                                     </div>
                                 </div>
-                            )}
+                            )} */}
                         </div>
 
                         {/* Methodology Info */}
