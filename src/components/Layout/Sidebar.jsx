@@ -307,7 +307,7 @@ const Sidebar = ({ isCollapsed }) => {
               onMouseLeave={(isRM || isDM) ? handleRmMouseLeave : undefined}
             >
               {/* If Admin → Direct Link */}
-              {isAdmin && !isRM && !isDM ? (
+              {isAdmin && !isRM && !isDM && false ? ( // Allow Admins to see the hover menu too
                 <Link
                   to="/resource-management"
                   className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${location.pathname.startsWith("/resource-management")
@@ -342,7 +342,7 @@ const Sidebar = ({ isCollapsed }) => {
                   </div>
 
                   {/* Show submenu only for Resource Manager or Delivery Manager */}
-                  {rmHovered && (isRM || isDM) && (
+                  {rmHovered && (isRM || isDM || isAdmin) && (
                     <ul
                       className={`fixed w-64 bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
                         }`}

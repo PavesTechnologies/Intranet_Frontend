@@ -203,8 +203,7 @@ const buildTaskPayload = (task) => {
   try {
     setSaving(true);
 
-    console.log("🚀 FINAL PAYLOAD:", task);
-    console.log("🧾 HEADERS:", headers);
+    
 
     await axios.post(`${TASKS_API}/create`, task, { headers });
 
@@ -212,7 +211,7 @@ const buildTaskPayload = (task) => {
     showStatusToast("Task created successfully", "success");
     setShowModal(false);
   } catch (err) {
-    console.log("❌ ERROR:", err.response?.data);
+    
     showStatusToast("Failed to create task", "error");
   } finally {
     setSaving(false);
@@ -238,10 +237,23 @@ const buildTaskPayload = (task) => {
   };
 
 
+  // const deleteTask = async (id) => {
+  //   await axios.delete(`${TASKS_API}/delete/${id}`, { headers });
+  //   fetchTasks();
+  // };
   const deleteTask = async (id) => {
+  try {
     await axios.delete(`${TASKS_API}/delete/${id}`, { headers });
+
+    showStatusToast("🗑️ Task deleted successfully", "success");
+
     fetchTasks();
-  };
+  } catch (err) {
+    
+
+    showStatusToast("❌ Failed to delete task", "error");
+  }
+};
 
   const groupedTasks = {
     todo: tasks.filter((t) => t.status === "todo"),

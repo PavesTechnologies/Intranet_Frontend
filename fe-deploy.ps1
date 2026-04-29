@@ -7,11 +7,11 @@ Write-Host "--- Starting Deployment for intranet-fe ---" -ForegroundColor Cyan
 
 # 1. Build the Docker Image
 Write-Host "Step 1: Building image 'pavesadmin/intranet-fe'..." -ForegroundColor Yellow
-docker build -t pavesadmin/intranet-fe .
+docker build -t pavesadmin/intranet-fe:latest .
 
 # 2. Push to Docker Hub
 # Note: Ensure you have run 'docker login' once before running this
 Write-Host "Step 2: Pushing image to Docker Hub..." -ForegroundColor Yellow
-docker push pavesadmin/intranet-fe
+docker push pavesadmin/intranet-fe:latest
 
 Write-Host "--- Deployment Successful! ---" -ForegroundColor Green
