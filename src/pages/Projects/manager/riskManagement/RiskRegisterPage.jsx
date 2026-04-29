@@ -108,23 +108,11 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
       Visual Improvements
   ========================= */
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
-      {/* Header Section */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-[1600px] mx-auto px-8 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* <div className="bg-indigo-600 p-2 rounded-lg">
-              <ShieldAlert className="text-white w-6 h-6" />
-            </div> */}
-            {/* <div>
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                Risk Register
-              </h1>
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">
-                Project Management • {projectId}
-              </p>
-            </div> */}
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Header */}
+      {/* <div className="bg-white border-b sticky top-0 z-[50] shadow-sm"> */}
+        <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between">
+          <h1 className="text-3xl font-bold">Risk Management</h1>
 
           <button
             onClick={() => setShowCreateRisk(true)}
@@ -134,19 +122,13 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
             New Risk
           </button>
         </div>
-      </header>
+      {/* </div> */}
 
-      <main className="max-w-[1600px] mx-auto px-8 py-8">
-        {/* Navigation / Filter Pills */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4 text-slate-600">
-            <LayoutGrid className="w-4 h-4" />
-            <span className="text-sm font-semibold uppercase tracking-widest">Filter by category</span>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {issueTypeCards.map((t) => {
-              const label = issueTypeLabel(t.issueType);
-              const active = activeIssueType === label;
+      {/* Issue Type Cards */}
+      <div className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-5 gap-4">
+        {issueTypeCards.map((t) => {
+          const label = issueTypeLabel(t.issueType);
+          const active = activeIssueType === label;
 
               return (
                 <button

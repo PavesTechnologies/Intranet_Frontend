@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+const RMS_BASE_URL = window.__APP_CONFIG__?.RMS_BASE_URL;
 
 const getAuthHeader = () => ({
   headers: {
