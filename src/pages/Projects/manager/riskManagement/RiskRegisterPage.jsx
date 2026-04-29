@@ -147,9 +147,9 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-40 shadow-sm">
+      {/* <div className="bg-white border-b sticky top-0 z-[50] shadow-sm"> */}
         <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between">
-          <h1 className="text-3xl font-bold">Risk Register</h1>
+          <h1 className="text-3xl font-bold">Risk Management</h1>
 
           <button
             onClick={() => setShowCreateRisk(true)}
@@ -170,7 +170,7 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
             }}
           />
         </div>
-      </div>
+      {/* </div> */}
 
       {/* Issue Type Cards */}
       <div className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-5 gap-4">
