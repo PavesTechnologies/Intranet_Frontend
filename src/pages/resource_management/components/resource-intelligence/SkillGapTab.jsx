@@ -319,7 +319,7 @@ export default function SkillGapTab({ resource, demand }) {
 
                     {/* Compliance Sidebar */}
                     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-6 h-full">
-                        <h4 className="text-[10px] font-bold text-slate-900 flex items-center gap-2 uppercase tracking-widest border-b border-slate-50 pb-3">
+                        <h4 className="text-[10px] font-bold text-slate-900 flex items-center gap-2 capitalize tracking-widest border-b border-slate-50 pb-3">
                             <Shield className="h-4 w-4 text-indigo-500" /> Intelligence Advisory
                         </h4>
 
@@ -348,7 +348,7 @@ export default function SkillGapTab({ resource, demand }) {
                                                 <span className="text-[8px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Drift</span>
                                             </div>
                                             <div className="flex justify-between text-[9px] font-medium text-slate-400">
-                                                <span>Inactive {w.yearsUnused}Y</span>
+                                                <span>UpSkill</span>
                                                 <span>{w.lastUsedDate}</span>
                                             </div>
                                         </div>
