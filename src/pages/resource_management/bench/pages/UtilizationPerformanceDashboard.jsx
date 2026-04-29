@@ -1,8 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
-<<<<<<< HEAD
-=======
+
 import { format, subDays, subWeeks, subMonths, startOfDay, endOfDay } from 'date-fns';
->>>>>>> 82b0b78a47fd566918f73e6afdadc381a5152649
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getOperationalProjects } from '../services/operationalProjectsService';
 // import LoadingSpinner from '../../../../components/LoadingSpinner';
@@ -305,6 +303,56 @@ const UtilizationPerformanceDashboard = () => {
 
       fetchResourceMetrics();
    }, [dateRange]);
+
+   useEffect(() => {
+      const fetchProjects = async () => {
+         try {
+            setProjectsLoading(true);
+            setProjectsError('');
+            const data = await getOperationalProjects(startDate, endDate);
+            const extracted = extractOperationalProjects(data);
+            const mapped = extracted.map(mapProjectCatalogEntry);
+            setOperationalProjects(mapped);
+         } catch (err) {
+            console.error('Failed to fetch operational projects:', err);
+            setProjectsError('Failed to load operational projects');
+         } finally {
+            setProjectsLoading(false);
+         }
+      };
+
+      if (activeTab === 'projects') {
+         fetchProjects();
+      }
+   }, [activeTab, startDate, endDate]);
+
+   const visibleOperationalProjects = useMemo(() => {
+      if (projectCategoryTab === 'internal') {
+         return operationalProjects.filter(p => p.isInternal);
+      }
+      return operationalProjects.filter(p => !p.isInternal);
+   }, [operationalProjects, projectCategoryTab]);
+
+   const totalProjectPages = Math.ceil(visibleOperationalProjects.length / PROJECTS_PER_PAGE) || 1;
+
+   const paginatedOperationalProjects = useMemo(() => {
+      const start = (projectPage - 1) * PROJECTS_PER_PAGE;
+      return visibleOperationalProjects.slice(start, start + PROJECTS_PER_PAGE);
+   }, [visibleOperationalProjects, projectPage]);
+
+   const handleRowClick = async (resource) => {
+      setSelectedResource(resource);
+      setIsProjectsLoading(true);
+      try {
+         const data = await getResourceProjects(resource.userId, dateRange.startDate, dateRange.endDate);
+         setResourceProjectsData(data);
+      } catch (err) {
+         console.error(err);
+         setResourceProjectsData([]);
+      } finally {
+         setIsProjectsLoading(false);
+      }
+   };
 
    // REPORTING ENGINE STATES
    const [reportData, setReportData] = useState(null);

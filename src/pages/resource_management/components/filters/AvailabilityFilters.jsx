@@ -275,7 +275,7 @@ export function FilterPanel({
 
         <div>
           <label className="text-[10px] font-heading font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">
-            Experience: {filters.experienceRange[0]}+ yrs
+            Experience: {filters.experienceRange[0]}{">"} yrs
           </label>
           <Slider
             value={[filters.experienceRange[0]]}
@@ -291,7 +291,7 @@ export function FilterPanel({
 
         <div>
           <label className="text-[10px] font-heading font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">
-            Allocation: {filters.allocationPercentage}+ %
+            Allocation: {filters.allocationPercentage}{"<"} %
           </label>
           <Slider
             value={[filters.allocationPercentage]}
