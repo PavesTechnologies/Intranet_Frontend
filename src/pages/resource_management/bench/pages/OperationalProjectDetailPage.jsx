@@ -149,7 +149,7 @@ const PerformanceTooltip = ({ active, payload, label }) => {
     return (
       <div className="bg-[#081534]/95 backdrop-blur-md border border-slate-700/50 rounded-2xl shadow-2xl p-5 flex flex-col gap-3 min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between border-b border-slate-700/50 pb-2 mb-1">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{label || 'Period'}</p>
+          <p className="text-[10px] font-black text-slate-400 capitalize tracking-[0.2em]">{label || 'Period'}</p>
           <Circle size={8} className="text-indigo-400 fill-indigo-400 animate-pulse" />
         </div>
         <div className="space-y-3">
@@ -163,7 +163,7 @@ const PerformanceTooltip = ({ active, payload, label }) => {
                     boxShadow: `0 0 8px ${(p.color || p.payload?.fill || p.stroke || '#4f46e5')}66`
                   }}
                 />
-                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-tight group-hover:text-white transition-colors">{p.name}:</span>
+                <span className="text-[11px] font-bold text-slate-300 capitalize tracking-tight group-hover:text-white transition-colors">{p.name}:</span>
               </div>
               <span className="text-[12px] font-black text-white tabular-nums">
                 {typeof p.value === 'number' ? p.value.toFixed(1) : p.value}{p.name.toLowerCase().includes('%') ? '%' : 'h'}
@@ -175,7 +175,7 @@ const PerformanceTooltip = ({ active, payload, label }) => {
             <div className="flex items-center justify-between gap-6 pt-3 mt-1 border-t border-slate-700/30">
               <div className="flex items-center gap-2.5">
                 <div className="h-2 w-2 rounded-full bg-slate-500 border border-white/10" />
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">Planned Hours:</span>
+                <span className="text-[11px] font-bold text-slate-400 capitalize tracking-tight">Planned Hours:</span>
               </div>
               <span className="text-[12px] font-black text-slate-300 tabular-nums">{Number(planned).toFixed(1)}h</span>
             </div>
@@ -183,7 +183,7 @@ const PerformanceTooltip = ({ active, payload, label }) => {
         </div>
         <div className="mt-2 flex items-center gap-2 opacity-50">
           <div className="h-px flex-1 bg-slate-700" />
-          <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Validated</span>
+          <span className="text-[8px] font-black text-slate-500 capitalize tracking-widest">Validated</span>
           <div className="h-px flex-1 bg-slate-700" />
         </div>
       </div>
@@ -289,7 +289,7 @@ const OperationalProjectDetailPage = () => {
           </button>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-none">{project?.name}</h1>
-            <p className="mt-1.5 text-xs font-semibold text-slate-400 uppercase tracking-widest">{project?.clientName}</p>
+            <p className="mt-1.5 text-xs font-semibold text-slate-400 capitalize tracking-widest">{project?.clientName}</p>
           </div>
         </div>
 
@@ -318,7 +318,7 @@ const OperationalProjectDetailPage = () => {
               <card.icon size={18} strokeWidth={2.5} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">{card.label}</p>
+              <p className="mb-0.5 text-[10px] font-bold capitalize tracking-wider text-slate-400">{card.label}</p>
               <p className="text-lg font-black tracking-tight text-slate-900 truncate">{card.value || "--"}</p>
             </div>
           </div>
@@ -357,7 +357,7 @@ const OperationalProjectDetailPage = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none">Project Performance Overview</h3>
+                    <h3 className="text-[12px] font-black text-[#081534] capitalize tracking-[0.2em] leading-none">Project Performance Overview</h3>
                   </div>
                 </div>
               </div>
@@ -392,11 +392,11 @@ const OperationalProjectDetailPage = () => {
               <div className="mt-8 flex flex-wrap items-center justify-center gap-6 border-t border-slate-50 pt-6">
                 <div className="flex items-center gap-2.5">
                   <History size={14} className="text-indigo-500" />
-                  <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Trend Preservation Active</span>
+                  <span className="text-[10px] font-black text-slate-600 capitalize tracking-widest">Trend Preservation Active</span>
                 </div>
                 <div className="flex items-center gap-2.5 border-l border-slate-200 pl-6">
                   <Scale size={14} className="text-slate-400" />
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic opacity-70">Comparison: Planned vs Realized</span>
+                  <span className="text-[10px] font-black text-slate-400 capitalize tracking-widest italic opacity-70">Comparison: Planned vs Realized</span>
                 </div>
               </div>
             </div>
@@ -404,7 +404,7 @@ const OperationalProjectDetailPage = () => {
             <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 flex flex-col group overflow-hidden">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex flex-col gap-1.5">
-                  <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none mb-1">Billing Yield Index</h3>
+                  <h3 className="text-[12px] font-black text-[#081534] capitalize tracking-[0.2em] leading-none mb-1">Billing Yield Index</h3>
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner group-hover:scale-110 transition-transform">
                   <PieChartIcon size={20} />
@@ -416,7 +416,7 @@ const OperationalProjectDetailPage = () => {
                   <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
                     <PieChartIcon className="text-slate-300" size={24} />
                   </div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No Intelligence Data</p>
+                  <p className="text-xs font-bold text-slate-400 capitalize tracking-widest">No Intelligence Data</p>
                 </div>
               ) : (
                 <>
@@ -440,7 +440,7 @@ const OperationalProjectDetailPage = () => {
                     </ResponsiveContainer>
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none pt-1">
                       <span className="text-[20px] font-black text-slate-900 leading-none">{formatMetric(project?.billablePercentage, "%")}</span>
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Billable</span>
+                      <span className="text-[9px] font-black text-slate-400 capitalize tracking-widest mt-0.5">Billable</span>
                     </div>
                   </div>
 
@@ -449,7 +449,7 @@ const OperationalProjectDetailPage = () => {
                       <div key={item.name} className="flex items-center justify-between rounded-xl border border-slate-50 bg-slate-50/30 p-3 hover:bg-white hover:shadow-sm transition-all">
                         <div className="flex items-center gap-3">
                           <div className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: item.color }} />
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{item.name}</span>
+                          <span className="text-[10px] font-black capitalize tracking-widest text-slate-500">{item.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] font-black text-[#081534]">{item.value}%</span>
@@ -468,7 +468,7 @@ const OperationalProjectDetailPage = () => {
             <div className="p-8 border-b border-slate-50 bg-slate-50/20">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex flex-col gap-1.5">
-                  <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none">Resource Capability Ledger</h3>
+                  <h3 className="text-[12px] font-black text-[#081534] capitalize tracking-[0.2em] leading-none">Resource Capability Ledger</h3>
                   <p className="text-[11px] font-medium text-slate-400 italic">Contribution breakdown of {projectDetail?.resources?.length || 0} active project members</p>
                 </div>
                 <div className="relative w-full md:w-80">
@@ -487,10 +487,10 @@ const OperationalProjectDetailPage = () => {
               <table className="w-full min-w-[800px] text-left">
                 <thead>
                   <tr className="border-b border-slate-50 bg-slate-50/50">
-                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Resource Profile</th>
-                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Billable Contribution</th>
-                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Non-Billable Log</th>
-                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Intensity</th>
+                    <th className="px-8 py-5 text-[10px] font-black capitalize tracking-widest text-slate-400">Resource Profile</th>
+                    <th className="px-8 py-5 text-[10px] font-black capitalize tracking-widest text-slate-400 text-center">Billable Contribution</th>
+                    <th className="px-8 py-5 text-[10px] font-black capitalize tracking-widest text-slate-400 text-center">Non-Billable Log</th>
+                    <th className="px-8 py-5 text-[10px] font-black capitalize tracking-widest text-slate-400 text-right">Intensity</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -499,7 +499,7 @@ const OperationalProjectDetailPage = () => {
                       <td colSpan="4" className="px-8 py-20 text-center">
                         <div className="flex flex-col items-center justify-center">
                           <Users className="text-slate-200 mb-4" size={40} />
-                          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No matching resource found</p>
+                          <p className="text-sm font-bold text-slate-400 capitalize tracking-widest">No matching resource found</p>
                         </div>
                       </td>
                     </tr>
@@ -515,7 +515,7 @@ const OperationalProjectDetailPage = () => {
                           <td className="px-8 py-5">
                             <div className="flex items-center gap-4">
                               <div className="h-10 w-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-xs shadow-sm group-hover:scale-110 transition-transform">
-                                {getResourceName(resource).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                                {getResourceName(resource).split(' ').map(n => n[0]).join('').tocapitalize().slice(0, 2)}
                               </div>
                               <div>
                                 <p className="text-sm font-black text-[#081534] group-hover:text-indigo-600 transition-colors">{getResourceName(resource)}</p>
@@ -541,7 +541,7 @@ const OperationalProjectDetailPage = () => {
                                   style={{ width: `${intensity}%` }}
                                 />
                               </div>
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{formatMetric(total, "h")} logged</span>
+                              <span className="text-[10px] font-black text-slate-400 capitalize tracking-widest">{formatMetric(total, "h")} logged</span>
                             </div>
                           </td>
                         </tr>

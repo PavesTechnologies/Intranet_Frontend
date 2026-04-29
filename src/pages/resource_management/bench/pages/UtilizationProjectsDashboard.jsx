@@ -44,14 +44,14 @@ const UtilizationProjectsDashboard = () => {
             {/* HEADER */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-10">
                <div className="flex flex-col gap-1">
-                  <h2 className="text-[24px] font-black text-slate-900 uppercase tracking-tight">Role Performance & Client Yield</h2>
+                  <h2 className="text-[24px] font-black text-slate-900 capitalize tracking-tight">Role Performance & Client Yield</h2>
                   <p className="text-[12px] font-bold text-slate-400 italic">Capability-based workload analytics and client profitability index</p>
                </div>
                <div className="flex items-center gap-3">
-                  <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-2xl text-[11px] font-black text-slate-600 uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
+                  <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-2xl text-[11px] font-black text-slate-600 capitalize tracking-widest hover:bg-slate-50 transition-all shadow-sm">
                      <Share2 size={16} /> Share Analytics
                   </button>
-                  <button className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
+                  <button className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-2xl text-[11px] font-black capitalize tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
                      <Download size={16} /> Capability Report
                   </button>
                </div>
@@ -67,7 +67,7 @@ const UtilizationProjectsDashboard = () => {
                               <Award size={26} strokeWidth={2.5} />
                            </div>
                            <div>
-                              <h3 className="text-[16px] font-black text-slate-900 uppercase tracking-widest">Role Performance Matrix</h3>
+                              <h3 className="text-[16px] font-black text-slate-900 capitalize tracking-widest">Role Performance Matrix</h3>
                               <p className="text-[11px] font-bold text-slate-400 italic">Capability-based avg utilization</p>
                            </div>
                         </div>
@@ -102,12 +102,12 @@ const UtilizationProjectsDashboard = () => {
 
                      <div className="mt-10 grid grid-cols-2 gap-6">
                         <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Peak Capability</p>
+                           <p className="text-[10px] font-black text-slate-400 capitalize tracking-widest mb-1">Peak Capability</p>
                            <p className="text-[18px] font-black text-slate-900">Engineering</p>
                            <span className="text-[11px] font-black text-emerald-600">94.2% Load</span>
                         </div>
                         <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Yield Leader</p>
+                           <p className="text-[10px] font-black text-slate-400 capitalize tracking-widest mb-1">Yield Leader</p>
                            <p className="text-[18px] font-black text-slate-900">Design</p>
                            <span className="text-[11px] font-black text-indigo-600">88.5% Billable</span>
                         </div>
@@ -124,7 +124,7 @@ const UtilizationProjectsDashboard = () => {
                               <PieChartIcon size={26} strokeWidth={2.5} />
                            </div>
                            <div>
-                              <h3 className="text-[16px] font-black text-slate-900 uppercase tracking-widest">Client Yield Analysis</h3>
+                              <h3 className="text-[16px] font-black text-slate-900 capitalize tracking-widest">Client Yield Analysis</h3>
                               <p className="text-[11px] font-bold text-slate-400 italic">Profitability index per engagement</p>
                            </div>
                         </div>
@@ -151,12 +151,12 @@ const UtilizationProjectsDashboard = () => {
                                  ))}
                               </Pie>
                               <RechartsTooltip />
-                              <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }} />
+                              <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '10px', fontWeight: 900, textTransform: 'capitalize', letterSpacing: '0.1em' }} />
                            </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[20px] text-center pointer-events-none">
                            <p className="text-3xl font-black text-slate-900 tracking-tight">82%</p>
-                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Avg Yield</p>
+                           <p className="text-[9px] font-black text-slate-400 capitalize tracking-widest">Avg Yield</p>
                         </div>
                      </div>
 
@@ -168,13 +168,13 @@ const UtilizationProjectsDashboard = () => {
                                     {client.name.charAt(0)}
                                  </div>
                                  <div className="flex flex-col">
-                                    <span className="text-[13px] font-black text-slate-900 uppercase tracking-tight">{client.name}</span>
+                                    <span className="text-[13px] font-black text-slate-900 capitalize tracking-tight">{client.name}</span>
                                     <span className="text-[10px] font-bold text-slate-400">{client.hours?.toFixed(0)}h Active Log</span>
                                  </div>
                               </div>
                               <div className="text-right">
                                  <span className="text-[14px] font-black text-indigo-600 block">{client.yield}%</span>
-                                 <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Billable</span>
+                                 <span className="text-[9px] font-black text-slate-300 capitalize tracking-widest">Billable</span>
                               </div>
                            </div>
                         ))}
@@ -190,8 +190,8 @@ const UtilizationProjectsDashboard = () => {
                      <ShieldCheck size={26} strokeWidth={2.5} />
                   </div>
                   <div>
-                     <h4 className="text-[16px] font-black text-white uppercase tracking-[0.2em]">Capability Intelligence Footer</h4>
-                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Cross-capability synergy identification engine active</p>
+                     <h4 className="text-[16px] font-black text-white capitalize tracking-[0.2em]">Capability Intelligence Footer</h4>
+                     <p className="text-[10px] font-bold text-slate-500 capitalize tracking-widest mt-1">Cross-capability synergy identification engine active</p>
                   </div>
                </div>
                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -201,7 +201,7 @@ const UtilizationProjectsDashboard = () => {
                      { title: 'Yield Volatility', val: 'Low', color: 'text-blue-400' },
                   ].map((item) => (
                      <div key={item.title} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex flex-col gap-2">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{item.title}</span>
+                        <span className="text-[10px] font-black text-slate-500 capitalize tracking-widest">{item.title}</span>
                         <span className={`text-[20px] font-black ${item.color}`}>{item.val}</span>
                      </div>
                   ))}

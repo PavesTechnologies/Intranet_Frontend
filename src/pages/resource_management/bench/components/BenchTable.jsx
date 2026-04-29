@@ -59,7 +59,7 @@ const BenchTable = ({
   const handleEditClick = (row, event) => {
     event.stopPropagation();
     setEditingRowId(row.id);
-    const upperCategory = row.category?.toUpperCase()?.replace(" ", "_");
+    const upperCategory = row.category?.tocapitalize()?.replace(" ", "_");
     setEditStatus(SUB_STATES.includes(upperCategory) ? upperCategory : "READY");
     setEditReason("");
   };
@@ -120,13 +120,13 @@ const BenchTable = ({
                   className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
               </th> */}
-              <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Consultant Details</th>
-              <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Core Expertise</th>
-              <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 min-w-[130px]">Status</th>
-              <th className="px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Availability</th>
-              <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 min-w-[100px]">Aging</th>
-              <th className="px-4 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Daily Exposure</th>
-              <th className="px-5 py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Actions</th>
+              <th className="px-4 py-4 text-left text-[10px] font-black capitalize tracking-widest text-slate-400">Consultant Details</th>
+              <th className="px-4 py-4 text-left text-[10px] font-black capitalize tracking-widest text-slate-400">Core Expertise</th>
+              <th className="px-4 py-4 text-left text-[10px] font-black capitalize tracking-widest text-slate-400 min-w-[130px]">Status</th>
+              <th className="px-4 py-4 text-center text-[10px] font-black capitalize tracking-widest text-slate-400">Availability</th>
+              <th className="px-4 py-4 text-left text-[10px] font-black capitalize tracking-widest text-slate-400 min-w-[100px]">Aging</th>
+              <th className="px-4 py-4 text-right text-[10px] font-black capitalize tracking-widest text-slate-400">Daily Exposure</th>
+              <th className="px-5 py-4 text-center text-[10px] font-black capitalize tracking-widest text-slate-400">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -217,7 +217,7 @@ const BenchTable = ({
                     {(row.warnings.missingSkills || row.missingSkills.length > 0) && (
                       <div className="mt-1.5 flex gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                         <AlertTriangle className="h-3 w-3 text-rose-500 mt-0.5" />
-                        <span className="text-[9px] font-bold text-rose-600 uppercase">Skill Gaps Detected</span>
+                        <span className="text-[9px] font-bold text-rose-600 capitalize">Skill Gaps Detected</span>
                       </div>
                     )}
                   </td>
@@ -232,8 +232,10 @@ const BenchTable = ({
                             className="h-9 w-full rounded-lg border border-slate-300 bg-white pl-3 pr-8 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 appearance-none transition-all cursor-pointer"
                           >
                             <option value="" disabled>Select Status</option>
-                            {SUB_STATES.map((state) => (
-                              <option key={state} value={state}>{state.replace("_", " ")}</option>
+                            {SUB_STATES.map((status) => (
+                              <option key={status} value={status}>
+                                {status.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                              </option>
                             ))}
                           </select>
                           <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">
@@ -254,7 +256,9 @@ const BenchTable = ({
                     ) : (
                       <div className="flex flex-col gap-1.5">
                         <div className="flex flex-wrap gap-1">
-                          {renderPill((row.category || "").replace(/_/g, " "), `${categoryStyles[row.category] || "border-slate-200 bg-slate-50 text-slate-600"} !px-2.5 !py-1 text-[10px] uppercase whitespace-nowrap`)}
+                          <span className="text-[10px] font-black text-slate-600 capitalize">
+                            {row.category?.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                          </span>
                         </div>
                       </div>
                     )}
@@ -273,20 +277,13 @@ const BenchTable = ({
                     </div>
                   </td>
                   <td className={`px-4 py-4 align-middle min-w-[100px] ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`}>
-                    {renderPill(agingTone.label, `${agingTone.className} !px-2.5 !py-1 text-[10px] uppercase whitespace-nowrap`)}
+                    {renderPill(agingTone.label, `${agingTone.className} !px-2.5 !py-1 text-[10px] capitalize whitespace-nowrap`)}
                   </td>
                   <td className={`px-4 py-4 align-middle text-right ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`}>
                     <div className="flex flex-col">
                       <span className={`text-[12px] font-bold ${row.warnings.highCost ? "text-rose-700" : "text-slate-900"}`}>
                         {row.costPerDay === null ? "—" : `₹${row.costPerDay.toLocaleString()}`}
                       </span>
-                      {/* {row.warnings.missingCost ? (
-                        <span className="text-[9px] font-bold text-amber-600 uppercase">Cost Missing</span>
-                      ) : (
-                        <span className="text-[10px] font-medium text-slate-400">
-                          Exp: {row.costExposure === null ? "-" : row.costExposure.toLocaleString()}
-                        </span>
-                      )} */}
                     </div>
                   </td>
                   <td className="px-5 py-4 align-middle text-center" onClick={(event) => event.stopPropagation()}>

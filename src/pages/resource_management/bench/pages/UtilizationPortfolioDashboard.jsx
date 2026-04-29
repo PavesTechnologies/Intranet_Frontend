@@ -43,14 +43,14 @@ const UtilizationPortfolioDashboard = () => {
             {/* HEADER */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-10">
                <div className="flex flex-col gap-1">
-                  <h2 className="text-[24px] font-black text-slate-900 uppercase tracking-tight">Project Portfolio Yield Analysis</h2>
+                  <h2 className="text-[24px] font-black text-slate-900 capitalize tracking-tight">Project Portfolio Yield Analysis</h2>
                   <p className="text-[12px] font-bold text-slate-400 italic">Financial efficiency and resource allocation optimization matrix</p>
                </div>
                <div className="flex items-center gap-3">
-                  <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-2xl text-[11px] font-black text-slate-600 uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
+                  <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-2xl text-[11px] font-black text-slate-600 capitalize tracking-widest hover:bg-slate-50 transition-all shadow-sm">
                      <Download size={16} /> Portfolio Report
                   </button>
-                  <button className="flex items-center gap-2 px-5 py-2.5 bg-[#081534] text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
+                  <button className="flex items-center gap-2 px-5 py-2.5 bg-[#081534] text-white rounded-2xl text-[11px] font-black capitalize tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
                      <LayoutGrid size={16} /> Grid View
                   </button>
                </div>
@@ -69,10 +69,10 @@ const UtilizationPortfolioDashboard = () => {
                         <div className={`h-12 w-12 rounded-2xl ${kpi.bg} ${kpi.color} flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform`}>
                            {React.cloneElement(kpi.icon, { size: 24, strokeWidth: 2.5 })}
                         </div>
-                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{kpi.note}</span>
+                        <span className="text-[10px] font-black text-emerald-500 capitalize tracking-widest">{kpi.note}</span>
                      </div>
                      <div>
-                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">{kpi.label}</p>
+                        <p className="text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] mb-0.5">{kpi.label}</p>
                         <p className="text-2xl font-black text-slate-900 tracking-tight">{kpi.value}</p>
                      </div>
                   </div>
@@ -84,7 +84,7 @@ const UtilizationPortfolioDashboard = () => {
                <div className="xl:col-span-1 bg-white rounded-[2rem] border border-slate-100 shadow-sm p-8 flex flex-col group relative overflow-hidden">
                   <div className="flex items-center justify-between mb-8">
                      <div className="flex flex-col">
-                        <h3 className="text-[13px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none mb-1.5">Utilization by Project</h3>
+                        <h3 className="text-[13px] font-black text-[#081534] capitalize tracking-[0.2em] leading-none mb-1.5">Utilization by Project</h3>
                         <span className="text-[10px] font-bold text-slate-400 italic">Workload intensity distribution</span>
                      </div>
                      <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner">
@@ -127,11 +127,11 @@ const UtilizationPortfolioDashboard = () => {
                            <Briefcase size={22} strokeWidth={2.5} />
                         </div>
                         <div>
-                           <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-widest">Project Performance Ledger</h4>
+                           <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-widest">Project Performance Ledger</h4>
                            <p className="text-[10px] font-bold text-slate-400 capitalize tracking-wide mt-0.5">Yield and efficiency metrics per engagement</p>
                         </div>
                      </div>
-                     <span className="px-4 py-1.5 rounded-xl bg-white border border-slate-200 text-[11px] font-black text-emerald-600 uppercase tracking-widest shadow-sm">
+                     <span className="px-4 py-1.5 rounded-xl bg-white border border-slate-200 text-[11px] font-black text-emerald-600 capitalize tracking-widest shadow-sm">
                         Live Analytics
                      </span>
                   </div>
@@ -139,11 +139,11 @@ const UtilizationPortfolioDashboard = () => {
                      <table className="w-full text-left">
                         <thead>
                            <tr className="bg-slate-50/50 border-b border-slate-100">
-                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[30%]">Project / Client</th>
-                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Project Yield</th>
-                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Efficiency</th>
-                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Cost vs Util</th>
-                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Status</th>
+                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] w-[30%]">Project / Client</th>
+                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Project Yield</th>
+                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Efficiency</th>
+                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Cost vs Util</th>
+                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-right">Status</th>
                            </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -151,8 +151,8 @@ const UtilizationPortfolioDashboard = () => {
                               <tr key={idx} className="hover:bg-slate-50/50 transition-all group">
                                  <td className="px-8 py-6">
                                     <div className="flex flex-col gap-0.5">
-                                       <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight leading-tight">{proj.projectName}</span>
-                                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest opacity-70 italic">{proj.clientName}</span>
+                                       <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight leading-tight">{proj.projectName}</span>
+                                       <span className="text-[11px] font-bold text-slate-400 capitalize tracking-widest opacity-70 italic">{proj.clientName}</span>
                                     </div>
                                  </td>
                                  <td className="px-8 py-6 text-center">
@@ -169,7 +169,7 @@ const UtilizationPortfolioDashboard = () => {
                                     </div>
                                  </td>
                                  <td className="px-8 py-6 text-center">
-                                    <div className={`inline-flex items-center gap-1 text-[11px] font-black uppercase ${proj.utilizationPercentage > 90 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                    <div className={`inline-flex items-center gap-1 text-[11px] font-black capitalize ${proj.utilizationPercentage > 90 ? 'text-rose-600' : 'text-emerald-600'}`}>
                                        {proj.utilizationPercentage > 90 ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
                                        {proj.utilizationPercentage > 90 ? 'High Burn' : 'Healthy'}
                                     </div>

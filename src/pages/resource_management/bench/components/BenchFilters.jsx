@@ -13,7 +13,7 @@ const BenchFilters = ({
 }) => {
   if (!open) return null;
 
-  const labelClassName = "text-[10px] font-black text-slate-400 uppercase tracking-tighter ml-0.5 mb-1.5 block";
+  const labelClassName = "text-[10px] font-black text-slate-400 capitalize tracking-tighter ml-0.5 mb-1.5 block";
   const selectClassName = "w-full text-[11px] font-semibold border-slate-200 rounded-lg h-9 bg-slate-50/50 focus:ring-indigo-600 shadow-sm transition-all outline-none";
 
   const FilterBody = (
@@ -104,7 +104,7 @@ const BenchFilters = ({
       <div className="shrink-0 px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Filter className="h-3.5 w-3.5 text-indigo-500" />
-          <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest leading-none mt-0.5">Bench Inventory Filters</h3>
+          <h3 className="text-[12px] font-bold text-slate-800 capitalize tracking-widest leading-none mt-0.5">Bench Inventory Filters</h3>
         </div>
         <button onClick={onClose} className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors">
           <X className="h-4 w-4" />
@@ -127,7 +127,7 @@ const BenchFilters = ({
           <button 
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors outline-none"
+            className="flex-1 px-4 py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 capitalize tracking-widest transition-colors outline-none"
           >
             Cancel
           </button>

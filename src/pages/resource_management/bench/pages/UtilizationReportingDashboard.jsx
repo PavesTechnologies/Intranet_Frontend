@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import {
   Download, Filter, Search, Users, Activity,
-  Briefcase, FileText, ChevronRight, TrendingUp, AlertTriangle, RefreshCcw, Monitor, ShieldCheck, Clock, Award, ShieldAlert, ArrowUpRight, ArrowDownRight, Zap, ArrowLeft
+  Briefcase, FileText, ChevronRight, TrendingUp, AlertTriangle, RefreshCcw, Monitor, ShieldCheck, Clock, Award, ShieldAlert, ArrowUpRight, ArrowDownRight, Zap, ArrowLeft, CalendarRange, BarChart3
 } from 'lucide-react';
 import { utilizationService } from '../../services/utilizationService';
 import toast from 'react-hot-toast';
@@ -85,21 +85,6 @@ const UtilizationReportingDashboard = () => {
     }
   };
 
-  const handleQuickReport = async () => {
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const data = await utilizationService.getQuickUtilizationReport();
-      setReportData(data);
-      toast.success('Quick report loaded');
-    } catch (err) {
-      console.error(err);
-      setError('Failed to load quick report.');
-      toast.error('Failed to load quick report');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const handleExportCSV = async () => {
     setIsExportingCSV(true);
@@ -129,60 +114,73 @@ const UtilizationReportingDashboard = () => {
 
   return (
     <div className="min-h-screen bg-slate-50/50 p-6 font-sans select-none selection:bg-indigo-100 selection:text-indigo-900">
-      <div className="mb-6 flex items-center gap-4">
-        <button
-          onClick={() => navigate('/resource-management/bench/utilization-performance')}
-          className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
-        >
-          <ArrowLeft size={18} />
-        </button>
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-none">Utilization Reporting & Dashboards</h1>
-          <p className="mt-1 text-xs sm:text-sm font-medium text-slate-500 capitalize tracking-normal flex items-center gap-2">
-            <Activity size={14} className="text-emerald-600" /> Comprehensive utilization analytics by dimension
-          </p>
+      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/resource-management/bench/utilization-performance')}
+            className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-none">Utilization Reporting & Dashboards</h1>
+            <p className="mt-1 text-xs sm:text-sm font-medium text-slate-500 capitalize tracking-normal flex items-center gap-2">
+              <Activity size={14} className="text-emerald-600" /> Comprehensive utilization analytics by dimension
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            disabled={!reportData || isExportingCSV}
+            className="h-[42px] px-5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
+          >
+            {isExportingCSV ? <RefreshCcw size={16} className="animate-spin text-emerald-600" /> : <Download size={16} />}
+            <span className="text-[12px] font-black capitalize">CSV</span>
+          </button>
+          <button
+            onClick={handleExportExcel}
+            disabled={!reportData || isExportingExcel}
+            className="h-[42px] px-5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-md shadow-emerald-600/10"
+          >
+            {isExportingExcel ? <RefreshCcw size={16} className="animate-spin" /> : <Download size={16} />}
+            <span className="text-[12px] font-black capitalize">EXCEL</span>
+          </button>
         </div>
       </div>
 
       {/* Report Config Panel */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 overflow-hidden relative group mb-6">
-        <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:scale-125 transition-transform duration-700">
-          <FileText size={120} />
-        </div>
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 relative z-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 flex-1">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Period Start</label>
-              <input
-                type="date"
-                value={reportParams.startDate}
-                max={reportParams.endDate}
-                min={
-                  reportParams.endDate
-                    ? new Date(new Date(reportParams.endDate).setFullYear(new Date(reportParams.endDate).getFullYear() - 1)).toISOString().split('T')[0]
-                    : undefined
-                }
-                onChange={(e) => setReportParams({ ...reportParams, startDate: e.target.value })}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] font-bold text-slate-700 bg-slate-50/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all tracking-tight"
-              />
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 mb-6 relative group">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
+          <div className="flex flex-wrap items-center gap-5 flex-1">
+            {/* Unified Calendar Picker */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-black text-slate-400 capitalize tracking-widest pl-1">Utilization Period</label>
+              <div className="flex items-center gap-2 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 hover:border-indigo-200 transition-all group/date">
+                <CalendarRange size={13} className="text-indigo-600 group-hover/date:scale-110 transition-transform" />
+                <div className="flex items-center gap-1">
+                  <input
+                    type="date"
+                    value={reportParams.startDate}
+                    onChange={(e) => setReportParams({ ...reportParams, startDate: e.target.value })}
+                    onClick={(e) => e.target.showPicker()}
+                    className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[95px] h-7"
+                  />
+                  <span className="text-slate-300 mx-0.5">—</span>
+                  <input
+                    type="date"
+                    value={reportParams.endDate}
+                    onChange={(e) => setReportParams({ ...reportParams, endDate: e.target.value })}
+                    onClick={(e) => e.target.showPicker()}
+                    className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[95px] h-7"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Period End</label>
-              <input
-                type="date"
-                value={reportParams.endDate}
-                min={reportParams.startDate}
-                max={
-                  reportParams.startDate
-                    ? new Date(new Date(reportParams.startDate).setFullYear(new Date(reportParams.startDate).getFullYear() + 1)).toISOString().split('T')[0]
-                    : undefined
-                }
-                onChange={(e) => setReportParams({ ...reportParams, endDate: e.target.value })}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] font-bold text-slate-700 bg-slate-50/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all tracking-tight"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Report Type</label>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-black text-slate-400 capitalize tracking-widest pl-1">Report Type</label>
               <div className="relative">
                 <select
                   value={reportParams.reportType}
@@ -195,76 +193,51 @@ const UtilizationReportingDashboard = () => {
                       setActiveTab(type);
                     }
                   }}
-                  className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 text-[13px] font-bold text-slate-700 bg-slate-50/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all appearance-none cursor-pointer tracking-tight truncate"
+                  className="h-9 min-w-[130px] pl-3 pr-8 rounded-lg border border-slate-100 text-[11px] font-bold text-slate-700 bg-slate-50 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all appearance-none cursor-pointer tracking-tight"
                 >
-                  <option value="SUMMARY">SUMMARY (Overview)</option>
+                  <option value="SUMMARY">SUMMARY</option>
                   <option value="RESOURCE">RESOURCE</option>
                   <option value="PROJECT">PROJECT</option>
                   <option value="CLIENT">CLIENT</option>
                   <option value="ROLE">ROLE</option>
                 </select>
-                <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" />
+                <ChevronRight size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Grouping</label>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-black text-slate-400 capitalize tracking-widest pl-1">Grouping</label>
               <div className="relative">
                 <select
                   value={reportParams.groupBy}
                   onChange={(e) => setReportParams({ ...reportParams, groupBy: e.target.value })}
-                  className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 text-[13px] font-bold text-slate-700 bg-slate-50/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all appearance-none cursor-pointer tracking-tight truncate"
+                  className="h-9 min-w-[100px] pl-3 pr-8 rounded-lg border border-slate-100 text-[11px] font-bold text-slate-700 bg-slate-50 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all appearance-none cursor-pointer tracking-tight"
                 >
                   <option value="WEEKLY">WEEKLY</option>
                   <option value="MONTHLY">MONTHLY</option>
                 </select>
-                <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" />
+                <ChevronRight size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" />
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center self-end">
             <button
               onClick={handleGenerateReport}
               disabled={isGenerating}
-              className="h-10 px-6 rounded-xl bg-emerald-600 text-white text-[12px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-emerald-600/20"
+              className="h-9 px-6 rounded-lg bg-indigo-600 text-white text-[11px] font-black capitalize tracking-widest hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md shadow-indigo-600/20"
             >
-              {isGenerating ? <RefreshCcw size={16} className="animate-spin" /> : <TrendingUp size={16} />}
-              {isGenerating ? 'GENERATING...' : 'GENERATE'}
+              {isGenerating ? <RefreshCcw size={14} className="animate-spin" /> : <BarChart3 size={14} />}
+              {isGenerating ? 'ANALYZING...' : 'GENERATE'}
             </button>
-            <button
-              onClick={handleQuickReport}
-              disabled={isGenerating}
-              className="h-10 px-4 rounded-xl bg-slate-100 text-slate-700 text-[12px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-              title="Quick Report"
-            >
-              <Zap size={16} className="text-amber-500" /> Quick
-            </button>
-            <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
-              <button
-                onClick={handleExportCSV}
-                disabled={!reportData || isExportingCSV}
-                className="h-10 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm min-w-[85px] justify-center"
-              >
-                {isExportingCSV ? <RefreshCcw size={16} className="animate-spin text-emerald-600" /> : <Download size={18} />}
-                <span className="text-[10px] font-black uppercase">{isExportingCSV ? 'Processing' : 'CSV'}</span>
-              </button>
-              <button
-                onClick={handleExportExcel}
-                disabled={!reportData || isExportingExcel}
-                className="h-10 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm min-w-[85px] justify-center"
-              >
-                {isExportingExcel ? <RefreshCcw size={16} className="animate-spin text-emerald-600" /> : <FileText size={18} />}
-                <span className="text-[10px] font-black uppercase">{isExportingExcel ? 'Processing' : 'Excel'}</span>
-              </button>
-            </div>
           </div>
         </div>
       </div>
-
       {error && (
         <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-center gap-4 mb-6 shadow-sm">
           <AlertTriangle size={20} className="text-rose-500" />
           <div>
-            <h4 className="text-[11px] font-black text-rose-900 uppercase">Error</h4>
+            <h4 className="text-[11px] font-black text-rose-900 capitalize">Error</h4>
             <p className="text-[12px] font-bold text-rose-600">{error}</p>
           </div>
         </div>
@@ -275,7 +248,7 @@ const UtilizationReportingDashboard = () => {
           <div className="h-20 w-20 bg-emerald-50 rounded-3xl flex items-center justify-center text-emerald-600 mb-8 border border-emerald-100 group-hover:rotate-12 transition-transform duration-500 shadow-inner">
             <BarChart className="w-10 h-10" />
           </div>
-          <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Utilization Reporting Engine</h3>
+          <h3 className="text-xl font-black text-slate-900 capitalize tracking-tight">Utilization Reporting Engine</h3>
           <p className="mt-3 text-[13px] font-medium text-slate-400 max-w-sm italic">Configure your parameters above to generate utilization analytics across multiple dimensions.</p>
         </div>
       )}
@@ -285,7 +258,7 @@ const UtilizationReportingDashboard = () => {
           <div className="h-20 w-20 bg-emerald-50 rounded-3xl flex items-center justify-center text-emerald-600 mb-8 border border-emerald-100 animate-pulse">
             <RefreshCcw size={40} className="animate-spin" />
           </div>
-          <h3 className="text-xl font-black text-emerald-900 uppercase tracking-tight">Compiling Intelligence Report</h3>
+          <h3 className="text-xl font-black text-emerald-900 capitalize tracking-tight">Compiling Intelligence Report</h3>
           <p className="mt-3 text-[13px] font-medium text-slate-400 max-w-sm italic leading-relaxed">Aggregating timesheet actuals...</p>
         </div>
       )}
@@ -305,7 +278,7 @@ const UtilizationReportingDashboard = () => {
                   {React.cloneElement(kpi.icon, { size: 20, strokeWidth: 2.5 })}
                 </div>
                 <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">{kpi.label}</p>
+                  <p className="text-[9px] font-black text-slate-400 capitalize tracking-[0.2em] mb-0.5">{kpi.label}</p>
                   <p className="text-xl font-black text-slate-900 tracking-tight">{kpi.value}</p>
                 </div>
               </div>
@@ -318,7 +291,7 @@ const UtilizationReportingDashboard = () => {
                 <button
                    key={tab}
                    onClick={() => setActiveTab(tab)}
-                   className={`px-6 py-4 text-[11px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-b-2 flex-1 ${activeTab === tab ? 'text-emerald-600 border-emerald-600 bg-emerald-50/30' : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'}`}
+                   className={`px-6 py-4 text-[11px] font-black capitalize tracking-widest whitespace-nowrap transition-all border-b-2 flex-1 ${activeTab === tab ? 'text-emerald-600 border-emerald-600 bg-emerald-50/30' : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'}`}
                 >
                    {tab === 'ANOMALIES' ? 'UTILIZATION ANOMALIES' : `${tab} UTILIZATION REPORT`}
                 </button>
@@ -334,7 +307,7 @@ const UtilizationReportingDashboard = () => {
                     <ShieldAlert size={20} />
                   </div>
                   <div>
-                    <h4 className="text-[12px] font-black text-rose-900 uppercase tracking-[0.1em]">Utilization Anomalies ({reportData.alerts?.length || 0})</h4>
+                    <h4 className="text-[12px] font-black text-rose-900 capitalize tracking-[0.1em]">Utilization Anomalies ({reportData.alerts?.length || 0})</h4>
                   </div>
                 </div>
               </div>
@@ -342,8 +315,8 @@ const UtilizationReportingDashboard = () => {
                 {(reportData.alerts || []).map((alert, idx) => (
                   <div key={idx} className="p-5 bg-slate-50/30 rounded-2xl border border-slate-100 flex flex-col gap-3">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[12px] font-black text-slate-900 uppercase">{alert.resourceName}</span>
-                      <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${alert.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{alert.severity}</span>
+                      <span className="text-[12px] font-black text-slate-900 capitalize">{alert.resourceName}</span>
+                      <span className={`text-[10px] font-black capitalize px-2 py-1 rounded ${alert.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{alert.severity}</span>
                     </div>
                     <p className="text-[12px] font-medium text-slate-500">{alert.message}</p>
                     <p className="text-[11px] font-bold text-indigo-600 mt-2">Action: {alert.recommendation}</p>
@@ -358,18 +331,18 @@ const UtilizationReportingDashboard = () => {
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
                   <Users className="text-indigo-600" />
-                  <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-[0.1em]">Resource Utilization Report</h4>
+                  <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Resource Utilization Report</h4>
                </div>
                <div className="overflow-x-auto">
                   <table className="w-full text-left">
                      <thead>
                         <tr className="bg-slate-50/30 border-b border-slate-100">
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase">Resource</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Hours</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Billable %</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase">Utilization</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Status</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Trend</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize">Resource</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Hours</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Billable %</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize">Utilization</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Status</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Trend</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50">
@@ -395,7 +368,7 @@ const UtilizationReportingDashboard = () => {
                                  </div>
                               </td>
                               <td className="px-8 py-4 text-center">
-                                 <span className={`text-[9px] font-black uppercase px-2 py-1 rounded ${res.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : res.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{res.utilizationBand || 'HEALTHY'}</span>
+                                 <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${res.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : res.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{res.utilizationBand || 'HEALTHY'}</span>
                               </td>
                               <td className="px-8 py-4 text-center">
                                  {res.trendSignal === 'UP' ? <ArrowUpRight className="inline text-emerald-500" size={16} /> : res.trendSignal === 'DOWN' ? <ArrowDownRight className="inline text-rose-500" size={16} /> : <span className="text-slate-400 font-bold">-</span>}
@@ -413,18 +386,18 @@ const UtilizationReportingDashboard = () => {
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mt-6">
                <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
                   <Monitor className="text-blue-600" />
-                  <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-[0.1em]">Project Utilization Report</h4>
+                  <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Project Utilization Report</h4>
                </div>
                <div className="overflow-x-auto">
                   <table className="w-full text-left">
                      <thead>
                         <tr className="bg-slate-50/30 border-b border-slate-100">
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase">Project</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Client</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Resources</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Hours</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase">Utilization</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Status</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize">Project</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Client</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Resources</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Hours</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize">Utilization</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Status</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50">
@@ -446,7 +419,7 @@ const UtilizationReportingDashboard = () => {
                                  </div>
                               </td>
                               <td className="px-8 py-4 text-center">
-                                 <span className={`text-[9px] font-black uppercase px-2 py-1 rounded ${proj.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : proj.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{proj.utilizationBand || 'HEALTHY'}</span>
+                                 <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${proj.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : proj.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{proj.utilizationBand || 'HEALTHY'}</span>
                               </td>
                            </tr>
                         ))}
@@ -461,17 +434,17 @@ const UtilizationReportingDashboard = () => {
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mt-6">
                <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
                   <Award className="text-amber-600" />
-                  <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-[0.1em]">Role Utilization Report</h4>
+                  <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Role Utilization Report</h4>
                </div>
                <div className="overflow-x-auto">
                   <table className="w-full text-left">
                      <thead>
                         <tr className="bg-slate-50/30 border-b border-slate-100">
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase">Role</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Resources</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Hours</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase">Utilization</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Status</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize">Role</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Resources</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Hours</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize">Utilization</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Status</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50">
@@ -492,7 +465,7 @@ const UtilizationReportingDashboard = () => {
                                  </div>
                               </td>
                               <td className="px-8 py-4 text-center">
-                                 <span className={`text-[9px] font-black uppercase px-2 py-1 rounded ${role.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : role.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{role.utilizationBand || 'HEALTHY'}</span>
+                                 <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${role.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : role.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{role.utilizationBand || 'HEALTHY'}</span>
                               </td>
                            </tr>
                         ))}
@@ -507,17 +480,17 @@ const UtilizationReportingDashboard = () => {
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mt-6">
                <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
                   <Briefcase className="text-purple-600" />
-                  <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-[0.1em]">Client Utilization Report</h4>
+                  <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Client Utilization Report</h4>
                </div>
                <div className="overflow-x-auto">
                   <table className="w-full text-left">
                      <thead>
                         <tr className="bg-slate-50/30 border-b border-slate-100">
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase">Client</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Active Projects</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Hours</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase">Utilization</th>
-                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase text-center">Status</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize">Client</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Active Projects</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Hours</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize">Utilization</th>
+                           <th className="px-8 py-4 text-[11px] font-black text-slate-400 capitalize text-center">Status</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50">
@@ -538,7 +511,7 @@ const UtilizationReportingDashboard = () => {
                                  </div>
                               </td>
                               <td className="px-8 py-4 text-center">
-                                 <span className={`text-[9px] font-black uppercase px-2 py-1 rounded ${client.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : client.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{client.utilizationBand || 'HEALTHY'}</span>
+                                 <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${client.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : client.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{client.utilizationBand || 'HEALTHY'}</span>
                               </td>
                            </tr>
                         ))}

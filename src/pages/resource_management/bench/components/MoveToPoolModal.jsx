@@ -45,7 +45,7 @@ const MoveToPoolModal = ({ open, resources = [], onClose, onSubmit }) => {
 
         <div className="space-y-4 px-5 py-5">
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Pool Type</label>
+            <label className="text-[11px] font-semibold capitalize tracking-[0.16em] text-gray-500">Pool Type</label>
             <select
               value={form.poolType}
               onChange={(event) => setForm((prev) => ({ ...prev, poolType: event.target.value }))}
@@ -58,7 +58,7 @@ const MoveToPoolModal = ({ open, resources = [], onClose, onSubmit }) => {
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Reason</label>
+            <label className="text-[11px] font-semibold capitalize tracking-[0.16em] text-gray-500">Reason</label>
             <textarea
               rows={4}
               value={form.reason}
