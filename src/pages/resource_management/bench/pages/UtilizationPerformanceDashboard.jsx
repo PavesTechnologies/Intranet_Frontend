@@ -173,7 +173,7 @@ const ALERT_INTELLIGENCE = [
 
 
 const UtilizationPerformanceDashboard = () => {
-   const PROJECTS_PER_PAGE = 5;
+   const PROJECTS_PER_PAGE = 4;
    const navigate = useNavigate();
    const location = useLocation();
    const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'portfolio');
@@ -280,6 +280,16 @@ const UtilizationPerformanceDashboard = () => {
          return !p.isInternal;
       });
    }, [operationalProjects, projectCategoryTab]);
+   
+   // Reset project page when switching categories (Active vs Internal)
+   useEffect(() => {
+      setProjectPage(1);
+   }, [projectCategoryTab]);
+
+   // Reset resource registry page when searching
+   useEffect(() => {
+      setCurrentPage(1);
+   }, [searchQuery]);
 
    const totalProjectPages = Math.ceil(visibleOperationalProjects.length / PROJECTS_PER_PAGE) || 1;
 
@@ -296,10 +306,6 @@ const UtilizationPerformanceDashboard = () => {
 
    const [resourceMetrics, setResourceMetrics] = useState([]);
    const [isResourceLoading, setIsResourceLoading] = useState(false);
-   const [dateRange, setDateRange] = useState({
-      startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0]
-   });
 
    const filteredAndPaginatedResources = useMemo(() => {
       let filtered = Array.isArray(resourceMetrics) ? resourceMetrics : [];
@@ -334,11 +340,11 @@ const UtilizationPerformanceDashboard = () => {
 
    useEffect(() => {
       const fetchResourceMetrics = async () => {
-         if (!dateRange.startDate || !dateRange.endDate) return;
-         if (new Date(dateRange.startDate) > new Date(dateRange.endDate)) return;
+         if (!startDate || !endDate) return;
+         if (new Date(startDate) > new Date(endDate)) return;
          try {
             setIsResourceLoading(true);
-            const data = await getBillNonBillable(dateRange.startDate, dateRange.endDate);
+            const data = await getBillNonBillable(startDate, endDate);
             console.log("Data from tms: ", data);
             setResourceMetrics(data);
          } catch (err) {
@@ -350,7 +356,7 @@ const UtilizationPerformanceDashboard = () => {
       };
 
       fetchResourceMetrics();
-   }, [dateRange]);
+   }, [startDate, endDate]);
 
    // REPORTING ENGINE STATES
    const [reportData, setReportData] = useState(null);
@@ -691,6 +697,7 @@ const UtilizationPerformanceDashboard = () => {
                         type="date"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
+                        onClick={(e) => e.target.showPicker()}
                         className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[110px]"
                      />
                      <span className="text-slate-300 mx-0.5">—</span>
@@ -698,6 +705,7 @@ const UtilizationPerformanceDashboard = () => {
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
+                        onClick={(e) => e.target.showPicker()}
                         className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[110px]"
                      />
                   </div>
@@ -714,12 +722,8 @@ const UtilizationPerformanceDashboard = () => {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
                            <div className="flex flex-col gap-2">
                               <div className="flex items-center gap-3">
-                                 <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none">Strategic Performance Status</h3>
-                                 <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${selectedResourceId ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-50 text-slate-500 border border-slate-100'}`}>
-                                    {selectedResourceId ? `LIVE: ${selectedResourceName}` : 'REAL-TIME: OVERALL PORTFOLIO'}
-                                 </span>
+                                 <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none">Portfolio Performance Overview</h3>
                               </div>
-                              <p className="text-[11px] font-medium text-slate-400 italic">Historical directional signals from validated workload registries</p>
                            </div>
                            <div className="flex items-center gap-1.5 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-100 self-start sm:self-center">
                               {['DAILY', 'WEEKLY', 'MONTHLY'].map(t => (
@@ -778,9 +782,6 @@ const UtilizationPerformanceDashboard = () => {
                         <div className="flex items-center justify-between mb-8">
                            <div className="flex flex-col gap-1.5">
                               <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none mb-1">Billing Yield Index</h3>
-                              <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest w-fit ${selectedResourceId ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-50 text-slate-500 border border-slate-100'}`}>
-                                 {selectedResourceId ? `USER: ${selectedResourceName}` : 'REAL-TIME: PORTFOLIO'}
-                              </span>
                            </div>
                            <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner">
                               <PieChartIcon size={20} />
@@ -941,18 +942,13 @@ const UtilizationPerformanceDashboard = () => {
                            </tbody>
                         </table>
                      </div>
-                     {!projectsLoading && visibleOperationalProjects.length > 0 && (
-                        <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/40">
-                           <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                              Showing {Math.min((projectPage - 1) * PROJECTS_PER_PAGE + 1, visibleOperationalProjects.length)}-
-                              {Math.min(projectPage * PROJECTS_PER_PAGE, visibleOperationalProjects.length)} of {visibleOperationalProjects.length}
-                           </div>
+                     {!projectsLoading && totalProjectPages > 1 && (
+                        <div className="border-t border-slate-100 py-6">
                            <Pagination
                               currentPage={projectPage}
                               totalPages={totalProjectPages}
                               onPrevious={() => setProjectPage((prev) => Math.max(prev - 1, 1))}
                               onNext={() => setProjectPage((prev) => Math.min(prev + 1, totalProjectPages))}
-                              className="justify-end py-0"
                            />
                         </div>
                      )}
@@ -965,7 +961,6 @@ const UtilizationPerformanceDashboard = () => {
                      <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                         <div>
                            <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest leading-none">Capability & Performance Ledger</h3>
-                           {/* <p className="text-[10px] font-medium text-slate-400 mt-1 uppercase tracking-widest opacity-70 italic font-serif">Deep-dive into individual billable efficiency vs historical directional signals</p> */}
                         </div>
                         <div className="flex items-center gap-4">
                            <div className="relative">
@@ -978,27 +973,6 @@ const UtilizationPerformanceDashboard = () => {
                                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                               />
                            </div>
-                           <div className="flex items-center gap-2">
-                              <input
-                                 type="date"
-                                 className="text-[10px] uppercase font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
-                                 value={dateRange.startDate}
-                                 max={dateRange.endDate || new Date().toISOString().split('T')[0]}
-                                 onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                              />
-                              <span className="text-[10px] font-bold text-slate-400 uppercase">to</span>
-                              <input
-                                 type="date"
-                                 className="text-[10px] uppercase font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
-                                 value={dateRange.endDate}
-                                 min={dateRange.startDate}
-                                 max={new Date().toISOString().split('T')[0]}
-                                 onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                              />
-                           </div>
-                           {/* <div className="flex items-center gap-2 bg-slate-900 text-white rounded-lg px-3 py-1 text-[9px] font-black uppercase tracking-widest">
-                              <ShieldCheck size={12} className="text-emerald-400" /> Source Verified
-                           </div> */}
                         </div>
                      </div>
                      <div className="overflow-x-auto no-scrollbar">
@@ -1016,8 +990,6 @@ const UtilizationPerformanceDashboard = () => {
                                  <tr>
                                     <td colSpan="4" className="px-6 py-8 text-center">
                                        <div className="flex flex-col items-center justify-center gap-2">
-                                          {/* <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div> */}
-                                          {/* <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Loading Resources...</span> */}
                                           <LoadingSpinner text='Loading Resources...' />
                                        </div>
                                     </td>
@@ -1045,7 +1017,6 @@ const UtilizationPerformanceDashboard = () => {
                                           </div>
                                        </td>
                                        <td className="px-6 py-4 text-center">
-                                          {/* STORY 5: Individual Trend Signals */}
                                           <div className="flex flex-col items-center gap-0.5">
                                              <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black uppercase"><Zap size={14} /> Stable</div>
                                           </div>
@@ -1065,7 +1036,7 @@ const UtilizationPerformanceDashboard = () => {
                         </table>
                      </div>
                      {filteredAndPaginatedResources.totalPages > 1 && (
-                        <div className="border-t border-slate-100 bg-white p-3">
+                        <div className="py-6 border-t border-slate-100">
                            <Pagination
                               currentPage={currentPage}
                               totalPages={filteredAndPaginatedResources.totalPages}
