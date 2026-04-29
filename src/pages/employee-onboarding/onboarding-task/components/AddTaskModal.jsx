@@ -94,7 +94,7 @@ export default function AddTaskModal({
 
     // assignee - store the value (ID/email/uuid) from the option
     if (name === "assigned_to") {
-      console.log("🔄 assigned_to change:", value, "type:", typeof value);
+
       setFormData((p) => ({
         ...p,
         assigned_to: String(value || ""), // Ensure it's always a string
