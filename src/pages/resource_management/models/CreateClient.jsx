@@ -297,7 +297,6 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
               "Cannot deactivate: This client still has active projects. Please complete or reassign them first."
             );
             setIsSubmitting(false);
-            return;
           }
         }
       } catch (error) {

@@ -181,7 +181,7 @@ const UtilizationPerformanceDashboard = () => {
    const [selectedResource, setSelectedResource] = useState(null);
    const [resourceProjectsData, setResourceProjectsData] = useState([]);
    const [isProjectsLoading, setIsProjectsLoading] = useState(false);
-   const [projectsDrawerTab, setProjectsDrawerTab] = useState('overall'); // 'overall' or 'projects'
+   const [projectsDrawerTab, setProjectsDrawerTab] = useState('overall');
 
    const [searchQuery, setSearchQuery] = useState('');
    const [currentPage, setCurrentPage] = useState(1);
@@ -706,7 +706,6 @@ const UtilizationPerformanceDashboard = () => {
                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                       {/* STORY 5: Individual Trend Signals */}
                                        <div className="flex flex-col items-center gap-0.5">
                                           <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black uppercase"><Zap size={14} /> Stable</div>
                                        </div>
@@ -737,61 +736,6 @@ const UtilizationPerformanceDashboard = () => {
                   )}
                </div>
             )}
-
-            {/* TAB 4: GOVERNANCE & READINESS */}
-            {/* {activeTab === 'governance' && (
-               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 flex flex-col items-center text-center">
-                     <div className="h-20 w-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center border border-emerald-100 mb-6 shadow-xl shadow-emerald-500/10">
-                        <Verified size={40} />
-                     </div>
-                     <h3 className="text-xl font-bold text-slate-900 uppercase tracking-tight">Enterprise Readiness Gate</h3>
-                     <p className="text-[12px] font-medium text-slate-500 italic mt-2 max-w-sm font-serif">Validation of all Ingested (Approved) timesheet actuals against governed calendars and historical trend preservation rules is complete.</p>
-
-                     <div className="mt-10 grid grid-cols-1 gap-3 w-full">
-                        {[
-                           { label: 'Trend Preservation (Story 5)', value: 'Historical Integrity Active', status: 'PASS' },
-                           { label: 'Ingestion Protocol (Story 1)', value: 'Approved Entries Only', status: 'PASS' },
-                           { label: 'Confidence Mask (Story 11)', value: 'Threshold > 90% Complete', status: 'PASS' },
-                        ].map((gate) => (
-                           <div key={gate.label} className="p-4 bg-slate-50/50 rounded-xl border border-slate-100 flex items-center justify-between">
-                              <div className="flex flex-col text-left">
-                                 <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight leading-none">{gate.label}</span>
-                                 <span className="text-[10px] font-medium text-slate-400 mt-2">{gate.value}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-emerald-600">
-                                 <CheckCircle2 size={16} />
-                                 <span className="text-[10px] font-black">{gate.status}</span>
-                              </div>
-                           </div>
-                        ))}
-                     </div>
-                  </div>
-
-                  <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 flex flex-col">
-                     <div className="flex items-center justify-between mb-8">
-                        <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest opacity-60">Threshold Intelligence</h3>
-                        <Lock size={14} className="text-indigo-400" />
-                     </div>
-                     <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl mb-4 relative overflow-hidden">
-                        <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-2 block">Enterprise Standard Logic</span>
-                        <p className="text-[11px] font-medium text-slate-600 leading-relaxed italic">Utilization is derived strictly from: (Total Actuals / Allocated Capacity) - Exclusions. Trend signals are calculated using 6-week rolling rolling averages.</p>
-                     </div>
-                     <div className="space-y-4 flex-1">
-                        {ALERT_INTELLIGENCE.map((alert) => (
-                           <div key={alert.id} className="p-4 bg-slate-50/50 border border-slate-100 rounded-xl relative hover:border-rose-100 transition-colors cursor-pointer group">
-                              <h5 className="text-[12px] font-bold text-slate-900 uppercase tracking-tight pr-12 leading-none">{alert.scope}</h5>
-                              <p className="text-[11px] font-medium text-slate-500 mt-2 leading-relaxed">{alert.message}</p>
-                              <div className="mt-4 flex items-center justify-between border-t border-white/50 pt-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                 <span>{alert.stakeholder}</span>
-                                 <span className="text-indigo-600">Story 7 Alert</span>
-                              </div>
-                           </div>
-                        ))}
-                     </div>
-                  </div>
-               </div>
-            )} */}
          </div>
 
          {/* RESOURCE PROJECTS DRAWER */}
