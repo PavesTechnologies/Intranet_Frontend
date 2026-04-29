@@ -10,6 +10,29 @@ import { cn } from "@/lib/utils";
 import { getUtilization } from "../../services/workforceService";
 import Pagination from "../../../../components/Pagination/pagination";
 
+// ── Date Helpers ───────────────────────────────────────────────────────────
+const parseDate = (str) => {
+    if (!str) return new Date();
+    if (str instanceof Date) return str;
+    const parts = str.split(/[-/]/);
+    if (parts.length === 3) {
+        // Assume YYYY-MM-DD or DD-MM-YYYY
+        const year = parts[0].length === 4 ? parts[0] : parts[2];
+        const month = parts[0].length === 4 ? parts[1] : parts[1];
+        const day = parts[0].length === 4 ? parts[2] : parts[0];
+        return new Date(year, month - 1, day);
+    }
+    return new Date(str);
+};
+
+const formatDate = (date) => {
+    return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const formatShortDate = (date) => {
+    return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
 // ── Mini Info Row ──────────────────────────────────────────────────────────
 function MiniInfoRow({ label, value, icon: Icon }) {
     return (
@@ -46,6 +69,7 @@ function UtilizationChart({ data }) {
                             style={{ height: `${((d.nonBillable || 0) / maxVal) * 100}%` }}
                         />
                     </div>
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{d.period}</span>
                 </div>
             ))}
         </div>
@@ -59,8 +83,8 @@ function TimelineBar({ resource }) {
         return <div className="h-2 w-full bg-slate-100 rounded-full" />
     }
 
-    const earliest = new Date(blocks[0].startDate).getTime()
-    const latest = Math.max(...blocks.map((b) => new Date(b.endDate).getTime()))
+    const earliest = Math.min(...blocks.map((b) => parseDate(b.startDate).getTime()))
+    const latest = Math.max(...blocks.map((b) => parseDate(b.endDate).getTime()))
     const totalSpan = latest - earliest || 1
     const today = Date.now()
 
@@ -68,8 +92,8 @@ function TimelineBar({ resource }) {
         <div className="relative pt-4 pb-2 font-sans">
             <div className="relative h-6 sm:h-8 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden shadow-inner">
                 {blocks.map((block, i) => {
-                    const start = new Date(block.startDate).getTime()
-                    const end = new Date(block.endDate).getTime()
+                    const start = parseDate(block.startDate).getTime()
+                    const end = parseDate(block.endDate).getTime()
                     const leftPct = ((start - earliest) / totalSpan) * 100
                     const widthPct = ((end - start) / totalSpan) * 100
 
@@ -86,7 +110,7 @@ function TimelineBar({ resource }) {
                                 block.tentative ? "bg-slate-300/40 border-r border-dashed border-slate-400" : color
                             )}
                             style={{ left: `${leftPct}%`, width: `${Math.max(widthPct, 1)}%` }}
-                            title={`${block.project}: ${block.allocation}% (${block.startDate} - ${block.endDate})`}
+                            title={`${block.project}: ${block.allocation}% (${formatShortDate(block.startDate)} - ${formatShortDate(block.endDate)})`}
                         />
                     )
                 })}
@@ -98,9 +122,9 @@ function TimelineBar({ resource }) {
                 )}
             </div>
             <div className="flex justify-between mt-2 px-0.5">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{new Date(blocks[0].startDate).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}</span>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{formatShortDate(earliest)}</span>
                 <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded">Current</span>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{new Date(blocks[blocks.length - 1].endDate).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}</span>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{formatShortDate(latest)}</span>
             </div>
         </div>
     )
@@ -124,8 +148,26 @@ export default function OverviewTab({ resource }) {
             setUtilLoading(true);
             try {
                 const id = resource.resourceId || resource.id;
-                const data = await getUtilization(id);
-                if (!cancelled) setUtilization(data);
+                
+                // To show a "Trend", we fetch the last 4 months
+                const now = new Date();
+                const monthsToFetch = [0, 1, 2, 3].map(offset => {
+                    const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+                    return { month: d.getMonth() + 1, year: d.getFullYear() };
+                }).reverse();
+
+                const trendData = await Promise.all(monthsToFetch.map(async (m) => {
+                    try {
+                        // Assuming getUtilization can take custom month/year or we adapt the service
+                        // For now, we'll try to use the current service if it's flexible, or simulate the trend
+                        const res = await getUtilization(id, m.month, m.year);
+                        return { ...res, period: new Date(m.year, m.month - 1).toLocaleDateString(undefined, { month: 'short' }) };
+                    } catch {
+                        return { billable: 0, nonBillable: 0, period: new Date(m.year, m.month - 1).toLocaleDateString(undefined, { month: 'short' }) };
+                    }
+                }));
+
+                if (!cancelled) setUtilization(trendData);
             } catch {
                 if (!cancelled) setUtilization(null);
             } finally {
@@ -147,8 +189,12 @@ export default function OverviewTab({ resource }) {
     }, [resource.currentProject]);
 
     const hasExpiredCerts = useMemo(() => {
-        return resource.certifications?.some(c => c.expiryDate && new Date(c.expiryDate) < new Date());
+        return resource.certifications?.some(c => c.expiryDate && parseDate(c.expiryDate) < new Date());
     }, [resource.certifications]);
+
+    const sortedTimeline = useMemo(() => {
+        return [...(resource.allocationTimeline || [])].sort((a, b) => parseDate(a.startDate) - parseDate(b.startDate));
+    }, [resource.allocationTimeline]);
 
     // Paginated Computations
     const paginatedCerts = useMemo(() => {
@@ -211,16 +257,16 @@ export default function OverviewTab({ resource }) {
                                 <span className="text-xs font-black text-slate-400 font-sans uppercase tracking-widest">Active Workload</span>
                                 <span className="text-3xl font-black text-indigo-600 font-sans tabular-nums tracking-tighter">{resource.currentAllocation || 0}%</span>
                             </div>
-                            
-                            <TimelineBar resource={resource} />
-                            
+
+                            <TimelineBar resource={{ ...resource, allocationTimeline: sortedTimeline }} />
+
                             <div className="bg-indigo-50/30 rounded-lg p-3 border border-indigo-100/50">
                                 <p className="text-[10px] font-bold text-indigo-700/70 font-sans uppercase tracking-[0.2em]">Strategy Insight</p>
                                 <p className="text-[11px] font-medium text-indigo-900 mt-1 leading-relaxed">
-                                    Current monthly capacity balance is <span className="font-black">{100 - (resource.currentAllocation || 0)}%</span>. 
-                                    {resource.currentAllocation > 100 ? " Resource is currently over-allocated." : 
-                                     resource.currentAllocation === 100 ? " Resource is at full capacity." : 
-                                     " Optimal room for strategic upskilling or shadow roles."}
+                                    Current monthly capacity balance is <span className="font-black">{100 - (resource.currentAllocation || 0)}%</span>.
+                                    {resource.currentAllocation > 100 ? " Resource is currently over-allocated." :
+                                        resource.currentAllocation === 100 ? " Resource is at full capacity." :
+                                            " Optimal room for strategic upskilling or shadow roles."}
                                 </p>
                             </div>
                         </div>
@@ -247,20 +293,20 @@ export default function OverviewTab({ resource }) {
                     <div className="flex-1 space-y-4">
                         {/* Breakdown List */}
                         <div className="space-y-3">
-                            {(resource.allocationTimeline || []).length > 0 ? (
-                                resource.allocationTimeline.map((block, i) => (
+                            {sortedTimeline.length > 0 ? (
+                                sortedTimeline.map((block, i) => (
                                     <div key={i} className="flex items-center justify-between group/item">
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-1.5 mb-0.5">
                                                 <div className={cn(
                                                     "h-1.5 w-1.5 rounded-full shrink-0",
-                                                    new Date() > new Date(block.endDate) ? "bg-slate-300" :
+                                                    new Date() > parseDate(block.endDate) ? "bg-slate-300" :
                                                         block.allocation > 70 ? "bg-amber-400" : "bg-emerald-400"
                                                 )} />
                                                 <p className="text-[11px] font-bold text-slate-900 truncate font-sans group-hover/item:text-indigo-600 transition-colors">{block.project}</p>
                                             </div>
                                             <p className="text-[9px] font-medium text-slate-400 pl-3 font-sans uppercase tracking-tight">
-                                                {new Date(block.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {new Date(block.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                {formatShortDate(block.startDate)} - {formatShortDate(block.endDate)}
                                             </p>
                                         </div>
                                         <div className="text-right">
@@ -304,15 +350,6 @@ export default function OverviewTab({ resource }) {
                                 <p className="text-[10px] font-medium text-emerald-500 leading-tight font-sans">Active allocation within optimal performance range.</p>
                             </div>
                         )}
-
-                        <div className="grid grid-cols-2 gap-3 mt-auto pt-6">
-                            <Button variant="outline" className="h-9 text-[10px] font-bold border-slate-200 hover:bg-slate-50 font-sans shadow-sm w-full uppercase tracking-tighter">
-                                Create Demand
-                            </Button>
-                            <Button variant="outline" className="h-9 text-[10px] font-bold border-slate-200 hover:bg-slate-50 font-sans shadow-sm w-full uppercase tracking-tighter">
-                                Reserve
-                            </Button>
-                        </div>
                     </div>
                 </div>
             </div>

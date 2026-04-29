@@ -197,7 +197,7 @@ export default function WorkforceAvailability() {
                       filteredResources={filteredResources}
                       onDayClick={handleDayClick}
                       selectedResourceId={null}
-                      onSelectResource={handleResourceClick}
+                      onSelectResource={null}
                       currentDate={currentDate}
                       onNavigate={setCurrentDate}
                     />
