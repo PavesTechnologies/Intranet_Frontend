@@ -87,7 +87,7 @@ export function useDemand(projectId = null) {
 
     // Pagination State
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(20);
+    const [pageSize, setPageSize] = useState(10);
 
     const demandRoleOptions = useMemo(() => getDemandRoleOptions(user?.roles), [user?.roles]);
     const effectiveRole = useMemo(
@@ -218,6 +218,12 @@ export function useDemand(projectId = null) {
     useEffect(() => {
         setPage(1);
     }, [activeTab, filters]);
+
+    useEffect(() => {
+        if (totalPages > 0 && page > totalPages) {
+            setPage(totalPages);
+        }
+    }, [page, totalPages]);
 
     const activeKPIs = useMemo(() => {
         if (!kpiData) return [];
