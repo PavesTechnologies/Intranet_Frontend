@@ -423,7 +423,9 @@ const buildKpis = (mode, allocations, roleOffRequests, selectedRows) => {
 };
 
 const buildPmDemandStyleKpis = (allocations, roleOffRequests, selectedRows) => {
-  const activeAllocations = allocations.filter((item) => item.status === "Active");
+  const activeAllocations = allocations.filter(
+    (item) => item.status === "Active" && item.roleOffStatus !== "Fulfilled",
+  );
   const pendingRequests = allocations.filter((item) => item.roleOffStatus === "Pending Approval");
   const totalRoleOffs = allocations.filter((item) => item.roleOffStatus && item.roleOffStatus !== "Not Requested");
 

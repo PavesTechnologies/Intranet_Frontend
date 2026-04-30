@@ -105,6 +105,8 @@ const RoleOffSidePanel = ({
   const [reasons, setReasons] = useState([]);
   const [reviewState, setReviewState] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const effectiveDateRef = useRef(null);
+  const [isEffectiveDatePickerOpen, setIsEffectiveDatePickerOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -139,6 +141,7 @@ const RoleOffSidePanel = ({
       setReviewState(null);
       setError("");
       setFieldErrors({});
+      setIsEffectiveDatePickerOpen(false);
       return;
     }
 
@@ -161,6 +164,7 @@ const RoleOffSidePanel = ({
     setError("");
     setShowRejectError(false);
     setFieldErrors({});
+    setIsEffectiveDatePickerOpen(false);
   }, [record, open, actionType, reasons]);
 
   if (!open || !record) return null;
@@ -356,6 +360,35 @@ const RoleOffSidePanel = ({
     }
   };
 
+  const handleEffectiveDateClick = () => {
+    if (isReadOnlyPm || isSubmitting) return;
+
+    const input = effectiveDateRef.current;
+    if (!input) return;
+
+    if (isEffectiveDatePickerOpen) {
+      input.blur();
+      setIsEffectiveDatePickerOpen(false);
+      return;
+    }
+
+    input.focus();
+
+    if (typeof input.showPicker === "function") {
+      try {
+        input.showPicker();
+        setIsEffectiveDatePickerOpen(true);
+        return;
+      } catch (err) {
+        if (err?.name !== "NotAllowedError") {
+          console.error("Failed to open effective date picker:", err);
+        }
+      }
+    }
+
+    setIsEffectiveDatePickerOpen(true);
+  };
+
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-slate-900/20 backdrop-blur-[1px]">
       <button type="button" disabled={isSubmitting} className="flex-1 cursor-default" onClick={onClose} aria-label="Close panel" />
@@ -481,11 +514,17 @@ const RoleOffSidePanel = ({
                     Effective Date
                   </label>
                   <input
+                    ref={effectiveDateRef}
                     type="date"
                     min={getTodayDate()}
                     max={record.endDateIso || undefined}
                     value={form.effectiveDate}
-                    onChange={(event) => updateField("effectiveDate", event.target.value)}
+                    onChange={(event) => {
+                      updateField("effectiveDate", event.target.value);
+                      setIsEffectiveDatePickerOpen(false);
+                    }}
+                    onClick={handleEffectiveDateClick}
+                    onBlur={() => setIsEffectiveDatePickerOpen(false)}
                     disabled={isReadOnlyPm || isSubmitting}
                     className={cn(getFieldClassName(fieldErrors.effectiveDate), "h-10 px-3")}
                   />

@@ -342,14 +342,16 @@ export default function EmployeeOnboardingPage() {
       }
 
       const excelData = newEmployees.map((emp) => ({
-        "Employee ID": emp.employee_id,
-        Name: `${emp.first_name} ${emp.last_name}`,
-        Email: emp.work_email,
-        Contact: emp.contact_number,
+        user_uuid: emp.user_uuid,
+        employee_id: emp.employee_id,
+        first_name: emp.first_name,
+        last_name: emp.last_name,
+        mail: emp.work_email,
+        contact: emp.contact_number,
         Department: departmentMap[emp.department_uuid],
         Designation: designationMap[emp.designation_uuid],
-        "Joining Date": emp.joining_date,
         Status: emp.employment_status,
+        
       }));
       setExcelPreview(excelData);
       setShowPreview(true);

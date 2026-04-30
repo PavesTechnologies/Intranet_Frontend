@@ -23,7 +23,7 @@ const ResourceVisualizationDrawer = ({
                             <User size={18} className="text-indigo-600" />
                             {selectedResource.userName}
                         </h2>
-                        <p className="text-[11px] font-medium text-slate-500 mt-1 uppercase tracking-widest">Resource Visualization</p>
+                        <p className="text-[11px] font-medium text-slate-500 mt-1 capitalize tracking-widest">Resource Visualization</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors">
                         <X size={18} />
