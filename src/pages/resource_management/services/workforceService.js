@@ -127,14 +127,18 @@ export const getHolidaysByYear = async (year) => {
   }
 };
 
-export const getUtilization = async (resourceId) => {
+export const getUtilization = async (resourceId, month, year) => {
   try {
+    const now = new Date();
+    const targetMonth = month || (now.getMonth() + 1);
+    const targetYear = year || now.getFullYear();
+
     const response = await axios.get(
       `${TSM_BASE_URL}/api/utilization/monthly/${resourceId}`,
       {
         params: {
-          year: new Date().getFullYear(),
-          month: new Date().getMonth() + 1,
+          year: targetYear,
+          month: targetMonth,
         },
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,

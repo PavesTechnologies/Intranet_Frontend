@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+
 import { format, subDays, subWeeks, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getOperationalProjects } from '../services/operationalProjectsService';
@@ -173,7 +174,7 @@ const ALERT_INTELLIGENCE = [
 
 
 const UtilizationPerformanceDashboard = () => {
-   const PROJECTS_PER_PAGE = 5;
+   const PROJECTS_PER_PAGE = 4;
    const navigate = useNavigate();
    const location = useLocation();
    const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'portfolio');
@@ -280,6 +281,16 @@ const UtilizationPerformanceDashboard = () => {
          return !p.isInternal;
       });
    }, [operationalProjects, projectCategoryTab]);
+   
+   // Reset project page when switching categories (Active vs Internal)
+   useEffect(() => {
+      setProjectPage(1);
+   }, [projectCategoryTab]);
+
+   // Reset resource registry page when searching
+   useEffect(() => {
+      setCurrentPage(1);
+   }, [searchQuery]);
 
    const totalProjectPages = Math.ceil(visibleOperationalProjects.length / PROJECTS_PER_PAGE) || 1;
 
@@ -296,10 +307,6 @@ const UtilizationPerformanceDashboard = () => {
 
    const [resourceMetrics, setResourceMetrics] = useState([]);
    const [isResourceLoading, setIsResourceLoading] = useState(false);
-   const [dateRange, setDateRange] = useState({
-      startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0]
-   });
 
    const filteredAndPaginatedResources = useMemo(() => {
       let filtered = Array.isArray(resourceMetrics) ? resourceMetrics : [];
@@ -334,11 +341,11 @@ const UtilizationPerformanceDashboard = () => {
 
    useEffect(() => {
       const fetchResourceMetrics = async () => {
-         if (!dateRange.startDate || !dateRange.endDate) return;
-         if (new Date(dateRange.startDate) > new Date(dateRange.endDate)) return;
+         if (!startDate || !endDate) return;
+         if (new Date(startDate) > new Date(endDate)) return;
          try {
             setIsResourceLoading(true);
-            const data = await getBillNonBillable(dateRange.startDate, dateRange.endDate);
+            const data = await getBillNonBillable(startDate, endDate);
             console.log("Data from tms: ", data);
             setResourceMetrics(data);
          } catch (err) {
@@ -350,7 +357,57 @@ const UtilizationPerformanceDashboard = () => {
       };
 
       fetchResourceMetrics();
-   }, [dateRange]);
+   }, [startDate, endDate]);
+
+   useEffect(() => {
+      const fetchProjects = async () => {
+         try {
+            setProjectsLoading(true);
+            setProjectsError('');
+            const data = await getOperationalProjects(startDate, endDate);
+            const extracted = extractOperationalProjects(data);
+            const mapped = extracted.map(mapProjectCatalogEntry);
+            setOperationalProjects(mapped);
+         } catch (err) {
+            console.error('Failed to fetch operational projects:', err);
+            setProjectsError('Failed to load operational projects');
+         } finally {
+            setProjectsLoading(false);
+         }
+      };
+
+      if (activeTab === 'projects') {
+         fetchProjects();
+      }
+   }, [activeTab, startDate, endDate]);
+
+   // const visibleOperationalProjects = useMemo(() => {
+   //    if (projectCategoryTab === 'internal') {
+   //       return operationalProjects.filter(p => p.isInternal);
+   //    }
+   //    return operationalProjects.filter(p => !p.isInternal);
+   // }, [operationalProjects, projectCategoryTab]);
+
+   // const totalProjectPages = Math.ceil(visibleOperationalProjects.length / PROJECTS_PER_PAGE) || 1;
+
+   // const paginatedOperationalProjects = useMemo(() => {
+   //    const start = (projectPage - 1) * PROJECTS_PER_PAGE;
+   //    return visibleOperationalProjects.slice(start, start + PROJECTS_PER_PAGE);
+   // }, [visibleOperationalProjects, projectPage]);
+
+   // const handleRowClick = async (resource) => {
+   //    setSelectedResource(resource);
+   //    setIsProjectsLoading(true);
+   //    try {
+   //       const data = await getResourceProjects(resource.userId, dateRange.startDate, dateRange.endDate);
+   //       setResourceProjectsData(data);
+   //    } catch (err) {
+   //       console.error(err);
+   //       setResourceProjectsData([]);
+   //    } finally {
+   //       setIsProjectsLoading(false);
+   //    }
+   // };
 
    // REPORTING ENGINE STATES
    const [reportData, setReportData] = useState(null);
@@ -657,31 +714,31 @@ const UtilizationPerformanceDashboard = () => {
             })}
          </div>
 
-            <div className="mb-6 border-b border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
-               <div className="flex items-end gap-10 overflow-x-auto no-scrollbar">
-                  {[
-                     { id: 'portfolio', label: 'Portfolio Analytics', icon: <PieIcon size={14} /> },
-                     { id: 'projects', label: 'Operational Projects', icon: <Monitor size={14} /> },
-                     { id: 'resource', label: 'Resource Capability', icon: <BrainCircuit size={14} /> },
-                     // { id: 'governance', label: 'Governance & Readiness', icon: <ShieldAlert size={14} /> }
-                  ].map((tab) => {
-                     const isActive = activeTab === tab.id;
-                     return (
-                        <button
-                           key={tab.id}
-                           onClick={() => setActiveTab(tab.id)}
-                           className={`group relative flex items-center gap-2 pb-3.5 pt-2 whitespace-nowrap transition-all ${isActive ? "text-[#081534]" : "text-slate-400 hover:text-slate-600"
-                              }`}
-                        >
-                           {tab.icon}
-                           <span className={`text-sm font-semibold tracking-tight ${isActive ? "text-[#081534]" : "text-slate-600"}`}>
-                              {tab.label}
-                           </span>
-                           <span className={`absolute bottom-0 left-0 h-0.5 rounded-full bg-[#081534] transition-all ${isActive ? "w-full opacity-100" : "w-0 opacity-0"}`} />
-                        </button>
-                     );
-                  })}
-               </div>
+         <div className="mb-6 border-b border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-end gap-10 overflow-x-auto no-scrollbar">
+               {[
+                  { id: 'portfolio', label: 'Portfolio Analytics', icon: <PieIcon size={14} /> },
+                  { id: 'projects', label: 'Operational Projects', icon: <Monitor size={14} /> },
+                  { id: 'resource', label: 'Resource Capability', icon: <BrainCircuit size={14} /> },
+                  // { id: 'governance', label: 'Governance & Readiness', icon: <ShieldAlert size={14} /> }
+               ].map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                     <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`group relative flex items-center gap-2 pb-3.5 pt-2 whitespace-nowrap transition-all ${isActive ? "text-[#081534]" : "text-slate-400 hover:text-slate-600"
+                           }`}
+                     >
+                        {tab.icon}
+                        <span className={`text-sm font-semibold tracking-tight ${isActive ? "text-[#081534]" : "text-slate-600"}`}>
+                           {tab.label}
+                        </span>
+                        <span className={`absolute bottom-0 left-0 h-0.5 rounded-full bg-[#081534] transition-all ${isActive ? "w-full opacity-100" : "w-0 opacity-0"}`} />
+                     </button>
+                  );
+               })}
+            </div>
 
                {/* Unified Calendar / Date Range Picker */}
                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm h-[38px] mb-2 hover:border-indigo-500 transition-all focus-within:ring-1 focus-within:ring-indigo-500 group">
@@ -691,13 +748,15 @@ const UtilizationPerformanceDashboard = () => {
                         type="date"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[110px]"
-                     />
-                     <span className="text-slate-300 mx-0.5">—</span>
-                     <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
+                        onClick={(e) => e.target.showPicker()}
+                     className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[110px]"
+                  />
+                  <span className="text-slate-300 mx-0.5">—</span>
+                  <input
+                     type="date"
+                     value={endDate}
+                     onChange={(e) => setEndDate(e.target.value)}
+                        onClick={(e) => e.target.showPicker()}
                         className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[110px]"
                      />
                   </div>
@@ -714,12 +773,8 @@ const UtilizationPerformanceDashboard = () => {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
                            <div className="flex flex-col gap-2">
                               <div className="flex items-center gap-3">
-                                 <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none">Strategic Performance Status</h3>
-                                 <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${selectedResourceId ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-50 text-slate-500 border border-slate-100'}`}>
-                                    {selectedResourceId ? `LIVE: ${selectedResourceName}` : 'REAL-TIME: OVERALL PORTFOLIO'}
-                                 </span>
+                                 <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none">Portfolio Performance Overview</h3>
                               </div>
-                              <p className="text-[11px] font-medium text-slate-400 italic">Historical directional signals from validated workload registries</p>
                            </div>
                            <div className="flex items-center gap-1.5 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-100 self-start sm:self-center">
                               {['DAILY', 'WEEKLY', 'MONTHLY'].map(t => (
@@ -778,9 +833,6 @@ const UtilizationPerformanceDashboard = () => {
                         <div className="flex items-center justify-between mb-8">
                            <div className="flex flex-col gap-1.5">
                               <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none mb-1">Billing Yield Index</h3>
-                              <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest w-fit ${selectedResourceId ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-50 text-slate-500 border border-slate-100'}`}>
-                                 {selectedResourceId ? `USER: ${selectedResourceName}` : 'REAL-TIME: PORTFOLIO'}
-                              </span>
                            </div>
                            <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner">
                               <PieChartIcon size={20} />
@@ -826,256 +878,256 @@ const UtilizationPerformanceDashboard = () => {
                   </div>
                )}
 
-               {/* TAB 2: PROJECTS & BREACHES (Story 3, 4, 6) */}
-               {activeTab === 'projects' && (
-                  <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden animate-in">
-                     <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
-                        <div>
-                           <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest leading-none">Project-Level Consumption Matrix</h3>
-                        </div>
+            {/* TAB 2: PROJECTS & BREACHES (Story 3, 4, 6) */}
+            {activeTab === 'projects' && (
+               <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden animate-in">
+                  <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
+                     <div>
+                        <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest leading-none">Project-Level Consumption Matrix</h3>
                      </div>
-                     <div className="px-6 py-3 border-b border-slate-100 bg-white">
-                        <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
-                           {[
-                              { id: 'active', label: 'Active Projects' },
-                              { id: 'internal', label: 'Internal Projects' },
-                           ].map((tab) => (
-                              <button
-                                 key={tab.id}
-                                 onClick={() => setProjectCategoryTab(tab.id)}
-                                 className={`rounded-lg px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${projectCategoryTab === tab.id
-                                    ? 'bg-white text-indigo-600 shadow-sm border border-slate-200'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                              >
-                                 {tab.label}
-                              </button>
-                           ))}
-                        </div>
+                  </div>
+                  <div className="px-6 py-3 border-b border-slate-100 bg-white">
+                     <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                        {[
+                           { id: 'active', label: 'Active Projects' },
+                           { id: 'internal', label: 'Internal Projects' },
+                        ].map((tab) => (
+                           <button
+                              key={tab.id}
+                              onClick={() => setProjectCategoryTab(tab.id)}
+                              className={`rounded-lg px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${projectCategoryTab === tab.id
+                                 ? 'bg-white text-indigo-600 shadow-sm border border-slate-200'
+                                 : 'text-slate-500 hover:text-slate-700'
+                                 }`}
+                           >
+                              {tab.label}
+                           </button>
+                        ))}
                      </div>
-                     {projectsLoading && (
-                        <div className="border-b border-slate-100 bg-white px-6 py-8">
-                           <LoadingSpinner text="Projects Loading..." />
-                        </div>
-                     )}
-                     {projectsError && (
-                        <div className="px-6 py-4 text-[11px] font-semibold text-amber-700 border-b border-amber-100 bg-amber-50/60">
-                           {projectsError}
-                        </div>
-                     )}
-                     <div className="overflow-x-auto no-scrollbar">
-                        <table className="w-full text-left">
-                           <thead>
-                              <tr className="bg-slate-50/50 border-b border-slate-50">
-                                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Project / Engagement</th>
-                                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Billing Strip</th>
-                                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Hours (Act / Plan)</th>
-                                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-right">Utilization %</th>
+                  </div>
+                  {projectsLoading && (
+                     <div className="border-b border-slate-100 bg-white px-6 py-8">
+                        <LoadingSpinner text="Projects Loading..." />
+                     </div>
+                  )}
+                  {projectsError && (
+                     <div className="px-6 py-4 text-[11px] font-semibold text-amber-700 border-b border-amber-100 bg-amber-50/60">
+                        {projectsError}
+                     </div>
+                  )}
+                  <div className="overflow-x-auto no-scrollbar">
+                     <table className="w-full text-left">
+                        <thead>
+                           <tr className="bg-slate-50/50 border-b border-slate-50">
+                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Project / Engagement</th>
+                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Billing Strip</th>
+                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Hours (Act / Plan)</th>
+                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-right">Utilization %</th>
+                           </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                           {!projectsLoading && visibleOperationalProjects.length === 0 && (
+                              <tr>
+                                 <td colSpan="4" className="px-6 py-8 text-center text-[11px] font-semibold text-slate-500">
+                                    {projectCategoryTab === 'internal'
+                                       ? 'No internal projects were returned by the backend hours summary endpoint.'
+                                       : 'No active client projects were returned by the backend hours summary endpoint.'}
+                                 </td>
                               </tr>
-                           </thead>
-                           <tbody className="divide-y divide-slate-50">
-                              {!projectsLoading && visibleOperationalProjects.length === 0 && (
-                                 <tr>
-                                    <td colSpan="4" className="px-6 py-8 text-center text-[11px] font-semibold text-slate-500">
-                                       {projectCategoryTab === 'internal'
-                                          ? 'No internal projects were returned by the backend hours summary endpoint.'
-                                          : 'No active client projects were returned by the backend hours summary endpoint.'}
-                                    </td>
-                                 </tr>
-                              )}
-                              {paginatedOperationalProjects.map((project) => (
-                                 <tr
-                                    key={project.id}
-                                    className="hover:bg-slate-50/40 transition-colors group cursor-pointer"
-                                    onClick={() => navigate(`/resource-management/bench/utilization-performance/projects/${project.id}`)}
-                                 >
+                           )}
+                           {paginatedOperationalProjects.map((project) => (
+                              <tr
+                                 key={project.id}
+                                 className="hover:bg-slate-50/40 transition-colors group cursor-pointer"
+                                 onClick={() => navigate(`/resource-management/bench/utilization-performance/projects/${project.id}`)}
+                              >
+                                 <td className="px-6 py-4">
+                                    <div className="flex flex-col">
+                                       <span className="text-[13px] font-bold text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{project.name}</span>
+                                       <span className="text-[10px] font-medium text-slate-400 mt-1.5 uppercase tracking-widest italic">
+                                          {projectCategoryTab === 'internal' ? 'Internal Project' : project.client} | {project.id}
+                                       </span>
+                                       <span className="text-[9px] font-semibold text-slate-500 mt-2">
+                                          Pending: {formatMetric(project.pendingHours, 'h')}
+                                       </span>
+                                    </div>
+                                 </td>
+                                 <td className="px-6 py-4 text-center">
+                                    {project.resourceHours > 0 ? (
+                                       <>
+                                          <div className="flex items-center justify-center gap-0.5 max-w-[140px] mx-auto overflow-hidden rounded-full h-2 bg-slate-100 border border-slate-200">
+                                             <div className="h-full bg-indigo-600" style={{ width: `${project.billable}%` }} />
+                                             <div className="h-full bg-indigo-300" style={{ width: `${project.nonBillable}%` }} />
+                                             <div className="h-full bg-slate-300" style={{ width: `${project.internal}%` }} />
+                                          </div>
+                                          <div className="flex justify-center gap-3 mt-1.5">
+                                             <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-600" /><span className="text-[8px] font-black text-slate-400 uppercase">{formatMetric(project.billableHours, 'h')} B</span></div>
+                                             <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-300" /><span className="text-[8px] font-black text-slate-400 uppercase">{formatMetric(project.nonBillableHours, 'h')} NB</span></div>
+                                          </div>
+                                       </>
+                                    ) : (
+                                       <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                                          No billed hours
+                                       </span>
+                                    )}
+                                 </td>
+                                 <td className="px-6 py-4 text-center">
+                                    <span className="text-[12px] font-bold text-slate-900">{formatMetric(project.actualHours)} / {formatMetric(project.plannedHours, 'h')}</span>
+                                    <div className="h-1 w-12 bg-slate-100 rounded-full mt-2 mx-auto overflow-hidden">
+                                       <div className="h-full bg-indigo-500" style={{ width: `${typeof project.util === 'number' ? project.util : 0}%` }} />
+                                    </div>
+                                 </td>
+                                 <td className="px-6 py-4 text-right">
+                                    <div className="flex flex-col items-end">
+                                       <span className={`text-[16px] font-black ${project.health === 'Critical' ? 'text-rose-600' : 'text-slate-900'}`}>{formatMetric(project.util, '%')}</span>
+                                       <span className={`inline-flex rounded-md border px-2 py-0.5 text-[8px] font-black uppercase tracking-widest mt-1 ${project.severity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                                          project.severity === 'Warning' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                             'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                          }`}>
+                                          {project.health}
+                                       </span>
+                                    </div>
+                                 </td>
+                              </tr>
+                           ))}
+                        </tbody>
+                     </table>
+                  </div>
+                  {!projectsLoading && visibleOperationalProjects.length > 0 && (
+                     <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/40">
+                        <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                           Showing {Math.min((projectPage - 1) * PROJECTS_PER_PAGE + 1, visibleOperationalProjects.length)}-
+                           {Math.min(projectPage * PROJECTS_PER_PAGE, visibleOperationalProjects.length)} of {visibleOperationalProjects.length}
+                        </div>
+                        <Pagination
+                           currentPage={projectPage}
+                           totalPages={totalProjectPages}
+                           onPrevious={() => setProjectPage((prev) => Math.max(prev - 1, 1))}
+                           onNext={() => setProjectPage((prev) => Math.min(prev + 1, totalProjectPages))}
+                           className="justify-end py-0"
+                        />
+                     </div>
+                  )}
+               </div>
+            )}
+
+            {/* TAB 3: RESOURCE CAPABILITIES */}
+            {activeTab === 'resource' && (
+               <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden animate-in">
+                  <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                     <div>
+                        <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest leading-none">Capability & Performance Ledger</h3>
+                        {/* <p className="text-[10px] font-medium text-slate-400 mt-1 uppercase tracking-widest opacity-70 italic font-serif">Deep-dive into individual billable efficiency vs historical directional signals</p> */}
+                     </div>
+                     <div className="flex items-center gap-4">
+                        <div className="relative">
+                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                           <input
+                              type="text"
+                              placeholder="Search Resource..."
+                              className="pl-7 text-[10px] font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500 w-40"
+                              value={searchQuery}
+                              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                           />
+                        </div>
+                        <div className="flex items-center gap-2">
+                           <input
+                              type="date"
+                              className="text-[10px] uppercase font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
+                              value={dateRange.startDate}
+                              max={dateRange.endDate || new Date().toISOString().split('T')[0]}
+                              onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                           />
+                           <span className="text-[10px] font-bold text-slate-400 uppercase">to</span>
+                           <input
+                              type="date"
+                              className="text-[10px] uppercase font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
+                              value={dateRange.endDate}
+                              min={dateRange.startDate}
+                              max={new Date().toISOString().split('T')[0]}
+                              onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                           />
+                        </div>
+                        {/* <div className="flex items-center gap-2 bg-slate-900 text-white rounded-lg px-3 py-1 text-[9px] font-black uppercase tracking-widest">
+                              <ShieldCheck size={12} className="text-emerald-400" /> Source Verified
+                           </div> */}
+                     </div>
+                  </div>
+                  <div className="overflow-x-auto no-scrollbar">
+                     <table className="w-full text-left">
+                        <thead>
+                           <tr className="bg-slate-50/50 border-b border-slate-50">
+                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Resource Registry</th>
+                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Hourly Split (B / NB)</th>
+                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Trend Signal</th>
+                              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-indigo-600 text-right">Overall Util %</th>
+                           </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                           {isResourceLoading ? (
+                              <tr>
+                                 <td colSpan="4" className="px-6 py-8 text-center">
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                       {/* <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div> */}
+                                       {/* <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Loading Resources...</span> */}
+                                       <LoadingSpinner text='Loading Resources...' />
+                                    </div>
+                                 </td>
+                              </tr>
+                           ) : (filteredAndPaginatedResources.paginated.length === 0 ? (
+                              <tr>
+                                 <td colSpan="4" className="px-6 py-8 text-center">
+                                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">No Resource Data Available</span>
+                                 </td>
+                              </tr>
+                           ) : (
+                              filteredAndPaginatedResources.paginated.map((res, idx) => (
+                                 <tr key={res.userId || idx} className="hover:bg-slate-50/40 transition-colors group cursor-pointer" onClick={() => handleRowClick(res)}>
                                     <td className="px-6 py-4">
                                        <div className="flex flex-col">
-                                          <span className="text-[13px] font-bold text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{project.name}</span>
-                                          <span className="text-[10px] font-medium text-slate-400 mt-1.5 uppercase tracking-widest italic">
-                                             {projectCategoryTab === 'internal' ? 'Internal Project' : project.client} | {project.id}
-                                          </span>
-                                          <span className="text-[9px] font-semibold text-slate-500 mt-2">
-                                             Pending: {formatMetric(project.pendingHours, 'h')}
-                                          </span>
+                                          <span className="text-[13px] font-bold text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{res.userName}</span>
+                                          <span className="text-[10px] font-medium text-slate-400 mt-1.5 uppercase tracking-widest italic">Resource</span>
                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                       {project.resourceHours > 0 ? (
-                                          <>
-                                             <div className="flex items-center justify-center gap-0.5 max-w-[140px] mx-auto overflow-hidden rounded-full h-2 bg-slate-100 border border-slate-200">
-                                                <div className="h-full bg-indigo-600" style={{ width: `${project.billable}%` }} />
-                                                <div className="h-full bg-indigo-300" style={{ width: `${project.nonBillable}%` }} />
-                                                <div className="h-full bg-slate-300" style={{ width: `${project.internal}%` }} />
-                                             </div>
-                                             <div className="flex justify-center gap-3 mt-1.5">
-                                                <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-600" /><span className="text-[8px] font-black text-slate-400 uppercase">{formatMetric(project.billableHours, 'h')} B</span></div>
-                                                <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-300" /><span className="text-[8px] font-black text-slate-400 uppercase">{formatMetric(project.nonBillableHours, 'h')} NB</span></div>
-                                             </div>
-                                          </>
-                                       ) : (
-                                          <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-slate-500">
-                                             No billed hours
-                                          </span>
-                                       )}
+                                       <div className="flex items-center justify-center gap-3">
+                                          <div className="flex flex-col items-center"><span className="text-[11px] font-black text-indigo-600">{res.billableHours}h</span><span className="text-[8px] font-bold text-slate-400 uppercase">Billable</span></div>
+                                          <div className="h-6 w-px bg-slate-100" />
+                                          <div className="flex flex-col items-center"><span className="text-[11px] font-black text-slate-600">{res.nonBillableHours}h</span><span className="text-[8px] font-bold text-slate-400 uppercase">Non-Bill</span></div>
+                                       </div>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                       <span className="text-[12px] font-bold text-slate-900">{formatMetric(project.actualHours)} / {formatMetric(project.plannedHours, 'h')}</span>
-                                       <div className="h-1 w-12 bg-slate-100 rounded-full mt-2 mx-auto overflow-hidden">
-                                          <div className="h-full bg-indigo-500" style={{ width: `${typeof project.util === 'number' ? project.util : 0}%` }} />
+                                       {/* STORY 5: Individual Trend Signals */}
+                                       <div className="flex flex-col items-center gap-0.5">
+                                          <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black uppercase"><Zap size={14} /> Stable</div>
                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                        <div className="flex flex-col items-end">
-                                          <span className={`text-[16px] font-black ${project.health === 'Critical' ? 'text-rose-600' : 'text-slate-900'}`}>{formatMetric(project.util, '%')}</span>
-                                          <span className={`inline-flex rounded-md border px-2 py-0.5 text-[8px] font-black uppercase tracking-widest mt-1 ${project.severity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-100' :
-                                             project.severity === 'Warning' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                                'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                             }`}>
-                                             {project.health}
-                                          </span>
+                                          <span className="text-[16px] font-black text-slate-900">{res.billablePercentage}%</span>
+                                          <div className="h-1 w-12 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                                             <div className="h-full bg-indigo-500" style={{ width: `${res.billablePercentage}%` }} />
+                                          </div>
                                        </div>
                                     </td>
                                  </tr>
-                              ))}
+                              ))))}
                            </tbody>
                         </table>
                      </div>
-                     {!projectsLoading && visibleOperationalProjects.length > 0 && (
-                        <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/40">
-                           <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                              Showing {Math.min((projectPage - 1) * PROJECTS_PER_PAGE + 1, visibleOperationalProjects.length)}-
-                              {Math.min(projectPage * PROJECTS_PER_PAGE, visibleOperationalProjects.length)} of {visibleOperationalProjects.length}
-                           </div>
+                     {!projectsLoading && totalProjectPages > 1 && (
+                        <div className="border-t border-slate-100 py-6">
                            <Pagination
                               currentPage={projectPage}
                               totalPages={totalProjectPages}
                               onPrevious={() => setProjectPage((prev) => Math.max(prev - 1, 1))}
                               onNext={() => setProjectPage((prev) => Math.min(prev + 1, totalProjectPages))}
-                              className="justify-end py-0"
                            />
                         </div>
                      )}
                   </div>
                )}
 
-               {/* TAB 3: RESOURCE CAPABILITIES */}
-               {activeTab === 'resource' && (
-                  <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden animate-in">
-                     <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                        <div>
-                           <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest leading-none">Capability & Performance Ledger</h3>
-                           {/* <p className="text-[10px] font-medium text-slate-400 mt-1 uppercase tracking-widest opacity-70 italic font-serif">Deep-dive into individual billable efficiency vs historical directional signals</p> */}
-                        </div>
-                        <div className="flex items-center gap-4">
-                           <div className="relative">
-                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
-                              <input
-                                 type="text"
-                                 placeholder="Search Resource..."
-                                 className="pl-7 text-[10px] font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500 w-40"
-                                 value={searchQuery}
-                                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                              />
-                           </div>
-                           <div className="flex items-center gap-2">
-                              <input
-                                 type="date"
-                                 className="text-[10px] uppercase font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
-                                 value={dateRange.startDate}
-                                 max={dateRange.endDate || new Date().toISOString().split('T')[0]}
-                                 onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                              />
-                              <span className="text-[10px] font-bold text-slate-400 uppercase">to</span>
-                              <input
-                                 type="date"
-                                 className="text-[10px] uppercase font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
-                                 value={dateRange.endDate}
-                                 min={dateRange.startDate}
-                                 max={new Date().toISOString().split('T')[0]}
-                                 onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                              />
-                           </div>
-                           {/* <div className="flex items-center gap-2 bg-slate-900 text-white rounded-lg px-3 py-1 text-[9px] font-black uppercase tracking-widest">
-                              <ShieldCheck size={12} className="text-emerald-400" /> Source Verified
-                           </div> */}
-                        </div>
-                     </div>
-                     <div className="overflow-x-auto no-scrollbar">
-                        <table className="w-full text-left">
-                           <thead>
-                              <tr className="bg-slate-50/50 border-b border-slate-50">
-                                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Resource Registry</th>
-                                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Hourly Split (B / NB)</th>
-                                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Trend Signal</th>
-                                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-indigo-600 text-right">Overall Util %</th>
-                              </tr>
-                           </thead>
-                           <tbody className="divide-y divide-slate-50">
-                              {isResourceLoading ? (
-                                 <tr>
-                                    <td colSpan="4" className="px-6 py-8 text-center">
-                                       <div className="flex flex-col items-center justify-center gap-2">
-                                          {/* <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div> */}
-                                          {/* <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Loading Resources...</span> */}
-                                          <LoadingSpinner text='Loading Resources...' />
-                                       </div>
-                                    </td>
-                                 </tr>
-                              ) : filteredAndPaginatedResources.paginated.length === 0 ? (
-                                 <tr>
-                                    <td colSpan="4" className="px-6 py-8 text-center">
-                                       <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">No Resource Data Available</span>
-                                    </td>
-                                 </tr>
-                              ) : (
-                                 filteredAndPaginatedResources.paginated.map((res, idx) => (
-                                    <tr key={res.userId || idx} className="hover:bg-slate-50/40 transition-colors group cursor-pointer" onClick={() => handleRowClick(res)}>
-                                       <td className="px-6 py-4">
-                                          <div className="flex flex-col">
-                                             <span className="text-[13px] font-bold text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{res.userName}</span>
-                                             <span className="text-[10px] font-medium text-slate-400 mt-1.5 uppercase tracking-widest italic">Resource</span>
-                                          </div>
-                                       </td>
-                                       <td className="px-6 py-4 text-center">
-                                          <div className="flex items-center justify-center gap-3">
-                                             <div className="flex flex-col items-center"><span className="text-[11px] font-black text-indigo-600">{res.billableHours}h</span><span className="text-[8px] font-bold text-slate-400 uppercase">Billable</span></div>
-                                             <div className="h-6 w-px bg-slate-100" />
-                                             <div className="flex flex-col items-center"><span className="text-[11px] font-black text-slate-600">{res.nonBillableHours}h</span><span className="text-[8px] font-bold text-slate-400 uppercase">Non-Bill</span></div>
-                                          </div>
-                                       </td>
-                                       <td className="px-6 py-4 text-center">
-                                          {/* STORY 5: Individual Trend Signals */}
-                                          <div className="flex flex-col items-center gap-0.5">
-                                             <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black uppercase"><Zap size={14} /> Stable</div>
-                                          </div>
-                                       </td>
-                                       <td className="px-6 py-4 text-right">
-                                          <div className="flex flex-col items-end">
-                                             <span className="text-[16px] font-black text-slate-900">{res.billablePercentage}%</span>
-                                             <div className="h-1 w-12 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
-                                                <div className="h-full bg-indigo-500" style={{ width: `${res.billablePercentage}%` }} />
-                                             </div>
-                                          </div>
-                                       </td>
-                                    </tr>
-                                 ))
-                              )}
-                           </tbody>
-                        </table>
-                     </div>
-                     {filteredAndPaginatedResources.totalPages > 1 && (
-                        <div className="border-t border-slate-100 bg-white p-3">
-                           <Pagination
-                              currentPage={currentPage}
-                              totalPages={filteredAndPaginatedResources.totalPages}
-                              onPrevious={() => setCurrentPage(p => Math.max(1, p - 1))}
-                              onNext={() => setCurrentPage(p => Math.min(filteredAndPaginatedResources.totalPages, p + 1))}
-                           />
-                        </div>
-                     )}
-                  </div>
-               )}
             </div>
 
          {/* RESOURCE PROJECTS DRAWER */}

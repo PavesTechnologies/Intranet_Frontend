@@ -318,6 +318,7 @@ const mapPendingRoleOffToRequest = (item) => {
     endDateIso: item.endDate || "",
     replacementRequired: Boolean(item.demandName),
     reason: item.roleOffReason || item.demandName || "",
+    resourcePerformance: item.resourcePerformance || "",
   };
 };
 
@@ -1104,6 +1105,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           roleOffReason: formState.reason,
           roleOffType: "PLANNED",
           confirmed: Boolean(formState.reviewConfirmed),
+          resourcePerformance: formState.resourcePerformance,
         };
 
         const response = await bulkPlannedRoleOff(bulkPayload);
@@ -1124,6 +1126,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
               replacementRequired: formState.replacementRequired,
               autoReplacementRequired: formState.replacementRequired,
               skipReason: formState.skipReason,
+              resourcePerformance: formState.resourcePerformance,
             },
           );
         });
@@ -1150,6 +1153,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           roleOffType: isBulkStyleUpdate ? "PLANNED" : formState.type.toUpperCase(),
           effectiveRoleOffDate: formState.effectiveDate,
           roleOffReason: formState.reason,
+          resourcePerformance: formState.resourcePerformance,
           autoReplacementRequired: isBulkStyleUpdate ? false : formState.replacementRequired,
           skipReason: isBulkStyleUpdate
             ? null
@@ -1187,6 +1191,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             replacementRequired: formState.replacementRequired,
             autoReplacementRequired: formState.replacementRequired,
             skipReason: formState.skipReason,
+            resourcePerformance: formState.resourcePerformance,
           },
         );
       }
@@ -1451,15 +1456,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             ) : null
           )}
         </div>
-        <div className="ml-4 shrink-0">
-          <button
-            onClick={() => navigate('/resource-management/roleoff/report')}
-            className="inline-flex items-center gap-2 rounded-md bg-[#081534] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#10214f]"
-          >
-            <ClipboardCheck className="h-4 w-4" />
-            Roleoff Report
-          </button>
-        </div>
+        
       </div>
 
       <div className="space-y-6">
@@ -1472,7 +1469,19 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                 : "Project Manager workspace for initiating and tracking role-off requests on active allocations."
             }
             metrics={pmKpis}
+            action={(
+              <div className="ml-4 shrink-0">
+                <button
+                  onClick={() => navigate("/resource-management/roleoff/report")}
+                  className="inline-flex items-center gap-2 rounded-md bg-[#081534] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#10214f]"
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  Roleoff Report
+                </button>
+              </div>
+            )}
           />
+          
         ) : (
           <KPISection items={kpis} />
         )}

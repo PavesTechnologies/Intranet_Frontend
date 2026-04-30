@@ -38,6 +38,7 @@ const baseForm = {
   type: "Planned",
   effectiveDate: "",
   reason: "",
+  resourcePerformance: "",
   replacementRequired: false,
   acknowledgeRisk: false,
   reviewConfirmed: false,
@@ -149,6 +150,7 @@ const RoleOffSidePanel = ({
       type: isExistingRequest ? (record.type || "Planned") : "Planned",
       effectiveDate: isExistingRequest ? (record.effectiveDateIso || "") : "",
       reason: isExistingRequest ? normalizeReasonValue(record.reason, reasons) : "",
+      resourcePerformance: isExistingRequest ? (record.resourcePerformance || "") : "",
       replacementRequired:
         isExistingRequest
           ? Boolean(record.replacementRequired)
@@ -220,6 +222,9 @@ const RoleOffSidePanel = ({
       }
       if (!form.reason) {
         nextFieldErrors.reason = "Reason is required.";
+      }
+      if (!form.resourcePerformance) {
+        nextFieldErrors.resourcePerformance = "Performance is required.";
       }
       if (
         !isBulkPmFlow &&
@@ -554,6 +559,30 @@ const RoleOffSidePanel = ({
                   ) : null}
                 </div>
 
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    Resource Performance
+                  </label>
+                  <select
+                    value={form.resourcePerformance}
+                    onChange={(event) => updateField("resourcePerformance", event.target.value)}
+                    disabled={isReadOnlyPm || isSubmitting}
+                    className={cn(getFieldClassName(fieldErrors.resourcePerformance), "h-10 px-3")}
+                  >
+                    <option value="">Select performance</option>
+                    <option value="HIGH_PERFORMER">High Performer</option>
+                    <option value="AVERAGE_PERFORMER">Average Performer</option>
+                    <option value="LOW_PERFORMER">Low Performer</option>
+                    <option value="EXCEPTIONAL">Exceptional</option>
+                    <option value="NEEDS_IMPROVEMENT">Needs Improvement</option>
+                    <option value="CONSISTENT">Consistent</option>
+                    <option value="NEW_RESOURCE">New Resource</option>
+                  </select>
+                  {fieldErrors.resourcePerformance ? (
+                    <p className="mt-1 text-xs text-rose-600">{fieldErrors.resourcePerformance}</p>
+                  ) : null}
+                </div>
+
                 {!isBulkPmFlow ? (
                   <label className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
                     <span>Replacement required</span>
@@ -661,6 +690,12 @@ const RoleOffSidePanel = ({
                     Effective Date
                   </p>
                   <p className="mt-1 font-medium text-gray-800">{record.effectiveDate || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    Resource Performance
+                  </p>
+                  <p className="mt-1 font-medium text-gray-800">{record.resourcePerformance || "-"}</p>
                 </div>
               </div>
             </section>

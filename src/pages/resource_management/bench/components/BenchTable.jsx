@@ -6,12 +6,15 @@ import { updateStatusResource } from "../services/benchService";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { toast } from "react-toastify";
 
-const SUB_STATES = [
+const BENCH_STATES = [
   "READY",
-  "TRAINING",
   "SHADOW",
   "NOT_AVAILABLE",
   "LOW_UTILIZATION",
+  "TRAINING"
+];
+
+const POOL_STATES = [
   "COE",
   "RND",
   "TRAINING_POOL"
@@ -50,29 +53,31 @@ const BenchTable = ({
   onCategoryChange,
   onRefresh,
   loading,
+  activeTab = "bench",
 }) => {
-  const [editingRowId, setEditingRowId] = useState(null);
+  const [editingRow, setEditingRow] = useState(null);
   const [editStatus, setEditStatus] = useState("");
   const [editReason, setEditReason] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   const handleEditClick = (row, event) => {
     event.stopPropagation();
-    setEditingRowId(row.id);
-    const upperCategory = row.category?.toUpperCase()?.replace(" ", "_");
-    setEditStatus(SUB_STATES.includes(upperCategory) ? upperCategory : "READY");
+    setEditingRow(row);
+    const upperCategory = row.category?.toUpperCase()?.replace(/ /g, "_");
+    
+    // Choose the initial state or a default depending on tab
+    const validStates = activeTab === "bench" ? BENCH_STATES : POOL_STATES;
+    setEditStatus(validStates.includes(upperCategory) ? upperCategory : validStates[0]);
     setEditReason("");
   };
 
-  const handleCancelEdit = (event) => {
-    event.stopPropagation();
-    setEditingRowId(null);
+  const handleCancelEdit = () => {
+    setEditingRow(null);
     setEditStatus("");
     setEditReason("");
   };
 
-  const handleSaveStatus = async (rowId, event) => {
-    event.stopPropagation();
+  const handleSaveStatus = async () => {
     if (!editStatus) {
       toast.error("Please select a status");
       return;
@@ -85,12 +90,13 @@ const BenchTable = ({
     try {
       setIsSaving(true);
       await updateStatusResource({
-        resourceId: rowId,
+        resourceId: editingRow.id,
         newSubState: editStatus,
         reason: editReason
+        // If stateType is needed, it can be passed here or handled on backend
       });
       toast.success("Status updated successfully");
-      setEditingRowId(null);
+      setEditingRow(null);
 
       onRefresh?.();
     } catch (error) {
@@ -102,6 +108,8 @@ const BenchTable = ({
 
   const allSelected = rows.length > 0 && rows.every((row) => selectedRows.includes(row.id));
   const anySelected = rows.some((row) => selectedRows.includes(row.id));
+  
+  const validStates = activeTab === "bench" ? BENCH_STATES : POOL_STATES;
 
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -152,24 +160,16 @@ const BenchTable = ({
               return (
                 <tr
                   key={row.id}
-                  onClick={() => !editingRowId ? onView(row) : undefined}
-                  className={`group transition-all ${!editingRowId ? "cursor-pointer hover:bg-indigo-50/30" : ""} ${activeRowId === row.id ? "bg-indigo-50/50" : ""} ${editingRowId === row.id ? "bg-blue-50/30" : ""}`}
+                  onClick={() => onView(row)}
+                  className={`group transition-all cursor-pointer hover:bg-indigo-50/30 ${activeRowId === row.id ? "bg-indigo-50/50" : ""}`}
                 >
-                  {/* <td className={`px-5 py-4 align-middle ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`} onClick={(event) => event.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedRows.includes(row.id)}
-                      onChange={(event) => onToggleRow(row.id, event.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                    />
-                  </td> */}
-                  <td className={`px-4 py-4 align-middle ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`}>
+                  <td className="px-4 py-4 align-middle">
                     <div className="flex flex-col">
                       <span className="text-[13px] font-bold text-slate-900 leading-tight tracking-tight">{row.name}</span>
                       <span className="text-[11px] font-medium text-slate-400 leading-normal">{row.role}</span>
                     </div>
                   </td>
-                  <td className={`px-4 py-4 align-middle min-w-[200px] ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`}>
+                  <td className={`px-4 py-4 align-middle min-w-[200px] ${editingRow?.id === row.id ? "opacity-50 pointer-events-none" : ""}`}>
                     <div className="flex flex-col gap-1">
                       {row.topSkills.length === 0 ? (
                         <span className="text-[10px] text-slate-300 italic">No expertise logged</span>
@@ -259,7 +259,7 @@ const BenchTable = ({
                       </div>
                     )}
                   </td>
-                  <td className={`px-4 py-4 align-middle text-center ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`}>
+                  <td className="px-4 py-4 align-middle text-center">
                     <div className="flex flex-col items-center gap-1">
                       <span className={`text-[13px] font-bold ${row.allocation < 50 ? 'text-rose-600' : 'text-slate-900'}`}>
                         {row.allocation}%
@@ -275,63 +275,31 @@ const BenchTable = ({
                   <td className={`px-4 py-4 align-middle min-w-[100px] ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`}>
                     {renderPill(agingTone.label, `${agingTone.className} !px-2.5 !py-1 text-[10px] uppercase whitespace-nowrap`)}
                   </td>
-                  <td className={`px-4 py-4 align-middle text-right ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`}>
+                  <td className="px-4 py-4 align-middle text-right">
                     <div className="flex flex-col">
                       <span className={`text-[12px] font-bold ${row.warnings.highCost ? "text-rose-700" : "text-slate-900"}`}>
                         {row.costPerDay === null ? "—" : `₹${row.costPerDay.toLocaleString()}`}
                       </span>
-                      {/* {row.warnings.missingCost ? (
-                        <span className="text-[9px] font-bold text-amber-600 uppercase">Cost Missing</span>
-                      ) : (
-                        <span className="text-[10px] font-medium text-slate-400">
-                          Exp: {row.costExposure === null ? "-" : row.costExposure.toLocaleString()}
-                        </span>
-                      )} */}
                     </div>
                   </td>
                   <td className="px-5 py-4 align-middle text-center" onClick={(event) => event.stopPropagation()}>
                     <div className="flex justify-center gap-2">
-                      {editingRowId === row.id ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={(e) => handleSaveStatus(row.id, e)}
-                            disabled={isSaving}
-                            title="Save Status"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-emerald-700 transition-all hover:bg-emerald-50 disabled:opacity-50"
-                          >
-                            <Check className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleCancelEdit}
-                            disabled={isSaving}
-                            title="Cancel Edit"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-rose-700 transition-all hover:bg-rose-50 disabled:opacity-50"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => onView(row)}
-                            title="View Details"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => handleEditClick(row, e)}
-                            title="Edit Status"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-blue-600 transition-all hover:bg-blue-50 hover:text-blue-700"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => onView(row)}
+                        title="View Details"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleEditClick(row, e)}
+                        title="Edit Status"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-blue-600 transition-all hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -340,6 +308,94 @@ const BenchTable = ({
           </tbody>
         </table>
       </div>
+
+      {editingRow && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <h3 className="text-[13px] font-bold text-slate-800 uppercase tracking-widest">Update Substate</h3>
+              <button 
+                onClick={handleCancelEdit}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Consultant</p>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <p className="text-sm font-bold text-slate-900 leading-tight">{editingRow.name}</p>
+                  <p className="text-[11px] font-medium text-slate-500 mt-0.5">Current state: <span className="font-bold text-slate-700">{editingRow.category?.replace(/_/g, " ")}</span></p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">New Target State</label>
+                <div className="relative">
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                    disabled={isSaving}
+                    className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 outline-none transition-all hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60"
+                  >
+                    <option value="" disabled>Select a substate</option>
+                    {validStates.map((state) => (
+                      <option key={state} value={state} className="font-medium">
+                        {state.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Justification</label>
+                <textarea
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  placeholder="Provide context for this change..."
+                  disabled={isSaving}
+                  className="h-20 w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-[13px] font-medium text-slate-600 outline-none transition-all placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60"
+                />
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50/50">
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                onClick={handleCancelEdit}
+                disabled={isSaving}
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-[12px] font-bold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2"
+                onClick={handleSaveStatus}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    SAVING...
+                  </>
+                ) : (
+                  <>APPLY STRATEGY</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
