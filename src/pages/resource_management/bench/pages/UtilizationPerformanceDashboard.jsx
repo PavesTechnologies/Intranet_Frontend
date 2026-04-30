@@ -165,7 +165,7 @@ const UtilizationPerformanceDashboard = () => {
    const [selectedResource, setSelectedResource] = useState(null);
    const [resourceProjectsData, setResourceProjectsData] = useState([]);
    const [isProjectsLoading, setIsProjectsLoading] = useState(false);
-   const [projectsDrawerTab, setProjectsDrawerTab] = useState('overall'); // 'overall' or 'projects'
+   const [projectsDrawerTab, setProjectsDrawerTab] = useState('overall');
 
    const [searchQuery, setSearchQuery] = useState('');
    const [currentPage, setCurrentPage] = useState(1);
@@ -1055,7 +1055,6 @@ const UtilizationPerformanceDashboard = () => {
                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                       {/* STORY 5: Individual Trend Signals */}
                                        <div className="flex flex-col items-center gap-0.5">
                                           <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black capitalize"><Zap size={14} /> Stable</div>
                                        </div>
