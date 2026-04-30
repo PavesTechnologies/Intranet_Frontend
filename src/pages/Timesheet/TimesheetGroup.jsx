@@ -661,7 +661,13 @@ const TimesheetGroup = ({
         </div>
       )}
            {" "}
-      <div className="flex justify-between items-center mb-1 mx-4">
+      <div
+        className={
+          !isWeeklyFormat
+            ? "relative flex items-center mb-1 mx-4 min-h-12"
+            : "flex justify-between items-center mb-1 mx-4"
+        }
+      >
                 {/* Daily format header */}       {" "}
         {!isWeeklyFormat && (
           <>
@@ -669,7 +675,7 @@ const TimesheetGroup = ({
             {editDateIndex === timesheetId &&
             emptyTimesheet &&
             status?.toLowerCase() !== "approved" ? (
-              <div className="relative">
+              <div className="absolute left-0 top-1/2 -translate-y-1/2">
                                {" "}
                 <DatePicker
                   selected={date ? parseLocalDate(date) : null}
@@ -816,21 +822,20 @@ const TimesheetGroup = ({
                   status?.toLowerCase() !== "approved" &&
                   setEditDateIndex(timesheetId)
                 }
-                className={`text-gray-500 font-semibold ${
+                className={`absolute left-0 top-1/2 -translate-y-1/2 text-gray-500 font-semibold ${
                   status?.toLowerCase() !== "approved"
                     ? "cursor-pointer hover:text-blue-600"
                     : "cursor-not-allowed"
                 }`}
               >
-                                {currentDate}             {" "}
+                {currentDate}
               </div>
             )}
                        {" "}
-            <div className="flex items-center gap-2">
+            <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
                            {" "}
               <span className="font-medium text-gray-700">
-                                Total hours : {totalHours} hrs            
-                 {" "}
+                Total hours : {totalHours} hrs
               </span>
                            {" "}
               <CustomStatusBadge label={currentStatus} size="sm" />         
@@ -841,12 +846,15 @@ const TimesheetGroup = ({
         )}
                 {/* 3 dots menu for daily format */}       {" "}
         {!isWeeklyFormat && (
-          <div className="relative" ref={menuRef}>
+          <div
+            className="absolute right-0 top-1/2 -translate-y-1/2"
+            ref={menuRef}
+          >
                        {" "}
             {window.location.pathname !== "/managerapproval" && (
               <button
                 onClick={() => setMenuOpen((open) => !open)}
-                className="p-2 rounded-full hover:bg-gray-300 focus:outline-none"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-300 focus:outline-none"
                 type="button"
                 disabled={
                   currentStatus?.toLowerCase() === "approved" ||
@@ -859,7 +867,7 @@ const TimesheetGroup = ({
                     : "More options"
                 }
               >
-                                <MoreVertical size={22} />             {" "}
+                <MoreVertical size={20} />
               </button>
             )}
                        {" "}
