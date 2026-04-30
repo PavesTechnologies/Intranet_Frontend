@@ -13,7 +13,7 @@ const BenchFilters = ({
 }) => {
   if (!open) return null;
 
-  const labelClassName = "text-[10px] font-black text-slate-400 uppercase tracking-tighter ml-0.5 mb-1.5 block";
+  const labelClassName = "text-[10px] font-black text-slate-400 capitalize tracking-tighter ml-0.5 mb-1.5 block";
   const selectClassName = "w-full text-[11px] font-semibold border-slate-200 rounded-lg h-9 bg-slate-50/50 focus:ring-indigo-600 shadow-sm transition-all outline-none";
 
   const FilterBody = (
@@ -96,7 +96,44 @@ const BenchFilters = ({
     </div>
   );
 
-  if (isDashboardPortal) return FilterBody;
+  const FilterFooter = (
+    <div className="shrink-0 p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+      <button 
+        type="button"
+        onClick={onReset}
+        className="flex-1 bg-white text-slate-600 border border-slate-200 py-2 rounded-lg text-[11px] font-bold hover:bg-slate-50 hover:text-rose-600 hover:border-rose-200 transition-all active:scale-[0.98] shadow-sm"
+      >
+        Reset All
+      </button>
+      <div className="flex-[2] flex items-center gap-3">
+        <button 
+          type="button"
+          onClick={onClose}
+          className="flex-1 px-4 py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 capitalize tracking-widest transition-colors outline-none"
+        >
+          Cancel
+        </button>
+        <button 
+          type="button"
+          onClick={onApply}
+          className="flex-[1.5] bg-indigo-600 text-white py-2 rounded-lg text-[11px] font-bold shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
+        >
+          Apply Filters
+        </button>
+      </div>
+    </div>
+  );
+
+  if (isDashboardPortal) {
+    return (
+      <>
+        <div className="flex-1 overflow-y-auto p-5 no-scrollbar">
+          {FilterBody}
+        </div>
+        {FilterFooter}
+      </>
+    );
+  }
 
   return (
     <div className="flex flex-col w-full bg-white rounded-xl overflow-hidden font-sans">
@@ -104,7 +141,7 @@ const BenchFilters = ({
       <div className="shrink-0 px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Filter className="h-3.5 w-3.5 text-indigo-500" />
-          <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest leading-none mt-0.5">Bench Inventory Filters</h3>
+          <h3 className="text-[12px] font-bold text-slate-800 capitalize tracking-widest leading-none mt-0.5">Bench Inventory Filters</h3>
         </div>
         <button onClick={onClose} className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors">
           <X className="h-4 w-4" />
@@ -115,31 +152,7 @@ const BenchFilters = ({
       {FilterBody}
 
       {/* Footer */}
-      <div className="shrink-0 p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
-        <button 
-          type="button"
-          onClick={onReset}
-          className="flex-1 bg-white text-slate-600 border border-slate-200 py-2 rounded-lg text-[11px] font-bold hover:bg-slate-50 hover:text-rose-600 hover:border-rose-200 transition-all active:scale-[0.98] shadow-sm"
-        >
-          Reset All
-        </button>
-        <div className="flex-[2] flex items-center gap-3">
-          <button 
-            type="button"
-            onClick={onClose}
-            className="flex-1 px-4 py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors outline-none"
-          >
-            Cancel
-          </button>
-          <button 
-            type="button"
-            onClick={onApply}
-            className="flex-[1.5] bg-indigo-600 text-white py-2 rounded-lg text-[11px] font-bold shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
-          >
-            Apply Filters
-          </button>
-        </div>
-      </div>
+      {FilterFooter}
     </div>
   );
 };

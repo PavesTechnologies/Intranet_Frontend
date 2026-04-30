@@ -45,7 +45,7 @@ const MoveToPoolModal = ({ open, resources = [], onClose, onSubmit }) => {
 
         <div className="space-y-6 px-6 py-6 bg-white">
           <div className="group">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 group-focus-within:text-indigo-600 transition-colors">Target Pool Environment</label>
+            <label className="text-[10px] font-bold capitalize tracking-widest text-slate-400 group-focus-within:text-indigo-600 transition-colors">Target Pool Environment</label>
             <div className="relative mt-2">
               <select
                 value={form.poolType}
@@ -63,7 +63,7 @@ const MoveToPoolModal = ({ open, resources = [], onClose, onSubmit }) => {
           </div>
 
           <div className="group">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 group-focus-within:text-indigo-600 transition-colors">Transition Strategy / Justification</label>
+            <label className="text-[10px] font-bold capitalize tracking-widest text-slate-400 group-focus-within:text-indigo-600 transition-colors">Transition Strategy / Justification</label>
             <textarea
               rows={4}
               value={form.reason}

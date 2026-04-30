@@ -47,12 +47,12 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
           <div className="grid grid-cols-2 gap-4">
             <div className={statCardClassName}>
               <div className={`${cardIconWrapperClass} from-blue-400 to-indigo-500`} />
-              <p className="relative z-10 text-[10px] font-bold uppercase tracking-widest text-slate-500">Utilization</p>
+              <p className="relative z-10 text-[10px] font-bold capitalize tracking-widest text-slate-500">Utilization</p>
               <p className="relative z-10 mt-2 text-3xl font-black text-slate-900 tracking-tighter">{resource.allocation}<span className="text-lg text-slate-400 font-bold ml-0.5">%</span></p>
             </div>
             <div className={statCardClassName}>
               <div className={`${cardIconWrapperClass} from-rose-400 to-orange-500`} />
-              <p className="relative z-10 text-[10px] font-bold uppercase tracking-widest text-slate-500">Bench Aging</p>
+              <p className="relative z-10 text-[10px] font-bold capitalize tracking-widest text-slate-500">Bench Aging</p>
               <div className="relative z-10 mt-3 flex items-center">
                 <span className={`inline-flex rounded-xl border px-3 py-1.5 text-[11px] font-bold tracking-widest uppercase shadow-sm ${agingTone.className}`}>
                   {agingTone.label}
@@ -61,12 +61,12 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
             </div>
             <div className={statCardClassName}>
               <div className={`${cardIconWrapperClass} from-emerald-400 to-teal-500`} />
-              <p className="relative z-10 text-[10px] font-bold uppercase tracking-widest text-slate-500">Current Category</p>
+              <p className="relative z-10 text-[10px] font-bold capitalize tracking-widest text-slate-500">Current Category</p>
               <p className="relative z-10 mt-2 text-xl font-black text-slate-900 tracking-tight leading-tight">{resource.category || "Unassigned"}</p>
             </div>
             <div className={statCardClassName}>
               <div className={`${cardIconWrapperClass} from-amber-400 to-yellow-500`} />
-              <p className="relative z-10 text-[10px] font-bold uppercase tracking-widest text-slate-500">Gross Exposure</p>
+              <p className="relative z-10 text-[10px] font-bold capitalize tracking-widest text-slate-500">Gross Exposure</p>
               <p className={`relative z-10 mt-2 text-2xl font-black tracking-tight ${resource.warnings?.highCost || resource.warnings?.longAging ? "text-rose-600" : "text-slate-900"}`}>
                 {resource.costExposure === null ? "—" : `₹${resource.costExposure.toLocaleString()}`}
               </p>
@@ -75,7 +75,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
 
           {/* Skill Inventory Section */}
           <div className="rounded-2xl border border-white bg-white/70 p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] backdrop-blur-sm">
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
+            <h3 className="text-[11px] font-bold capitalize tracking-[0.2em] text-slate-500 flex items-center gap-2">
               <div className="h-1.5 w-1.5 rounded-full bg-indigo-500" /> Skill & Capability Profile
             </h3>
             <div className="mt-4 flex flex-wrap gap-2.5">
@@ -103,7 +103,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
             
             {resource.missingSkills?.length > 0 && (
               <div className="mt-5 rounded-xl bg-orange-50/50 border border-orange-100 p-4">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-orange-600 flex items-center gap-1.5">
+                <p className="text-[10px] font-bold capitalize tracking-widest text-orange-600 flex items-center gap-1.5">
                   <ShieldAlert className="h-3 w-3" /> Identified Skill Gaps
                 </p>
                 <div className="mt-2.5 flex flex-wrap gap-2">
@@ -119,7 +119,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
 
           {/* Administrative Insights */}
           <div className="rounded-2xl border border-white bg-white/70 p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] backdrop-blur-sm">
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
+            <h3 className="text-[11px] font-bold capitalize tracking-[0.2em] text-slate-500 flex items-center gap-2">
               <div className="h-1.5 w-1.5 rounded-full bg-rose-400" /> Operational Insights
             </h3>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -145,7 +145,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
           </div>
 
           {/* <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Last Project</p>
+            <p className="text-[11px] font-semibold capitalize tracking-[0.16em] text-gray-500">Last Project</p>
             <div className="mt-3 space-y-2 text-sm text-slate-600">
               <div className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4 text-slate-400" />
@@ -159,7 +159,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
           {/* DEMAND MATCHING SECTION */}
           <div className="rounded-2xl border border-white bg-white/70 p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] backdrop-blur-sm relative overflow-hidden">
             <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-emerald-100 blur-3xl opacity-50 pointer-events-none" />
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2 relative z-10">
+            <h3 className="text-[11px] font-bold capitalize tracking-[0.2em] text-slate-500 flex items-center gap-2 relative z-10">
               <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live Demand Matrix
             </h3>
             <div className="mt-4 space-y-3 relative z-10">
@@ -169,7 +169,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
                     <div className="absolute inset-0 rounded-full border-2 border-indigo-200 animate-ping opacity-20"></div>
                     <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
                   </div>
-                  <p className="mt-3 text-[10px] font-bold uppercase tracking-widest">Running ML Matrix...</p>
+                  <p className="mt-3 text-[10px] font-bold capitalize tracking-widest">Running ML Matrix...</p>
                 </div>
               ) : resourceDemands.length === 0 ? (
                 <div className="py-6 text-center text-[12px] font-medium text-slate-400 border border-dashed border-slate-200 bg-white/50 rounded-xl">
