@@ -222,7 +222,7 @@ const BenchTable = ({
                     )}
                   </td>
                   <td className="px-4 py-4 align-middle min-w-[130px]" onClick={(event) => event.stopPropagation()}>
-                    {editingRowId === row.id ? (
+                    {editingRow?.id === row.id ? (
                       <div className="flex flex-col gap-2 min-w-[150px] py-1">
                         <div className="relative">
                           <select
@@ -232,7 +232,7 @@ const BenchTable = ({
                             className="h-9 w-full rounded-lg border border-slate-300 bg-white pl-3 pr-8 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 appearance-none transition-all cursor-pointer"
                           >
                             <option value="" disabled>Select Status</option>
-                            {SUB_STATES.map((state) => (
+                            {validStates.map((state) => (
                               <option key={state} value={state}>{state.replace("_", " ")}</option>
                             ))}
                           </select>
@@ -272,7 +272,7 @@ const BenchTable = ({
                       </div>
                     </div>
                   </td>
-                  <td className={`px-4 py-4 align-middle min-w-[100px] ${editingRowId === row.id ? "opacity-50 pointer-events-none" : ""}`}>
+                  <td className={`px-4 py-4 align-middle min-w-[100px] ${editingRow?.id === row.id ? "opacity-50 pointer-events-none" : ""}`}>
                     {renderPill(agingTone.label, `${agingTone.className} !px-2.5 !py-1 text-[10px] uppercase whitespace-nowrap`)}
                   </td>
                   <td className="px-4 py-4 align-middle text-right">
