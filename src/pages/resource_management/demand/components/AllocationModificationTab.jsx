@@ -113,7 +113,7 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
   const roles = user?.roles || [];
   const isRM = roles.includes("RESOURCE-MANAGER");
   const isPM = roles.includes("PROJECT-MANAGER");
-  const projectName = demand?.project?.name || demand?.projectName || "N/A";
+  const projectName = demand?.projectInfo?.projectName || demand?.project?.name || demand?.projectName || "N/A";
 
   const [items, setItems] = useState([]);
   const [resourceOptions, setResourceOptions] = useState([]);

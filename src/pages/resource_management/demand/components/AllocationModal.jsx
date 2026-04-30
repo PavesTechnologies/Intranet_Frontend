@@ -26,7 +26,9 @@ const getAllocationStartDate = (demandStartDate) => {
     return demandDate && demandDate > today ? demandDate : today;
 };
 
-const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = [], isBenchMode = false, benchMatches = [], onSuccess }) => {
+const EMPTY_ARRAY = [];
+
+const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_ARRAY, isBenchMode = false, benchMatches = EMPTY_ARRAY, onSuccess }) => {
     const [resources, setResources] = useState([]);
     const [isLoadingResources, setIsLoadingResources] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,7 +40,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = [], isB
         demandId: demand?.demandId || demand?.id || '',
         allocationStartDate: getAllocationStartDate(demand?.demandStartDate),
         allocationEndDate: toDateInputValue(demand?.demandEndDate),
-        allocationPercentage: demand?.allocationPercentage || 100,
+        allocationPercentage: demand?.allocation || demand?.allocationPercentage || 100,
         allocationStatus: 'ACTIVE',
         skipValidation: false
     });
