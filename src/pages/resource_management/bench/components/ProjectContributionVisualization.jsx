@@ -152,7 +152,7 @@ const ProjectContributionVisualization = ({ projects }) => {
               ].map(h => (
                 <th
                   key={h.label}
-                  className="px-3 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider"
+                  className="px-3 py-2 text-[10px] font-semibold text-slate-400 capitalize tracking-wider"
                   style={{ textAlign: h.align, width: h.width }}
                 >
                   {h.label}

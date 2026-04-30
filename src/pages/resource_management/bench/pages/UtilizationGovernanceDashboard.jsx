@@ -43,14 +43,14 @@ const UtilizationGovernanceDashboard = () => {
          <div className="max-w-[1600px] mx-auto px-8 pt-8">
             <div className="flex items-center justify-between mb-8">
                <div className="flex flex-col gap-1">
-                  <h2 className="text-[24px] font-black text-slate-900 uppercase tracking-tight">Active Governance Breaches</h2>
+                  <h2 className="text-[24px] font-black text-slate-900 capitalize tracking-tight">Active Governance Breaches</h2>
                   <p className="text-[12px] font-bold text-slate-400 italic">Operational risk monitor & performance deviation registry</p>
                </div>
                <div className="flex items-center gap-3">
-                  <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black text-slate-600 uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
+                  <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black text-slate-600 capitalize tracking-widest hover:bg-slate-50 transition-all shadow-sm">
                      <Download size={14} /> Export Audit
                   </button>
-                  <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200">
+                  <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-[11px] font-black capitalize tracking-widest hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200">
                      <Filter size={14} /> Filter Registry
                   </button>
                </div>
@@ -70,7 +70,7 @@ const UtilizationGovernanceDashboard = () => {
                            {React.cloneElement(kpi.icon, { size: 28, strokeWidth: 2.5 })}
                         </div>
                         <div>
-                           <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{kpi.label}</p>
+                           <p className="text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] mb-1">{kpi.label}</p>
                            <p className="text-2xl font-black text-slate-900 tracking-tight">{kpi.value}</p>
                         </div>
                      </div>
@@ -82,7 +82,7 @@ const UtilizationGovernanceDashboard = () => {
                   <div className="lg:col-span-1 bg-white rounded-[2rem] border border-slate-100 shadow-sm p-8 flex flex-col group relative overflow-hidden">
                      <div className="flex items-center justify-between mb-8">
                         <div className="flex flex-col">
-                           <h3 className="text-[13px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none mb-1.5">Severity Distribution</h3>
+                           <h3 className="text-[13px] font-black text-[#081534] capitalize tracking-[0.2em] leading-none mb-1.5">Severity Distribution</h3>
                            <span className="text-[10px] font-bold text-slate-400 italic">Directional workload risk index</span>
                         </div>
                         <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner">
@@ -118,11 +118,11 @@ const UtilizationGovernanceDashboard = () => {
                               <ShieldAlert size={22} strokeWidth={2.5} />
                            </div>
                            <div>
-                              <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-widest">Active Breach Registry</h4>
+                              <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-widest">Active Breach Registry</h4>
                               <p className="text-[10px] font-bold text-slate-400 capitalize tracking-wide mt-0.5">Real-time performance deviation logs</p>
                            </div>
                         </div>
-                        <span className="px-4 py-1.5 rounded-xl bg-white border border-slate-200 text-[11px] font-black text-indigo-600 uppercase tracking-widest shadow-sm">
+                        <span className="px-4 py-1.5 rounded-xl bg-white border border-slate-200 text-[11px] font-black text-indigo-600 capitalize tracking-widest shadow-sm">
                            Live Monitor
                         </span>
                      </div>
@@ -130,10 +130,10 @@ const UtilizationGovernanceDashboard = () => {
                         <table className="w-full text-left">
                            <thead>
                               <tr className="bg-slate-50/50 border-b border-slate-50">
-                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Resource / Project</th>
-                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Breach Type</th>
-                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Utilization</th>
-                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
+                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em]">Resource / Project</th>
+                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em]">Breach Type</th>
+                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Utilization</th>
+                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-right">Actions</th>
                               </tr>
                            </thead>
                            <tbody className="divide-y divide-slate-50">
@@ -142,7 +142,7 @@ const UtilizationGovernanceDashboard = () => {
                                     <td colSpan="4" className="px-8 py-20 text-center">
                                        <div className="flex flex-col items-center gap-3 opacity-30">
                                           <CheckCircle2 size={48} className="text-emerald-500" />
-                                          <span className="text-[14px] font-black uppercase tracking-widest text-slate-500">No active governance breaches identified</span>
+                                          <span className="text-[14px] font-black capitalize tracking-widest text-slate-500">No active governance breaches identified</span>
                                        </div>
                                     </td>
                                  </tr>
@@ -151,12 +151,12 @@ const UtilizationGovernanceDashboard = () => {
                                     <tr key={idx} className="hover:bg-slate-50/50 transition-all group">
                                        <td className="px-8 py-6">
                                           <div className="flex flex-col gap-0.5">
-                                             <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{alert.scope || 'General'}</span>
-                                             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest opacity-70 italic">{alert.id || 'N/A'}</span>
+                                             <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{alert.scope || 'General'}</span>
+                                             <span className="text-[11px] font-bold text-slate-400 capitalize tracking-widest opacity-70 italic">{alert.id || 'N/A'}</span>
                                           </div>
                                        </td>
                                        <td className="px-8 py-6">
-                                          <div className={`inline-flex items-center h-7 px-4 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm ${
+                                          <div className={`inline-flex items-center h-7 px-4 rounded-full text-[10px] font-black capitalize tracking-widest border shadow-sm ${
                                              alert.severity?.toLowerCase() === 'critical' || alert.severity?.toLowerCase() === 'high' 
                                              ? 'bg-rose-50 text-rose-600 border-rose-100' 
                                              : 'bg-amber-50 text-amber-600 border-amber-100'
@@ -174,8 +174,8 @@ const UtilizationGovernanceDashboard = () => {
                                        </td>
                                        <td className="px-8 py-6 text-right">
                                           <div className="flex items-center justify-end gap-3">
-                                             <button className="h-9 px-4 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-95">Resolve</button>
-                                             <button className="h-9 px-4 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95">Escalate</button>
+                                             <button className="h-9 px-4 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-black capitalize tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-95">Resolve</button>
+                                             <button className="h-9 px-4 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 text-[10px] font-black capitalize tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95">Escalate</button>
                                           </div>
                                        </td>
                                     </tr>
@@ -197,15 +197,15 @@ const UtilizationGovernanceDashboard = () => {
                         <ShieldCheck size={32} strokeWidth={2.5} />
                      </div>
                      <div>
-                        <h4 className="text-[18px] font-black text-white uppercase tracking-[0.2em]">Downstream Readiness Registry</h4>
-                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1.5">Sustained directional signals identified by intelligence engine</p>
+                        <h4 className="text-[18px] font-black text-white capitalize tracking-[0.2em]">Downstream Readiness Registry</h4>
+                        <p className="text-[11px] font-bold text-slate-500 capitalize tracking-[0.2em] mt-1.5">Sustained directional signals identified by intelligence engine</p>
                      </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                      <div className="p-8 bg-slate-800/40 border border-slate-700/50 rounded-3xl hover:bg-slate-800/60 transition-all duration-500 group/item">
                         <div className="flex items-center gap-3 mb-4">
                            <Target size={18} className="text-indigo-400" />
-                           <span className="text-[12px] font-black text-indigo-400 uppercase tracking-widest block">Automated Compliance Detection</span>
+                           <span className="text-[12px] font-black text-indigo-400 capitalize tracking-widest block">Automated Compliance Detection</span>
                         </div>
                         <p className="text-[14px] font-medium text-slate-400 leading-relaxed italic border-l-2 border-indigo-500 pl-6 py-1">
                            Sustained status is only triggered after 4 consecutive weekly cycles (W+4) of threshold deviation. 
@@ -217,8 +217,8 @@ const UtilizationGovernanceDashboard = () => {
                            <Zap size={32} />
                         </div>
                         <div>
-                           <span className="text-[12px] font-black text-white uppercase tracking-widest block mb-2">Direct Engine Integration</span>
-                           <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest leading-loose">
+                           <span className="text-[12px] font-black text-white capitalize tracking-widest block mb-2">Direct Engine Integration</span>
+                           <p className="text-[11px] font-bold text-slate-500 capitalize tracking-widest leading-loose">
                               Verified breach signals are automatically dispatched to the capacity leveling module for resource re-allocation.
                            </p>
                         </div>
