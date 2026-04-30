@@ -711,7 +711,7 @@ const TimesheetGroup = ({
                   }}
                   open
                   onClickOutside={() => setEditDateIndex(null)}
-                  calendarClassName="shadow-lg rounded-xl border border-gray-200 p-2 z-[9999]"
+                  calendarClassName="timesheet-datepicker shadow-lg rounded-xl border border-gray-200 p-2 z-[9999]"
                   popperClassName="z-[9999]"
                   shouldCloseOnSelect={true}
                   showPopperArrow={false}
@@ -776,17 +776,15 @@ const TimesheetGroup = ({
 
                     return (
                       <div
-                        className="relative group cursor-pointer"
+                        className="relative group flex h-full w-full items-center justify-center cursor-pointer"
                         title={tooltipText}
                       >
-                                                {day}                       {" "}
+                        {day}
                         {tooltipText && (
                           <div className="absolute -bottom-7 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[9999]">
-                                                        {tooltipText}           
-                                         {" "}
+                            {tooltipText}
                           </div>
                         )}
-                                             {" "}
                       </div>
                     );
                   }}
