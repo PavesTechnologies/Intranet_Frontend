@@ -517,7 +517,7 @@ const EntriesTable = ({
             {editIndex === idx ? (
               <>
                                
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-left">
                                    
                   <FormSelect
                     name="projectId"
@@ -528,7 +528,7 @@ const EntriesTable = ({
                                  
                 </td>
                                
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-left">
                                    
                   <FormSelect
                     name="taskId"
@@ -539,7 +539,7 @@ const EntriesTable = ({
                                  
                 </td>
                                
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-left">
                                    
                   <FormTime
                     name="fromTime"
@@ -549,7 +549,7 @@ const EntriesTable = ({
                                  
                 </td>
                                
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-left">
                                    
                   <FormTime
                     name="toTime"
@@ -559,7 +559,7 @@ const EntriesTable = ({
                                  
                 </td>
                                
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-left">
                                    
                   <FormSelect
                     name="workType"
@@ -570,7 +570,7 @@ const EntriesTable = ({
                                  
                 </td>
                                
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-left">
                                    
                   <FormInput
                     name="description"
@@ -580,7 +580,7 @@ const EntriesTable = ({
                                  
                 </td>
                                
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-left">
                                    
                   {(
                     editData.isBillable !== undefined
@@ -592,7 +592,7 @@ const EntriesTable = ({
                 </td>
                                
                 {showActions && (
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 text-left">
                                        
                     <div className="flex gap-2">
                                            
@@ -614,7 +614,7 @@ const EntriesTable = ({
             ) : (
               <>
                                
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-left">
                                    
                   {entry.projectName ||
                     projectIdToName[entry.projectId] ||
@@ -622,24 +622,24 @@ const EntriesTable = ({
                                  
                 </td>
                                
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-left">
                                    
                   {entry.taskName || taskIdToName[entry.taskId] || "N/A"}       
                          
                 </td>
                                
-                <td className="px-4 py-2">{prettyTime(entry.fromTime)}</td>     
+                <td className="px-4 py-2 text-left">{prettyTime(entry.fromTime)}</td>     
                          
-                <td className="px-4 py-2">{prettyTime(entry.toTime)}</td>       
+                <td className="px-4 py-2 text-left">{prettyTime(entry.toTime)}</td>       
                        
-                <td className="px-4 py-2">{mapWorkType(entry.workLocation)}</td>
+                <td className="px-4 py-2 text-left">{mapWorkType(entry.workLocation)}</td>
                                
-                <td className="px-4 py-2">{entry.description}</td>             
+                <td className="px-4 py-2 text-left">{entry.description}</td>             
                  
-                <td className="px-4 py-2">{entry.isBillable ? "Yes" : "No"}</td>
+                <td className="px-4 py-2 text-left">{entry.isBillable ? "Yes" : "No"}</td>
                                
                 {showActions && (
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 text-left">
                     {console.log("Status from entries table: ", status)}       
                                
                     {(status?.toLowerCase() === "draft" ||
@@ -684,10 +684,10 @@ const EntriesTable = ({
             key="add-new"
             className="text-sm bg-white hover:bg-blue-50 transition"
           >
-                        {selectionMode && <td className="px-4 py-2"></td>}     
+                        {selectionMode && <td className="px-4 py-2 text-left"></td>}     
                  
-            <td className="px-4 py-2">
-                           
+            <td className="px-4 py-2 text-left">
+                            
               <FormSelect
                 name="projectId"
                 value={addData.projectId || ""}
@@ -697,8 +697,8 @@ const EntriesTable = ({
                          
             </td>
                        
-            <td className="px-4 py-2">
-                           
+            <td className="px-4 py-2 text-left">
+                            
               <FormSelect
                 name="taskId"
                 value={addData.taskId || ""}
@@ -708,8 +708,8 @@ const EntriesTable = ({
                          
             </td>
                        
-            <td className="px-4 py-2">
-                           
+            <td className="px-4 py-2 text-left">
+                            
               <FormTime
                 name="fromTime"
                 value={addData.fromTime || ""}
@@ -718,8 +718,8 @@ const EntriesTable = ({
                          
             </td>
                        
-            <td className="px-4 py-2">
-                           
+            <td className="px-4 py-2 text-left">
+                            
               <FormTime
                 name="toTime"
                 value={addData.toTime || ""}
@@ -728,8 +728,8 @@ const EntriesTable = ({
                          
             </td>
                        
-            <td className="px-4 py-2">
-                           
+            <td className="px-4 py-2 text-left">
+                            
               <FormSelect
                 name="workType"
                 value={addData.workType}
@@ -739,8 +739,8 @@ const EntriesTable = ({
                          
             </td>
                        
-            <td className="px-4 py-2">
-                           
+            <td className="px-4 py-2 text-left">
+                            
               <FormInput
                 name="description"
                 value={addData.description || ""}
@@ -749,8 +749,8 @@ const EntriesTable = ({
                          
             </td>
                        
-            <td className="px-4 py-2">
-                           
+            <td className="px-4 py-2 text-left">
+                            
               {addData.projectId &&
               taskIdToBillablity[addData.taskId] !== undefined
                 ? taskIdToBillablity[addData.taskId]
@@ -761,8 +761,8 @@ const EntriesTable = ({
             </td>
                        
             {showActions && (
-            <td className="px-4 py-2">
-                           
+            <td className="px-4 py-2 text-left">
+                            
               <div className="flex gap-2">
                                
                 <button className="text-green-500" onClick={handleAddEntry}>
