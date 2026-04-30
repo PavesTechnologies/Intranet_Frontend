@@ -171,6 +171,18 @@
   border-radius: 9999px !important;
 }
 
+.timesheet-range-datepicker .react-datepicker__day--outside-month,
+.timesheet-range-datepicker .react-datepicker__day--disabled {
+  color: #c7cdd6 !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+.timesheet-range-datepicker .react-datepicker__day--outside-month:hover,
+.timesheet-range-datepicker .react-datepicker__day--disabled:hover {
+  background-color: transparent !important;
+}
+
 
 @keyframes fadeIn {
   from {
