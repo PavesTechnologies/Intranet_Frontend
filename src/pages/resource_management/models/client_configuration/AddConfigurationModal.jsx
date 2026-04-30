@@ -14,7 +14,7 @@ const CONFIG_OPTIONS = [
   },
   {
     key: "compliances",
-    label: "Compliance Requirements",
+    label: "Pre-requisites",
     enabled: (d) => d?.compliance,
   },
 ];

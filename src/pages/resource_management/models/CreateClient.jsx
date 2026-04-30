@@ -285,27 +285,27 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
     setIsSubmitting(true);
 
     // If changing status from ACTIVE to INACTIVE, check for active projects
-    if (mode === "edit" && formData.status === "INACTIVE" && initialData.status === "ACTIVE") {
-      try {
-        const projectsResponse = await getProjectsByClient(formData.clientId);
-        if (projectsResponse.success && Array.isArray(projectsResponse.data)) {
-          const hasActiveProjects = projectsResponse.data.some(
-            (project) => project.projectStatus === "ACTIVE"
-          );
-          if (hasActiveProjects) {
-            toast.error(
-              "Cannot deactivate: This client still has active projects. Please complete or reassign them first."
-            );
-            setIsSubmitting(false);
-          }
-        }
-      } catch (error) {
-        console.error("Error checking client projects:", error);
-        // If we fail to check projects, it might be safer to stop, 
-        // but here we'll let it proceed unless the backend also blocks it.
-      }
-    }
-
+    // if (mode === "edit" && formData.status === "INACTIVE" && initialData.status === "ACTIVE") {
+    //   try {
+    //     const projectsResponse = await getProjectsByClient(formData.clientId);
+    //     if (projectsResponse.success && Array.isArray(projectsResponse.data)) {
+    //       const hasActiveProjects = projectsResponse.data.some(
+    //         (project) => project.projectStatus === "ACTIVE"
+    //       );
+    //       if (hasActiveProjects) {
+    //         toast.error(
+    //           "Cannot deactivate: This client still has active projects. Please complete or reassign them first."
+    //         );
+    //         setIsSubmitting(false);
+    //         onSuccess?.();
+    //       }
+    //     }
+    //   } catch (error) {
+    //     console.error("Error checking client projects:", error);
+    //     // toast.error("Failed to check client projects.");
+    //     // setIsSubmitting(false);
+    //   }
+    // } else {
     try {
       const clientCreation =
         mode === "create"
@@ -328,6 +328,7 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
     } finally {
       setIsSubmitting(false);
     }
+    // }
   };
 
   return (
@@ -374,7 +375,7 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
         <CustomListbox
           label="Status"
           value={formData.status}
-          options={STATUS_OPTIONS}
+          options={mode !== "edit" ? STATUS_OPTIONS.filter(opt => opt !== "INACTIVE") : STATUS_OPTIONS}
           onChange={(val) => handleGenericListboxChange("status", val)}
           error={errors.includes("status")}
         />

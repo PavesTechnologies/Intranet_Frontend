@@ -52,12 +52,15 @@ const KPICard = ({ label, count }) => {
   );
 };
 
-const RoleOffSummaryCard = ({ title, description, metrics = [] }) => {
+const RoleOffSummaryCard = ({ title, description, metrics = [], action = null }) => {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-5">
-        <h2 className="text-2xl font-bold tracking-tight text-[#102a56]">{title}</h2>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-[#102a56]">{title}</h2>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
 
       <div

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__?.RMS_BASE_URL;
 
 export const fetchResources = async () => {
   try {

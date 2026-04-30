@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
+
+import { format, subDays, subWeeks, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getOperationalProjects } from '../services/operationalProjectsService';
 // import LoadingSpinner from '../../../../components/LoadingSpinner';
@@ -10,24 +12,27 @@ import {
 import {
    ArrowLeft, TrendingUp, BarChart3, Users, Zap, Target, Activity,
    Download, Filter, Search, Award, Monitor, PieChart as PieIcon,
-   ChevronRight, BrainCircuit, Timer, Star, Briefcase, FileText, ShieldCheck,
-   AlertTriangle, ArrowUpRight, ArrowDownRight, History, Bell, CheckCircle2,
-   Share2, RefreshCcw, Info, Database, Fingerprint, Lock, ShieldAlert,
-   Verified, ZapOff, Scale, LayoutGrid, CalendarRange, Clock, PieChart as PieChartIcon,
-   TrendingUp as TrendingUpIcon, MoveUpRight, X, User, BarChart2
+   ChevronRight, Briefcase, FileText, ShieldCheck, AlertTriangle,
+   ArrowUpRight, ArrowDownRight, History, Bell, CheckCircle2,
+   Share2, RefreshCcw, Info, Fingerprint, Lock, ShieldAlert,
+   Scale, LayoutGrid, PieChart as PieChartIcon,
+   TrendingUp as TrendingUpIcon, MoveUpRight, Circle, CalendarRange,
+   ZapOff, Database, Clock, X, User, BarChart2, BrainCircuit
 } from 'lucide-react';
 import { getBillNonBillable, getResourceProjects } from '../../services/utilizationService';
 import Pagination from '../../../../components/Pagination/pagination';
 import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { utilizationService } from '../../services/utilizationService';
+import { fetchResources } from '../../services/resource';
 import ResourceVisualizationDrawer from '../components/ResourceVisualizationDrawer';
 
 // --- INTEGRATED MOCK DATA MODELS FOR ALL 12 STORIES ---
 
 const KPI_STATS = [
-   { label: 'Strategic Utilization', value: '86.4%', trend: 'Story 5: +2.1%', icon: <TrendingUpIcon />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-   { label: 'Billable Yield', value: '72.1%', trend: 'Story 3', icon: <Award />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-   { label: 'Historical Confidence', value: '94%', trend: 'Preserved', icon: <Fingerprint />, color: 'text-blue-600', bg: 'bg-blue-50' },
-   { label: 'Active Breaches', value: '3 Critical', trend: 'Prioritize', icon: <AlertTriangle />, color: 'text-rose-600', bg: 'bg-rose-50' },
+   { label: 'Total Resources', value: '0', trend: 'Active Pool', icon: <Users />, color: 'text-rose-600', bg: 'bg-rose-50' },
+   { label: 'Utilization', value: '0.0%', trend: 'Live', icon: <TrendingUpIcon />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+   { label: 'Billable Ratio', value: '0.0%', trend: '', icon: <Award />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+   { label: 'Confidence Score', value: '100%', trend: 'Verified', icon: <Fingerprint />, color: 'text-blue-600', bg: 'bg-blue-50' },
 ];
 
 const BILLING_PIE_DATA = [
@@ -165,14 +170,18 @@ const ALERT_INTELLIGENCE = [
    { id: 'AL-110', scope: 'Resource Mike Ross', message: 'Allocation exists (100%) but utilization is < 40%.', stakeholder: 'Resource Manager', status: 'Acknowledged', severity: 'Warning' },
 ];
 
+
+
+
 const UtilizationPerformanceDashboard = () => {
-   const PROJECTS_PER_PAGE = 5;
+   const PROJECTS_PER_PAGE = 4;
    const navigate = useNavigate();
    const location = useLocation();
    const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'portfolio');
    const [projectCategoryTab, setProjectCategoryTab] = useState('active');
    const [projectPage, setProjectPage] = useState(1);
    const [granularity, setGranularity] = useState('WEEKLY');
+   const [selectedResourceId, setSelectedResourceId] = useState(null);
    const [OVERALL_CONFIDENCE_SCORE] = useState(94);
    const [operationalProjects, setOperationalProjects] = useState([]);
    const [projectsLoading, setProjectsLoading] = useState(true);
@@ -186,13 +195,118 @@ const UtilizationPerformanceDashboard = () => {
    const [searchQuery, setSearchQuery] = useState('');
    const [currentPage, setCurrentPage] = useState(1);
    const ITEMS_PER_PAGE = 8;
+   const [liveData, setLiveData] = useState(null);
+   const [allResources, setAllResources] = useState([]);
+   const [rmsUsers, setRmsUsers] = useState([]);
+   const [loading, setLoading] = useState(false);
+
+   const [startDate, setStartDate] = useState(format(subWeeks(new Date(), 6), 'yyyy-MM-dd'));
+   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
+   // STORY 1 & 2: Dynamic Live Ingestion
+   useEffect(() => {
+      const fetchLiveUtilization = async () => {
+         setLoading(true);
+         try {
+            // Fetch global utilization summary
+            const data = await utilizationService.getRMSSummary(
+               startDate,
+               endDate
+            );
+            setLiveData(data);
+         } catch (err) {
+            console.error('Failed to fetch live utilization:', err);
+         } finally {
+            setLoading(false);
+         }
+      };
+      fetchLiveUtilization();
+   }, [selectedResourceId, startDate, endDate]);
+
+   // Fetch all resources for Capability Ledger
+   useEffect(() => {
+      const getAllResources = async () => {
+         try {
+            const response = await fetchResources();
+            const resourceList = response.data;
+            setAllResources(resourceList);
+            if (resourceList && resourceList.length > 0) {
+               // Auto-selection disabled to favor "Overall Resource" default view
+            }
+         } catch (err) {
+            console.error('Failed to fetch resources:', err);
+            setAllResources([]);
+         }
+      };
+      getAllResources();
+   }, []);
+
+   // Fetch RMS Users utilization data
+   useEffect(() => {
+      const fetchRMSUsers = async () => {
+         try {
+            const data = await utilizationService.getRMSUsers(startDate, endDate);
+            setRmsUsers(Array.isArray(data) ? data : []);
+         } catch (err) {
+            console.error('Failed to fetch RMS users:', err);
+            setRmsUsers([]);
+         }
+      };
+      fetchRMSUsers();
+   }, [startDate, endDate]);
+
+   // Fetch Operational Projects (Story 4 & 5)
+   useEffect(() => {
+      const fetchProjects = async () => {
+         try {
+            setProjectsLoading(true);
+            const response = await getOperationalProjects();
+            const projectList = extractOperationalProjects(response);
+            setOperationalProjects(projectList.map(mapProjectCatalogEntry));
+            setProjectsError('');
+         } catch (err) {
+            console.error('Failed to fetch operational projects:', err);
+            setProjectsError('Failed to load operational projects from command hub.');
+            setOperationalProjects([]);
+         } finally {
+            setProjectsLoading(false);
+         }
+      };
+      fetchProjects();
+   }, []);
+
+   const visibleOperationalProjects = useMemo(() => {
+      return operationalProjects.filter(p => {
+         if (projectCategoryTab === 'internal') return p.isInternal;
+         return !p.isInternal;
+      });
+   }, [operationalProjects, projectCategoryTab]);
+   
+   // Reset project page when switching categories (Active vs Internal)
+   useEffect(() => {
+      setProjectPage(1);
+   }, [projectCategoryTab]);
+
+   // Reset resource registry page when searching
+   useEffect(() => {
+      setCurrentPage(1);
+   }, [searchQuery]);
+
+   const totalProjectPages = Math.ceil(visibleOperationalProjects.length / PROJECTS_PER_PAGE) || 1;
+
+   const paginatedOperationalProjects = useMemo(() => {
+      const startIndex = (projectPage - 1) * PROJECTS_PER_PAGE;
+      return visibleOperationalProjects.slice(startIndex, startIndex + PROJECTS_PER_PAGE);
+   }, [visibleOperationalProjects, projectPage, PROJECTS_PER_PAGE]);
+
+   const selectedResourceName = useMemo(() => {
+      if (!selectedResourceId) return null;
+      const user = rmsUsers.find(u => String(u.userId) === String(selectedResourceId));
+      return user?.name || `User ${selectedResourceId}`;
+   }, [selectedResourceId, rmsUsers]);
 
    const [resourceMetrics, setResourceMetrics] = useState([]);
    const [isResourceLoading, setIsResourceLoading] = useState(false);
-   const [dateRange, setDateRange] = useState({
-      startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0]
-   });
 
    const filteredAndPaginatedResources = useMemo(() => {
       let filtered = Array.isArray(resourceMetrics) ? resourceMetrics : [];
@@ -210,82 +324,6 @@ const UtilizationPerformanceDashboard = () => {
       return { paginated, totalPages };
    }, [resourceMetrics, searchQuery, currentPage]);
 
-   useEffect(() => {
-      const fetchResourceMetrics = async () => {
-         if (!dateRange.startDate || !dateRange.endDate) return;
-         if (new Date(dateRange.startDate) > new Date(dateRange.endDate)) return;
-         try {
-            setIsResourceLoading(true);
-            const data = await getBillNonBillable(dateRange.startDate, dateRange.endDate);
-            console.log("Data from tms: ", data);
-            setResourceMetrics(data);
-         } catch (err) {
-            console.error(err);
-            setResourceMetrics([]);
-         } finally {
-            setIsResourceLoading(false);
-         }
-      };
-
-      fetchResourceMetrics();
-   }, [dateRange.startDate, dateRange.endDate]);
-
-   const activeChartData = useMemo(() => {
-      return PORTFOLIO_DATA[granularity] || [];
-   }, [granularity]);
-
-   const visibleOperationalProjects = useMemo(() => (
-      operationalProjects.filter((project) => (
-         projectCategoryTab === 'internal' ? project.isInternal : !project.isInternal
-      ))
-   ), [operationalProjects, projectCategoryTab]);
-
-   const totalProjectPages = Math.max(
-      1,
-      Math.ceil(visibleOperationalProjects.length / PROJECTS_PER_PAGE),
-   );
-
-   const paginatedOperationalProjects = useMemo(() => {
-      const startIndex = (projectPage - 1) * PROJECTS_PER_PAGE;
-      return visibleOperationalProjects.slice(startIndex, startIndex + PROJECTS_PER_PAGE);
-   }, [visibleOperationalProjects, projectPage, PROJECTS_PER_PAGE]);
-
-   useEffect(() => {
-      const fetchOperationalProjects = async () => {
-         setProjectsLoading(true);
-         setProjectsError('');
-
-         try {
-            const data = await getOperationalProjects();
-            const normalizedProjects = extractOperationalProjects(data).map(mapProjectCatalogEntry);
-
-            if (normalizedProjects.length > 0) {
-               setOperationalProjects(normalizedProjects);
-            } else {
-               setProjectsError('Project hours summary is empty for this user.');
-               setOperationalProjects([]);
-            }
-         } catch (error) {
-            setProjectsError('Unable to fetch project hours summary right now.');
-            setOperationalProjects([]);
-         } finally {
-            setProjectsLoading(false);
-         }
-      };
-
-      fetchOperationalProjects();
-   }, []);
-
-   useEffect(() => {
-      setProjectPage(1);
-   }, [projectCategoryTab]);
-
-   useEffect(() => {
-      if (projectPage > totalProjectPages) {
-         setProjectPage(totalProjectPages);
-      }
-   }, [projectPage, totalProjectPages]);
-
    const handleRowClick = async (res) => {
       setSelectedResource(res);
       setProjectsDrawerTab('overall');
@@ -301,27 +339,333 @@ const UtilizationPerformanceDashboard = () => {
       }
    };
 
+   useEffect(() => {
+      const fetchResourceMetrics = async () => {
+         if (!startDate || !endDate) return;
+         if (new Date(startDate) > new Date(endDate)) return;
+         try {
+            setIsResourceLoading(true);
+            const data = await getBillNonBillable(startDate, endDate);
+            console.log("Data from tms: ", data);
+            setResourceMetrics(data);
+         } catch (err) {
+            console.error(err);
+            setResourceMetrics([]);
+         } finally {
+            setIsResourceLoading(false);
+         }
+      };
+
+      fetchResourceMetrics();
+   }, [startDate, endDate]);
+
+   useEffect(() => {
+      const fetchProjects = async () => {
+         try {
+            setProjectsLoading(true);
+            setProjectsError('');
+            const data = await getOperationalProjects(startDate, endDate);
+            const extracted = extractOperationalProjects(data);
+            const mapped = extracted.map(mapProjectCatalogEntry);
+            setOperationalProjects(mapped);
+         } catch (err) {
+            console.error('Failed to fetch operational projects:', err);
+            setProjectsError('Failed to load operational projects');
+         } finally {
+            setProjectsLoading(false);
+         }
+      };
+
+      if (activeTab === 'projects') {
+         fetchProjects();
+      }
+   }, [activeTab, startDate, endDate]);
+
+   // const visibleOperationalProjects = useMemo(() => {
+   //    if (projectCategoryTab === 'internal') {
+   //       return operationalProjects.filter(p => p.isInternal);
+   //    }
+   //    return operationalProjects.filter(p => !p.isInternal);
+   // }, [operationalProjects, projectCategoryTab]);
+
+   // const totalProjectPages = Math.ceil(visibleOperationalProjects.length / PROJECTS_PER_PAGE) || 1;
+
+   // const paginatedOperationalProjects = useMemo(() => {
+   //    const start = (projectPage - 1) * PROJECTS_PER_PAGE;
+   //    return visibleOperationalProjects.slice(start, start + PROJECTS_PER_PAGE);
+   // }, [visibleOperationalProjects, projectPage]);
+
+   // const handleRowClick = async (resource) => {
+   //    setSelectedResource(resource);
+   //    setIsProjectsLoading(true);
+   //    try {
+   //       const data = await getResourceProjects(resource.userId, dateRange.startDate, dateRange.endDate);
+   //       setResourceProjectsData(data);
+   //    } catch (err) {
+   //       console.error(err);
+   //       setResourceProjectsData([]);
+   //    } finally {
+   //       setIsProjectsLoading(false);
+   //    }
+   // };
+
+   // REPORTING ENGINE STATES
+   const [reportData, setReportData] = useState(null);
+   const [isGenerating, setIsGenerating] = useState(false);
+   const [reportError, setReportError] = useState(null);
+   const [reportParams, setReportParams] = useState({
+      startDate: '2025-05-01',
+      endDate: '2026-03-31',
+      reportType: 'SUMMARY',
+      groupBy: 'WEEKLY',
+      approvedOnly: true,
+      includeTrends: true,
+      includeAlerts: true,
+      overUtilizationThreshold: 50,
+      underUtilizationThreshold: 10,
+      resourceIds: [17],
+      projectIds: [],
+      roles: [],
+      clients: []
+   });
+
+   const handleGenerateReport = async () => {
+      setIsGenerating(true);
+      setReportError(null);
+
+      // TELEMETRY: Print outgoing payload to console for verification
+      console.log('[Utilization Engine] Dispatching Report Request:', reportParams);
+
+      try {
+         const data = await utilizationService.generateUtilizationReport(reportParams);
+         setReportData(data);
+         console.log('[Utilization Engine] Success Data Received:', data);
+      } catch (err) {
+         const detailedMsg = err.response?.data?.message || err.message || 'Failed to generate intelligence report.';
+         setReportError(detailedMsg);
+         console.error('[Utilization Engine] Request Failed:', err.response?.data || err);
+      } finally {
+         setIsGenerating(false);
+      }
+   };
+
+   const handleExportCSV = async () => {
+      try {
+         await utilizationService.exportUtilizationCSV(reportParams);
+      } catch (err) {
+         console.error('CSV Export Error:', err);
+      }
+   };
+
+   const handleExportExcel = async () => {
+      try {
+         await utilizationService.exportUtilizationExcel(reportParams);
+      } catch (err) {
+         console.error('Excel Export Error:', err);
+      }
+   };
+
+
+
+   const activeChartData = useMemo(() => {
+      if (liveData) {
+         // The new backend response has 'daily', 'weekly', 'monthly' directly on the root object
+         const key = granularity.toLowerCase();
+         if (liveData[key]) {
+            return liveData[key];
+         }
+         // Fallback if structured old way
+         if (liveData.portfolioTrends && liveData.portfolioTrends[key]) {
+            return liveData.portfolioTrends[key];
+         }
+      }
+      return [];
+   }, [granularity, liveData]);
+
+   // STORY 3 & 4: Merged Resource Ledger (Directory + Live Metrics)
+   const mergedResources = useMemo(() => {
+      const base = (Array.isArray(allResources) && allResources.length > 0) ? allResources : [];
+
+      // If we have live summaries, overlay them onto the base directory
+      if (liveData?.resourceSummaries && Array.isArray(liveData.resourceSummaries)) {
+         return base.map(res => {
+            const summary = liveData.resourceSummaries.find(s => s.userId === (res.resourceId || res.id));
+            if (summary) {
+               return { ...res, ...summary }; // Merge summary metrics into directory record
+            }
+            return res;
+         });
+      }
+      return base;
+   }, [allResources, liveData]);
+
+   // STORY 3 & 4: Dynamic Billing Yield Calculation
+   const activeBillingData = useMemo(() => {
+      const defaultState = [
+         { name: 'Billable', value: 0, color: '#4f46e5' },
+         { name: 'Non-Billable', value: 0, color: '#818cf8' },
+         { name: 'Internal', value: 0, color: '#cbd5e1' },
+      ];
+
+      if (liveData) {
+         // Priority 1: High-fidelity percentage mapping (consistent with newest reporting specs)
+         if (liveData.billablePercentage !== undefined || liveData.internalNonBillablePercentage !== undefined) {
+            const b = liveData.billablePercentage || 0;
+            const nb = liveData.otherNonBillablePercentage || liveData.nonBillablePercentage || 0;
+            const i = liveData.internalNonBillablePercentage || liveData.internalPercentage || 0;
+
+            return [
+               { name: 'Billable', value: Number(parseFloat(b).toFixed(2)), color: '#4f46e5' },
+               { name: 'Non-Billable', value: Number(parseFloat(nb).toFixed(2)), color: '#818cf8' },
+               { name: 'Internal', value: Number(parseFloat(i).toFixed(2)), color: '#cbd5e1' },
+            ];
+         }
+
+         // Direct mapping for the new backend API response
+         if (liveData.totalHours !== undefined && liveData.billableHours !== undefined) {
+            const bHours = liveData.billableHours || 0;
+            const nbHours = liveData.nonBillableHours || 0;
+            const total = liveData.totalHours || (bHours + nbHours) || 1;
+
+            const b = Math.round((bHours / total) * 100);
+            const nb = Math.round((nbHours / total) * 100);
+            const i = Math.max(0, 100 - b - nb);
+
+            return [
+               { name: 'Billable', value: b, color: '#4f46e5' },
+               { name: 'Non-Billable', value: nb, color: '#818cf8' },
+               { name: 'Internal', value: i, color: '#cbd5e1' },
+            ];
+         }
+
+         // Priority 2: Traditional ratio mapping
+         if (liveData.billableRatio !== undefined || liveData.totalPercentage !== undefined) {
+            const b = liveData.billableRatio ?? 0;
+            const nb = liveData.nonBillablePercentage ?? 0;
+            const i = liveData.internalPercentage ?? 0;
+            return [
+               { name: 'Billable', value: Number(parseFloat(b).toFixed(2)), color: '#4f46e5' },
+               { name: 'Non-Billable', value: Number(parseFloat(nb).toFixed(2)), color: '#818cf8' },
+               { name: 'Internal', value: Number(parseFloat(i).toFixed(2)), color: '#cbd5e1' },
+            ];
+         }
+
+         // Priority 2: Fallback to selected resource summary
+         const resData = liveData.resourceSummaries && liveData.resourceSummaries.length > 0
+            ? liveData.resourceSummaries[0]
+            : null;
+
+         if (resData) {
+            if (resData.billablePercentage !== undefined || resData.internalNonBillablePercentage !== undefined || resData.internalPercentage !== undefined) {
+               return [
+                  { name: 'Billable', value: Number(Number(resData.billablePercentage || 0).toFixed(2)), color: '#4f46e5' },
+                  { name: 'Non-Billable', value: Number(Number(resData.otherNonBillablePercentage || resData.nonBillablePercentage || 0).toFixed(2)), color: '#818cf8' },
+                  { name: 'Internal', value: Number(Number(resData.internalNonBillablePercentage || resData.internalPercentage || 0).toFixed(2)), color: '#cbd5e1' },
+               ];
+            }
+
+            if (resData.billableHours !== undefined || resData.nonBillableHours !== undefined) {
+               const bHours = resData.billableHours || 0;
+               const nbHours = resData.nonBillableHours || 0;
+               const iHours = resData.internalHours || 0;
+               const total = bHours + nbHours + iHours;
+
+               if (total === 0) return defaultState;
+
+               const b = Math.round((bHours / total) * 100);
+               const nb = Math.round((nbHours / total) * 100);
+               const i = 100 - b - nb;
+
+               return [
+                  { name: 'Billable', value: b, color: '#4f46e5' },
+                  { name: 'Non-Billable', value: nb, color: '#818cf8' },
+                  { name: 'Internal', value: i, color: '#cbd5e1' },
+               ];
+            }
+         }
+      }
+      return defaultState;
+   }, [liveData]);
+
+
+   const dynamicKPIs = useMemo(() => {
+      if (!liveData) return KPI_STATS;
+
+      // Map from new API fields if present, with fallbacks to old names
+      let utilVal = liveData.utilization ?? liveData.overallUtilizationPercentage ?? 0;
+      if (!liveData.utilization && !liveData.overallUtilizationPercentage && liveData.monthly && liveData.monthly.length > 0) {
+         const sumUtil = liveData.monthly.reduce((acc, m) => acc + m.util, 0);
+         utilVal = sumUtil / liveData.monthly.length;
+      }
+
+      let billableRatio = liveData.billableRatio ?? liveData.billablePercentage ?? 0;
+      if (!liveData.billableRatio && !liveData.billablePercentage && liveData.totalHours) {
+         billableRatio = (liveData.billableHours / liveData.totalHours) * 100;
+      }
+
+      let confScore = liveData.confidenceScore ?? liveData.averageConfidenceScore ?? 100;
+      let totalRes = liveData.totalResources ?? liveData.totalUsers ?? (liveData.resourceSummaries ? liveData.resourceSummaries.length : 0);
+
+      // Parse from specific kpiStats payload if present (Legacy support)
+      let utilTrend = 'Live';
+      let billableTrend = '';
+      let confTrend = 'Verified';
+
+      if (liveData.kpiStats && Array.isArray(liveData.kpiStats)) {
+         liveData.kpiStats.forEach(k => {
+            if (k.label === 'Utilization') {
+               utilVal = parseFloat(k.value) || utilVal;
+               utilTrend = k.trend || utilTrend;
+            }
+            if (k.label === 'Billable Ratio') {
+               billableRatio = parseFloat(k.value) || billableRatio;
+               billableTrend = k.trend || billableTrend;
+            }
+            if (k.label === 'Confidence Score') {
+               confScore = parseFloat(k.value) || confScore;
+               confTrend = k.trend || confTrend;
+            }
+         });
+      }
+
+      return [
+         {
+            label: 'Total Resources',
+            value: totalRes,
+            trend: 'Active Pool',
+            icon: <Users />,
+            color: 'text-rose-600', bg: 'bg-rose-50'
+         },
+         {
+            label: 'Utilization',
+            value: `${parseFloat(utilVal).toFixed(2)}%`,
+            trend: utilTrend === 'down' ? 'Declining' : utilTrend === 'up' ? 'Improving' : utilTrend,
+            icon: <TrendingUpIcon />,
+            color: utilTrend === 'down' ? 'text-amber-600' : 'text-indigo-600', bg: utilTrend === 'down' ? 'bg-amber-50' : 'bg-indigo-50'
+         },
+         {
+            label: 'Billable Ratio',
+            value: `${parseFloat(billableRatio).toFixed(2)}%`,
+            trend: billableTrend === 'down' ? 'Declining' : billableTrend === 'up' ? 'Improving' : billableTrend,
+            icon: <Award />,
+            color: 'text-emerald-600', bg: 'bg-emerald-50'
+         },
+         {
+            label: 'Confidence Score',
+            value: `${parseFloat(confScore).toFixed(0)}%`,
+            trend: confTrend === 'down' ? 'Declining' : confTrend === 'up' ? 'Improving' : confTrend,
+            icon: <Fingerprint />,
+            color: 'text-blue-600', bg: 'bg-blue-50'
+         },
+      ];
+   }, [liveData]);
+
+   const billablePercentage = useMemo(() => {
+      const b = activeBillingData.find(d => d.name === 'Billable');
+      return b ? b.value : 0;
+   }, [activeBillingData]);
    return (
       <div className="min-h-screen bg-[#FDFDFE] p-6 font-sans select-none">
-
-         {/* Confidence Banner */}
-         {/* {OVERALL_CONFIDENCE_SCORE < 100 && (
-            <div className="mb-6 flex items-center justify-between p-3 bg-amber-50/50 border border-amber-100 rounded-xl">
-               <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white text-amber-500 rounded-lg shadow-sm border border-amber-50">
-                     <ShieldAlert size={18} />
-                  </div>
-                  <div>
-                     <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest leading-none">Historical Data Confidence (Story 5 & 11)</span>
-                     <p className="text-[11px] font-medium text-amber-600/80 mt-0.5 font-serif">Trend preservation active. Metrics based on 94% verified historical actuals.</p>
-                  </div>
-               </div>
-               <div className="flex items-center gap-2 px-3 py-1 bg-white border border-rose-100 rounded-lg text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">
-                  <ZapOff size={12} /> Sync Restricted
-               </div>
-            </div>
-         )} */}
-
          {/* Header â€” Unified Command Strip */}
          <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -333,42 +677,44 @@ const UtilizationPerformanceDashboard = () => {
                </button> */}
                <div>
                   <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-none">Utilization Intelligence Hub</h1>
-                  <p className="mt-1.5 text-xs sm:text-sm text-slate-500 font-medium tracking-normal italic opacity-80 underline decoration-indigo-200 decoration-2 underline-offset-4 font-serif">
-                     Governed Command Hub â€” Identifying Directional Trends & Patterns (Story 5)
-                  </p>
                </div>
             </div>
 
-            <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest">
-               {/* <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg border border-slate-800 shadow-xl shadow-slate-900/10">
-                  <ShieldCheck size={14} className="text-emerald-400" />
-                  Readiness Gate: PASSED
-               </div> */}
-               <button className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
-                  <Download size={14} className="text-indigo-600" />
-                  Full Audit Export
+            <div className="flex items-center gap-3">
+               <button
+                  type="button"
+                  onClick={() => navigate('/resource-management/bench/utilization-reporting')}
+                  className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm h-[42px]"
+               >
+                  <BarChart3 className="h-4 w-4 text-emerald-600" />
+                  REPORT & DASHBOARD
                </button>
             </div>
          </div>
-
          {/* KPI Stats Grid */}
-         <div className="flex flex-nowrap gap-3 overflow-x-auto mb-6 pb-1 no-scrollbar">
-            {KPI_STATS.map((stat) => (
-               <div key={stat.label} className="min-w-[200px] flex-1 flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm hover:border-indigo-100 transition-all group">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${stat.bg} ${stat.color} shadow-sm border-white transition-transform group-hover:scale-105`}>
-                     {React.cloneElement(stat.icon, { size: 20 })}
+         <div className="flex flex-nowrap gap-4 overflow-x-auto no-scrollbar mb-6">
+            {(liveData ? dynamicKPIs : KPI_STATS).map((stat, idx) => {
+               const originalStat = KPI_STATS.find(s => s.label === stat.label) || KPI_STATS[idx % KPI_STATS.length];
+               return (
+                  <div key={stat.label} className="flex min-w-[200px] flex-1 items-center gap-4 rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:border-indigo-100 hover:shadow-md group">
+                     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-sm ${originalStat.bg} ${originalStat.color} group-hover:scale-105 transition-transform`}>
+                        {React.cloneElement(originalStat.icon, { size: 18, strokeWidth: 2.5 })}
+                     </div>
+                     <div className="min-w-0 flex-1">
+                        <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">{stat.label}</p>
+                        <div className="flex items-center gap-2">
+                           <p className="text-xl font-black tracking-tight text-slate-900">{stat.value}</p>
+                           <div className={`flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded ${stat.label === 'Active Breaches' || stat.trend === 'down' || stat.trend === 'Declining' ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                              {stat.trend}
+                           </div>
+                        </div>
+                     </div>
                   </div>
-                  <div className="min-w-0">
-                     <p className="mb-0.5 text-[10px] font-bold tracking-widest text-slate-400 uppercase">{stat.label}</p>
-                     <p className="text-lg font-extrabold tracking-tight text-slate-900 leading-none">{stat.value}</p>
-                     <span className={`text-[8px] font-black uppercase tracking-widest ${stat.label === 'Strategic Utilization' ? 'text-indigo-500' : stat.label === 'Billable Yield' ? 'text-indigo-400' : stat.trend === 'Prioritize' ? 'text-rose-500' : 'text-slate-400 opacity-60'}`}>{stat.trend}</span>
-                  </div>
-               </div>
-            ))}
+               );
+            })}
          </div>
 
-         {/* STRATEGIC COMMAND TABS */}
-         <div className="mb-6 border-b border-slate-200">
+         <div className="mb-6 border-b border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-end gap-10 overflow-x-auto no-scrollbar">
                {[
                   { id: 'portfolio', label: 'Portfolio Analytics', icon: <PieIcon size={14} /> },
@@ -393,99 +739,144 @@ const UtilizationPerformanceDashboard = () => {
                   );
                })}
             </div>
-         </div>
 
-         {/* DASHBOARD CONTENT ENGINE */}
-         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+               {/* Unified Calendar / Date Range Picker */}
+               <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm h-[38px] mb-2 hover:border-indigo-500 transition-all focus-within:ring-1 focus-within:ring-indigo-500 group">
+                  <CalendarRange size={14} className="text-indigo-600 shrink-0 group-hover:scale-110 transition-transform" />
+                  <div className="flex items-center gap-1">
+                     <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        onClick={(e) => e.target.showPicker()}
+                     className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[110px]"
+                  />
+                  <span className="text-slate-300 mx-0.5">—</span>
+                  <input
+                     type="date"
+                     value={endDate}
+                     onChange={(e) => setEndDate(e.target.value)}
+                        onClick={(e) => e.target.showPicker()}
+                        className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[110px]"
+                     />
+                  </div>
+               </div>
+            </div>
+ 
+            {/* DASHBOARD CONTENT ENGINE */}
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+               {/* TAB 0: UTILIZATION REPORTING & DASHBOARDS */}
+               {activeTab === 'portfolio' && (
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
 
-            {/* TAB 1: STRATEGIC PORTFOLIO (Story 3, 5, 8, 9) */}
-            {activeTab === 'portfolio' && (
-               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2 bg-white rounded-xl border border-slate-100 shadow-sm p-6 overflow-hidden">
-                     <div className="flex items-center justify-between mb-8">
-                        <div className="flex flex-col">
-                           <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest opacity-60">Story 5: Continuous Pattern Discovery</h3>
-                           <p className="text-[10px] font-medium text-slate-400 italic font-serif">Generating historical trend lines from approved timesheets (Planned vs Actual)</p>
+                     <div className="xl:col-span-2 bg-white rounded-3xl border border-slate-100 shadow-sm p-8 overflow-hidden">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
+                           <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-3">
+                                 <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none">Portfolio Performance Overview</h3>
+                              </div>
+                           </div>
+                           <div className="flex items-center gap-1.5 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-100 self-start sm:self-center">
+                              {['DAILY', 'WEEKLY', 'MONTHLY'].map(t => (
+                                 <button
+                                    key={t}
+                                    onClick={() => setGranularity(t)}
+                                    className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all duration-300 ${granularity === t ? 'bg-white shadow-md text-indigo-600 border border-slate-100 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                                 >
+                                    {t}
+                                 </button>
+                              ))}
+                           </div>
                         </div>
-                        <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-100">
-                           {['DAILY', 'WEEKLY', 'MONTHLY'].map(t => (
-                              <button
-                                 key={t}
-                                 onClick={() => setGranularity(t)}
-                                 className={`px-3 py-1 rounded text-[9px] font-bold uppercase transition-all ${granularity === t ? 'bg-white shadow-sm text-indigo-600 border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
-                              >
-                                 {t}
-                              </button>
+                        <div className="h-80 w-full overflow-x-auto no-scrollbar">
+                           <div style={{ minWidth: activeChartData.length > 8 ? `${activeChartData.length * 80}px` : '100vw' }} className="h-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                 <ComposedChart data={activeChartData} margin={{ bottom: 30, right: 20 }}>
+                                    <defs>
+                                       <linearGradient id="utilGradient" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.15} />
+                                          <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                                       </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f8fafc" />
+                                    <XAxis
+                                       dataKey="period"
+                                       axisLine={false}
+                                       tickLine={false}
+                                       tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 800 }}
+                                       interval={0}
+                                       angle={-30}
+                                       textAnchor="end"
+                                    />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 800 }} domain={[0, 100]} />
+                                    <RechartsTooltip content={<PerformanceTooltip />} />
+                                    <Area type="monotone" dataKey="util" fill="url(#utilGradient)" stroke="#4f46e5" strokeWidth={4} name="Utilization %" animationDuration={1500} />
+                                    <Line type="monotone" dataKey="actual" stroke="#94a3b8" strokeWidth={2} strokeDasharray="6 6" dot={false} name="Actual Hours" />
+                                 </ComposedChart>
+                              </ResponsiveContainer>
+                           </div>
+                        </div>
+                        <div className="mt-8 flex flex-wrap items-center justify-center gap-6 border-t border-slate-50 pt-6">
+                           <div className="flex items-center gap-2.5">
+                              <History size={14} className="text-indigo-500" />
+                              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Trend Preservation Active</span>
+                           </div>
+                           <div className="flex items-center gap-2.5 border-l border-slate-200 pl-6">
+                              <Scale size={14} className="text-slate-400" />
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic opacity-70">Comparison: Planned vs Realized</span>
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* QUICK-GLANCE BILLING BREAKDOWN */}
+                     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 flex flex-col group overflow-hidden">
+                        <div className="flex items-center justify-between mb-8">
+                           <div className="flex flex-col gap-1.5">
+                              <h3 className="text-[12px] font-black text-[#081534] uppercase tracking-[0.2em] leading-none mb-1">Billing Yield Index</h3>
+                           </div>
+                           <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner">
+                              <PieChartIcon size={20} />
+                           </div>
+                        </div>
+                        <div className="flex-1 h-60 w-full mt-4 relative">
+                           <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                 <Pie
+                                    data={activeBillingData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={80}
+                                    paddingAngle={6}
+                                    dataKey="value"
+                                    stroke="none"
+                                 >
+                                    {activeBillingData.map((entry, index) => (
+                                       <Cell key={`cell-${index}`} fill={entry.color} cornerRadius={4} />
+                                    ))}
+                                 </Pie>
+                                 <RechartsTooltip />
+                              </PieChart>
+                           </ResponsiveContainer>
+                           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none pt-1">
+                              <span className="text-[20px] font-black text-slate-900 leading-none">{activeBillingData.find(d => d.name === 'Billable')?.value || 0}%</span>
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Billable</span>
+                           </div>
+                        </div>
+                        <div className="mt-4 space-y-2">
+                           {activeBillingData.map((item) => (
+                              <div key={item.name} className="flex items-center justify-between p-2 bg-slate-50/50 rounded-lg border border-slate-100">
+                                 <div className="flex items-center gap-2">
+                                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{item.name}</span>
+                                 </div>
+                                 <span className="text-[11px] font-black text-slate-900">{item.value}%</span>
+                              </div>
                            ))}
                         </div>
                      </div>
-                     <div className="h-64 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                           <ComposedChart data={activeChartData}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                              <XAxis dataKey="period" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }} />
-                              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }} domain={[0, 100]} />
-                              <RechartsTooltip content={<PerformanceTooltip />} />
-                              <Area type="monotone" dataKey="util" fill="#EEF2FF" stroke="#4f46e5" strokeWidth={3} name="Utilization %" />
-                              <Line type="monotone" dataKey="actual" stroke="#cbd5e1" strokeWidth={2} strokeDasharray="5 5" name="Actual Hours" />
-                           </ComposedChart>
-                        </ResponsiveContainer>
-                     </div>
-                     <div className="mt-4 flex items-center justify-center gap-8 border-t border-slate-50 pt-4">
-                        <div className="flex items-center gap-2">
-                           <History size={12} className="text-indigo-500" />
-                           <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Story 5: Trend Preservation Active</span>
-                        </div>
-                        <div className="flex items-center gap-2 border-l border-slate-200 pl-8">
-                           <Scale size={12} className="text-slate-400" />
-                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">Comparing Planned Allocation vs Realized Log</span>
-                        </div>
-                     </div>
                   </div>
-
-                  {/* STORY 3 â€” DEDICATED BILLING CLASSIFICATION BREAKDOWN */}
-                  <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 flex flex-col group overflow-hidden">
-                     <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-[11px] font-black text-[#081534] uppercase tracking-widest opacity-60">Portfolio Yield Index</h3>
-                        <PieChartIcon size={14} className="text-indigo-400" />
-                     </div>
-                     <div className="flex-1 h-48 w-full mt-2">
-                        <ResponsiveContainer width="100%" height="100%">
-                           <PieChart>
-                              <Pie
-                                 data={BILLING_PIE_DATA}
-                                 innerRadius={55}
-                                 outerRadius={75}
-                                 paddingAngle={5}
-                                 dataKey="value"
-                                 stroke="none"
-                              >
-                                 {BILLING_PIE_DATA.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                 ))}
-                              </Pie>
-                              <RechartsTooltip />
-                           </PieChart>
-                        </ResponsiveContainer>
-                        {/* <div className="absolute inset-x-0 top-36 flex flex-col items-center justify-center pointer-events-none">
-                           <span className="text-[18px] font-black text-slate-900 leading-none">72%</span>
-                           <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Billable</span>
-                        </div> */}
-                     </div>
-                     <div className="mt-4 space-y-2">
-                        {BILLING_PIE_DATA.map((item) => (
-                           <div key={item.name} className="flex items-center justify-between p-2 bg-slate-50/50 rounded-lg border border-slate-100">
-                              <div className="flex items-center gap-2">
-                                 <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{item.name}</span>
-                              </div>
-                              <span className="text-[11px] font-black text-slate-900">{item.value}%</span>
-                           </div>
-                        ))}
-                     </div>
-                  </div>
-               </div>
-            )}
+               )}
 
             {/* TAB 2: PROJECTS & BREACHES (Story 3, 4, 6) */}
             {activeTab === 'projects' && (
@@ -620,7 +1011,7 @@ const UtilizationPerformanceDashboard = () => {
                </div>
             )}
 
-            {/* TAB 3: RESOURCE CAPABILITIES (Story 3, 4, 5, 10) */}
+            {/* TAB 3: RESOURCE CAPABILITIES */}
             {activeTab === 'resource' && (
                <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden animate-in">
                   <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
@@ -658,8 +1049,8 @@ const UtilizationPerformanceDashboard = () => {
                            />
                         </div>
                         {/* <div className="flex items-center gap-2 bg-slate-900 text-white rounded-lg px-3 py-1 text-[9px] font-black uppercase tracking-widest">
-                           <ShieldCheck size={12} className="text-emerald-400" /> Source Verified
-                        </div> */}
+                              <ShieldCheck size={12} className="text-emerald-400" /> Source Verified
+                           </div> */}
                      </div>
                   </div>
                   <div className="overflow-x-auto no-scrollbar">
@@ -683,7 +1074,7 @@ const UtilizationPerformanceDashboard = () => {
                                     </div>
                                  </td>
                               </tr>
-                           ) : filteredAndPaginatedResources.paginated.length === 0 ? (
+                           ) : (filteredAndPaginatedResources.paginated.length === 0 ? (
                               <tr>
                                  <td colSpan="4" className="px-6 py-8 text-center">
                                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">No Resource Data Available</span>
@@ -719,24 +1110,24 @@ const UtilizationPerformanceDashboard = () => {
                                        </div>
                                     </td>
                                  </tr>
-                              ))
-                           )}
-                        </tbody>
-                     </table>
-                  </div>
-                  {filteredAndPaginatedResources.totalPages > 1 && (
-                     <div className="border-t border-slate-100 bg-white p-3">
-                        <Pagination
-                           currentPage={currentPage}
-                           totalPages={filteredAndPaginatedResources.totalPages}
-                           onPrevious={() => setCurrentPage(p => Math.max(1, p - 1))}
-                           onNext={() => setCurrentPage(p => Math.min(filteredAndPaginatedResources.totalPages, p + 1))}
-                        />
+                              ))))}
+                           </tbody>
+                        </table>
                      </div>
-                  )}
-               </div>
-            )}
-         </div>
+                     {!projectsLoading && totalProjectPages > 1 && (
+                        <div className="border-t border-slate-100 py-6">
+                           <Pagination
+                              currentPage={projectPage}
+                              totalPages={totalProjectPages}
+                              onPrevious={() => setProjectPage((prev) => Math.max(prev - 1, 1))}
+                              onNext={() => setProjectPage((prev) => Math.min(prev + 1, totalProjectPages))}
+                           />
+                        </div>
+                     )}
+                  </div>
+               )}
+
+            </div>
 
          {/* RESOURCE PROJECTS DRAWER */}
          <ResourceVisualizationDrawer
@@ -755,19 +1146,48 @@ const UtilizationPerformanceDashboard = () => {
 
 const PerformanceTooltip = ({ active, payload, label }) => {
    if (active && payload && payload.length) {
+      const pointData = payload[0].payload;
+      const planned = pointData.planned !== undefined ? pointData.planned : pointData.plannedHours;
+
       return (
-         <div className="bg-[#081534] border border-slate-800 rounded-lg shadow-2xl p-4 flex flex-col gap-2 min-w-[170px]">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{label} Pattern</p>
-            <div className="space-y-2.5">
+         <div className="bg-[#081534]/95 backdrop-blur-md border border-slate-700/50 rounded-2xl shadow-2xl p-5 flex flex-col gap-3 min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-700/50 pb-2 mb-1">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{label || 'Period'}</p>
+               <Circle size={8} className="text-indigo-400 fill-indigo-400 animate-pulse" />
+            </div>
+            <div className="space-y-3">
                {payload.map((p, idx) => (
-                  <div key={idx} className="flex items-center justify-between gap-6">
-                     <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: p.color || p.stroke }} />
-                        <span className="text-[10px] font-bold text-slate-300 uppercase tracking-tight">{p.name}:</span>
+                  <div key={`${p.name}-${idx}`} className="flex items-center justify-between gap-6 group">
+                     <div className="flex items-center gap-2.5">
+                        <div
+                           className="h-2 w-2 rounded-full border border-white/20"
+                           style={{
+                              backgroundColor: p.color || p.payload?.fill || p.stroke || '#4f46e5',
+                              boxShadow: `0 0 8px ${(p.color || p.payload?.fill || p.stroke || '#4f46e5')}66`
+                           }}
+                        />
+                        <span className="text-[11px] font-bold text-slate-300 uppercase tracking-tight group-hover:text-white transition-colors">{p.name}:</span>
                      </div>
-                     <span className="text-[11px] font-black text-white">{p.value}{p.name.includes('%') ? '' : 'h'}</span>
+                     <span className="text-[12px] font-black text-white tabular-nums">
+                        {typeof p.value === 'number' ? p.value.toFixed(1) : p.value}{p.name.toLowerCase().includes('%') ? '%' : 'h'}
+                     </span>
                   </div>
                ))}
+
+               {planned !== undefined && (
+                  <div className="flex items-center justify-between gap-6 pt-3 mt-1 border-t border-slate-700/30">
+                     <div className="flex items-center gap-2.5">
+                        <div className="h-2 w-2 rounded-full bg-slate-500 border border-white/10" />
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">Planned Hours:</span>
+                     </div>
+                     <span className="text-[12px] font-black text-slate-300 tabular-nums">{Number(planned).toFixed(1)}h</span>
+                  </div>
+               )}
+            </div>
+            <div className="mt-2 flex items-center gap-2 opacity-50">
+               <div className="h-px flex-1 bg-slate-700" />
+               <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Validated</span>
+               <div className="h-px flex-1 bg-slate-700" />
             </div>
          </div>
       );
@@ -776,3 +1196,4 @@ const PerformanceTooltip = ({ active, payload, label }) => {
 };
 
 export default UtilizationPerformanceDashboard;
+

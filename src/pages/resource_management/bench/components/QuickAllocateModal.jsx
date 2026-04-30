@@ -13,13 +13,17 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
 
   useEffect(() => {
     if (open) {
+      if (resource?.preSelectedDemandId) {
+        setSelectedDemandId(resource.preSelectedDemandId);
+      } else {
+        setSelectedDemandId("");
+      }
       fetchDemands();
       setSuccess(false);
       setError("");
-      setSelectedDemandId("");
       setAllocationPercentage(100);
     }
-  }, [open]);
+  }, [open, resource]);
 
   const fetchDemands = async () => {
     setLoadingDemands(true);
@@ -64,6 +68,16 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
           });
         }
       });
+
+      // Ensure pre-selected demand is in the list
+      if (resource.preSelectedDemandId && !seen.has(resource.preSelectedDemandId)) {
+        unique.push({
+          demandId: resource.preSelectedDemandId,
+          displayName: resource.preSelectedDemandName || "Selected Demand",
+          score: "N/A",
+          projectInfo: "Pre-selected"
+        });
+      }
 
       setDemands(unique);
     } catch (err) {
@@ -146,23 +160,31 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
               <div className="space-y-4">
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Select Demand <span className="text-rose-500">*</span></label>
-                  {loadingDemands ? (
+                  {loadingDemands && demands.length === 0 ? (
                     <div className="flex h-11 items-center justify-center rounded-lg border border-dashed border-slate-200">
                       <Loader2 className="h-4 w-4 animate-spin text-slate-300" />
                     </div>
                   ) : (
-                    <select
-                      value={selectedDemandId}
-                      onChange={(e) => setSelectedDemandId(e.target.value)}
-                      className="w-full h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50/50 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.5rem_center] bg-no-repeat"
-                    >
-                      <option value="">Choose a demand...</option>
-                      {demands.map(demand => (
-                        <option key={demand.demandId} value={demand.demandId}>
-                          {demand.displayName} ({demand.projectInfo})
-                        </option>
-                      ))}
-                    </select>
+                    <div className={`relative ${resource?.preSelectedDemandId ? "opacity-90 grayscale-[20%]" : ""}`}>
+                      <select
+                        value={selectedDemandId}
+                        onChange={(e) => setSelectedDemandId(e.target.value)}
+                        disabled={!!resource?.preSelectedDemandId}
+                        className={`w-full h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition-all appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.5rem_center] bg-no-repeat ${!resource?.preSelectedDemandId ? 'focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50/50' : 'cursor-not-allowed bg-slate-50'}`}
+                      >
+                        <option value="">Choose a demand...</option>
+                        {demands.map(demand => (
+                          <option key={demand.demandId} value={demand.demandId}>
+                            {demand.displayName} ({demand.projectInfo})
+                          </option>
+                        ))}
+                      </select>
+                      {resource?.preSelectedDemandId && (
+                        <div className="absolute inset-y-0 right-10 flex items-center pr-2 pointer-events-none">
+                          <CheckCircle className="h-4 w-4 text-emerald-500" />
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 

@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { useAuth } from "../../../../../contexts/AuthContext";
+
+
+
 
 export default function CountryEducationMapping() {
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const token = localStorage.getItem("token");
+  const { user } = useAuth();
+  const roles = user?.roles?.map(r => r.toUpperCase()) || [];
+  const canView = roles.includes("ADMIN") || roles.includes("HR");
 
   const axiosConfig = {
     headers: { Authorization: `Bearer ${token}` },
@@ -29,11 +36,19 @@ export default function CountryEducationMapping() {
 
   /* ================= LOAD COUNTRIES ONLY ================= */
   useEffect(() => {
+    if (!canView) return;
     axios
       .get(`${BASE}/masters/country`, axiosConfig)
       .then((res) => setCountries(res.data || []))
       .catch(() => setError("Failed to load countries"));
-  }, []);
+  }, [canView]);
+  if (!canView) {
+  return (
+    <div className="p-6 text-center text-red-600">
+      You are not authorized to view Country Education Mapping
+    </div>
+  );
+}
 
   /* ================= LOAD MAPPINGS ================= */
   const loadMappings = async (countryUuid) => {
@@ -154,7 +169,10 @@ export default function CountryEducationMapping() {
         {selectedCountry && (
           <>
             <div className="flex justify-between items-center mb-3">
-              <h2 className="text-lg font-medium">Existing Mappings</h2>
+              <h2 className="text-lg font-medium">
+                Existing Mappings
+              </h2>
+              {canView && (
               <button
                 onClick={loadFormData}
                 className="bg-blue-600 text-white px-4 py-2 rounded"
@@ -162,6 +180,7 @@ export default function CountryEducationMapping() {
               >
                 {loadingFormData ? "Loading..." : "+ Add Mapping"}
               </button>
+              )}
             </div>
 
             {loadingMappings ? (

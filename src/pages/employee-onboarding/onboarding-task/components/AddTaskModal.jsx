@@ -9,27 +9,41 @@ const normalizeStatusValue = (status) => {
   return "todo";
 };
 
+const formatDate = (date) => {
+  if (!date) return "";
+  try {
+    return new Date(date).toISOString().split("T")[0];
+  } catch {
+    return "";
+  }
+};
+
 const createInitialFormData = (data) => {
   const d = data ?? {};
 
-  console.log("🔧 createInitialFormData input:", d);
-  console.log("🔧 assigned_to value:", d.assigned_to, "type:", typeof d.assigned_to);
+  const due = formatDate(d.due_date || d.dueDate);
+  const reminder = formatDate(d.reminder_date || d.reminderDate);
 
   return {
-    title: d.task_title || d.title || "",
+    title: d.task_title || d.title || "Untitled Task",
     taskType: d.task_type || d.taskType || "Onboarding",
-    user_uuid: d.user_uuid || "",
-    assigned_to: (typeof d.assigned_to === 'string' ? d.assigned_to : String(d.assigned_to || "")) || "",
+    user_uuid: String(d.user_uuid || ""),
+    assigned_to: String(d.assigned_to || ""),
     assigned_team: d.assigned_team || "IT Team",
-    priority: (d.priority || "medium").toLowerCase(),
+    priority: (d.priority || "Medium"),
     status: normalizeStatusValue(d.status),
-    progress: d.progress || 0,
-    dueDate: d.due_date?.split("T")[0] || d.dueDate || "",
-    reminderDate: d.reminder_date?.split("T")[0] || d.reminderDate || "",
+    progress: d.progress ?? 0,
+
+    // ✅ FIXED
+    dueDate: due,
+    reminderDate: reminder || due,
+
     description: d.description || "",
+
+    created_by: d.created_by || "Admin",
+    updated_by: d.updated_by || "Admin",
   };
 };
-
 /* ---------- UI STYLES ---------- */
 const inputStyle = {
   width: "100%",
@@ -80,7 +94,7 @@ export default function AddTaskModal({
 
     // assignee - store the value (ID/email/uuid) from the option
     if (name === "assigned_to") {
-      console.log("🔄 assigned_to change:", value, "type:", typeof value);
+
       setFormData((p) => ({
         ...p,
         assigned_to: String(value || ""), // Ensure it's always a string
@@ -117,17 +131,14 @@ export default function AddTaskModal({
   const handleSubmit = () => {
     // Validation with user feedback
     if (!formData.title || typeof formData.title !== 'string' || !formData.title.trim()) {
-      console.error("❌ Task Title is required");
       alert("⚠️ Please enter a Task Title");
       return;
     }
     if (!formData.user_uuid || typeof formData.user_uuid !== 'string' || !formData.user_uuid.trim()) {
-      console.error("❌ Employee is required");
       alert("⚠️ Please select an Employee");
       return;
     }
     if (!formData.assigned_to || typeof formData.assigned_to !== 'string' || !formData.assigned_to.trim()) {
-      console.error("❌ Assigned To is required");
       alert("⚠️ Please select who to assign this task to");
       return;
     }
@@ -140,19 +151,20 @@ export default function AddTaskModal({
       description: formData.description.trim(),
       assigned_to: formData.assigned_to.trim(),
       assigned_team: formData.assigned_team || "IT Team",
-      priority: formData.priority || "medium", // lowercase: high, medium, low
+      priority: formData.priority || "Medium", // lowercase: high, medium, low
       status: 
         formData.status === "todo" ? "To Do" :
         formData.status === "progress" ? "In Progress" :
         "Completed",
       progress: parseInt(formData.progress) || 0,
-      due_date: formData.dueDate || new Date().toISOString().split("T")[0],
-      reminder_date: formData.reminderDate || formData.dueDate || new Date().toISOString().split("T")[0],
+      due_date: formData.dueDate || initialData?.due_date,
+      reminder_date: formData.reminderDate || initialData?.reminder_date,
       send_notification: true,
       escalation_owner: "Manager",
       internal_notes: "",
       comments: "",
       created_by: "Admin",
+      updated_by: "Admin",
     };
 
     // Attach task_uuid for update mode
@@ -160,16 +172,12 @@ export default function AddTaskModal({
       payload.task_uuid = initialData.task_uuid;
     }
 
-    console.log("📤 SENDING PAYLOAD:", JSON.stringify(payload, null, 2));
-    console.log("✅ Validation passed, submitting...");
+   
 
     // Call parent's onSave callback
-    if (typeof onSave === "function") {
-      console.log("🔄 Calling onSave callback...");
+    if (typeof onSave === "function") {    
       onSave(payload);
-      console.log("✅ onSave callback called successfully");
     } else {
-      console.error("❌ onSave callback not provided or not a function");
       alert("❌ Error: Unable to save task. Please refresh the page and try again.");
     }
   };
@@ -203,7 +211,7 @@ export default function AddTaskModal({
             <label style={labelStyle}>Employee</label>
             <select
               name="user_uuid"
-              value={formData.user_uuid}
+              value={String(formData.user_uuid)}
               onChange={handleChange}
               style={inputStyle}
             >
@@ -220,7 +228,7 @@ export default function AddTaskModal({
             <label style={labelStyle}>Assigned To</label>
             <select
               name="assigned_to"
-              value={formData.assigned_to}
+              value={String(formData.assigned_to)}
               onChange={handleChange}
               style={inputStyle}
             >
@@ -241,9 +249,9 @@ export default function AddTaskModal({
               onChange={handleChange}
               style={inputStyle}
             >
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
             </select>
           </div>
 
@@ -258,6 +266,22 @@ export default function AddTaskModal({
               <option value="todo">To Do</option>
               <option value="progress">In Progress</option>
               <option value="completed">Completed</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Task Type</label>
+            <select
+              name="taskType"
+              value={formData.taskType}
+              onChange={handleChange}
+              style={inputStyle}
+            >
+              <option value="Onboarding">Onboarding</option>
+              <option value="Exit">Exit</option>
+              <option value="IT Provisioning">IT Provisioning</option>
+              <option value="Finance Clearance">Finance Clearance</option>
+              <option value="Admin">Admin</option>
             </select>
           </div>
 
