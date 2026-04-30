@@ -27,7 +27,7 @@ export default function ExcelPreviewModal({
         </div>
 
         {/* TABLE PREVIEW */}
-        <div className="max-h-[400px] overflow-auto border rounded-lg">
+        {/* <div className="max-h-[400px] overflow-auto border rounded-lg">
 
           <table className="min-w-full text-sm">
 
@@ -56,7 +56,53 @@ export default function ExcelPreviewModal({
 
           </table>
 
-        </div>
+        </div> */}
+        {/* TABLE PREVIEW */}
+<div className="max-h-[400px] overflow-auto border rounded-lg">
+
+  <table className="min-w-max w-full text-sm border-collapse">
+
+    <thead className="bg-gray-100 sticky top-0 z-10">
+      <tr>
+        {excelPreview.length > 0 &&
+          Object.keys(excelPreview[0]).map((key) => (
+            <th
+              key={key}
+              className={`px-4 py-3 text-left font-semibold whitespace-nowrap
+                ${key === "user_uuid" ? "min-w-[320px]" : ""}
+              `}
+            >
+              {key}
+            </th>
+          ))}
+      </tr>
+    </thead>
+
+    <tbody>
+      {excelPreview.map((row, index) => (
+        <tr key={index} className="border-t">
+
+          {Object.entries(row).map(([key, val], i) => (
+            <td
+              key={i}
+              className={`px-4 py-3 align-top
+                ${key === "user_uuid"
+                  ? "min-w-[320px] whitespace-nowrap break-normal"
+                  : "whitespace-nowrap"
+                }
+              `}
+            >
+              {val}
+            </td>
+          ))}
+
+        </tr>
+      ))}
+    </tbody>
+
+  </table>
+
+</div>
 
         {/* FOOTER */}
         <div className="flex justify-end gap-3 mt-4">

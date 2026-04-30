@@ -124,7 +124,7 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <div>
             <h3 className="text-lg font-bold text-[#081534]">Quick Allocate</h3>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Streamlined Staffing</p>
+            <p className="text-[11px] font-bold capitalize tracking-widest text-slate-400">Streamlined Staffing</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
             <X className="h-5 w-5" />
@@ -145,7 +145,7 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
           ) : (
             <div className="space-y-6">
               <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 scale-100 transition-transform hover:scale-[1.01]">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Target Resource</p>
+                <p className="text-[10px] font-bold capitalize tracking-widest text-slate-400">Target Resource</p>
                 <div className="mt-2 flex items-center gap-3">
                    <div className="h-10 w-10 rounded-full bg-[#081534] flex items-center justify-center text-white font-bold">
                       {resource.name?.charAt(0)}
@@ -159,7 +159,7 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Select Demand <span className="text-rose-500">*</span></label>
+                  <label className="text-[10px] font-bold capitalize tracking-widest text-slate-500 mb-2 block">Select Demand <span className="text-rose-500">*</span></label>
                   {loadingDemands && demands.length === 0 ? (
                     <div className="flex h-11 items-center justify-center rounded-lg border border-dashed border-slate-200">
                       <Loader2 className="h-4 w-4 animate-spin text-slate-300" />
@@ -190,7 +190,7 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
 
                 <div>
                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Allocation Percentage</label>
+                      <label className="text-[10px] font-bold capitalize tracking-widest text-slate-500">Allocation Percentage</label>
                       <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{allocationPercentage}%</span>
                    </div>
                    <input
