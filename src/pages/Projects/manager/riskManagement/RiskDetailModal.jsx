@@ -14,7 +14,13 @@ import AddMitigationForm from "./AddMitigationForm";
 import MitigationList from "./MitigationList";
 import CreateRiskModal from "./createRiskModal";
 
-export default function RiskDetailModal({ risk, onClose, projectId }) {
+export default function RiskDetailModal({
+  risk,
+  onClose,
+  projectId,
+  selectedIssue,
+  onUpdated,
+}) {
   const [riskDetail, setRiskDetail] = useState(null);
   const [mitigations, setMitigations] = useState([]);
   const [members, setMembers] = useState([]);
@@ -39,20 +45,24 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
 
   useEffect(() => {
     if (!risk?.id) return;
+
     let mounted = true;
 
     async function load() {
       setLoading(true);
       setError(null);
+
       try {
         const riskReq = axios.get(`${BASE_URL}/api/risks/${risk.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+
         const mitigationReq = axios
           .get(`${BASE_URL}/api/mitigation-plans/risk/${risk.id}`, {
             headers: { Authorization: `Bearer ${token}` },
           })
           .catch(() => ({ data: [] }));
+
         const membersReq = axios.get(
           `${BASE_URL}/api/projects/${projectId}/members`,
           { headers: { Authorization: `Bearer ${token}` } },
@@ -65,16 +75,19 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
               headers: { Authorization: `Bearer ${token}` },
             })
           : null;
+
         const ownerReq = riskRes.ownerId
           ? axios.get(`${BASE_URL}/api/users/${riskRes.ownerId}`, {
               headers: { Authorization: `Bearer ${token}` },
             })
           : null;
+
         const reporterReq = riskRes.reporterId
           ? axios.get(`${BASE_URL}/api/users/${riskRes.reporterId}`, {
               headers: { Authorization: `Bearer ${token}` },
             })
           : null;
+
         const statusReq = riskRes.statusId
           ? axios.get(`${BASE_URL}/api/risk-statuses/${riskRes.statusId}`, {
               headers: { Authorization: `Bearer ${token}` },
@@ -98,6 +111,7 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
         ]);
 
         if (!mounted) return;
+
         setRiskDetail(riskRes);
         setMitigations(mitigationRes?.data || []);
         setMembers(membersRes?.data || []);
@@ -110,12 +124,15 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
         console.error(err);
         if (mounted) setError("Failed to load risk details");
       } finally {
-        mounted && setLoading(false);
+        if (mounted) setLoading(false);
       }
     }
 
     load();
-    return () => (mounted = false);
+
+    return () => {
+      mounted = false;
+    };
   }, [risk?.id, projectId, BASE_URL, token]);
 
   async function startEditStatus() {
@@ -125,6 +142,7 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
         headers: { Authorization: `Bearer ${token}` },
       },
     );
+
     setStatuses(res.data || []);
     setEditingStatus(true);
   }
@@ -135,26 +153,59 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
       { statusId: selectedStatusId },
       { headers: { Authorization: `Bearer ${token}` } },
     );
+
     const updated = statuses.find((s) => s.id === selectedStatusId);
     setStatus(updated || null);
     setEditingStatus(false);
+
+    onUpdated?.();
   }
 
   function handleCreated(plan) {
     setMitigations((p) => [...p, plan]);
     setShowAdd(false);
   }
+
   function handleUpdated(updated) {
     setMitigations((p) => p.map((m) => (m.id === updated.id ? updated : m)));
   }
+
   function handleDeleted(id) {
     setMitigations((p) => p.filter((m) => m.id !== id));
   }
 
   if (!risk) return null;
 
+  const editRiskData = riskDetail
+    ? {
+        ...riskDetail,
+
+        linkedType:
+          riskDetail.linkedType ||
+          risk.linkedType ||
+          selectedIssue?.linkedType ||
+          null,
+
+        linkedId:
+          riskDetail.linkedId ||
+          risk.linkedId ||
+          selectedIssue?.linkedId ||
+          null,
+
+        linkedName:
+          riskDetail.linkedName ||
+          riskDetail.linkedTitle ||
+          risk.linkedName ||
+          risk.linkedTitle ||
+          selectedIssue?.title ||
+          selectedIssue?.name ||
+          null,
+      }
+    : null;
+
   /* ── Score colour ── */
   const score = riskDetail?.riskScore ?? 0;
+
   const scoreColor =
     score >= 20
       ? "text-red-600 bg-red-50 border-red-200"
@@ -165,40 +216,43 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
           : "text-emerald-600 bg-emerald-50 border-emerald-200";
 
   return (
-    /* bottom-sheet on mobile, centred card on sm+ */
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center sm:justify-center">
       <div
         className="
-        bg-white w-full
-        sm:max-w-3xl sm:mx-4
-        rounded-t-2xl sm:rounded-2xl
-        shadow-2xl flex flex-col
-        max-h-[92dvh] sm:max-h-[88vh]
-        overflow-hidden
-      "
+          bg-white w-full
+          sm:max-w-3xl sm:mx-4
+          rounded-t-2xl sm:rounded-2xl
+          shadow-2xl flex flex-col
+          max-h-[92dvh] sm:max-h-[88vh]
+          overflow-hidden
+        "
       >
-        {/* ── Header ── */}
+        {/* Header */}
         <div className="bg-indigo-600 text-white px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-start sm:items-center flex-shrink-0">
           <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
               <ShieldAlert className="w-4 h-4" />
             </div>
+
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h2 className="font-bold text-sm sm:text-base">
                   Risk #{risk.id}
                 </h2>
+
                 {riskDetail?.priority && (
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/20 uppercase tracking-wide">
                     {riskDetail.priority}
                   </span>
                 )}
               </div>
+
               <p className="text-xs text-white/70 truncate max-w-[200px] sm:max-w-sm mt-0.5">
                 {riskDetail?.title || "Loading…"}
               </p>
             </div>
           </div>
+
           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
             <button
               onClick={() => setShowEdit(true)}
@@ -206,12 +260,14 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
             >
               <Pencil size={12} /> Edit
             </button>
+
             <button
               onClick={() => setShowEdit(true)}
               className="sm:hidden w-7 h-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20"
             >
               <Pencil size={13} />
             </button>
+
             <button
               onClick={onClose}
               className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
@@ -221,18 +277,20 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
           </div>
         </div>
 
-        {/* ── Edit modal ── */}
+        {/* Edit modal */}
         <CreateRiskModal
           isOpen={showEdit}
           onClose={() => setShowEdit(false)}
           projectId={projectId}
-          risk={riskDetail}
-          onSuccess={() => window.location.reload()}
+          risk={editRiskData}
+          onSuccess={() => {
+            setShowEdit(false);
+            onUpdated?.();
+          }}
         />
 
-        {/* ── Scrollable body ── */}
+        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto">
-          {/* Loading / error */}
           {loading && (
             <div className="flex items-center justify-center py-12">
               <svg
@@ -256,6 +314,7 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
               </svg>
             </div>
           )}
+
           {error && (
             <div className="mx-4 sm:mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
               {error}
@@ -264,10 +323,11 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
 
           {riskDetail && (
             <div className="px-4 sm:px-6 py-4 space-y-4">
-              {/* ── Metrics strip ── */}
+              {/* Metrics strip */}
               <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 <Metric label="Probability" value={riskDetail.probability} />
                 <Metric label="Impact" value={riskDetail.impact} />
+
                 <div
                   className={`border rounded-xl p-3 sm:p-4 text-center ${scoreColor}`}
                 >
@@ -280,40 +340,44 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
                 </div>
               </div>
 
-              {/* ── Info grid — 1 col mobile, 2 col sm+ ── */}
+              {/* Info grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 <InfoCard
                   label="Category"
                   value={category?.name}
                   icon={<Tag size={13} className="text-slate-400" />}
                 />
+
                 <InfoCard
                   label="Owner"
                   value={owner?.name}
                   icon={<User size={13} className="text-slate-400" />}
                 />
+
                 <InfoCard
                   label="Reporter"
                   value={reporter?.name}
                   icon={<User size={13} className="text-slate-400" />}
                 />
+
                 <InfoCard label="Triggers" value={riskDetail.triggers || "—"} />
               </div>
 
-              {/* ── Status row ── */}
+              {/* Status row */}
               <div className="border border-slate-200 rounded-xl p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
                     <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-1.5">
                       Status
                     </p>
+
                     {!editingStatus ? (
                       <span className="px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
                         {status?.name || "—"}
                       </span>
                     ) : (
                       <select
-                        value={selectedStatusId}
+                        value={selectedStatusId || ""}
                         onChange={(e) =>
                           setSelectedStatusId(Number(e.target.value))
                         }
@@ -327,6 +391,7 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
                       </select>
                     )}
                   </div>
+
                   {!editingStatus ? (
                     <button
                       onClick={startEditStatus}
@@ -342,6 +407,7 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
                       >
                         Cancel
                       </button>
+
                       <button
                         onClick={saveStatus}
                         className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-colors"
@@ -353,7 +419,7 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
                 </div>
               </div>
 
-              {/* ── Description ── */}
+              {/* Description */}
               {riskDetail.description && (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4">
                   <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-2">
@@ -365,18 +431,20 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
                 </div>
               )}
 
-              {/* ── Mitigation Plans ── */}
+              {/* Mitigation Plans */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <h4 className="font-semibold text-sm flex items-center gap-2 text-slate-800">
                     <AlertCircle size={15} className="text-indigo-500" />
                     Mitigation Plans
+
                     {mitigations.length > 0 && (
                       <span className="text-[10px] bg-indigo-100 text-indigo-600 font-bold px-1.5 py-0.5 rounded-full">
                         {mitigations.length}
                       </span>
                     )}
                   </h4>
+
                   <button
                     onClick={() => setShowAdd(true)}
                     className="flex items-center gap-1 text-indigo-600 text-xs font-semibold hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition-colors"
@@ -402,7 +470,7 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
           )}
         </div>
 
-        {/* ── Footer ── */}
+        {/* Footer */}
         <div className="border-t border-slate-100 bg-slate-50/60 px-4 sm:px-6 py-3 flex justify-end flex-shrink-0">
           <button
             onClick={onClose}
@@ -413,7 +481,7 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
         </div>
       </div>
 
-      {/* ── Add Mitigation overlay ── */}
+      {/* Add Mitigation overlay */}
       {showAdd && (
         <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center sm:justify-center">
           <div className="bg-white w-full sm:max-w-md sm:mx-4 rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden max-h-[85dvh]">
@@ -431,6 +499,7 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
 }
 
 /* ── Sub components ── */
+
 function Metric({ label, value }) {
   return (
     <div className="border border-slate-200 rounded-xl p-3 sm:p-4 text-center bg-white">
@@ -452,6 +521,7 @@ function InfoCard({ label, value, icon }) {
           {icon}
         </div>
       )}
+
       <div className="min-w-0">
         <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
           {label}
