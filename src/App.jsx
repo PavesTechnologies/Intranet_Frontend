@@ -872,7 +872,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/demand"
             element={
-              <ProtectedRoute allowedRoles={["RESOURCE-MANAGER", "DELIVERY-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["RESOURCE-MANAGER", "DELIVERY-MANAGER", "Admin", "Super Admin"]}>
                 <DemandWorkspacePage />
               </ProtectedRoute>
             }
@@ -880,7 +880,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/demand/:demandId"
             element={
-              <ProtectedRoute allowedRoles={["RESOURCE-MANAGER", "DELIVERY-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["RESOURCE-MANAGER", "DELIVERY-MANAGER", "Admin", "Super Admin"]}>
                 <DemandDetailPage />
               </ProtectedRoute>
             }
@@ -888,7 +888,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff"
             element={
-              <ProtectedRoute allowedRoles={["PROJECT-MANAGER", "RESOURCE-MANAGER", "DELIVERY-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["PROJECT-MANAGER", "RESOURCE-MANAGER", "DELIVERY-MANAGER", "Admin", "Super Admin"]}>
                 <RoleOffEntry />
               </ProtectedRoute>
             }

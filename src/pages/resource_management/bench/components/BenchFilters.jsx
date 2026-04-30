@@ -96,7 +96,44 @@ const BenchFilters = ({
     </div>
   );
 
-  if (isDashboardPortal) return FilterBody;
+  const FilterFooter = (
+    <div className="shrink-0 p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+      <button 
+        type="button"
+        onClick={onReset}
+        className="flex-1 bg-white text-slate-600 border border-slate-200 py-2 rounded-lg text-[11px] font-bold hover:bg-slate-50 hover:text-rose-600 hover:border-rose-200 transition-all active:scale-[0.98] shadow-sm"
+      >
+        Reset All
+      </button>
+      <div className="flex-[2] flex items-center gap-3">
+        <button 
+          type="button"
+          onClick={onClose}
+          className="flex-1 px-4 py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 capitalize tracking-widest transition-colors outline-none"
+        >
+          Cancel
+        </button>
+        <button 
+          type="button"
+          onClick={onApply}
+          className="flex-[1.5] bg-indigo-600 text-white py-2 rounded-lg text-[11px] font-bold shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
+        >
+          Apply Filters
+        </button>
+      </div>
+    </div>
+  );
+
+  if (isDashboardPortal) {
+    return (
+      <>
+        <div className="flex-1 overflow-y-auto p-5 no-scrollbar">
+          {FilterBody}
+        </div>
+        {FilterFooter}
+      </>
+    );
+  }
 
   return (
     <div className="flex flex-col w-full bg-white rounded-xl overflow-hidden font-sans">
@@ -115,31 +152,7 @@ const BenchFilters = ({
       {FilterBody}
 
       {/* Footer */}
-      <div className="shrink-0 p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
-        <button 
-          type="button"
-          onClick={onReset}
-          className="flex-1 bg-white text-slate-600 border border-slate-200 py-2 rounded-lg text-[11px] font-bold hover:bg-slate-50 hover:text-rose-600 hover:border-rose-200 transition-all active:scale-[0.98] shadow-sm"
-        >
-          Reset All
-        </button>
-        <div className="flex-[2] flex items-center gap-3">
-          <button 
-            type="button"
-            onClick={onClose}
-            className="flex-1 px-4 py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 capitalize tracking-widest transition-colors outline-none"
-          >
-            Cancel
-          </button>
-          <button 
-            type="button"
-            onClick={onApply}
-            className="flex-[1.5] bg-indigo-600 text-white py-2 rounded-lg text-[11px] font-bold shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
-          >
-            Apply Filters
-          </button>
-        </div>
-      </div>
+      {FilterFooter}
     </div>
   );
 };

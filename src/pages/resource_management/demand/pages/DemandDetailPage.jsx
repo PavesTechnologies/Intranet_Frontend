@@ -1071,18 +1071,20 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
         </div>
     );
 
-    const { demand, sla } = data;
-    const project = demand.project || {};
-    const role = demand.role || {};
-    const isApproved = ['APPROVED', 'OPEN', 'ACTIVE'].includes(demand.demandStatus?.toUpperCase());
+    const demand = data?.demand || data || {};
+    const sla = data?.sla || demand?.sla;
+    const project = demand?.project || {};
+    const role = demand?.role || {};
+    const isApproved = ['APPROVED', 'OPEN', 'ACTIVE', 'FULFILLED'].includes(demand?.demandStatus?.toUpperCase() || demand?.lifecycleState?.toUpperCase());
 
-    const slaId = sla?.demandSlaId || demand.demandSlaId;
+    const slaId = sla?.demandSlaId || demand?.demandSlaId || demand?.slaId;
 
     const isSoft =
         !slaId && (
-            demand.demandCommitment?.toUpperCase() === 'SOFT' ||
-            demand.demandStatus?.toUpperCase() === 'SOFT' ||
-            demand.demandStatus?.toUpperCase() === 'REQUESTED'
+            demand?.demandCommitment?.toUpperCase() === 'SOFT' ||
+            demand?.demandStatus?.toUpperCase() === 'SOFT' ||
+            demand?.demandStatus?.toUpperCase() === 'REQUESTED' ||
+            demand?.lifecycleState?.toUpperCase() === 'SOFT'
         );
 
     const TABS = [

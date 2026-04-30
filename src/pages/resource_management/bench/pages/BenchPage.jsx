@@ -5,8 +5,7 @@ import BenchKPI from "../components/BenchKPI";
 import BenchFilters from "../components/BenchFilters";
 import BenchTable from "../components/BenchTable";
 import BenchDrawer from "../components/BenchDrawer";
-import AllocateModal from "../components/AllocateModal";
-import QuickAllocateModal from "../components/QuickAllocateModal";
+import AllocationModal from "../../demand/components/AllocationModal";
 import MoveToPoolModal from "../components/MoveToPoolModal";
 import { getBenchMatches } from "../services/benchService";
 import { createPortal } from "react-dom";
@@ -64,8 +63,8 @@ const BenchPage = () => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedResourceId, setSelectedResourceId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [allocateTargets, setAllocateTargets] = useState([]);
-  const [quickAllocateTarget, setQuickAllocateTarget] = useState(null);
+  const [allocateTargetIds, setAllocateTargetIds] = useState([]);
+  const [allocationDemand, setAllocationDemand] = useState(null);
   const [moveToPoolTargets, setMoveToPoolTargets] = useState([]);
   const [bulkCategory, setBulkCategory] = useState(CATEGORY_OPTIONS[0]);
   const [liveMatches, setLiveMatches] = useState([]);
@@ -265,53 +264,13 @@ const BenchPage = () => {
     setDrawerOpen(true);
   };
 
-  const handleAllocate = (targets) => {
-    const list = Array.isArray(targets) ? targets : [targets];
-    if (list.length === 1) {
-      setQuickAllocateTarget(list[0]);
-    } else {
-      setAllocateTargets(list);
-    }
+  const handleQuickAllocate = (resource) => {
+    setAllocateTargetIds([resource.id]);
+    setAllocationDemand(null);
   };
 
   const handleMoveToPool = (targets) => {
     setMoveToPoolTargets(Array.isArray(targets) ? targets : [targets]);
-  };
-
-  const handleQuickAllocate = (resource) => {
-    setQuickAllocateTarget(resource);
-  };
-
-  const applyAllocation = ({ project, allocation, startDate }) => {
-    const ids = allocateTargets.map((item) => item.id);
-
-    setResources((prev) =>
-      prev.map((item) =>
-        ids.includes(item.id)
-          ? {
-            ...item,
-            allocation,
-            availability: Math.max(0, 100 - allocation),
-            lastAllocationDate: startDate,
-            poolType: "",
-            category: "Not Available",
-            lastProject: {
-              name: project,
-              client: "Assigned",
-              endDate: startDate,
-              reason: "Allocated from bench management",
-            },
-          }
-          : item,
-      ),
-    );
-
-    setSelectedRows((prev) => prev.filter((id) => !ids.includes(id)));
-    setAllocateTargets([]);
-    if (selectedResourceId && ids.includes(selectedResourceId)) {
-      setDrawerOpen(false);
-      setSelectedResourceId(null);
-    }
   };
 
   const applyMoveToPool = ({ poolType, reason }) => {
@@ -493,6 +452,7 @@ const BenchPage = () => {
             onCategoryChange={(id, category) => setResourceCategory([id], category)}
             onRefresh={() => fetchData(true)}
             loading={loading}
+            activeTab={activeTab}
           />
         </div>
       </div>
@@ -501,24 +461,32 @@ const BenchPage = () => {
         open={drawerOpen}
         resource={selectedResource}
         onClose={() => setDrawerOpen(false)}
-        onAllocate={(resource) => handleAllocate(resource)}
+        onAllocate={(resource, demand) => {
+          setAllocateTargetIds([resource.id]);
+          setAllocationDemand(demand);
+        }}
         onMoveToPool={(resource) => handleMoveToPool(resource)}
         liveMatches={liveMatches}
         loadingMatches={loadingMatches}
       />
 
-      <AllocateModal
-        open={allocateTargets.length > 0}
-        resources={allocateTargets}
-        onClose={() => setAllocateTargets([])}
-        onSubmit={applyAllocation}
-      />
-
-      <QuickAllocateModal
-        open={Boolean(quickAllocateTarget)}
-        resource={quickAllocateTarget}
-        onClose={() => setQuickAllocateTarget(null)}
-        onRefresh={fetchData}
+      <AllocationModal
+        isOpen={allocateTargetIds.length > 0}
+        isBenchMode={true}
+        benchMatches={liveMatches}
+        onClose={() => {
+          setAllocateTargetIds([]);
+          setAllocationDemand(null);
+        }}
+        demand={allocationDemand}
+        initialResourceIds={allocateTargetIds}
+        onSuccess={() => {
+          fetchData(true);
+          setAllocateTargetIds([]);
+          setAllocationDemand(null);
+          setDrawerOpen(false);
+          setSelectedRows([]);
+        }}
       />
 
       <MoveToPoolModal

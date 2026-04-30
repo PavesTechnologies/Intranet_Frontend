@@ -515,7 +515,7 @@ const OperationalProjectDetailPage = () => {
                           <td className="px-8 py-5">
                             <div className="flex items-center gap-4">
                               <div className="h-10 w-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-xs shadow-sm group-hover:scale-110 transition-transform">
-                                {getResourceName(resource).split(' ').map(n => n[0]).join('').tocapitalize().slice(0, 2)}
+                                {getResourceName(resource).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                               </div>
                               <div>
                                 <p className="text-sm font-black text-[#081534] group-hover:text-indigo-600 transition-colors">{getResourceName(resource)}</p>
