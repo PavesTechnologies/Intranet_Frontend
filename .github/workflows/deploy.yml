@@ -45,7 +45,7 @@ jobs:
             docker compose pull frontend
 
             echo "Restarting frontend container..."
-            docker compose up -d frontend
+            docker compose up -d
 
             echo "Cleaning old unused images..."
             docker image prune -f
