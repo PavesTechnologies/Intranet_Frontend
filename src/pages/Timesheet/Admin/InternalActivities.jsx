@@ -1,7 +1,7 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { Pencil, CheckCircle, XCircle } from "lucide-react";
+import { Pencil, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
@@ -114,6 +114,36 @@ const InternalActivities = () => {
     }
   };
 
+  const deleteTask = async (id) => {
+    const confirmed = window.confirm("Are you sure you want to delete?");
+    if (!confirmed) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await axios.delete(
+        `${
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        }/api/internal-projects/${id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
+      setEditingTaskId(null);
+      setTempTaskName("");
+      fetchInternalActivities();
+      toast.success(res?.data || "Task deleted successfully");
+    } catch (err) {
+      console.log("failed to delete task: ", err);
+      toast.error(err?.response?.data || "Failed to delete task.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchInternalActivities();
   }, []);
@@ -166,6 +196,11 @@ const InternalActivities = () => {
                             className="text-red-500 hover:text-red-800 w-6 h-6 cursor-pointer"
                             onClick={handleCancelEdit}
                             title="Cancel"
+                          />
+                          <Trash2
+                            className="text-red-500 hover:text-red-800 w-6 h-6 cursor-pointer"
+                            onClick={() => deleteTask(activites.id)}
+                            title="Delete"
                           />
                         </div>
                       ) : (
