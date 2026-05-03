@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { Pencil, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
 const InternalActivities = () => {
   const [internalActivities, setInternalActivities] = useState([]);
@@ -12,6 +13,8 @@ const InternalActivities = () => {
   const [addTaskField, setAddTaskField] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [tempTaskName, setTempTaskName] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTaskId, setDeleteTaskId] = useState(null);
 
   const fetchInternalActivities = async () => {
     setLoading(true);
@@ -114,11 +117,15 @@ const InternalActivities = () => {
     }
   };
 
-  const deleteTask = async (id) => {
-    const confirmed = window.confirm("Are you sure you want to delete?");
-    if (!confirmed) {
-      return;
-    }
+  const handleDeleteClick = (id) => {
+    setDeleteTaskId(id);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setShowDeleteModal(false);
+    const id = deleteTaskId;
+    setDeleteTaskId(null);
 
     setLoading(true);
     try {
@@ -142,6 +149,11 @@ const InternalActivities = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setDeleteTaskId(null);
   };
 
   useEffect(() => {
@@ -199,7 +211,7 @@ const InternalActivities = () => {
                           />
                           <Trash2
                             className="text-red-500 hover:text-red-800 w-6 h-6 cursor-pointer"
-                            onClick={() => deleteTask(activites.id)}
+                            onClick={() => handleDeleteClick(activites.id)}
                             title="Delete"
                           />
                         </div>
@@ -273,6 +285,15 @@ const InternalActivities = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        title="Delete Task"
+        message="Are you sure you want to delete?"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        confirmText="Yes"
+      />
     </div>
   );
 };
