@@ -8,8 +8,12 @@ import {
   Pencil,
   Check,
   ShieldAlert,
+  Trash2,
 } from "lucide-react";
 import axios from "axios";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 import AddMitigationForm from "./AddMitigationForm";
 import MitigationList from "./MitigationList";
 import CreateRiskModal from "./createRiskModal";
@@ -28,20 +32,24 @@ export default function RiskDetailModal({
   const [owner, setOwner] = useState(null);
   const [reporter, setReporter] = useState(null);
 
-  /* ── Status ── */
   const [status, setStatus] = useState(null);
   const [statuses, setStatuses] = useState([]);
   const [editingStatus, setEditingStatus] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
 
-  /* ── Edit ── */
   const [showEdit, setShowEdit] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
 
   const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
   const token = localStorage.getItem("token");
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
 
   useEffect(() => {
     if (!risk?.id) return;
@@ -54,45 +62,45 @@ export default function RiskDetailModal({
 
       try {
         const riskReq = axios.get(`${BASE_URL}/api/risks/${risk.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
         });
 
         const mitigationReq = axios
           .get(`${BASE_URL}/api/mitigation-plans/risk/${risk.id}`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers,
           })
           .catch(() => ({ data: [] }));
 
         const membersReq = axios.get(
           `${BASE_URL}/api/projects/${projectId}/members`,
-          { headers: { Authorization: `Bearer ${token}` } },
+          { headers },
         );
 
         const riskRes = (await riskReq).data;
 
         const categoryReq = riskRes.categoryId
           ? axios.get(`${BASE_URL}/api/risk/category/${riskRes.categoryId}`, {
-              headers: { Authorization: `Bearer ${token}` },
+              headers,
             })
-          : null;
+          : Promise.resolve({ data: null });
 
         const ownerReq = riskRes.ownerId
           ? axios.get(`${BASE_URL}/api/users/${riskRes.ownerId}`, {
-              headers: { Authorization: `Bearer ${token}` },
+              headers,
             })
-          : null;
+          : Promise.resolve({ data: null });
 
         const reporterReq = riskRes.reporterId
           ? axios.get(`${BASE_URL}/api/users/${riskRes.reporterId}`, {
-              headers: { Authorization: `Bearer ${token}` },
+              headers,
             })
-          : null;
+          : Promise.resolve({ data: null });
 
         const statusReq = riskRes.statusId
           ? axios.get(`${BASE_URL}/api/risk-statuses/${riskRes.statusId}`, {
-              headers: { Authorization: `Bearer ${token}` },
+              headers,
             })
-          : null;
+          : Promise.resolve({ data: null });
 
         const [
           mitigationRes,
@@ -136,29 +144,99 @@ export default function RiskDetailModal({
   }, [risk?.id, projectId, BASE_URL, token]);
 
   async function startEditStatus() {
-    const res = await axios.get(
-      `${BASE_URL}/api/projects/${projectId}/risk-statuses`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    );
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/projects/${projectId}/risk-statuses`,
+        { headers },
+      );
 
-    setStatuses(res.data || []);
-    setEditingStatus(true);
+      setStatuses(res.data || []);
+      setEditingStatus(true);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load risk statuses");
+    }
   }
 
   async function saveStatus() {
-    await axios.patch(
-      `${BASE_URL}/api/risks/${risk.id}/status`,
-      { statusId: selectedStatusId },
-      { headers: { Authorization: `Bearer ${token}` } },
+    try {
+      await axios.patch(
+        `${BASE_URL}/api/risks/${risk.id}/status`,
+        { statusId: selectedStatusId },
+        { headers },
+      );
+
+      const updated = statuses.find((s) => s.id === selectedStatusId);
+      setStatus(updated || null);
+      setEditingStatus(false);
+
+      toast.success("Risk status updated successfully");
+      onUpdated?.();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update risk status");
+    }
+  }
+
+  async function executeDeleteRisk() {
+    try {
+      setDeleting(true);
+
+      await axios.delete(`${BASE_URL}/api/risks/${risk.id}`, {
+        headers,
+      });
+
+      toast.success("Risk deleted successfully");
+      onUpdated?.();
+      onClose?.();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete risk");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function handleDeleteRisk() {
+    const ConfirmToast = ({ closeToast }) => (
+      <div className="flex flex-col gap-3 py-1">
+        <p className="text-sm text-gray-800 font-medium">
+          Are you sure you want to delete this risk?
+        </p>
+
+        <p className="text-xs text-gray-500">
+          This action cannot be undone.
+        </p>
+
+        <div className="flex justify-end gap-2 mt-1">
+          <button
+            onClick={closeToast}
+            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-200 transition-colors"
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={() => {
+              executeDeleteRisk();
+              closeToast();
+            }}
+            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
     );
 
-    const updated = statuses.find((s) => s.id === selectedStatusId);
-    setStatus(updated || null);
-    setEditingStatus(false);
-
-    onUpdated?.();
+    toast.warn(<ConfirmToast />, {
+      position: "top-center",
+      autoClose: false,
+      closeOnClick: false,
+      draggable: false,
+      closeButton: false,
+      icon: false,
+    });
   }
 
   function handleCreated(plan) {
@@ -203,7 +281,6 @@ export default function RiskDetailModal({
       }
     : null;
 
-  /* ── Score colour ── */
   const score = riskDetail?.riskScore ?? 0;
 
   const scoreColor =
@@ -217,6 +294,8 @@ export default function RiskDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center sm:justify-center">
+      <ToastContainer position="top-right" autoClose={3000} />
+
       <div
         className="
           bg-white w-full
@@ -227,7 +306,6 @@ export default function RiskDetailModal({
           overflow-hidden
         "
       >
-        {/* Header */}
         <div className="bg-indigo-600 text-white px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-start sm:items-center flex-shrink-0">
           <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
@@ -255,6 +333,23 @@ export default function RiskDetailModal({
 
           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
             <button
+              onClick={handleDeleteRisk}
+              disabled={deleting}
+              className="hidden sm:flex items-center gap-1 text-xs text-white/90 hover:text-white bg-red-500/25 hover:bg-red-500/40 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-60"
+            >
+              <Trash2 size={12} />
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+
+            <button
+              onClick={handleDeleteRisk}
+              disabled={deleting}
+              className="sm:hidden w-7 h-7 flex items-center justify-center rounded-lg bg-red-500/25 hover:bg-red-500/40 disabled:opacity-60"
+            >
+              <Trash2 size={13} />
+            </button>
+
+            <button
               onClick={() => setShowEdit(true)}
               className="hidden sm:flex items-center gap-1 text-xs text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg transition-colors"
             >
@@ -277,7 +372,6 @@ export default function RiskDetailModal({
           </div>
         </div>
 
-        {/* Edit modal */}
         <CreateRiskModal
           isOpen={showEdit}
           onClose={() => setShowEdit(false)}
@@ -289,7 +383,6 @@ export default function RiskDetailModal({
           }}
         />
 
-        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto">
           {loading && (
             <div className="flex items-center justify-center py-12">
@@ -323,7 +416,6 @@ export default function RiskDetailModal({
 
           {riskDetail && (
             <div className="px-4 sm:px-6 py-4 space-y-4">
-              {/* Metrics strip */}
               <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 <Metric label="Probability" value={riskDetail.probability} />
                 <Metric label="Impact" value={riskDetail.impact} />
@@ -340,7 +432,6 @@ export default function RiskDetailModal({
                 </div>
               </div>
 
-              {/* Info grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 <InfoCard
                   label="Category"
@@ -363,7 +454,6 @@ export default function RiskDetailModal({
                 <InfoCard label="Triggers" value={riskDetail.triggers || "—"} />
               </div>
 
-              {/* Status row */}
               <div className="border border-slate-200 rounded-xl p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
@@ -419,7 +509,6 @@ export default function RiskDetailModal({
                 </div>
               </div>
 
-              {/* Description */}
               {riskDetail.description && (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4">
                   <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-2">
@@ -431,7 +520,6 @@ export default function RiskDetailModal({
                 </div>
               )}
 
-              {/* Mitigation Plans */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <h4 className="font-semibold text-sm flex items-center gap-2 text-slate-800">
@@ -470,8 +558,16 @@ export default function RiskDetailModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-slate-100 bg-slate-50/60 px-4 sm:px-6 py-3 flex justify-end flex-shrink-0">
+        <div className="border-t border-slate-100 bg-slate-50/60 px-4 sm:px-6 py-3 flex justify-between items-center flex-shrink-0">
+          <button
+            onClick={handleDeleteRisk}
+            disabled={deleting}
+            className="px-4 py-2 rounded-xl border border-red-200 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-60 flex items-center gap-2"
+          >
+            <Trash2 size={14} />
+            {deleting ? "Deleting..." : "Delete Risk"}
+          </button>
+
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-white transition-colors"
@@ -481,7 +577,6 @@ export default function RiskDetailModal({
         </div>
       </div>
 
-      {/* Add Mitigation overlay */}
       {showAdd && (
         <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center sm:justify-center">
           <div className="bg-white w-full sm:max-w-md sm:mx-4 rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden max-h-[85dvh]">
@@ -497,8 +592,6 @@ export default function RiskDetailModal({
     </div>
   );
 }
-
-/* ── Sub components ── */
 
 function Metric({ label, value }) {
   return (
