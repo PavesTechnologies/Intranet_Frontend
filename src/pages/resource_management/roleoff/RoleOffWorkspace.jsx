@@ -899,18 +899,24 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     }
   };
 
-  const handleOpenBulkRmPanel = () => {
+  const handleOpenBulkRmPanel = (actionType = "bulk-rm") => {
     const selectedRequests = visibleRows.filter((item) => selectedRows.includes(item.id));
     if (selectedRequests.length < 2) return;
 
-    openSidePanel(createBulkRequestRecord(selectedRequests, "Selected Requests"), "bulk-rm");
+    openSidePanel(
+      createBulkRequestRecord(selectedRequests, "Selected Requests"),
+      actionType,
+    );
   };
 
-  const handleOpenBulkDmPanel = () => {
+  const handleOpenBulkDmPanel = (actionType = "bulk-dm-reject") => {
     const selectedRequests = visibleRows.filter((item) => selectedRows.includes(item.id));
     if (selectedRequests.length < 2) return;
 
-    openSidePanel(createBulkRequestRecord(selectedRequests, "Selected Requests"), "bulk-dm");
+    openSidePanel(
+      createBulkRequestRecord(selectedRequests, "Selected Requests"),
+      actionType,
+    );
   };
 
   const getPmActionType = (row, currentTab = pmActiveTab) => {
@@ -1382,9 +1388,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             label: bulkActionState.loading && bulkActionState.key === "rm-approve"
               ? "Approving..."
               : "Bulk Approve",
-            onClick: () => handleRmApprove(createBulkRequestRecord(
-              visibleRows.filter((item) => selectedRows.includes(item.id)),
-            )),
+            onClick: () => handleOpenBulkRmPanel("bulk-rm-approve"),
             loading: bulkActionState.loading && bulkActionState.key === "rm-approve",
             disabled: bulkActionState.loading,
           },
@@ -1392,7 +1396,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             label: bulkActionState.loading && bulkActionState.key === "rm-reject"
               ? "Rejecting..."
               : "Bulk Reject",
-            onClick: handleOpenBulkRmPanel,
+            onClick: () => handleOpenBulkRmPanel("bulk-rm-reject"),
             variant: "outline",
             className: "h-9 border-rose-300 bg-white text-xs text-rose-700 hover:bg-rose-50 hover:text-rose-800",
             disabled: bulkActionState.loading,
@@ -1410,9 +1414,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             label: bulkActionState.loading && bulkActionState.key === "dm-fulfill"
               ? "Fulfilling..."
               : "Bulk Fulfill",
-            onClick: () => handleApproveRequest(createBulkRequestRecord(
-              visibleRows.filter((item) => selectedRows.includes(item.id)),
-            )),
+            onClick: () => handleOpenBulkDmPanel("bulk-dm-approve"),
             loading: bulkActionState.loading && bulkActionState.key === "dm-fulfill",
             disabled: bulkActionState.loading,
           },
@@ -1420,7 +1422,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             label: bulkActionState.loading && bulkActionState.key === "dm-reject"
               ? "Rejecting..."
               : "Bulk Reject",
-            onClick: handleOpenBulkDmPanel,
+            onClick: () => handleOpenBulkDmPanel("bulk-dm-reject"),
             variant: "outline",
             className: "h-9 border-rose-300 bg-white text-xs text-rose-700 hover:bg-rose-50 hover:text-rose-800",
             disabled: bulkActionState.loading,
