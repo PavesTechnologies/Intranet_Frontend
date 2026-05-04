@@ -96,7 +96,7 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
   }
 
   /* =========================
-     Load Risks (ALL + Specific)
+     Load Risks
   ========================= */
 
   useEffect(() => {
@@ -137,7 +137,9 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
     }
 
     loadRisks();
-    return () => (cancelled = true);
+    return () => {
+      cancelled = true;
+    };
   }, [selectedIssue, activeIssueType, riskPage, projectId, refreshKey]);
 
   /* =========================
@@ -147,30 +149,28 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
-      {/* <div className="bg-white border-b sticky top-0 z-[50] shadow-sm"> */}
-        <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between">
-          <h1 className="text-3xl font-bold">Risk Management</h1>
+      <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between">
+        <h1 className="text-3xl font-bold">Risk Management</h1>
 
-          <button
-            onClick={() => setShowCreateRisk(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            New Risk
-          </button>
+        <button
+          onClick={() => setShowCreateRisk(true)}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          New Risk
+        </button>
 
-          <CreateRiskModal
-            projectId={projectId}
-            isOpen={showCreateRisk}
-            onClose={() => setShowCreateRisk(false)}
-            onCreate={() => {
-              setShowCreateRisk(false);
-              setRiskPage(1);
-              setRefreshKey((prev) => prev + 1); // 🔥 refresh summary + risks
-            }}
-          />
-        </div>
-      {/* </div> */}
+        <CreateRiskModal
+          projectId={projectId}
+          isOpen={showCreateRisk}
+          onClose={() => setShowCreateRisk(false)}
+          onCreate={() => {
+            setShowCreateRisk(false);
+            setRiskPage(1);
+            setRefreshKey((prev) => prev + 1);
+          }}
+        />
+      </div>
 
       {/* Issue Type Cards */}
       <div className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-5 gap-4">
@@ -228,8 +228,13 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
 
       <RiskDetailModal
         risk={showRiskModal ? selectedRisk : null}
+        selectedIssue={selectedIssue}
         onClose={() => setShowRiskModal(false)}
         projectId={projectId}
+        onUpdated={() => {
+          setRefreshKey((prev) => prev + 1);
+          setRiskPage(1);
+        }}
       />
     </div>
   );

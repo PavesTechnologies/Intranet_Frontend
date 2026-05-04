@@ -1,9 +1,10 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { Pencil, CheckCircle, XCircle } from "lucide-react";
+import { Pencil, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
 const InternalActivities = () => {
   const [internalActivities, setInternalActivities] = useState([]);
@@ -12,6 +13,8 @@ const InternalActivities = () => {
   const [addTaskField, setAddTaskField] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [tempTaskName, setTempTaskName] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTaskId, setDeleteTaskId] = useState(null);
 
   const fetchInternalActivities = async () => {
     setLoading(true);
@@ -114,6 +117,45 @@ const InternalActivities = () => {
     }
   };
 
+  const handleDeleteClick = (id) => {
+    setDeleteTaskId(id);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setShowDeleteModal(false);
+    const id = deleteTaskId;
+    setDeleteTaskId(null);
+
+    setLoading(true);
+    try {
+      const res = await axios.delete(
+        `${
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        }/api/internal-projects/${id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
+      setEditingTaskId(null);
+      setTempTaskName("");
+      fetchInternalActivities();
+      toast.success(res?.data || "Task deleted successfully");
+    } catch (err) {
+      console.log("failed to delete task: ", err);
+      toast.error(err?.response?.data || "Failed to delete task.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setDeleteTaskId(null);
+  };
+
   useEffect(() => {
     fetchInternalActivities();
   }, []);
@@ -166,6 +208,11 @@ const InternalActivities = () => {
                             className="text-red-500 hover:text-red-800 w-6 h-6 cursor-pointer"
                             onClick={handleCancelEdit}
                             title="Cancel"
+                          />
+                          <Trash2
+                            className="text-red-500 hover:text-red-800 w-6 h-6 cursor-pointer"
+                            onClick={() => handleDeleteClick(activites.id)}
+                            title="Delete"
                           />
                         </div>
                       ) : (
@@ -238,6 +285,15 @@ const InternalActivities = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        title="Delete Task"
+        message="Are you sure you want to delete?"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        confirmText="Yes"
+      />
     </div>
   );
 };
