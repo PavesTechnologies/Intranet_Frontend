@@ -6,7 +6,7 @@ import StoryCard from "./StoryCard";
 import CreateSprintModal from "./CreateSprintModal";
 import SprintColumn from "./SprintColumn";
 import Button from "../../../../components/Button/Button";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import SprintPendingModal from "./SprintPendingModal";
 
@@ -187,6 +187,15 @@ const SprintBoard = ({ projectId, projectName }) => {
         }
       }
 
+      if (errorData.message?.toLowerCase().includes("another active sprint")) {
+          toast.warn(
+              "Cannot start sprint: Another active sprint already exists in this project.",
+              { autoClose: 3000, containerId: "global" }
+          );
+          fetchSprints();
+          return;
+      }
+
       // Generic error message
       const errorMsg = errorData.message || error.message || "Operation failed";
       toast.error(errorMsg);
@@ -212,7 +221,6 @@ const SprintBoard = ({ projectId, projectName }) => {
    ============================== */
   return (
     <DndProvider backend={HTML5Backend}>
-      <ToastContainer />
       <div className="p-6 space-y-6">
         {/* ===== Page Header ===== */}
         <div className="flex justify-between items-center">
