@@ -353,9 +353,18 @@ const AppRoutes = () => {
               // </ProtectedRoute>
             }
           />
+
           <Route path="/projects" element={<ProjectManager />} />
           <Route path="/projects/:projectId" element={<ProjectTabs />} />
           <Route path="/projects/list" element={<ProjectList />} />
+          {/* <Route
+  path="/projects/:projectId/issuetracker"
+  element={
+    <ProtectedRoute allowedRoles={["General", "Manager"]}>
+      <IssueTracker />
+    </ProtectedRoute>
+  }
+/> */}
           <Route
             path="/projects/:projectId/issuetracker"
             element={<IssueTracker />}
