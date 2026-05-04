@@ -942,7 +942,7 @@ const AppRoutes = () => {
 function App() {
   return (
     <>
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer position="top-right" autoClose={3000} style={{ zIndex: 999999 }} containerId="global" />
       <Router basename={window.__APP_CONFIG__.basePath}>
         <></>
         <AuthProvider>
