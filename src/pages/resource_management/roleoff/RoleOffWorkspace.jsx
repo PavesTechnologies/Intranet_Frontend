@@ -318,6 +318,7 @@ const mapPendingRoleOffToRequest = (item) => {
     endDateIso: item.endDate || "",
     replacementRequired: Boolean(item.demandName),
     reason: item.roleOffReason || item.demandName || "",
+    resourcePerformance: item.resourcePerformance || "",
   };
 };
 
@@ -422,7 +423,9 @@ const buildKpis = (mode, allocations, roleOffRequests, selectedRows) => {
 };
 
 const buildPmDemandStyleKpis = (allocations, roleOffRequests, selectedRows) => {
-  const activeAllocations = allocations.filter((item) => item.status === "Active");
+  const activeAllocations = allocations.filter(
+    (item) => item.status === "Active" && item.roleOffStatus !== "Fulfilled",
+  );
   const pendingRequests = allocations.filter((item) => item.roleOffStatus === "Pending Approval");
   const totalRoleOffs = allocations.filter((item) => item.roleOffStatus && item.roleOffStatus !== "Not Requested");
 
@@ -896,18 +899,24 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     }
   };
 
-  const handleOpenBulkRmPanel = () => {
+  const handleOpenBulkRmPanel = (actionType = "bulk-rm") => {
     const selectedRequests = visibleRows.filter((item) => selectedRows.includes(item.id));
     if (selectedRequests.length < 2) return;
 
-    openSidePanel(createBulkRequestRecord(selectedRequests, "Selected Requests"), "bulk-rm");
+    openSidePanel(
+      createBulkRequestRecord(selectedRequests, "Selected Requests"),
+      actionType,
+    );
   };
 
-  const handleOpenBulkDmPanel = () => {
+  const handleOpenBulkDmPanel = (actionType = "bulk-dm-reject") => {
     const selectedRequests = visibleRows.filter((item) => selectedRows.includes(item.id));
     if (selectedRequests.length < 2) return;
 
-    openSidePanel(createBulkRequestRecord(selectedRequests, "Selected Requests"), "bulk-dm");
+    openSidePanel(
+      createBulkRequestRecord(selectedRequests, "Selected Requests"),
+      actionType,
+    );
   };
 
   const getPmActionType = (row, currentTab = pmActiveTab) => {
@@ -1102,6 +1111,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           roleOffReason: formState.reason,
           roleOffType: "PLANNED",
           confirmed: Boolean(formState.reviewConfirmed),
+          resourcePerformance: formState.resourcePerformance,
         };
 
         const response = await bulkPlannedRoleOff(bulkPayload);
@@ -1122,6 +1132,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
               replacementRequired: formState.replacementRequired,
               autoReplacementRequired: formState.replacementRequired,
               skipReason: formState.skipReason,
+              resourcePerformance: formState.resourcePerformance,
             },
           );
         });
@@ -1148,6 +1159,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           roleOffType: isBulkStyleUpdate ? "PLANNED" : formState.type.toUpperCase(),
           effectiveRoleOffDate: formState.effectiveDate,
           roleOffReason: formState.reason,
+          resourcePerformance: formState.resourcePerformance,
           autoReplacementRequired: isBulkStyleUpdate ? false : formState.replacementRequired,
           skipReason: isBulkStyleUpdate
             ? null
@@ -1185,6 +1197,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             replacementRequired: formState.replacementRequired,
             autoReplacementRequired: formState.replacementRequired,
             skipReason: formState.skipReason,
+            resourcePerformance: formState.resourcePerformance,
           },
         );
       }
@@ -1375,9 +1388,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             label: bulkActionState.loading && bulkActionState.key === "rm-approve"
               ? "Approving..."
               : "Bulk Approve",
-            onClick: () => handleRmApprove(createBulkRequestRecord(
-              visibleRows.filter((item) => selectedRows.includes(item.id)),
-            )),
+            onClick: () => handleOpenBulkRmPanel("bulk-rm-approve"),
             loading: bulkActionState.loading && bulkActionState.key === "rm-approve",
             disabled: bulkActionState.loading,
           },
@@ -1385,7 +1396,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             label: bulkActionState.loading && bulkActionState.key === "rm-reject"
               ? "Rejecting..."
               : "Bulk Reject",
-            onClick: handleOpenBulkRmPanel,
+            onClick: () => handleOpenBulkRmPanel("bulk-rm-reject"),
             variant: "outline",
             className: "h-9 border-rose-300 bg-white text-xs text-rose-700 hover:bg-rose-50 hover:text-rose-800",
             disabled: bulkActionState.loading,
@@ -1403,9 +1414,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             label: bulkActionState.loading && bulkActionState.key === "dm-fulfill"
               ? "Fulfilling..."
               : "Bulk Fulfill",
-            onClick: () => handleApproveRequest(createBulkRequestRecord(
-              visibleRows.filter((item) => selectedRows.includes(item.id)),
-            )),
+            onClick: () => handleOpenBulkDmPanel("bulk-dm-approve"),
             loading: bulkActionState.loading && bulkActionState.key === "dm-fulfill",
             disabled: bulkActionState.loading,
           },
@@ -1413,7 +1422,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             label: bulkActionState.loading && bulkActionState.key === "dm-reject"
               ? "Rejecting..."
               : "Bulk Reject",
-            onClick: handleOpenBulkDmPanel,
+            onClick: () => handleOpenBulkDmPanel("bulk-dm-reject"),
             variant: "outline",
             className: "h-9 border-rose-300 bg-white text-xs text-rose-700 hover:bg-rose-50 hover:text-rose-800",
             disabled: bulkActionState.loading,
@@ -1449,15 +1458,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             ) : null
           )}
         </div>
-        <div className="ml-4 shrink-0">
-          <button
-            onClick={() => navigate('/resource-management/roleoff/report')}
-            className="inline-flex items-center gap-2 rounded-md bg-[#081534] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#10214f]"
-          >
-            <ClipboardCheck className="h-4 w-4" />
-            Roleoff Report
-          </button>
-        </div>
+        
       </div>
 
       <div className="space-y-6">
@@ -1470,7 +1471,19 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                 : "Project Manager workspace for initiating and tracking role-off requests on active allocations."
             }
             metrics={pmKpis}
+            action={(
+              <div className="ml-4 shrink-0">
+                <button
+                  onClick={() => navigate("/resource-management/roleoff/report")}
+                  className="inline-flex items-center gap-2 rounded-md bg-[#081534] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#10214f]"
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  Roleoff Report
+                </button>
+              </div>
+            )}
           />
+          
         ) : (
           <KPISection items={kpis} />
         )}

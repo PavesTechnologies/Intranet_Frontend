@@ -66,7 +66,7 @@ const UtilizationResourceDashboard = () => {
             {/* HEADER */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-10">
                <div className="flex flex-col gap-1">
-                  <h2 className="text-[24px] font-black text-slate-900 uppercase tracking-tight">Resource Performance Registry</h2>
+                  <h2 className="text-[24px] font-black text-slate-900 capitalize tracking-tight">Resource Performance Registry</h2>
                   <p className="text-[12px] font-bold text-slate-400 italic">Granular workload actuals and talent allocation ledger</p>
                </div>
                
@@ -84,7 +84,7 @@ const UtilizationResourceDashboard = () => {
                   <button className="h-11 w-11 bg-white border border-slate-200 rounded-2xl flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm">
                      <Filter size={20} />
                   </button>
-                  <button className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
+                  <button className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-2xl text-[11px] font-black capitalize tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
                      <Download size={16} /> Export CSV
                   </button>
                </div>
@@ -96,11 +96,11 @@ const UtilizationResourceDashboard = () => {
                   <table className="w-full text-left">
                      <thead>
                         <tr className="bg-slate-50/50 border-b border-slate-100">
-                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[25%]">Resource Profile</th>
-                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Workload Util</th>
-                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Billable Ratio</th>
-                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Trend Signal</th>
-                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Activity</th>
+                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] w-[25%]">Resource Profile</th>
+                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em]">Workload Util</th>
+                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Billable Ratio</th>
+                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Trend Signal</th>
+                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-right">Activity</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50">
@@ -112,11 +112,11 @@ const UtilizationResourceDashboard = () => {
                            >
                               <td className="px-8 py-5">
                                  <div className="flex items-center gap-4">
-                                    <div className="h-12 w-12 rounded-2xl bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center text-slate-500 font-black text-sm uppercase group-hover:scale-110 transition-transform duration-500">
+                                    <div className="h-12 w-12 rounded-2xl bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center text-slate-500 font-black text-sm capitalize group-hover:scale-110 transition-transform duration-500">
                                        {res.userName?.charAt(0)}
                                     </div>
                                     <div className="flex flex-col gap-0.5">
-                                       <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{res.userName}</span>
+                                       <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{res.userName}</span>
                                        <span className="text-[11px] font-bold text-slate-400 opacity-80">{res.role}</span>
                                     </div>
                                  </div>
@@ -124,7 +124,7 @@ const UtilizationResourceDashboard = () => {
                               <td className="px-8 py-5">
                                  <div className="flex flex-col gap-1.5 min-w-[180px]">
                                     <div className="flex items-center justify-between">
-                                       <span className={`text-[11px] font-black uppercase tracking-tight ${res.billablePercentage > 100 ? 'text-rose-600' : 'text-indigo-600'}`}>
+                                       <span className={`text-[11px] font-black capitalize tracking-tight ${res.billablePercentage > 100 ? 'text-rose-600' : 'text-indigo-600'}`}>
                                           {res.billablePercentage}% Utilized
                                        </span>
                                        <span className="text-[10px] font-bold text-slate-400 italic">{res.billableHours}h Actual</span>
@@ -140,7 +140,7 @@ const UtilizationResourceDashboard = () => {
                               <td className="px-8 py-5 text-center">
                                  <div className="inline-flex flex-col items-center gap-1 px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-100 shadow-sm">
                                     <span className="text-[14px] font-black text-emerald-700 tracking-tight">82.5%</span>
-                                    <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest leading-none">Billable</span>
+                                    <span className="text-[8px] font-black text-emerald-600 capitalize tracking-widest leading-none">Billable</span>
                                  </div>
                               </td>
                               <td className="px-8 py-5 text-center">
@@ -173,7 +173,7 @@ const UtilizationResourceDashboard = () => {
                
                {/* PAGINATION */}
                <div className="px-8 py-6 border-t border-slate-100 bg-slate-50/30 flex items-center justify-between">
-                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest italic">Showing {paginatedResources.length} of {filteredResources.length} talent profiles</p>
+                  <p className="text-[11px] font-black text-slate-400 capitalize tracking-widest italic">Showing {paginatedResources.length} of {filteredResources.length} talent profiles</p>
                   <Pagination 
                      currentPage={currentPage}
                      totalPages={totalPages}
@@ -193,15 +193,15 @@ const UtilizationResourceDashboard = () => {
                      {/* DRAWER HEADER */}
                      <div className="flex items-start justify-between mb-12">
                         <div className="flex items-center gap-6">
-                           <div className="h-24 w-24 rounded-[2rem] bg-indigo-50 border-4 border-white shadow-xl flex items-center justify-center text-indigo-600 font-black text-3xl uppercase">
+                           <div className="h-24 w-24 rounded-[2rem] bg-indigo-50 border-4 border-white shadow-xl flex items-center justify-center text-indigo-600 font-black text-3xl capitalize">
                               {selectedResource.userName?.charAt(0)}
                            </div>
                            <div className="flex flex-col gap-2">
                               <div className="flex items-center gap-3">
-                                 <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tight">{selectedResource.userName}</h3>
-                                 <div className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-emerald-100">Active</div>
+                                 <h3 className="text-3xl font-black text-slate-900 capitalize tracking-tight">{selectedResource.userName}</h3>
+                                 <div className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black capitalize tracking-widest rounded-lg border border-emerald-100">Active</div>
                               </div>
-                              <p className="text-[14px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                              <p className="text-[14px] font-bold text-slate-400 capitalize tracking-widest flex items-center gap-2">
                                  <Briefcase size={16} className="text-indigo-500" /> {selectedResource.role}
                               </p>
                            </div>
@@ -220,7 +220,7 @@ const UtilizationResourceDashboard = () => {
                            <div className="absolute top-0 right-0 p-8 opacity-[0.05] group-hover:scale-125 transition-transform duration-700">
                               <Zap size={80} />
                            </div>
-                           <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest mb-2">Total Utilization</p>
+                           <p className="text-[11px] font-black text-indigo-400 capitalize tracking-widest mb-2">Total Utilization</p>
                            <p className="text-4xl font-black text-white tracking-tight">{selectedResource.billablePercentage}%</p>
                            <div className="mt-4 flex items-center gap-2">
                               <div className="h-1.5 flex-1 bg-white/10 rounded-full overflow-hidden">
@@ -233,7 +233,7 @@ const UtilizationResourceDashboard = () => {
                            <div className="absolute top-0 right-0 p-8 opacity-[0.05] group-hover:scale-125 transition-transform duration-700">
                               <PieChart size={80} />
                            </div>
-                           <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Billable Ratio</p>
+                           <p className="text-[11px] font-black text-slate-400 capitalize tracking-widest mb-2">Billable Ratio</p>
                            <p className="text-4xl font-black text-slate-900 tracking-tight">85.0%</p>
                            <div className="mt-4 flex items-center gap-2">
                               <div className="h-1.5 flex-1 bg-slate-100 rounded-full overflow-hidden">
@@ -246,7 +246,7 @@ const UtilizationResourceDashboard = () => {
 
                      {/* CONTACT & INFO */}
                      <div className="space-y-6 mb-12">
-                        <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-3">
+                        <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.2em] flex items-center gap-3">
                            Communication Profile <div className="h-px flex-1 bg-slate-100" />
                         </h4>
                         <div className="grid grid-cols-2 gap-4">
@@ -255,7 +255,7 @@ const UtilizationResourceDashboard = () => {
                                  <Mail size={18} />
                               </div>
                               <div className="flex flex-col">
-                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Enterprise Email</span>
+                                 <span className="text-[9px] font-black text-slate-400 capitalize tracking-widest">Enterprise Email</span>
                                  <span className="text-[12px] font-bold text-slate-700">{selectedResource.userName?.toLowerCase().replace(' ', '.')}@company.com</span>
                               </div>
                            </div>
@@ -264,7 +264,7 @@ const UtilizationResourceDashboard = () => {
                                  <Phone size={18} />
                               </div>
                               <div className="flex flex-col">
-                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Internal Extension</span>
+                                 <span className="text-[9px] font-black text-slate-400 capitalize tracking-widest">Internal Extension</span>
                                  <span className="text-[12px] font-bold text-slate-700">+1-800-UTIL-42</span>
                               </div>
                            </div>
@@ -274,10 +274,10 @@ const UtilizationResourceDashboard = () => {
                      {/* TREND CHART */}
                      <div className="space-y-6">
                         <div className="flex items-center justify-between">
-                           <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-3 flex-1">
+                           <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.2em] flex items-center gap-3 flex-1">
                               Performance Trend <div className="h-px flex-1 bg-slate-100" />
                            </h4>
-                           <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                           <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 capitalize tracking-widest ml-4">
                               <History size={14} /> Last 30 Days
                            </div>
                         </div>
@@ -300,9 +300,9 @@ const UtilizationResourceDashboard = () => {
                      <div className="mt-12 pt-8 border-t border-slate-100 flex items-center justify-between">
                         <div className="flex items-center gap-4">
                            <ShieldCheck size={20} className="text-emerald-500" />
-                           <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest italic">Validated capability profile synchronized with ERP</p>
+                           <p className="text-[11px] font-black text-slate-400 capitalize tracking-widest italic">Validated capability profile synchronized with ERP</p>
                         </div>
-                        <button className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-2xl text-[12px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-xl shadow-slate-200">
+                        <button className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-2xl text-[12px] font-black capitalize tracking-[0.2em] hover:bg-slate-800 transition-all shadow-xl shadow-slate-200">
                            Generate Deep Dive
                         </button>
                      </div>

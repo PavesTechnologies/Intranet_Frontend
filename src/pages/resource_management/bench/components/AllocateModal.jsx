@@ -58,7 +58,7 @@ const AllocateModal = ({ open, resources = [], onClose, onSubmit }) => {
 
         <div className="space-y-4 px-5 py-5">
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Project</label>
+            <label className="text-[11px] font-semibold capitalize tracking-[0.16em] text-gray-500">Project</label>
             <input
               type="text"
               value={form.project}
@@ -70,7 +70,7 @@ const AllocateModal = ({ open, resources = [], onClose, onSubmit }) => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Allocation %</label>
+              <label className="text-[11px] font-semibold capitalize tracking-[0.16em] text-gray-500">Allocation %</label>
               <input
                 type="number"
                 min="1"
@@ -81,7 +81,7 @@ const AllocateModal = ({ open, resources = [], onClose, onSubmit }) => {
               />
             </div>
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Start Date</label>
+              <label className="text-[11px] font-semibold capitalize tracking-[0.16em] text-gray-500">Start Date</label>
               <input
                 type="date"
                 min={getToday()}

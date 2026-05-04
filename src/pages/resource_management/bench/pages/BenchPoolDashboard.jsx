@@ -224,8 +224,6 @@ const BenchPoolDashboard = () => {
     const cos = Math.cos(-RADIAN * midAngle);
     return (
       <g>
-        <text x={cx} y={cy} dy={-4} textAnchor="middle" fill="#0f172a" className="text-[13px] font-bold">{payload.name}</text>
-        <text x={cx} y={cy} dy={14} textAnchor="middle" fill="#64748b" className="text-[10px] font-medium">{value} Resources</text>
         <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius} startAngle={startAngle} endAngle={endAngle} fill={fill} />
         <Sector cx={cx} cy={cy} startAngle={startAngle} endAngle={endAngle} innerRadius={outerRadius + 4} outerRadius={outerRadius + 6} fill={fill} className="opacity-20" />
       </g>
@@ -255,76 +253,14 @@ const BenchPoolDashboard = () => {
           <button 
             onClick={handleExport}
             disabled={isExporting}
-            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[12px] font-bold text-slate-600 shadow-sm hover:bg-slate-50 transition-all uppercase tracking-wider disabled:opacity-70"
+            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[12px] font-bold text-slate-600 shadow-sm hover:bg-slate-50 transition-all capitalize tracking-wider disabled:opacity-70"
           >
             <Download size={14} className="text-indigo-600" />
             {isExporting ? 'Exporting...' : 'Export Audit'}
           </button>
           
-          <div className="relative">
-            <button 
-              ref={filterButtonRef}
-              onClick={toggleFilters}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all shadow-sm ${
-                filterPanelOpen || activeFilterCount > 0
-                  ? "bg-indigo-600 text-white border-indigo-600" 
-                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <Filter size={14} />
-              <span className="text-[11px] font-bold uppercase tracking-wider">Filters</span>
-              {activeFilterCount > 0 && (
-                <span className={`ml-1 px-1.5 rounded-sm text-[10px] font-bold ${filterPanelOpen ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
+          {/* Filter button moved to tabs section below */}
 
-            {filterPanelOpen && dropdownPos && createPortal(
-              <div
-                id="bench-filter-portal"
-                className={`fixed bg-white border border-slate-200 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] z-[100] w-[calc(100vw-3rem)] sm:w-[400px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${
-                  dropdownPos.align === 'up' ? "origin-bottom-right" : "origin-top-right"
-                }`}
-                style={{
-                  top: dropdownPos.top === 'auto' ? 'auto' : `${dropdownPos.top}px`,
-                  bottom: dropdownPos.bottom === 'auto' ? 'auto' : `${dropdownPos.bottom}px`,
-                  right: `${dropdownPos.right}px`,
-                  maxHeight: `${dropdownPos.maxHeight}px`,
-                }}
-              >
-                <div className="shrink-0 px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-3.5 w-3.5 text-indigo-500" />
-                    <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest leading-none mt-0.5">Bench Analysis Filters</h3>
-                  </div>
-                  <button onClick={() => setFilterPanelOpen(false)} className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto no-scrollbar p-5">
-                   <BenchFilters
-                    open={filterPanelOpen}
-                    filters={draftFilters}
-                    filterOptions={filterOptions}
-                    onChange={(key, value) => setDraftFilters((prev) => ({ ...prev, [key]: value }))}
-                    onReset={() => {
-                        setDraftFilters(FILTER_DEFAULTS);
-                        setFilters(FILTER_DEFAULTS);
-                        setFilterPanelOpen(false);
-                    }}
-                    onApply={() => {
-                        setFilters(draftFilters);
-                        setFilterPanelOpen(false);
-                    }}
-                    onClose={() => setFilterPanelOpen(false)}
-                    isDashboardPortal={true}
-                    />
-                </div>
-              </div>,
-              document.body
-            )}
-          </div>
         </div>
       </div>
 
@@ -337,7 +273,7 @@ const BenchPoolDashboard = () => {
       </div>
 
       {/* Tabs - Match Role-Off Navigation Style */}
-      <div className="mb-4 border-b border-slate-200">
+      <div className="mb-4 border-b border-slate-200 flex items-center justify-between">
         <div className="flex items-end gap-8 overflow-x-auto px-1">
           {[
             { id: 'overview', label: 'Overview' },
@@ -361,6 +297,69 @@ const BenchPoolDashboard = () => {
             );
           })}
         </div>
+
+        <div className="relative pb-2">
+          <button 
+            ref={filterButtonRef}
+            onClick={toggleFilters}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all shadow-sm ${
+              filterPanelOpen || activeFilterCount > 0
+                ? "bg-indigo-600 text-white border-indigo-600" 
+                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <Filter size={14} />
+            <span className="text-[11px] font-bold capitalize tracking-wider">Filters</span>
+            {activeFilterCount > 0 && (
+              <span className={`ml-1 px-1.5 rounded-sm text-[10px] font-bold ${filterPanelOpen ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          {filterPanelOpen && dropdownPos && createPortal(
+            <div
+              id="bench-filter-portal"
+              className={`fixed bg-white border border-slate-200 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] z-[100] w-[calc(100vw-3rem)] sm:w-[400px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${
+                dropdownPos.align === 'up' ? "origin-bottom-right" : "origin-top-right"
+              }`}
+              style={{
+                top: dropdownPos.top === 'auto' ? 'auto' : `${dropdownPos.top}px`,
+                bottom: dropdownPos.bottom === 'auto' ? 'auto' : `${dropdownPos.bottom}px`,
+                right: `${dropdownPos.right}px`,
+                maxHeight: `${dropdownPos.maxHeight}px`,
+              }}
+            >
+              <div className="shrink-0 px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-3.5 w-3.5 text-indigo-500" />
+                  <h3 className="text-[12px] font-bold text-slate-800 capitalize tracking-widest leading-none mt-0.5">Bench Analysis Filters</h3>
+                </div>
+                <button onClick={() => setFilterPanelOpen(false)} className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <BenchFilters
+                open={filterPanelOpen}
+                filters={draftFilters}
+                filterOptions={filterOptions}
+                onChange={(key, value) => setDraftFilters((prev) => ({ ...prev, [key]: value }))}
+                onReset={() => {
+                  setDraftFilters(FILTER_DEFAULTS);
+                  setFilters(FILTER_DEFAULTS);
+                  setFilterPanelOpen(false);
+                }}
+                onApply={() => {
+                  setFilters(draftFilters);
+                  setFilterPanelOpen(false);
+                }}
+                onClose={() => setFilterPanelOpen(false)}
+                isDashboardPortal={true}
+              />
+            </div>,
+            document.body
+          )}
+        </div>
       </div>
 
       {/* Tab Content */}
@@ -372,10 +371,10 @@ const BenchPoolDashboard = () => {
               <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm flex flex-col items-center hover:shadow-md transition-shadow relative overflow-hidden group">
                 <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-all" />
                 <div className="flex items-center justify-between w-full mb-2">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Bench Composition</h3>
+                  <h3 className="text-[10px] font-black text-slate-400 capitalize tracking-widest leading-none">Bench Composition</h3>
                   <Activity size={12} className="text-indigo-400" />
                 </div>
-                <div className="h-44 w-full">
+                <div className="h-44 w-full relative">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -395,12 +394,22 @@ const BenchPoolDashboard = () => {
                       </Pie>
                     </PieChart>
                   </ResponsiveContainer>
+                  
+                  {/* Center Text Overlay */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-[-4px]">
+                    <span className="text-[12px] font-black text-slate-900 capitalize tracking-tight">
+                      {categoryChartData[activeIndex]?.name || 'Loading...'}
+                    </span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                      {categoryChartData[activeIndex]?.value || 0} Resources
+                    </span>
+                  </div>
                 </div>
                 <div className="w-full mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-slate-50 pt-3">
                     {categoryChartData.slice(0, 4).map((entry, index) => (
                       <div key={entry.name} className="flex items-center gap-2 overflow-hidden">
                         <div className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                        <span className="text-[9px] font-bold text-slate-600 truncate uppercase tracking-tighter w-full">
+                        <span className="text-[9px] font-bold text-slate-600 truncate capitalize tracking-tighter w-full">
                           {entry.name}: <span className="text-slate-900 ml-0.5">{entry.value}</span>
                         </span>
                       </div>
@@ -412,7 +421,7 @@ const BenchPoolDashboard = () => {
               <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm lg:col-span-2 flex flex-col group overflow-hidden">
                 <div className="flex items-center justify-between w-full mb-6 relative">
                   <div className="flex flex-col gap-0.5">
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Capability Saturation</h3>
+                    <h3 className="text-[10px] font-black text-slate-400 capitalize tracking-widest leading-none">Capability Saturation</h3>
                     <p className="text-[9px] font-medium text-slate-400 italic">Distribution across top technical skillsets</p>
                   </div>
                   <Zap size={14} className="text-amber-400" />
@@ -421,7 +430,7 @@ const BenchPoolDashboard = () => {
                   {skillsChartData.map((skill) => (
                       <div key={skill.name} className="flex flex-col gap-1.5">
                           <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
-                              <span className="uppercase tracking-tight truncate">{skill.name}</span>
+                              <span className="capitalize tracking-tight truncate">{skill.name}</span>
                               <span className="text-slate-400 text-[10px]">{skill.count} Resources</span>
                           </div>
                           <div className="h-1 w-full bg-slate-50 rounded-full overflow-hidden shadow-inner">
@@ -438,7 +447,7 @@ const BenchPoolDashboard = () => {
         {activeTab === 'risk' && (
           <div className="space-y-4">
             <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
-               <h3 className="text-[10px] font-bold text-[#081534] mb-4 uppercase tracking-widest opacity-60">Bench Cost Impact per Resource</h3>
+               <h3 className="text-[10px] font-bold text-[#081534] mb-4 capitalize tracking-widest opacity-60">Bench Cost Impact per Resource</h3>
                <div className="h-56 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={costChartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
@@ -457,7 +466,7 @@ const BenchPoolDashboard = () => {
                   <ShieldAlert size={20} />
                </div>
                <div>
-                  <p className="text-[11px] font-bold text-orange-800 uppercase tracking-widest">Active High Risk Units: {highRiskCount}</p>
+                  <p className="text-[11px] font-bold text-orange-800 capitalize tracking-widest">Active High Risk Units: {highRiskCount}</p>
                   <p className="text-[10px] font-medium text-orange-600 italic">Identified resources requiring immediate focus for allocation or upskilling.</p>
                </div>
             </div>
@@ -467,17 +476,17 @@ const BenchPoolDashboard = () => {
         {activeTab === 'log' && (
           <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-              <h3 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest leading-none">Bench Inventory Summary</h3>
-              <span className="text-[10px] font-bold bg-white border border-slate-200 px-2.5 py-1 rounded-full text-slate-600">{filteredContent.length} UNITS</span>
+              <h3 className="text-[11px] font-bold text-slate-800 capitalize tracking-widest leading-none">Bench Inventory Summary</h3>
+              <span className="text-[10px] font-bold bg-white border border-slate-200 px-2.5 py-1 rounded-full text-slate-600">{filteredContent.length} Units</span>
             </div>
             <div className="overflow-x-auto no-scrollbar">
               <table className="w-full text-left">
                 <thead>
                    <tr className="bg-slate-50/30 border-b border-slate-50">
-                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Resource / Expertise</th>
-                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Aging Period</th>
-                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Risk Profile</th>
-                    <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Action Context</th>
+                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500">Resource / Expertise</th>
+                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500">Aging Period</th>
+                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500">Risk Profile</th>
+                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500">Action Context</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -485,8 +494,8 @@ const BenchPoolDashboard = () => {
                     <tr key={row.resourceId} className="hover:bg-slate-50/40 transition-colors group cursor-pointer">
                        <td className="px-6 py-4">
                         <div className="flex flex-col">
-                          <span className="text-[13px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{row.name}</span>
-                          <span className="text-[10px] font-medium text-slate-400 mt-1 uppercase tracking-wider">{row.role} | {row.region}</span>
+                          <span className="text-[13px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{row.name}</span>
+                          <span className="text-[10px] font-medium text-slate-400 mt-1 capitalize tracking-wider">{row.role} | {row.region}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -496,12 +505,12 @@ const BenchPoolDashboard = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex rounded-md border px-2.5 py-1 text-[9px] font-bold uppercase tracking-tighter ${
+                        <span className={`inline-flex rounded-md border px-2.5 py-1 text-[9px] font-bold capitalize tracking-tighter ${
                           row.riskLevel === 'HIGH' ? 'bg-rose-50 text-rose-700 border-rose-100' : 
                           row.riskLevel === 'MEDIUM' ? 'bg-amber-50 text-amber-700 border-amber-100' : 
                           'bg-emerald-50 text-emerald-700 border-emerald-100'
                         }`}>
-                          {row.riskLevel} Level
+                          {row.riskLevel?.toLowerCase().charAt(0).toUpperCase() + row.riskLevel?.toLowerCase().slice(1)} Level
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -527,10 +536,10 @@ const KPICard = ({ title, value, icon, trend, subText, color, bgColor, borderCol
       {React.cloneElement(icon, { size: 20 })}
     </div>
     <div className="min-w-0">
-      <p className="mb-0.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">{title}</p>
+      <p className="mb-0.5 text-[10px] font-bold tracking-wider text-slate-400 capitalize">{title}</p>
       <p className="text-xl font-extrabold tracking-tight text-slate-900 leading-none">{value}</p>
       <div className="flex items-center gap-1 mt-1 opacity-60">
-         <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{trend}</span>
+         <span className="text-[8px] font-black capitalize tracking-widest text-slate-400">{trend}</span>
       </div>
     </div>
   </div>

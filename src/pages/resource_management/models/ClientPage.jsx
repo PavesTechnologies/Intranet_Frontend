@@ -1002,7 +1002,7 @@ const ClientPage = () => {
                         : "text-gray-900"
                         }`}
                     >
-                      {project.name}
+                      {project.projectName}
                     </h3>
                     {getProjectId(selectedProject) ===
                       getProjectId(project) && (
@@ -1062,7 +1062,7 @@ const ClientPage = () => {
               <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50 rounded-t-xl">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">
-                    {selectedProject.name}
+                    {selectedProject.projectName}
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
                     Managed by{" "}

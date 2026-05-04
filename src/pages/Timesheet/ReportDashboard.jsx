@@ -35,6 +35,9 @@ const monthOptions = [
 ];
 
 const currentYear = new Date().getFullYear();
+const currentMonth = new Date().getMonth() + 1; // 1-indexed (Jan=1, May=5)
+const defaultMonth = currentMonth > 1 ? currentMonth - 1 : 12;
+const defaultYear = currentMonth > 1 ? currentYear : currentYear - 1;
 const yearOptions = [currentYear, currentYear - 1];
 
 export default function ReportDashboard() {
@@ -51,10 +54,10 @@ export default function ReportDashboard() {
   const [projectBreakdownPerPage, setProjectBreakdownPerPage] = useState(8);
   const [leaveHoursPerPage, setLeaveHoursPerPage] = useState(8);
   const TS_BASE_URL = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [appliedMonth, setAppliedMonth] = useState(new Date().getMonth());
-  const [appliedYear, setAppliedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
+  const [selectedYear, setSelectedYear] = useState(defaultYear);
+  const [appliedMonth, setAppliedMonth] = useState(defaultMonth);
+  const [appliedYear, setAppliedYear] = useState(defaultYear);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [projectPages, setProjectPages] = useState({});
@@ -71,7 +74,7 @@ export default function ReportDashboard() {
 
   const filteredMonths =
     selectedYear === currentYear
-      ? monthOptions.filter((m) => m.value <= appliedMonth)
+      ? monthOptions.filter((m) => m.value < currentMonth)
       : monthOptions;
 
   const itemsPerPageChangeEmployeeBreakdown = (event) => {
@@ -125,6 +128,7 @@ export default function ReportDashboard() {
         toast.error(err.response?.data || "Failed to fetch data");
         if (err.response?.status === 400) {
           setLeaveError(true);
+          setData(null);
         }
       } finally {
         setLoading(false);
@@ -412,8 +416,57 @@ export default function ReportDashboard() {
 
   if (leaveError && !data)
     return (
-      <div className="report-container text-center font-semibold">
-        Pending Leaves needs to be reviewed.
+      <div className="report-container">
+        <div className="report-header">
+          <div>
+            <h1>Monthly Finance Timesheet Report</h1>
+            <p className="subtitle pt-1">
+              Team Productivity & Utilization Metrics
+            </p>
+            <p className="month pt-1">
+              Report Month:
+              <button
+                className="filter-toggle-btn"
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+              >
+                <span>
+                  {monthOptions.find((m) => m.value === selectedMonth)?.name}
+                  ,{selectedYear}
+                </span>
+              </button>
+            </p>
+            {isFilterOpen && (
+              <div className="report-filters">
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                >
+                  {filteredMonths.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                >
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+                <button className="apply-btn" onClick={handleFilterApply}>
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="text-center font-semibold" style={{ marginTop: "2rem" }}>
+          Pending Leaves for {monthOptions.find((m) => m.value === appliedMonth)?.name} {appliedYear} needs to be reviewed.
+        </div>
       </div>
     );
 

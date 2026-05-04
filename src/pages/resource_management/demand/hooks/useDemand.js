@@ -227,6 +227,7 @@ export function useDemand(projectId = null) {
 
     const activeKPIs = useMemo(() => {
         if (!kpiData) return [];
+
         return [
             { label: "Active", count: kpiData.active || 0 },
             { label: "Approved", count: kpiData.approved || 0 },

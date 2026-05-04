@@ -5,8 +5,7 @@ import BenchKPI from "../components/BenchKPI";
 import BenchFilters from "../components/BenchFilters";
 import BenchTable from "../components/BenchTable";
 import BenchDrawer from "../components/BenchDrawer";
-import AllocateModal from "../components/AllocateModal";
-import QuickAllocateModal from "../components/QuickAllocateModal";
+import AllocationModal from "../../demand/components/AllocationModal";
 import MoveToPoolModal from "../components/MoveToPoolModal";
 import { getBenchMatches } from "../services/benchService";
 import { createPortal } from "react-dom";
@@ -64,8 +63,8 @@ const BenchPage = () => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedResourceId, setSelectedResourceId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [allocateTargets, setAllocateTargets] = useState([]);
-  const [quickAllocateTarget, setQuickAllocateTarget] = useState(null);
+  const [allocateTargetIds, setAllocateTargetIds] = useState([]);
+  const [allocationDemand, setAllocationDemand] = useState(null);
   const [moveToPoolTargets, setMoveToPoolTargets] = useState([]);
   const [bulkCategory, setBulkCategory] = useState(CATEGORY_OPTIONS[0]);
   const [liveMatches, setLiveMatches] = useState([]);
@@ -265,53 +264,13 @@ const BenchPage = () => {
     setDrawerOpen(true);
   };
 
-  const handleAllocate = (targets) => {
-    const list = Array.isArray(targets) ? targets : [targets];
-    if (list.length === 1) {
-      setQuickAllocateTarget(list[0]);
-    } else {
-      setAllocateTargets(list);
-    }
+  const handleQuickAllocate = (resource) => {
+    setAllocateTargetIds([resource.id]);
+    setAllocationDemand(null);
   };
 
   const handleMoveToPool = (targets) => {
     setMoveToPoolTargets(Array.isArray(targets) ? targets : [targets]);
-  };
-
-  const handleQuickAllocate = (resource) => {
-    setQuickAllocateTarget(resource);
-  };
-
-  const applyAllocation = ({ project, allocation, startDate }) => {
-    const ids = allocateTargets.map((item) => item.id);
-
-    setResources((prev) =>
-      prev.map((item) =>
-        ids.includes(item.id)
-          ? {
-            ...item,
-            allocation,
-            availability: Math.max(0, 100 - allocation),
-            lastAllocationDate: startDate,
-            poolType: "",
-            category: "Not Available",
-            lastProject: {
-              name: project,
-              client: "Assigned",
-              endDate: startDate,
-              reason: "Allocated from bench management",
-            },
-          }
-          : item,
-      ),
-    );
-
-    setSelectedRows((prev) => prev.filter((id) => !ids.includes(id)));
-    setAllocateTargets([]);
-    if (selectedResourceId && ids.includes(selectedResourceId)) {
-      setDrawerOpen(false);
-      setSelectedResourceId(null);
-    }
   };
 
   const applyMoveToPool = ({ poolType, reason }) => {
@@ -348,39 +307,32 @@ const BenchPage = () => {
     : "No results match the current search and filters.";
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-6 font-sans">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50/50 p-4 sm:p-6 lg:p-8 font-sans select-none">
+      <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          {/* <button
-            onClick={() => navigate('/resource-management/roleoff')}
-            className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm shrink-0"
-            title="Back to Role-Off Operations"
-          >
-            <ArrowLeft size={18} />
-          </button> */}
           <div className="flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-none">Bench Management Workspace</h1>
-            <p className="mt-1 text-xs sm:text-sm font-medium text-slate-500">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 leading-none capitalize">Bench Management Workspace</h1>
+            <p className="mt-2 text-xs sm:text-sm font-medium text-slate-500">
               Strategic tracking of available resource supply and internal pool movements
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => navigate('/resource-management/bench/report')}
-            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[11px] font-black text-slate-700 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm h-[42px] capitalize tracking-wider"
           >
-            <BarChart2 className="h-3.5 w-3.5 text-indigo-600" />
-            BENCH ANALYTICS
+            <BarChart2 className="h-4 w-4 text-indigo-600" />
+            Bench Analytics
           </button>
           <button
             type="button"
             onClick={handleExport}
-            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-[12px] font-bold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-[11px] font-black text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98] h-[42px] capitalize tracking-wider"
           >
-            <Download className="h-3.5 w-3.5" />
-            EXPORT AUDIT
+            <Download className="h-4 w-4" />
+            Export Audit
           </button>
         </div>
       </div>
@@ -389,8 +341,8 @@ const BenchPage = () => {
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-100 bg-white px-5 py-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-6 overflow-x-auto px-1">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-6 overflow-x-auto no-scrollbar px-1">
               {BENCH_TABS.map((tab) => {
                 const isActive = activeTab === tab.id;
                 const Icon = tab.id === "bench" ? Users : Layers;
@@ -407,7 +359,7 @@ const BenchPage = () => {
                       }`}
                   >
                     <Icon className={`h-4 w-4 transition-colors ${isActive ? "text-indigo-600" : "text-slate-400 group-hover:text-indigo-500"}`} />
-                    <span className={`text-[12px] font-bold tracking-tight lowercase ${isActive ? "text-slate-900" : "text-slate-500"}`}>
+                    <span className={`text-[12px] font-bold tracking-tight capitalize ${isActive ? "text-slate-900" : "text-slate-500"}`}>
                       {tab.label}
                     </span>
                     <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold transition-all ${isActive ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500"}`}>
@@ -421,15 +373,15 @@ const BenchPage = () => {
               })}
             </div>
 
-            <div className="flex flex-1 items-center justify-end gap-2">
-              <div className="relative w-full max-w-sm">
+            <div className="flex items-center gap-3 flex-1 lg:flex-none lg:min-w-[450px] justify-end pb-2 lg:pb-0">
+              <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search name, role, skill or location..."
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/30 pl-9 pr-4 text-[13px] font-medium text-slate-600 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500 shadow-inner"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/30 pl-9 pr-4 text-[13px] font-medium text-slate-600 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500 shadow-inner"
                 />
               </div>
 
@@ -438,13 +390,13 @@ const BenchPage = () => {
                   ref={filterButtonRef}
                   type="button"
                   onClick={toggleFilters}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all shadow-sm ${filterPanelOpen
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl border h-10 transition-all shadow-sm ${filterPanelOpen
                     ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/10"
                     : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                 >
                   <Filter className={`h-3.5 w-3.5 ${filterPanelOpen ? 'fill-current' : ''}`} />
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Filters</span>
+                  <span className="text-[11px] font-black capitalize tracking-widest">Filters</span>
                   {Object.values(filters).filter(v => v !== "" && v !== "ALL").length > 0 && (
                     <span className={`ml-1 px-1.5 rounded-sm text-[10px] font-bold ${filterPanelOpen ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
                       {Object.values(filters).filter(v => v !== "" && v !== "ALL").length}
@@ -500,6 +452,7 @@ const BenchPage = () => {
             onCategoryChange={(id, category) => setResourceCategory([id], category)}
             onRefresh={() => fetchData(true)}
             loading={loading}
+            activeTab={activeTab}
           />
         </div>
       </div>
@@ -508,24 +461,32 @@ const BenchPage = () => {
         open={drawerOpen}
         resource={selectedResource}
         onClose={() => setDrawerOpen(false)}
-        onAllocate={(resource) => handleAllocate(resource)}
+        onAllocate={(resource, demand) => {
+          setAllocateTargetIds([resource.id]);
+          setAllocationDemand(demand);
+        }}
         onMoveToPool={(resource) => handleMoveToPool(resource)}
         liveMatches={liveMatches}
         loadingMatches={loadingMatches}
       />
 
-      <AllocateModal
-        open={allocateTargets.length > 0}
-        resources={allocateTargets}
-        onClose={() => setAllocateTargets([])}
-        onSubmit={applyAllocation}
-      />
-
-      <QuickAllocateModal
-        open={Boolean(quickAllocateTarget)}
-        resource={quickAllocateTarget}
-        onClose={() => setQuickAllocateTarget(null)}
-        onRefresh={fetchData}
+      <AllocationModal
+        isOpen={allocateTargetIds.length > 0}
+        isBenchMode={true}
+        benchMatches={liveMatches}
+        onClose={() => {
+          setAllocateTargetIds([]);
+          setAllocationDemand(null);
+        }}
+        demand={allocationDemand}
+        initialResourceIds={allocateTargetIds}
+        onSuccess={() => {
+          fetchData(true);
+          setAllocateTargetIds([]);
+          setAllocationDemand(null);
+          setDrawerOpen(false);
+          setSelectedRows([]);
+        }}
       />
 
       <MoveToPoolModal

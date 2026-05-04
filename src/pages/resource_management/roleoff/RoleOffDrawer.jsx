@@ -31,6 +31,7 @@ const buildInitialState = (request) => ({
   type: request?.type || "Planned",
   effectiveDate: request?.effectiveDateIso || "",
   reason: request?.reason || "",
+  resourcePerformance: request?.resourcePerformance || "",
   acknowledgeRisk: false,
   replacementRequired: Boolean(request?.replacementRequired),
 });
@@ -70,6 +71,7 @@ const RoleOffDrawer = ({
     const nextErrors = {};
 
     if (!formState.reason) nextErrors.reason = "Reason is required.";
+    if (!formState.resourcePerformance) nextErrors.resourcePerformance = "Performance is required.";
     if (!formState.effectiveDate) {
       nextErrors.effectiveDate = "Effective date is required.";
     } else {
@@ -211,6 +213,32 @@ const RoleOffDrawer = ({
                 <p className="mt-1 text-xs text-rose-600">{errors.effectiveDate}</p>
               ) : null}
             </div>
+
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                Resource Performance
+              </label>
+              <select
+                value={formState.resourcePerformance}
+                disabled={mode !== "create"}
+                onChange={(event) =>
+                  setFormState((prev) => ({ ...prev, resourcePerformance: event.target.value }))
+                }
+                className="mt-2 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm outline-none transition-colors focus:border-blue-500"
+              >
+                <option value="">Select performance</option>
+                <option value="HIGH_PERFORMER">High Performer</option>
+                <option value="AVERAGE_PERFORMER">Average Performer</option>
+                <option value="LOW_PERFORMER">Low Performer</option>
+                <option value="EXCEPTIONAL">Exceptional</option>
+                <option value="NEEDS_IMPROVEMENT">Needs Improvement</option>
+                <option value="CONSISTENT">Consistent</option>
+                <option value="NEW_RESOURCE">New Resource</option>
+              </select>
+              {errors.resourcePerformance ? (
+                <p className="mt-1 text-xs text-rose-600">{errors.resourcePerformance}</p>
+              ) : null}
+            </div>
           </section>
 
           <section>
@@ -347,7 +375,12 @@ const RoleOffDrawer = ({
                     if (!validate()) return;
                     onSubmit?.(formState);
                   }}
-                  disabled={!formState.reason || !formState.effectiveDate || (impact === "High" && !formState.acknowledgeRisk)}
+                  disabled={
+                    !formState.reason
+                    || !formState.effectiveDate
+                    || !formState.resourcePerformance
+                    || (impact === "High" && !formState.acknowledgeRisk)
+                  }
                 >
                   Submit Request
                 </Button>

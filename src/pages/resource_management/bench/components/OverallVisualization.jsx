@@ -125,7 +125,7 @@ const OverallVisualization = ({ projects }) => {
           {['Type', 'Hours', 'Share'].map((h, i) => (
             <span
               key={h}
-              className="text-[10px] font-medium text-slate-400 uppercase tracking-wider"
+              className="text-[10px] font-medium text-slate-400 capitalize tracking-wider"
               style={{ textAlign: i > 0 ? 'right' : 'left' }}
             >
               {h}
