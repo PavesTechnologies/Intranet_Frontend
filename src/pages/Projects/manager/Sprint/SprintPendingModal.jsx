@@ -32,11 +32,11 @@ const SprintPendingModal = ({
         },
       );
 
-      toast.success("Sprint finalized successfully");
+      toast.success("Sprint finalized successfully", { autoClose: 3000, containerId: "global" });
       refresh();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to finalize sprint");
+      toast.error(err.response?.data?.message || "Failed to finalize sprint", { autoClose: 3000, containerId: "global" });
     }
   };
 
