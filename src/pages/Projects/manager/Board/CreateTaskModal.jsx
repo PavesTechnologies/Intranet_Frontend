@@ -83,6 +83,10 @@ export const CreateTaskModal = ({
               placeholder="Enter description"
             />
           </label>
+          <FormDatePicker label="Start Date" name="startDate" value={formData.startDate || ""} onChange={onChange} min={today} />
+
+          <FormDatePicker label="Due Date" name="dueDate" value={formData.dueDate || ""} onChange={onChange} min={today} />
+
 
           <div className="flex justify-end gap-2 mt-4">
             <button

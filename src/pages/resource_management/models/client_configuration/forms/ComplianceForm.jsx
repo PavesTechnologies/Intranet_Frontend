@@ -39,6 +39,12 @@ const ComplianceForm = ({ formData, setFormData }) => {
   };
 
   useEffect(() => {
+    if (formData.mandatoryFlag === undefined) {
+      setFormData((prev) => ({ ...prev, mandatoryFlag: false }));
+    }
+  }, []);
+
+  useEffect(() => {
     if (formData.requirementType === "SKILL") {
       fetchSkills();
     }

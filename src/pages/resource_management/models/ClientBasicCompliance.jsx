@@ -41,7 +41,7 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
       complianceId: data.complianceId,
       requirementType: data.requirementType,
       requirementName: data.requirementName,
-      mandatoryFlag: data.mandatoryFlag ?? true,
+      mandatoryFlag: data.mandatoryFlag ?? false,
       activeFlag: data.activeFlag ?? true,
     };
 

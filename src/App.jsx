@@ -353,9 +353,18 @@ const AppRoutes = () => {
               // </ProtectedRoute>
             }
           />
+
           <Route path="/projects" element={<ProjectManager />} />
           <Route path="/projects/:projectId" element={<ProjectTabs />} />
           <Route path="/projects/list" element={<ProjectList />} />
+          {/* <Route
+  path="/projects/:projectId/issuetracker"
+  element={
+    <ProtectedRoute allowedRoles={["General", "Manager"]}>
+      <IssueTracker />
+    </ProtectedRoute>
+  }
+/> */}
           <Route
             path="/projects/:projectId/issuetracker"
             element={<IssueTracker />}
@@ -942,7 +951,7 @@ const AppRoutes = () => {
 function App() {
   return (
     <>
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer position="top-right" autoClose={3000} style={{ zIndex: 999999 }} containerId="global" />
       <Router basename={window.__APP_CONFIG__.basePath}>
         <></>
         <AuthProvider>
