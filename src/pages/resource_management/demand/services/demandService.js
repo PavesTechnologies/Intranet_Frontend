@@ -13,10 +13,10 @@ const getAuthHeader = () => {
 };
 
 // const ROLE_ALIAS_MAP = {
-//     "RESOURCE-MANAGER": "RESOURCE_MANAGER",
+//     "Resource_Manager": "RESOURCE_MANAGER",
 //     "RESOURCE MANAGER": "RESOURCE_MANAGER",
 //     "RESOURCE_MANAGER": "RESOURCE_MANAGER",
-//     "DELIVERY-MANAGER": "DELIVERY_MANAGER",
+//     "Delivery_Manager": "DELIVERY_MANAGER",
 //     "DELIVERY MANAGER": "DELIVERY_MANAGER",
 //     "DELIVERY_MANAGER": "DELIVERY_MANAGER"
 // };
@@ -37,7 +37,7 @@ const normalizeRoleKey = (role) => {
 
   return role
     .toUpperCase()
-    .replace(/-/g, "_") // RESOURCE-MANAGER → RESOURCE_MANAGER
+    .replace(/-/g, "_") // Resource_Manager → RESOURCE_MANAGER
     .trim();
 };
 

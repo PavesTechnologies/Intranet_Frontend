@@ -16,7 +16,8 @@ import { useAuth } from "../../../contexts/AuthContext";
 const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
   const { user } = useAuth();
   const permissions = user?.permissions || [];
-  const canEditConfig = permissions.includes("EDIT_CLIENT_CONFIG");
+  const roles = user?.roles || [];
+  const canEditConfig = roles.includes("Admin"); // permissions.includes("EDIT_CLIENT_CONFIG");
   const [complianceList, setComplianceList] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);

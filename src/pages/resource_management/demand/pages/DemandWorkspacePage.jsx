@@ -195,7 +195,7 @@ const DemandWorkspacePage = () => {
     const [rejectingDemand, setRejectingDemand] = useState(null);
     const [rejectReason, setRejectReason] = useState("");
     const [rejectReasonError, setRejectReasonError] = useState("");
-    const isRMView = effectiveRole === "RESOURCE-MANAGER";
+    const isRMView = effectiveRole === "Resource_Manager";
 
     const openApproveModal = (demand) => {
         setApprovingDemand(demand);

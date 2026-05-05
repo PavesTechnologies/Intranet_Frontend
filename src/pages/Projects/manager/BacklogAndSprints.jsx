@@ -7,7 +7,7 @@ import axios from "axios";
 import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { Plus, List, ChevronRight, ChevronDown } from "lucide-react";
-import { ToastContainer } from "react-toastify"; // ✅ Added
+// Use the global ToastContainer mounted in App.jsx to avoid duplicate containers
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { jwtDecode } from "jwt-decode";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -143,62 +143,72 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   // =======================================
   // Sprint Start / Complete
   // =======================================
-  const handleSprintStatus = async (sprintId, action) => {
+const handleSprintStatus = async (sprintId, action) => {
     try {
-      await axios.put(
-        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
-      );
-
-      toast.success(
-        action === "start" ? "Sprint started" : "Sprint completed",
-        { autoClose: 1500 },
-      );
-
-      fetchSprints();
-      fetchStories();
-    } catch (err) {
-      const data = err.response?.data || {};
-
-      // 1. Handle Sprint Completion Error (Pending Tasks)
-      if (
-        action === "complete" &&
-        data.code === "SPRINT_COMPLETION_VALIDATION_ERROR"
-      ) {
-        setPendingData({
-          sprintId,
-          tasks: data.data?.pendingTasks || [],
-          stories: data.data?.pendingStories || [],
-        });
-        setShowPendingModal(true);
-        return;
-      }
-
-      // 2. Handle "Another sprint is already active" error specifically
-      if (
-        data.message &&
-        data.message.includes("Another active sprint already exists")
-      ) {
-        toast.warn(
-          "Cannot start sprint: Another active sprint already exists in this project.",
-          {
-            autoClose: 3000,
-          },
+        await axios.put(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
+            {},
+            { headers },
         );
-        return;
-      }
 
-      // 3. Generic fallback error
-      toast.error(data.message || "Failed to update sprint status", {
-        autoClose: 2000,
-      });
+        toast.success(
+            action === "start" ? "Sprint started" : "Sprint completed",
+            { autoClose: 1500 }  // ← no containerId
+        );
+        fetchSprints();
+        fetchStories();
+
+    } catch (err) {
+        const data = err.response?.data || {};
+
+        // Check 1 — completion validation
+        if (action === "complete" && data.code === "SPRINT_COMPLETION_VALIDATION_ERROR") {
+            setPendingData({
+                sprintId,
+                tasks: data.data?.pendingTasks || [],
+                stories: data.data?.pendingStories || [],
+            });
+            setShowPendingModal(true);
+            return;
+        }
+
+        // Check 2 — another active sprint
+        if (data.message?.toLowerCase().includes("another active sprint")) {
+            toast.warn(
+                "Cannot start sprint: Another active sprint already exists in this project.",
+                { autoClose: 3000 }  // ← no containerId
+            );
+            fetchSprints();
+            return;
+        }
+
+        // ✅ Check 3 — empty sprint
+        if (
+            data.message?.toLowerCase().includes("empty sprint") ||
+            data.message?.toLowerCase().includes("at least one task or story")
+        ) {
+            toast.warn(
+                data.message,  // show exact backend message
+                { autoClose: 3000 }
+            );
+            return;
+        }
+
+        // ✅ Check 4 — epic not assigned (Story must belong to an Epic)
+        if (data.message?.toLowerCase().includes("epic")) {
+            toast.warn(
+                data.message,  // show exact backend message
+                { autoClose: 3000 }
+            );
+            return;
+        }
+
+        // Fallback — all other errors
+        toast.error(data.message || "Failed to update sprint status", {
+            autoClose: 2000   // ← no containerId
+        });
     }
-  };
+};
 
   // =======================================
   // Assign Epic to Story
@@ -472,9 +482,7 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="max-w-6xl mx-auto p-6 space-y-6">
-        {/* Toast Container — MUST EXIST for instant toasts */}
-        <ToastContainer position="top-right" autoClose={1500} />{" "}
-        {/* ✅ Sped up global autoClose */}
+  {/* Use the global ToastContainer mounted in App.jsx */}
         {/* Header */}
         <div className="flex justify-between items-center">
           {/* <h1 className="text-2xl font-semibold text-indigo-900">

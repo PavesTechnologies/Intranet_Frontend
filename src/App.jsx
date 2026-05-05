@@ -252,11 +252,11 @@ const ProjectManager = () => {
 const RoleOffEntry = () => {
   const { user } = useAuth();
 
-  if (user?.roles?.includes("DELIVERY-MANAGER")) {
+  if (user?.roles?.includes("Delivery_Manager")) {
     return <Navigate to="/resource-management/roleoff/dm" replace />;
   }
 
-  if (user?.roles?.includes("RESOURCE-MANAGER")) {
+  if (user?.roles?.includes("Resource_Manager")) {
     return <Navigate to="/resource-management/roleoff/rm" replace />;
   }
 
@@ -283,7 +283,7 @@ const AppRoutes = () => {
         navigate(lastPath, { replace: true });
       }
       else if (currentPath === "/") {
-        if (user?.roles?.includes("DELIVERY-MANAGER")) {
+        if (user?.roles?.includes("Delivery_Manager")) {
           navigate("/resource-management/demand", { replace: true });
         } else {
           navigate("/dashboard", { replace: true });
@@ -787,7 +787,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
                 <AdminPannel />
               </ProtectedRoute>
             }
@@ -795,7 +795,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/bench"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
                 <BenchPage />
               </ProtectedRoute>
             }
@@ -803,7 +803,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/bench/report"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
                 <BenchPoolDashboard />
               </ProtectedRoute>
             }
@@ -811,7 +811,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/bench/utilization-performance"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
                 <UtilizationPerformanceDashboard />
               </ProtectedRoute>
             }
@@ -819,7 +819,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/bench/utilization-performance/projects/:projectId"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
                 <OperationalProjectDetailPage />
               </ProtectedRoute>
             }
@@ -827,7 +827,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/bench/utilization-reporting"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
                 <UtilizationReportingDashboard />
               </ProtectedRoute>
             }
@@ -881,7 +881,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/demand"
             element={
-              <ProtectedRoute allowedRoles={["RESOURCE-MANAGER", "DELIVERY-MANAGER", "Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Resource_Manager", "Delivery_Manager", "Admin", "Super Admin"]}>
                 <DemandWorkspacePage />
               </ProtectedRoute>
             }
@@ -889,7 +889,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/demand/:demandId"
             element={
-              <ProtectedRoute allowedRoles={["RESOURCE-MANAGER", "DELIVERY-MANAGER", "Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Resource_Manager", "Delivery_Manager", "Admin", "Super Admin"]}>
                 <DemandDetailPage />
               </ProtectedRoute>
             }
@@ -897,7 +897,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff"
             element={
-              <ProtectedRoute allowedRoles={["PROJECT-MANAGER", "RESOURCE-MANAGER", "DELIVERY-MANAGER", "Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Project_Manager", "Resource_Manager", "Delivery_Manager", "Admin", "Super Admin"]}>
                 <RoleOffEntry />
               </ProtectedRoute>
             }
@@ -905,7 +905,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff/pm"
             element={
-              <ProtectedRoute allowedRoles={["PROJECT-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Project_Manager"]}>
                 <PMRoleOffPage />
               </ProtectedRoute>
             }
@@ -913,7 +913,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff/rm"
             element={
-              <ProtectedRoute allowedRoles={["RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Resource_Manager"]}>
                 <RMRoleOffPage />
               </ProtectedRoute>
             }
@@ -921,7 +921,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff/dm"
             element={
-              <ProtectedRoute allowedRoles={["DELIVERY-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Delivery_Manager"]}>
                 <DMRoleOffPage />
               </ProtectedRoute>
             }
@@ -930,7 +930,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff/report"
             element={
-              <ProtectedRoute allowedRoles={["PROJECT-MANAGER", "RESOURCE-MANAGER", "DELIVERY-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Project_Manager", "Resource_Manager", "Delivery_Manager"]}>
                 <RoleOffDashboard />
               </ProtectedRoute>
             }
@@ -951,7 +951,7 @@ const AppRoutes = () => {
 function App() {
   return (
     <>
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer position="top-right" autoClose={3000} style={{ zIndex: 999999 }}  />
       <Router basename={window.__APP_CONFIG__.basePath}>
         <></>
         <AuthProvider>
