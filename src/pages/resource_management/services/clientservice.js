@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+const RMS_BASE_URL = window.__APP_CONFIG__?.RMS_BASE_URL;
 
 const getAuthHeader = () => ({
   headers: {
@@ -443,12 +443,9 @@ export const getAssetById = async (assetId) => {
    ASSIGN ASSET TO RESOURCE
    =============================== */
 export const assignClientAsset = async (assignmentData) => {
-  console.log("Assignment Data:", assignmentData);
   try {
-    // FIX: Using the nested ID safely
     const id =
       assignmentData.asset?.assetId ||
-      assignmentData.asset?.id ||
       assignmentData.assetId;
 
     const response = await axios.post(

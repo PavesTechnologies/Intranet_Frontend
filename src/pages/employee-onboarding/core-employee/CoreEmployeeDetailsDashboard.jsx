@@ -86,6 +86,11 @@ export default function EmployeeOnboardingPage() {
   const [exportLoading, setExportLoading] = useState(false);
 
   const [exportedEmails, setExportedEmails] = useState([]);
+  const fileInputRef = useRef(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [failedRecords, setFailedRecords] = useState([]);
+
+  
 
   /* ============================
      FETCH EMPLOYEES
@@ -162,8 +167,80 @@ export default function EmployeeOnboardingPage() {
 
       const data = await res.json();
       setDesignations(data || []);
+
     } catch (err) {
       console.error("Failed to fetch designations", err);
+    }
+  };
+
+  const handleBulkUpload = async (event) => {
+    try {
+
+      const file = event.target.files[0];
+
+      if (!file) return;
+
+      const token = localStorage.getItem("token");
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      setUploadLoading(true);
+
+      const response = await fetch(
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/bulk-direct-upload`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: formData
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+
+        // Success toast
+        if (data.success_count > 0) {
+          showStatusToast(
+            `${data.success_count} employees uploaded successfully`,
+            "success"
+          );
+        }
+
+        // Error toasts
+        if (data.failed_records?.length > 0) {
+
+          data.failed_records.forEach((item) => {
+
+            showStatusToast(
+              `Row ${item.row}: ${formatError(item.reason)}`,
+              "error"
+            );
+
+          });
+
+        }
+
+        fetchEmployees();
+
+      } else {
+
+        showStatusToast("Upload failed", "error");
+
+      }
+
+    } catch (error) {
+
+      console.error(error);
+      showStatusToast("Upload failed", "error");
+
+    } finally {
+
+      setUploadLoading(false);
+
     }
   };
 
@@ -171,6 +248,7 @@ export default function EmployeeOnboardingPage() {
     fetchEmployees();
     fetchDepartments();
     fetchDesignations();
+    handleBulkUpload;
   }, []);
 
   /* ============================
@@ -264,14 +342,16 @@ export default function EmployeeOnboardingPage() {
       }
 
       const excelData = newEmployees.map((emp) => ({
-        "Employee ID": emp.employee_id,
-        Name: `${emp.first_name} ${emp.last_name}`,
-        Email: emp.work_email,
-        Contact: emp.contact_number,
+        user_uuid: emp.user_uuid,
+        employee_id: emp.employee_id,
+        first_name: emp.first_name,
+        last_name: emp.last_name,
+        mail: emp.work_email,
+        contact: emp.contact_number,
         Department: departmentMap[emp.department_uuid],
         Designation: designationMap[emp.designation_uuid],
-        "Joining Date": emp.joining_date,
         Status: emp.employment_status,
+        
       }));
       setExcelPreview(excelData);
       setShowPreview(true);
@@ -282,24 +362,106 @@ export default function EmployeeOnboardingPage() {
     }
   };
 
-  const downloadExcel = () => {
+  // const downloadExcel = () => {
+  //   const worksheet = XLSX.utils.json_to_sheet(excelPreview);
+
+  //   const workbook = XLSX.utils.book_new();
+
+  //   XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
+
+  //   // Auto column width
+  //   const cols = Object.keys(excelPreview[0]).map(() => ({ wch: 25 }));
+  //   worksheet["!cols"] = cols;
+
+  //   XLSX.writeFile(workbook, "Employee_Report.xlsx");
+
+  //   const newEmails = excelPreview.map((emp) => emp.Email.toLowerCase());
+  //   setExportedEmails((prev) => [...new Set([...prev, ...newEmails])]);
+
+  //   setShowPreview(false);
+  // };
+const downloadExcel = async () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    // Create worksheet
     const worksheet = XLSX.utils.json_to_sheet(excelPreview);
 
+    // Create workbook
     const workbook = XLSX.utils.book_new();
-
     XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
 
     // Auto column width
     const cols = Object.keys(excelPreview[0]).map(() => ({ wch: 25 }));
     worksheet["!cols"] = cols;
 
-    XLSX.writeFile(workbook, "Employee_Report.xlsx");
+    // Convert workbook to buffer
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
 
-    const newEmails = excelPreview.map((emp) => emp.Email.toLowerCase());
-    setExportedEmails((prev) => [...new Set([...prev, ...newEmails])]);
+    // Create Blob
+    const blob = new Blob(
+      [excelBuffer],
+      {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }
+    );
 
-    setShowPreview(false);
-  };
+    // Create File
+    const file = new File(
+      [blob],
+      "Employee_Report.xlsx",
+      {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }
+    );
+
+    // FormData
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // API call
+    const response = await fetch(
+      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/multiple-users`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      }
+    );
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showStatusToast("Excel sent successfully", "success");
+
+      const newEmails = excelPreview.map((emp) =>
+        emp.Email.toLowerCase()
+      );
+
+      setExportedEmails((prev) => [
+        ...new Set([...prev, ...newEmails]),
+      ]);
+
+      setShowPreview(false);
+
+    } else {
+      showStatusToast(
+        data.message || "Failed to send excel",
+        "error"
+      );
+    }
+
+  } catch (error) {
+    console.error("Send excel error:", error);
+
+    showStatusToast("Failed to send excel", "error");
+  }
+};
   /* ============================
      TABLE CONFIG
   ============================ */
@@ -386,29 +548,77 @@ export default function EmployeeOnboardingPage() {
         <div>
           <h1 className="text-2xl font-bold">Employee Dashboard</h1>
 
-          <p className="text-gray-500">Manage employee records</p>
-        </div>
-
-        {/* Buttons Section */}
-        <div className="flex gap-3">
-          <button
-            onClick={handleExportPreview}
-            disabled={exportLoading}
-            className={`px-4 py-2 rounded-lg shadow-sm text-white flex items-center gap-2
-          ${exportLoading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"}`}
-          >
-            {exportLoading ? (
-              <>
-                <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-4 h-4"></span>
-                Exporting...
-              </>
-            ) : (
-              "Export Excel"
-            )}
-          </button>
-        </div>
+        <p className="text-gray-500">
+          Manage employee records
+        </p>
       </div>
-      {/* SUMMARY CARDS */}
+
+
+      {/* Buttons Section */}
+      <div className="flex gap-3">
+        {/* Upload Button */}
+  <button
+    onClick={() => fileInputRef.current.click()}
+    className="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700"
+  >
+    {uploadLoading ? "Uploading..." : "Upload Excel"}
+  </button>
+
+  <input
+    type="file"
+    accept=".xlsx, .xls"
+    ref={fileInputRef}
+    onChange={handleBulkUpload}
+    hidden
+  />
+
+        <button
+        onClick={handleExportPreview}
+        disabled={exportLoading}
+        className={`px-4 py-2 rounded-lg shadow-sm text-white flex items-center gap-2
+          ${exportLoading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"}`}
+      >
+        {exportLoading ? (
+          <>
+            <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-4 h-4"></span>
+            Exporting...
+          </>
+        ) : (
+          "Export Excel"
+        )}
+      </button>
+      {failedRecords.length > 0 && (
+  <div className="mt-4 border rounded-lg p-4 bg-red-50">
+    <h3 className="font-semibold text-red-600 mb-2">
+      Failed Records
+    </h3>
+
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b">
+          <th className="text-left p-2">Row</th>
+          <th className="text-left p-2">Reason</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {failedRecords.map((item, index) => (
+          <tr key={index} className="border-b">
+            <td className="p-2">{item.row}</td>
+            <td className="p-2">{formatError(item.reason)}</td>
+          </tr>
+        ))}
+      </tbody>
+
+    </table>
+
+  </div>
+)}
+
+      </div>
+
+    </div>
+    {/* SUMMARY CARDS */}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard title="Total Employees" value={totalEmployees} icon={Users} />
@@ -519,6 +729,24 @@ export default function EmployeeOnboardingPage() {
 /* ============================
    STAT CARD
 ============================ */
+const formatError = (error) => {
+
+  if (!error) return "Unknown error";
+
+  if (error.includes("Duplicate entry")) {
+    return "Email already exists";
+  }
+
+  if (error.includes("IntegrityError")) {
+    return "Duplicate record found";
+  }
+
+  if (error.includes("NOT NULL")) {
+    return "Required field missing";
+  }
+
+  return "Upload failed";
+};
 
 function StatCard({ title, value, icon: Icon }) {
   return (

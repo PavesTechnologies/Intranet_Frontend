@@ -80,7 +80,7 @@ const EntriesTable = ({
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [entryIdToDelete, setEntryIdToDelete] = useState(null); // ✅ Converts a backend UTC datetime string (e.g. "2025-11-10T04:30:00Z")
-  //    to a local "HH:mm" string that will show correctly in <input type="time">
+  //    to a local "HH:mm" string that will show correctly in <input type="time">
 
   const toLocalTimeString = (utcString) => {
     if (!utcString) return "";
@@ -418,16 +418,36 @@ const EntriesTable = ({
     setAddData({ workType: "Office", isBillable: "Yes" });
   };
 
+  const showActions = window.location.pathname === "/timesheets";
+  const dataColumnWidths = showActions
+    ? selectionMode
+      ? ["13%", "13%", "10%", "10%", "14%", "21%", "7%", "8%"]
+      : ["14%", "14%", "11%", "11%", "14%", "22%", "6%", "8%"]
+    : selectionMode
+      ? ["15%", "15%", "11%", "11%", "15%", "22%", "7%"]
+      : ["16%", "16%", "12%", "12%", "16%", "22%", "6%"];
+  const tableColumnWidths = [
+    ...(selectionMode ? ["4%"] : []),
+    ...dataColumnWidths,
+  ];
+  const tableColumnCount = tableColumnWidths.length;
+
   return (
-    <table className="w-full border-collapse rounded">
-           {" "}
+    <>
+    <table className="w-full table-fixed border-collapse rounded">
+      <colgroup>
+        {tableColumnWidths.map((width, index) => (
+          <col key={`${width}-${index}`} style={{ width }} />
+        ))}
+      </colgroup>
+           
       <thead>
-               {" "}
+               
         <tr className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm">
-                   {" "}
+                   
           {selectionMode && (
             <th className="px-4 py-2">
-                           {" "}
+                           
               <input
                 type="checkbox"
                 title="Select All"
@@ -445,28 +465,28 @@ const EntriesTable = ({
                   }
                 }}
               />
-                         {" "}
+                         
             </th>
           )}
-                    <th className="text-left px-4 py-2">Project</th>         {" "}
-          <th className="text-left px-4 py-2">Task</th>         {" "}
-          <th className="text-left px-4 py-2">Start</th>         {" "}
-          <th className="text-left px-4 py-2">End</th>         {" "}
-          <th className="text-left px-4 py-2">Work Location</th>         {" "}
-          <th className="text-left px-4 py-2">Description</th>         {" "}
-          <th className="text-left px-4 py-2">Billable</th>         {" "}
-          {window.location.pathname === "/timesheets" && (
+                    <th className="text-left px-4 py-2">Project</th>         
+          <th className="text-left px-4 py-2">Task</th>         
+          <th className="text-left px-4 py-2">Start</th>         
+          <th className="text-left px-4 py-2">End</th>         
+          <th className="text-left px-4 py-2">Work Location</th>         
+          <th className="text-left px-4 py-2">Description</th>         
+          <th className="text-left px-4 py-2">Billable</th>         
+          {showActions && (
             <th className="text-left px-4 py-2">Actions</th>
           )}
-                 {" "}
+                 
         </tr>
-             {" "}
+             
       </thead>
-           {" "}
+           
       {/* ----------------- tbody: mapped rows + add-row (if any) ----------------- */}
-           {" "}
+           
       <tbody>
-               {" "}
+               
         {[...entries, ...pendingEntries].map((entry, idx) => (
           <tr
             key={entry.timesheetEntryId || `new-${idx}`}
@@ -474,10 +494,10 @@ const EntriesTable = ({
               idx % 2 === 0 ? "bg-white" : "bg-gray-50"
             } hover:bg-blue-50 transition`}
           >
-                       {" "}
+                       
             {selectionMode && (
               <td className="px-4 py-2 text-center">
-                               {" "}
+                               
                 <input
                   type="checkbox"
                   checked={selectedEntryIds.includes(
@@ -490,291 +510,288 @@ const EntriesTable = ({
                     )
                   }
                 />
-                             {" "}
+                             
               </td>
             )}
-                       {" "}
+                       
             {editIndex === idx ? (
               <>
-                               {" "}
-                <td className="px-4 py-2">
-                                   {" "}
+                               
+                <td className="px-4 py-2 text-left">
+                                   
                   <FormSelect
                     name="projectId"
                     value={editData.projectId}
                     options={projectOptions}
                     onChange={handleChange}
                   />
-                                 {" "}
+                                 
                 </td>
-                               {" "}
-                <td className="px-4 py-2">
-                                   {" "}
+                               
+                <td className="px-4 py-2 text-left">
+                                   
                   <FormSelect
                     name="taskId"
                     value={editData.taskId}
                     options={getTaskOptions(editData.projectId)}
                     onChange={handleChange}
                   />
-                                 {" "}
+                                 
                 </td>
-                               {" "}
-                <td className="px-4 py-2">
-                                   {" "}
+                               
+                <td className="px-4 py-2 text-left">
+                                   
                   <FormTime
                     name="fromTime"
                     value={editData.fromTime}
                     onChange={handleChange}
                   />
-                                 {" "}
+                                 
                 </td>
-                               {" "}
-                <td className="px-4 py-2">
-                                   {" "}
+                               
+                <td className="px-4 py-2 text-left">
+                                   
                   <FormTime
                     name="toTime"
                     value={editData.toTime}
                     onChange={handleChange}
                   />
-                                 {" "}
+                                 
                 </td>
-                               {" "}
-                <td className="px-4 py-2">
-                                   {" "}
+                               
+                <td className="px-4 py-2 text-left">
+                                   
                   <FormSelect
                     name="workType"
                     value={editData.workType}
                     options={workTypeOptions}
                     onChange={handleChange}
                   />
-                                 {" "}
+                                 
                 </td>
-                               {" "}
-                <td className="px-4 py-2">
-                                   {" "}
+                               
+                <td className="px-4 py-2 text-left">
+                                   
                   <FormInput
                     name="description"
                     value={editData.description}
                     onChange={handleChange}
                   />
-                                 {" "}
+                                 
                 </td>
-                               {" "}
-                <td className="px-4 py-2">
-                                   {" "}
-                  <td className="px-4 py-2">
-                                       {" "}
-                    {(
-                      editData.isBillable !== undefined
-                        ? editData.isBillable
-                        : entry.isBillable
-                    )
-                      ? "Yes"
-                      : "No"}
-                                     {" "}
-                  </td>
-                                 {" "}
+                               
+                <td className="px-4 py-2 text-left">
+                                   
+                  {(
+                    editData.isBillable !== undefined
+                      ? editData.isBillable
+                      : entry.isBillable
+                  )
+                    ? "Yes"
+                    : "No"}
                 </td>
-                               {" "}
-                {window.location.pathname !== "/managerapproval" && (
-                  <td className="px-4 py-2">
-                                       {" "}
+                               
+                {showActions && (
+                  <td className="px-4 py-2 text-left">
+                                       
                     <div className="flex gap-2">
-                                           {" "}
+                                           
                       <button className="text-green-500" onClick={handleSave}>
-                                                <Check />                   
-                         {" "}
+                                                <Check />                   
+                         
                       </button>
-                                           {" "}
+                                           
                       <button className="text-red-500" onClick={handleCancel}>
-                                                <X />                     {" "}
+                                                <X />                     
                       </button>
-                                         {" "}
+                                         
                     </div>
-                                     {" "}
+                                     
                   </td>
                 )}
-                             {" "}
+                             
               </>
             ) : (
               <>
-                               {" "}
-                <td className="px-4 py-2">
-                                   {" "}
+                               
+                <td className="px-4 py-2 text-left">
+                                   
                   {entry.projectName ||
                     projectIdToName[entry.projectId] ||
                     "N/A"}
-                                 {" "}
+                                 
                 </td>
-                               {" "}
-                <td className="px-4 py-2">
-                                   {" "}
-                  {entry.taskName || taskIdToName[entry.taskId] || "N/A"}       
-                         {" "}
+                               
+                <td className="px-4 py-2 text-left">
+                                   
+                  {entry.taskName || taskIdToName[entry.taskId] || "N/A"}       
+                         
                 </td>
-                               {" "}
-                <td className="px-4 py-2">{prettyTime(entry.fromTime)}</td>     
-                         {" "}
-                <td className="px-4 py-2">{prettyTime(entry.toTime)}</td>       
-                       {" "}
-                <td className="px-4 py-2">{mapWorkType(entry.workLocation)}</td>
-                               {" "}
-                <td className="px-4 py-2">{entry.description}</td>             
-                 {" "}
-                <td className="px-4 py-2">{entry.isBillable ? "Yes" : "No"}</td>
-                               {" "}
-                {window.location.pathname === "/timesheets" && (
-                  <td className="px-4 py-2">
-                    {console.log("Status from entries table: ", status)}       
-                               {" "}
+                               
+                <td className="px-4 py-2 text-left">{prettyTime(entry.fromTime)}</td>     
+                         
+                <td className="px-4 py-2 text-left">{prettyTime(entry.toTime)}</td>       
+                       
+                <td className="px-4 py-2 text-left">{mapWorkType(entry.workLocation)}</td>
+                               
+                <td className="px-4 py-2 text-left">{entry.description}</td>             
+                 
+                <td className="px-4 py-2 text-left">{entry.isBillable ? "Yes" : "No"}</td>
+                               
+                {showActions && (
+                  <td className="px-4 py-2 text-left">
+                    {console.log("Status from entries table: ", status)}       
+                               
                     {(status?.toLowerCase() === "draft" ||
                       status?.toLowerCase() === "submitted" ||
                       status?.toLowerCase() === "rejected") && (
                       <div className="flex gap-4">
-                                             
+                                             
                         <button
                           className="text-blue-600 hover:text-blue-800 text-sm"
                           onClick={() => handleEditClick(idx)}
                           title="Edit entry"
                         >
-                                                 {" "}
-                          <Pencil className="inline w-4 h-4" />                 
-                             {" "}
+                                                 
+                          <Pencil className="inline w-4 h-4" />                 
+                             
                         </button>
-                                             
+                                             
                         <button
                           className={`text-red-600 hover:text-red-800 text-sm ${deleteLoading ? "opacity-50 cursor-not-allowed" : ""}`}
                           onClick={() => handleDelete(entry.timesheetEntryId)}
                           title="Delete entry"
                           disabled={deleteLoading}
                         >
-                                                 {" "}
-                          <Trash2 className="inline w-4 h-4" />                 
-                             {" "}
+                                                 
+                          <Trash2 className="inline w-4 h-4" />                 
+                             
                         </button>
                       </div>
                     )}
-                                     {" "}
+                                     
                   </td>
                 )}
-                             {" "}
+                             
               </>
             )}
-                     {" "}
+                     
           </tr>
         ))}
-                {/* ←──────── Add-row for new entry ───────→ */}       {" "}
+                {/* ←──────── Add-row for new entry ───────→ */}       
         {addingNewEntry && (
           <tr
             key="add-new"
             className="text-sm bg-white hover:bg-blue-50 transition"
           >
-                        {selectionMode && <td className="px-4 py-2"></td>}     
-                 {" "}
-            <td className="px-4 py-2">
-                           {" "}
+                        {selectionMode && <td className="px-4 py-2 text-left"></td>}     
+                 
+            <td className="px-4 py-2 text-left">
+                            
               <FormSelect
                 name="projectId"
                 value={addData.projectId || ""}
                 options={projectOptions}
                 onChange={handleAddChange}
               />
-                         {" "}
+                         
             </td>
-                       {" "}
-            <td className="px-4 py-2">
-                           {" "}
+                       
+            <td className="px-4 py-2 text-left">
+                            
               <FormSelect
                 name="taskId"
                 value={addData.taskId || ""}
                 options={getTaskOptions(addData.projectId)}
                 onChange={handleAddChange}
               />
-                         {" "}
+                         
             </td>
-                       {" "}
-            <td className="px-4 py-2">
-                           {" "}
+                       
+            <td className="px-4 py-2 text-left">
+                            
               <FormTime
                 name="fromTime"
                 value={addData.fromTime || ""}
                 onChange={handleAddChange}
               />
-                         {" "}
+                         
             </td>
-                       {" "}
-            <td className="px-4 py-2">
-                           {" "}
+                       
+            <td className="px-4 py-2 text-left">
+                            
               <FormTime
                 name="toTime"
                 value={addData.toTime || ""}
                 onChange={handleAddChange}
               />
-                         {" "}
+                         
             </td>
-                       {" "}
-            <td className="px-4 py-2">
-                           {" "}
+                       
+            <td className="px-4 py-2 text-left">
+                            
               <FormSelect
                 name="workType"
                 value={addData.workType}
                 options={workTypeOptions}
                 onChange={handleAddChange}
               />
-                         {" "}
+                         
             </td>
-                       {" "}
-            <td className="px-4 py-2">
-                           {" "}
+                       
+            <td className="px-4 py-2 text-left">
+                            
               <FormInput
                 name="description"
                 value={addData.description || ""}
                 onChange={handleAddChange}
               />
-                         {" "}
+                         
             </td>
-                       {" "}
-            <td className="px-4 py-2">
-                           {" "}
+                       
+            <td className="px-4 py-2 text-left">
+                            
               {addData.projectId &&
               taskIdToBillablity[addData.taskId] !== undefined
                 ? taskIdToBillablity[addData.taskId]
                   ? "Yes"
                   : "No"
                 : "N/A"}
-                         {" "}
+                         
             </td>
-                       {" "}
-            <td className="px-4 py-2">
-                           {" "}
+                       
+            {showActions && (
+            <td className="px-4 py-2 text-left">
+                            
               <div className="flex gap-2">
-                               {" "}
+                               
                 <button className="text-green-500" onClick={handleAddEntry}>
-                                    <Check />               {" "}
+                                    <Check />               
                 </button>
-                               {" "}
+                               
                 <button className="text-red-500" onClick={handleCancel}>
-                                    <X />               {" "}
+                                    <X />               
                 </button>
-                             {" "}
+                             
               </div>
-                         {" "}
+                         
             </td>
-                     {" "}
+            )}
+                     
           </tr>
         )}
-             {" "}
+             
       </tbody>
-           {" "}
+           
       {pendingEntries.length > 0 && (
         <tfoot>
-                   {" "}
+                   
           <tr>
-                       {" "}
-            <td colSpan="9" className="px-4 py-1">
-                           {" "}
+                       
+            <td colSpan={tableColumnCount} className="px-4 py-1">
+                           
               <div className="flex justify-end py-1">
-                               {" "}
+                               
                 <Button
                   size="small"
                   onClick={async () => {
@@ -801,26 +818,27 @@ const EntriesTable = ({
                     }
                   }}
                 >
-                                    Submit Timesheet                {" "}
+                                    Submit Timesheet                
                 </Button>
-                             {" "}
+                             
               </div>
-                         {" "}
+                         
             </td>
-                     {" "}
+                     
           </tr>
-                 {" "}
+                 
         </tfoot>
       )}
-      <ConfirmDialog
-        open={isConfirmOpen}
-        title="Confirm Delete"
-        message={`Are you sure you want to delete this entry? This action cannot be undone.`}
-        onConfirm={() => handleDeleteClick(entryIdToDelete)}
-        onCancel={handleCancelDelete}
-      />
-         {" "}
+         
     </table>
+    <ConfirmDialog
+      open={isConfirmOpen}
+      title="Confirm Delete"
+      message={`Are you sure you want to delete this entry? This action cannot be undone.`}
+      onConfirm={() => handleDeleteClick(entryIdToDelete)}
+      onCancel={handleCancelDelete}
+    />
+    </>
   );
 };
 

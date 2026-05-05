@@ -531,20 +531,22 @@ const TimesheetHistoryGroup = ({
                    {" "}
           <div className="flex justify-between items-center">
                        {" "}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
                            {" "}
               <div
                 className={`${getWeekBadgeColor()} text-white px-3 py-1 rounded-full text-sm font-bold`}
               >
-                                Week {weekGroup.weekId || weekNumber}           
-                 {" "}
+                Week {weekGroup.weekId || weekNumber}
               </div>
                            {" "}
-              <div className="text-lg font-semibold text-gray-800">
-                                {monthName} {year}             {" "}
+              <div className="flex items-center gap-3">
+                <div className="text-lg font-semibold text-gray-800">
+                  {monthName} {year}
+                </div>
+                <div className="text-sm text-gray-600">
+                  {weekData.weekRange}
+                </div>
               </div>
-                           {" "}
-              <div className="text-sm text-gray-600">{weekData.weekRange}</div> 
                        {" "}
             </div>
                        {" "}
@@ -582,10 +584,10 @@ const TimesheetHistoryGroup = ({
                   </div>
                 )}
                            {" "}
-              <div className="text-right">
+              <div className="flex flex-col items-center leading-tight">
                                {" "}
                 <div className={`text-lg font-bold ${getTotalHoursColor()}`}>
-                                    {totalHours} hrs                {" "}
+                  {totalHours} hrs
                 </div>
                                {" "}
                 <div className="text-xs text-gray-500">Total Hours</div>       
@@ -645,7 +647,7 @@ const TimesheetHistoryGroup = ({
                   }}
                   open
                   onClickOutside={() => setEditDateIndex(null)}
-                  calendarClassName="shadow-lg rounded-xl border border-gray-200 p-2 z-[9999]"
+                  calendarClassName="timesheet-datepicker shadow-lg rounded-xl border border-gray-200 p-2 z-[9999]"
                   popperClassName="z-[9999]"
                   shouldCloseOnSelect={true}
                   showPopperArrow={false}
@@ -710,17 +712,15 @@ const TimesheetHistoryGroup = ({
 
                     return (
                       <div
-                        className="relative group cursor-pointer"
+                        className="relative group flex h-full w-full items-center justify-center cursor-pointer"
                         title={tooltipText}
                       >
-                                                {day}                       {" "}
+                        {day}
                         {tooltipText && (
                           <div className="absolute -bottom-7 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[9999]">
-                                                        {tooltipText}           
-                                         {" "}
+                            {tooltipText}
                           </div>
                         )}
-                                             {" "}
                       </div>
                     );
                   }}

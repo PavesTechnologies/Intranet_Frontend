@@ -73,13 +73,15 @@ const ProjectDashboard = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
-  const userRole = user?.roles?.includes("Manager")
+  const userRole = user?.roles?.includes("Project_Manager")
     ? "MANAGER"
     : user?.roles?.includes("Admin")
       ? "ADMIN"
       : "EMPLOYEE";
 
   const canManageProjects = userRole === "MANAGER" || userRole === "ADMIN";
+  const canmywork= userRole === "EMPLOYEE";
+
 
   // ------------------- FETCH PROJECTS -------------------
   const fetchProjects = async (status) => {
@@ -194,16 +196,25 @@ const ProjectDashboard = () => {
         <h1 className="text-3xl font-bold">Dashboard</h1>
 
         <div className="flex gap-3">
+          {canmywork && (
+            <Button
+              onClick={() => navigate("/my-work")}
+              variant="secondary"
+              size="medium"
+            >
+                My Work
+              </Button>
+          )}
           {canManageProjects && (
             <>
-              <Button
+
+                <Button
                 onClick={() => navigate("/my-work")}
                 variant="secondary"
                 size="medium"
               >
                 My Work
               </Button>
-
               <Button
                 onClick={() => navigate(`/block-leave-dates/${user?.user_id}`)}
                 variant="secondary"

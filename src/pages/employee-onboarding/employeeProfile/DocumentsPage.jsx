@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -19,14 +20,8 @@ import {
   Trash2,
   AlertTriangle,
 } from "lucide-react";
-
-export default function DocumentsPage({
-  employee,
-  user_uuid,
-  hrData = {},
-  identityTypes = [],
-  config = null,
-}) {
+import Select from "react-select";
+export default function DocumentsPage({ employee, user_uuid, hrData = {}, identityTypes = [], config = null, rawCertifications = [], refreshCertifications }) {
   const { employee_uuid } = useParams();
 
   const [educationDocs, setEducationDocs] = useState([]);
@@ -39,6 +34,20 @@ export default function DocumentsPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingDoc, setLoadingDoc] = useState(null);
   const [deletingDoc, setDeletingDoc] = useState(null);
+  // 🔥 NEW STATES FOR CERTIFICATIONS
+  const [skills, setSkills] = useState([]);
+  const [selectedSkill, setSelectedSkill] = useState(null);
+  const [customSkill, setCustomSkill] = useState("");
+
+  const [providers, setProviders] = useState([]);
+  const [selectedProvider, setSelectedProvider] = useState(null);
+  const [filteredProviders, setFilteredProviders] = useState([]);
+
+  const [allCertificates, setAllCertificates] = useState([]);
+  const [filteredCertificates, setFilteredCertificates] = useState([]);
+  const [selectedCertificate, setSelectedCertificate] = useState(null);
+
+  const [proficiencies, setProficiencies] = useState([]);
 
   /* ---- Sync folder and search from prop (deep linking) ---- */
   useEffect(() => {
@@ -139,25 +148,186 @@ export default function DocumentsPage({
     setIdentityDocs(idDocs);
 
     /* ---- Map Certifications ---- */
-    const certDocs = (data.certifications || []).map((doc, idx) => ({
-      id: doc.certification_uuid || `cert-${idx}`,
-      name: doc.certification_name || doc.name || "NA",
-      issuing_org: doc.issuing_organization || doc.issuer || "NA",
-      issue_date: doc.issue_date || "NA",
-      expiry_date: doc.expiry_date || "No Expiry",
-      credential_id: doc.credential_id || "",
-      credential_url: doc.credential_url || "",
-      file_path: doc.file_path || null,
-      documents:
-        doc.documents ||
-        (doc.file_path
-          ? [{ doc_type: "certificate", file_path: doc.file_path }]
-          : []),
-    }));
-    setCertificationDocs(certDocs);
+
+
 
     setLoading(false);
   }, [hrData]);
+
+  useEffect(() => {
+    const fetchSkills = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+
+        const res = await fetch(`${BASE_URL}/api/skills/active`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const result = await res.json();
+
+        const formatted = (result.data || []).map((s) => ({
+          value: s.id,
+          label: s.name,
+        }));
+
+        formatted.push({ value: "other", label: "Other" });
+
+        setSkills(formatted);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchSkills();
+  }, []);
+
+  useEffect(() => {
+    const fetchCertificates = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+
+        const res = await fetch(`${BASE_URL}/api/certificates`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const result = await res.json();
+
+        setAllCertificates(result.data || []);
+
+        const providerSet = new Set();
+        (result.data || []).forEach((cert) => {
+          if (cert.providerName) {
+            providerSet.add(cert.providerName);
+          }
+        });
+
+        const formattedProviders = [...providerSet].map((p) => ({
+          value: p,
+          label: p,
+        }));
+
+        formattedProviders.push({ value: "other", label: "Other" });
+
+        setProviders(formattedProviders);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchCertificates();
+  }, []);
+  useEffect(() => {
+    if (!selectedSkill) {
+      setFilteredCertificates([]);
+      return;
+    }
+
+    const filtered = allCertificates.filter(
+      (cert) => cert.skillId === selectedSkill.value
+    );
+
+    const unique = Array.from(
+      new Map(filtered.map((c) => [c.certificateName, c])).values()
+    );
+
+    setFilteredCertificates(
+      unique.map((c) => ({
+        value: c.certificateId,
+        label: c.certificateName,
+      }))
+    );
+  }, [selectedSkill]);
+  useEffect(() => {
+    const fetchProficiencies = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+
+        const res = await fetch(
+          `${BASE_URL}/api/proficiency/get-all-proficiency-levels`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        const result = await res.json();
+
+        const formatted = (result.data || []).map((p) => ({
+          value: p.proficiencyId,
+          label: p.proficiencyName,
+        }));
+
+        setProficiencies(formatted);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchProficiencies();
+  }, []);
+  useEffect(() => {
+    if (!selectedCertificate) {
+      setFilteredProviders([]);
+      setSelectedProvider(null);
+      return;
+    }
+
+    const providers = allCertificates
+      .filter(cert => cert.certificateId === selectedCertificate.value)
+      .map(cert => cert.providerName)
+      .filter(Boolean);
+
+    const uniqueProviders = [...new Set(providers)];
+
+    const formatted = uniqueProviders.map(p => ({
+      value: p,
+      label: p,
+    }));
+
+    formatted.push({ value: "other", label: "Other" });
+
+    setFilteredProviders(formatted);
+
+  }, [selectedCertificate, allCertificates]);
+
+  
+  useEffect(() => {
+    if (!rawCertifications || !skills.length || !proficiencies.length) return;
+
+    const formatted = rawCertifications.map((doc) => {
+      // ✅ MAP SKILL NAME
+      const skillObj = skills.find(
+        (s) => s.value === doc.certificate?.skillId
+      );
+
+      // ✅ MAP PROFICIENCY NAME
+      const profObj = proficiencies.find(
+        (p) => p.value === doc.proficiencyId
+      );
+
+      return {
+        id: doc.id,
+        certificateId: doc.certificateId,
+        skillId: doc.certificate?.skillId,
+        skillName: skillObj?.label || "NA",
+        name: doc.certificate?.certificateName || "NA",
+        issuing_org: doc.certificate?.providerName || "NA",
+        proficiencyId: doc.proficiencyId,
+        proficiencyName: profObj?.label || "NA",
+        issue_date: doc.issuedDate,
+        expiry_date: doc.expiryDate || "No Expiry",
+        documents: doc.fileName
+          ? [{ doc_type: "certificate", file_path: doc.fileName }]
+          : [],
+        certificateFile: doc.certificateFile,
+        fileType: doc.fileType,
+      };
+    });
+
+    setCertificationDocs(formatted);
+  }, [rawCertifications, skills, proficiencies]);
 
   /* ---- Resolve signed URL from file_path ---- */
   const getSignedUrl = async (filePath) => {
@@ -182,6 +352,20 @@ export default function DocumentsPage({
     signedUrl = signedUrl.replace(/^"+|"+$/g, "").trim();
 
     return signedUrl;
+  };
+  // 🔥 CERTIFICATION FILE HANDLER (BASE64 → URL)
+  const getFileUrlFromBase64 = (base64, fileType) => {
+    if (!base64) return null;
+
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length)
+      .fill(0)
+      .map((_, i) => byteCharacters.charCodeAt(i));
+
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: fileType });
+
+    return URL.createObjectURL(blob);
   };
 
   /* ---- Detect file type from URL ---- */
@@ -225,63 +409,375 @@ export default function DocumentsPage({
   };
 
   /* ---- Upload Document ---- */
-  const handleUpload = async () => {
-    if (!uploadFile) return;
+  // const handleUpload = async () => {
+  //   if (!uploadFile && uploadModal.category!=="certifications") return;
 
-    try {
-      setUploading(true);
-      const token = localStorage.getItem("token");
-      const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+  //   try {
+  //     setUploading(true);
+  //     const token = localStorage.getItem("token");
+  //     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
-      const targetUserUuid = user_uuid;
+  //     const targetUserUuid = user_uuid;
 
-      const formData = new FormData();
-      formData.append("file", uploadFile);
-      formData.append("user_uuid", targetUserUuid || "");
-      formData.append("category", uploadModal.category);
+  //     const formData = new FormData();
+  //     formData.append("file", uploadFile);
+  //     formData.append("user_uuid", targetUserUuid || "");
+  //     formData.append("category", uploadModal.category);
 
-      if (uploadModal.docId) {
-        formData.append("document_id", uploadModal.docId);
+  //     if (uploadModal.docId) {
+  //       formData.append("document_id", uploadModal.docId);
+  //     }
+
+  //     // Append category-specific metadata
+  //     Object.entries(uploadFormData).forEach(([key, value]) => {
+  //       if (value) formData.append(key, value);
+  //     });
+
+  //     const response = await fetch(
+  //       `${BASE_URL}/hr/upload-document`,
+  //       {
+  //         method: "POST",
+  //         headers: {
+  //           Authorization: `Bearer ${token}`,
+  //         },
+  //         body: formData,
+  //       }
+  //     );
+
+  //     if (response.ok) {
+  //       setUploadSuccess(true);
+  //       setTimeout(() => {
+  //         setUploadModal({ open: false, category: "", docId: null });
+  //         setUploadFile(null);
+  //         setUploadFormData({});
+  //         setUploadSuccess(false);
+  //         // Refresh documents
+  //         window.location.reload();
+  //       }, 1500);
+  //     } else {
+  //       const errData = await response.json().catch(() => ({}));
+  //       showStatusToast(errData.detail || "Upload failed. Please try again.", "error");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error uploading document:", error);
+  //     showStatusToast("Upload failed. Please try again.", "error");
+  //   } finally {
+  //     setUploading(false);
+  //   }
+  // };
+  // const handleUpload = async () => {
+  //   if (!uploadFile && uploadModal.category !== "certifications") return;
+
+  //   try {
+  //     setUploading(true);
+
+  //     const token = localStorage.getItem("token");
+
+  //     // 🔥 1. CERTIFICATIONS → RMS
+  //     if (uploadModal.category === "certifications") {
+  //       const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+
+  //       const formData = new FormData();
+
+  //       // ✅ VALIDATION BEFORE API CALL
+  //         if (!employee?.empId) {
+  //           alert("Employee ID missing");
+  //           return;
+  //         }
+
+  //         if (!selectedCertificate?.value) {
+  //           alert("Please select a certificate");
+  //           return;
+  //         }
+
+  //         if (!uploadFormData.proficiencyId) {
+  //           alert("Please select proficiency");
+  //           return;
+  //         }
+
+  //       const certData = {
+  //         resourceId: Number(employee?.empId),
+  //         certificateId: selectedCertificate?.value,
+  //         skillId: selectedSkill?.value=== "other" ? null : selectedSkill?.value,
+  //         proficiencyId: uploadFormData.proficiencyId,
+  //         issuedDate: uploadFormData.issue_date,
+  //         expiryDate: uploadFormData.expiry_date || null,
+  //         activeFlag: true
+  //       };
+
+        
+
+  //       formData.append(
+  //         "certificateData",
+  //         new Blob([JSON.stringify(certData)], { type: "application/json" })
+  //       );
+
+  //       if (uploadFile) {
+  //         formData.append("certificateFile", uploadFile);
+  //       }
+  //       const isEdit = !!uploadModal.docId;
+
+  //       const url = isEdit
+  //         ? `${BASE_URL}/api/resource-certificates/${uploadModal.docId}`
+  //         : `${BASE_URL}/api/resource-certificates`;
+
+  //       const method = isEdit ? "PUT" : "POST";
+
+  //       const response = await fetch(
+  //         url,
+  //         {
+  //           method,
+  //           headers: {
+  //             Authorization: `Bearer ${token}`,
+  //           },
+  //           body: formData,
+  //         }
+  //       );
+
+  //       if (!response.ok) {
+  //         alert("Certification upload failed");
+  //         return;
+  //       }
+
+  //       alert(isEdit ? "Certification updated successfully" : "Certification saved successfully");
+  //       await fetchCertifications();
+  //       // reset
+  //       setUploadModal({ open: false, category: "", docId: null });
+  //       setUploadFormData({});
+  //       setSelectedSkill(null);
+  //       setSelectedCertificate(null);
+  //       setUploadFile(null);
+
+  //       return; // ✅ IMPORTANT → stops here
+  //     }
+
+  //     // 🔥 2. OTHER DOCUMENTS → EMPLOYEE ONBOARDING
+  //     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+
+  //     const formData = new FormData();
+
+  //     formData.append("file", uploadFile);
+  //     formData.append("user_uuid", user_uuid);
+  //     formData.append("category", uploadModal.category);
+
+  //     if (uploadModal.docId) {
+  //       formData.append("document_id", uploadModal.docId);
+  //     }
+
+  //     Object.entries(uploadFormData).forEach(([key, value]) => {
+  //       if (value) formData.append(key, value);
+  //     });
+
+  //     const response = await fetch(
+  //       `${BASE_URL}/hr/upload-document`,
+  //       {
+  //         method: "POST",
+  //         headers: {
+  //           Authorization: `Bearer ${token}`,
+  //         },
+  //         body: formData,
+  //       }
+  //     );
+
+  //     if (response.ok) {
+  //       setUploadSuccess(true);
+  //       setTimeout(() => {
+  //         setUploadModal({ open: false, category: "", docId: null });
+  //         setUploadFile(null);
+  //         setUploadFormData({});
+  //         setUploadSuccess(false);
+  //         window.location.reload();
+  //       }, 1500);
+  //     } else {
+  //       alert("Upload failed");
+  //     }
+
+  //   } catch (error) {
+  //     console.error(error);
+  //   } finally {
+  //     setUploading(false);
+  //   }
+  // };
+
+ const handleUpload = async () => {
+  if (!uploadFile && uploadModal.category !== "certifications") return;
+
+  try {
+    setUploading(true);
+    const token = localStorage.getItem("token");
+
+    // 🔥 1. CERTIFICATIONS → RMS API
+    if (uploadModal.category === "certifications") {
+      const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+
+      // ✅ VALIDATION
+      if (!employee?.empId) {
+        alert("Employee ID missing");
+        return;
       }
 
-      // Append category-specific metadata
-      Object.entries(uploadFormData).forEach(([key, value]) => {
-        if (value) formData.append(key, value);
-      });
+      if (!selectedCertificate?.value) {
+        alert("Please select a certificate");
+        return;
+      }
 
-      const response = await fetch(`${BASE_URL}/hr/upload-document`, {
-        method: "POST",
+      if (!uploadFormData.proficiencyId) {
+        alert("Please select proficiency");
+        return;
+      }
+      const isEdit = !!uploadModal.docId;
+
+// ✅ BUILD PAYLOAD DIFFERENTLY FOR POST & PUT
+     let certData;
+
+      if (isEdit) {
+        // 🔥 UPDATE (merge existing data)
+        const existingDoc = certificationDocs.find(
+          (d) => d.id === uploadModal.docId
+        );
+
+        certData = {
+          resourceId: Number(employee.empId),
+
+          certificateId:
+            selectedCertificate?.value || existingDoc?.certificateId,
+
+          skillId:
+            selectedSkill?.value === "other"
+              ? null
+              : selectedSkill?.value ?? existingDoc?.skillId,
+
+          proficiencyId:
+            uploadFormData.proficiencyId ?? existingDoc?.proficiencyId,
+
+          issuedDate:
+            uploadFormData.issue_date ?? existingDoc?.issue_date,
+
+          expiryDate:
+            uploadFormData.expiry_date ?? existingDoc?.expiry_date,
+
+          activeFlag: true,
+        };
+      } else {
+        // 🔥 CREATE (all required fields)
+        certData = {
+          resourceId: Number(employee.empId),
+          certificateId: selectedCertificate.value,
+          skillId:
+            selectedSkill?.value === "other"
+              ? null
+              : selectedSkill?.value,
+          proficiencyId: uploadFormData.proficiencyId,
+          issuedDate: uploadFormData.issue_date,
+          expiryDate: uploadFormData.expiry_date || null,
+          activeFlag: true,
+        };
+      }
+
+      // ✅ CREATE FORM DATA (IMPORTANT FORMAT)
+      const formData = new FormData();
+
+      formData.append(
+        "certificateData",
+        new Blob([JSON.stringify(certData)], {
+          type: "application/json",
+        })
+      );
+
+      // ✅ FILE (optional)
+      if (uploadFile) {
+        formData.append("certificateFile", uploadFile);
+      }
+
+      // ✅ API CONFIG
+      const url = isEdit
+        ? `${BASE_URL}/api/resource-certificates/${uploadModal.docId}`
+        : `${BASE_URL}/api/resource-certificates`;
+
+      const method = isEdit ? "PUT" : "POST";
+
+      // ✅ API CALL
+      const response = await fetch(url, {
+        method,
         headers: {
           Authorization: `Bearer ${token}`,
         },
         body: formData,
       });
 
-      if (response.ok) {
-        setUploadSuccess(true);
-        setTimeout(() => {
-          setUploadModal({ open: false, category: "", docId: null });
-          setUploadFile(null);
-          setUploadFormData({});
-          setUploadSuccess(false);
-          // Refresh documents
-          window.location.reload();
-        }, 1500);
-      } else {
-        const errData = await response.json().catch(() => ({}));
-        showStatusToast(
-          errData.detail || "Upload failed. Please try again.",
-          "error",
-        );
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("API ERROR:", errText);
+        alert("Certification upload failed");
+        return;
       }
-    } catch (error) {
-      console.error("Error uploading document:", error);
-      showStatusToast("Upload failed. Please try again.", "error");
-    } finally {
-      setUploading(false);
-    }
-  };
 
+      // ✅ SUCCESS
+      alert(
+        isEdit
+          ? "Certification updated successfully"
+          : "Certification saved successfully"
+      );
+
+      // ✅ REFRESH DATA
+      await refreshCertifications?.();
+
+      // ✅ RESET STATE
+      setUploadModal({ open: false, category: "", docId: null });
+      setUploadFormData({});
+      setSelectedSkill(null);
+      setSelectedCertificate(null);
+      setUploadFile(null);
+
+      return;
+
+      
+
+   
+    }
+
+    // 🔥 2. OTHER DOCUMENTS (UNCHANGED)
+    const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+
+    const formData = new FormData();
+    formData.append("file", uploadFile);
+    formData.append("user_uuid", user_uuid);
+    formData.append("category", uploadModal.category);
+
+    if (uploadModal.docId) {
+      formData.append("document_id", uploadModal.docId);
+    }
+
+    Object.entries(uploadFormData).forEach(([key, value]) => {
+      if (value) formData.append(key, value);
+    });
+
+    const response = await fetch(`${BASE_URL}/hr/upload-document`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (response.ok) {
+      setUploadSuccess(true);
+      setTimeout(() => {
+        setUploadModal({ open: false, category: "", docId: null });
+        setUploadFile(null);
+        setUploadFormData({});
+        setUploadSuccess(false);
+        window.location.reload();
+      }, 1500);
+    } else {
+      alert("Upload failed");
+    }
+  } catch (error) {
+    console.error(error);
+  } finally {
+    setUploading(false);
+  }
+};
   /* ---- Reset upload modal ---- */
   const closeUploadModal = () => {
     setUploadModal({ open: false, category: "", docId: null });
@@ -291,25 +787,88 @@ export default function DocumentsPage({
   };
 
   /* ---- Delete Document ---- */
+  // const deleteDocument = (docId, category) => {
+  //   setConfirmModal({
+  //     open: true,
+  //     title: "Delete Document",
+  //     message: "Are you sure you want to delete this document? This action cannot be undone.",
+  //     onConfirm: async () => {
+  //       setConfirmModal({ open: false, title: "", message: "", onConfirm: null });
+  //       try {
+  //         setDeletingDoc(docId);
+  //         const token = localStorage.getItem("token");
+  //         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+
+  //         const response = await fetch(
+  //           `${BASE_URL}/hr/delete-document/${docId}?category=${encodeURIComponent(category)}`,
+  //           {
+  //             method: "DELETE",
+  //             headers: {
+  //               Authorization: `Bearer ${token}`,
+  //               "Content-Type": "application/json",
+  //             },
+  //           }
+  //         );
+
+  //         if (response.ok) {
+  //           showStatusToast("Document deleted successfully.", "success");
+  //           if (category === "education") {
+  //             setEducationDocs((prev) => prev.filter((d) => d.id !== docId));
+  //           } else if (category === "experience") {
+  //             setExperienceDocs((prev) => prev.filter((d) => d.id !== docId));
+  //           } else if (category === "identity") {
+  //             setIdentityDocs((prev) => prev.filter((d) => d.id !== docId));
+  //           } else if (category === "certifications") {
+  //             setCertificationDocs((prev) => prev.filter((d) => d.id !== docId));
+  //           }
+  //         } else {
+  //           const errData = await response.json().catch(() => ({}));
+  //           showStatusToast(errData.detail || "Delete failed. Please try again.", "error");
+  //         }
+  //       } catch (error) {
+  //         console.error("Error deleting document:", error);
+  //         showStatusToast("Delete failed. Please try again.", "error");
+  //       } finally {
+  //         setDeletingDoc(null);
+  //       }
+  //     },
+  //   });
+  // };
+
   const deleteDocument = (docId, category) => {
-    setConfirmModal({
-      open: true,
-      title: "Delete Document",
-      message:
-        "Are you sure you want to delete this document? This action cannot be undone.",
-      onConfirm: async () => {
-        setConfirmModal({
-          open: false,
-          title: "",
-          message: "",
-          onConfirm: null,
-        });
-        try {
-          setDeletingDoc(docId);
-          const token = localStorage.getItem("token");
+  setConfirmModal({
+    open: true,
+    title: "Delete Document",
+    message: "Are you sure you want to delete this document?",
+    onConfirm: async () => {
+      setConfirmModal({ open: false, title: "", message: "", onConfirm: null });
+
+      try {
+        setDeletingDoc(docId);
+        const token = localStorage.getItem("token");
+
+        let response;
+
+        // 🔥 1. CERTIFICATIONS → RMS API
+        if (category === "certifications") {
+          const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+
+          response = await fetch(
+            `${BASE_URL}/api/resource-certificates/${docId}`,
+            {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+        }
+
+        // 🔥 2. OTHER DOCUMENTS → EMPLOYEE ONBOARDING
+        else {
           const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
-          const response = await fetch(
+          response = await fetch(
             `${BASE_URL}/hr/delete-document/${docId}?category=${encodeURIComponent(category)}`,
             {
               method: "DELETE",
@@ -319,36 +878,36 @@ export default function DocumentsPage({
               },
             },
           );
-
-          if (response.ok) {
-            showStatusToast("Document deleted successfully.", "success");
-            if (category === "education") {
-              setEducationDocs((prev) => prev.filter((d) => d.id !== docId));
-            } else if (category === "experience") {
-              setExperienceDocs((prev) => prev.filter((d) => d.id !== docId));
-            } else if (category === "identity") {
-              setIdentityDocs((prev) => prev.filter((d) => d.id !== docId));
-            } else if (category === "certifications") {
-              setCertificationDocs((prev) =>
-                prev.filter((d) => d.id !== docId),
-              );
-            }
-          } else {
-            const errData = await response.json().catch(() => ({}));
-            showStatusToast(
-              errData.detail || "Delete failed. Please try again.",
-              "error",
-            );
-          }
-        } catch (error) {
-          console.error("Error deleting document:", error);
-          showStatusToast("Delete failed. Please try again.", "error");
-        } finally {
-          setDeletingDoc(null);
         }
-      },
-    });
-  };
+
+        // ✅ HANDLE RESPONSE
+        if (response.ok) {
+          showStatusToast("Deleted successfully", "success");
+
+          if (category === "certifications") {
+            setCertificationDocs(prev => prev.filter(d => d.id !== docId));
+          } else if (category === "education") {
+            setEducationDocs(prev => prev.filter(d => d.id !== docId));
+          } else if (category === "experience") {
+            setExperienceDocs(prev => prev.filter(d => d.id !== docId));
+          } else if (category === "identity") {
+            setIdentityDocs(prev => prev.filter(d => d.id !== docId));
+          }
+
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          showStatusToast(errData.message || "Delete failed", "error");
+        }
+
+      } catch (error) {
+        console.error("Delete error:", error);
+        showStatusToast("Delete failed", "error");
+      } finally {
+        setDeletingDoc(null);
+      }
+    },
+  });
+};
 
   /* ---- Pre-fill form data for re-upload ---- */
   const openReuploadModal = (doc, category) => {
@@ -384,8 +943,7 @@ export default function DocumentsPage({
       };
     } else if (category === "certifications") {
       prefillData = {
-        certification_name: doc.name !== "NA" ? doc.name : "",
-        issuing_organization: doc.issuing_org !== "NA" ? doc.issuing_org : "",
+        proficiencyId: doc.proficiencyId || "",
         issue_date: doc.issue_date !== "NA" ? doc.issue_date : "",
         expiry_date:
           doc.expiry_date !== "No Expiry" && doc.expiry_date !== "NA"
@@ -394,6 +952,20 @@ export default function DocumentsPage({
         credential_id: doc.credential_id || "",
         credential_url: doc.credential_url || "",
       };
+
+      // ✅ Update complementary dropdown states
+      const skillObj = skills.find((s) => s.value === doc.skillId);
+      setSelectedSkill(skillObj || null);
+
+      setSelectedCertificate({
+        value: doc.certificateId,
+        label: doc.name,
+      });
+
+      setSelectedProvider({
+        value: doc.issuing_org,
+        label: doc.issuing_org,
+      });
     }
 
     setUploadFormData(prefillData);
@@ -538,11 +1110,10 @@ export default function DocumentsPage({
                 <button
                   key={folder.key}
                   onClick={() => setActiveFolder(folder.key)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-                    currentFolderKey === folder.key
-                      ? "bg-indigo-50 text-indigo-700 font-semibold"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-800"
-                  }`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentFolderKey === folder.key
+                    ? "bg-indigo-50 text-indigo-700 font-semibold"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-800"
+                    }`}
                 >
                   <span
                     className={
@@ -555,11 +1126,10 @@ export default function DocumentsPage({
                   </span>
                   <span className="flex-1 text-left">{folder.label}</span>
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      currentFolderKey === folder.key
-                        ? "bg-indigo-100 text-indigo-600"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
+                    className={`text-xs px-2 py-0.5 rounded-full ${currentFolderKey === folder.key
+                      ? "bg-indigo-100 text-indigo-600"
+                      : "bg-gray-100 text-gray-500"
+                      }`}
                   >
                     {folder.count}
                   </span>
@@ -820,9 +1390,18 @@ export default function DocumentsPage({
                       title={doc.name}
                       hasFile={doc.documents.length > 0}
                       documents={doc.documents}
-                      onViewDocument={(filePath, docTitle) =>
-                        viewDocument(filePath, doc.id, docTitle)
-                      }
+                      onViewDocument={() => {
+                        const url = getFileUrlFromBase64(doc.certificateFile, doc.fileType);
+
+                        if (url) {
+                          setPreviewModal({
+                            open: true,
+                            url,
+                            title: doc.name,
+                            type: doc.fileType?.includes("pdf") ? "pdf" : "image",
+                          });
+                        }
+                      }}
                       cardTitle={doc.name}
                       onUpload={() => openReuploadModal(doc, "certifications")}
                       onDelete={() => deleteDocument(doc.id, "certifications")}
@@ -830,11 +1409,11 @@ export default function DocumentsPage({
                       loading={loadingDoc === doc.id}
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                        <DocField label="Skill" value={doc.skillName} />
                         <DocField label="Certificate Name" value={doc.name} />
-                        <DocField
-                          label="Issuing Organization"
-                          value={doc.issuing_org}
-                        />
+                        <DocField label="Issuing Organization" value={doc.issuing_org} />
+
+                        <DocField label="Proficiency" value={doc.proficiencyName} />
                         <DocField label="Issue Date" value={doc.issue_date} />
                         <DocField label="Expiry Date" value={doc.expiry_date} />
                         {doc.credential_id && (
@@ -1175,65 +1754,103 @@ export default function DocumentsPage({
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                         Certification Details
                       </p>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                        {/* 🔥 Skill Dropdown */}
+                        <div className="sm:col-span-2">
+                          <label className="text-sm font-medium text-gray-700">Skill</label>
+                          <Select
+                            options={skills}
+                            value={selectedSkill}
+                            onChange={setSelectedSkill}
+                            placeholder="Select Skill"
+                          />
+                        </div>
+
+                        {/* 🔥 Custom Skill */}
+                        {selectedSkill?.value === "other" && (
+                          <div className="sm:col-span-2">
+                            <UploadField
+                              label="Custom Skill"
+                              placeholder="Enter custom skill"
+                              value={customSkill}
+                              onChange={setCustomSkill}
+                            />
+                          </div>
+                        )}
+
+                        {/* 🔥 Certificate Dropdown */}
+                        <div className="sm:col-span-2">
+                          <label className="text-sm font-medium text-gray-700">Certificate</label>
+                          <Select
+                            options={filteredCertificates}
+                            value={selectedCertificate}
+                            onChange={(val) => {
+                              setSelectedCertificate(val);
+                              setSelectedProvider(null); // 🔥 reset provider
+                            }}
+                            placeholder="Select Certificate"
+                          />
+                        </div>
+                        {/* 🔥 Provider Dropdown */}
+                        <div className="sm:col-span-2">
+                          <label className="text-sm font-medium text-gray-700">
+                            Issuing Organization
+                          </label>
+                          <Select
+                            options={filteredProviders}
+                            value={selectedProvider}
+                            onChange={setSelectedProvider}
+                            placeholder="Select Provider"
+                          />
+                        </div>
+                        {selectedProvider?.value === "other" && (
+                          <div className="sm:col-span-2">
+                            <UploadField
+                              label="Custom Provider"
+                              placeholder="Enter provider name"
+                              value={uploadFormData.customProvider || ""}
+                              onChange={(v) =>
+                                setUploadFormData(d => ({ ...d, customProvider: v }))
+                              }
+                            />
+                          </div>
+                        )}
+
+                        {/* 🔥 Proficiency */}
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Proficiency</label>
+                          <Select
+                            options={proficiencies}
+                            value={proficiencies.find(p => p.value === uploadFormData.proficiencyId) || null}
+                            onChange={(val) =>
+                              setUploadFormData((d) => ({
+                                ...d,
+                                proficiencyId: val.value,
+                              }))
+                            }
+                            placeholder="Select Proficiency"
+                          />
+                        </div>
+
+                        {/* 🔥 Issue Date */}
                         <UploadField
-                          label="Certificate Name"
-                          placeholder="e.g. AWS Cloud Practitioner, Python Course"
-                          value={uploadFormData.certification_name || ""}
-                          onChange={(v) =>
-                            setUploadFormData((d) => ({
-                              ...d,
-                              certification_name: v,
-                            }))
-                          }
-                        />
-                        <UploadField
-                          label="Issuing Organization"
-                          placeholder="e.g. Coursera, Udemy, AWS"
-                          value={uploadFormData.issuing_organization || ""}
-                          onChange={(v) =>
-                            setUploadFormData((d) => ({
-                              ...d,
-                              issuing_organization: v,
-                            }))
-                          }
-                        />
-                        <UploadField
-                          label="Issue Date"
+                          label="Issued Date"
                           type="date"
                           value={uploadFormData.issue_date || ""}
                           onChange={(v) =>
                             setUploadFormData((d) => ({ ...d, issue_date: v }))
                           }
                         />
+
+                        {/* 🔥 Expiry Date */}
                         <UploadField
-                          label="Expiry Date (if any)"
+                          label="Expiry Date"
                           type="date"
                           value={uploadFormData.expiry_date || ""}
                           onChange={(v) =>
                             setUploadFormData((d) => ({ ...d, expiry_date: v }))
-                          }
-                        />
-                        <UploadField
-                          label="Credential ID (Optional)"
-                          placeholder="e.g. ABC123XYZ"
-                          value={uploadFormData.credential_id || ""}
-                          onChange={(v) =>
-                            setUploadFormData((d) => ({
-                              ...d,
-                              credential_id: v,
-                            }))
-                          }
-                        />
-                        <UploadField
-                          label="Credential URL (Optional)"
-                          placeholder="e.g. https://verify.coursera.org/..."
-                          value={uploadFormData.credential_url || ""}
-                          onChange={(v) =>
-                            setUploadFormData((d) => ({
-                              ...d,
-                              credential_url: v,
-                            }))
                           }
                         />
                       </div>
@@ -1249,11 +1866,10 @@ export default function DocumentsPage({
                       onClick={() => fileInputRef.current?.click()}
                       onDrop={handleDrop}
                       onDragOver={handleDragOver}
-                      className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
-                        uploadFile
-                          ? "border-indigo-300 bg-indigo-50/50"
-                          : "border-gray-200 bg-gray-50/50 hover:border-indigo-300 hover:bg-indigo-50/30"
-                      }`}
+                      className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${uploadFile
+                        ? "border-indigo-300 bg-indigo-50/50"
+                        : "border-gray-200 bg-gray-50/50 hover:border-indigo-300 hover:bg-indigo-50/30"
+                        }`}
                     >
                       <input
                         ref={fileInputRef}
