@@ -38,6 +38,7 @@ export default function CreateOffer() {
     designation: "",
     employee_type: "",
     cc_mails: [],
+    currency: "INR",
   });
 
   const [components, setComponents] = useState([
@@ -61,6 +62,18 @@ export default function CreateOffer() {
     { label: "Quarterly", value: "Quarterly" },
     { label: "Yearly", value: "Yearly" },
   ];
+  
+  const currencyOptions = [
+    { label: "INR (₹)", value: "INR", symbol: "₹" },
+    { label: "USD ($)", value: "USD", symbol: "$" },
+    { label: "EUR (€)", value: "EUR", symbol: "€" },
+    { label: "GBP (£)", value: "GBP", symbol: "£" },
+    { label: "AED (د.إ)", value: "AED", symbol: "د.إ" },
+  ];
+
+  const getCurrencySymbol = (code) => {
+    return currencyOptions.find(opt => opt.value === code)?.symbol || "₹";
+  };
 
   /* ================= STEPS ================= */
 
@@ -349,8 +362,17 @@ export default function CreateOffer() {
                 <p className="text-sm text-gray-500 mt-1">Define the salary components and structure.</p>
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-lg">
-                Annual CTC: ₹ {totalCTC.toLocaleString()}
+              <div className="grid grid-cols-2 gap-6 items-end">
+                <SelectInput
+                  label="Currency"
+                  options={currencyOptions}
+                  value={currencyOptions.find(opt => opt.value === formData.currency)}
+                  onChange={(v) => setFormData({ ...formData, currency: v?.value })}
+                />
+                <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-2 h-[45px]">
+                  <span className="text-blue-700 font-medium">Annual CTC:</span>
+                  <span className="text-blue-900 font-bold">{getCurrencySymbol(formData.currency)} {totalCTC.toLocaleString()}</span>
+                </div>
               </div>
 
               {components.map((c) => (
@@ -450,7 +472,7 @@ export default function CreateOffer() {
                 </p>
 
                 <p>
-                  <b>Annual CTC:</b> ₹ {totalCTC.toLocaleString()}
+                  <b>Annual CTC:</b> {getCurrencySymbol(formData.currency)} {totalCTC.toLocaleString()}
                 </p>
 
                 {/* Salary Breakdown Table */}
@@ -475,7 +497,7 @@ export default function CreateOffer() {
                           <td className="border p-2">{c.type}</td>
                           <td className="border p-2">{c.frequency}</td>
                           <td className="border p-2">
-                            ₹ {Number(c.amount || 0).toLocaleString()}
+                            {getCurrencySymbol(formData.currency)} {Number(c.amount || 0).toLocaleString()}
                           </td>
                         </tr>
                       ))}
