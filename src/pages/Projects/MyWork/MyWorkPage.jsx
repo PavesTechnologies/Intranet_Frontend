@@ -129,6 +129,7 @@ export default function MyWorkPage() {
 
         {/* ── Filter bar ────────────────────────────────────────────────────── */}
         <FilterBar projects={data?.projects} />
+      
 
         {/* ── Empty state (no work assigned at all) ─────────────────────────── */}
         {isEmpty ? (

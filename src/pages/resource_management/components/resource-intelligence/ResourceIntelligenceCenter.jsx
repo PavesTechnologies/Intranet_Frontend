@@ -70,7 +70,21 @@ export default function ResourceIntelligenceCenter() {
         noticeDaysRemaining = Math.max(0, Math.ceil((end - new Date()) / 86400000));
     }
 
-    const alloc = resource.currentAllocation || 0;
+    const currentAllocation = useMemo(() => {
+        if (!resource.allocationTimeline || resource.allocationTimeline.length === 0) return resource.currentAllocation || 0;
+        const today = new Date();
+        const total = resource.allocationTimeline.reduce((sum, block) => {
+            const start = new Date(block.startDate);
+            const end = new Date(block.endDate);
+            if (today >= start && today <= end) {
+                return sum + (Number(block.allocation) || 0);
+            }
+            return sum;
+        }, 0);
+        return total;
+    }, [resource.allocationTimeline, resource.currentAllocation]);
+
+    const alloc = currentAllocation;
     const allocColor = alloc > 100 ? "bg-rose-500" : alloc > 70 ? "bg-amber-500" : alloc > 20 ? "bg-indigo-500" : "bg-emerald-500";
 
     return (
@@ -118,7 +132,7 @@ export default function ResourceIntelligenceCenter() {
                             {/* Allocation circular/tiny view for mobile */}
                             <div className="flex flex-col gap-0.5 w-16 sm:w-32">
                                 <div className="flex justify-between items-center text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                    <span className="hidden xs:inline">Allocaion </span>
+                                    <span className="sm:inline capitalize">Allocation </span>
                                     <span className="text-slate-900">{alloc}%</span>
                                 </div>
                                 <div className="h-1 sm:h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -185,7 +199,7 @@ export default function ResourceIntelligenceCenter() {
                     <Suspense fallback={<TabSkeleton />}>
                         {/* Preserve state by keeping tabs in DOM but hidden */}
                         <div className={cn(activeTab === "overview" ? "block" : "hidden")}>
-                            <OverviewTab resource={resource} />
+                            <OverviewTab resource={{ ...resource, currentAllocation }} />
                         </div>
                         <div className={cn(activeTab === "skills" ? "block" : "hidden")}>
                             <SkillsTab resource={resource} />
@@ -197,7 +211,7 @@ export default function ResourceIntelligenceCenter() {
                             <SkillGapTab resource={resource} />
                         </div>
                         <div className={cn(activeTab === "insights" ? "block" : "hidden")}>
-                            <InsightsTab resource={resource} />
+                            <InsightsTab resource={{ ...resource, currentAllocation }} />
                         </div>
                     </Suspense>
                 </div>

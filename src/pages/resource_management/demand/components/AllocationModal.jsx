@@ -26,18 +26,21 @@ const getAllocationStartDate = (demandStartDate) => {
     return demandDate && demandDate > today ? demandDate : today;
 };
 
-const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
+const EMPTY_ARRAY = [];
+
+const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_ARRAY, isBenchMode = false, benchMatches = EMPTY_ARRAY, onSuccess }) => {
     const [resources, setResources] = useState([]);
     const [isLoadingResources, setIsLoadingResources] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [availableBenchDemands, setAvailableBenchDemands] = useState([]);
 
     const [formData, setFormData] = useState({
         resourceId: [],
         demandId: demand?.demandId || demand?.id || '',
         allocationStartDate: getAllocationStartDate(demand?.demandStartDate),
         allocationEndDate: toDateInputValue(demand?.demandEndDate),
-        allocationPercentage: demand?.allocationPercentage || 100,
+        allocationPercentage: demand?.allocation || demand?.allocationPercentage || 100,
         allocationStatus: 'ACTIVE',
         skipValidation: false
     });
@@ -96,13 +99,34 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
                 demandId: demand?.demandId || demand?.id || '',
                 allocationStartDate: getAllocationStartDate(demand?.demandStartDate),
                 allocationEndDate: toDateInputValue(demand?.demandEndDate),
-                resourceId: [],
-                skipValidation: false
+                resourceId: initialResourceIds,
+                skipValidation: false,
+                allocationPercentage: 100 // Default or driven by demand if available later
             }));
+            
+            if (isBenchMode && !demand && initialResourceIds.length > 0) {
+                const targetResId = initialResourceIds[0];
+                const matchObj = benchMatches.find(m => String(m.resourceId) === String(targetResId));
+                setAvailableBenchDemands(matchObj?.demands || []);
+            } else {
+                setAvailableBenchDemands([]);
+            }
+
             setErrors({});
             setSearchQuery("");
         }
-    }, [isOpen, demand]);
+    }, [isOpen, demand, isBenchMode, benchMatches, initialResourceIds]);
+
+    const handleDemandChange = (e) => {
+        const selectedId = e.target.value;
+        const selectedMatch = availableBenchDemands.find(d => String(d.demandId || d.id) === String(selectedId));
+        setFormData(prev => ({
+            ...prev,
+            demandId: selectedId,
+            allocationStartDate: toDateInputValue(selectedMatch?.demandStartDate) || prev.allocationStartDate,
+            allocationEndDate: toDateInputValue(selectedMatch?.demandEndDate) || prev.allocationEndDate,
+        }));
+    };
 
     const toggleResource = (id) => {
         setFormData(prev => {
@@ -117,6 +141,7 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
 
     const validate = () => {
         const newErrors = {};
+        if (!formData.demandId) newErrors.demandId = 'Demand must be selected';
         if (formData.resourceId.length === 0) newErrors.resourceId = 'At least one resource is required';
         if (!formData.allocationStartDate) newErrors.allocationStartDate = 'Start date is required';
         if (!formData.allocationEndDate) newErrors.allocationEndDate = 'End date is required';
@@ -125,6 +150,14 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
             if (new Date(formData.allocationEndDate) < new Date(formData.allocationStartDate)) {
                 newErrors.allocationEndDate = 'End date cannot be earlier than start date';
             }
+        }
+
+        const limits = getCurrentDemandLimits();
+        if (limits.minStart && formData.allocationStartDate && formData.allocationStartDate < limits.minStart) {
+            newErrors.allocationStartDate = `Start date cannot be before ${limits.minStart}`;
+        }
+        if (limits.maxEnd && formData.allocationEndDate && formData.allocationEndDate > limits.maxEnd) {
+            newErrors.allocationEndDate = `End date cannot be after ${limits.maxEnd}`;
         }
 
         if (!formData.skipValidation) {
@@ -143,6 +176,26 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
         return {
             isValid: Object.keys(newErrors).length === 0,
             errors: newErrors,
+        };
+    };
+
+    const getCurrentDemandLimits = () => {
+        let currentStartDate = null;
+        let currentEndDate = null;
+
+        if (isBenchMode && formData.demandId && availableBenchDemands) {
+            const matchedMatch = availableBenchDemands.find(d => String(d.demandId || d.id) === String(formData.demandId));
+            if (matchedMatch) {
+                currentStartDate = toDateInputValue(matchedMatch.demandStartDate);
+                currentEndDate = toDateInputValue(matchedMatch.demandEndDate);
+            }
+        } else if (demand) {
+            currentStartDate = toDateInputValue(demand.demandStartDate);
+            currentEndDate = toDateInputValue(demand.demandEndDate);
+        }
+        return { 
+            minStart: currentStartDate || undefined, 
+            maxEnd: currentEndDate || undefined 
         };
     };
 
@@ -170,14 +223,27 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
                 return;
             }
 
+            const errorReasons = (enrichedResult?.data?.failedResources || [])
+                .map(item => item.reason)
+                .filter(Boolean);
+
             if (hasAllocationResults && failureCount > 0 && successCount === 0) {
-                toast.error(result.message || "Allocation failed");
+                if (errorReasons.length > 0) {
+                    errorReasons.forEach(msg => toast.error(msg, { autoClose: 7000 }));
+                } else {
+                    toast.error(result.message || "Allocation failed");
+                }
             } else if (hasAllocationResults && failureCount > 0) {
                 toast.warning(result.message || "Allocation completed with some failures");
+                errorReasons.forEach(msg => toast.error(msg, { autoClose: 7000 }));
             } else if (result.success && !isFailedAllocationMessage) {
                 toast.success(result.message || "Resources allocated successfully");
             } else {
-                toast.error(result.message || "Allocation failed");
+                if (errorReasons.length > 0) {
+                    errorReasons.forEach(msg => toast.error(msg, { autoClose: 7000 }));
+                } else {
+                    toast.error(result.message || "Allocation failed");
+                }
             }
 
             if (onSuccess) onSuccess(enrichedResult);
@@ -200,8 +266,10 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
         return resourceName.includes(normalizedQuery) || resourceRole.includes(normalizedQuery);
     });
 
+    const { minStart, maxEnd } = getCurrentDemandLimits();
+
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
             <div
                 className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
                 style={{ width: '80vh', maxWidth: '95vw', maxHeight: '90vh' }}
@@ -228,16 +296,39 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
                 {/* Form Body */}
                 <form id="allocation-form" onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
 
-                    {/* Demand Name (Read-only) */}
+                    {/* Demand Name (Read-only or Selectable) */}
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                             Demand Pipeline
                         </label>
-                        <Input
-                            value={demand?.demandName || 'N/A'}
-                            readOnly
-                            className="bg-slate-50 border-slate-200 font-bold text-slate-900 h-10 rounded-xl focus-visible:ring-0 cursor-not-allowed pl-4 text-xs"
-                        />
+                        {isBenchMode && !demand ? (
+                            <div className="relative">
+                                <select
+                                    value={formData.demandId}
+                                    onChange={handleDemandChange}
+                                    className={cn("bg-white border-slate-200 font-bold text-slate-900 h-10 w-full rounded-xl focus-visible:ring-2 focus-visible:ring-indigo-500 pl-4 text-xs appearance-none cursor-pointer", errors.demandId && "border-rose-500")}
+                                >
+                                    <option value="" disabled>Select a demand...</option>
+                                    {availableBenchDemands.map((d, i) => (
+                                        <option key={d.demandId || d.id || i} value={d.demandId || d.id}>
+                                            {d.demandName || "Unnamed Demand"}
+                                        </option>
+                                    ))}
+                                </select>
+                                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                </span>
+                            </div>
+                        ) : (
+                            <Input
+                                value={demand?.demandName || 'N/A'}
+                                readOnly
+                                className="bg-slate-50 border-slate-200 font-bold text-slate-900 h-10 rounded-xl focus-visible:ring-0 cursor-not-allowed pl-4 text-xs"
+                            />
+                        )}
+                        {errors.demandId && <p className="text-[9px] font-bold text-rose-500 mt-0.5">{errors.demandId}</p>}
                     </div>
 
                     {/* Multi-Resource Selection */}
@@ -246,7 +337,7 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
                             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                 <User className="h-3 w-3 text-indigo-500" /> Target Resources ({formData.resourceId.length})
                             </label>
-                            {formData.resourceId.length > 0 && (
+                            {(!isBenchMode && formData.resourceId.length > 0) && (
                                 <button
                                     type="button"
                                     onClick={() => setFormData(prev => ({ ...prev, resourceId: [] }))}
@@ -258,58 +349,62 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
                         </div>
 
                         {/* Search Input */}
-                        <div className="relative">
-                            <Input
-                                placeholder="Filter resources by name or role..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="h-10 rounded-xl border-slate-200 text-xs pl-4 pr-10"
-                            />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300">
-                                <Loader2 className={cn("h-3.5 w-3.5 animate-spin", !isLoadingResources && "hidden")} />
+                        {!isBenchMode && (
+                            <div className="relative">
+                                <Input
+                                    placeholder="Filter resources by name or role..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="h-10 rounded-xl border-slate-200 text-xs pl-4 pr-10"
+                                />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300">
+                                    <Loader2 className={cn("h-3.5 w-3.5 animate-spin", !isLoadingResources && "hidden")} />
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Resource List (Selectable) */}
-                        <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/30">
-                            <div className="max-h-48 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                                {isLoadingResources ? (
-                                    <div className="p-8 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-indigo-400" /></div>
-                                ) : filteredResources.length === 0 ? (
-                                    <div className="p-8 text-center text-slate-400 font-bold text-[10px] uppercase">No resources found</div>
-                                ) : filteredResources.map((res) => {
-                                    const isSelected = formData.resourceId.includes(res.resourceId);
-                                    return (
-                                        <button
-                                            key={res.resourceId}
-                                            type="button"
-                                            onClick={() => toggleResource(res.resourceId)}
-                                            className={cn(
-                                                "w-full flex items-center justify-between p-3 rounded-xl transition-all border group text-left",
-                                                isSelected
-                                                    ? "bg-indigo-50 border-indigo-200 shadow-sm"
-                                                    : "bg-white border-transparent hover:border-slate-200"
-                                            )}
-                                        >
-                                            <div className="flex flex-col">
-                                                <span className={cn("text-xs font-bold", isSelected ? "text-indigo-900" : "text-slate-700 group-hover:text-slate-900")}>
-                                                    {res.resourceName || `Resource ${res.resourceId}`}
-                                                </span>
-                                                <span className="text-[10px] font-medium text-slate-400">
-                                                    {res.resourceRole || "No role assigned"}
-                                                </span>
-                                            </div>
-                                            <div className={cn(
-                                                "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all",
-                                                isSelected ? "bg-indigo-600 border-indigo-600" : "bg-white border-slate-200"
-                                            )}>
-                                                {isSelected && <X className="h-3 w-3 text-white" />}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
+                        {!isBenchMode && (
+                            <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/30">
+                                <div className="max-h-48 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                                    {isLoadingResources ? (
+                                        <div className="p-8 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-indigo-400" /></div>
+                                    ) : filteredResources.length === 0 ? (
+                                        <div className="p-8 text-center text-slate-400 font-bold text-[10px] uppercase">No resources found</div>
+                                    ) : filteredResources.map((res) => {
+                                        const isSelected = formData.resourceId.includes(res.resourceId);
+                                        return (
+                                            <button
+                                                key={res.resourceId}
+                                                type="button"
+                                                onClick={() => toggleResource(res.resourceId)}
+                                                className={cn(
+                                                    "w-full flex items-center justify-between p-3 rounded-xl transition-all border group text-left",
+                                                    isSelected
+                                                        ? "bg-indigo-50 border-indigo-200 shadow-sm"
+                                                        : "bg-white border-transparent hover:border-slate-200"
+                                                )}
+                                            >
+                                                <div className="flex flex-col">
+                                                    <span className={cn("text-xs font-bold", isSelected ? "text-indigo-900" : "text-slate-700 group-hover:text-slate-900")}>
+                                                        {res.resourceName || `Resource ${res.resourceId}`}
+                                                    </span>
+                                                    <span className="text-[10px] font-medium text-slate-400">
+                                                        {res.resourceRole || "No role assigned"}
+                                                    </span>
+                                                </div>
+                                                <div className={cn(
+                                                    "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all",
+                                                    isSelected ? "bg-indigo-600 border-indigo-600" : "bg-white border-slate-200"
+                                                )}>
+                                                    {isSelected && <X className="h-3 w-3 text-white" />}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
+                        )}
                         {errors.resourceId && <p className="text-[9px] font-bold text-rose-500 mt-1">{errors.resourceId}</p>}
                     </div>
 
@@ -317,18 +412,20 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
                     {formData.resourceId.length > 0 && (
                         <div className="flex flex-wrap gap-2 pt-1">
                             {formData.resourceId.map(id => {
-                                const res = resources.find(r => r.resourceId === id);
-                                if (!res) return null;
+                                const res = resources.find(r => String(r.resourceId) === String(id));
+                                const displayName = res?.resourceName || `Allocated Resource Profile`;
                                 return (
-                                    <div key={id} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-50 border border-indigo-100 rounded-lg animate-in zoom-in-50">
-                                        <span className="text-[10px] font-bold text-indigo-700">{res.resourceName || `Resource ${id}`}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleResource(id)}
-                                            className="text-indigo-400 hover:text-indigo-600"
-                                        >
-                                            <X className="h-2.5 w-2.5" />
-                                        </button>
+                                    <div key={id} className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg animate-in zoom-in-50">
+                                        <span className="text-[11px] font-bold text-indigo-700">{displayName}</span>
+                                        {!isBenchMode && (
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleResource(id)}
+                                                className="text-indigo-400 hover:text-indigo-600 ml-1"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </button>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -337,29 +434,16 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
 
                     {/* Dates Row */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                <Calendar className="h-3 w-3 text-indigo-500" /> Start Date
-                            </label>
-                            <Input
-                                type="date"
-                                min={new Date().toISOString().split('T')[0]}
-                                max={demand?.demandEndDate}
-                                value={formData.allocationStartDate}
-                                onChange={(e) => setFormData({ ...formData, allocationStartDate: e.target.value })}
-                                className={cn("h-10 rounded-xl border-slate-200 font-bold text-slate-900 text-xs", errors.allocationStartDate && "border-rose-500")}
-                            />
-                            {errors.allocationStartDate && <p className="text-[9px] font-bold text-rose-500 mt-0.5">{errors.allocationStartDate}</p>}
-                        </div>
+                        
                         <div className="space-y-1">
                             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                 <Calendar className="h-3 w-3 text-indigo-500" /> End Date
                             </label>
                             <Input
                                 type="date"
-                                min={formData.allocationStartDate}
-                                max={demand?.demandEndDate}
                                 value={formData.allocationEndDate}
+                                min={formData.allocationStartDate || minStart}
+                                max={maxEnd}
                                 onChange={(e) => setFormData({ ...formData, allocationEndDate: e.target.value })}
                                 className={cn("h-10 rounded-xl border-slate-200 font-bold text-slate-900 text-xs", errors.allocationEndDate && "border-rose-500")}
                             />
@@ -389,7 +473,7 @@ const AllocationModal = ({ isOpen, onClose, demand, onSuccess }) => {
                                     onChange={(e) => setFormData({ ...formData, allocationPercentage: parseInt(e.target.value) || 0 })}
                                     className={cn(
                                         "h-10 rounded-xl border-slate-200 font-bold text-slate-900 pr-8 text-xs transition-all",
-                                        formData.skipValidation
+                                        (formData.skipValidation)
                                             ? "bg-white cursor-text border-amber-300 focus-visible:ring-amber-400"
                                             : "bg-slate-100 opacity-70 cursor-not-allowed select-none",
                                         errors.allocationPercentage && "border-rose-500"

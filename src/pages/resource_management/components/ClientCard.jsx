@@ -48,7 +48,7 @@ const ClientCard = ({ client, onStatusUpdate, onClick }) => {
                 <p><span className="font-medium text-gray-800">Country:</span> {client.countryName}</p>
             </div>
 
-            {userRole === 'ADMIN' && (
+            {userRole === 'Admin' && (
                 <div className="client-actions mt-auto border-t pt-3 flex flex-col gap-2">
                     <button
                         onClick={(e) => {

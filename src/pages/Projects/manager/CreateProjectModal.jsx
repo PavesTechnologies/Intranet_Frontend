@@ -794,14 +794,20 @@ const Step2 = ({ fd, err, onChange }) => (
 const Step3 = ({
   fd,
   err,
-  users,
+   users,
+  projectManagers,
+  resourceManagers,
+  deliveryOwners,
+  clients,
+  resources,
   onChange,
   onOwner,
   toggleMember,
   search,
   setSearch,
 }) => {
-  const filtered = users.filter((u) =>
+  const allUsers = [...projectManagers, ...resourceManagers, ...deliveryOwners];
+  const filtered = allUsers.filter((u) =>
     u?.name?.toLowerCase().includes(search.toLowerCase()),
   );
   return (
@@ -815,43 +821,31 @@ const Step3 = ({
             error={err.ownerId}
           >
             <option value="">Select owner</option>
-            {users.map(
-              (u) =>
-                u && (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                    {u.roles?.length ? ` · ${u.roles.join(", ")}` : ""}
-                  </option>
-                ),
-            )}
+            {projectManagers.map((u) => (
+  <option key={u.id} value={u.id}>
+    {u.name}
+  </option>
+))}
           </Sel>
         </Field>
         <Field label="Client" optional>
           <Sel name="clientId" value={fd.clientId} onChange={onChange}>
             <option value="">Select client</option>
-            {users.map(
-              (u) =>
-                u && (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                    {u.roles?.length ? ` · ${u.roles.join(", ")}` : ""}
-                  </option>
-                ),
-            )}
+           {clients.map((c) => (
+  <option key={c.clientId} value={c.clientId}>
+    {c.clientName}
+  </option>
+))}
           </Sel>
         </Field>
         <Field label="Resource Manager" required error={err.rmId}>
           <Sel name="rmId" value={fd.rmId} onChange={onChange} error={err.rmId}>
             <option value="">Select resource manager</option>
-            {users.map(
-              (u) =>
-                u && (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                    {u.roles?.length ? ` · ${u.roles.join(", ")}` : ""}
-                  </option>
-                ),
-            )}
+           {resourceManagers.map((u) => (
+  <option key={u.id} value={u.id}>
+    {u.name}
+  </option>
+))}
           </Sel>
         </Field>
         <Field label="Delivery Owner" required error={err.deliveryOwnerId}>
@@ -862,15 +856,11 @@ const Step3 = ({
             error={err.deliveryOwnerId}
           >
             <option value="">Select delivery owner</option>
-            {users.map(
-              (u) =>
-                u && (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                    {u.roles?.length ? ` · ${u.roles.join(", ")}` : ""}
-                  </option>
-                ),
-            )}
+            {deliveryOwners.map((u) => (
+  <option key={u.id} value={u.id}>
+    {u.name}
+  </option>
+))}
           </Sel>
         </Field>
       </div>
@@ -1214,9 +1204,16 @@ const Step4 = ({ statuses, setStatuses, statusError }) => {
 };
 
 /* ─── Step 5 — Review ─────────────────────────────────────────────────────── */
-const Step5 = ({ fd, statuses, users }) => {
-  const getName = (id) =>
-    users.find((u) => u?.id?.toString() === id?.toString())?.name;
+const Step5 = ({ fd, statuses, users, clients, resources }) => {
+  const getName = (id) => {
+    const user = users.find((u) => u?.id?.toString() === id?.toString());
+    if (user) return user.name;
+    const client = clients.find((c) => c?.clientId?.toString() === id?.toString());
+    if (client) return client.clientName;
+    const resource = resources.find((r) => r?.id?.toString() === id?.toString());
+    if (resource) return resource.name;
+    return id;
+  };
   const memberNames = fd.memberIds.map(getName).filter(Boolean).join(", ");
   const fmtBudget = (v) =>
     v
@@ -1331,6 +1328,9 @@ const CreateProjectModal = ({
   const [fd, setFd] = useState(DEFAULT_FORM);
   const [statuses, setStatuses] = useState(DEFAULT_STATUSES);
   const [users, setUsers] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [resources, setResources] = useState([]);
+  
   const [step, setStep] = useState(1);
   const [dir, setDir] = useState(1);
   const [errors, setErrors] = useState({});
@@ -1340,6 +1340,11 @@ const CreateProjectModal = ({
   const [search, setSearch] = useState("");
   const [keyAuto, setKeyAuto] = useState(true);
   const [showWarn, setShowWarn] = useState(false);
+
+const [projectManagers, setProjectManagers] = useState([]);
+const [resourceManagers, setResourceManagers] = useState([]);
+const [deliveryOwners, setDeliveryOwners] = useState([]);
+
   const token = localStorage.getItem("token");
 
   /* ── Open / reset ─────────────────────────────────────────────────────── */
@@ -1421,6 +1426,51 @@ const CreateProjectModal = ({
       .catch(console.error);
   }, [isOpen, token]);
 
+  /* ── Fetch clients ────────────────────────────────────────────────────── */
+  useEffect(() => {
+    if (!isOpen) return;
+    axios
+      .get(`${window.__APP_CONFIG__.RMS_BASE_URL}/api/client/get-active-clients`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => {
+         const list = res.data?.data;
+        if (Array.isArray(list)) setClients(list.filter(Boolean));
+      })
+      .catch(console.error);
+  }, [isOpen, token]);
+
+  /* ── Fetch resources ──────────────────────────────────────────────────── */
+  useEffect(() => {
+    if (!isOpen || !editingProjectId) return;
+    axios
+      .get(`${window.__APP_CONFIG__.RMS_BASE_URL}/api/allocation/get-all-resources/${editingProjectId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => {
+        const list = Array.isArray(res.data) ? res.data : res.data?.content;
+        if (Array.isArray(list)) setResources(list.filter(Boolean));
+      })
+      .catch(console.error);
+  }, [isOpen, editingProjectId, token]);
+
+
+  useEffect(() => {
+  if (!isOpen) return;
+
+  axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/project_manager`, { headers: { Authorization: `Bearer ${token}` } })
+    .then(res => setProjectManagers(res.data || []))
+    .catch(console.error);
+
+  axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/resource-managers`, { headers: { Authorization: `Bearer ${token}` } })
+    .then(res => setResourceManagers(res.data || []))
+    .catch(console.error);
+
+  axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/delivery-owners`, { headers: { Authorization: `Bearer ${token}` } })
+    .then(res => setDeliveryOwners(res.data || []))
+    .catch(console.error);
+
+}, [isOpen, token]);
   /* ── Handlers ─────────────────────────────────────────────────────────── */
   const handleChange = useCallback(
     (e) => {
@@ -1547,7 +1597,7 @@ const CreateProjectModal = ({
       status: fd.status,
       currentStage: fd.currentStage,
       deliveryModel: fd.deliveryModel,
-      clientId: "a54bcfd3-0368-48ba-a495-9386dca8ae7f",
+      clientId: fd.clientId,
       rmId: parseInt(fd.rmId, 10) || 120,
       deliveryOwnerId: parseInt(fd.deliveryOwnerId, 10) || 120,
       primaryLocation: fd.primaryLocation,
@@ -1662,12 +1712,18 @@ const CreateProjectModal = ({
       <Step3
         fd={fd}
         err={errors}
-        users={users}
+         users={users}
+        clients={clients}
+        resources={resources}
         onChange={handleChange}
         onOwner={handleOwner}
         toggleMember={toggleMember}
         search={search}
         setSearch={setSearch}
+         projectManagers={projectManagers}
+  resourceManagers={resourceManagers}
+  deliveryOwners={deliveryOwners}
+        
       />
     ),
     4: (
@@ -1677,7 +1733,7 @@ const CreateProjectModal = ({
         statusError={statusErr}
       />
     ),
-    5: <Step5 fd={fd} statuses={statuses} users={users} />,
+    5: <Step5 fd={fd} statuses={statuses} users={users} clients={clients} resources={resources} />,
   };
 
   return (

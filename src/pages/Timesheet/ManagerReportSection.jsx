@@ -72,7 +72,7 @@ export default function ManagerReportSection() {
       </div>
 
       {/* Animated content (no changes here) */}
-      <div className="mt-4 relative min-h-[400px]">
+      <div className="mt-4">
         <AnimatePresence mode="wait">
           {activeTab === "monthlyReport" && (
             <motion.div
@@ -81,7 +81,7 @@ export default function ManagerReportSection() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.3 }}
-              className="absolute w-full"
+              className="w-full"
             >
               <ManagerMonthlyReport />
             </motion.div>
@@ -94,7 +94,7 @@ export default function ManagerReportSection() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
-              className="absolute w-full"
+              className="w-full"
             >
               <ReportDashboard />
             </motion.div>

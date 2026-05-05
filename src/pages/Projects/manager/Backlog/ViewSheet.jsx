@@ -149,14 +149,20 @@ const ViewSheet = () => {
               : ""}
           </p>
         </div>
-        <Button
-          size="medium"
-          variant="secondary"
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 bg-blue-600 border border-blue-600 text-white hover:bg-blue-700"
-        >
-          &larr; Back
-        </Button>
+      <button
+  onClick={() => navigate(-1)}
+  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 transition-colors rounded-lg hover:bg-gray-100 hover:text-gray-900"
+>
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="18" height="18" 
+    viewBox="0 0 24 24" fill="none" 
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+  >
+    <path d="m15 18-6-6 6-6"/>
+  </svg>
+  Back
+</button>
       </div>
 
       {/* MAIN ISSUE CARD */}
@@ -344,7 +350,11 @@ const ViewSheet = () => {
         <h2 className="text-lg font-bold mb-6 text-gray-900 flex items-center gap-2">
           <span className="text-indigo-600">💬</span> Discussion
         </h2>
-        <CommentBox entityId={id} entityType={type} currentUser={user} />
+        <CommentBox 
+  entityId={id} 
+  entityType={type?.toLowerCase()} // or .toLowerCase()
+  currentUser={user} 
+/>
       </div>
     </div>
   );
