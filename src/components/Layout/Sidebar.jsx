@@ -303,8 +303,8 @@ const Sidebar = ({ isCollapsed }) => {
             <li
               ref={rmRef}
               className="relative"
-              onMouseEnter={(isRM || isDM) ? handleRmMouseEnter : undefined}
-              onMouseLeave={(isRM || isDM) ? handleRmMouseLeave : undefined}
+              onMouseEnter={(isRM || isDM || isAdmin) ? handleRmMouseEnter : undefined}
+              onMouseLeave={(isRM || isDM || isAdmin) ? handleRmMouseLeave : undefined}
             >
               {/* If Admin → Direct Link */}
               {isAdmin && !isRM && !isDM && false ? (

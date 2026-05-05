@@ -18,7 +18,7 @@ const ROLE_PRIORITY = [
     "Delivery_Manager",
     "Project_Manager",
     "MANAGER",
-    "ADMIN",
+    "Admin",
     "SUPER ADMIN",
     "SUPER-ADMIN",
     "GENERAL"
@@ -53,9 +53,7 @@ export const DELIVERY_MODELS = [
 
 const normalizeRoleKey = (role = "") => {
     if (!role) return "";
-    return role.toUpperCase()
-        .replace(/^ROLE[-_]/, "") // Strip ROLE- or ROLE_ prefix
-        .replace(/_/g, "-")       // Standardize underscores to hyphens
+    return role.replace(/^ROLE[-_]/i, "") // Strip ROLE- or ROLE_ prefix
         .trim();
 };
 
