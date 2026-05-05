@@ -37,7 +37,7 @@ const normalizeRoleKey = (role) => {
 
   return role
     .toUpperCase()
-    .replace(/-/g, "_") // Resource_Manager→ RESOURCE_MANAGER
+    .replace(/-/g, "_") // Resource_Manager → RESOURCE_MANAGER
     .trim();
 };
 

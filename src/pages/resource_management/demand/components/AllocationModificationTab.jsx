@@ -183,8 +183,8 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
       console.error("Failed to fetch allocation modifications", requestError);
       setError(
         requestError?.response?.data?.message ||
-          requestError?.message ||
-          "Failed to load allocation modifications"
+        requestError?.message ||
+        "Failed to load allocation modifications"
       );
     } finally {
       setLoading(false);

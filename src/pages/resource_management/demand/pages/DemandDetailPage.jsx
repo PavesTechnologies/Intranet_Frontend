@@ -165,7 +165,7 @@ const RoleInfoTab = ({ demand, skillsRequirements }) => {
     // Flatten skills from both requiredSkills and roleSkills for the matrix
     const skills = useMemo(() => {
         const list = [];
-        
+
         // Add direct required skills
         if (skillsRequirements?.requiredSkills) {
             skillsRequirements.requiredSkills.forEach(s => {
@@ -1137,7 +1137,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
     const skillsReq = data?.demandskillsRequirements || {};
     const rejectionInfo = data?.rejectionInfo || {};
     const clientInfo = data?.clientInfo || {};
-    
+
     const isApproved = ['APPROVED', 'OPEN', 'ACTIVE', 'FULFILLED'].includes(demand?.demandStatus?.toUpperCase());
 
     const slaId = sla?.demandSlaId;
@@ -1166,7 +1166,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
             <header className="bg-white border-b border-slate-100 sticky top-0">
                 <div className="max-w-[1600px] mx-auto px-6 py-3">
                     <div className="flex items-center justify-between">
-                        
+
                         {/* Header Left */}
                         <div className="flex items-center gap-4">
                             <Button
@@ -1248,13 +1248,13 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
             <main className="flex-1 overflow-y-auto bg-slate-50/50">
                 <div className="max-w-[1400px] mx-auto p-6 md:p-10 font-sans">
                     {activeTab === 'overview' && (
-                        <OverviewTab 
-                            demand={demand} 
-                            project={project} 
-                            clientInfo={clientInfo} 
-                            passedClientName={passedClientName} 
-                            sla={sla} 
-                            rejectionInfo={rejectionInfo} 
+                        <OverviewTab
+                            demand={demand}
+                            project={project}
+                            clientInfo={clientInfo}
+                            passedClientName={passedClientName}
+                            sla={sla}
+                            rejectionInfo={rejectionInfo}
                         />
                     )}
                     {activeTab === 'resource' && (
