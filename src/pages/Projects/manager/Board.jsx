@@ -123,6 +123,8 @@ const Board = ({ projectId, sprintId, projectName }) => {
   const [sprintPopup, setSprintPopup] = useState(null);
   const [isFinishingSprint, setIsFinishingSprint] = useState(false);
   const [highlightPulse, setHighlightPulse] = useState(false);
+  const [activeSprintName, setActiveSprintName] = useState("");
+ 
   // load data
   const loadBoard = useCallback(async () => {
     setLoading(true);
@@ -135,6 +137,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
           { headers: headersWithToken() }
         );
         activeSprintId = res.data[0]?.id;
+        setActiveSprintName(res.data[0]?.name ?? "");
         console.log("Sprint ID:", activeSprintId);
         setActiveSprintId(activeSprintId);
       } catch (err) {
@@ -558,9 +561,17 @@ const Board = ({ projectId, sprintId, projectName }) => {
   /* ── NEW: shared header — rendered for both board and swimlane views ── */
   const sharedHeader = (
     <div className="flex items-center justify-between mb-4">
-      <h2 className="text-xl font-semibold">
+      {/* <h2 className="text-xl font-semibold">
         {projectName ?? "Project Board"}
-      </h2>
+      </h2> */}
+      <h2 className="text-xl font-semibold">
+  {projectName ?? "Project Board"}
+  {activeSprintName && (
+    <span className="ml-3 text-sm font-normal text-gray-500 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100">
+      {activeSprintName}
+    </span>
+  )}
+</h2>
       <div className="flex items-center gap-3">
         {/* Sprint ending pill — only shown when shouldShowPopup or endingSoon is true */}
         {sprintPopup && (
@@ -652,7 +663,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
           {filterOpen && (
             <div className="absolute right-0 mt-2 w-[560px] bg-white shadow-lg rounded border z-50 p-4">
               <div className="flex gap-6">
-                <div className="w-1/3 border-r pr-3">
+                {/* <div className="w-1/3 border-r pr-3">
                   <ul className="space-y-2 text-sm">
                     <li className="py-1 px-2 rounded bg-slate-50">Parent</li>
                     <li className="py-1 px-2 rounded bg-slate-50">Sprint</li>
@@ -662,7 +673,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
                     <li className="py-1 px-2 rounded bg-slate-50">Status</li>
                     <li className="py-1 px-2 rounded bg-slate-50">Priority</li>
                   </ul>
-                </div>
+                </div> */}
                 <div className="w-2/3 pl-3">
                   <div className="mb-3">
                     <div className="flex items-center gap-2">
@@ -738,8 +749,8 @@ const Board = ({ projectId, sprintId, projectName }) => {
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">Sprint</div>
-                    <div className="flex flex-wrap gap-2">
+                    {/* <div className="text-xs text-gray-500 mb-1">Sprint</div> */}
+                    {/* <div className="flex flex-wrap gap-2">
                       {Array.from(
                         new Set(
                           safeTasks
@@ -760,7 +771,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
                       {!safeTasks.some((t) => t.sprintId || t.sprint) && (
                         <div className="text-sm text-gray-400">No sprints found</div>
                       )}
-                    </div>
+                    </div> */}
                   </div>
                   <div className="flex justify-end gap-2 mt-4">
                     <button

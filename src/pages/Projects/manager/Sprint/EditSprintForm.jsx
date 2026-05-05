@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { showStatusToast } from "../../../../components/toastfy/toast";
+import { toast } from "react-toastify";
 
 const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
   const token = localStorage.getItem("token");
@@ -37,7 +37,7 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
           projectId: sprint.projectId,
         });
       } catch (err) {
-        showStatusToast("Failed to load sprint details", "error", 3000);
+        toast.success("Sprint updated successfully!", { autoClose: 3000, containerId: "global" });
       } finally {
         setLoading(false);
       }
@@ -71,11 +71,7 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
       onUpdated?.();
       onClose?.();
     } catch (err) {
-      showStatusToast(
-        err.response?.data?.message || "Failed to update sprint",
-        "error",
-        4000,
-      );
+      toast.error("Failed to load sprint details", { autoClose: 3000, containerId: "global" });
     } finally {
       setLoading(false);
     }
