@@ -104,8 +104,9 @@ export default function ViewEmpDetails() {
     contact_number: "",
     designation: "",
     employee_type: "",
-    package: "",
-    currency: "",
+    // currency: "",
+    total_ctc: "",
+    compensation_components: [],
     cc_emails: "",
   });
 
@@ -129,9 +130,9 @@ export default function ViewEmpDetails() {
       setEmployee(offerData);
       setEditData({
         ...offerData,
-        cc_emails: offerData?.cc_emails
-          ? offerData.cc_emails.split(",").map((e) => e.trim()).filter(Boolean).join(", ")
-          : "",
+        cc_emails: offerData?.cc_mails
+        ? offerData.cc_mails.join(", ")
+        : "",
       });
     } catch {
       showStatusToast("Failed to fetch employee details");
@@ -256,15 +257,28 @@ export default function ViewEmpDetails() {
   const handleUpdateOffer = async () => {
     const token = localStorage.getItem("token");
     const payload = {
-      first_name: editData.first_name, middle_name: editData.middle_name,
-      last_name: editData.last_name, mail: editData.mail,
-      country_code: editData.country_code, contact_number: editData.contact_number,
-      designation: editData.designation, employee_type: editData.employee_type,
-      package: editData.package, currency: editData.currency,
-      cc_emails: editData.cc_emails
-        ? editData.cc_emails.split(",").map((e) => e.trim()).filter(Boolean)
-        : [],
-    };
+  first_name: editData.first_name,
+  middle_name: editData.middle_name,
+  last_name: editData.last_name,
+  mail: editData.mail,
+  country_code: editData.country_code,
+  contact_number: editData.contact_number,
+  designation: editData.designation,
+  employee_type: editData.employee_type,
+
+  total_ctc: Number(editData.total_ctc || 0),
+
+  compensation_components:
+  Array.isArray(editData.compensation_components)
+    ? editData.compensation_components
+    : [],
+  cc_emails: editData.cc_emails
+    ? editData.cc_emails
+        .split(",")
+        .map((e) => e.trim())
+        .filter(Boolean)
+    : [],
+};
     try {
       setUpdating(true);
       await axios.put(
@@ -408,7 +422,15 @@ export default function ViewEmpDetails() {
               )}
               {(isHR || isAdmin) && isNoRequest && (
                 <button
-                  onClick={() => { setEditData(employee); setIsEditing(true); }}
+                onClick={() => {
+                  setEditData({
+                    ...employee,
+                    cc_emails: employee?.cc_mails
+                      ? employee.cc_mails.join(", ")
+                      : "",
+                  });
+                  setIsEditing(true);
+                }}
                   disabled={employee.status === "SENT"}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl text-indigo-700 bg-indigo-50 hover:bg-indigo-100 text-sm font-medium transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -573,7 +595,7 @@ export default function ViewEmpDetails() {
                   .filter((key) =>
                     [
                       "first_name","middle_name","last_name","mail","country_code",
-                      "contact_number","designation","employee_type","package","currency","cc_emails",
+                      "contact_number","designation","employee_type","total_ctc","cc_emails",
                     ].includes(key)
                   )
                   .map((key) => (
