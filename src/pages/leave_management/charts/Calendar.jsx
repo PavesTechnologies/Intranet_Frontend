@@ -2,14 +2,22 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-
-
 const token = localStorage.getItem("token");
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const months = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 export default function Calendar() {
@@ -29,9 +37,12 @@ export default function Calendar() {
   useEffect(() => {
     const fetchHolidays = async () => {
       try {
-        const res = await axios.get(`${window.__APP_CONFIG__.BASE_URL}/api/holidays/all`,{
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await axios.get(
+          `${window.__APP_CONFIG__.BASE_URL}/api/holidays/all`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
         setHolidays(res.data);
       } catch (err) {
         console.error("Error fetching holiday data:", err);
@@ -78,7 +89,10 @@ export default function Calendar() {
     <div className="max-w-md mx-auto bg-white shadow-lg rounded-2xl p-6 mt-10 border border-gray-100">
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
-        <button onClick={prevMonth} className="p-2 rounded-full hover:bg-gray-200 transition">
+        <button
+          onClick={prevMonth}
+          className="p-2 rounded-full hover:bg-gray-200 transition"
+        >
           <ChevronLeft className="w-5 h-5" />
         </button>
 
@@ -90,7 +104,9 @@ export default function Calendar() {
             className="appearance-none bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 cursor-pointer transition"
           >
             {months.map((month, index) => (
-              <option key={month} value={index}>{month}</option>
+              <option key={month} value={index}>
+                {month}
+              </option>
             ))}
           </select>
 
@@ -101,12 +117,17 @@ export default function Calendar() {
             className="appearance-none bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 cursor-pointer transition"
           >
             {yearOptions.map((year) => (
-              <option key={year} value={year}>{year}</option>
+              <option key={year} value={year}>
+                {year}
+              </option>
             ))}
           </select>
         </div>
 
-        <button onClick={nextMonth} className="p-2 rounded-full hover:bg-gray-200 transition">
+        <button
+          onClick={nextMonth}
+          className="p-2 rounded-full hover:bg-gray-200 transition"
+        >
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
@@ -141,8 +162,8 @@ export default function Calendar() {
                 isToday
                   ? "bg-blue-500 text-white font-bold"
                   : holiday
-                  ? "bg-red-100 text-red-700 font-medium hover:bg-red-200"
-                  : "hover:bg-gray-100"
+                    ? "bg-red-100 text-red-700 font-medium hover:bg-red-200"
+                    : "hover:bg-gray-100"
               }`}
             >
               {day}

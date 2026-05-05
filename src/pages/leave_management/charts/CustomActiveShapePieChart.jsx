@@ -44,8 +44,6 @@ const renderActiveShape = (props) => {
   const ex = mx + (cos >= 0 ? 1 : -1) * 20;
   const ey = my;
 
-  
-
   return (
     <g>
       <Sector
@@ -86,11 +84,12 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
       try {
         setLoading(true);
         const res = await axios.get(
-          `${BASE_URL}/api/leave-requests/employee/${employeeId}/${year}`,{
-            headers:{
-              Authorization: `Bearer ${localStorage.getItem('token')}`
-            }
-          }
+          `${BASE_URL}/api/leave-requests/employee/${employeeId}/${year}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
         );
         const leaveRequests = res.data.data;
 
@@ -113,7 +112,6 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
       } finally {
         setLoading(false);
       }
-
     };
 
     fetchLeaves();
@@ -134,11 +132,14 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
           {year}
         </span>
       </div>
-      { loading ? (
+      {loading ? (
         <p className="text-sm text-gray-500 animate-pulse">Loading...</p>
       ) : data.length > 0 ? (
         <div className="w-full flex justify-center items-center">
-          <ResponsiveContainer width="100%" height={window.innerWidth < 640 ? 180 : 220}>
+          <ResponsiveContainer
+            width="100%"
+            height={window.innerWidth < 640 ? 180 : 220}
+          >
             <PieChart>
               <Pie
                 activeIndex={activeIndex}
@@ -153,23 +154,24 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
               >
                 {data.map((entry, index) => {
                   let fillColor;
-                  switch (entry.name?.toLowerCase()) {
-                    case "earned_leave":
-                      fillColor = "#22c55e";
+                  console.log("Entry Name:", entry);
+                  switch (entry.name) {
+                    case "Earned Leave":
+                      fillColor = "#34d399";
                       break;
-                    case "sick_leave":
+                    case "Sick Leave":
                       fillColor = "#ef4444";
                       break;
-                    case "compensatory_leave":
+                    case "Complementry Leave":
                       fillColor = "#3b82f6";
                       break;
-                    case "unpaid_leave":
+                    case "Unpaid Leave":
                       fillColor = "#e7e5e4";
                       break;
-                    case "maternity_leave":
+                    case "Maternity Leave":
                       fillColor = "#ff5883";
                       break;
-                    case "paternity_leave":
+                    case "Paternity Leave":
                       fillColor = "#F25117";
                       break;
                     default:
@@ -179,7 +181,6 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
                   return <Cell key={`cell-${index}`} fill={fillColor} />;
                 })}
               </Pie>
-
               {/* ✅ Tooltip shows leave type and days */}
               <Tooltip
                 formatter={(value, name, props) => [`${value} days`, name]}
@@ -189,7 +190,6 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
                   fontSize: "13px",
                 }}
               />
-
               Center label inside pie
               <text
                 x="50%"
@@ -204,9 +204,7 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
           </ResponsiveContainer>
         </div>
       ) : (
-        <p className="text-sm text-gray-400">
-          No approved leave data to show.
-        </p>
+        <p className="text-sm text-gray-400">No approved leave data to show.</p>
       )}
     </div>
   );

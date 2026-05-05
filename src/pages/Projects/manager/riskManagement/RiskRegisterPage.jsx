@@ -48,13 +48,13 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
     async function fetchSummary() {
       try {
         const token = localStorage.getItem("token");
-        const BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+        const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 
         const res = await axios.get(
           `${BASE_URL}/api/risk-links/${projectId}/risk-summary/by-issue-type`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
 
         setIssueTypeSummary(res.data || []);
@@ -73,7 +73,7 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
   const issueTypeCards = useMemo(() => {
     const total = issueTypeSummary.reduce(
       (sum, it) => sum + (it.riskCount || 0),
-      0
+      0,
     );
 
     return [
@@ -107,7 +107,7 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
 
       try {
         const token = localStorage.getItem("token");
-        const BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+        const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 
         const params = {
           projectId,

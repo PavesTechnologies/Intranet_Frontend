@@ -32,12 +32,12 @@ const useLeaveData = (employeeId, refreshKey, year) => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       const allLeaves = response.data?.data || [];
       const approvedLeaves = allLeaves.filter(
-        (leave) => leave.status === "APPROVED" || leave.status === "PENDING"
+        (leave) => leave.status === "APPROVED" || leave.status === "PENDING",
       );
 
       setLeaveData(approvedLeaves);

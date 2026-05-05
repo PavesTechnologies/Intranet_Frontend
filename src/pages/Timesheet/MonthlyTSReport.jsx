@@ -13,7 +13,7 @@ import { toast } from "react-toastify";
 import Button from "../../components/Button/Button.jsx";
 import { useNavigate } from "react-router-dom";
 
-const TS_BASE_URL = import.meta.env.VITE_TIMESHEET_API_ENDPOINT;
+const TS_BASE_URL = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
 
 const MonthlyTSReport = () => {
   const [apiData, setApiData] = useState(null);
@@ -55,9 +55,9 @@ const MonthlyTSReport = () => {
   const yearOptions = [currentYear, currentYear - 1];
 
   const filteredMonths =
-  selectedYear === currentYear
-    ? monthOptions.filter((m) => m.value <= month)
-    : monthOptions;
+    selectedYear === currentYear
+      ? monthOptions.filter((m) => m.value <= month)
+      : monthOptions;
 
   useEffect(() => {
     const loadProjectInfo = async () => {
@@ -105,7 +105,7 @@ const MonthlyTSReport = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       const data = await res.data;
       setApiData(data);
@@ -204,7 +204,7 @@ const MonthlyTSReport = () => {
     const pageWidth = doc.internal.pageSize.getWidth();
 
     const monthLabel = new Date(
-      `${year}-${String(month).padStart(2, "0")}-01`
+      `${year}-${String(month).padStart(2, "0")}-01`,
     ).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
     const totalHours = Number(apiData.totalHoursWorked || 0);
@@ -213,7 +213,7 @@ const MonthlyTSReport = () => {
     const activeProjects = Number(apiData.activeProjectsCount || 0);
     const leavesDays = Number(apiData.leavesAndHolidays?.totalLeavesDays || 0);
     const leavesHours = Number(
-      apiData.leavesAndHolidays?.totalLeavesHours || 0
+      apiData.leavesAndHolidays?.totalLeavesHours || 0,
     );
     const holidaysDays = Number(apiData.leavesAndHolidays?.totalHolidays || 0);
 
@@ -303,19 +303,19 @@ const MonthlyTSReport = () => {
     doc.text(
       `Non-Billable Hours: ${nonBillableHours.toFixed(2)}`,
       cardX + 6,
-      textY
+      textY,
     );
 
-// ------------- Divider (MUST COME AFTER ACTIVE PROJECTS) -------------
-textY += 6;
-doc.text(`Active Projects: ${activeProjects}`, cardX + 6, textY);
+    // ------------- Divider (MUST COME AFTER ACTIVE PROJECTS) -------------
+    textY += 6;
+    doc.text(`Active Projects: ${activeProjects}`, cardX + 6, textY);
 
-textY += 6;
-doc.text(
-  `Total Working Days: ${apiData.leavesAndHolidays?.totalWorkingDays || 0} days`,
-  cardX + 6,
-  textY
-);
+    textY += 6;
+    doc.text(
+      `Total Working Days: ${apiData.leavesAndHolidays?.totalWorkingDays || 0} days`,
+      cardX + 6,
+      textY,
+    );
 
     // Divider line
     const dividerY = textY + 4;
@@ -329,7 +329,7 @@ doc.text(
     doc.text(
       `Total Leaves: ${leavesDays} days (${leavesHours} hrs)`,
       cardX + 6,
-      bottomY
+      bottomY,
     );
 
     bottomY += 6;
@@ -444,7 +444,7 @@ doc.text(
       }
       if (week.startDate && week.endDate) {
         weekLabelParts.push(
-          `(${formatDate(week.startDate)} to ${formatDate(week.endDate)})`
+          `(${formatDate(week.startDate)} to ${formatDate(week.endDate)})`,
         );
       }
       const hoursPart = `— ${Number(week.totalHours || 0).toFixed(2)} hrs`;
@@ -472,7 +472,7 @@ doc.text(
         timesheets.some(
           (ts) =>
             ts.defaultHolidayTimesheet ||
-            (Array.isArray(ts.entries) && ts.entries.length > 0)
+            (Array.isArray(ts.entries) && ts.entries.length > 0),
         ) && Number(week.totalHours || 0) > 0;
 
       if (!hasEntries) {
@@ -630,7 +630,7 @@ doc.text(
     doc.text(
       `Report generated on ${new Date().toISOString().slice(0, 10)}.`,
       notesX + 10,
-      y + notesHeight - 6
+      y + notesHeight - 6,
     );
 
     doc.save(`User_Monthly_Report_${monthLabel.replace(" ", "_")}.pdf`);

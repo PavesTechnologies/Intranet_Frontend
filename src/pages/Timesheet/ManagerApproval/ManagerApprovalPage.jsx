@@ -30,12 +30,12 @@ const ManagerApprovalPage = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/timesheets/manager`,
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/timesheets/manager`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error("Failed to fetch timesheets");
@@ -100,9 +100,9 @@ const ManagerApprovalPage = () => {
                 entry.otherDescription?.toLowerCase().includes(lowerSearch) ||
                 entry.workLocation?.toLowerCase().includes(lowerSearch) ||
                 entry.projectName?.toLowerCase().includes(lowerSearch) ||
-                entry.taskName?.toLowerCase().includes(lowerSearch)
-            )
-          )
+                entry.taskName?.toLowerCase().includes(lowerSearch),
+            ),
+          ),
         );
 
         if (!userMatch && !nestedMatch) return false;
@@ -111,7 +111,7 @@ const ManagerApprovalPage = () => {
       // 🔹 3️⃣ Date Filter — match selected date exactly
       if (selectedDate) {
         const hasDate = user.weeklySummary?.some((week) =>
-          week.timesheets?.some((ts) => ts.workDate === selectedDate)
+          week.timesheets?.some((ts) => ts.workDate === selectedDate),
         );
         if (!hasDate) return false;
       }
@@ -125,9 +125,9 @@ const ManagerApprovalPage = () => {
               (ts) =>
                 ts.status?.toLowerCase() === statusFilter.toLowerCase() ||
                 ts.actionStatus?.some(
-                  (a) => a.status?.toLowerCase() === statusFilter.toLowerCase()
-                )
-            )
+                  (a) => a.status?.toLowerCase() === statusFilter.toLowerCase(),
+                ),
+            ),
         );
         if (!hasStatus) return false;
       }
@@ -138,22 +138,22 @@ const ManagerApprovalPage = () => {
     return filtered;
   }, [statusFilter, userFilter, selectedDate, searchTerm, groupedTimesheets]);
 
-const handleResetFilters = () => {
-  setSearchTerm("");
-  setSelectedDate("");
-  setUserFilter("All Users");
-  setStatusFilter("All");
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setSelectedDate("");
+    setUserFilter("All Users");
+    setStatusFilter("All");
 
-  // Smoothly scroll down to the timesheet table after resetting filters
-  if (entriesTableRef.current) {
-    entriesTableRef.current.scrollIntoView({ behavior: "smooth" });
-  }
-};
+    // Smoothly scroll down to the timesheet table after resetting filters
+    if (entriesTableRef.current) {
+      entriesTableRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  };
 
   // ✅ Add this function inside ManagerApprovalPage component, before return()
   const handleTableRefresh = async () => {
-     fetchGroupedTimesheets(); // refresh approval table
-     fetchDashboardData(); // refresh dashboard summary
+    fetchGroupedTimesheets(); // refresh approval table
+    fetchDashboardData(); // refresh dashboard summary
   };
 
   if (loading && loadingDashboard) {
@@ -163,7 +163,6 @@ const handleResetFilters = () => {
       </div>
     );
   }
-
 
   return (
     <div className="max-w-7xl mx-auto p-6">

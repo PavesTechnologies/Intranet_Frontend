@@ -5,7 +5,7 @@ import { Listbox, Transition } from "@headlessui/react";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const useLeavelables = () => {
   const [leavelables, setLeavelables] = useState([]);
@@ -128,6 +128,7 @@ const defaultForm = {
   minLeaveDays: "",
   coolDownPeriod: "",
   gender: "",
+  maxNoOfTimes: "",
   // deactivationEffectiveDate: "",
 };
 
@@ -193,6 +194,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               active: formData.active,
               gender: formData.gender,
               effectiveStartDate: formData.effectiveStartDate,
+              maxNoOfTimes: Number(formData.maxNoOfTimes) || 0,
             },
           }
         : {
@@ -236,6 +238,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             active: formData.active,
             gender: formData.gender,
             effectiveStartDate: formData.effectiveStartDate,
+            maxNoOfTimes: Number(formData.maxNoOfTimes) || 0,
           }
         : {
             // Regular Add Payload
@@ -514,6 +517,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               {[
                 "maxLeaveDays",
                 "minLeaveDays",
+                "maxNoOfTimes",
                 "waitingPeriodDays",
                 "advanceNoticePeriod",
                 "coolDownPeriod",

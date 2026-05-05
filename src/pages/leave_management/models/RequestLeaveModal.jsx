@@ -10,7 +10,7 @@ import DateRangePicker from "./DateRangePicker";
 // import {useLeaveConsumption} from "../hooks/useLeaveConsumption";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 // const token = localStorage.getItem("token");
 
 // -- Helper: Massage leaves to dropdown options --
@@ -281,6 +281,7 @@ export default function RequestLeaveModal({
   const [balanceError, setBalanceError] = useState("");
   const [driveLink, setDriveLink] = useState("");
   // const leaveTypeOptions = mapLeaveBalancesToDropdown(balances);
+  // console.log("allBalances",allBalances);
   const leaveTypeOptions = useLeaveDropdownOptions(allBalances);
   const selectedLeaveType = leaveTypeOptions.find(
     (o) => o.leaveTypeId === leaveTypeId,
@@ -297,8 +298,6 @@ export default function RequestLeaveModal({
     holidays,
     leaveTypeId,
   );
-
- 
 
   const shouldShowDriveLink = () => {
     if (!selectedLeaveType) return false;
@@ -330,8 +329,6 @@ export default function RequestLeaveModal({
       }, 200); // 200ms delay
     }
   }, [isOpen]);
-
-  
 
   useEffect(() => {
     if (!shouldShowDriveLink()) {

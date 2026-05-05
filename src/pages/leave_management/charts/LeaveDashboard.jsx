@@ -109,7 +109,7 @@ export default function LeaveDashboard({ employeeId, refreshKey, year }) {
       </div>
     );
 
-    // console.log("special leaves", specialLeaves);
+  // console.log("special leaves", specialLeaves);
 
   const isEmpty =
     leaveData?.regular?.length === 0 &&
@@ -205,8 +205,8 @@ export default function LeaveDashboard({ employeeId, refreshKey, year }) {
                       {displayName}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {remaining} days remaining · {leave.totalEntitledDays ?? "-"}{" "}
-                      total
+                      {remaining} days remaining ·{" "}
+                      {leave.totalEntitledDays ?? "-"} total
                     </p>
                   </div>
                   <div

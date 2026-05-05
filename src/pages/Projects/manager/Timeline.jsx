@@ -39,24 +39,24 @@ const Timeline = ({ projectId }) => {
 
     try {
       const token = localStorage.getItem("token");
-      const headers = { 
+      const headers = {
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       };
 
       const [sprintR, epicR, storyR] = await Promise.all([
         fetch(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`,
-          { headers }
-        ).then(r => r.json()),
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
+          { headers },
+        ).then((r) => r.json()),
         fetch(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`,
-          { headers }
-        ).then(r => r.json()),
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+          { headers },
+        ).then((r) => r.json()),
         fetch(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`,
-          { headers }
-        ).then(r => r.json()),
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
+          { headers },
+        ).then((r) => r.json()),
       ]);
 
       setSprints(sprintR?.data ?? sprintR ?? []);
@@ -79,9 +79,8 @@ const Timeline = ({ projectId }) => {
   const fallbackStart = (item) =>
     toStart(item?.startDate || item?.start_date) || startTimeline;
   const fallbackEnd = (item) =>
-    toEnd(
-      item?.endDate || item?.end_date || item?.dueDate || item?.due_date
-    ) || fallbackStart(item).add(6, "day");
+    toEnd(item?.endDate || item?.end_date || item?.dueDate || item?.due_date) ||
+    fallbackStart(item).add(6, "day");
 
   const calcX = (date) => {
     const diff = dayjs(date).startOf("day").diff(startTimeline, "day");
@@ -89,8 +88,7 @@ const Timeline = ({ projectId }) => {
   };
 
   const calcW = (s, e) => {
-    const diff =
-      dayjs(e).endOf("day").diff(dayjs(s).startOf("day"), "day") + 1;
+    const diff = dayjs(e).endOf("day").diff(dayjs(s).startOf("day"), "day") + 1;
     return Math.max(diff * cellWidth, cellWidth);
   };
 
@@ -181,10 +179,7 @@ const Timeline = ({ projectId }) => {
           }}
         >
           {expandable ? (
-            <button 
-              className="expand-btn" 
-              onClick={onToggle}
-            >
+            <button className="expand-btn" onClick={onToggle}>
               {expanded ? "▼" : "▶"}
             </button>
           ) : (
@@ -204,7 +199,13 @@ const Timeline = ({ projectId }) => {
   };
 
   const StoryRow = ({ story, indent }) => (
-    <ItemRow item={story} labelKey="title" color="#10B981" icon="📋" indent={indent} />
+    <ItemRow
+      item={story}
+      labelKey="title"
+      color="#10B981"
+      icon="📋"
+      indent={indent}
+    />
   );
 
   const EpicRow = ({ epic, sprintId, indent }) => {
@@ -214,9 +215,7 @@ const Timeline = ({ projectId }) => {
     const epicStories = stories.filter(
       (s) =>
         (s.epicId === epicId || s.epic_id === epicId) &&
-        (!sprintId ||
-          s.sprintId === sprintId ||
-          s.sprint_id === sprintId)
+        (!sprintId || s.sprintId === sprintId || s.sprint_id === sprintId),
     );
 
     return (
@@ -245,13 +244,11 @@ const Timeline = ({ projectId }) => {
     const expanded = expandedSprints.has(sprintId);
 
     const sprintEpics = epics.filter(
-      (e) => e.sprintId === sprintId || e.sprint_id === sprintId
+      (e) => e.sprintId === sprintId || e.sprint_id === sprintId,
     );
 
     const directStories = stories.filter(
-      (s) =>
-        !s.epicId &&
-        (s.sprintId === sprintId || s.sprint_id === sprintId)
+      (s) => !s.epicId && (s.sprintId === sprintId || s.sprint_id === sprintId),
     );
 
     return (
@@ -269,7 +266,12 @@ const Timeline = ({ projectId }) => {
         {expanded && (
           <>
             {sprintEpics.map((epic) => (
-              <EpicRow key={epic.id} epic={epic} sprintId={sprintId} indent={1} />
+              <EpicRow
+                key={epic.id}
+                epic={epic}
+                sprintId={sprintId}
+                indent={1}
+              />
             ))}
 
             {directStories.map((story) => (
@@ -281,15 +283,9 @@ const Timeline = ({ projectId }) => {
     );
   };
 
-  const unassignedEpics = epics.filter(
-    (e) => !e.sprintId && !e.sprint_id
-  );
+  const unassignedEpics = epics.filter((e) => !e.sprintId && !e.sprint_id);
   const unassignedStories = stories.filter(
-    (s) =>
-      !s.sprintId &&
-      !s.sprint_id &&
-      !s.epicId &&
-      !s.epic_id
+    (s) => !s.sprintId && !s.sprint_id && !s.epicId && !s.epic_id,
   );
 
   if (loading)
@@ -297,17 +293,12 @@ const Timeline = ({ projectId }) => {
 
   return (
     <div className="timeline-wrapper">
-      <div
-        ref={scrollRef}
-        className="timeline-scroll-container"
-      >
+      <div ref={scrollRef} className="timeline-scroll-container">
         <div className="timeline-table">
           {/* HEADER ROW */}
           <div className="header-row">
             {/* STICKY WORK HEADER */}
-            <div className="sticky-header-column">
-              Work
-            </div>
+            <div className="sticky-header-column">Work</div>
 
             {/* CALENDAR HEADER */}
             <div className="calendar-header">
@@ -316,7 +307,10 @@ const Timeline = ({ projectId }) => {
                 {monthGroups.map((m, i) => (
                   <div
                     key={i}
-                    style={{ width: m.days * cellWidth, minWidth: m.days * cellWidth }}
+                    style={{
+                      width: m.days * cellWidth,
+                      minWidth: m.days * cellWidth,
+                    }}
                     className="month-cell"
                   >
                     {m.month}
@@ -386,7 +380,7 @@ const Timeline = ({ projectId }) => {
           width: 100%;
           background: white;
           border-radius: 8px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           border: 1px solid #e5e7eb;
           overflow: hidden;
         }
@@ -427,7 +421,7 @@ const Timeline = ({ projectId }) => {
           font-weight: 600;
           color: #374151;
           vertical-align: middle;
-          box-shadow: 2px 0 4px rgba(0,0,0,0.05);
+          box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
         }
 
         .calendar-header {
@@ -495,7 +489,7 @@ const Timeline = ({ projectId }) => {
           font-weight: 600;
           color: #374151;
           font-size: 14px;
-          box-shadow: 2px 0 4px rgba(0,0,0,0.03);
+          box-shadow: 2px 0 4px rgba(0, 0, 0, 0.03);
         }
 
         /* CONTENT ROWS */
@@ -521,7 +515,7 @@ const Timeline = ({ projectId }) => {
           border-right: 1px solid #e5e7eb;
           padding: 12px;
           vertical-align: middle;
-          box-shadow: 2px 0 4px rgba(0,0,0,0.03);
+          box-shadow: 2px 0 4px rgba(0, 0, 0, 0.03);
         }
 
         .sticky-column {

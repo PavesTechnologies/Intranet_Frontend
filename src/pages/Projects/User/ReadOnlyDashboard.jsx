@@ -31,7 +31,7 @@ const ReadOnlyDashboard = () => {
   const token = localStorage.getItem("token");
 
   const axiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_PMS_BASE_URL,
+    baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
     headers: { "Content-Type": "application/json" },
   });
 
@@ -72,8 +72,10 @@ const ReadOnlyDashboard = () => {
   }, [userId]);
 
   const toggleExpand = (id, type) => {
-    if (type === "project") setExpandedProjects(expandedProjects === id ? null : id);
-    if (type === "story") setExpandedStories(expandedStories === id ? null : id);
+    if (type === "project")
+      setExpandedProjects(expandedProjects === id ? null : id);
+    if (type === "story")
+      setExpandedStories(expandedStories === id ? null : id);
     if (type === "task") setExpandedTasks(expandedTasks === id ? null : id);
   };
 
@@ -111,19 +113,22 @@ const ReadOnlyDashboard = () => {
 
           {project.members?.length > 0 && (
             <p>
-              <strong>Members:</strong> {project.members.map((m) => m.name).join(", ")}
+              <strong>Members:</strong>{" "}
+              {project.members.map((m) => m.name).join(", ")}
             </p>
           )}
 
           {project.createdAt && (
             <p>
-              <strong>Created At:</strong> {new Date(project.createdAt).toLocaleString()}
+              <strong>Created At:</strong>{" "}
+              {new Date(project.createdAt).toLocaleString()}
             </p>
           )}
 
           {project.updatedAt && (
             <p>
-              <strong>Updated At:</strong> {new Date(project.updatedAt).toLocaleString()}
+              <strong>Updated At:</strong>{" "}
+              {new Date(project.updatedAt).toLocaleString()}
             </p>
           )}
 
@@ -144,9 +149,7 @@ const ReadOnlyDashboard = () => {
   // 🔹 STORY RENDER
   const renderStory = (story) => {
     const projectId =
-      story?.project?.id ||
-      story?.epic?.project?.id ||
-      story?.epic?.projectId;
+      story?.project?.id || story?.epic?.project?.id || story?.epic?.projectId;
 
     return (
       <li key={story.id} className="bg-white rounded-xl shadow p-4">
@@ -205,9 +208,7 @@ const ReadOnlyDashboard = () => {
   // 🔹 TASK RENDER
   const renderTask = (task) => {
     const projectId =
-      task?.story?.project?.id ||
-      task?.project?.id ||
-      task?.story?.projectId;
+      task?.story?.project?.id || task?.project?.id || task?.story?.projectId;
 
     return (
       <li key={task.id} className="bg-white rounded-xl shadow p-4">
@@ -265,7 +266,7 @@ const ReadOnlyDashboard = () => {
 
   // 🔹 FILTERING — FIXED & CLEANED
   const filteredProjects = projects.filter(
-    (p) => projectFilter === "ALL" || p.status === projectFilter
+    (p) => projectFilter === "ALL" || p.status === projectFilter,
   );
 
   const filteredStories = stories.filter((s) => {

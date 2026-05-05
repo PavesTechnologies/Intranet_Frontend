@@ -52,7 +52,7 @@ const AdminPanel = ({ employeeId }) => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       )
       .then((res) => {
         const arr = Array.isArray(res.data) ? res.data : res.data?.data || [];
@@ -74,7 +74,7 @@ const AdminPanel = ({ employeeId }) => {
         `${BASE_URL}/api/leave-revoke/pending/${employeeId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        },
       );
 
       if (res.data.success && Array.isArray(res.data.data)) {
@@ -90,7 +90,7 @@ const AdminPanel = ({ employeeId }) => {
       }
     } catch (err) {
       toast.error(
-        err.response?.data?.message || "Failed to fetch Revoke Requests."
+        err.response?.data?.message || "Failed to fetch Revoke Requests.",
       );
       setRevokeRequests([]);
     }
@@ -102,47 +102,32 @@ const AdminPanel = ({ employeeId }) => {
   // Subscribe to WebSocket for real-time updates
   // In AdminPanel.js
   console.log("leavered", leaveApprovalRef.current);
-  // useEffect(() => {
-  //   const unsub = subscribe("data-updated", () => {
-  //     fetchRevokeRequests();
-  //     if (refreshCooldown.current) return; // ⛔ already refreshing
 
-  //     refreshCooldown.current = true;
-  //     console.log("WS EVENT → refreshing admin data");
-  //     leaveApprovalRef.current?.refreshData();
 
-  //     setTimeout(() => {
-  //       refreshCooldown.current = false;
-  //     }, 2000);
-  //   });
+  useEffect(() => {
+    const sub1 = subscribe("leave-updated", () => {
+      handleRefresh();
+    });
+    const sub2 = subscribe("data-updated", () => {
+      handleRefresh();
+    });
 
-  //   return unsub;
-  // }, [subscribe, fetchRevokeRequests]);
-
-  useEffect(()=>{
-    const sub1 = subscribe("leave-updated",()=>{
-      handleRefresh()
-    })
-    const sub2 = subscribe("data-updated",()=>{
-      handleRefresh()
-    })
-
-    return ()=>{
+    return () => {
       sub1();
       sub2();
-    }
-  }, [subscribe, fetchRevokeRequests])
-  const handleRefresh = ()=>{
+    };
+  }, [subscribe, fetchRevokeRequests]);
+  const handleRefresh = () => {
     if (refreshCooldown.current) return; // ⛔ already refreshing
     refreshCooldown.current = true;
-    fetchRevokeRequests()
+    fetchRevokeRequests();
     console.log("WS EVENT → refreshing admin data");
     leaveApprovalRef.current?.refreshData();
 
     setTimeout(() => {
       refreshCooldown.current = false;
     }, 2000);
-  }
+  };
 
   // const filteredAdminRequests = adminLeaveRequests.filter((request) => {
   //   const matchesSearch =
@@ -193,13 +178,13 @@ const AdminPanel = ({ employeeId }) => {
           <p className="text-gray-600">Handle leave requests and approvals</p>
         </div>
         <div>
-          <Button
+          {/* <Button
             onClick={() => navigate(`/block-leave-dates/${employeeId}`)}
             variant="secondary"
             size="medium"
           >
             Manage Leave Blocks
-          </Button>
+          </Button> */}
         </div>
       </div>
 
@@ -256,7 +241,7 @@ const AdminPanel = ({ employeeId }) => {
       </div> */}
 
       {/* Comp-Off Balance Requests Section */}
-      {permissions.includes("VIEW_PENDING_COMPOFF_REQUESTS") && (
+      {permissions.includes("VIEW_COMPOFF_BY_EMPLOYEE") && (
         <CompOffBalanceRequests managerId={employeeId} />
       )}
       {/* <CompOffBalanceRequests managerId={employeeId} /> */}

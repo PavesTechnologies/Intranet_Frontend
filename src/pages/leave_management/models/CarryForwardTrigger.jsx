@@ -8,7 +8,7 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
   // ❗ Hooks ABOVE return
 
@@ -37,7 +37,7 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       const data = response.data;
@@ -51,7 +51,6 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
       setIsModalOpen(false);
       onClose();
       onSuccess(); // 🔥 parent will refresh data
-
     } catch (err) {
       toast.error("Failed to process carry forward");
     } finally {
@@ -62,9 +61,7 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
       <div className="bg-white p-6 rounded-xl shadow-md w-full max-w-md">
-        <h2 className="text-lg font-semibold mb-3">
-          Process Carry Forward
-        </h2>
+        <h2 className="text-lg font-semibold mb-3">Process Carry Forward</h2>
 
         <input
           type="number"
@@ -75,10 +72,7 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
         />
 
         <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-300 rounded"
-          >
+          <button onClick={onClose} className="px-4 py-2 bg-gray-300 rounded">
             Close
           </button>
 

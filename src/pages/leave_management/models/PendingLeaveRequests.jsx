@@ -1,151 +1,90 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import axios from "axios";
 import PendingLeaveRequestsTable from "./PendingLeaveRequestsTable";
 import SkeletonTable from "./SkeletonTable";
-import RequestLeaveModal from "./RequestLeaveModal";
-import { Fonts } from "../../../components/Fonts/Fonts";
 import { useAuth } from "../../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import Pagination from "../../../components/Pagination/pagination";
 import NoPendingLeaves from "../../../components/icons/no_pending_leaves.svg";
-import { useWebSocket } from "../websockets/WebSocketProvider";
+import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
-const PendingLeaveRequests = ({ refreshKey, year }) => {
-  const [pendingLeaves, setPendingLeaves] = useState([]);
-  const [leaveTypes, setLeaveTypes] = useState([]);
-  const [leaveBalances, setLeaveBalances] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1); // Start from page 1
-  const [refreshKeyInternal, setRefreshKeyInternal] = useState(0);
-  const { subscribe } = useWebSocket();
-  const refreshCooldown = useRef(false);
+// ✅ Removed refreshKey prop — self-sufficient now
+const PendingLeaveRequests = ({ refresh, year }) => {
+  const [pendingLeaves, setPendingLeaves]   = useState([]);
+  const [leaveTypes, setLeaveTypes]         = useState([]);
+  const [leaveBalances, setLeaveBalances]   = useState({});
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState(null);
+  const [currentPage, setCurrentPage]       = useState(1);
 
-  const employeeId = useAuth()?.user?.user_id;
-
+  const employeeId   = useAuth()?.user?.user_id;
+  const BASE_URL     = window.__APP_CONFIG__.BASE_URL;
   const ITEMS_PER_PAGE = 5;
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-  /**
-   * Fetch pending leave requests, leave types, and balances.
-   */
-  const fetchData = async (
-    employeeId,
-    setPendingLeaves,
-    setLeaveTypes,
-    setLeaveBalances,
-    setError,
-    setLoading,
-  ) => {
+  // ─── Single stable fetchData ──────────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    if (!employeeId) return;
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      if (!token) {
-        toast.error("Authentication token not found.");
-        return;
-      }
 
       const [leaveReqRes, leaveTypeRes, balanceRes] = await Promise.all([
         axios.get(
           `${BASE_URL}/api/leave-requests/employee/pending/${employeeId}/${year}`,
-          {
-            withCredentials: true,
-            headers: {
-              "Cache-Control": "no-store",
-              Authorization: `Bearer ${token}`,
-            },
-          },
+          { headers: { Authorization: `Bearer ${token}` } }
         ),
         axios.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get(
           `${BASE_URL}/api/leave-balance/employee/drop/${employeeId}/${year}`,
-          {
-            withCredentials: true,
-            headers: { Authorization: `Bearer ${token}` },
-          },
+          { headers: { Authorization: `Bearer ${token}` } }
         ),
       ]);
 
       const allLeaves = Array.isArray(leaveReqRes.data?.data)
-        ? leaveReqRes.data.data
-        : [];
-      const onlyPending = allLeaves.filter(
-        (leave) => String(leave.status).toUpperCase() === "PENDING",
-      );
+        ? leaveReqRes.data.data : [];
 
-      console.log(onlyPending);
-      setPendingLeaves(onlyPending);
+      setPendingLeaves(
+        allLeaves.filter((l) => String(l.status).toUpperCase() === "PENDING")
+      );
       setLeaveTypes(leaveTypeRes.data || []);
       setLeaveBalances(balanceRes.data || {});
+      setError(null);
     } catch (err) {
       console.error(err);
       setError("Failed to fetch pending leave requests.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [employeeId, year, BASE_URL]);
+  // ↑ Only recreated when employeeId/year/BASE_URL change
 
+  // ─── ONE useEffect — no duplicate ─────────────────────────────────────
   useEffect(() => {
-    if (!subscribe) return;
+    fetchData();
+  }, [fetchData, refresh]); // refresh can trigger a manual refresh from parent
+  // ↑ fetchData is stable so this runs only on mount + year/employeeId change
 
-    const unSubscribe = subscribe("/topic/data-updated", () => {
-      handleRefresh();
-    });
-    return unSubscribe;
-  }, [subscribe]);
-
-  const handleRefresh = () => {
-    if (refreshCooldown.current) return;
-    refreshCooldown.current = true;
-
-    fetchData(
-      // ✅ call the actual local function
-      employeeId,
-      setPendingLeaves,
-      setLeaveTypes,
-      setLeaveBalances,
-      setError,
-      setLoading,
-    );
-
-    setTimeout(() => {
-      refreshCooldown.current = false;
-    }, 2000);
-  };
-
-  useEffect(() => {
-    if (employeeId) {
-      fetchData(
-        employeeId,
-        setPendingLeaves,
-        setLeaveTypes,
-        setLeaveBalances,
-        setError,
-        setLoading,
-      );
-    }
-  }, [employeeId, refreshKey, refreshKeyInternal, year]);
-
-  const handleLeaveRequestSuccess = () => {
-    setRefreshKeyInternal((prevKey) => prevKey + 1);
-  };
-
-  // Pagination
-  const totalPages = Math.ceil(pendingLeaves.length / ITEMS_PER_PAGE);
-  const paginatedLeaves = pendingLeaves.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE,
+  // ─── ✅ useLeaveWebSocket actually CALLED now ──────────────────────────
+  // Listens for manager approve/reject → refreshes this table only
+  useLeaveWebSocket(
+    "employee-update",
+    ["LEAVE_APPROVED", "LEAVE_REJECTED", "LEAVE_UPDATED"],
+    fetchData
   );
 
-  const handlePrevious = () => {
-    if (currentPage > 1) setCurrentPage((prev) => prev - 1);
-  };
+  // ─── Stable ref for grandchild ────────────────────────────────────────
+  const handleChildRefresh = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const handleNext = () => {
-    if (currentPage < totalPages) setCurrentPage((prev) => prev + 1);
-  };
+  // ─── Pagination ───────────────────────────────────────────────────────
+  const totalPages      = Math.ceil(pendingLeaves.length / ITEMS_PER_PAGE);
+  const paginatedLeaves = pendingLeaves.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <>
@@ -156,11 +95,7 @@ const PendingLeaveRequests = ({ refreshKey, year }) => {
       ) : pendingLeaves.length === 0 ? (
         <div className="flex items-center justify-center h-32">
           <div className="text-3xl leading-none">
-            <img
-              src={NoPendingLeaves}
-              alt="No Pending Leaves"
-              className="w-20"
-            />
+            <img src={NoPendingLeaves} alt="No Pending Leaves" className="w-20" />
           </div>
           <div className="pl-4 leading-snug">
             <h2 className="text-xl font-semibold">
@@ -176,17 +111,15 @@ const PendingLeaveRequests = ({ refreshKey, year }) => {
             leaveBalances={leaveBalances}
             leaveTypeNames={leaveTypes}
             employeeId={employeeId}
-            refreshData={handleLeaveRequestSuccess}
+            refreshData={handleChildRefresh}
             year={year}
           />
-
-          {/* ✅ Custom Pagination */}
           {totalPages > 1 && (
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
-              onPrevious={handlePrevious}
-              onNext={handleNext}
+              onPrevious={() => setCurrentPage(p => Math.max(1, p - 1))}
+              onNext={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             />
           )}
         </>

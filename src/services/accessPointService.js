@@ -2,7 +2,7 @@
 import axios from "axios";
 
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_USER_MANAGEMENT_URL,
+  baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -17,7 +17,7 @@ axiosInstance.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 const ACCESS_POINT_URL = "/admin/access-points/";
@@ -47,7 +47,7 @@ export const getUnmappedPermissions = () =>
 // Assign permission to access point
 export const assignPermissionToAccessPoint = (accessPointId, permissionId) =>
   axiosInstance.post(
-    `${ACCESS_POINT_URL}${accessPointId}/map-permission/${permissionId}`
+    `${ACCESS_POINT_URL}${accessPointId}/map-permission/${permissionId}`,
   );
 
 export const uploadBulkPermissionMappingFile = (formData) =>
@@ -59,7 +59,7 @@ export const uploadBulkPermissionMappingFile = (formData) =>
         "Content-Type": "multipart/form-data",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
 
 export const mapPermissionBulkFile = (formData) =>
@@ -71,7 +71,7 @@ export const mapPermissionBulkFile = (formData) =>
         "Content-Type": "multipart/form-data",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
 
 // console.log(`${ACCESS_POINT_URL}${accessPointId}/map-permission/${permissionId}`);
