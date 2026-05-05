@@ -23,7 +23,7 @@ export default function ClientEscalationSection({ clientId, clientContactRefetch
                   : "text-gray-600 hover:text-gray-900"
               }
             >
-              Client 
+              Client
             </span>
 
             {activeTab === "client" && (
@@ -46,7 +46,7 @@ export default function ClientEscalationSection({ clientId, clientContactRefetch
                   : "text-gray-600 hover:text-gray-900"
               }
             >
-              Company 
+              Company
             </span>
 
             {activeTab === "company" && (
@@ -60,7 +60,7 @@ export default function ClientEscalationSection({ clientId, clientContactRefetch
         </div>
       </div>
 
-      <div className="mt-4 relative min-h-[250px]">
+      <div className="mt-4 min-h-[100px] mb-8">
         <AnimatePresence mode="wait">
           {activeTab === "client" && (
             <motion.div
@@ -69,7 +69,7 @@ export default function ClientEscalationSection({ clientId, clientContactRefetch
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.3 }}
-              className="absolute w-full"
+              className="w-full"
             >
               <ClientEscalationContact clientId={clientId} escalationRefetchKey={clientContactRefetchKey} />
             </motion.div>
@@ -82,7 +82,7 @@ export default function ClientEscalationSection({ clientId, clientContactRefetch
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
-              className="absolute w-full"
+              className="w-full"
             >
               <CompanyEscalation />
             </motion.div>

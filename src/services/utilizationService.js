@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const TIMESHEET_API_BASE = import.meta.env.VITE_TIMESHEET_API_ENDPOINT || 'http://localhost:5000';
+const TIMESHEET_API_BASE = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;  
 
 /**
  * Story 1 & 2 Service: Ingests Approved Timesheet Data and calculates accuracy metrics.

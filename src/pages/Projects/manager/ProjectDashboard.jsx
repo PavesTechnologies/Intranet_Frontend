@@ -73,7 +73,7 @@ const ProjectDashboard = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
-  const userRole = user?.roles?.includes("Manager")
+  const userRole = user?.roles?.includes("Project_Manager")
     ? "MANAGER"
     : user?.roles?.includes("Admin")
       ? "ADMIN"

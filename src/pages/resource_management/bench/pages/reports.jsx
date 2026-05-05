@@ -7,7 +7,7 @@
 //                                  <AlertTriangle size={20} spellCheck={false} />
 //                               </div>
 //                               <div className="flex-1">
-//                                  <h4 className="text-[11px] font-black text-rose-900 uppercase tracking-widest">Intelligence Request Error</h4>
+//                                  <h4 className="text-[11px] font-black text-rose-900 capitalize tracking-widest">Intelligence Request Error</h4>
 //                                  <p className="text-[12px] font-bold text-rose-600 leading-tight italic">{reportError}</p>
 //                               </div>
 //                               <button
@@ -27,7 +27,7 @@
 //                            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 relative z-10">
 //                               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 flex-1">
 //                                  <div className="space-y-1.5">
-//                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Period Start</label>
+//                                     <label className="text-[10px] font-black text-slate-400 capitalize tracking-widest pl-1">Period Start</label>
 //                                     <div className="relative">
 //                                        <input
 //                                           type="date"
@@ -38,7 +38,7 @@
 //                                     </div>
 //                                  </div>
 //                                  <div className="space-y-1.5">
-//                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Period End</label>
+//                                     <label className="text-[10px] font-black text-slate-400 capitalize tracking-widest pl-1">Period End</label>
 //                                     <div className="relative">
 //                                        <input
 //                                           type="date"
@@ -49,7 +49,7 @@
 //                                     </div>
 //                                  </div>
 //                                  <div className="space-y-1.5">
-//                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Report Type</label>
+//                                     <label className="text-[10px] font-black text-slate-400 capitalize tracking-widest pl-1">Report Type</label>
 //                                     <div className="relative">
 //                                        <select
 //                                           value={reportParams.reportType}
@@ -66,7 +66,7 @@
 //                                     </div>
 //                                  </div>
 //                                  <div className="space-y-1.5">
-//                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Grouping</label>
+//                                     <label className="text-[10px] font-black text-slate-400 capitalize tracking-widest pl-1">Grouping</label>
 //                                     <div className="relative">
 //                                        <select
 //                                           value={reportParams.groupBy}
@@ -85,7 +85,7 @@
 //                                  <button
 //                                     onClick={handleGenerateReport}
 //                                     disabled={isGenerating}
-//                                     className="h-10 px-6 rounded-xl bg-indigo-600 text-white text-[12px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-indigo-600/20"
+//                                     className="h-10 px-6 rounded-xl bg-indigo-600 text-white text-[12px] font-black capitalize tracking-widest hover:bg-slate-900 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-indigo-600/20"
 //                                  >
 //                                     {isGenerating ? <RefreshCcw size={16} className="animate-spin" /> : <TrendingUp size={16} />}
 //                                     {isGenerating ? 'GENERATING...' : 'GENERATE REPORT'}
@@ -98,7 +98,7 @@
 //                                        title="Export to CSV"
 //                                     >
 //                                        <Download size={18} />
-//                                        <span className="text-[10px] font-black uppercase">CSV</span>
+//                                        <span className="text-[10px] font-black capitalize">CSV</span>
 //                                     </button>
 //                                     <button
 //                                        onClick={handleExportExcel}
@@ -107,7 +107,7 @@
 //                                        title="Export to Excel"
 //                                     >
 //                                        <FileText size={18} />
-//                                        <span className="text-[10px] font-black uppercase">Excel</span>
+//                                        <span className="text-[10px] font-black capitalize">Excel</span>
 //                                     </button>
 //                                  </div>
 //                               </div>
@@ -128,7 +128,7 @@
 //                                           {reportParams.approvedOnly && <CheckCircle2 size={12} className="text-white" />}
 //                                        </div>
 //                                        <div className="flex flex-col">
-//                                           <span className="text-[11px] font-black text-slate-700 uppercase tracking-tight">Validated Data Only</span>
+//                                           <span className="text-[11px] font-black text-slate-700 capitalize tracking-tight">Validated Data Only</span>
 //                                           <span className="text-[9px] font-bold text-slate-400 italic">Approved Timesheets Only</span>
 //                                        </div>
 //                                     </label>
@@ -139,7 +139,7 @@
 //                                           onChange={(e) => setReportParams({ ...reportParams, includeTrends: e.target.checked })}
 //                                           className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
 //                                        />
-//                                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">Include Trends</span>
+//                                        <span className="text-[11px] font-bold text-slate-600 capitalize tracking-tight group-hover:text-indigo-600 transition-colors">Include Trends</span>
 //                                     </label>
 //                                     <label className="flex items-center gap-3 cursor-pointer group">
 //                                        <input
@@ -148,14 +148,14 @@
 //                                           onChange={(e) => setReportParams({ ...reportParams, includeAlerts: e.target.checked })}
 //                                           className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
 //                                        />
-//                                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">Include Alerts</span>
+//                                        <span className="text-[11px] font-bold text-slate-600 capitalize tracking-tight group-hover:text-indigo-600 transition-colors">Include Alerts</span>
 //                                     </label>
 //                                  </div>
 //                               </div>
 
 //                               <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
 //                                  <div className="space-y-1.5">
-//                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Resource IDs</label>
+//                                     <label className="text-[10px] font-black text-slate-400 capitalize tracking-widest pl-1">Resource IDs</label>
 //                                     <input
 //                                        type="text"
 //                                        value={reportParams.resourceIds.join(', ')}
@@ -168,7 +168,7 @@
 //                                     />
 //                                  </div>
 //                                  <div className="space-y-1.5">
-//                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Project IDs</label>
+//                                     <label className="text-[10px] font-black text-slate-400 capitalize tracking-widest pl-1">Project IDs</label>
 //                                     <input
 //                                        type="text"
 //                                        value={reportParams.projectIds.join(', ')}
@@ -181,7 +181,7 @@
 //                                     />
 //                                  </div>
 //                                  <div className="space-y-1.5">
-//                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Roles (comma-sep)</label>
+//                                     <label className="text-[10px] font-black text-slate-400 capitalize tracking-widest pl-1">Roles (comma-sep)</label>
 //                                     <input
 //                                        type="text"
 //                                        value={reportParams.roles.join(', ')}
@@ -194,7 +194,7 @@
 //                                     />
 //                                  </div>
 //                                  <div className="space-y-1.5">
-//                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Clients (comma-sep)</label>
+//                                     <label className="text-[10px] font-black text-slate-400 capitalize tracking-widest pl-1">Clients (comma-sep)</label>
 //                                     <input
 //                                        type="text"
 //                                        value={reportParams.clients.join(', ')}
@@ -211,7 +211,7 @@
 
 //                            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 pt-6 border-t border-slate-50 relative z-10">
 //                               <div className="space-y-1.5">
-//                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Over Util Threshold</label>
+//                                  <label className="text-[10px] font-black text-slate-400 capitalize tracking-widest pl-1">Over Util Threshold</label>
 //                                  <input
 //                                     type="number"
 //                                     step="0.1"
@@ -221,7 +221,7 @@
 //                                  />
 //                               </div>
 //                               <div className="space-y-1.5">
-//                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Under Util Threshold</label>
+//                                  <label className="text-[10px] font-black text-slate-400 capitalize tracking-widest pl-1">Under Util Threshold</label>
 //                                  <input
 //                                     type="number"
 //                                     step="0.1"
@@ -239,7 +239,7 @@
 //                               <div className="h-20 w-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 mb-8 border border-slate-100 group-hover:rotate-12 transition-transform duration-500 shadow-inner">
 //                                  <TrendingUp size={40} />
 //                               </div>
-//                               <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Intelligence Hub Reporting Engine</h3>
+//                               <h3 className="text-xl font-black text-slate-900 capitalize tracking-tight">Intelligence Hub Reporting Engine</h3>
 //                               <p className="mt-3 text-[13px] font-medium text-slate-400 max-w-sm italic">Configure your parameters above to generate high-fidelity utilization analytics, performance alerts, and sustained trend signals.</p>
 //                            </div>
 //                         )}
@@ -254,7 +254,7 @@
 //                                     <Zap size={12} fill="currentColor" />
 //                                  </div>
 //                               </div>
-//                               <h3 className="text-xl font-black text-indigo-900 uppercase tracking-tight">Compiling Intelligence Report</h3>
+//                               <h3 className="text-xl font-black text-indigo-900 capitalize tracking-tight">Compiling Intelligence Report</h3>
 //                               <p className="mt-3 text-[13px] font-medium text-slate-400 max-w-sm italic leading-relaxed">Aggregating timesheet actuals from validated workload registries and detecting sustained breach signals...</p>
 //                            </div>
 //                         )}
@@ -274,7 +274,7 @@
 //                                           {React.cloneElement(kpi.icon, { size: 28, strokeWidth: 2.5 })}
 //                                        </div>
 //                                        <div>
-//                                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{kpi.label}</p>
+//                                           <p className="text-[10px] font-black text-slate-400 capitalize tracking-[0.2em] mb-1">{kpi.label}</p>
 //                                           <p className="text-2xl font-black text-slate-900 tracking-tight">{kpi.value}</p>
 //                                        </div>
 //                                     </div>
@@ -293,28 +293,28 @@
 //                                              <ShieldAlert size={20} strokeWidth={2.5} />
 //                                           </div>
 //                                           <div>
-//                                              <h4 className="text-[12px] font-black text-rose-900 uppercase tracking-[0.1em]">Active Governance Breaches ({reportData.alerts.length})</h4>
-//                                              <p className="text-[10px] font-bold text-rose-600 opacity-70 uppercase tracking-widest mt-0.5">Automated Intelligence Detection</p>
+//                                              <h4 className="text-[12px] font-black text-rose-900 capitalize tracking-[0.1em]">Active Governance Breaches ({reportData.alerts.length})</h4>
+//                                              <p className="text-[10px] font-bold text-rose-600 opacity-70 capitalize tracking-widest mt-0.5">Automated Intelligence Detection</p>
 //                                           </div>
 //                                        </div>
-//                                        <span className="px-3 py-1 rounded-lg bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-rose-200 animate-pulse">Action Required</span>
+//                                        <span className="px-3 py-1 rounded-lg bg-rose-500 text-white text-[10px] font-black capitalize tracking-widest shadow-lg shadow-rose-200 animate-pulse">Action Required</span>
 //                                     </div>
 //                                     <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
 //                                        {reportData.alerts.map((alert, idx) => (
 //                                           <div key={idx} className="p-5 bg-slate-50/30 rounded-2xl border border-slate-100 flex flex-col gap-3 hover:bg-white hover:border-rose-200 hover:shadow-md transition-all cursor-default group">
 //                                              <div className="flex items-center justify-between mb-1">
-//                                                 <span className="text-[12px] font-black text-slate-900 uppercase tracking-tight group-hover:text-rose-600 transition-colors">{alert.resourceName || alert.resourceId || 'Signal Spike'}</span>
+//                                                 <span className="text-[12px] font-black text-slate-900 capitalize tracking-tight group-hover:text-rose-600 transition-colors">{alert.resourceName || alert.resourceId || 'Signal Spike'}</span>
 //                                                 <div className={`h-2.5 w-2.5 rounded-full animate-ping ${alert.severity === 'CRITICAL' ? 'bg-rose-500' : 'bg-amber-500'}`} />
 //                                              </div>
 //                                              <p className="text-[12px] font-medium text-slate-500 leading-relaxed bg-white p-3 rounded-xl border border-slate-50 border-dashed">{alert.message}</p>
-//                                              <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+//                                              <div className="mt-1 flex items-center justify-between text-[10px] font-black capitalize tracking-widest">
 //                                                 <span className={`${alert.severity === 'CRITICAL' ? 'text-rose-600' : 'text-amber-600'}`}>
 //                                                    Severity: {alert.severity}
 //                                                 </span>
 //                                                 <span className="text-indigo-600 opacity-60">Status: OPEN</span>
 //                                              </div>
 //                                              <div className="mt-1 p-3 bg-rose-50 border border-rose-100 rounded-xl">
-//                                                 <span className="text-[9px] font-black text-rose-700 uppercase tracking-widest block mb-1">REC: Recommendation</span>
+//                                                 <span className="text-[9px] font-black text-rose-700 capitalize tracking-widest block mb-1">REC: Recommendation</span>
 //                                                 <p className="text-[10px] font-bold text-rose-600 leading-tight italic">{alert.recommendation}</p>
 //                                              </div>
 //                                           </div>
@@ -333,11 +333,11 @@
 //                                              <Users size={22} strokeWidth={2.5} />
 //                                           </div>
 //                                           <div>
-//                                              <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-[0.1em]">Resource Performance Registry</h4>
+//                                              <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Resource Performance Registry</h4>
 //                                              <p className="text-[10px] font-bold text-slate-400 capitalize tracking-wide mt-0.5">Granular workload actuals and breach signals</p>
 //                                           </div>
 //                                        </div>
-//                                        <span className="px-3 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-black text-indigo-600 uppercase tracking-widest shadow-sm">
+//                                        <span className="px-3 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-black text-indigo-600 capitalize tracking-widest shadow-sm">
 //                                           {reportData.resourceUtilizations.length} Entries
 //                                        </span>
 //                                     </div>
@@ -345,11 +345,11 @@
 //                                        <table className="w-full text-left">
 //                                           <thead>
 //                                              <tr className="bg-slate-50/30 border-b border-slate-100">
-//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[25%]">Resource Profile</th>
-//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Actual Hours</th>
-//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Workload Utilization</th>
-//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Trend Signal</th>
-//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Score</th>
+//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] w-[25%]">Resource Profile</th>
+//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Actual Hours</th>
+//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em]">Workload Utilization</th>
+//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Trend Signal</th>
+//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Score</th>
 //                                              </tr>
 //                                           </thead>
 //                                           <tbody className="divide-y divide-slate-50">
@@ -357,11 +357,11 @@
 //                                                 <tr key={idx} className="hover:bg-slate-50/50 transition-all group">
 //                                                    <td className="px-8 py-5">
 //                                                       <div className="flex items-center gap-3">
-//                                                          <div className="h-10 w-10 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center text-slate-500 font-black text-xs uppercase group-hover:scale-110 transition-transform duration-300">
+//                                                          <div className="h-10 w-10 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center text-slate-500 font-black text-xs capitalize group-hover:scale-110 transition-transform duration-300">
 //                                                             {res.resourceName.charAt(0)}
 //                                                          </div>
 //                                                          <div className="flex flex-col gap-0.5">
-//                                                             <span className="text-[13px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{res.resourceName}</span>
+//                                                             <span className="text-[13px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{res.resourceName}</span>
 //                                                             <span className="text-[11px] font-bold text-slate-400 opacity-80">{res.role}</span>
 //                                                          </div>
 //                                                       </div>
@@ -369,13 +369,13 @@
 //                                                    <td className="px-8 py-5 text-center">
 //                                                       <div className="inline-flex flex-col items-center gap-1 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner group-hover:bg-white transition-colors">
 //                                                          <span className="text-[13px] font-black text-slate-700 tracking-tight">{res.totalHours?.toFixed(1)}h</span>
-//                                                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Actual</span>
+//                                                          <span className="text-[9px] font-bold text-slate-400 capitalize tracking-widest leading-none">Actual</span>
 //                                                       </div>
 //                                                    </td>
 //                                                    <td className="px-8 py-5">
 //                                                       <div className="flex flex-col gap-1.5 min-w-[180px]">
 //                                                          <div className="flex items-center justify-between mb-1">
-//                                                             <span className={`text-[11px] font-black tracking-[0.1em] uppercase ${res.utilizationBand === 'HIGH' || res.utilizationBand === 'CRITICAL' ? 'text-rose-600' : 'text-emerald-600'}`}>
+//                                                             <span className={`text-[11px] font-black tracking-[0.1em] capitalize ${res.utilizationBand === 'HIGH' || res.utilizationBand === 'CRITICAL' ? 'text-rose-600' : 'text-emerald-600'}`}>
 //                                                                {res.utilizationBand} — {res.utilizationPercentage}%
 //                                                             </span>
 //                                                             {res.utilizationBand === 'HIGH' && <Zap size={12} className="text-amber-500 animate-pulse" fill="currentColor" />}
@@ -389,7 +389,7 @@
 //                                                       </div>
 //                                                    </td>
 //                                                    <td className="px-8 py-5 text-center">
-//                                                       <div className={`inline-flex items-center h-8 gap-2 text-[10px] font-black uppercase px-4 rounded-xl border-2 transition-all ${res.trendSignal === 'UP' ? 'bg-rose-50 border-rose-100 text-rose-600' : 'bg-emerald-50 border-emerald-100 text-emerald-600'}`}>
+//                                                       <div className={`inline-flex items-center h-8 gap-2 text-[10px] font-black capitalize px-4 rounded-xl border-2 transition-all ${res.trendSignal === 'UP' ? 'bg-rose-50 border-rose-100 text-rose-600' : 'bg-emerald-50 border-emerald-100 text-emerald-600'}`}>
 //                                                          {res.trendSignal === 'UP' ? <ArrowUpRight size={14} strokeWidth={3} className="text-rose-500" /> : <ArrowDownRight size={14} strokeWidth={3} className="text-emerald-500" />}
 //                                                          {res.trendSignal}
 //                                                       </div>
@@ -421,9 +421,9 @@
 //                                     <div className="px-8 py-5 bg-slate-900 flex items-center justify-between rounded-b-3xl">
 //                                        <div className="flex items-center gap-3">
 //                                           <ShieldCheck size={18} className="text-indigo-400" />
-//                                           <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] italic">Validated performance registry synchronized with timesheet actuals</p>
+//                                           <p className="text-[10px] font-black text-indigo-400 capitalize tracking-[0.2em] italic">Validated performance registry synchronized with timesheet actuals</p>
 //                                        </div>
-//                                        <button className="text-[10px] font-black text-white px-4 py-1.5 rounded-lg border border-white/20 hover:bg-white/10 transition-colors uppercase tracking-[0.1em]">View Audit Log</button>
+//                                        <button className="text-[10px] font-black text-white px-4 py-1.5 rounded-lg border border-white/20 hover:bg-white/10 transition-colors capitalize tracking-[0.1em]">View Audit Log</button>
 //                                     </div>
 //                                  </div>
 //                               )}
@@ -434,7 +434,7 @@
 //                                     <div className="flex items-center justify-between px-2">
 //                                        <div className="flex items-center gap-3">
 //                                           <div className="h-4 w-4 rounded-full bg-indigo-600 shadow-[0_0_8px_rgba(79,70,229,0.5)]" />
-//                                           <h4 className="text-[14px] font-black text-[#081534] uppercase tracking-[0.2em]">Project Portfolio Yield Analysis</h4>
+//                                           <h4 className="text-[14px] font-black text-[#081534] capitalize tracking-[0.2em]">Project Portfolio Yield Analysis</h4>
 //                                        </div>
 //                                        <div className="h-px flex-1 mx-8 bg-slate-200/50" />
 //                                     </div>
@@ -444,10 +444,10 @@
 //                                              <div className="absolute top-0 left-0 w-2 h-full bg-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity" />
 //                                              <div className="flex items-start justify-between mb-8">
 //                                                 <div className="flex flex-col gap-1">
-//                                                    <h5 className="text-[15px] font-black text-slate-900 leading-tight group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{proj.projectName}</h5>
+//                                                    <h5 className="text-[15px] font-black text-slate-900 leading-tight group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{proj.projectName}</h5>
 //                                                    <div className="flex items-center gap-2">
 //                                                       <Briefcase size={12} className="text-slate-400" />
-//                                                       <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{proj.clientName}</span>
+//                                                       <span className="text-[11px] font-black text-slate-400 capitalize tracking-widest">{proj.clientName}</span>
 //                                                    </div>
 //                                                 </div>
 //                                                 <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-all duration-500">
@@ -457,14 +457,14 @@
 
 //                                              <div className="grid grid-cols-2 gap-8 mb-8">
 //                                                 <div>
-//                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Load Status</p>
+//                                                    <p className="text-[10px] font-black text-slate-400 capitalize tracking-widest mb-1.5">Load Status</p>
 //                                                    <div className="flex items-center gap-2">
 //                                                       <span className={`text-2xl font-black tracking-tight ${proj.utilizationPercentage > 90 ? 'text-rose-600' : 'text-slate-900'}`}>{proj.utilizationPercentage}%</span>
 //                                                       <TrendingUpIcon size={14} className={proj.utilizationPercentage > 90 ? 'text-rose-600' : 'text-emerald-600'} />
 //                                                    </div>
 //                                                 </div>
 //                                                 <div>
-//                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Billable Yield</p>
+//                                                    <p className="text-[10px] font-black text-slate-400 capitalize tracking-widest mb-1.5">Billable Yield</p>
 //                                                    <p className="text-2xl font-black text-indigo-600 tracking-tight">{proj.billableRatio}%</p>
 //                                                 </div>
 //                                              </div>
@@ -476,7 +476,7 @@
 //                                                       style={{ width: `${proj.billableRatio}%` }}
 //                                                    />
 //                                                 </div>
-//                                                 <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-widest text-slate-500 px-1">
+//                                                 <div className="flex items-center justify-between text-[11px] font-black capitalize tracking-widest text-slate-500 px-1">
 //                                                    <span className="flex items-center gap-1.5"><Users size={12} /> {proj.resourceCount} Resources</span>
 //                                                    <span className="flex items-center gap-1.5"><History size={12} /> {proj.totalHours}h Logged</span>
 //                                                 </div>
@@ -496,11 +496,11 @@
 //                                              <Award size={22} strokeWidth={2.5} />
 //                                           </div>
 //                                           <div>
-//                                              <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-[0.1em]">Role Performance Registry</h4>
+//                                              <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Role Performance Registry</h4>
 //                                              <p className="text-[10px] font-bold text-slate-400 capitalize tracking-wide mt-0.5">Capability-based workload analytics</p>
 //                                           </div>
 //                                        </div>
-//                                        <span className="px-3 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-black text-emerald-600 uppercase tracking-widest shadow-sm">
+//                                        <span className="px-3 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-black text-emerald-600 capitalize tracking-widest shadow-sm">
 //                                           {reportData.roleUtilizations.length} Roles
 //                                        </span>
 //                                     </div>
@@ -508,11 +508,11 @@
 //                                        <table className="w-full text-left">
 //                                           <thead>
 //                                              <tr className="bg-slate-50/30 border-b border-slate-100">
-//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[25%]">Capability Role</th>
-//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Pooled Hours</th>
-//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Unique Resources</th>
-//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Group Utilization</th>
-//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Yield</th>
+//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] w-[25%]">Capability Role</th>
+//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Pooled Hours</th>
+//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Unique Resources</th>
+//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em]">Group Utilization</th>
+//                                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Yield</th>
 //                                              </tr>
 //                                           </thead>
 //                                           <tbody className="divide-y divide-slate-50">
@@ -521,7 +521,7 @@
 //                                                    <td className="px-8 py-5">
 //                                                       <div className="flex items-center gap-3">
 //                                                          <div className="flex flex-col gap-0.5">
-//                                                             <span className="text-[13px] font-black text-slate-900 uppercase tracking-tight">{role.roleName}</span>
+//                                                             <span className="text-[13px] font-black text-slate-900 capitalize tracking-tight">{role.roleName}</span>
 //                                                          </div>
 //                                                       </div>
 //                                                    </td>
@@ -559,7 +559,7 @@
 //                                     <div className="flex items-center justify-between px-2">
 //                                        <div className="flex items-center gap-3">
 //                                           <div className="h-4 w-4 rounded-full bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.5)]" />
-//                                           <h4 className="text-[14px] font-black text-[#081534] uppercase tracking-[0.2em]">External Client Yield Analysis</h4>
+//                                           <h4 className="text-[14px] font-black text-[#081534] capitalize tracking-[0.2em]">External Client Yield Analysis</h4>
 //                                        </div>
 //                                        <div className="h-px flex-1 mx-8 bg-slate-200/50" />
 //                                     </div>
@@ -571,20 +571,20 @@
 //                                              </div>
 //                                              <div className="flex flex-col gap-4">
 //                                                 <div>
-//                                                    <h5 className="text-[14px] font-black text-slate-900 uppercase tracking-tight group-hover:text-blue-600 transition-colors">{client.clientName}</h5>
-//                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{client.projectCount} Projects</p>
+//                                                    <h5 className="text-[14px] font-black text-slate-900 capitalize tracking-tight group-hover:text-blue-600 transition-colors">{client.clientName}</h5>
+//                                                    <p className="text-[10px] font-bold text-slate-400 capitalize tracking-widest">{client.projectCount} Projects</p>
 //                                                 </div>
 //                                                 <div className="grid grid-cols-2 gap-4">
 //                                                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-//                                                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Total Hours</span>
+//                                                       <span className="text-[9px] font-black text-slate-400 capitalize tracking-widest block mb-1">Total Hours</span>
 //                                                       <span className="text-[16px] font-black text-slate-900">{client.totalHours?.toFixed(0)}h</span>
 //                                                    </div>
 //                                                    <div className="p-3 bg-blue-50 rounded-2xl border border-blue-100">
-//                                                       <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest block mb-1">Billable Ratio</span>
+//                                                       <span className="text-[9px] font-black text-blue-400 capitalize tracking-widest block mb-1">Billable Ratio</span>
 //                                                       <span className="text-[16px] font-black text-blue-600">{client.billableRatio || 0}%</span>
 //                                                    </div>
 //                                                 </div>
-//                                                 <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400 border-t border-slate-50 pt-4">
+//                                                 <div className="flex items-center gap-4 text-[10px] font-black capitalize tracking-widest text-slate-400 border-t border-slate-50 pt-4">
 //                                                    <span>Resources: {client.resourceCount}</span>
 //                                                    <span>Utilization: {client.utilizationPercentage}%</span>
 //                                                 </div>
@@ -606,8 +606,8 @@
 //                                           <Target size={22} strokeWidth={2.5} />
 //                                        </div>
 //                                        <div>
-//                                           <h4 className="text-[14px] font-black text-white uppercase tracking-[0.2em]">Strategic Pattern Detection</h4>
-//                                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Sustained directional signals identified by intelligence engine</p>
+//                                           <h4 className="text-[14px] font-black text-white capitalize tracking-[0.2em]">Strategic Pattern Detection</h4>
+//                                           <p className="text-[10px] font-bold text-slate-500 capitalize tracking-widest mt-0.5">Sustained directional signals identified by intelligence engine</p>
 //                                        </div>
 //                                     </div>
 //                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -615,18 +615,18 @@
 //                                           <div key={idx} className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 hover:bg-slate-800/60 transition-all group">
 //                                              <div className="flex items-start justify-between mb-4">
 //                                                 <div>
-//                                                    <h6 className="text-[13px] font-black text-white uppercase tracking-tight mb-1">{pattern.title}</h6>
-//                                                    <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${pattern.severity === 'CRITICAL' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
+//                                                    <h6 className="text-[13px] font-black text-white capitalize tracking-tight mb-1">{pattern.title}</h6>
+//                                                    <span className={`px-2 py-0.5 rounded text-[9px] font-black capitalize tracking-widest ${pattern.severity === 'CRITICAL' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
 //                                                       {pattern.severity}
 //                                                    </span>
 //                                                 </div>
 //                                                 <div className="text-right">
-//                                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Signal strength</p>
+//                                                    <p className="text-[10px] font-black text-slate-500 capitalize tracking-widest mb-1">Signal strength</p>
 //                                                    <p className="text-[18px] font-black text-indigo-400 leading-none">{pattern.averageUtilization}%</p>
 //                                                 </div>
 //                                              </div>
 //                                              <p className="text-[11px] font-medium text-slate-400 italic leading-relaxed mb-4 border-l-2 border-indigo-500 pl-4 py-1">{pattern.description}</p>
-//                                              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+//                                              <div className="flex items-center justify-between text-[10px] font-black capitalize tracking-widest">
 //                                                 <span className="text-slate-500">Duration: {pattern.durationWeeks} Weeks</span>
 //                                                 <span className="text-indigo-400">Recommendation: {pattern.recommendation}</span>
 //                                              </div>

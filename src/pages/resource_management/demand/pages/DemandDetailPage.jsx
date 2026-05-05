@@ -28,130 +28,126 @@ import { fetchResourcesByDemandId } from '../../services/resource';
  */
 
 const DetailCard = ({ title, icon: Icon, children, className, rightElement }) => (
-    <div className={cn("bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md", className)}>
-        <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 tracking-tight">
-                {Icon && <Icon className="h-4 w-4 text-indigo-500" />} {title}
+    <div className={cn("bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col transition-all", className)}>
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                {Icon && <Icon className="h-3.5 w-3.5 text-indigo-500" />} {title}
             </h3>
             {rightElement}
         </div>
-        <div className="p-6 flex-1">
+        <div className="p-4 flex-1">
             {children}
         </div>
     </div>
 );
 
 const InfoRow = ({ label, value, icon: Icon, colorClass = "text-slate-900" }) => (
-    <div className="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0">
-        <div className="flex items-center gap-2 text-slate-400">
-            {Icon && <Icon className="h-3.5 w-3.5" />}
-            <span className="text-[10px] font-bold text-slate-500 tracking-tight">{label}</span>
+    <div className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+        <div className="flex items-center gap-2">
+            {Icon && <Icon className="h-3 w-3 text-slate-300" />}
+            <span className="text-[10px] font-bold text-slate-400 tracking-tight">{label}</span>
         </div>
-        <span className={cn("text-xs font-bold text-right ml-4", colorClass)}>{value || "—"}</span>
+        <div className={cn("text-[11px] font-black text-right ml-4 truncate max-w-[180px]", colorClass)}>{value || "—"}</div>
     </div>
 );
 
 /**
  * --- TAB 1: OVERVIEW ---
  */
-const OverviewTab = ({ demand, project, sla, passedClientName }) => {
-    console.log("Demand: ", demand);
-    const warningThreshold = sla?.warningThresholdDays || 5;
+const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejectionInfo }) => {
+    const slaId = sla?.demandSlaId;
     const remainingDays = sla?.remainingDays ?? 0;
     const progress = Math.min(100, Math.max(0, ((sla?.slaDurationDays - remainingDays) / sla?.slaDurationDays) * 100)) || 0;
 
-    let slaColor = "bg-emerald-500";
-    if (remainingDays < 0) slaColor = "bg-rose-500";
-    else if (remainingDays <= warningThreshold) slaColor = "bg-orange-500";
-
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {/* Card 1: Demand Summary */}
-            <DetailCard title="Demand Summary" icon={FileText}>
-                <div className="space-y-1">
-                    <InfoRow label="Demand Name" value={demand.demandName} />
-                    <InfoRow label="Demand Type" value={demand.demandType} />
-                    <InfoRow label="Priority" value={<PriorityBadge priority={demand.demandPriority} />} />
-                    <InfoRow label="Resources Required" value={demand.resourcesRequired || demand.resourceRequired || "1"} />
-                    <InfoRow label="Min Experience" value={`${demand.minExp || 0} Years`} />
-                    <InfoRow label="Commitment Status" value={demand.demandCommitment || "CONFIRMED"} colorClass="text-indigo-600" />
-                </div>
-            </DetailCard>
-
-            {/* Card 2: Project & Client Info */}
-            <DetailCard title="Project & Client Info" icon={Building2}>
-                <div className="space-y-1">
-                    <InfoRow label="Project Name" value={project.name || "N/A"} icon={Briefcase} />
-                    <InfoRow label="Client" value={passedClientName || demand.clientName || demand.client || "N/A"} icon={UserCheck} />
-                    <InfoRow label="Delivery Model" value={project.deliveryModel || demand.deliveryModel || "Onsite"} icon={Globe} />
-                    <InfoRow label="Location" value={project.primaryLocation || "N/A"} icon={MapPin} />
-                    <InfoRow label="Lifecycle" value={project.lifecycleStage || "N/A"} colorClass="text-emerald-600" />
-                    <InfoRow label="Risk Level" value={
-                        <div className={cn(
-                            "px-2 py-0.5 rounded text-[9px] font-bold border",
-                            project.riskLevel?.toUpperCase() === 'HIGH' ? "bg-rose-50 text-rose-600 border-rose-100" :
-                                project.riskLevel?.toUpperCase() === 'MEDIUM' ? "bg-amber-50 text-amber-600 border-amber-100" :
-                                    "bg-emerald-50 text-emerald-600 border-emerald-100"
-                        )}>
-                            {project.riskLevel || "Low"}
-                        </div>
-                    } />
-                    <InfoRow label="Staffing Readiness" value={project.staffingReadinessStatus || "Ready"} colorClass="text-indigo-600" />
-                </div>
-            </DetailCard>
-
-            {/* Card 3: SLA Health Indicator */}
-            {!sla?.slaDurationDays ? (
-                <DetailCard title="SLA Health Indicator" icon={Activity} rightElement={
-                    <div className="px-2 py-0.5 bg-slate-100 text-slate-400 rounded text-[9px] font-bold border border-slate-200">No SLA</div>
-                }>
-                    <div className="flex flex-col items-center justify-center h-full py-10 gap-4 text-slate-300">
-                        <div className="h-14 w-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center">
-                            <Clock className="h-6 w-6 text-slate-300" />
-                        </div>
-                        <div className="text-center">
-                            <p className="text-[11px] font-black text-slate-400 tracking-widest">NO SLA ASSIGNED</p>
-                            <p className="text-[9px] font-bold text-slate-300 mt-1">This demand has no SLA configuration</p>
-                        </div>
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Column 1: Demand Specification */}
+                <DetailCard title="Demand Specification" icon={FileText}>
+                    <div className="space-y-0.5">
+                        <InfoRow label="Internal ID" value={demand.demandId?.slice(0, 8)} colorClass="font-mono text-indigo-600" />
+                        <InfoRow label="Demand Type" value={demand.demandType} />
+                        <InfoRow label="Priority" value={<PriorityBadge priority={demand.demandPriority} />} />
+                        <InfoRow label="Resources Needed" value={demand.resourceRequired || "1"} />
+                        <InfoRow label="Experience Min" value={`${demand.minExp || 0} Years`} />
+                        <InfoRow label="Start Date" value={demand.demandStartDate} icon={Calendar} />
+                        <InfoRow label="End Date" value={demand.demandEndDate} icon={Calendar} />
                     </div>
                 </DetailCard>
-            ) : (
-                <DetailCard title="SLA Health Indicator" icon={Activity} rightElement={
-                    <div className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[9px] font-bold border border-emerald-100">Healthy Stable</div>
-                }>
-                    <div className="flex flex-col h-full">
-                        <div className="text-center py-4 mb-4">
-                            <span className={cn("text-3xl font-black tracking-tighter", remainingDays < 0 ? "text-rose-600" : remainingDays <= 5 ? "text-orange-600" : "text-emerald-600")}>
-                                {remainingDays < 0 ? `${Math.abs(remainingDays)} Days Over` : `${remainingDays} Days Remaining`}
-                            </span>
-                        </div>
 
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                                    <span className="text-[9px] font-black text-slate-400 block mb-1">Created</span>
-                                    <span className="text-xs font-bold text-slate-900 block">{sla?.slaCreatedAt ? new Date(sla.slaCreatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : "N/A"}</span>
+                {/* Column 2: Project Intelligence */}
+                <DetailCard title="Project Intelligence" icon={Briefcase}>
+                    <div className="space-y-0.5">
+                        <InfoRow label="Project Name" value={project.projectName} icon={Briefcase} />
+                        <InfoRow label="Risk Profile" value={
+                            <div className={cn(
+                                "px-2 py-0.5 rounded text-[9px] font-black border",
+                                project.riskLevel?.toUpperCase() === 'HIGH' ? "bg-rose-50 text-rose-600 border-rose-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                            )}>
+                                {project.riskLevel || "LOW"}
+                            </div>
+                        } />
+                        <InfoRow label="Status" value={project.status || "ACTIVE"} colorClass="text-emerald-600 uppercase" />
+                        <InfoRow label="Lifecycle" value={project.lifecycle} />
+                        <InfoRow label="Location" value={project.location} icon={MapPin} />
+                        <InfoRow label="Delivery" value={project.deliveryModel || demand.deliveryModel} icon={Globe} />
+                    </div>
+                </DetailCard>
+
+                {/* Column 3: Partner & Compliance */}
+                <div className="space-y-6">
+                    <DetailCard title="Partner Profile" icon={Building2}>
+                        <div className="space-y-0.5">
+                            <InfoRow label="Client" value={clientInfo?.clientName || passedClientName} icon={UserCheck} />
+                            <InfoRow label="Priority Score" value={demand.priorityScore || "N/A"} colorClass="text-indigo-600 font-black" />
+                        </div>
+                    </DetailCard>
+
+                    <DetailCard title="SLA Compliance" icon={Activity}>
+                        {!slaId ? (
+                            <div className="text-center py-2">
+                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">No Active SLA</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-end">
+                                    <span className={cn("text-lg font-black tracking-tighter", remainingDays < 0 ? "text-rose-600" : "text-slate-900")}>
+                                        {remainingDays} Days Left
+                                    </span>
+                                    <Clock className="h-4 w-4 text-indigo-500" />
                                 </div>
-                                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                                    <span className="text-[9px] font-black text-slate-400 block mb-1">Due Date</span>
-                                    <span className="text-xs font-bold text-slate-900 block">{sla?.slaDueAt ? new Date(sla.slaDueAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : "N/A"}</span>
+                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                                    <div className="h-full bg-indigo-600 rounded-full transition-all duration-1000" style={{ width: `${progress}%` }} />
                                 </div>
                             </div>
+                        )}
+                    </DetailCard>
+                </div>
+            </div>
 
-                            <div className="space-y-2">
-                                <div className="flex justify-between items-center text-[10px] font-black tracking-widest text-slate-400">
-                                    <span>Progress</span>
-                                    <span>{Math.round(progress)}%</span>
-                                </div>
-                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                                    <div className={cn("h-full transition-all duration-1000", slaColor)} style={{ width: `${progress}%` }} />
-                                </div>
-                                <div className="flex justify-between items-center text-[9px] font-bold text-slate-400">
-                                    <span>Threshold: {warningThreshold} Days</span>
-                                    <span>SLA Target: {sla?.slaDurationDays || 30} Days</span>
-                                </div>
+            {/* Strategic Justification (Full Width) */}
+            <DetailCard title="Strategic Justification" icon={Target}>
+                <p className="text-[11px] font-medium text-slate-600 leading-relaxed italic bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                    {demand.demandJustification || "No justification provided for this demand."}
+                </p>
+            </DetailCard>
+
+            {/* Rejection Details if any */}
+            {(rejectionInfo?.rejectionReason || rejectionInfo?.dmRejectionReason || rejectionInfo?.rmRejectionReason) && (
+                <DetailCard title="Rejection Analysis" icon={XCircle} className="border-rose-100 shadow-rose-500/5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {rejectionInfo.dmRejectionReason && (
+                            <div className="p-3 bg-rose-50/50 rounded-lg border border-rose-100">
+                                <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest block mb-1">DM Reason</span>
+                                <p className="text-[11px] font-bold text-rose-700">{rejectionInfo.dmRejectionReason}</p>
                             </div>
-                        </div>
+                        )}
+                        {rejectionInfo.rmRejectionReason && (
+                            <div className="p-3 bg-rose-50/50 rounded-lg border border-rose-100">
+                                <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest block mb-1">RM Reason</span>
+                                <p className="text-[11px] font-bold text-rose-700">{rejectionInfo.rmRejectionReason}</p>
+                            </div>
+                        )}
                     </div>
                 </DetailCard>
             )}
@@ -162,21 +158,49 @@ const OverviewTab = ({ demand, project, sla, passedClientName }) => {
 /**
  * --- TAB 2: DELIVERY ROLE INFO ---
  */
-const RoleInfoTab = ({ demand, role }) => {
+const RoleInfoTab = ({ demand, skillsRequirements }) => {
     const [page, setPage] = useState(1);
     const [pageSize] = useState(5);
 
-    // Group skills for the table
+    // Flatten skills from both requiredSkills and roleSkills for the matrix
     const skills = useMemo(() => {
-        if (!role.skill) return [];
-        return [{
-            primary: role.skill.name || "N/A",
-            sub: role.subSkill?.name || "N/A",
-            proficiency: role.proficiencyLevel?.proficiencyName || "N/A",
-            mandatory: role.mandatoryFlag || false,
-            status: role.status || "Active"
-        }];
-    }, [role]);
+        const list = [];
+        
+        // Add direct required skills
+        if (skillsRequirements?.requiredSkills) {
+            skillsRequirements.requiredSkills.forEach(s => {
+                list.push({
+                    primary: s.skillName || "N/A",
+                    sub: s.subSkillName || "N/A",
+                    proficiency: s.proficiencyLevelName || "N/A",
+                    mandatory: s.mandatoryFlag || false,
+                    status: s.status || "Active",
+                    source: "Requirement"
+                });
+            });
+        }
+
+        // Add role-specific skills
+        if (skillsRequirements?.deliveryRoleDetails?.roleSkills) {
+            skillsRequirements.deliveryRoleDetails.roleSkills.forEach(s => {
+                // Check if already added (simple deduplication by name)
+                if (!list.some(existing => existing.primary === s.skillName && existing.sub === s.subSkillName)) {
+                    list.push({
+                        primary: s.skillName || "N/A",
+                        sub: s.subSkillName || "N/A",
+                        proficiency: s.proficiencyLevelName || "N/A",
+                        mandatory: s.mandatoryFlag || false,
+                        status: s.status || "Active",
+                        source: "Role"
+                    });
+                }
+            });
+        }
+
+        return list;
+    }, [skillsRequirements]);
+
+    const certificates = skillsRequirements?.requiredCertificates || [];
 
     const totalElements = skills.length;
     const totalPages = Math.ceil(totalElements / pageSize);
@@ -197,77 +221,113 @@ const RoleInfoTab = ({ demand, role }) => {
                             <Code2 className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-xl sm:text-2xl font-black tracking-tight">{role.role?.roleName || "N/A"}</h2>
+                            <h2 className="text-xl sm:text-2xl font-black tracking-tight">{skillsRequirements?.deliveryRoleDetails?.roleName || "N/A"}</h2>
                             <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-1">
-                                <span className="text-[9px] sm:text-[10px] font-black text-indigo-400 tracking-widest">Allocation: {demand.allocationPercentage || 0}%</span>
+                                <span className="text-[9px] sm:text-[10px] font-black text-indigo-400 tracking-widest">Allocation: {demand.allocation || 0}%</span>
                                 <div className="hidden sm:block h-1 w-1 rounded-full bg-white/20" />
                                 <span className="text-[9px] sm:text-[10px] font-black text-white/40 tracking-widest">Min Exp: {demand.minExp || 0} Years</span>
+                                <div className="hidden sm:block h-1 w-1 rounded-full bg-white/20" />
+                                <span className="text-[9px] sm:text-[10px] font-black text-white/40 tracking-widest">Required: {demand.resourceRequired || 0}</span>
                             </div>
                         </div>
-                    </div>
-                    <div className="flex gap-3 mt-4 sm:mt-0">
-                        <div className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] sm:text-[10px] font-black tracking-widest text-indigo-400">Mandatory: {role.mandatoryFlag ? "Yes" : "No"}</div>
-                        <div className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] sm:text-[10px] font-black tracking-widest text-indigo-400">Structural Valid</div>
                     </div>
                 </div>
             </div>
 
-            {/* Skills Table */}
-            <DetailCard title="Technical Blueprint & Skills Matrix" icon={Award}>
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="border-b border-slate-100">
-                                <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Primary Skill</th>
-                                <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Sub Skill</th>
-                                <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Proficiency</th>
-                                <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Mandatory</th>
-                                <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 text-center">
-                            {paginatedSkills.map((skill, i) => (
-                                <tr key={i} className="group hover:bg-slate-50/50 transition-colors">
-                                    <td className="py-4 px-4">
-                                        <span className="text-xs font-black text-slate-900 tracking-tight">{skill.primary}</span>
-                                    </td>
-                                    <td className="py-4 px-4 text-xs font-bold text-slate-500 tracking-tight">{skill.sub}</td>
-                                    <td className="py-4 px-4">
-                                        <div className="flex flex-col items-center gap-1.5 w-32 mx-auto">
-                                            <span className="text-[9px] font-black text-indigo-600 italic">{skill.proficiency}</span>
-                                            <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-indigo-500" style={{ width: '60%' }} />
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="py-4 px-4">
-                                        <div className="flex justify-center">
-                                            {skill.mandatory ? (
-                                                <div className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" title="Mandatory" />
-                                            ) : (
-                                                <div className="h-2 w-2 rounded-full bg-slate-200" title="Optional" />
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="py-4 px-4">
-                                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[9px] font-black border border-emerald-100">Active</span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Skills Table */}
+                <div className="lg:col-span-2">
+                    <DetailCard title="Technical Blueprint & Skills Matrix" icon={Award}>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="border-b border-slate-100">
+                                        <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Skill</th>
+                                        <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Sub Skill</th>
+                                        <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Proficiency</th>
+                                        <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Mandatory</th>
+                                        <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Source</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50 text-center">
+                                    {paginatedSkills.map((skill, i) => (
+                                        <tr key={i} className="group hover:bg-slate-50/50 transition-colors">
+                                            <td className="py-4 px-4">
+                                                <span className="text-xs font-black text-slate-900 tracking-tight">{skill.primary}</span>
+                                            </td>
+                                            <td className="py-4 px-4 text-xs font-bold text-slate-500 tracking-tight">{skill.sub}</td>
+                                            <td className="py-4 px-4">
+                                                <div className="flex flex-col items-center gap-1.5 w-32 mx-auto">
+                                                    <span className="text-[9px] font-black text-indigo-600 italic">{skill.proficiency}</span>
+                                                    <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-indigo-500" style={{ width: '60%' }} />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <div className="flex justify-center">
+                                                    {skill.mandatory ? (
+                                                        <div className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" title="Mandatory" />
+                                                    ) : (
+                                                        <div className="h-2 w-2 rounded-full bg-slate-200" title="Optional" />
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <span className={cn(
+                                                    "px-2 py-0.5 rounded text-[9px] font-black border",
+                                                    skill.source === "Requirement" ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-600 border-slate-100"
+                                                )}>{skill.source}</span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {skills.length === 0 && (
+                                        <tr>
+                                            <td colSpan="5" className="py-10 text-center text-slate-400 text-xs font-bold">No skills specified</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        {totalPages > 1 && (
+                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                <Pagination
+                                    currentPage={page}
+                                    totalPages={totalPages}
+                                    onPrevious={() => setPage(p => Math.max(1, p - 1))}
+                                    onNext={() => setPage(p => Math.min(totalPages, p + 1))}
+                                />
+                            </div>
+                        )}
+                    </DetailCard>
                 </div>
-                {totalPages > 1 && (
-                    <div className="mt-4 pt-4 border-t border-slate-100">
-                        <Pagination
-                            currentPage={page}
-                            totalPages={totalPages}
-                            onPrevious={() => setPage(p => Math.max(1, p - 1))}
-                            onNext={() => setPage(p => Math.min(totalPages, p + 1))}
-                        />
-                    </div>
-                )}
-            </DetailCard>
+
+                {/* Certificates */}
+                <div className="lg:col-span-1">
+                    <DetailCard title="Required Certifications" icon={Award}>
+                        <div className="space-y-4">
+                            {certificates.length > 0 ? certificates.map((cert, idx) => (
+                                <div key={idx} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:shadow-sm transition-shadow">
+                                    <div className="flex items-start gap-3">
+                                        <div className="h-8 w-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center shrink-0">
+                                            <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-black text-slate-900 tracking-tight">{cert.certificateName}</p>
+                                            <p className="text-[10px] font-bold text-slate-500 mt-0.5">{cert.issuingAuthority}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="py-10 text-center flex flex-col items-center gap-3 opacity-40">
+                                    <Award className="h-10 w-10 text-slate-300" />
+                                    <p className="text-[10px] font-black uppercase tracking-widest">No certifications required</p>
+                                </div>
+                            )}
+                        </div>
+                    </DetailCard>
+                </div>
+            </div>
         </div>
     );
 };
@@ -281,14 +341,14 @@ const RoleInfoTab = ({ demand, role }) => {
  *  3. Resource Manager Approved → complete if FULFILLED/ACTIVE, rejected if REJECTED, pending if APPROVED
  *  4. Final Confirmation        → complete if FULFILLED | ACTIVE
  */
-const ApprovalFlowTab = ({ demand }) => {
+const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
     const rawStatus = demand?.demandStatus?.toUpperCase() || '';
-    const dmRejection = demand?.dmRejectionReason || (rawStatus === 'REJECTED' && !demand?.rmRejectionReason ? demand?.rejectionReason : null);
-    const rmRejection = demand?.rmRejectionReason || (rawStatus === 'REJECTED' && !!demand?.rmRejectionReason ? demand?.rejectionReason : null);
+    const dmRejection = rejectionInfo?.dmRejectionReason || rejectionInfo?.rejectionReason;
+    const rmRejection = rejectionInfo?.rmRejectionReason;
 
     // ── Derive step statuses from real demand status ──────────────────────────
     const dmDone = ['APPROVED', 'FULFILLED', 'ACTIVE'].includes(rawStatus) || (rawStatus === 'REJECTED' && !!rmRejection);
-    const dmRejected = rawStatus === 'REJECTED' && !!dmRejection;
+    const dmRejected = rawStatus === 'REJECTED' && !!dmRejection && !rmRejection;
     const dmPending = rawStatus === 'REQUESTED' || rawStatus === 'DRAFT';
 
     const rmDone = ['FULFILLED', 'ACTIVE'].includes(rawStatus);
@@ -1071,18 +1131,22 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
         </div>
     );
 
-    const { demand, sla } = data;
-    const project = demand.project || {};
-    const role = demand.role || {};
-    const isApproved = ['APPROVED', 'OPEN', 'ACTIVE'].includes(demand.demandStatus?.toUpperCase());
+    const demand = data || {};
+    const sla = data?.slaInfo;
+    const project = data?.projectInfo || {};
+    const skillsReq = data?.demandskillsRequirements || {};
+    const rejectionInfo = data?.rejectionInfo || {};
+    const clientInfo = data?.clientInfo || {};
+    
+    const isApproved = ['APPROVED', 'OPEN', 'ACTIVE', 'FULFILLED'].includes(demand?.demandStatus?.toUpperCase());
 
-    const slaId = sla?.demandSlaId || demand.demandSlaId;
+    const slaId = sla?.demandSlaId;
 
     const isSoft =
         !slaId && (
-            demand.demandCommitment?.toUpperCase() === 'SOFT' ||
-            demand.demandStatus?.toUpperCase() === 'SOFT' ||
-            demand.demandStatus?.toUpperCase() === 'REQUESTED'
+            demand?.demandType?.toUpperCase() === 'SOFT' ||
+            demand?.demandStatus?.toUpperCase() === 'SOFT' ||
+            demand?.demandStatus?.toUpperCase() === 'REQUESTED'
         );
 
     const TABS = [
@@ -1096,89 +1160,66 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
     ];
 
     return (
-        <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans selection:bg-indigo-100">
+        <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans selection:bg-indigo-100 overflow-hidden">
 
-            {/* --- TOP HEADER (Responsive & Matched Layout) --- */}
+            {/* --- TOP HEADER (Slimmed Down) --- */}
             <header className="bg-white border-b border-slate-100 sticky top-0">
-                <div className="max-w-[1500px] mx-auto px-6 py-5">
-                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-
-                        {/* Header Left: Back + Info */}
-                        <div className="flex items-center gap-4 sm:gap-6">
+                <div className="max-w-[1600px] mx-auto px-6 py-3">
+                    <div className="flex items-center justify-between">
+                        
+                        {/* Header Left */}
+                        <div className="flex items-center gap-4">
                             <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={propOnBack || (() => navigate('/resource-management/demand'))}
-                                className="h-10 w-10 min-w-[40px] text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-transparent hover:border-slate-200 transition-all"
+                                className="h-9 w-9 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
                             >
-                                <ArrowLeft className="h-5 w-5" />
+                                <ArrowLeft className="h-4 w-4" />
                             </Button>
 
-                            <div className="flex items-center gap-3 sm:gap-5">
-                                <div className="space-y-1">
-                                    <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-none break-words uppercase">
-                                        {demand.demandName || "N/A"}
-                                    </h1>
-                                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                                        <span className="text-[10px] sm:text-[11px] font-black text-indigo-600 tracking-widest">{role.role?.roleName || "N/A"}</span>
-                                        <div className="h-1 w-1 rounded-full bg-slate-300 hidden sm:block" />
-                                        <span className="text-[10px] sm:text-[11px] font-black text-slate-500 tracking-widest">{passedClientName || demand.clientName || demand.client || "N/A"}</span>
-                                        <div className="h-1 w-1 rounded-full bg-slate-300 hidden sm:block" />
-                                        <span className="text-[10px] sm:text-[11px] font-black text-slate-400 tracking-widest">{project.primaryLocation || "N/A"}</span>
-                                    </div>
+                            <div className="space-y-0.5">
+                                <h1 className="text-base font-black text-slate-900 tracking-tight leading-none uppercase truncate max-w-[400px]">
+                                    {demand.demandName || "N/A"}
+                                </h1>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-[10px] font-black text-indigo-600 tracking-widest">{skillsReq?.deliveryRoleDetails?.roleName || "N/A"}</span>
+                                    <div className="h-1 w-1 rounded-full bg-slate-300" />
+                                    <StateBadge state={demand.demandStatus} className="px-2 py-0.5 rounded text-[8px] font-black" />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Header Right: Stats & Actions */}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 xl:gap-10">
-                            {/* Allocation section from reference */}
-                            <div className="hidden md:flex flex-col items-end gap-1.5">
-                                <div className="flex items-center justify-between w-full min-w-[120px]">
-                                    <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Allocation</span>
-                                    <span className="text-[10px] font-black text-slate-900 tracking-widest">{demand.allocationPercentage || 0}%</span>
+                        {/* Header Right */}
+                        <div className="flex items-center gap-4">
+                            <div className="hidden xl:flex items-center gap-6 pr-6 border-r border-slate-100">
+                                <div className="text-right">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Priority</p>
+                                    <PriorityBadge priority={demand.demandPriority} />
                                 </div>
-                                <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                                    <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${demand.allocationPercentage || 0}%` }} />
+                                <div className="text-right">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Allocation</p>
+                                    <p className="text-sm font-black text-slate-900">{demand.allocation || 0}%</p>
                                 </div>
                             </div>
 
-                            {/* Status, SLA and CTA from reference with matched order */}
-                            <div className="flex flex-wrap items-center gap-4 sm:border-l sm:border-slate-100 sm:pl-6 xl:pl-10 w-full sm:w-auto">
-                                <StateBadge state={demand.demandStatus} className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-black text-[10px] sm:text-[11px]" />
-
-                                <div className="flex items-center gap-3 sm:gap-4 p-2.5 bg-slate-50/50 border border-slate-100 rounded-2xl">
-                                    <div className="flex flex-col items-end pr-2 border-r border-slate-200 text-right">
-                                        <span className="text-[8px] sm:text-[9px] font-black text-slate-400 tracking-tight">SLA Status</span>
-                                        <span className={cn("text-[10px] sm:text-xs font-black whitespace-nowrap",
-                                            !slaId ? "text-slate-400"
-                                                : (sla?.remainingDays || 0) < 0 ? "text-rose-600"
-                                                    : (sla?.remainingDays || 0) <= 5 ? "text-orange-600"
-                                                        : "text-emerald-600")}>
-                                            {!slaId ? "No SLA" : `${sla?.remainingDays || 0} Days`}
-                                        </span>
-                                    </div>
-                                    <div className="relative h-8 w-8 sm:h-10 sm:w-10 border-[3px] border-slate-100 rounded-full flex items-center justify-center bg-white shadow-sm">
-                                        {!slaId ? <XCircle className="h-4 w-4 text-slate-300" /> : <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-500" />}
-                                    </div>
-                                </div>
-
-                                {isRM && (
-                                    <button
-                                        onClick={() => setIsAllocationModalOpen(true)}
-                                        className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] sm:text-[11px] font-black tracking-widest rounded-xl shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 border border-indigo-500"
-                                    >
-                                        <Plus className="h-4 w-4" />
-                                        <span className="whitespace-nowrap uppercase">Allocate Resource</span>
-                                    </button>
-                                )}
-                            </div>
+                            {isRM && (
+                                <button
+                                    onClick={() => setIsAllocationModalOpen(true)}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black tracking-widest rounded-lg shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2"
+                                >
+                                    <Plus className="h-3.5 w-3.5" />
+                                    <span className="uppercase">Allocate</span>
+                                </button>
+                            )}
                         </div>
                     </div>
+                </div>
 
-                    {/* Navigation Tabs */}
-                    <div className="overflow-x-auto overflow-y-hidden no-scrollbar -mx-6 px-6">
-                        <nav className="flex gap-6 sm:gap-10 mt-6 -mb-[1px] min-w-max border-b border-slate-100">
+                {/* Sub-Header Tabs */}
+                <div className="bg-white border-t border-slate-50">
+                    <div className="max-w-[1600px] mx-auto px-6">
+                        <nav className="flex gap-8 -mb-[1px]">
                             {TABS.map((tab) => {
                                 const Icon = tab.icon;
                                 const isActive = activeTab === tab.id;
@@ -1187,13 +1228,13 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
                                         className={cn(
-                                            "group flex items-center gap-2 sm:gap-3 pb-4 text-[10px] sm:text-[11px] font-black transition-all border-b-2 relative tracking-[0.1em] whitespace-nowrap",
+                                            "flex items-center gap-2 py-3 text-[10px] font-black transition-all border-b-2 relative tracking-widest uppercase",
                                             isActive
                                                 ? "text-indigo-600 border-indigo-600"
-                                                : "text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300"
+                                                : "text-slate-400 border-transparent hover:text-slate-600"
                                         )}
                                     >
-                                        <Icon className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 transition-colors", isActive ? "text-indigo-600" : "text-slate-300 group-hover:text-slate-400")} />
+                                        <Icon className={cn("h-3.5 w-3.5", isActive ? "text-indigo-600" : "text-slate-300")} />
                                         {tab.label}
                                     </button>
                                 );
@@ -1203,11 +1244,19 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
                 </div>
             </header>
 
-
-            {/* --- MAIN CONTENT AREA --- */}
-            <main className="flex-1 overflow-y-auto bg-slate-50/80">
-                <div className="max-w-[1500px] mx-auto px-6 py-10 font-sans">
-                    {activeTab === 'overview' && <OverviewTab demand={demand} project={project} sla={sla} passedClientName={passedClientName} />}
+            {/* --- SINGLE COLUMN CONTENT AREA --- */}
+            <main className="flex-1 overflow-y-auto bg-slate-50/50">
+                <div className="max-w-[1400px] mx-auto p-6 md:p-10 font-sans">
+                    {activeTab === 'overview' && (
+                        <OverviewTab 
+                            demand={demand} 
+                            project={project} 
+                            clientInfo={clientInfo} 
+                            passedClientName={passedClientName} 
+                            sla={sla} 
+                            rejectionInfo={rejectionInfo} 
+                        />
+                    )}
                     {activeTab === 'resource' && (
                         <DemandResourcesTab
                             demandId={demandId}
@@ -1215,9 +1264,9 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
                             user={user}
                         />
                     )}
-                    {activeTab === 'roleInfo' && <RoleInfoTab demand={demand} role={role} />}
+                    {activeTab === 'roleInfo' && <RoleInfoTab demand={demand} skillsRequirements={skillsReq} />}
                     {isRM && activeTab === 'skillGap' && <SkillGapTab demand={demand} />}
-                    {activeTab === 'approvalFlow' && <ApprovalFlowTab demand={demand} />}
+                    {activeTab === 'approvalFlow' && <ApprovalFlowTab demand={demand} rejectionInfo={rejectionInfo} />}
                     {activeTab === 'slaInsights' && <SLAInsightsTab sla={sla} />}
                     {!isDM && activeTab === 'allocationResults' && <AllocationResultsTab results={allocationResults} />}
                 </div>
