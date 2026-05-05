@@ -52,7 +52,7 @@ const DemandWorkspacePage = () => {
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingDemand, setEditingDemand] = useState(null);
     const [draftFilters, setDraftFilters] = useState(filters);
-    const isRMView = effectiveRole === "RESOURCE-MANAGER";
+    const isRMView = effectiveRole === "Resource_Manager";
 
     // Sync draft with global filters when they change externally (like Reset)
     useEffect(() => {

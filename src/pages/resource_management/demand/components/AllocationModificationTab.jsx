@@ -111,8 +111,8 @@ const ActionPromptModal = ({
 
 const AllocationModificationTab = ({ demandId, demand, user }) => {
   const roles = user?.roles || [];
-  const isRM = roles.includes("RESOURCE-MANAGER");
-  const isPM = roles.includes("PROJECT-MANAGER");
+  const isRM = roles.includes("Resource_Manager");
+  const isPM = roles.includes("Project_Manager");
   const projectName = demand?.project?.name || demand?.projectName || "N/A";
 
   const [items, setItems] = useState([]);

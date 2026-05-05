@@ -11,8 +11,8 @@ import { useAuth } from "../../../../contexts/AuthContext";
 const DemandCardRow = ({ demand, onView, onEdit, activeTab }) => {
     const { user } = useAuth();
     const roles = user?.roles || [];
-    const isRM = roles.includes("RESOURCE-MANAGER");
-    const isDM = roles.includes("DELIVERY-MANAGER");
+    const isRM = roles.includes("Resource_Manager");
+    const isDM = roles.includes("Delivery_Manager");
     const status = demand.lifecycleState?.toUpperCase();
     const isEditDisabled = status === 'REJECTED' || (isDM && status === 'APPROVED');
 

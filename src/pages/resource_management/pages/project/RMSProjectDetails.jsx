@@ -46,7 +46,7 @@ const RMSProjectDetails = () => {
   const { user } = useAuth();
   const location = useLocation();
   const roles = user?.roles;
-  const isRM = roles?.includes("RESOURCE-MANAGER");
+  const isRM = roles?.includes("Resource_Manager");
   const PROJECT_STATUSES = getEnumValues("ProjectStatus");
   const PRIORITY_LEVELS = getEnumValues("PriorityLevel");
   const RISK_LEVELS = getEnumValues("RiskLevel");
