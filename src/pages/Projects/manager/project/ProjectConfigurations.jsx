@@ -22,7 +22,7 @@ const ProjectConfigurations = ({ projectId }) => {
   const { getEnumValues } = useEnums();
   const { user } = useAuth();
   const roles = user?.roles;
-  const isRM = roles?.includes("RESOURCE-MANAGER");
+  const isRM = roles?.includes("Resource_Manager");
 
   const [project, setProject] = useState(null);
   const [activeTab, setActiveTab] = useState("sla");
@@ -894,14 +894,14 @@ const ProjectConfigurations = ({ projectId }) => {
                                 onChange={(e) =>
                                   e.target.checked
                                     ? setSelectedClientSlas([
-                                        ...selectedClientSlas,
-                                        sla.slaType,
-                                      ])
+                                      ...selectedClientSlas,
+                                      sla.slaType,
+                                    ])
                                     : setSelectedClientSlas(
-                                        selectedClientSlas.filter(
-                                          (t) => t !== sla.slaType,
-                                        ),
-                                      )
+                                      selectedClientSlas.filter(
+                                        (t) => t !== sla.slaType,
+                                      ),
+                                    )
                                 }
                               />
                             </td>
@@ -967,14 +967,14 @@ const ProjectConfigurations = ({ projectId }) => {
                                 onChange={(e) =>
                                   e.target.checked
                                     ? setSelectedClientCompliance([
-                                        ...selectedClientCompliance,
-                                        comp.requirementType,
-                                      ])
+                                      ...selectedClientCompliance,
+                                      comp.requirementType,
+                                    ])
                                     : setSelectedClientCompliance(
-                                        selectedClientCompliance.filter(
-                                          (t) => t !== comp.requirementType,
-                                        ),
-                                      )
+                                      selectedClientCompliance.filter(
+                                        (t) => t !== comp.requirementType,
+                                      ),
+                                    )
                                 }
                               />
                             </td>
@@ -1039,14 +1039,14 @@ const ProjectConfigurations = ({ projectId }) => {
                                 onChange={(e) =>
                                   e.target.checked
                                     ? setSelectedClientEscalations([
-                                        ...selectedClientEscalations,
-                                        esc.contactId,
-                                      ])
+                                      ...selectedClientEscalations,
+                                      esc.contactId,
+                                    ])
                                     : setSelectedClientEscalations(
-                                        selectedClientEscalations.filter(
-                                          (id) => id !== esc.contactId,
-                                        ),
-                                      )
+                                      selectedClientEscalations.filter(
+                                        (id) => id !== esc.contactId,
+                                      ),
+                                    )
                                 }
                               />
                             </td>

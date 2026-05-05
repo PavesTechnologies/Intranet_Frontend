@@ -14,9 +14,9 @@ export const defaultFilters = {
 };
 
 const ROLE_PRIORITY = [
-    "RESOURCE-MANAGER",
-    "DELIVERY-MANAGER",
-    "PROJECT-MANAGER",
+    "Resource_Manager",
+    "Delivery_Manager",
+    "Project_Manager",
     "MANAGER",
     "ADMIN",
     "SUPER ADMIN",
@@ -25,8 +25,8 @@ const ROLE_PRIORITY = [
 ];
 
 const DEMAND_ROLE_LABELS = {
-    "RESOURCE-MANAGER": "Resource Manager",
-    "DELIVERY-MANAGER": "Delivery Manager"
+    "Resource_Manager": "Resource Manager",
+    "Delivery_Manager": "Delivery Manager"
 };
 
 export const DEMAND_STATUSES = [

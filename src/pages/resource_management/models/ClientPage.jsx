@@ -462,9 +462,10 @@ const ClientPage = () => {
   const { clientId } = useParams();
   const { user } = useAuth();
   const permissions = user?.permissions || [];
-  const canConfigAgreements = permissions.includes("ADD_CONFIGURATION");
-  const canManageAssets = permissions.includes("ASSETS_MANAGEMENT");
-  const canEditProfile = permissions.includes("EDIT_CLIENT_PROFILE");
+  const roles = user?.roles || [];
+  const canConfigAgreements = roles.includes("Admin");  // permissions.includes("ADD_CONFIGURATION");
+  const canManageAssets = roles.includes("Resource_Manager"); // permissions.includes("ASSETS_MANAGEMENT");
+  const canEditProfile = roles.includes("Admin");  // permissions.includes("EDIT_CLIENT_PROFILE");
   const navigate = useNavigate();
 
   // State declarations - ALL hooks inside component
