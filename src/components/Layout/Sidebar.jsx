@@ -131,9 +131,9 @@ const Sidebar = ({ isCollapsed }) => {
   // Role checks
   const isAdmin =
     user?.roles?.includes("Admin") || user?.roles?.includes("Super Admin");
-  const isRM = user?.roles?.includes("RESOURCE-MANAGER");
-  const isPM = user?.roles?.includes("PROJECT-MANAGER");
-  const isDM = user?.roles?.includes("DELIVERY-MANAGER");
+  const isRM = user?.roles?.includes("Resource_Manager");
+  const isPM = user?.roles?.includes("Project_Manager");
+  const isDM = user?.roles?.includes("Delivery_Manager");
   const isGeneral = user?.roles?.includes("General");
 
   // State for User Management Hover
@@ -303,11 +303,11 @@ const Sidebar = ({ isCollapsed }) => {
             <li
               ref={rmRef}
               className="relative"
-              onMouseEnter={(isRM || isDM) ? handleRmMouseEnter : undefined}
-              onMouseLeave={(isRM || isDM) ? handleRmMouseLeave : undefined}
+              onMouseEnter={(isRM || isDM || isAdmin) ? handleRmMouseEnter : undefined}
+              onMouseLeave={(isRM || isDM || isAdmin) ? handleRmMouseLeave : undefined}
             >
               {/* If Admin → Direct Link */}
-              {isAdmin && !isRM && !isDM && false ? ( // Allow Admins to see the hover menu too
+              {isAdmin && !isRM && !isDM && false ? (
                 <Link
                   to="/resource-management"
                   className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${location.pathname.startsWith("/resource-management")
@@ -354,21 +354,21 @@ const Sidebar = ({ isCollapsed }) => {
                         ? deliveryManagerResourceManagementSubmenu
                         : resourceManagementSubmenu
                       ).map((item) => (
-                          <li key={item.label}>
-                            <NavLink
-                              to={item.to}
-                              end
-                              className={({ isActive }) =>
-                                `block px-4 py-2 text-xs transition-colors ${isActive
-                                  ? "bg-blue-100 text-[#0a174e] font-semibold"
-                                  : "hover:bg-[#263383] hover:text-white"
-                                }`
-                              }
-                            >
-                              {item.label}
-                            </NavLink>
-                          </li>
-                        ))}
+                        <li key={item.label}>
+                          <NavLink
+                            to={item.to}
+                            end
+                            className={({ isActive }) =>
+                              `block px-4 py-2 text-xs transition-colors ${isActive
+                                ? "bg-blue-100 text-[#0a174e] font-semibold"
+                                : "hover:bg-[#263383] hover:text-white"
+                              }`
+                            }
+                          >
+                            {item.label}
+                          </NavLink>
+                        </li>
+                      ))}
                     </ul>
                   )}
                 </>

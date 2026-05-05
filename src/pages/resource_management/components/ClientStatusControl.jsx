@@ -44,7 +44,7 @@ const ClientStatusControl = ({ client, onStatusUpdate }) => {
                 <ClientStatusBadge status={client.status} />
             </div>
 
-            {userRole === 'ADMIN' && (
+            {userRole === 'Admin' && (
                 <div className="status-actions">
                     <select
                         value={client.status}
