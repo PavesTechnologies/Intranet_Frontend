@@ -22,7 +22,7 @@ const ProjectConfigurations = ({ projectId }) => {
   const { getEnumValues } = useEnums();
   const { user } = useAuth();
   const roles = user?.roles;
-  const isRM = roles?.includes("RESOURCE-MANAGER");
+  const isRM = roles?.includes("Resource_Manager");
 
   const [project, setProject] = useState(null);
   const [activeTab, setActiveTab] = useState("sla");

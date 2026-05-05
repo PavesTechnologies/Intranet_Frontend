@@ -11,8 +11,7 @@ const DM_PENDING_STATUSES = ['REQUESTED', 'DRAFT', 'SOFT', 'PROPOSED', 'PENDING'
 
 const DemandCardRow = ({ demand, onView, onEdit, onApprove, onReject, decisionState, activeTab, viewerRole }) => {
     const status = String(demand.lifecycleState || '').toUpperCase();
-    const normalizedViewerRole = String(viewerRole || '').toUpperCase();
-    const isDMView = normalizedViewerRole === "DELIVERY-MANAGER";
+    const isDMView = viewerRole === "Delivery_Manager";
     const canQuickDecision = isDMView && DM_PENDING_STATUSES.includes(status);
     const isEditDisabled = status === 'REJECTED' || (isDMView && status === 'APPROVED');
     const isApproving = decisionState?.demandId === demand.id && decisionState?.action === "approve";

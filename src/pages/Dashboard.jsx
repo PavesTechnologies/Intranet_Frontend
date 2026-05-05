@@ -32,8 +32,8 @@ const Dashboard = () => {
   const roles = user?.roles || [];
   const isAdminOrSuperAdmin =
     roles.includes("Super Admin") || roles.includes("Admin");
-  const isRM = roles.includes("RESOURCE-MANAGER");
-  // const isPM = roles.includes("PROJECT-MANAGER");
+  const isRM = roles.includes("Resource_Manager");
+  // const isPM = roles.includes("Project_Manager");
   const isHR = roles.includes("HR");
   const isGeneral = roles?.includes("General");
   const isDeveloper = roles.includes("Developer");

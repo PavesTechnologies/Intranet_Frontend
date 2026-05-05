@@ -131,9 +131,9 @@ const Sidebar = ({ isCollapsed }) => {
   // Role checks
   const isAdmin =
     user?.roles?.includes("Admin") || user?.roles?.includes("Super Admin");
-  const isRM = user?.roles?.includes("RESOURCE-MANAGER");
-  const isPM = user?.roles?.includes("PROJECT-MANAGER");
-  const isDM = user?.roles?.includes("DELIVERY-MANAGER");
+  const isRM = user?.roles?.includes("Resource_Manager");
+  const isPM = user?.roles?.includes("Project_Manager");
+  const isDM = user?.roles?.includes("Delivery_Manager");
   const isGeneral = user?.roles?.includes("General");
 
   // State for User Management Hover
@@ -303,8 +303,8 @@ const Sidebar = ({ isCollapsed }) => {
             <li
               ref={rmRef}
               className="relative"
-              onMouseEnter={(isRM || isDM) ? handleRmMouseEnter : undefined}
-              onMouseLeave={(isRM || isDM) ? handleRmMouseLeave : undefined}
+              onMouseEnter={(isRM || isDM || isAdmin) ? handleRmMouseEnter : undefined}
+              onMouseLeave={(isRM || isDM || isAdmin) ? handleRmMouseLeave : undefined}
             >
               {/* If Admin → Direct Link */}
               {isAdmin && !isRM && !isDM && false ? ( // Allow Admins to see the hover menu too

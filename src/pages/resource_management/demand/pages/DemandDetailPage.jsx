@@ -1083,8 +1083,8 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
     const navigate = useNavigate();
     const { user } = useAuth();
 
-    const isRM = user?.roles?.includes("RESOURCE-MANAGER");
-    const isDM = user?.roles?.includes("DELIVERY-MANAGER");
+    const isRM = user?.roles?.includes("Resource_Manager");
+    const isDM = user?.roles?.includes("Delivery_Manager");
 
     const [data, setData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
