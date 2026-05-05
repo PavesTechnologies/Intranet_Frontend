@@ -397,7 +397,7 @@ export default function ViewEmpDetails() {
 
             {/* Quick actions (top-right) */}
             <div className="flex-shrink-0 flex items-center gap-2">
-              {(isHR || isManager) && (
+              {/* {(isHR || isManager) && (
                 <button
                   onClick={handlePreviewOffer}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-700 bg-slate-100 hover:bg-slate-200 text-sm font-medium transition-all hover:-translate-y-0.5 active:translate-y-0"
@@ -405,7 +405,7 @@ export default function ViewEmpDetails() {
                   <Eye size={15} />
                   Preview
                 </button>
-              )}
+              )} */}
               {(isHR || isAdmin) && isNoRequest && (
                 <button
                   onClick={() => { setEditData(employee); setIsEditing(true); }}
