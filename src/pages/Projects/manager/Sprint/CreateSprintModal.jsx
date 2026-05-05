@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { X } from "lucide-react";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 const getCurrentDateTime = () => {
@@ -165,7 +165,7 @@ const CreateSprintModal = ({
     try {
       let res;
 
-      if (sprint) {
+  if (sprint) {
         // -------------------------
         // EDIT MODE
         // -------------------------
@@ -175,7 +175,7 @@ const CreateSprintModal = ({
           { headers: { Authorization: `Bearer ${token}` } },
         );
 
-        toast.success("Sprint updated successfully!");
+        toast.success("Sprint updated successfully!", {containerId: "global"});
       } else {
         // -------------------------
         // CREATE MODE
@@ -186,14 +186,20 @@ const CreateSprintModal = ({
           { headers: { Authorization: `Bearer ${token}` } },
         );
 
-        toast.success("Sprint created successfully!");
+        toast.success("Sprint created successfully!", {containerId: "global"});
       }
 
       onCreated(res.data);
+      onClose(); // ← close immediately, toast will show on top of nothing
 
-      setTimeout(() => onClose(), 600);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Error saving sprint");
+      console.log('[sprint-modal] handleSubmit - caught error', { err: err?.response?.data || err?.message, ts: Date.now() });
+
+      toast.error(err.response?.data?.message || "Error saving sprint", {
+          autoClose: 3000,
+          toastId: `sprint-error-${Date.now()}`, // ✅ prevents duplicate toasts on rapid clicks
+          containerId: "global",
+      });
     }
   };
 
@@ -201,9 +207,11 @@ const CreateSprintModal = ({
   // Render
   // ---------------------------
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex justify-center items-center">
+    //<div className="fixed inset-0 bg-black/40 z-50 flex justify-center items-center">
+    <div className="fixed inset-0 bg-black/40 z-[100] flex justify-center items-center">
+  <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto relative z-[101]"></div>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto relative">
-        <ToastContainer />
+  {/* Use global ToastContainer in App.jsx */}
 
         {/* Close Button */}
         <button

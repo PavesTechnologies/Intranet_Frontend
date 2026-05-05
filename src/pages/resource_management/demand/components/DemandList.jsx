@@ -1,7 +1,7 @@
 import React from 'react';
 import DemandCardRow from './DemandCardRow';
 
-const DemandList = ({ demands, onViewDetail, onEdit, activeTab }) => {
+const DemandList = ({ demands, onViewDetail, onEdit, onApprove, onReject, decisionState, activeTab, viewerRole }) => {
     return (
         <div className="flex flex-col bg-white">
             {demands.map((demand) => (
@@ -10,7 +10,11 @@ const DemandList = ({ demands, onViewDetail, onEdit, activeTab }) => {
                     demand={demand}
                     onView={onViewDetail}
                     onEdit={onEdit}
+                    onApprove={onApprove}
+                    onReject={onReject}
+                    decisionState={decisionState}
                     activeTab={activeTab}
+                    viewerRole={viewerRole}
                 />
             ))}
         </div>
