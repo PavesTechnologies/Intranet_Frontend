@@ -146,42 +146,66 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
 const handleSprintStatus = async (sprintId, action) => {
     try {
         await axios.put(
-              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
-              {},
-              { headers }, // ✅ use the headers constant defined at top of component
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
+            {},
+            { headers },
         );
 
         toast.success(
             action === "start" ? "Sprint started" : "Sprint completed",
-            { autoClose: 1500, containerId: "global" }  // ← ADD containerId
+            { autoClose: 1500 }  // ← no containerId
         );
         fetchSprints();
         fetchStories();
+
     } catch (err) {
         const data = err.response?.data || {};
 
+        // Check 1 — completion validation
         if (action === "complete" && data.code === "SPRINT_COMPLETION_VALIDATION_ERROR") {
             setPendingData({
-                  sprintId,
-                  tasks: data.data?.pendingTasks || [],
-                  stories: data.data?.pendingStories || [],
+                sprintId,
+                tasks: data.data?.pendingTasks || [],
+                stories: data.data?.pendingStories || [],
             });
             setShowPendingModal(true);
             return;
         }
 
+        // Check 2 — another active sprint
         if (data.message?.toLowerCase().includes("another active sprint")) {
             toast.warn(
                 "Cannot start sprint: Another active sprint already exists in this project.",
-                { autoClose: 3000, containerId: "global" }  // ← ADD containerId
+                { autoClose: 3000 }  // ← no containerId
             );
             fetchSprints();
             return;
         }
 
+        // ✅ Check 3 — empty sprint
+        if (
+            data.message?.toLowerCase().includes("empty sprint") ||
+            data.message?.toLowerCase().includes("at least one task or story")
+        ) {
+            toast.warn(
+                data.message,  // show exact backend message
+                { autoClose: 3000 }
+            );
+            return;
+        }
+
+        // ✅ Check 4 — epic not assigned (Story must belong to an Epic)
+        if (data.message?.toLowerCase().includes("epic")) {
+            toast.warn(
+                data.message,  // show exact backend message
+                { autoClose: 3000 }
+            );
+            return;
+        }
+
+        // Fallback — all other errors
         toast.error(data.message || "Failed to update sprint status", {
-            autoClose: 2000,
-            containerId: "global"  // ← ADD containerId
+            autoClose: 2000   // ← no containerId
         });
     }
 };
