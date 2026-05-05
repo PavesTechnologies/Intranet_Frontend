@@ -81,11 +81,11 @@ export default function RisksPanel({
                 : "Select an issue to view risks"}
             </p>
           </div>
-          {selectedIssue && (
-            <button className="p-2 hover:bg-slate-200 rounded-lg transition">
-              <Download className="w-4 h-4 text-slate-600" />
-            </button>
-          )}
+          {/* {selectedIssue && (
+            // <button className="p-2 hover:bg-slate-200 rounded-lg transition">
+            //   <Download className="w-4 h-4 text-slate-600" />
+            // </button>
+          )} */}
         </div>
 
         {/* Body */}

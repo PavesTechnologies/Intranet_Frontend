@@ -58,7 +58,7 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
   const { user } = useAuth();
-  const userRole = user?.roles?.includes("Manager")
+  const userRole = user?.roles?.includes("Project_Manager")
     ? "MANAGER"
     : user?.roles?.includes("Admin")
       ? "ADMIN"
@@ -98,7 +98,7 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
 
     try {
       const decoded = jwtDecode(token);
-      return decoded?.roles?.includes("Manager");
+      return decoded?.roles?.includes("Project_Manager");
     } catch (e) {
       return false;
     }
@@ -485,11 +485,11 @@ const handleSprintStatus = async (sprintId, action) => {
   {/* Use the global ToastContainer mounted in App.jsx */}
         {/* Header */}
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-semibold text-indigo-900">
+          {/* <h1 className="text-2xl font-semibold text-indigo-900">
             Backlog & Sprint Planning {projectName}
-          </h1>
+          </h1> */}
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 align-middle">
             <Button
               size="medium"
               variant="outline"
