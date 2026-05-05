@@ -414,11 +414,11 @@ const TimesheetGroup = ({
 
     return (
       <span
-        className={`inline-block rounded-full font-medium border ${getStatusColor(
+        className={`inline-block rounded-full font-medium border text-center ${getStatusColor(
           label,
         )} ${sizeStyles[size]}`}
       >
-                {label}     {" "}
+        {label}
       </span>
     );
   };
