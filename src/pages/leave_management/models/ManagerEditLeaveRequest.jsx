@@ -985,6 +985,7 @@ export default function ManagerEditLeaveRequest({
       startDate,
       endDate,
       daysRequested: weekdays,
+      leaveName: selectedLeaveType.leaveName,
       managerComment,
       startSession: halfDayConfig.start,
       endSession: isMultiDay ? halfDayConfig.end : "none",

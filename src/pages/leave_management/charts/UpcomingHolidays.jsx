@@ -21,6 +21,7 @@ export default function UpcomingHolidays({ year }) {
       try {
         const res = await axios.get(
           `${window.__APP_CONFIG__.BASE_URL}/api/holidays/year/${year}`,
+
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,

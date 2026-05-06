@@ -9,6 +9,7 @@ import ManagerEditLeaveRequest from "./ManagerEditLeaveRequest";
 import LeaveSection from "./LeaveSection";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
@@ -33,6 +34,7 @@ const formatted = new Date().toISOString().slice(0, 7);
 //   }
 //   return count;
 // }
+const MANAGER_WS_EVENTS = ["LEAVE_APPLIED", "LEAVE_CANCELLED", "LEAVE_UPDATED"];
 
 const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
   const [adminLeaveRequests, setAdminLeaveRequests] = useState([]);
@@ -132,36 +134,25 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
       const payload = {
         managerId,
         status: selectedStatus !== "All" ? selectedStatus : null,
-        year: selectedYear || null,
+        year: Number(selectedYear) || null,
         month: selectedMonth || null,
       };
 
-      const res = await axios.post(
-        `${BASE_URL}/api/leave-requests/manager/history`,
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
-      );
+      const [res, types] = await Promise.all([
+        axios.post(`${BASE_URL}/api/leave-requests/manager/history`, payload, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }),
+        axios.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }),
+      ]);
 
-      const types = await axios.get(
-        `${BASE_URL}/api/leave/get-all-leave-types`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
-      );
-
-      console.log("res", res);
       const arr = Array.isArray(res.data) ? res.data : res.data?.data || [];
       setAdminLeaveRequests(arr);
+
       const regular = types.data?.regualar || [];
       const genderBased = types.data?.genderBasedLeaves || [];
-      const mergedLeaves = [...regular, ...genderBased];
-      setAllLeaveTypes(mergedLeaves || []);
+      setAllLeaveTypes([...regular, ...genderBased]);
     } catch (err) {
       toast.error("Error fetching leave data");
     } finally {
@@ -170,32 +161,23 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
   }, [managerId, selectedStatus, selectedYear, selectedMonth]);
 
   useEffect(() => {
-    // 1. Skip the second render caused by Strict Mode
-    if (isMountedRef.current) {
-      // This is the dependency change logic (status, year, month change)
-      if (managerId) fetchData();
-      return;
-    }
+    if (managerId) fetchData();
+  }, [fetchData, managerId]);
 
-    // 2. Initial Mount Logic (runs on 1st mount and 1st remount)
-    if (managerId) {
-      fetchData();
-      // 3. Mark as fetched after the first successful execution
-      isMountedRef.current = true;
-    }
+  // useEffect(() => {
+  //   if (isMountedRef.current) {
+  //     if (managerId) fetchData();
+  //     return;
+  //   }
+  //   if (managerId) {
+  //     fetchData();
+  //     isMountedRef.current = true;
+  //   }
+  // }, [fetchData, managerId]); // Still include the dependencies
 
-    // The cleanup function (return) is not strictly necessary here since there is no timer/subscription
-    // that needs cleanup on unmount, but leave it if you add one later.
-  }, [fetchData, managerId]); // Still include the dependencies
+  useLeaveWebSocket("manager-update", MANAGER_WS_EVENTS, fetchData);
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      refreshData: fetchData,
-    }),
-    [fetchData],
-  );
-
+  useImperativeHandle(ref, () => ({ refreshData: fetchData }), [fetchData]);
   const LeaveReasonCell = ({ reason }) => {
     const [expanded, setExpanded] = useState(false);
 
@@ -622,7 +604,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                       className={`px-3 py-1 rounded-md transition
                       ${"bg-green-600 hover:bg-green-700 text-white cursor-pointer"}`}
                     >
-                      Accept All
+                      Approve
                     </button>
 
                     {/* ❌ Reject All */}
@@ -644,7 +626,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                       className={`px-3 py-1 rounded-md transition
                       ${"bg-red-600 hover:bg-red-700 text-white cursor-pointer"}`}
                     >
-                      Reject All
+                      Reject
                     </button>
 
                     {/* 🧹 Clear Selection */}
@@ -772,7 +754,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
             ) : (
               // State 3: Render the data rows if data exists
               paginatedRequests.map((request) => {
-                console.log("request", request);
+                console.log("request editing ", request);
                 const typeObj =
                   allLeaveTypes.find(
                     (t) => t.leaveName === request.leaveName,
