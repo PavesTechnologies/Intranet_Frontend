@@ -314,6 +314,18 @@ export default function LoginPage() {
   const [errors, setErrors] = useState({});
   const [shake, setShake] = useState(null);
 
+  // Forgot password state
+  const [currentView, setCurrentView] = useState('login');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [forgotErrors, setForgotErrors] = useState({});
+  const [forgotShake, setForgotShake] = useState(null);
+
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -454,8 +466,83 @@ export default function LoginPage() {
     }
   };
 
+  const handleSendOtp = async () => {
+    const e = {};
+    if (!forgotEmail.trim()) e.email = 'Email address is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail.trim())) e.email = 'Enter a valid email address';
+    if (Object.keys(e).length) {
+      setForgotErrors(e);
+      setForgotShake('email');
+      setTimeout(() => setForgotShake(null), 450);
+      return;
+    }
+    setForgotErrors({});
+    setSendingOtp(true);
+    try {
+      await axios.post(
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/send-otp`,
+        { email: forgotEmail.trim() },
+      );
+      setOtpSent(true);
+      showStatusToast("OTP sent to your email. Check inbox/spam.", "success");
+    } catch (err) {
+      console.error("sendOtp error:", err);
+      showStatusToast(
+        "Failed to send OTP: " + (err.response?.data?.detail || err.message),
+        "error",
+      );
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleReset = async () => {
+    const e = {};
+    if (!forgotEmail.trim()) e.email = 'Email address is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail.trim())) e.email = 'Enter a valid email address';
+    if (!otp.trim()) e.otp = 'OTP is required';
+    if (!newPassword) e.newPassword = 'New password is required';
+    
+    if (Object.keys(e).length) {
+      setForgotErrors(e);
+      const f = e.email ? 'email' : (e.otp ? 'otp' : 'newPassword');
+      setForgotShake(f);
+      setTimeout(() => setForgotShake(null), 450);
+      return;
+    }
+    setForgotErrors({});
+    setResetting(true);
+    try {
+      await axios.post(
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/forgot-password`,
+        {
+          email: forgotEmail.trim(),
+          otp: otp.trim(),
+          new_password: newPassword,
+        },
+      );
+      showStatusToast("Password reset successfully!", "success");
+      setCurrentView('login');
+      setForgotEmail('');
+      setOtp('');
+      setNewPassword('');
+      setOtpSent(false);
+    } catch (err) {
+      console.error("handleReset error:", err);
+      showStatusToast(
+        "Error resetting password: " +
+          (err.response?.data?.detail || err.message),
+        "error",
+      );
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const onKey = e => { if (e.key === 'Enter') handleSubmit(); };
+  const onForgotKey = e => { if (e.key === 'Enter') otpSent ? handleReset() : handleSendOtp(); };
   const clrErr = f => setErrors(p => ({ ...p, [f]: '' }));
+  const clrForgotErr = f => setForgotErrors(p => ({ ...p, [f]: '' }));
 
   const EYE_D = showPw
     ? 'M13.5 7s-2 3.5-5.5 3.5S2.5 7 2.5 7 4.5 3.5 8 3.5 13.5 7 13.5 7zM8 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM2 2l12 12'
@@ -533,101 +620,204 @@ export default function LoginPage() {
         style={{ flex: 1, height: '100vh', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px', position: 'relative' }}
       >
         <div style={{ width: '100%', maxWidth: '360px' }}>
-          {/* Heading */}
-          <div className='a1' style={{ marginBottom: '40px' }}>
-            <h2 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--neutral-950)', letterSpacing: '-0.022em', lineHeight: 1.2, marginBottom: '8px' }}>Welcome back</h2>
-            <p style={{ fontSize: '14px', fontWeight: 400, color: 'var(--neutral-500)', lineHeight: 1.5, margin: 0 }}>Sign in to continue to your workspace</p>
-          </div>
+          {currentView === 'login' ? (
+            <>
+              {/* Heading */}
+              <div className='a1' style={{ marginBottom: '40px' }}>
+                <h2 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--neutral-950)', letterSpacing: '-0.022em', lineHeight: 1.2, marginBottom: '8px' }}>Welcome back</h2>
+                <p style={{ fontSize: '14px', fontWeight: 400, color: 'var(--neutral-500)', lineHeight: 1.5, margin: 0 }}>Sign in to continue to your workspace</p>
+              </div>
 
-          {/* Microsoft SSO */}
-          <div className='a2'>
-            <button
-              type='button' className='btn-ms'
-              disabled={loading}
-              aria-label='Sign in with Microsoft'
-              onClick={handleMicrosoftLogin}
-            >
-              <MS_LOGO />
-              Continue with Microsoft
-            </button>
-          </div>
+              {/* Microsoft SSO */}
+              <div className='a2'>
+                <button
+                  type='button' className='btn-ms'
+                  disabled={loading}
+                  aria-label='Sign in with Microsoft'
+                  onClick={handleMicrosoftLogin}
+                >
+                  <MS_LOGO />
+                  Continue with Microsoft
+                </button>
+              </div>
 
-          {/* Divider */}
-          <div className='a3' style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '24px 0' }}>
-            <div style={{ flex: 1, height: '1px', background: 'var(--neutral-150)' }} />
-            <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--neutral-300)', letterSpacing: '.1em', textTransform: 'uppercase' }}>or</span>
-            <div style={{ flex: 1, height: '1px', background: 'var(--neutral-150)' }} />
-          </div>
+              {/* Divider */}
+              <div className='a3' style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '24px 0' }}>
+                <div style={{ flex: 1, height: '1px', background: 'var(--neutral-150)' }} />
+                <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--neutral-300)', letterSpacing: '.1em', textTransform: 'uppercase' }}>or</span>
+                <div style={{ flex: 1, height: '1px', background: 'var(--neutral-150)' }} />
+              </div>
 
-          {/* Email */}
-          <div className={`a4\${shake==='email'?' shake':''}`} style={{ marginBottom: '16px' }}>
-            <FloatingInput
-              id='email' label='Email address' type='email'
-              value={email}
-              onChange={e => { setEmail(e.target.value); clrErr('email') }}
-              onKeyDown={onKey}
-              error={errors.email}
-              autoComplete='email'
-            />
-          </div>
+              {/* Email */}
+              <div className={`a4\${shake==='email'?' shake':''}`} style={{ marginBottom: '16px' }}>
+                <FloatingInput
+                  id='email' label='Email address' type='email'
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); clrErr('email') }}
+                  onKeyDown={onKey}
+                  error={errors.email}
+                  autoComplete='email'
+                />
+              </div>
 
-          {/* Password */}
-          <div className={`a5\${shake==='pw'?' shake':''}`} >
-            <FloatingInput
-              id='password' label='Password'
-              type={showPw ? 'text' : 'password'}
-              value={pw}
-              onChange={e => { setPw(e.target.value); clrErr('pw') }}
-              onKeyDown={onKey}
-              error={errors.pw}
-              autoComplete='current-password'
-              hasSuffix={true}
-            >
-              <button
-                type='button' className='pw-btn' tabIndex={-1}
-                aria-label={showPw ? 'Hide password' : 'Show password'}
-                aria-pressed={showPw}
-                onClick={() => setShowPw(v => !v)}
-              >
-                <svg width={17} height={17} viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.4} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-                  <path d={EYE_D} />
-                </svg>
-              </button>
-            </FloatingInput>
-          </div>
+              {/* Password */}
+              <div className={`a5\${shake==='pw'?' shake':''}`} >
+                <FloatingInput
+                  id='password' label='Password'
+                  type={showPw ? 'text' : 'password'}
+                  value={pw}
+                  onChange={e => { setPw(e.target.value); clrErr('pw') }}
+                  onKeyDown={onKey}
+                  error={errors.pw}
+                  autoComplete='current-password'
+                  hasSuffix={true}
+                >
+                  <button
+                    type='button' className='pw-btn' tabIndex={-1}
+                    aria-label={showPw ? 'Hide password' : 'Show password'}
+                    aria-pressed={showPw}
+                    onClick={() => setShowPw(v => !v)}
+                  >
+                    <svg width={17} height={17} viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.4} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+                      <path d={EYE_D} />
+                    </svg>
+                  </button>
+                </FloatingInput>
+              </div>
 
-          {/* Forgot */}
-          <div className='a6' style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-            <button type='button' className='lnk' style={{ fontSize: '13px', fontWeight: 500, color: 'var(--neutral-400)' }} onClick={() => navigate('/reset-password')}>
-              Forgot password?
-            </button>
-          </div>
+              {/* Forgot */}
+              <div className='a6' style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                <button type='button' className='lnk' style={{ fontSize: '13px', fontWeight: 500, color: 'var(--neutral-400)' }} onClick={() => setCurrentView('forgot')}>
+                  Forgot password?
+                </button>
+              </div>
 
-          {/* Sign In */}
-          <div className='a7' style={{ marginTop: '24px' }}>
-            <button
-              type='button' className='btn-primary'
-              onClick={handleSubmit} disabled={loading}
-              aria-busy={loading}
-            >
-              {loading
-                ? <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-                  {[0, 1, 2].map(i => <div key={i} className='dot' style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,.85)', animationDelay: `${i * 145}ms` }} />)}
+              {/* Sign In */}
+              <div className='a7' style={{ marginTop: '24px' }}>
+                <button
+                  type='button' className='btn-primary'
+                  onClick={handleSubmit} disabled={loading}
+                  aria-busy={loading}
+                >
+                  {loading
+                    ? <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                      {[0, 1, 2].map(i => <div key={i} className='dot' style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,.85)', animationDelay: `${i * 145}ms` }} />)}
+                    </div>
+                    : 'Sign in'
+                  }
+                </button>
+              </div>
+
+              {/* AUP */}
+              <div className='a8' style={{ marginTop: '16px', textAlign: 'center' }}>
+                <p style={{ fontSize: '11px', color: 'var(--neutral-300)', lineHeight: 1.6, margin: 0 }}>
+                  By signing in, you agree to the{' '}
+                  <button type='button' className='lnk' style={{ fontSize: '11px', color: 'var(--neutral-400)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                    User Policy
+                  </button>
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Forgot Password View */}
+              <div className='a1' style={{ marginBottom: '40px' }}>
+                <h2 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--neutral-950)', letterSpacing: '-0.022em', lineHeight: 1.2, marginBottom: '8px' }}>Reset password</h2>
+                <p style={{ fontSize: '14px', fontWeight: 400, color: 'var(--neutral-500)', lineHeight: 1.5, margin: 0 }}>Enter your email to receive an OTP and set a new password</p>
+              </div>
+
+              {/* Email */}
+              <div className={`a2\${forgotShake==='email'?' shake':''}`} style={{ marginBottom: '16px' }}>
+                <FloatingInput
+                  id='forgotEmail' label='Email address' type='email'
+                  value={forgotEmail}
+                  onChange={e => { setForgotEmail(e.target.value); clrForgotErr('email') }}
+                  onKeyDown={onForgotKey}
+                  error={forgotErrors.email}
+                  autoComplete='email'
+                />
+              </div>
+
+              {!otpSent ? (
+                <div className='a3' style={{ marginTop: '24px' }}>
+                  <button
+                    type='button' className='btn-primary'
+                    onClick={handleSendOtp} disabled={sendingOtp}
+                    aria-busy={sendingOtp}
+                  >
+                    {sendingOtp
+                      ? <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                        {[0, 1, 2].map(i => <div key={i} className='dot' style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,.85)', animationDelay: `${i * 145}ms` }} />)}
+                      </div>
+                      : 'Send OTP'
+                    }
+                  </button>
                 </div>
-                : 'Sign in'
-              }
-            </button>
-          </div>
+              ) : (
+                <>
+                  {/* OTP */}
+                  <div className={`a3\${forgotShake==='otp'?' shake':''}`} style={{ marginBottom: '16px' }}>
+                    <FloatingInput
+                      id='otp' label='Enter OTP' type='text'
+                      value={otp}
+                      onChange={e => { setOtp(e.target.value); clrForgotErr('otp') }}
+                      onKeyDown={onForgotKey}
+                      error={forgotErrors.otp}
+                      autoComplete='off'
+                    />
+                  </div>
+                  
+                  {/* New Password */}
+                  <div className={`a4\${forgotShake==='newPassword'?' shake':''}`} style={{ marginBottom: '16px' }}>
+                    <FloatingInput
+                      id='newPassword' label='New Password'
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={e => { setNewPassword(e.target.value); clrForgotErr('newPassword') }}
+                      onKeyDown={onForgotKey}
+                      error={forgotErrors.newPassword}
+                      autoComplete='new-password'
+                      hasSuffix={true}
+                    >
+                      <button
+                        type='button' className='pw-btn' tabIndex={-1}
+                        aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                        aria-pressed={showNewPassword}
+                        onClick={() => setShowNewPassword(v => !v)}
+                      >
+                        <svg width={17} height={17} viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.4} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+                          <path d={showNewPassword ? 'M13.5 7s-2 3.5-5.5 3.5S2.5 7 2.5 7 4.5 3.5 8 3.5 13.5 7 13.5 7zM8 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM2 2l12 12' : 'M13.5 7s-2 3.5-5.5 3.5S2.5 7 2.5 7 4.5 3.5 8 3.5 13.5 7 13.5 7zM8 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4z'} />
+                        </svg>
+                      </button>
+                    </FloatingInput>
+                  </div>
 
-          {/* AUP */}
-          <div className='a8' style={{ marginTop: '16px', textAlign: 'center' }}>
-            <p style={{ fontSize: '11px', color: 'var(--neutral-300)', lineHeight: 1.6, margin: 0 }}>
-              By signing in, you agree to the{' '}
-              <button type='button' className='lnk' style={{ fontSize: '11px', color: 'var(--neutral-400)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
-                User Policy
-              </button>
-            </p>
-          </div>
+                  {/* Reset Password Button */}
+                  <div className='a5' style={{ marginTop: '24px' }}>
+                    <button
+                      type='button' className='btn-primary'
+                      onClick={handleReset} disabled={resetting}
+                      aria-busy={resetting}
+                    >
+                      {resetting
+                        ? <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                          {[0, 1, 2].map(i => <div key={i} className='dot' style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,.85)', animationDelay: `${i * 145}ms` }} />)}
+                        </div>
+                        : 'Reset Password'
+                      }
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Back to Login */}
+              <div className='a6' style={{ marginTop: '24px', textAlign: 'center' }}>
+                <button type='button' className='lnk' style={{ fontSize: '13px', fontWeight: 500, color: 'var(--neutral-400)' }} onClick={() => setCurrentView('login')}>
+                  ← Back to login
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Security footer */}
