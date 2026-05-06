@@ -26,6 +26,12 @@ export default function TestExecution() {
   const [selectedRunId, setSelectedRunId] = useState(null);
   const [runsRefreshKey, setRunsRefreshKey] = useState(0);
   const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [cycleName, setCycleName] = useState("");
+
+  useEffect(() => {
+    const selectedCycle = cycles.find(c => c.id === selectedCycleId);
+    setCycleName(selectedCycle?.name || "");
+  }, [selectedCycleId, cycles]);
 
   const dropdownRef = useRef(null);
 const executeDeleteCycle = async (cycleId) => {
@@ -333,6 +339,7 @@ const executeDeleteCycle = async (cycleId) => {
           <CreateTestRunForm
             projectId={projectId}
             cycleId={selectedCycleId}
+            cycleName={cycleName}
             onSuccess={handleRunCreated}
             onClose={() => setShowRunModal(false)}
           />
