@@ -148,7 +148,7 @@ import Profile from "./pages/UserManagement/user/Profile";
 import EditProfile from "./pages/UserManagement/user/EditProfile";
 
 import Register from "./pages/UserManagement/auth/Register";
-import ForgotPassword from "./pages/UserManagement/auth/ForgotPassword";
+
 
 // ✅ Leave Management
 import EmployeePanel from "./pages/leave_management/EmployeePanel";
@@ -298,7 +298,7 @@ const AppRoutes = () => {
         {/* Public Route */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/reset-password" element={<ForgotPassword />} />
+
         {/* Unauthorized should be here */}
         <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="/change-password" element={<InitialPasswordSetup />} />

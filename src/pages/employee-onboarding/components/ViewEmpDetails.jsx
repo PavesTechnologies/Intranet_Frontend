@@ -130,9 +130,9 @@ export default function ViewEmpDetails() {
       setEmployee(offerData);
       setEditData({
         ...offerData,
-        cc_emails: offerData?.cc_mails
-        ? offerData.cc_mails.join(", ")
-        : "",
+        cc_emails:
+        offerData?.cc_emails?.join(", ") ||
+        "",
       });
     } catch {
       showStatusToast("Failed to fetch employee details");
@@ -425,9 +425,10 @@ export default function ViewEmpDetails() {
                 onClick={() => {
                   setEditData({
                     ...employee,
-                    cc_emails: employee?.cc_mails
-                      ? employee.cc_mails.join(", ")
-                      : "",
+                   cc_emails:
+                  employee?.cc_emails?.join(", ") ||
+                  employee?.cc_mails?.join(", ") ||
+                  "",
                   });
                   setIsEditing(true);
                 }}
@@ -491,8 +492,8 @@ export default function ViewEmpDetails() {
                   icon: <Mail size={16} />,
                   label: "CC Emails",
                   value:
-                    employee?.cc_mails && employee.cc_mails.length > 0
-                      ? employee.cc_mails.join(", ")
+                   employee?.cc_emails && employee.cc_emails.length > 0
+                      ? employee.cc_emails.join(", ")
                       : "—",
                   delay: 360,
                 },

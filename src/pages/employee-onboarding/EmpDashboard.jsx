@@ -27,24 +27,24 @@ export default function EmployeeOnboardingDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-const { user } = useAuth();
-const rawRoles = user?.roles || "";
+  const { user } = useAuth();
+  const rawRoles = user?.roles || "";
 
-const userRoles = useMemo(() => {
-  return Array.isArray(rawRoles) 
-    ? rawRoles 
-    : typeof rawRoles === 'string' ? rawRoles.split(',').map(r => r.trim()) : [];
-}, [rawRoles]);
+  const userRoles = useMemo(() => {
+    return Array.isArray(rawRoles)
+      ? rawRoles
+      : typeof rawRoles === 'string' ? rawRoles.split(',').map(r => r.trim()) : [];
+  }, [rawRoles]);
 
-const isHR = userRoles.includes("HR");
-const isManager = userRoles.includes("Manager");
-const isAdmin = userRoles.includes("Admin");
+  const isHR = userRoles.includes("HR");
+  const isManager = userRoles.includes("Manager");
+  const isAdmin = userRoles.includes("Admin");
 
-// Determine if the "Admin View" (Manager Portal) should even be an option
-const hasApprovalPrivileges = isManager || isAdmin;
+  // Determine if the "Admin View" (Manager Portal) should even be an option
+  const hasApprovalPrivileges = isManager || isAdmin;
 
-// State to control which view is currently active
-const [viewRole, setViewRole] = useState(hasApprovalPrivileges && !isHR ? "ADMIN" : "HR");
+  // State to control which view is currently active
+  const [viewRole, setViewRole] = useState(hasApprovalPrivileges && !isHR ? "ADMIN" : "HR");
 
   const handleKpiClick = (status) => {
     setStatusFilter(status);
@@ -146,8 +146,8 @@ const [viewRole, setViewRole] = useState(hasApprovalPrivileges && !isHR ? "ADMIN
             {viewRole === "HR" ? "Employee Onboarding" : "Manager Approval Portal"}
           </h1>
           <p className="text-sm font-medium text-slate-500 mt-1">
-            {viewRole === "HR" 
-              ? "Manage offer letters and onboarding workflow" 
+            {viewRole === "HR"
+              ? "Manage offer letters and onboarding workflow"
               : "Review and action pending offer letters"}
           </p>
         </div>
@@ -157,17 +157,15 @@ const [viewRole, setViewRole] = useState(hasApprovalPrivileges && !isHR ? "ADMIN
           <div className="flex bg-slate-200/50 p-1 rounded-xl shadow-sm border border-slate-200/50">
             <button
               onClick={() => setViewRole("HR")}
-              className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                viewRole === "HR" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
-              }`}
+              className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${viewRole === "HR" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                }`}
             >
               HR View
             </button>
             <button
               onClick={() => setViewRole("ADMIN")}
-              className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                viewRole === "ADMIN" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
-              }`}
+              className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${viewRole === "ADMIN" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                }`}
             >
               Admin View
             </button>
@@ -178,19 +176,19 @@ const [viewRole, setViewRole] = useState(hasApprovalPrivileges && !isHR ? "ADMIN
       {/* CONTENT AREA */}
       {viewRole === "ADMIN" ? (
         /* This calls the Manager endpoint inside this component */
-        <AdminApprovalDashboard /> 
+        <AdminApprovalDashboard />
       ) : (
         <div className="space-y-8">
           {/* STAT CARDS SECTION */}
           <div className="flex flex-wrap gap-3">
-            <StatCard 
-              title="Total" 
-              value={offers.length} 
-              icon={Users} 
-              iconBg="bg-slate-100" 
+            <StatCard
+              title="Total"
+              value={offers.length}
+              icon={Users}
+              iconBg="bg-slate-100"
               iconColor="text-slate-600"
               isActive={statusFilter === "ALL"}
-              onClick={() => handleKpiClick("ALL")} 
+              onClick={() => handleKpiClick("ALL")}
             />
             <StatCard
               title="Draft"
@@ -290,7 +288,7 @@ const [viewRole, setViewRole] = useState(hasApprovalPrivileges && !isHR ? "ADMIN
                   className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 text-slate-900 text-sm rounded-xl shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium"
                 />
               </div>
-              
+
               {/* Optional Reset Filters Button */}
               {hasActiveFilters && (
                 <button
@@ -320,13 +318,13 @@ const [viewRole, setViewRole] = useState(hasApprovalPrivileges && !isHR ? "ADMIN
                 </button>
               </div>
             ) : (
-                <EmpTable
-                  key={`${searchTerm}-${statusFilter}`}
-                  offers={filteredOffers}
-                  employeeUserIds={employeeUserIds}
-                  loading={loading}
-                  stage="HR_VIEW"
-                />
+              <EmpTable
+                key={`${searchTerm}-${statusFilter}`}
+                offers={filteredOffers}
+                employeeUserIds={employeeUserIds}
+                loading={loading}
+                stage="HR_VIEW"
+              />
             )}
           </div>
         </div>
@@ -340,11 +338,10 @@ function StatCard({ title, value, icon: Icon, iconBg, iconColor, isActive, onCli
   return (
     <div
       onClick={onClick}
-      className={`bg-white shrink-0 min-w-[140px] flex-1 rounded-xl px-4 py-3 border shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex items-center gap-3 ${
-        isActive 
-          ? "border-indigo-500 ring-1 ring-indigo-500/20 shadow-md bg-indigo-50/10" 
+      className={`bg-white shrink-0 min-w-[140px] flex-1 rounded-xl px-4 py-3 border shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex items-center gap-3 ${isActive
+          ? "border-indigo-500 ring-1 ring-indigo-500/20 shadow-md bg-indigo-50/10"
           : "border-slate-200 hover:border-slate-300 hover:shadow-md"
-      }`}
+        }`}
     >
       <div className={`w-8 h-8 ${iconBg} rounded-lg flex items-center justify-center shrink-0`}>
         <Icon className={`h-4 w-4 ${iconColor}`} />

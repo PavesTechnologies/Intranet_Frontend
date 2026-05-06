@@ -108,7 +108,7 @@ export default function LeaveUsageChart({ leave }) {
         <div className="flex justify-between items-center">
           <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Remaining</span>
           <span className="text-xs font-semibold text-gray-700 tabular-nums">
-            {isUnpaid ? "∞" : `${remaining} days`}
+            {isUnpaid ? "∞" : `${remaining.toFixed(2)} days`}
           </span>
         </div>
       </div>

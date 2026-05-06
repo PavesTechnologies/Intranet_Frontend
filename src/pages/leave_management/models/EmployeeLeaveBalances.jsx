@@ -421,7 +421,7 @@ const EmployeeLeaveBalances = () => {
           )}
         </div>
 
-        <div className="relative z-50">
+        <div className="relative z-60">
           <YearDropdown
             value={currentYear}
             onChange={(year) => {
