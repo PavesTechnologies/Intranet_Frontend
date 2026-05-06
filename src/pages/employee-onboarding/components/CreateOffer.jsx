@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import { toast } from "react-toastify";
 import { User, Briefcase, FileText, Plus, Trash2 } from "lucide-react";
 
@@ -57,12 +58,26 @@ export default function CreateOffer() {
     { label: "Bonus", value: "Bonus" },
   ];
 
+  const componentOptions = [
+    { label: "Basic Salary", value: "Basic Salary" },
+    { label: "HRA", value: "HRA" },
+    { label: "Special Allowance", value: "Special Allowance" },
+    { label: "Conveyance Allowance", value: "Conveyance Allowance" },
+    { label: "Medical Allowance", value: "Medical Allowance" },
+    { label: "LTA", value: "LTA" },
+    { label: "Performance Bonus", value: "Performance Bonus" },
+    { label: "Food Allowance", value: "Food Allowance" },
+    { label: "Mobile Allowance", value: "Mobile Allowance" },
+    { label: "Gratuity", value: "Gratuity" },
+    { label: "PF (Employer Contribution)", value: "PF" },
+  ];
+
   const frequencyOptions = [
     { label: "Monthly", value: "Monthly" },
     { label: "Quarterly", value: "Quarterly" },
     { label: "Yearly", value: "Yearly" },
   ];
-  
+
   const currencyOptions = [
     { label: "INR (₹)", value: "INR", symbol: "₹" },
     { label: "USD ($)", value: "USD", symbol: "$" },
@@ -297,12 +312,14 @@ export default function CreateOffer() {
                 name="mail"
                 value={formData.mail}
                 onChange={handleChange}
+                bgClass={formData.mail ? "bg-slate-50/80" : "bg-white"}
               />
 
               <div className="grid grid-cols-2 gap-6">
                 <SelectInput
                   label="Country Code"
                   options={countries}
+                  value={countries.find(c => c.value === formData.country_code)}
                   onChange={(v) =>
                     setFormData({ ...formData, country_code: v?.value })
                   }
@@ -330,6 +347,7 @@ export default function CreateOffer() {
                   { label: "Contractor", value: "Contractor" },
                   { label: "Intern", value: "Intern" },
                 ]}
+                value={formData.employee_type ? { label: formData.employee_type, value: formData.employee_type } : null}
                 onChange={(v) =>
                   setFormData({ ...formData, employee_type: v?.value })
                 }
@@ -377,11 +395,12 @@ export default function CreateOffer() {
 
               {components.map((c) => (
                 <div key={c.id} className="grid grid-cols-5 gap-4 items-end">
-                  <Input
+                  <CreatableSelectInput
                     label="Component"
-                    value={c.name}
-                    onChange={(e) =>
-                      handleComponentChange(c.id, "name", e.target.value)
+                    options={componentOptions}
+                    value={c.name ? { label: c.name, value: c.name } : null}
+                    onChange={(v) =>
+                      handleComponentChange(c.id, "name", v?.value)
                     }
                   />
                   <SelectInput
@@ -532,24 +551,28 @@ export default function CreateOffer() {
 
 /* SMALL COMPONENTS */
 
-function Input({ label, ...props }) {
+function Input({ label, bgClass, ...props }) {
+  const isFilled = props.value && props.value.toString().length > 0;
   return (
     <div>
       <label className="text-sm font-medium text-gray-700 block mb-1.5">{label}</label>
       <input
         {...props}
-        className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm transition-all hover:border-gray-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none placeholder-gray-400 bg-white shadow-sm"
+        className={`w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm transition-all hover:border-gray-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none placeholder-gray-400 ${bgClass || (isFilled ? 'bg-blue-50/50' : 'bg-white')} shadow-sm`}
       />
     </div>
   );
 }
 
 function SelectInput({ label, ...props }) {
+  const isFilled = props.value ? (Array.isArray(props.value) ? props.value.length > 0 : !!props.value) : false;
+  
   const customStyles = {
     control: (base, state) => ({
       ...base,
       borderRadius: '0.5rem',
       borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+      backgroundColor: isFilled ? '#eff6ff' : 'white',
       boxShadow: state.isFocused ? '0 0 0 4px rgba(59, 130, 246, 0.1)' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
       padding: '2px',
       fontSize: '0.875rem',
@@ -570,13 +593,96 @@ function SelectInput({ label, ...props }) {
       borderRadius: '0.5rem',
       boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
       overflow: 'hidden',
-    })
+    }),
+    multiValue: (base) => ({
+      ...base,
+      backgroundColor: '#eef2ff',
+      borderRadius: '6px',
+      border: '1px solid #e0e7ff',
+    }),
+    multiValueLabel: (base) => ({
+      ...base,
+      color: '#4338ca',
+      fontSize: '0.75rem',
+      fontWeight: '600',
+      padding: '2px 6px',
+    }),
+    multiValueRemove: (base) => ({
+      ...base,
+      color: '#4338ca',
+      cursor: 'pointer',
+      '&:hover': {
+        backgroundColor: '#e0e7ff',
+        color: '#3730a3',
+      },
+    }),
   };
 
   return (
     <div>
       <label className="text-sm font-medium text-gray-700 block mb-1.5">{label}</label>
       <Select styles={customStyles} {...props} />
+    </div>
+  );
+}
+function CreatableSelectInput({ label, ...props }) {
+  const isFilled = props.value ? (Array.isArray(props.value) ? props.value.length > 0 : !!props.value) : false;
+
+  const customStyles = {
+    control: (base, state) => ({
+      ...base,
+      borderRadius: '0.5rem',
+      borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+      backgroundColor: isFilled ? '#eff6ff' : 'white',
+      boxShadow: state.isFocused ? '0 0 0 4px rgba(59, 130, 246, 0.1)' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+      padding: '2px',
+      fontSize: '0.875rem',
+      transition: 'all 0.2s ease',
+      '&:hover': {
+        borderColor: state.isFocused ? '#3b82f6' : '#9ca3af'
+      }
+    }),
+    option: (base, state) => ({
+      ...base,
+      fontSize: '0.875rem',
+      backgroundColor: state.isSelected ? '#2563eb' : state.isFocused ? '#eff6ff' : 'transparent',
+      color: state.isSelected ? 'white' : '#1f2937',
+      cursor: 'pointer',
+    }),
+    menu: (base) => ({
+      ...base,
+      borderRadius: '0.5rem',
+      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+      overflow: 'hidden',
+    }),
+    multiValue: (base) => ({
+      ...base,
+      backgroundColor: '#eef2ff',
+      borderRadius: '6px',
+      border: '1px solid #e0e7ff',
+    }),
+    multiValueLabel: (base) => ({
+      ...base,
+      color: '#4338ca',
+      fontSize: '0.75rem',
+      fontWeight: '600',
+      padding: '2px 6px',
+    }),
+    multiValueRemove: (base) => ({
+      ...base,
+      color: '#4338ca',
+      cursor: 'pointer',
+      '&:hover': {
+        backgroundColor: '#e0e7ff',
+        color: '#3730a3',
+      },
+    }),
+  };
+
+  return (
+    <div>
+      <label className="text-sm font-medium text-gray-700 block mb-1.5">{label}</label>
+      <CreatableSelect styles={customStyles} {...props} />
     </div>
   );
 }
