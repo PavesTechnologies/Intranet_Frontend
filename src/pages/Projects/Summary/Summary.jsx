@@ -130,12 +130,12 @@ const Summary = ({ projectId, projectName }) => {
         <div className="mb-6 px-1">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-slate-800 tracking-tight">
+              {/* <h1 className="text-2xl font-semibold text-slate-800 tracking-tight">
                 {projectName || "Project"}
               </h1>
               <p className="text-sm text-slate-500 mt-0.5">
                 Overview & progress at a glance
-              </p>
+              </p> */}
             </div>
             <div>
               <span className="px-3 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">

@@ -3,6 +3,7 @@ import { jwtDecode } from "jwt-decode";
 
 import { useNavigate, useParams } from "react-router-dom";
 import { getAssetsByClient } from "../services/clientservice";
+import { projectResourceDetails } from "../services/resource";
 import { getAvailableSerialsByAssetId } from "../services/clientservice";
 import {
   ArrowLeft,
@@ -169,6 +170,35 @@ const AssetDetail = () => {
 
   const [availableSerials, setAvailableSerials] = useState([]);
   const [serialLoading, setSerialLoading] = useState(false);
+  const [projectResources, setProjectResources] = useState([]);
+  const [projectResourcesLoading, setProjectResourcesLoading] = useState(false);
+
+  const availableProjectResources = useMemo(() => {
+    const currentlyAssignedNames = assignments
+      .filter((a) => a.assignmentStatus === "ASSIGNED")
+      .map((a) => a.resourceName);
+
+    return projectResources.filter((res) => {
+      // Allow the currently selected resource in edit mode to remain available
+      if (editingAssignment && editingAssignment.resourceName === res.resourceName) {
+        return true;
+      }
+      return !currentlyAssignedNames.includes(res.resourceName);
+    });
+  }, [projectResources, assignments, editingAssignment]);
+
+  const fetchProjectResources = async () => {
+    setProjectResourcesLoading(true);
+    try {
+      const res = await projectResourceDetails(formData.projectId);
+      setProjectResources(res?.data || []);
+    } catch (err) {
+      console.error("Failed to load project resources", err);
+      toast.error(err.response?.data?.message || "Failed to load project resources");
+    } finally {
+      setProjectResourcesLoading(false);
+    }
+  };
 
   const getLoggedInUserName = () => {
     const token = localStorage.getItem("token");
@@ -200,7 +230,7 @@ const AssetDetail = () => {
 
   const [formData, setFormData] = useState({
     resourceName: "",
-    // projectId: "",
+    projectId: "",
     projectName: "",
     assignedDate: today,
     expectedReturnDate: "",
@@ -211,6 +241,12 @@ const AssetDetail = () => {
     description: "",
     serialNumber: "",
   });
+
+  useEffect(() => {
+    if (formData.projectId) {
+      fetchProjectResources();
+    }
+  }, [formData.projectId]);
 
   const [returnData, setReturnData] = useState({
     conditionOnReturn: "Good",
@@ -241,8 +277,7 @@ const AssetDetail = () => {
         }
       }
     } catch (err) {
-      console.error("Fetch Error:", err);
-      toast.error("Failed to load asset details");
+      toast.error(err.response?.data?.message || "Failed to load asset details");
     } finally {
       setLoading(false);
     }
@@ -339,6 +374,7 @@ const AssetDetail = () => {
       },
       serialNumber: formData.serialNumber,
       resourceName: formData.resourceName,
+      projectId: formData.projectId,
       projectName: formData.projectName,
       assignedDate: formData.assignedDate,
       expectedReturnDate: formData.expectedReturnDate,
@@ -353,13 +389,15 @@ const AssetDetail = () => {
     setUpdateLoading(true);
     try {
       if (editingAssignment) {
-        await assignUpdateClientAsset(editingAssignment.assignmentId, payload);
+        const res = await assignUpdateClientAsset(editingAssignment.assignmentId, payload);
+      } else {
+        const res = await assignClientAsset(payload);
+      }
+      if (editingAssignment) {
         toast.success("Assignment updated successfully");
       } else {
-        await assignClientAsset(payload);
         toast.success("Assignment created successfully");
       }
-
       await fetchData();
       fetchKPI();
       closeModal();
@@ -381,6 +419,7 @@ const AssetDetail = () => {
       );
       toast.success(res.message || "Asset marked as returned");
       await fetchData();
+      fetchKPI();
       setReturnModal(false);
       setReturnItem(null);
     } catch (err) {
@@ -410,6 +449,7 @@ const AssetDetail = () => {
 
     setFormData({
       resourceName: a.resourceName || "",
+      projectId: a.projectId || "",
       projectName: a.projectName || "",
       assignedDate: a.assignedDate ? new Date(a.assignedDate).toISOString().split("T")[0] : today,
       expectedReturnDate: a.expectedReturnDate || "",
@@ -429,6 +469,7 @@ const AssetDetail = () => {
     setEditingAssignment(null);
     setFormData({
       resourceName: "",
+      projectId: "",
       projectName: "",
       assignedDate: today,
       expectedReturnDate: "",
@@ -704,28 +745,21 @@ const AssetDetail = () => {
           <form onSubmit={handleAssignSave} className="flex flex-col h-full max-h-[calc(80vh-60px)]">
             <div className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="Resource Name"
-                  name="resourceName"
-                  value={formData.resourceName}
-                  onChange={handleFormChange}
-                  required
-                />
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
                     Project
                   </label>
                   <select
                     name="projectId"
-                    // value={formData.projectId || ""}
+                    value={formData.projectId || ""}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        // projectId: e.target.value,
+                        projectId: e.target.value,
                         projectName:
                           clientProjects.find(
                             (p) => p.pmsProjectId == e.target.value,
-                          )?.name || "",
+                          )?.projectName || "",
                       }))
                     }
                     required
@@ -734,7 +768,41 @@ const AssetDetail = () => {
                     <option value="">Select Project</option>
                     {clientProjects.map((p) => (
                       <option key={p.pmsProjectId} value={p.pmsProjectId}>
-                        {p.name}
+                        {p.projectName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
+                    Resource Name
+                  </label>
+                  <select
+                    name="resourceName"
+                    value={formData.resourceName || ""}
+                    onChange={handleFormChange}
+                    required
+                    disabled={!formData.projectId || projectResourcesLoading || availableProjectResources.length === 0}
+                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all ${projectResourcesLoading
+                      ? "cursor-wait opacity-60"
+                      : !formData.projectId || availableProjectResources.length === 0
+                        ? "cursor-not-allowed opacity-60"
+                        : "appearance-none cursor-pointer"
+                      }`}
+                  >
+                    <option value="">
+                      {!formData.projectId
+                        ? "Select Resource"
+                        : projectResourcesLoading
+                          ? "Loading resources..."
+                          : availableProjectResources.length === 0
+                            ? "No resources allocated to this project"
+                            : "Select Resource"}
+                    </option>
+                    {availableProjectResources.map((res) => (
+                      <option key={res.resourceId} value={res.resourceName}>
+                        {res.resourceName} - {res.resourceRole}
                       </option>
                     ))}
                   </select>

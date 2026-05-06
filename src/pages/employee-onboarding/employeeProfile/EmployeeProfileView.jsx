@@ -61,6 +61,7 @@ export default function EmployeeProfileView() {
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [employeeSkills, setEmployeeSkills] = useState([]);
+  const [rawCertifications, setRawCertifications] = useState(null);
   const [expandedSkills, setExpandedSkills] = useState(new Set());
   const [selectedSkill, setSelectedSkill] = useState(null);
   const toggleExpand = (skillId) => {
@@ -85,11 +86,13 @@ export default function EmployeeProfileView() {
 
       if (!coreRes.ok) throw new Error("Failed to fetch employee");
       const coreData = await coreRes.json();
-      // if (!coreRes.ok) throw new Error("Failed to fetch employee");
-      // const coreData = await coreRes.json();
 
-      // 2. Fire department, designation, and HR profile calls IN PARALLEL
-      // const parallelPromises = [];
+      // 🔥 FIRE SKILLS & CERTS AS SOON AS WE HAVE ID
+      if (coreData.employee_id) {
+        fetchEmployeeSkills(coreData.employee_id);
+        fetchRawCertifications(coreData.employee_id);
+      }
+
       // 2. Fire department, designation, and HR profile calls IN PARALLEL
       const parallelPromises = [];
 
@@ -151,10 +154,11 @@ export default function EmployeeProfileView() {
     }
   };
 
-  const fetchEmployeeSkills = async () => {
+  const fetchEmployeeSkills = async (empId) => {
     try {
-      if (!employee?.employee_id) return;
-      const res = await skillService.getEmployeeSkills(employee.employee_id);
+      const targetId = empId || employee?.employee_id;
+      if (!targetId) return;
+      const res = await skillService.getEmployeeSkills(targetId);
       const rawData = res?.data || [];
 
       // const mapped = rawData.map(item => ({
@@ -219,13 +223,22 @@ export default function EmployeeProfileView() {
     fetchAllData();
   }, [employee_uuid]);
 
-  useEffect(() => {
-    if (!employee?.employee_id) return;
-
-    console.log("✅ Calling API with:", employee.employee_id);
-
-    fetchEmployeeSkills();
-  }, [employee?.employee_id]);
+  const fetchRawCertifications = async (empId) => {
+    try {
+      const targetId = empId || employee?.employee_id;
+      if (!targetId) return;
+      
+      const token = localStorage.getItem("token");
+      const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+      const res = await fetch(`${BASE_URL}/api/resource-certificates/resource/${targetId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await res.json();
+      setRawCertifications(result.data || []);
+    } catch (err) {
+      console.error("Error fetching raw certifications:", err);
+    }
+  };
 
   const [about, setAbout] = useState({
     about_me: "",
@@ -799,6 +812,8 @@ export default function EmployeeProfileView() {
               hrData={hrData}
               identityTypes={identityTypes}
               config={docTabConfig}
+              rawCertifications={rawCertifications}
+              refreshCertifications={() => fetchRawCertifications(employee.employee_id)}
             />
           )}
         </div>
