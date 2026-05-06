@@ -302,14 +302,14 @@ const Dashboard = () => {
       color: "bg-[#d23369]",
       stats: "5 events today",
     },
-    {
-      title: "Employee Exit",
-      description: "Manage employee exit processes",
-      icon: AlertCircle,
-      href: "/employee-exit",
-      color: "bg-[#ff3d72]",
-      stats: "2 exits this month",
-    },
+    // {
+    //   title: "Employee Exit",
+    //   description: "Manage employee exit processes",
+    //   icon: AlertCircle,
+    //   href: "/employee-exit",
+    //   color: "bg-[#ff3d72]",
+    //   stats: "2 exits this month",
+    // },
   ];
   const filteredModuleCards = moduleCards.filter((card) => {
     // If it's the Onboarding card AND the user is General (but not HR)
