@@ -332,14 +332,14 @@ export default function RiskDetailModal({
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-            <button
+            {/* <button
               onClick={handleDeleteRisk}
               disabled={deleting}
               className="hidden sm:flex items-center gap-1 text-xs text-white/90 hover:text-white bg-red-500/25 hover:bg-red-500/40 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-60"
             >
               <Trash2 size={12} />
               {deleting ? "Deleting..." : "Delete"}
-            </button>
+            </button> */}
 
             <button
               onClick={handleDeleteRisk}

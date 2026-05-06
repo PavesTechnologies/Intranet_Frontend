@@ -59,8 +59,8 @@ export default function TopTabs({ selectedTab }) {
               flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all
               ${
                 activeTab === tab.tab
-                  ? "bg-[#0A1128] text-white shadow-md"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-[#0A1128]"
+                  ? "bg-[#02195c] text-white shadow-md"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-[#181818]"
               }
             `}
           >

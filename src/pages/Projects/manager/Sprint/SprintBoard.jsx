@@ -108,100 +108,79 @@ const SprintBoard = ({ projectId, projectName }) => {
    * Change Sprint Status
    ============================== */
   const handleStatusChange = async (sprintId, action) => {
-    try {
-      const response = await axios.put(
-        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
-        {},
-        { headers },
-      );
-
-      // success UI
-      toast.success(`Sprint ${action} successful`);
-      fetchStories();
-      fetchSprints();
-    } catch (error) {
-      const errorData = error.response?.data || {};
-
-      console.log("❌ Error Response:", {
-        code: errorData.code,
-        message: errorData.message,
-        data: errorData.data,
-        fullError: error,
-      });
-
-      // Handle structured error response (preferred)
-      if (
-        action === "complete" &&
-        errorData.code === "SPRINT_COMPLETION_VALIDATION_ERROR"
-      ) {
-        const { pendingTasks = [], pendingStories = [] } = errorData.data || {};
-
-        console.log("✅ Modal triggered with:", {
-          pendingTasks,
-          pendingStories,
-        });
-
-        setPendingData({
-          sprintId,
-          tasks: Array.isArray(pendingTasks) ? pendingTasks : [],
-          stories: Array.isArray(pendingStories) ? pendingStories : [],
-        });
-        setShowPendingModal(true);
-        return;
-      }
-
-      // Fallback: handle old API response format with string parsing
-      if (
-        action === "complete" &&
-        errorData.message?.includes("Cannot complete sprint")
-      ) {
-        try {
-          const raw = errorData.message;
-          let tasks = raw.match(/Tasks not done: \[(.*?)\]/);
-          let stories = raw.match(/Stories not done: \[(.*?)\]/);
-
-          tasks = tasks
-            ? tasks[1]
-                .split(",")
-                .map((t) => t.trim())
-                .filter(Boolean)
-            : [];
-          stories = stories
-            ? stories[1]
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean)
-            : [];
-
-          if (tasks.length > 0 || stories.length > 0) {
-            setPendingData({
-              sprintId,
-              tasks,
-              stories,
-            });
-            setShowPendingModal(true);
-            return;
-          }
-        } catch (parseErr) {
-          console.error("Failed to parse pending items:", parseErr);
-        }
-      }
-
-      if (errorData.message?.toLowerCase().includes("another active sprint")) {
-          toast.warn(
-              "Cannot start sprint: Another active sprint already exists in this project.",
-              { autoClose: 3000, containerId: "global" }
+      try {
+          const response = await axios.put(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
+              {},
+              { headers },
           );
+          toast.success(`Sprint ${action} successful`);  // no containerId
+          fetchStories();
           fetchSprints();
-          return;
+
+      } catch (error) {
+          const errorData = error.response?.data || {};
+
+          // Check 1 — completion validation (structured)
+          if (action === "complete" && errorData.code === "SPRINT_COMPLETION_VALIDATION_ERROR") {
+              const { pendingTasks = [], pendingStories = [] } = errorData.data || {};
+              setPendingData({
+                  sprintId,
+                  tasks: Array.isArray(pendingTasks) ? pendingTasks : [],
+                  stories: Array.isArray(pendingStories) ? pendingStories : [],
+              });
+              setShowPendingModal(true);
+              return;
+          }
+
+          // Check 2 — completion validation (old string format)
+          if (action === "complete" && errorData.message?.includes("Cannot complete sprint")) {
+              try {
+                  const raw = errorData.message;
+                  let tasks = raw.match(/Tasks not done: \[(.*?)\]/);
+                  let stories = raw.match(/Stories not done: \[(.*?)\]/);
+                  tasks = tasks ? tasks[1].split(",").map((t) => t.trim()).filter(Boolean) : [];
+                  stories = stories ? stories[1].split(",").map((s) => s.trim()).filter(Boolean) : [];
+                  if (tasks.length > 0 || stories.length > 0) {
+                      setPendingData({ sprintId, tasks, stories });
+                      setShowPendingModal(true);
+                      return;
+                  }
+              } catch (parseErr) {
+                  console.error("Failed to parse pending items:", parseErr);
+              }
+          }
+
+          // Check 3 — another active sprint
+          if (errorData.message?.toLowerCase().includes("another active sprint")) {
+              toast.warn(
+                  "Cannot start sprint: Another active sprint already exists in this project.",
+                  { autoClose: 3000 }  // ← no containerId
+              );
+              fetchSprints();
+              return;
+          }
+
+          // ✅ Check 4 — empty sprint
+          if (
+              errorData.message?.toLowerCase().includes("empty sprint") ||
+              errorData.message?.toLowerCase().includes("at least one task or story")
+          ) {
+              toast.warn(errorData.message, { autoClose: 3000 });
+              return;
+          }
+
+          // ✅ Check 5 — epic not assigned
+          if (errorData.message?.toLowerCase().includes("epic")) {
+              toast.warn(errorData.message, { autoClose: 3000 });
+              return;
+          }
+
+          // Fallback — no containerId
+          const errorMsg = errorData.message || error.message || "Operation failed";
+          toast.error(errorMsg, { autoClose: 2000 });  // ← no containerId
       }
-
-      // Generic error message
-      const errorMsg = errorData.message || error.message || "Operation failed";
-      toast.error(errorMsg);
-    }
   };
-
   /** ==============================
    * Lifecycle
    ============================== */

@@ -565,7 +565,8 @@ const Board = ({ projectId, sprintId, projectName }) => {
         {projectName ?? "Project Board"}
       </h2> */}
       <h2 className="text-xl font-semibold">
-  {projectName ?? "Project Board"}
+  {/* {projectName ?? "Project Board"} */}
+  Active Sprint
   {activeSprintName && (
     <span className="ml-3 text-sm font-normal text-gray-500 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100">
       {activeSprintName}

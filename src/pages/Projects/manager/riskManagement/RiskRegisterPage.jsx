@@ -150,11 +150,11 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
       <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between">
-        <h1 className="text-3xl font-bold">Risk Management</h1>
+        <h1 className="text-3xl font-bold"></h1>
 
         <button
           onClick={() => setShowCreateRisk(true)}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center gap-2"
+          className="px-4 py-2 bg-indigo-900 text-white rounded-lg flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           New Risk
@@ -173,7 +173,7 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
       </div>
 
       {/* Issue Type Cards */}
-      <div className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-5 gap-4">
+      <div className="max-w-5xl mx-auto px-3 py-3 grid grid-cols-5 gap-4">
         {issueTypeCards.map((t) => {
           const label = issueTypeLabel(t.issueType);
           const active = activeIssueType === label;
@@ -188,8 +188,8 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
                 setSelectedIssue(null);
                 setRiskData(null);
               }}
-              className={`p-4 rounded-lg ${
-                active ? "bg-indigo-600 text-white" : "bg-white border"
+              className={`p-3 rounded-lg ${
+                active ? "bg-indigo-900 text-white" : "bg-white border"
               }`}
             >
               <div className="font-semibold">{label}</div>

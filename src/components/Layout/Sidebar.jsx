@@ -19,8 +19,8 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Leave Management", href: "/leave-management", icon: PlaneTakeoff },
   { name: "Timesheets", href: "/timesheets", icon: Clock },
-  { name: "Calendar", href: "/calendar", icon: Calendar },
-  { name: "Employee Exit", href: "/employee-exit", icon: AlertCircle },
+  // { name: "Calendar", href: "/calendar", icon: Calendar },
+  // { name: "Employee Exit", href: "/employee-exit", icon: AlertCircle },
 ];
 
 const userManagementSubmenu = [
@@ -131,9 +131,10 @@ const Sidebar = ({ isCollapsed }) => {
   // Role checks
   const isAdmin =
     user?.roles?.includes("Admin") || user?.roles?.includes("Super Admin");
-  const isRM = user?.roles?.includes("RESOURCE-MANAGER");
-  const isPM = user?.roles?.includes("PROJECT-MANAGER");
-  const isDM = user?.roles?.includes("DELIVERY-MANAGER");
+  const isRMSAdmin = user?.roles?.includes("Admin");
+  const isRM = user?.roles?.includes("Resource_Manager");
+  const isPM = user?.roles?.includes("Project_Manager");
+  const isDM = user?.roles?.includes("Delivery_Manager");
   const isGeneral = user?.roles?.includes("General");
 
   // State for User Management Hover
@@ -299,15 +300,15 @@ const Sidebar = ({ isCollapsed }) => {
           }
 
           {/* 2. Resource Management (With Pop Label/Submenu) */}
-          {(isAdmin || isRM || isDM) && (
+          {(isRMSAdmin || isRM || isDM) && (
             <li
               ref={rmRef}
               className="relative"
-              onMouseEnter={(isRM || isDM) ? handleRmMouseEnter : undefined}
-              onMouseLeave={(isRM || isDM) ? handleRmMouseLeave : undefined}
+              onMouseEnter={(isRM || isDM || isRMSAdmin) ? handleRmMouseEnter : undefined}
+              onMouseLeave={(isRM || isDM || isRMSAdmin) ? handleRmMouseLeave : undefined}
             >
               {/* If Admin → Direct Link */}
-              {isAdmin && !isRM && !isDM && false ? ( // Allow Admins to see the hover menu too
+              {isRMSAdmin && !isRM && !isDM ? (
                 <Link
                   to="/resource-management"
                   className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${location.pathname.startsWith("/resource-management")
@@ -342,7 +343,7 @@ const Sidebar = ({ isCollapsed }) => {
                   </div>
 
                   {/* Show submenu only for Resource Manager or Delivery Manager */}
-                  {rmHovered && (isRM || isDM || isAdmin) && (
+                  {rmHovered && (isRM || isDM || isRMSAdmin) && (
                     <ul
                       className={`fixed w-64 bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
                         }`}
@@ -354,21 +355,21 @@ const Sidebar = ({ isCollapsed }) => {
                         ? deliveryManagerResourceManagementSubmenu
                         : resourceManagementSubmenu
                       ).map((item) => (
-                          <li key={item.label}>
-                            <NavLink
-                              to={item.to}
-                              end
-                              className={({ isActive }) =>
-                                `block px-4 py-2 text-xs transition-colors ${isActive
-                                  ? "bg-blue-100 text-[#0a174e] font-semibold"
-                                  : "hover:bg-[#263383] hover:text-white"
-                                }`
-                              }
-                            >
-                              {item.label}
-                            </NavLink>
-                          </li>
-                        ))}
+                        <li key={item.label}>
+                          <NavLink
+                            to={item.to}
+                            end
+                            className={({ isActive }) =>
+                              `block px-4 py-2 text-xs transition-colors ${isActive
+                                ? "bg-blue-100 text-[#0a174e] font-semibold"
+                                : "hover:bg-[#263383] hover:text-white"
+                              }`
+                            }
+                          >
+                            {item.label}
+                          </NavLink>
+                        </li>
+                      ))}
                     </ul>
                   )}
                 </>

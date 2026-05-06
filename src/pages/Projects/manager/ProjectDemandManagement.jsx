@@ -569,7 +569,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                     open={demandModalOpen}
                     onClose={() => setDemandModalOpen(false)}
                     projectDetails={project}
-                    userRole={user?.roles?.map(r => r.toUpperCase().replace(/^ROLE[-_]/, "").replace(/_/g, "-")).find(r => ["RESOURCE-MANAGER", "DELIVERY-MANAGER", "PROJECT-MANAGER", "MANAGER"].includes(r)) || ""}
+                    userRole={user?.roles?.map(r => r.toUpperCase().replace(/^ROLE[-_]/, "").replace(/_/g, "-")).find(r => ["Resource_Manager", "Delivery_Manager", "Project_Manager", "MANAGER"].includes(r)) || ""}
                     onSuccess={() => {
                         setDemandModalOpen(false);
                         fetchContext(); // Reload data after creation
@@ -586,7 +586,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                     }}
                     initialData={editingDemand}
                     mode="edit"
-                    userRole={user?.roles?.map(r => r.toUpperCase().replace(/^ROLE[-_]/, "").replace(/_/g, "-")).find(r => ["RESOURCE-MANAGER", "DELIVERY-MANAGER", "PROJECT-MANAGER", "MANAGER"].includes(r)) || ""}
+                    userRole={user?.roles?.map(r => r.toUpperCase().replace(/^ROLE[-_]/, "").replace(/_/g, "-")).find(r => ["Resource_Manager", "Delivery_Manager", "Project_Manager", "MANAGER"].includes(r)) || ""}
                     onSuccess={() => {
                         setEditModalOpen(false);
                         fetchContext(); // Reload data after update

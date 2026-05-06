@@ -18,7 +18,8 @@ const CompanyEscalation = () => {
   const { user } = useAuth();
   const { companyId } = useParams();
   const permissions = user?.permissions || [];
-  const canEditConfig = permissions.includes("EDIT_CLIENT_CONFIG");
+  const roles = user?.roles || [];
+  const canEditConfig = roles.includes("Admin"); // permissions.includes("EDIT_CLIENT_CONFIG");
 
   const [contactList, setContactList] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -192,8 +193,8 @@ const CompanyEscalation = () => {
                   <td className="px-6 py-4">
                     <span
                       className={`px-2 py-1 text-xs rounded-full ${item.activeFlag
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-600"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-red-100 text-red-600"
                         }`}
                     >
                       {item.activeFlag ? "Active" : "Inactive"}

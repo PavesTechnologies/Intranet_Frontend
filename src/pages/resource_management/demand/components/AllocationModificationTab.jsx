@@ -111,8 +111,8 @@ const ActionPromptModal = ({
 
 const AllocationModificationTab = ({ demandId, demand, user }) => {
   const roles = user?.roles || [];
-  const isRM = roles.includes("RESOURCE-MANAGER");
-  const isPM = roles.includes("PROJECT-MANAGER");
+  const isRM = roles.includes("Resource_Manager");
+  const isPM = roles.includes("Project_Manager");
   const projectName = demand?.projectInfo?.projectName || demand?.project?.name || demand?.projectName || "N/A";
 
   const [items, setItems] = useState([]);
@@ -183,8 +183,8 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
       console.error("Failed to fetch allocation modifications", requestError);
       setError(
         requestError?.response?.data?.message ||
-          requestError?.message ||
-          "Failed to load allocation modifications"
+        requestError?.message ||
+        "Failed to load allocation modifications"
       );
     } finally {
       setLoading(false);
