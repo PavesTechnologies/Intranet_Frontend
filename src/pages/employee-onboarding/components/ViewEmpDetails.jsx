@@ -132,7 +132,6 @@ export default function ViewEmpDetails() {
         ...offerData,
         cc_emails:
         offerData?.cc_emails?.join(", ") ||
-        offerData?.cc_mails?.join(", ") ||
         "",
       });
     } catch {
@@ -495,8 +494,6 @@ export default function ViewEmpDetails() {
                   value:
                    employee?.cc_emails && employee.cc_emails.length > 0
                       ? employee.cc_emails.join(", ")
-                      : employee?.cc_mails && employee.cc_mails.length > 0
-                      ? employee.cc_mails.join(", ")
                       : "—",
                   delay: 360,
                 },
