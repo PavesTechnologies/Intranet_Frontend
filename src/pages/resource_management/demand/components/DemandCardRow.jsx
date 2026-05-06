@@ -1,6 +1,6 @@
 import React from 'react';
 import { PriorityBadge, StateBadge, SLABadge } from './FormalBadges';
-import { Pencil, Briefcase, User, Clock, Check, Loader2, X } from "lucide-react";
+import { Pencil, Briefcase, User, Clock, Check, Loader2, X, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -9,14 +9,25 @@ import { cn } from "@/lib/utils";
  */
 const DM_PENDING_STATUSES = ['REQUESTED', 'DRAFT', 'SOFT', 'PROPOSED', 'PENDING', 'OPEN', 'IN_PROGRESS', 'IN PROGRESS'];
 
-const DemandCardRow = ({ demand, onView, onEdit, onApprove, onReject, decisionState, activeTab, viewerRole }) => {
-    const status = String(demand.lifecycleState || '').toUpperCase();
-    const normalizedViewerRole = String(viewerRole || '').toUpperCase();
-    const isDMView = normalizedViewerRole === "Delivery_Manager";
+const normalizeRole = (role = "") =>
+    String(role)
+        .toUpperCase()
+        .replace(/^ROLE[-_]/, "")
+        .replace(/[^A-Z0-9]/g, "");
+
+const DemandCardRow = ({ demand, onView, onEdit, onApprove, onReject, onFulfill, onRMReject, decisionState, activeTab, viewerRole }) => {
+    const status = String(demand.lifecycleState || demand.demandStatus || '').toUpperCase();
+    const normalizedViewerRole = normalizeRole(viewerRole);
+    const isDMView = normalizedViewerRole === "DELIVERYMANAGER";
+    const isRMView = normalizedViewerRole === "RESOURCEMANAGER";
     const canQuickDecision = isDMView && DM_PENDING_STATUSES.includes(status);
-    const isEditDisabled = status === 'REJECTED' || (isDMView && status === 'APPROVED');
+    const canRMCloseDemand = isRMView && status === 'APPROVED';
+    const isFulfilled = status === 'FULFILLED';
+    const isRejected = status === 'REJECTED';
+    const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED');
     const isApproving = decisionState?.demandId === demand.id && decisionState?.action === "approve";
     const isRejecting = decisionState?.demandId === demand.id && decisionState?.action === "reject";
+    const isFulfilling = decisionState?.demandId === demand.id && decisionState?.action === "fulfill";
 
     return (
         <div
@@ -139,9 +150,34 @@ const DemandCardRow = ({ demand, onView, onEdit, onApprove, onReject, decisionSt
                                 {isRejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-[14px] w-[14px] stroke-[2.4]" />}
                             </button>
                         </div>
+                    ) : canRMCloseDemand ? (
+                        <div className="flex items-center gap-2">
+                            <button
+                                title="Fulfill demand"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onFulfill) onFulfill(demand);
+                                }}
+                                disabled={isFulfilling || isRejecting}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-[0_5px_14px_rgba(16,185,129,0.12)] transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {isFulfilling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-[15px] w-[15px] stroke-[2.4]" />}
+                            </button>
+                            <button
+                                title="Reject demand"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onRMReject) onRMReject(demand);
+                                }}
+                                disabled={isFulfilling || isRejecting}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 shadow-[0_5px_14px_rgba(244,63,94,0.12)] transition hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {isRejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-[14px] w-[14px] stroke-[2.4]" />}
+                            </button>
+                        </div>
                     ) : (
                         <button
-                            title={status === 'REJECTED' ? 'Cannot Edit Rejected Demand' : (isDMView && status === 'APPROVED') ? 'Cannot Edit Approved Demand' : 'Edit'}
+                            title={isFulfilled ? 'Cannot Edit Fulfilled Demand' : isRejected ? 'Cannot Edit Rejected Demand' : (isDMView && status === 'APPROVED') ? 'Cannot Edit Approved Demand' : 'Edit'}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 if (onEdit) onEdit(demand);
