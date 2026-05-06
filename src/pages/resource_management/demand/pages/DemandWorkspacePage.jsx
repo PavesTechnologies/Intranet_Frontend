@@ -10,7 +10,7 @@ import DemandList from '../components/DemandList';
 import DemandFilters from '../components/DemandFilters';
 import { useDemand } from '../hooks/useDemand';
 import DemandModal from '../../models/DemandModal';
-import { handleDMDecision } from '../../services/demandService';
+import { handleDMDecision, handleRMDecision } from '../../services/demandService';
 import {
     Select,
     SelectContent,
@@ -39,20 +39,29 @@ const DecisionModal = ({
     if (!demand) return null;
 
     const isReject = type === "reject";
+    const isFulfill = type === "fulfill";
     const accentWrapClass = isReject
         ? "border-rose-200 bg-rose-50 text-rose-600"
+        : isFulfill
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
         : "border-emerald-200 bg-emerald-50 text-emerald-700";
     const headerBg = isReject
         ? "bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_55%,#fef2f2_100%)]"
+        : isFulfill
+            ? "bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#f8fafc_100%)]"
         : "bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#eff6ff_100%)]";
     const primaryButtonClass = isReject
         ? "bg-rose-600 shadow-rose-200 hover:bg-rose-700"
+        : isFulfill
+            ? "bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700"
         : "bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700";
-    const title = isReject ? "Share the rejection reason" : "Approve this demand";
+    const title = isReject ? "Share the rejection reason" : isFulfill ? "Fulfill this demand" : "Approve this demand";
     const helperText = isReject
         ? "Add a short reason and submit your decision."
+        : isFulfill
+            ? "Confirm that staffing is complete and close this demand."
         : "Confirm the demand and move it to the next step.";
-    const buttonLabel = isReject ? "Submit Rejection" : "Confirm Approval";
+    const buttonLabel = isReject ? "Submit Rejection" : isFulfill ? "Mark Fulfilled" : "Confirm Approval";
     const Icon = isReject ? XCircle : CheckCircle2;
 
     return createPortal(
@@ -63,7 +72,7 @@ const DecisionModal = ({
                         <div>
                             <div className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]", accentWrapClass)}>
                                 <Icon className="h-3.5 w-3.5" />
-                                {isReject ? "Reject" : "Approve"}
+                                {isReject ? "Reject" : isFulfill ? "Fulfill" : "Approve"}
                             </div>
                             <h3 className="mt-3 text-lg font-bold text-slate-900">
                                 {title}
@@ -123,7 +132,9 @@ const DecisionModal = ({
                     ) : (
                         <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
                             <p className="text-sm font-semibold text-slate-800">
-                                The demand will be approved immediately after confirmation.
+                                {isFulfill
+                                    ? "The demand will be marked as fulfilled immediately after confirmation."
+                                    : "The demand will be approved immediately after confirmation."}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
                                 No extra form update is needed.
@@ -193,8 +204,12 @@ const DemandWorkspacePage = () => {
     const [decisionState, setDecisionState] = useState({ demandId: null, action: null });
     const [approvingDemand, setApprovingDemand] = useState(null);
     const [rejectingDemand, setRejectingDemand] = useState(null);
+    const [fulfillingDemand, setFulfillingDemand] = useState(null);
+    const [rmRejectingDemand, setRmRejectingDemand] = useState(null);
     const [rejectReason, setRejectReason] = useState("");
     const [rejectReasonError, setRejectReasonError] = useState("");
+    const [rmRejectReason, setRmRejectReason] = useState("");
+    const [rmRejectReasonError, setRmRejectReasonError] = useState("");
     const isRMView = effectiveRole === "Resource_Manager";
 
     const openApproveModal = (demand) => {
@@ -207,6 +222,16 @@ const DemandWorkspacePage = () => {
         setRejectReasonError("");
     };
 
+    const openFulfillModal = (demand) => {
+        setFulfillingDemand(demand);
+    };
+
+    const openRMRejectModal = (demand) => {
+        setRmRejectingDemand(demand);
+        setRmRejectReason("");
+        setRmRejectReasonError("");
+    };
+
     const closeApproveModal = () => {
         if (decisionState.action === "approve") return;
         setApprovingDemand(null);
@@ -217,6 +242,18 @@ const DemandWorkspacePage = () => {
         setRejectingDemand(null);
         setRejectReason("");
         setRejectReasonError("");
+    };
+
+    const closeFulfillModal = () => {
+        if (decisionState.action === "fulfill") return;
+        setFulfillingDemand(null);
+    };
+
+    const closeRMRejectModal = () => {
+        if (decisionState.action === "reject") return;
+        setRmRejectingDemand(null);
+        setRmRejectReason("");
+        setRmRejectReasonError("");
     };
 
     const handleQuickApprove = async () => {
@@ -260,6 +297,55 @@ const DemandWorkspacePage = () => {
             setRejectingDemand(null);
             setRejectReason("");
             setRejectReasonError("");
+            await refreshData();
+        } catch (error) {
+            toast.error(getActionErrorMessage(error, "Demand rejection failed"));
+        } finally {
+            setDecisionState({ demandId: null, action: null });
+        }
+    };
+
+    const handleRMFulfill = async () => {
+        if (!fulfillingDemand?.id) return;
+
+        setDecisionState({ demandId: fulfillingDemand.id, action: "fulfill" });
+        try {
+            const response = await handleRMDecision({
+                demandId: fulfillingDemand.id,
+                decision: "FULFILLED",
+                rejectionReason: null
+            });
+            toast.success(response?.message || "Demand fulfilled successfully");
+            setFulfillingDemand(null);
+            await refreshData();
+        } catch (error) {
+            toast.error(getActionErrorMessage(error, "Demand fulfillment failed"));
+        } finally {
+            setDecisionState({ demandId: null, action: null });
+        }
+    };
+
+    const handleRMReject = async () => {
+        const cleanedReason = rmRejectReason.trim();
+
+        if (!cleanedReason) {
+            setRmRejectReasonError("Please enter a rejection reason.");
+            return;
+        }
+
+        if (!rmRejectingDemand?.id) return;
+
+        setDecisionState({ demandId: rmRejectingDemand.id, action: "reject" });
+        try {
+            const response = await handleRMDecision({
+                demandId: rmRejectingDemand.id,
+                decision: "REJECTED",
+                rejectionReason: cleanedReason
+            });
+            toast.success(response?.message || "Demand rejected successfully");
+            setRmRejectingDemand(null);
+            setRmRejectReason("");
+            setRmRejectReasonError("");
             await refreshData();
         } catch (error) {
             toast.error(getActionErrorMessage(error, "Demand rejection failed"));
@@ -518,6 +604,8 @@ const DemandWorkspacePage = () => {
                                             }}
                                             onApprove={openApproveModal}
                                             onReject={openRejectModal}
+                                            onFulfill={openFulfillModal}
+                                            onRMReject={openRMRejectModal}
                                             decisionState={decisionState}
                                             activeTab={activeTab}
                                             viewerRole={effectiveRole}
@@ -609,6 +697,33 @@ const DemandWorkspacePage = () => {
                 }}
                 onClose={closeRejectModal}
                 onSubmit={handleQuickReject}
+            />
+
+            <DecisionModal
+                type="fulfill"
+                demand={fulfillingDemand}
+                reason=""
+                error=""
+                loading={decisionState.action === "fulfill" && decisionState.demandId === fulfillingDemand?.id}
+                onReasonChange={() => { }}
+                onClose={closeFulfillModal}
+                onSubmit={handleRMFulfill}
+            />
+
+            <DecisionModal
+                type="reject"
+                demand={rmRejectingDemand}
+                reason={rmRejectReason}
+                error={rmRejectReasonError}
+                loading={decisionState.action === "reject" && decisionState.demandId === rmRejectingDemand?.id}
+                onReasonChange={(value) => {
+                    setRmRejectReason(value.slice(0, 250));
+                    if (rmRejectReasonError && value.trim()) {
+                        setRmRejectReasonError("");
+                    }
+                }}
+                onClose={closeRMRejectModal}
+                onSubmit={handleRMReject}
             />
 
             {editModalOpen && (

@@ -29,6 +29,7 @@ import {
   getPendingRoleOffs,
   getPendingRoleOffsForDM,
   getResources,
+  getRoleOffsApprovedToday,
   getRoleOffProjectKPI,
   pmCancelRoleOff,
   rmApprove,
@@ -51,6 +52,26 @@ const mapStatus = (item) => {
 };
 
 const TODAY = new Date().toISOString().slice(0, 10);
+
+const getDateOnly = (value) => {
+  if (!value) return "";
+  if (typeof value === "string") {
+    const matchedDate = value.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+    if (matchedDate) return matchedDate[1];
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+};
+
+const isTodayDate = (value) => getDateOnly(value) === TODAY;
+
+const isFinalRoleOffStatus = (status) =>
+  ["Fulfilled", "Rejected", "Cancelled", "Closed"].includes(status);
+
+const isDlActionableStatus = (status) =>
+  ["Pending", "Pending Approval", "Approved"].includes(status);
 
 const deriveImpact = (allocation) => {
   if (
@@ -139,6 +160,38 @@ const toBoolean = (value) => {
   }
   if (typeof value === "number") return value !== 0;
   return Boolean(value);
+};
+
+const hasIdentifierValue = (value) => {
+  if (value === undefined || value === null) return false;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized !== "" && normalized !== "null" && normalized !== "undefined" && normalized !== "0";
+};
+
+const isReplacementCreated = (item = {}) => {
+  if (
+    [
+      item.replacementCreated,
+      item.isReplacementCreated,
+      item.replacementDemandCreated,
+      item.demandCreated,
+      item.backfillCreated,
+    ].some((value) => value === true || String(value).trim().toLowerCase() === "true")
+  ) {
+    return true;
+  }
+
+  return [
+    item.replacementDemandId,
+    item.replacementDemand?.id,
+    item.replacementDemand?.demandId,
+    item.createdDemandId,
+    item.generatedDemandId,
+    item.backfillDemandId,
+    item.demandId,
+    item.demand?.id,
+    item.demand?.demandId,
+  ].some(hasIdentifierValue);
 };
 
 const isBulkCreatedRoleOff = (item) => {
@@ -277,6 +330,36 @@ const mapResourceToAllocation = (item, index) => {
 
 const mapPendingRoleOffToRequest = (item) => {
   const fallbackId = item.roleOffId || item.id || item.allocationId || `${item.resourceId}-${item.projectName}-${item.endDate}`;
+  const roleOffSources = getRoleOffSources(item);
+  const effectiveDateIso = getFirstDefinedValue(
+    roleOffSources,
+    ["effectiveDate", "effectiveRoleOffDate", "roleOffEffectiveDate"],
+    item.effectiveDate || item.endDate || "",
+  );
+  const finalApprovalDateIso = getFirstDefinedValue(
+    roleOffSources,
+    [
+      "dlApprovedDate",
+      "dlApprovedAt",
+      "deliveryLeadApprovedDate",
+      "deliveryLeadApprovedAt",
+      "fulfilledDate",
+      "fulfilledAt",
+      "roleOffFulfilledDate",
+      "roleOffFulfilledAt",
+      "approvedDate",
+      "approvedAt",
+      "updatedAt",
+    ],
+    effectiveDateIso,
+  );
+  const replacementRequired = [
+    item.autoReplacementRequired,
+    item.replacementRequired,
+    item.requestedReplacement,
+    item.replacementNeeded,
+  ].some(toBoolean);
+  const replacementCreated = isReplacementCreated(item);
 
   return {
     id: fallbackId,
@@ -312,11 +395,14 @@ const mapPendingRoleOffToRequest = (item) => {
     impactSummary: `Allocation on ${item.projectName || "the current project"} is at ${Number(item.allocationPercentage || 0)}% with ${normalizeImpact(item.impact).toLowerCase()} impact.`,
     status: mapStatus(item),
     allocationPercent: Number(item.allocationPercentage || 0),
-    effectiveDate: formatDisplayDate(item.effectiveDate || item.endDate),
-    effectiveDateIso: item.effectiveDate || item.endDate || "",
+    effectiveDate: formatDisplayDate(effectiveDateIso),
+    effectiveDateIso,
+    approvedDateIso: getDateOnly(finalApprovalDateIso),
+    fulfilledDateIso: getDateOnly(finalApprovalDateIso),
     endDate: formatDisplayDate(item.endDate),
     endDateIso: item.endDate || "",
-    replacementRequired: Boolean(item.demandName),
+    replacementRequired,
+    replacementCreated,
     reason: item.roleOffReason || item.demandName || "",
     resourcePerformance: item.resourcePerformance || "",
   };
@@ -337,10 +423,23 @@ const titleMap = {
   },
 };
 
-const buildKpis = (mode, allocations, roleOffRequests, selectedRows) => {
+const buildKpis = (mode, allocations, roleOffRequests, selectedRows, approvedTodayCount = null) => {
   const activeAllocations = allocations.filter((item) => item.status === "Active");
   const pendingRequests = roleOffRequests.filter((item) => item.status === "Pending Approval");
+  const dlApprovalQueue = roleOffRequests.filter((item) => isDlActionableStatus(item.status));
   const highImpactPending = pendingRequests.filter((item) => item.impact === "High");
+  const activeRoleOffRequests = roleOffRequests.filter(
+    (item) => !isFinalRoleOffStatus(item.status),
+  );
+  const fulfilledToday = roleOffRequests.filter(
+    (item) =>
+      item.status === "Fulfilled" &&
+      (
+        isTodayDate(item.fulfilledDateIso) ||
+        isTodayDate(item.approvedDateIso) ||
+        isTodayDate(item.effectiveDateIso)
+      ),
+  );
 
   if (mode === "pm") {
     return [
@@ -375,7 +474,7 @@ const buildKpis = (mode, allocations, roleOffRequests, selectedRows) => {
     return [
       {
         label: "Active Allocations",
-        value: activeAllocations.length,
+        value: activeRoleOffRequests.length,
         icon: <Users className="h-5 w-5" />,
         iconWrapperClassName: "border-blue-100 bg-blue-50 text-blue-700",
       },
@@ -393,7 +492,7 @@ const buildKpis = (mode, allocations, roleOffRequests, selectedRows) => {
       },
       {
         label: "Replacement Created",
-        value: roleOffRequests.filter((item) => item.replacementRequired).length,
+        value: roleOffRequests.filter((item) => item.replacementCreated).length,
         icon: <Check className="h-5 w-5" />,
         iconWrapperClassName: "border-emerald-100 bg-emerald-50 text-emerald-700",
       },
@@ -403,19 +502,21 @@ const buildKpis = (mode, allocations, roleOffRequests, selectedRows) => {
   return [
     {
       label: "Pending Approvals",
-      value: pendingRequests.length,
+      value: mode === "dm" ? dlApprovalQueue.length : pendingRequests.length,
       icon: <ClipboardCheck className="h-5 w-5" />,
       iconWrapperClassName: "border-amber-100 bg-amber-50 text-amber-700",
     },
     {
       label: "High Impact Requests",
-      value: highImpactPending.length,
+      value: mode === "dm"
+        ? dlApprovalQueue.filter((item) => item.impact === "High").length
+        : highImpactPending.length,
       icon: <AlertTriangle className="h-5 w-5" />,
       iconWrapperClassName: "border-rose-100 bg-rose-50 text-rose-700",
     },
     {
       label: "Approved Today",
-      value: roleOffRequests.filter((item) => item.approvedDateIso === TODAY).length,
+      value: typeof approvedTodayCount === "number" ? approvedTodayCount : fulfilledToday.length,
       icon: <Check className="h-5 w-5" />,
       iconWrapperClassName: "border-emerald-100 bg-emerald-50 text-emerald-700",
     },
@@ -424,7 +525,9 @@ const buildKpis = (mode, allocations, roleOffRequests, selectedRows) => {
 
 const buildPmDemandStyleKpis = (allocations, roleOffRequests, selectedRows) => {
   const activeAllocations = allocations.filter(
-    (item) => item.status === "Active" && item.roleOffStatus !== "Fulfilled",
+    (item) =>
+      item.status === "Active" &&
+      item.roleOffStatus !== "Fulfilled",
   );
   const pendingRequests = allocations.filter((item) => item.roleOffStatus === "Pending Approval");
   const totalRoleOffs = allocations.filter((item) => item.roleOffStatus && item.roleOffStatus !== "Not Requested");
@@ -547,6 +650,12 @@ const PM_QUEUE_TABS = [
   { id: "active", label: "Active" },
   { id: "process", label: "Roleoff Process" },
   { id: "fulfilled", label: "Fulfilled Roleoff" },
+  { id: "rejected", label: "Rejected Roleoff" },
+];
+
+const DM_QUEUE_TABS = [
+  { id: "queue", label: "Approval Queue" },
+  { id: "fulfilled", label: "Fulfilled Roleoff" },
 ];
 
 const extractArrayPayload = (payload) => {
@@ -581,6 +690,30 @@ const getNumericMetricValue = (source, keys, fallback = 0) => {
   }
 
   return fallback;
+};
+
+const getApprovedTodayCount = (payload) => {
+  if (typeof payload === "number") return payload;
+  if (Array.isArray(payload)) return payload.length;
+  if (typeof payload?.data === "number") return payload.data;
+  if (Array.isArray(payload?.data)) return payload.data.length;
+  if (Array.isArray(payload?.data?.data)) return payload.data.data.length;
+
+  const source = extractObjectPayload(payload) || payload;
+  return getNumericMetricValue(
+    source,
+    [
+      "approvedToday",
+      "approvedTodayCount",
+      "todayApproved",
+      "todayApprovedCount",
+      "count",
+      "total",
+      "totalElements",
+      "numberOfElements",
+    ],
+    0,
+  );
 };
 
 const createBulkPanelRecord = (records = []) => {
@@ -655,6 +788,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   const [allocations, setAllocations] = useState([]);
   const [roleOffRequests, setRoleOffRequests] = useState([]);
   const [projectKpiData, setProjectKpiData] = useState(null);
+  const [approvedTodayCount, setApprovedTodayCount] = useState(0);
   const [selectedRows, setSelectedRows] = useState([]);
   const [filterPanelCollapsed, setFilterPanelCollapsed] = useState(true);
   const [filters, setFilters] = useState({
@@ -664,6 +798,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     reason: "",
   });
   const [pmActiveTab, setPmActiveTab] = useState("active");
+  const [dmActiveTab, setDmActiveTab] = useState("queue");
   const [panelState, setPanelState] = useState({
     open: false,
     actionType: "create",
@@ -739,22 +874,52 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   const loadPendingRoleOffRequests = useCallback(async (isActiveRef = () => true) => {
     if (mode !== "rm" && mode !== "dm") {
       setRoleOffRequests([]);
+      setApprovedTodayCount(0);
       return;
     }
     setLoading(true);
     try {
-      const response = mode === "dm"
-        ? await getPendingRoleOffsForDM()
-        : await getPendingRoleOffs();
+      const [requestsResult, approvedTodayResult] = await Promise.allSettled([
+        mode === "dm" ? getPendingRoleOffsForDM() : getPendingRoleOffs(),
+        mode === "dm" ? getRoleOffsApprovedToday(projectId) : Promise.resolve(null),
+      ]);
       if (!isActiveRef()) return;
 
-      const data = extractArrayPayload(response);
-      const mappedRequests = data.map(mapPendingRoleOffToRequest);
+      if (requestsResult.status !== "fulfilled") {
+        throw requestsResult.reason;
+      }
+
+      const data = extractArrayPayload(requestsResult.value);
+      let combinedData = data;
+
+      if (mode === "dm" && approvedTodayResult.status === "fulfilled") {
+        const approvedTodayData = extractArrayPayload(approvedTodayResult.value);
+        // Combine and de-duplicate to ensure fulfilled items are included in the list
+        const existingIds = new Set(data.map((item) => item.id || item.roleOffId));
+        const newItems = approvedTodayData.filter(
+          (item) => !existingIds.has(item.id || item.roleOffId),
+        );
+        combinedData = [...data, ...newItems];
+      }
+
+      const mappedRequests = combinedData.map(mapPendingRoleOffToRequest);
       setRoleOffRequests(mappedRequests);
+
+      if (mode === "dm") {
+        if (approvedTodayResult.status === "fulfilled") {
+          setApprovedTodayCount(getApprovedTodayCount(approvedTodayResult.value));
+        } else {
+          setApprovedTodayCount(0);
+          console.error("Failed to load approved-today role-off KPI", approvedTodayResult.reason);
+        }
+      } else {
+        setApprovedTodayCount(0);
+      }
     } catch (error) {
       if (!isActiveRef()) return;
 
       setRoleOffRequests([]);
+      setApprovedTodayCount(0);
       toast.error(
         mode === "dm"
           ? "Failed to load DM role-off requests"
@@ -763,7 +928,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     } finally {
       if (isActiveRef()) setLoading(false);
     }
-  }, [mode]);
+  }, [mode, projectId]);
 
   useEffect(() => {
     let active = true;
@@ -802,8 +967,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   }, [roleOffRequests, projectName]);
 
   const kpis = useMemo(
-    () => buildKpis(mode, scopedAllocations, scopedRoleOffRequests, selectedRows),
-    [mode, scopedAllocations, scopedRoleOffRequests, selectedRows],
+    () => buildKpis(mode, scopedAllocations, scopedRoleOffRequests, selectedRows, approvedTodayCount),
+    [mode, scopedAllocations, scopedRoleOffRequests, selectedRows, approvedTodayCount],
   );
   const pmKpiFallback = useMemo(
     () => buildPmDemandStyleKpis(scopedAllocations, scopedRoleOffRequests, selectedRows),
@@ -824,12 +989,21 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       (item) =>
         item.status === "Active" &&
         item.roleOffStatus !== "Not Requested" &&
-        item.roleOffStatus !== "Fulfilled",
+        item.roleOffStatus !== "Fulfilled" &&
+        item.roleOffStatus !== "Rejected",
     ).length,
     fulfilled: scopedAllocations.filter(
       (item) => item.status === "Active" && item.roleOffStatus === "Fulfilled",
     ).length,
+    rejected: scopedAllocations.filter(
+      (item) => item.status === "Active" && item.roleOffStatus === "Rejected",
+    ).length,
   }), [scopedAllocations]);
+
+  const dmTabCounts = useMemo(() => ({
+    queue: scopedRoleOffRequests.filter((item) => isDlActionableStatus(item.status)).length,
+    fulfilled: scopedRoleOffRequests.filter((item) => item.status === "Fulfilled").length,
+  }), [scopedRoleOffRequests]);
 
   const visibleRows = useMemo(() => {
     const baseRows =
@@ -841,15 +1015,29 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             return item.roleOffStatus === "Fulfilled";
           }
 
+          if (pmActiveTab === "rejected") {
+            return item.roleOffStatus === "Rejected";
+          }
+
           if (pmActiveTab === "process") {
-            return item.roleOffStatus !== "Not Requested" && item.roleOffStatus !== "Fulfilled";
+            return (
+              item.roleOffStatus !== "Not Requested" &&
+              item.roleOffStatus !== "Fulfilled" &&
+              item.roleOffStatus !== "Rejected"
+            );
           }
 
           return item.roleOffStatus === "Not Requested" || item.roleOffStatus === "Rejected";
         })
         : mode === "rm"
           ? scopedRoleOffRequests
-          : scopedRoleOffRequests;
+          : scopedRoleOffRequests.filter((item) => {
+            if (dmActiveTab === "fulfilled") {
+              return item.status === "Fulfilled";
+            }
+
+            return isDlActionableStatus(item.status);
+          });
 
     return baseRows.filter((row) => {
       const searchTarget = [row.resource, row.project, row.role, row.client].join(" ").toLowerCase();
@@ -859,7 +1047,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       const matchesReason = filters.reason ? row.reason === filters.reason : true;
       return matchesSearch && matchesStatus && matchesImpact && matchesReason;
     });
-  }, [scopedAllocations, scopedRoleOffRequests, mode, filters, pmActiveTab]);
+  }, [scopedAllocations, scopedRoleOffRequests, mode, filters, pmActiveTab, dmActiveTab]);
 
   const hasActiveFilters = useMemo(
     () => Object.values(filters).some((value) => String(value || "").trim() !== ""),
@@ -1405,7 +1593,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       };
     }
 
-    if (mode === "dm") {
+    if (mode === "dm" && dmActiveTab !== "fulfilled") {
       return {
         title: `${selectedRows.length} request(s) selected`,
         description: "Fulfill or reject the selected role-off requests in bulk.",
@@ -1432,7 +1620,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     }
 
     return null;
-  }, [bulkActionState, mode, pmActiveTab, selectedRows, visibleRows]);
+  }, [bulkActionState, mode, pmActiveTab, dmActiveTab, selectedRows, visibleRows]);
 
   return (
     <div className={embedded ? "bg-gray-50 p-0" : "min-h-screen bg-gray-50 p-6"}>
@@ -1631,13 +1819,52 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                   </div>
                 </div>
               ) : null}
+
+              {mode === "dm" ? (
+                <div className="mt-2 pt-1">
+                  <div className="flex items-end gap-8 overflow-x-auto px-1">
+                    {DM_QUEUE_TABS.map((tab) => {
+                      const isActive = dmActiveTab === tab.id;
+                      const count = dmTabCounts[tab.id] || 0;
+
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => {
+                            setDmActiveTab(tab.id);
+                            setSelectedRows([]);
+                          }}
+                          className={`group relative inline-flex items-center gap-2 whitespace-nowrap px-1 pb-3 pt-2 text-left transition-colors ${isActive
+                            ? "text-[#263383]"
+                            : "text-gray-600 hover:text-[#263383]"
+                            }`}
+                        >
+                          <span className={`text-[15px] font-semibold leading-tight ${isActive ? "text-[#263383]" : "text-gray-700"
+                            }`}>
+                            {tab.label}
+                          </span>
+                          <span className={`text-xs font-medium ${isActive ? "text-[#263383]" : "text-gray-400 group-hover:text-[#263383]"
+                            }`}>
+                            {count}
+                          </span>
+                          <span
+                            className={`absolute bottom-0 left-0 h-0.5 rounded-full bg-blue-600 transition-all ${isActive ? "w-full opacity-100" : "w-0 opacity-0"
+                              }`}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="p-4">
 
               <RoleOffTable
                 mode={mode}
-                pmTab={pmActiveTab}
+                pmTab={mode === "dm" ? dmActiveTab : pmActiveTab}
                 loading={loading}
                 rows={visibleRows}
                 hasActiveFilters={hasActiveFilters}
