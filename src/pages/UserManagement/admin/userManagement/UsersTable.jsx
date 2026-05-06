@@ -37,7 +37,7 @@ export default function UsersTable() {
   const [userToToggle, setUserToToggle] = useState(null);
   const [actionType, setActionType] = useState("");
   const [userBulkUploadModalOpen, setUserBulkUploadModalOpen] = useState(false);
-  const [confirming, setConfirming] = useState(false); // ✅ moved inside component
+  const [confirming, setConfirming] = useState(false);
 
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
@@ -49,12 +49,12 @@ export default function UsersTable() {
       showStatusToast("Session expired. Please login again.", "warning");
       logout();
     }
-  }, [token, navigate]);
+  }, [token, logout]);
 
-  // ✅ Fetch from backend with pagination & search
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
+
       const res = await axios.get(
         `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users`,
         {
@@ -66,10 +66,12 @@ export default function UsersTable() {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
+
       setUsers(res.data.users || []);
       setTotalUsers(res.data.total || 0);
     } catch (err) {
       console.error("Failed to fetch users:", err);
+
       if (err.response?.status === 403) {
         if (!accessDeniedShownRef.current) {
           showStatusToast("Access denied. Admins only.", "error");
@@ -85,7 +87,7 @@ export default function UsersTable() {
     } finally {
       setLoading(false);
     }
-  }, [token, navigate, currentPage, searchTerm]);
+  }, [token, navigate, currentPage, searchTerm, logout]);
 
   useEffect(() => {
     fetchUsers();
@@ -122,12 +124,14 @@ export default function UsersTable() {
 
   const confirmToggle = async () => {
     if (!userToToggle) return;
+
     try {
       if (actionType === "deactivate") {
         await axios.delete(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
+
         showStatusToast("User deactivated successfully.", "success");
       } else {
         await axios.patch(
@@ -135,8 +139,10 @@ export default function UsersTable() {
           {},
           { headers: { Authorization: `Bearer ${token}` } },
         );
+
         showStatusToast("User activated successfully.", "success");
       }
+
       fetchUsers();
     } catch (err) {
       console.error(`${actionType} failed:`, err);
@@ -150,22 +156,26 @@ export default function UsersTable() {
 
   const totalPages = Math.ceil(totalUsers / ITEMS_PER_PAGE);
 
-  const headers = ["ID", "Name", "Email", "Contact", "Status", "Actions"];
-  const columns = ["user_id", "name", "mail", "contact", "status", "actions"];
+  // ✅ changed ID column to number-wise serial number
+  const headers = ["S.no", "Name", "Email", "Contact", "Status", "Actions"];
+  const columns = ["serial_no", "name", "mail", "contact", "status", "actions"];
 
-  const tableData = users.map((user) => {
+  const tableData = users.map((user, index) => {
     let formattedContact = user.contact;
+
     if (user.contact) {
       const phoneNumber = parsePhoneNumberFromString(
         "+" + user.contact.replace(/\D/g, ""),
       );
+
       if (phoneNumber) {
         formattedContact = phoneNumber.formatInternational();
       }
     }
 
     return {
-      user_id: user.user_id,
+      // ✅ page-based serial number: page 1 => 1-10, page 2 => 11-20
+      serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
       name: `${user.first_name} ${user.last_name}`,
       mail: user.mail,
       contact: formattedContact,
@@ -206,6 +216,7 @@ export default function UsersTable() {
     <div className="px-6 py-4">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h2 className="text-2xl font-semibold text-gray-800">Users</h2>
+
         <div className="space-x-3 flex flex-wrap gap-2">
           <Button
             onClick={() => setUserBulkUploadModalOpen(true)}
@@ -214,6 +225,7 @@ export default function UsersTable() {
           >
             + Add User Bulk
           </Button>
+
           <Button
             onClick={() => setCreateModalOpen(true)}
             variant="primary"
@@ -221,6 +233,7 @@ export default function UsersTable() {
           >
             + Add User
           </Button>
+
           <Button
             onClick={() => navigate("/user-management/users/roles")}
             variant="secondary"
@@ -258,7 +271,6 @@ export default function UsersTable() {
         />
       )}
 
-      {/* --- Modals --- */}
       <Modal
         isOpen={isCreateModalOpen}
         onClose={() => setCreateModalOpen(false)}
@@ -330,6 +342,7 @@ export default function UsersTable() {
           >
             Cancel
           </Button>
+
           <Button
             onClick={async () => {
               setConfirming(true);
