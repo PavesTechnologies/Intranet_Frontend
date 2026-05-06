@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { listAccessPoints, deleteAccessPoint } from '../../../../services/accessPointService';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Pencil, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Trash2, MoreVertical } from 'lucide-react';
 import Button from "../../../../components/Button/Button";
 import Pagination from "../../../../components/Pagination/pagination";
 import Modal from '../../../../components/Modal/modal';
@@ -12,9 +12,20 @@ const AccessPointList = ({ searchTerm }) => {
   const [aps, setAps] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
   const [selectedAccessPointId, setSelectedAccessPointId] = useState(null);
   const itemsPerPage = 6;
  
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.dropdown-menu-container')) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const navigate = useNavigate();
  
   useEffect(() => {
@@ -96,51 +107,78 @@ const AccessPointList = ({ searchTerm }) => {
                 key={ap.access_uuid}
                 className="bg-white p-5 rounded-xl shadow-md hover:shadow-lg transition-all border flex flex-col"
               >
-                {/* ... Card content remains the same ... */}
-                <h3 className="text-lg font-semibold text-gray-800 mb-3 break-words overflow-wrap-anywhere">
-                  {ap.endpoint_path}
-                </h3>
-                
-                <div className="flex-grow mb-4 space-y-2">
-                  <p className="text-sm text-gray-600">
-                    <strong className="font-medium">Method:</strong> 
-                    <span className="ml-1">{ap.method}</span>
-                  </p>
-                  <p className="text-sm text-gray-600 break-words">
-                    <strong className="font-medium">Module:</strong> 
-                    <span className="ml-1">{ap.module}</span>
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    <strong className="font-medium">Public:</strong> 
-                    <span className="ml-1">{ap.is_public ? 'Yes' : 'No'}</span>
-                  </p>
-                  <p className="text-sm text-gray-600 break-words">
-                    <strong className="font-medium">Permission:</strong> 
-                    <span className="ml-1">{ap.permission_code || 'N/A'}</span>
-                  </p>
-                </div>
- 
-                {/* Action buttons */}
-                <div className="space-y-2 mt-auto">
-                  <Button
-                    onClick={() => navigate(`/user-management/access-points/${ap.access_uuid}`)}
-                    className="flex items-center w-full justify-center gap-2 bg-green-500 text-white px-2 py-2 rounded-lg hover:bg-green-600 transition-all shadow"
-                  >
-                    <Eye className="w-4 h-4" /> View
-                  </Button>
-                  <Button
-                    onClick={() => navigate(`/user-management/access-points/edit/${ap.access_uuid}`)}
-                    className="flex items-center w-full justify-center gap-2 bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-all shadow"
-                  >
-                    <Pencil className="w-4 h-4" /> Edit
-                  </Button>
-                  <Button
-                    onClick={() => handleDeleteClick(ap.access_uuid)}
-                    className="flex items-center w-full justify-center gap-2 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-all shadow"
-                  >
-                    <Trash2 className="w-4 h-4" /> Delete
-                  </Button>
-                </div>
+                <div className="flex justify-between items-start gap-4 mb-3">
+                  <h3 className="text-lg font-semibold text-gray-800 break-all flex-1 min-w-0">
+                    {ap.endpoint_path}
+                  </h3>
+                  <div className="flex gap-2 shrink-0 relative dropdown-menu-container">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/user-management/access-points/${ap.access_uuid}`);
+                      }}
+                      className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors shadow-sm"
+                      title="View"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(openMenuId === ap.access_uuid ? null : ap.access_uuid);
+                      }}
+                      className="p-1.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shadow-sm"
+                      title="Actions"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+
+                    {openMenuId === ap.access_uuid && (
+                      <div className="absolute right-0 top-10 w-32 bg-white border rounded-lg shadow-lg z-20 overflow-hidden py-1 animate-in fade-in zoom-in duration-200">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(null);
+                            navigate(`/user-management/access-points/edit/${ap.access_uuid}`);
+                          }}
+                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 gap-2 transition-colors"
+                        >
+                          <Pencil className="w-4 h-4 text-amber-600" /> Edit
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(null);
+                            handleDeleteClick(ap.access_uuid);
+                          }}
+                          className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 gap-2 transition-colors border-t border-gray-50"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex-grow space-y-2">
+                  <p className="text-sm text-gray-600">
+                    <strong className="font-medium">Method:</strong> 
+                    <span className="ml-1">{ap.method}</span>
+                  </p>
+                  <p className="text-sm text-gray-600 break-words">
+                    <strong className="font-medium">Module:</strong> 
+                    <span className="ml-1">{ap.module}</span>
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <strong className="font-medium">Public:</strong> 
+                    <span className="ml-1">{ap.is_public ? 'Yes' : 'No'}</span>
+                  </p>
+                  <p className="text-sm text-gray-600 break-words">
+                    <strong className="font-medium">Permission:</strong> 
+                    <span className="ml-1">{ap.permission_code || 'N/A'}</span>
+                  </p>
+                </div>
               </div>
             ))}
           </div>
