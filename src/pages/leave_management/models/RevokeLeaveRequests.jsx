@@ -3,42 +3,84 @@ import { Check, X } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+const formatted = new Date().toISOString().slice(0, 7);
 
 const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
-    const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleApprove = async (leaveId) => {
-    setLoading(true);
+  const handleResourceCalculate = async (resourceId) => {
     try {
-      const res = await axios.post(`${BASE_URL}/api/leave-revoke/approve/${leaveId}`,
+      const res = axios.post(
+        `${RMS_BASE_URL}/api/availability/recalculate/resource/${resourceId}`,
         {},
         {
-          headers:{
-            Authorization: `Bearer ${localStorage.getItem("token")}`
-          }
-        }
+          params: {
+            yearMonth: formatted,
+          },
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
       );
-      toast.success(res?.data?.message || "Leave request revoked successfully.");
+      console.log("Recalculate result: ", res);
+    } catch (err) {
+      console.error("Failed to calculate resource availability", err);
+    }
+  };
+
+  const handleApprove = async (leaveId, employeeId, year) => {
+    setLoading(true);
+
+    try {
+      const res = await axios.post(
+        `${BASE_URL}/api/leave-revoke/approve/${leaveId}`,
+        {
+          employeeId: employeeId,
+          year: year,
+        }, // ✅ correct body
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
+
+      toast.success(
+        res?.data?.message || "Leave request revoked successfully.",
+      );
+
       if (onActionSuccess) onActionSuccess();
-    } catch(err) {
-      toast.error(err?.response?.data?.message || "Failed to revoke leave request.");
+
+      handleResourceCalculate(employeeId);
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || "Failed to revoke leave request.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReject = async (leaveId) => {
+  const handleReject = async (leaveId, employeeId, year) => {
     try {
       setLoading(true);
-      const res = await axios.post(`${BASE_URL}/api/leave-revoke/reject/${leaveId}`,
-        {},
+      const res = await axios.post(
+        `${BASE_URL}/api/leave-revoke/reject/${leaveId}`,
         {
-          headers:{
-            Authorization: `Bearer ${localStorage.getItem("token")}`
-          }
-        }
+          payload: {
+            employeeId: employeeId,
+            year: year,
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
       );
       toast.success(res?.data?.message || "Revoke request rejected.");
       if (onActionSuccess) onActionSuccess();
@@ -53,17 +95,27 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
   //   if (managerId) fetchCompOffs();
   // }, [managerId]);
 
+  // ✅ When employee submits a new revoke → manager's list refreshes
+    useLeaveWebSocket(
+        "manager-update",
+        ["REVOKE_REQUESTED"],   // employee filed a revoke → show it in manager's list
+        onActionSuccess         // this already calls fetchRevokeRequests in AdminPanel
+    );
+
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500 mb-6">
-      <h3 className="text-lg font-semibold text-blue-900 mb-2">Revoke Leave Requests</h3>
+      <h3 className="text-lg font-semibold text-blue-900 mb-2">
+        Revoke Leave Requests
+      </h3>
       <div className="border-b-2 border-blue-500 w-16 mb-4"></div>
-        {loading ? (
-          <LoadingSpinner text="Loading..." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse rounded-lg overflow-hidden shadow-sm">
+      {loading ? (
+        <LoadingSpinner text="Loading..." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse rounded-lg overflow-hidden shadow-sm">
             <thead>
-                <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs">
+              <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs">
                 <th className="p-3 text-center uppercase">Leave Type</th>
                 <th className="p-3 text-center uppercase">Employee</th>
                 <th className="p-3 text-center uppercase">Start Date</th>
@@ -71,52 +123,63 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
                 <th className="p-3 text-center uppercase">Duration</th>
                 <th className="p-3 text-center uppercase">Reason</th>
                 <th className="p-3 text-center uppercase">Action</th>
-                </tr>
+              </tr>
             </thead>
             <tbody className="bg-white divide-y divide-blue-100 text-center">
-                {revokeRequests.map((req) => (
-                <tr key={req.revokeId} className="hover:bg-blue-50 transition-colors text-xs">
-                    <td className="p-3">{req.leaveName}</td>
-                    <td className="p-3">{req.employeeName}</td>
-                    <td className="p-3">{new Date(req.startDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="p-3">{new Date(req.endDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="p-3">{req.days <= 1 ? `${req.days} Day` : `${req.days} Days`}</td>
-                    <td className="p-3">{req.reason}</td>
-                    <td className="p-3 flex justify-center gap-2">
+              {revokeRequests.map((req) => (
+                <tr
+                  key={req.revokeId}
+                  className="hover:bg-blue-50 transition-colors text-xs"
+                >
+                  <td className="p-3">{req.leaveName}</td>
+                  <td className="p-3">{req.employeeName}</td>
+                  <td className="p-3">
+                    {new Date(req.startDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </td>
+                  <td className="p-3">
+                    {new Date(req.endDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </td>
+                  <td className="p-3">
+                    {req.days <= 1 ? `${req.days} Day` : `${req.days} Days`}
+                    {console.log("Days requested:", req)}
+                  </td>
+                  <td className="p-3">{req.reason}</td>
+                  <td className="p-3 flex justify-center gap-2">
                     <button
-                        onClick={() => handleApprove(req.revokeId)}
-                        className="p-1 pr-2 text-green-600 hover:text-green-800 transition-colors"
-                        title="Approve"
-                        disabled={loading}
+                      onClick={() =>
+                        handleApprove(req.revokeId, req.employeeId, req.year)
+                      }
+                      className="p-1 pr-2 text-green-600 hover:text-green-800 transition-colors"
+                      title="Approve"
+                      disabled={loading}
                     >
-                        <Check className="w-4 h-4" />
+                      <Check className="w-4 h-4" />
                     </button>
                     <button
-                        onClick={() => handleReject(req.revokeId)}
-                        className="p-1 pl-4 text-red-600 hover:text-red-800 transition-colors"
-                        title="Reject"
-                        disabled={loading}
+                      onClick={() =>
+                        handleReject(req.revokeId, req.employeeId, req.year)
+                      }
+                      className="p-1 pl-4 text-red-600 hover:text-red-800 transition-colors"
+                      title="Reject"
+                      disabled={loading}
                     >
-                        <X className="w-4 h-4" />
+                      <X className="w-4 h-4" />
                     </button>
-                    </td>
+                  </td>
                 </tr>
-                ))}
+              ))}
             </tbody>
-            </table>
+          </table>
         </div>
-        )
-      }
+      )}
     </div>
   );
 };

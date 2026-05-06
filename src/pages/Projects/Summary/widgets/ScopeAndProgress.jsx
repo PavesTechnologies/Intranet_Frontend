@@ -9,26 +9,41 @@ import { itemVariants } from "../uiConfig";
 
 const { Title, Text } = Typography;
 
-const ScopeAndProgress = ({ epics, stories, bugs, tasks, statuses }) => {
+const ScopeAndProgress = ({  stories, bugs, tasks, statuses }) => {
   const allWorkItems = useMemo(
     () => [...stories, ...tasks, ...bugs],
     [stories, tasks, bugs]
   );
   const totalItems = allWorkItems.length;
 
+  const getWorkStatusId = (item) => {
+    return item.status?.id ?? item.statusId ?? item.status?.statusId ?? null;
+  };
+
+  const getWorkStatusName = (item) => {
+    return (
+      item.status?.name ??
+      item.statusName ??
+      (typeof item.status === "string" ? item.status : null) ??
+      item.status?.label ??
+      ""
+    );
+  };
+
   const doneStatusId = useMemo(() => {
     if (!statuses || statuses.length === 0) return null;
     const doneStatus = statuses.reduce(
       (max, status) => (status.sortOrder > max.sortOrder ? status : max),
-      statuses[0]
+      statuses[0],
     );
     return doneStatus?.id;
   }, [statuses]);
 
   const completedItems = useMemo(() => {
     return allWorkItems.filter((item) => {
-      if (doneStatusId) return item.status?.id === doneStatusId;
-      return item.status?.name?.toLowerCase() === "done";
+      const statusId = getWorkStatusId(item);
+      if (doneStatusId && statusId != null) return statusId === doneStatusId;
+      return getWorkStatusName(item).toLowerCase() === "done";
     }).length;
   }, [allWorkItems, doneStatusId]);
 
@@ -45,11 +60,11 @@ const ScopeAndProgress = ({ epics, stories, bugs, tasks, statuses }) => {
 
   const statItems = useMemo(
     () => [
-      {
-        name: "Epics",
-        count: epics.length,
-        icon: <FiZap className="text-purple-500 text-xl" />,
-      },
+      // {
+      //   name: "Epics",
+      //   count: epics.length,
+      //   icon: <FiZap className="text-purple-500 text-xl" />,
+      // },
       {
         name: "User Stories",
         count: stories.length,
@@ -66,7 +81,7 @@ const ScopeAndProgress = ({ epics, stories, bugs, tasks, statuses }) => {
         icon: <FaBug className="text-red-500 text-xl" />,
       },
     ],
-    [epics.length, stories.length, tasks.length, bugs.length]
+    [ stories.length, tasks.length, bugs.length]
   );
 
   return (

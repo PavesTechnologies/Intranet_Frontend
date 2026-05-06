@@ -5,8 +5,8 @@ import { PencilIcon } from "lucide-react";
 import EditLeaveModal from "./EditLeaveModal";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationModal from "./ConfirmationModal";
-const token = localStorage.getItem('token');
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const token = localStorage.getItem("token");
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 /**
  * This is now a "presentational" component. It receives data and functions as props.
@@ -54,22 +54,21 @@ const PendingLeaveRequestsTable = ({
         toast.error("Leave not found.");
         return;
       }
-      
+
       const empId = leaveToCancel.employee?.employeeId || employeeId;
 
       await axios.put(
-        `${BASE_URL}/api/leave-requests/${cancelId}/cancel/${empId}`, 
-        null,       
+        `${BASE_URL}/api/leave-requests/${cancelId}/cancel/${empId}`,
+        null,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       toast.success("Leave cancelled successfully");
-      refreshData(); 
-
+      refreshData();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Cancel failed");
     } finally {
@@ -81,7 +80,7 @@ const PendingLeaveRequestsTable = ({
   // This helper now uses the prop for leave type names.
   const getLabelFromName = (name) => {
     if (!name) return "-";
-    
+
     // First, try to find a direct match from the props
     if (Array.isArray(leaveTypeNames) && leaveTypeNames.length > 0) {
       const match = leaveTypeNames.find((lt) => lt.name === name);
@@ -94,9 +93,9 @@ const PendingLeaveRequestsTable = ({
     // "L-SICK_LEAVE" -> "Sick Leave"
     return name
       .replace(/^L-/, "") // Removes "L-" prefix
-      .replace(/_/g, " ")   // Replaces underscores with spaces
-      .toLowerCase()       // Converts to lowercase
-      .replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase()); // Capitalizes each word
+      .replace(/_/g, " ") // Replaces underscores with spaces
+      .toLowerCase() // Converts to lowercase
+      .replace(/(^\w{1})|(\s+\w{1})/g, (letter) => letter.toUpperCase()); // Capitalizes each word
   };
 
   return (
@@ -117,16 +116,22 @@ const PendingLeaveRequestsTable = ({
             {/* The component now just maps over the leaves it was given. */}
             {pendingLeaves.map((leave) => (
               <tr key={leave.leaveId} className="border-t text-xs">
-                <td className="p-3 text-center">{getLabelFromName(leave.leaveType?.leaveName)}</td>
+                <td className="p-3 text-center">
+                  {getLabelFromName(leave.leaveName)}
+                </td>
                 <td className="p-3 text-center">
                   {new Date(leave.startDate).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
                     year: "numeric",
                   })}
-                  {leave.startSession && leave.startSession !== "none" && leave.startSession !== "fullday" && (
-                    <span className="ml-1 text-gray-500">({leave.startSession})</span>
-                  )}
+                  {leave.startSession &&
+                    leave.startSession !== "none" &&
+                    leave.startSession !== "fullday" && (
+                      <span className="ml-1 text-gray-500">
+                        ({leave.startSession})
+                      </span>
+                    )}
                 </td>
                 <td className="p-3 text-center">
                   {new Date(leave.endDate).toLocaleDateString("en-US", {
@@ -134,10 +139,14 @@ const PendingLeaveRequestsTable = ({
                     day: "numeric",
                     year: "numeric",
                   })}
-                  {leave.endSession && leave.endSession !== "none" && leave.endSession !== "fullday" && (
-                    <span className="ml-1 text-gray-500">({leave.endSession})</span>
-                  )}
-                  </td>
+                  {leave.endSession &&
+                    leave.endSession !== "none" &&
+                    leave.endSession !== "fullday" && (
+                      <span className="ml-1 text-gray-500">
+                        ({leave.endSession})
+                      </span>
+                    )}
+                </td>
                 <td className="p-3 text-center">{leave.daysRequested}</td>
                 <td className="p-3 text-center">{leave.reason || "-"}</td>
                 <td className="p-3 text-center">
@@ -172,8 +181,8 @@ const PendingLeaveRequestsTable = ({
           onSuccess={handleUpdateSuccess}
           employeeId={employeeId}
           year={year}
-          />
-        )}
+        />
+      )}
 
       <ConfirmationModal
         isOpen={cancelId}

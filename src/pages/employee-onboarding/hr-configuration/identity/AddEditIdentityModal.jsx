@@ -2,18 +2,14 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-export default function AddEditIdentityModal({
-  onClose,
-  onSuccess,
-  editData,
-}) {
+export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   useEffect(() => {
     if (editData) {
@@ -23,52 +19,63 @@ export default function AddEditIdentityModal({
     }
   }, [editData]);
 
- const handleSave = async () => {
-  try {
-    setSaving(true);
+  const handleSave = async () => {
+    if (!name.trim()) {
+      toast.error("Identity name is required");
+      return;
+    }
 
-    const payload = {
-      identity_type_name: name.trim(),          // ✅ required
-      description: description?.trim() || "",   // ✅ ALWAYS send string
-      is_active: Boolean(isActive),              // ✅ ALWAYS send boolean
-    };
+    try {
+      setSaving(true);
 
-    if (editData) {
-      // UPDATE
-      await axios.put(
-        `${BASE_URL}/identity/${editData.identity_type_uuid}`,
-        payload,
-        {
+      const payload = {
+        identity_type_name: name.trim(),
+        description: description?.trim() || "",
+        is_active: Boolean(isActive),
+        identity_type_uuid: editData?.identity_type_uuid, // Keep UUID for updates
+      };
+
+      let savedItem;
+
+      if (editData) {
+        await axios.put(
+          `${BASE_URL}/identity/${editData.identity_type_uuid}`,
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+        toast.success("Identity type updated");
+        savedItem = payload;
+      } else {
+        const res = await axios.post(`${BASE_URL}/identity`, payload, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        });
+        toast.success("Identity type created");
+        savedItem = {
+          ...payload,
+          identity_type_uuid:
+            res.data.identity_type_uuid || crypto.randomUUID(),
+        };
+      }
+
+      onSuccess(savedItem); // ✅ Update table immediately
+      onClose();
+    } catch (error) {
+      console.error("Save identity failed:", error.response?.data);
+      toast.error(
+        error.response?.data?.detail || "Failed to save identity type",
       );
-      toast.success("Identity type updated");
-    } else {
-      // CREATE
-      await axios.post(`${BASE_URL}/identity`, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-      toast.success("Identity type created");
+    } finally {
+      setSaving(false);
     }
-
-    onClose();
-    onSuccess();
-  } catch (error) {
-    console.error("Save identity failed:", error.response?.data);
-    toast.error(
-      error.response?.data?.detail || "Failed to save identity type"
-    );
-  } finally {
-    setSaving(false);
-  }
-};
-
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -77,18 +84,14 @@ export default function AddEditIdentityModal({
           {editData ? "Edit Identity Type" : "Add Identity Type"}
         </h2>
 
-        <label className="block text-sm font-medium mb-1">
-          Identity Name
-        </label>
+        <label className="block text-sm font-medium mb-1">Identity Name</label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full border rounded-lg px-3 py-2 mb-3"
         />
 
-        <label className="block text-sm font-medium mb-1">
-          Description
-        </label>
+        <label className="block text-sm font-medium mb-1">Description</label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -107,15 +110,21 @@ export default function AddEditIdentityModal({
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 rounded-lg"
+            className="px-2 py-2 bg-gray-200 rounded-lg transition-all duration-100 ease-in-out
+            active:translate-y-[1px]
+            disabled:opacity-60 disabled:cursor-not-allowed
+            flex items-center justify-center gap-2"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || !name}
-            className={`px-4 py-2 rounded-lg text-white ${
-              saving || !name
+            disabled={saving || !name.trim()}
+            className={`px-4 py-2 rounded-lg text-white transition-all duration-100 ease-in-out
+            active:translate-y-[1px]
+            disabled:opacity-60 disabled:cursor-not-allowed
+            flex items-center justify-center gap-2 ${
+              saving || !name.trim()
                 ? "bg-gray-400"
                 : "bg-blue-700 hover:bg-blue-800"
             }`}

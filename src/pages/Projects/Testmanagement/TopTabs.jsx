@@ -1,21 +1,26 @@
 "use client";
 
 import { NavLink, useParams } from "react-router-dom";
-import { LayoutGrid, FileText, PenTool, Play, BarChart3, Bug } from "lucide-react";
+import { FileText, PenTool, Play, Bug } from "lucide-react";
 
 export default function TopTabs({ selectedTab }) {
   const { projectId } = useParams();
-   console.log("Project ID in TopTabs:", projectId);
-  // ⭐ Default to overview
-  const activeTab = selectedTab || "test-management/test-plans";
+  console.log("Project ID in TopTabs:", projectId);
+
+  // ⭐ 1. Define the tabs that are actually visible
+  const validTabs = [
+    "test-management/test-plans",
+    "test-management/test-design",
+    "test-management/test-execution",
+    "test-management/test-bugs"
+  ];
+
+  // ⭐ 2. If the parent passes an invalid tab (like "overview"), force it to "test-plans"
+  const activeTab = validTabs.includes(selectedTab) 
+    ? selectedTab 
+    : "test-management/test-plans";
 
   const tabs = [
-    // {
-    //   name: "Overview",
-    //   path: `/projects/${projectId}?tab=test-management/overview`,
-    //   tab: "test-management/overview",
-    //   icon: <LayoutGrid size={16} />,
-    // },
     {
       name: "Test Plans",
       path: `/projects/${projectId}?tab=test-management/test-plans`,
@@ -40,12 +45,6 @@ export default function TopTabs({ selectedTab }) {
       tab: "test-management/test-bugs", 
       icon: <Bug size={16} />,
     },
-    // {
-    //   name: "Reports",
-    //   path: `/projects/${projectId}?tab=test-management/reports`,
-    //   tab: "test-management/reports",
-    //   icon: <BarChart3 size={16} />,
-    // },
   ];
 
   return (
@@ -60,8 +59,8 @@ export default function TopTabs({ selectedTab }) {
               flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all
               ${
                 activeTab === tab.tab
-                  ? "bg-[#0A1128] text-white shadow-md"
-                  : "text-gray-600 hover:text-[#0A1128]"
+                  ? "bg-[#02195c] text-white shadow-md"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-[#181818]"
               }
             `}
           >

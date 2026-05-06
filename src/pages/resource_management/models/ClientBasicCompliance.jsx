@@ -1,0 +1,333 @@
+import React, { useEffect, useState, useRef } from "react";
+import {
+  getClientCompliance,
+  updateClientCompliance,
+  deleteClientCompliance,
+} from "../services/clientservice";
+import { toast } from "react-toastify";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import Pagination from "../../../components/Pagination/pagination";
+import { Pencil, Trash2 } from "lucide-react";
+import Modal from "../../../components/Modal/modal";
+import ComplianceForm from "./client_configuration/forms/ComplianceForm";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
+import { useAuth } from "../../../contexts/AuthContext";
+
+const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
+  const { user } = useAuth();
+  const permissions = user?.permissions || [];
+  const roles = user?.roles || [];
+  const canEditConfig = roles.includes("Admin"); // permissions.includes("EDIT_CLIENT_CONFIG");
+  const [complianceList, setComplianceList] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  // const [openMenu, setOpenMenu] = useState(false);
+  const menuRef = useRef(null);
+  const [formData, setFormData] = useState({});
+  const [openUpdateCompliance, setOpenUpdateCompliance] = useState(false);
+  const [openComfirmModal, setOpenConfirmModal] = useState(false);
+  const [selectedComplianceId, setSelectedComplianceId] = useState(null);
+
+  const ITEMS_PER_PAGE = 3;
+
+  const handleSetFormData = (data) => {
+    if (!data) return;
+
+    const formattedData = {
+      client: {
+        clientId: clientId,
+      },
+      complianceId: data.complianceId,
+      requirementType: data.requirementType,
+      requirementName: data.requirementName,
+      mandatoryFlag: data.mandatoryFlag ?? false,
+      activeFlag: data.activeFlag ?? true,
+    };
+
+    if (data.requirementType === "SKILL") {
+      formattedData.skill = { id: data.skill?.id || null };
+    } else if (data.requirementType === "CERTIFICATION") {
+      formattedData.certificate = {
+        certificateId: data.certificate?.certificateId || null,
+      };
+    }
+
+    setFormData(formattedData);
+  };
+
+  const handleUpdateCompliance = async () => {
+    setUpdateLoading(true);
+    try {
+      const res = await updateClientCompliance(formData);
+      const updated = res.data;
+      setOpenUpdateCompliance(false);
+      // fetchCompliance();
+      setComplianceList((prev) =>
+        prev.map((item) =>
+          item.complianceId === updated.complianceId
+            ? { ...item, ...updated }
+            : item,
+        ),
+      );
+      toast.success(res.message || "Pre-requisite updated successfully");
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Failed to update Pre-requisite.",
+      );
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleDeleteCompliance = async () => {
+    setDeleteLoading(true);
+    try {
+      const res = await deleteClientCompliance(selectedComplianceId);
+      toast.success(res.message || "Pre-requisite deleted successfully.");
+      setOpenConfirmModal(false);
+      setSelectedComplianceId(null);
+      fetchCompliance();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Failed to delete Pre-requisite.",
+      );
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const fetchCompliance = async () => {
+    setLoading(true);
+    try {
+      const res = await getClientCompliance(clientId);
+      const data = res.data || [];
+
+      const normalized = data.map((compliance) => ({
+        ...compliance,
+        activeFlag: compliance.activeFlag ?? false,
+      }));
+
+      setComplianceList(normalized);
+      setCurrentPage(1);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to fetch SLA");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCompliance();
+  }, [clientId, complianceRefetchKey]);
+
+  // useEffect(() => {
+  //   const handleClickOutside = (event) => {
+  //     if (menuRef.current && !menuRef.current.contains(event.target)) {
+  //       setOpenMenu(false);
+  //     }
+  //   };
+
+  //   document.addEventListener("mousedown", handleClickOutside);
+  //   return () => document.removeEventListener("mousedown", handleClickOutside);
+  // }, []);
+
+  if (loading) {
+    return (
+      <div className="p-4 flex justify-center items-center">
+        <LoadingSpinner text="Loading Compliance Information..." />
+      </div>
+    );
+  }
+
+  if (complianceList.length === 0) {
+    return (
+      <div className="p-4">
+        <h2 className="text-xl font-semibold mb-4">
+          Basic Compliance Information
+        </h2>
+        <p className="text-gray-600 italic font-semibold text-sm">
+          No Compliance information available for this client. Add from above!
+        </p>
+      </div>
+    );
+  }
+
+  const totalPages = Math.ceil(complianceList.length / ITEMS_PER_PAGE);
+  const paginatedData = complianceList.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
+
+  return (
+    <div className="p-4">
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-max w-full text-sm text-center">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                  Requirement
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                  Type
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                  Mandatory
+                </th>
+                {/* <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                Source
+              </th> */}
+                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+
+            {/* BODY */}
+            <tbody className="divide-y divide-gray-100">
+              {paginatedData.map((item) => (
+                <tr key={item.complianceId} className="hover:bg-gray-50">
+                  {/* REQUIREMENT */}
+                  <td className="px-6 py-4 font-semibold text-gray-900">
+                    {item.requirementName}
+                  </td>
+
+                  {/* TYPE */}
+                  <td className="px-6 py-4 text-gray-700">
+                    {item.requirementType}
+                  </td>
+
+                  {/* MANDATORY */}
+                  <td className="px-6 py-4">
+                    <span
+                      className={`px-3 py-1 text-xs font-semibold rounded-full
+                      ${item.mandatoryFlag
+                          ? "bg-red-100 text-red-700"
+                          : "bg-gray-100 text-gray-600"
+                        }
+                    `}
+                    >
+                      {item.mandatoryFlag ? "Mandatory" : "Optional"}
+                    </span>
+                  </td>
+
+                  {/* SOURCE */}
+                  {/* <td className="px-6 py-4">
+                  <span
+                    className={`px-3 py-1 text-xs font-semibold rounded-full
+                      ${
+                        item.isInherited
+                          ? "bg-indigo-100 text-indigo-700"
+                          : "bg-purple-100 text-purple-700"
+                      }
+                    `}
+                  >
+                    {item.isInherited ? "Inherited" : "Project"}
+                  </span>
+                </td> */}
+
+                  {/* STATUS */}
+                  <td className="px-6 py-4">
+                    <span
+                      className={`px-3 py-1 text-xs font-semibold rounded-full
+                      ${item.activeFlag
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600"
+                        }
+                    `}
+                    >
+                      {item.activeFlag ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+
+                  {/* ACTIONS */}
+                  <td className="px-6 py-4">
+                    {canEditConfig ? (
+                      <div className="flex justify-center items-center gap-4">
+                        <button
+                          title="Edit Compliance"
+                          onClick={() => {
+                            handleSetFormData(item);
+                            // setOpenMenu(false);
+                            setOpenUpdateCompliance(true);
+                          }}
+                          className="px-2 text-blue-600 hover:text-blue-800 transition"
+                        >
+                          <Pencil size={14} />
+                        </button>
+
+                        <button
+                          title="Delete Compliance"
+                          onClick={() => {
+                            setSelectedComplianceId(item.complianceId);
+                            // setOpenMenu(false);
+                            setOpenConfirmModal(true);
+                          }}
+                          className="p-1 text-red-600 hover:text-red-800 transition"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-gray-500 italic text-xs">
+                        Don't have permission to take actions
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+          onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+        />
+      )}
+
+      {/* Update Compliance Modal */}
+      <Modal
+        title="Update Compliance"
+        subtitle="Update Compliance details."
+        isOpen={openUpdateCompliance}
+        onClose={() => setOpenUpdateCompliance(false)}
+      >
+        <ComplianceForm formData={formData} setFormData={setFormData} />
+        <div className="flex justify-end mt-4">
+          <button
+            type="button"
+            onClick={handleUpdateCompliance}
+            disabled={updateLoading}
+            className={`px-4 py-2 rounded-xl bg-blue-700 text-white hover:bg-blue-800 ${updateLoading && "opacity-50 cursor-not-allowed"}`}
+          >
+            {updateLoading ? "Updating..." : "Update"}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Delete Compliance Modal */}
+      <ConfirmationModal
+        isOpen={openComfirmModal}
+        title="Delete Compliance"
+        message="Are you sure you want to delete this Compliance? This Action cannot be undone."
+        onConfirm={handleDeleteCompliance}
+        onCancel={() => {
+          setOpenConfirmModal(false);
+          setSelectedComplianceId(null);
+        }}
+        isLoading={deleteLoading}
+      />
+    </div>
+  );
+};
+export default ClientBasicCompliance;

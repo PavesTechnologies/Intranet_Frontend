@@ -2,6 +2,7 @@
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+
 const STATUS_CONFIG = {
   success: {
     toastType: toast.success,

@@ -15,7 +15,7 @@ try {
 export default function InitialPasswordSetup() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user,logout } = useAuth();
+  const { user, logout } = useAuth();
   const email = user?.email;
 
   const [otp, setOtp] = useState("");
@@ -54,16 +54,19 @@ export default function InitialPasswordSetup() {
 
     setLoading(true);
     try {
-      await axios.post(`${import.meta.env.VITE_USER_MANAGEMENT_URL}/auth/send-otp`, {
-        email,
-      });
+      await axios.post(
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/send-otp`,
+        {
+          email,
+        },
+      );
       setOtpSent(true);
       showStatusToast("OTP sent to your email. Check inbox/spam.", "success");
     } catch (err) {
       console.error("Send OTP Error:", err);
       showStatusToast(
         "Failed to send OTP: " + (err.response?.data?.detail || err.message),
-        "error"
+        "error",
       );
     } finally {
       setLoading(false);
@@ -79,17 +82,21 @@ export default function InitialPasswordSetup() {
 
     setLoading(true);
     try {
-      await axios.post(`${import.meta.env.VITE_USER_MANAGEMENT_URL}/auth/validate-otp`, {
-        email,
-        otp: otp.trim(),
-      });
+      await axios.post(
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/validate-otp`,
+        {
+          email,
+          otp: otp.trim(),
+        },
+      );
       setOtpVerified(true);
       showStatusToast("OTP verified successfully!", "success");
     } catch (err) {
       console.error("OTP Verify Error:", err);
       showStatusToast(
-        "OTP verification failed: " + (err.response?.data?.detail || err.message),
-        "error"
+        "OTP verification failed: " +
+          (err.response?.data?.detail || err.message),
+        "error",
       );
     } finally {
       setLoading(false);
@@ -114,24 +121,28 @@ export default function InitialPasswordSetup() {
     setLoading(true);
     try {
       await axios.post(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/auth/first-login/change-password`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/first-login/change-password`,
         {
           email,
           new_password: newPassword,
           confirm_password: confirmPassword,
         },
-        authHeader
+        authHeader,
       );
 
-      showStatusToast("Password set successfully! Please login again.", "success");
+      showStatusToast(
+        "Password set successfully! Please login again.",
+        "success",
+      );
       logout();
-      
+
       navigate("/");
     } catch (err) {
       console.error("Set Password Error:", err);
       showStatusToast(
-        "Error setting password: " + (err.response?.data?.detail || err.message),
-        "error"
+        "Error setting password: " +
+          (err.response?.data?.detail || err.message),
+        "error",
       );
     } finally {
       setLoading(false);
@@ -217,27 +228,51 @@ export default function InitialPasswordSetup() {
             <div className="text-sm text-gray-600">
               <ul className="space-y-1">
                 <li className="flex items-center gap-2">
-                  <input type="checkbox" checked={passwordRules.minLength} readOnly />
+                  <input
+                    type="checkbox"
+                    checked={passwordRules.minLength}
+                    readOnly
+                  />
                   Minimum 8–12 characters
                 </li>
                 <li className="flex items-center gap-2">
-                  <input type="checkbox" checked={passwordRules.firstCapital} readOnly />
+                  <input
+                    type="checkbox"
+                    checked={passwordRules.firstCapital}
+                    readOnly
+                  />
                   First letter capital
                 </li>
                 <li className="flex items-center gap-2">
-                  <input type="checkbox" checked={passwordRules.digit} readOnly />
+                  <input
+                    type="checkbox"
+                    checked={passwordRules.digit}
+                    readOnly
+                  />
                   At least one digit
                 </li>
                 <li className="flex items-center gap-2">
-                  <input type="checkbox" checked={passwordRules.specialChar} readOnly />
+                  <input
+                    type="checkbox"
+                    checked={passwordRules.specialChar}
+                    readOnly
+                  />
                   At least one special character
                 </li>
                 <li className="flex items-center gap-2">
-                  <input type="checkbox" checked={passwordRules.noSpaces} readOnly />
+                  <input
+                    type="checkbox"
+                    checked={passwordRules.noSpaces}
+                    readOnly
+                  />
                   No spaces
                 </li>
                 <li className="flex items-center gap-2">
-                  <input type="checkbox" checked={passwordRules.notEasy} readOnly />
+                  <input
+                    type="checkbox"
+                    checked={passwordRules.notEasy}
+                    readOnly
+                  />
                   Avoid common passwords (e.g., "password", "123456")
                 </li>
               </ul>
@@ -255,7 +290,8 @@ export default function InitialPasswordSetup() {
 
         <div className="mt-6 text-sm text-gray-600">
           <button
-            onClick={() => {navigate("/")
+            onClick={() => {
+              navigate("/");
               logout();
             }}
             className="hover:underline hover:text-blue-600"

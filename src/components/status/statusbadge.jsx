@@ -1,22 +1,27 @@
 import React from "react";
 import clsx from "clsx";
 
-/**
- * Reusable Status Badge
- * Colors are fixed: green (+ve), yellow (pending/holding), red (-ve)
- * Text is dynamic (any status label)
- */
 const StatusBadge = ({ label, size = "md" }) => {
-  const normalized = label.toLowerCase();
+  const raw = label?.toLowerCase() || "";
+  const normalized = raw.replace(/_/g, " ").trim();
 
   let bgColor = "bg-gray-200";
   let textColor = "text-gray-700";
 
-  if (
+  if (normalized === "joining pending") {
+    bgColor = "bg-red-100";
+    textColor = "text-red-700";
+  } else if (normalized === "joining") {
+    bgColor = "bg-purple-100";
+    textColor = "text-purple-700";
+  } else if (normalized === "completed") {
+    bgColor = "bg-blue-100";
+    textColor = "text-blue-700";
+  } else if (
     normalized.includes("approve") ||
     normalized.includes("complete") ||
     normalized.includes("release") ||
-    normalized.includes("active")
+    normalized.includes("active") 
   ) {
     bgColor = "bg-green-100";
     textColor = "text-green-700";
@@ -31,10 +36,44 @@ const StatusBadge = ({ label, size = "md" }) => {
     normalized.includes("reject") ||
     normalized.includes("cancel") ||
     normalized.includes("fail") ||
-    normalized.includes("inactive") 
+    normalized.includes("inactive")
   ) {
     bgColor = "bg-red-100";
     textColor = "text-red-600";
+  }
+
+  if (raw === "offered") {
+    bgColor = "bg-blue-100";
+    textColor = "text-blue-700";
+  }
+
+  if (raw === "created") {
+    bgColor = "bg-gray-100";
+    textColor = "text-gray-700";
+  }
+
+  if (raw === "reject") {
+    bgColor = "bg-red-100";
+    textColor = "text-red-700";
+  }
+
+  if (raw === "verified") {
+    bgColor = "bg-green-100";
+    textColor = "text-green-700";
+  }
+
+  if (raw === "accepted") {
+    bgColor = "bg-orange-100";
+    textColor = "text-orange-700";
+  }
+
+  if (raw === "submitted") {
+    bgColor = "bg-yellow-100";
+    textColor = "text-yellow-700";
+  }
+  if (normalized === "rescheduled") {
+    bgColor = "bg-yellow-100";
+    textColor = "text-yellow-700";
   }
 
   const sizeStyles = {

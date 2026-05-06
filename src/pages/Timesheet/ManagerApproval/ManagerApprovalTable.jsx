@@ -6,7 +6,7 @@ import { reviewTimesheet, handleBulkReview } from "../api";
 import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
-import { MoreVertical, X } from "lucide-react";
+import { MoreVertical, X, ChevronDown, ChevronUp } from "lucide-react";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 import ConfirmationModal from "../../leave_management/models/ConfirmationModal";
 import { set } from "date-fns";
@@ -40,6 +40,11 @@ const ManagerApprovalTable = ({
   const [userLevelLoading, setUserLevelLoading] = useState(null); // for Approve/Reject All Weeks
   const [weekLevelLoading, setWeekLevelLoading] = useState({}); // for per-week Approve/Reject
 
+  // ✅ Per-user expand/collapse state — collapsed by default
+  const [expandedUsers, setExpandedUsers] = useState({});
+  const toggleUser = (userId) =>
+    setExpandedUsers((prev) => ({ ...prev, [userId]: !prev[userId] }));
+
   // -----------------------------
   // Fetch project info
   // -----------------------------
@@ -47,12 +52,12 @@ const ManagerApprovalTable = ({
     const fetchProjectInfo = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/project-info/all`,
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/project-info/all`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         );
         if (!res.ok) throw new Error("Failed to fetch project info");
         const data = await res.json();
@@ -81,13 +86,13 @@ const ManagerApprovalTable = ({
     try {
       const res = await fetch(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       if (!res.ok) throw new Error("Failed to fetch holiday users");
       const data = await res.json();
@@ -124,15 +129,15 @@ const ManagerApprovalTable = ({
   const projectIdToName = useMemo(
     () =>
       Object.fromEntries(projectInfo.map((p) => [p.projectId, p.projectName])),
-    [projectInfo]
+    [projectInfo],
   );
 
   const taskIdToName = useMemo(
     () =>
       Object.fromEntries(
-        projectInfo.flatMap((p) => p.tasks.map((t) => [t.taskId, t.taskName]))
+        projectInfo.flatMap((p) => p.tasks.map((t) => [t.taskId, t.taskName])),
       ),
-    [projectInfo]
+    [projectInfo],
   );
 
   // -----------------------------
@@ -156,7 +161,7 @@ const ManagerApprovalTable = ({
           })),
         })),
       })),
-    [groupedData, projectIdToName, taskIdToName]
+    [groupedData, projectIdToName, taskIdToName],
   );
 
   // -----------------------------
@@ -167,7 +172,7 @@ const ManagerApprovalTable = ({
       await reviewTimesheet(timesheetId, comment, status);
       showStatusToast(
         `Timesheet ${status.toLowerCase()} successfully`,
-        "success"
+        "success",
       );
       onRefresh?.();
     } catch (err) {
@@ -178,11 +183,11 @@ const ManagerApprovalTable = ({
 
   const disableButton = (user) => {
     const submittedWeeks = user.weeklySummary.filter((week) => {
-        const status = week.weeklyStatus?.toUpperCase();
-        return status === "SUBMITTED" || status === "PARTIALLY APPROVED";
-      });
+      const status = week.weeklyStatus?.toUpperCase();
+      return status === "SUBMITTED" || status === "PARTIALLY APPROVED";
+    });
 
-      return (submittedWeeks.length === 0 );
+    return submittedWeeks.length === 0;
   };
 
   // -----------------------------
@@ -216,7 +221,7 @@ const ManagerApprovalTable = ({
 
       const res = await fetch(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheets/review_multiple_users`,
         {
           method: "POST",
@@ -225,7 +230,7 @@ const ManagerApprovalTable = ({
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(requestPayload),
-        }
+        },
       );
 
       if (!res.ok) throw new Error("Bulk review failed");
@@ -234,7 +239,7 @@ const ManagerApprovalTable = ({
         `All submitted weeks ${status.toLowerCase()} successfully for ${
           user.userName
         }`,
-        "success"
+        "success",
       );
 
       onRefresh?.();
@@ -307,7 +312,7 @@ const ManagerApprovalTable = ({
       user.weeklySummary.forEach((week) => {
         // Get week details based on calendar month
         const allDates = week.timesheets.flatMap((t) =>
-          t.entries.map((e) => new Date(t.workDate))
+          t.entries.map((e) => new Date(t.workDate)),
         );
         const firstEntryDate = allDates[0];
         const { weekNumber, dateRange } = getMonthWeekRange(firstEntryDate);
@@ -316,7 +321,7 @@ const ManagerApprovalTable = ({
         const totalHours = week.timesheets.reduce(
           (sum, sheet) =>
             sum + sheet.entries.reduce((s, e) => s + (e.hoursWorked || 0), 0),
-          0
+          0,
         );
 
         // 🧮 Calculate Billable Hours based on `billable === "Yes"` (or true)
@@ -326,7 +331,7 @@ const ManagerApprovalTable = ({
             sheet.entries
               .filter((e) => e.billable === "Yes" || e.billable === true)
               .reduce((s, e) => s + (e.hoursWorked || 0), 0),
-          0
+          0,
         );
 
         let weekPrinted = false;
@@ -362,7 +367,7 @@ const ManagerApprovalTable = ({
 
             userPrinted = true;
             weekPrinted = true;
-          })
+          }),
         );
       });
     });
@@ -401,10 +406,10 @@ const ManagerApprovalTable = ({
               entry.hoursWorked?.toFixed(2) || 0,
               new Date(sheet.workDate).toLocaleDateString(),
               sheet.status,
-            ])
-          )
-        )
-      )
+            ]),
+          ),
+        ),
+      ),
     );
 
     autoTable(doc, {
@@ -434,7 +439,7 @@ const ManagerApprovalTable = ({
       .filter(
         (week) =>
           statusFilter === "All" ||
-          week.weeklyStatus?.toUpperCase() === statusFilter.toUpperCase()
+          week.weeklyStatus?.toUpperCase() === statusFilter.toUpperCase(),
       )
       .map((week) => (
         <div
@@ -453,7 +458,7 @@ const ManagerApprovalTable = ({
                     variant="success"
                     size="medium"
                     disabled={Object.values(weekLevelLoading || {}).some(
-                      Boolean
+                      Boolean,
                     )}
                     onClick={handleApproveAll}
                   >
@@ -464,7 +469,7 @@ const ManagerApprovalTable = ({
                     variant="danger"
                     size="medium"
                     disabled={Object.values(weekLevelLoading || {}).some(
-                      Boolean
+                      Boolean,
                     )}
                     onClick={handleRejectAllCancelModal}
                     //   async() => {
@@ -563,7 +568,7 @@ const ManagerApprovalTable = ({
                   user.userId,
                   timesheetIds,
                   "REJECTED",
-                  comment
+                  comment,
                 );
                 // setShowCommentBox((prev) => ({
                 //   ...prev,
@@ -599,7 +604,7 @@ const ManagerApprovalTable = ({
                   user.userId,
                   timesheetIds,
                   "APPROVED",
-                  "approved"
+                  "approved",
                 );
                 showStatusToast("Timesheets Approved succesfully!", "success");
                 onRefresh?.();
@@ -620,9 +625,9 @@ const ManagerApprovalTable = ({
               weekEnd: week.endDate,
               timesheets: week.timesheets,
               weekRange: `${new Date(
-                week.startDate
+                week.startDate,
               ).toLocaleDateString()} - ${new Date(
-                week.endDate
+                week.endDate,
               ).toLocaleDateString()}`,
               totalHours: week.totalHours,
               status: week.weeklyStatus,
@@ -661,7 +666,7 @@ const ManagerApprovalTable = ({
       setSelectedUsers((prev) =>
         prev.includes(record.id)
           ? prev.filter((id) => id !== record.id)
-          : [...prev, record.id]
+          : [...prev, record.id],
       );
       return;
     }
@@ -696,7 +701,7 @@ const ManagerApprovalTable = ({
     if (selectedUsers.length === 0) return;
 
     const confirmDelete = window.confirm(
-      `Are you sure you want to remove ${selectedUsers.length} user(s)?`
+      `Are you sure you want to remove ${selectedUsers.length} user(s)?`,
     );
     if (!confirmDelete) return;
 
@@ -704,14 +709,14 @@ const ManagerApprovalTable = ({
       for (const id of selectedUsers) {
         const res = await fetch(
           `${
-            import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+            window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holiday-exclude-users/${id}`,
           {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         );
         if (!res.ok) throw new Error(`Failed to delete user ${id}`);
       }
@@ -743,7 +748,7 @@ const ManagerApprovalTable = ({
     try {
       const res = await fetch(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/create`,
         {
           method: "POST",
@@ -756,7 +761,7 @@ const ManagerApprovalTable = ({
             holidayDate: selectedHoliday,
             reason,
           }),
-        }
+        },
       );
 
       if (!res.ok)
@@ -764,7 +769,7 @@ const ManagerApprovalTable = ({
 
       showStatusToast(
         "User added to holiday exclusion successfully!",
-        "success"
+        "success",
       );
       fetchHolidayExcludedUsers();
       setShowAddUserSection(false);
@@ -786,22 +791,22 @@ const ManagerApprovalTable = ({
       // Run both API calls in parallel and wait for both to finish
       const [usersRes, holidaysRes] = await Promise.all([
         fetch(
-          `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/manager/users`,
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/manager/users`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         ),
         fetch(
           `${
-            import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+            window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holidays/currentMonth`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         ),
       ]);
 
@@ -837,7 +842,7 @@ const ManagerApprovalTable = ({
     try {
       const res = await fetch(
         `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/${selectedUpdateRecord.id}`,
         {
           method: "PUT",
@@ -850,7 +855,7 @@ const ManagerApprovalTable = ({
             holidayDate: updateHoliday,
             reason: updateReason,
           }),
-        }
+        },
       );
 
       if (!res.ok) throw new Error("Failed to update user record");
@@ -897,87 +902,129 @@ const ManagerApprovalTable = ({
               No Approvals
             </div>
           ) : (
-            enrichedGroupedData.map((user) => (
-              <div
-                key={user.userId}
-                className="bg-white rounded-xl shadow-md border p-4"
-              >
-                {/* ✅ One-line layout for username and action buttons */}
-                {console.log("user: ", user)}
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-xl font-bold text-gray-800">
-                    {user.userName} (ID: {user.userId})
-                  </h2>
+            enrichedGroupedData.map((user) => {
+              const isExpanded = !!expandedUsers[user.userId];
+              const totalWeeks = user.weeklySummary?.length || 0;
+              const pendingWeeks =
+                user.weeklySummary?.filter((w) => {
+                  const s = w.weeklyStatus?.toUpperCase();
+                  return (
+                    s === "SUBMITTED" ||
+                    s === "PARTIALLY APPROVED" ||
+                    s === "PARTIALLY_APPROVED"
+                  );
+                }).length || 0;
 
-                  <div className="flex gap-3">
-                    {userLevelLoading === user.userId ? (
-                      <LoadingSpinner text="Processing..." />
-                    ) : (
-                      <>
-                        <Button
-                          variant="success"
-                          size="small"
-                          disabled={userLevelLoading !== null || disableButton(user)}
-                          onClick={handleApproveAllWeeks}
-                          className={`disabled:opacity-50 disabled:cursor-not-allowed`}
-                        >
-                          Approve All Weeks
-                        </Button>
+              return (
+                <div
+                  key={user.userId}
+                  className="bg-white rounded-xl shadow-md border p-4"
+                >
+                  {/* ✅ Collapsible user header */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => toggleUser(user.userId)}
+                      className="flex items-center gap-3 text-left flex-1 min-w-0 py-1 hover:bg-gray-50 rounded-md px-2 -mx-2 transition-colors"
+                      aria-expanded={isExpanded}
+                    >
+                      {isExpanded ? (
+                        <ChevronUp size={20} className="text-gray-500 shrink-0" />
+                      ) : (
+                        <ChevronDown size={20} className="text-gray-500 shrink-0" />
+                      )}
+                      <h2 className="text-xl font-bold text-gray-800 truncate">
+                        {user.userName} (ID: {user.userId})
+                      </h2>
+                      <span className="text-sm text-gray-500 shrink-0">
+                        • {totalWeeks} {totalWeeks === 1 ? "week" : "weeks"}
+                      </span>
+                      {pendingWeeks > 0 && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300 shrink-0">
+                          {pendingWeeks} pending
+                        </span>
+                      )}
+                    </button>
 
-                        <Button
-                          variant="danger"
-                          size="small"
-                          disabled={userLevelLoading !== null || disableButton(user)}
-                          className={`disabled:opacity-50 disabled:cursor-not-allowed`}
-                          onClick={handleCancelModal}
-                        >
-                          Reject All Weeks
-                        </Button>
-                      </>
-                    )}
+                    <div className="flex gap-3 shrink-0">
+                      {userLevelLoading === user.userId ? (
+                        <LoadingSpinner text="Processing..." />
+                      ) : (
+                        <>
+                          <Button
+                            variant="success"
+                            size="small"
+                            disabled={
+                              userLevelLoading !== null || disableButton(user)
+                            }
+                            onClick={handleApproveAllWeeks}
+                            className={`disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            Approve All Weeks
+                          </Button>
+
+                          <Button
+                            variant="danger"
+                            size="small"
+                            disabled={
+                              userLevelLoading !== null || disableButton(user)
+                            }
+                            className={`disabled:opacity-50 disabled:cursor-not-allowed`}
+                            onClick={handleCancelModal}
+                          >
+                            Reject All Weeks
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <CancellationModal
-                  title="Reject All Weeks"
-                  subtitle="Are you sure you want to Reject All Weeks Timesheets?"
-                  isOpen={rejectAllCancellationModal}
-                  onCancel={handleCancelModal}
-                  onConfirm={async (reason) => {
-                    setUserLevelLoading(user.userId);
-                    setActionLoading(true);
-                    try {
-                      await handleSelectAllWeeks(user, "REJECTED", reason);
-                    } finally {
-                      setUserLevelLoading(null);
-                      setActionLoading(false);
-                      handleCancelModal();
-                    }
-                  }}
-                  isLoading={actionLoading}
-                  confirmText="Confirm"
-                />
-                <ConfirmationModal
-                  title="Approve All Weeks"
-                  message="Are you sure you want to Approve All Weeks Timesheets?"
-                  isOpen={approveAllWeeks}
-                  onCancel={handleApproveAllWeeks}
-                  onConfirm={async () => {
-                    setUserLevelLoading(user.userId);
-                    setActionLoading(true);
-                    try {
-                      await handleSelectAllWeeks(user, "APPROVED");
-                    } finally {
-                      setUserLevelLoading(null);
-                      setActionLoading(false);
-                    }
-                  }}
-                  isLoading={actionLoading}
-                />
-                <hr className="my-3 border-gray-200" />
-                {renderUserWeeks(user)}
-              </div>
-            ))
+                  <CancellationModal
+                    title="Reject All Weeks"
+                    subtitle="Are you sure you want to Reject All Weeks Timesheets?"
+                    isOpen={rejectAllCancellationModal}
+                    onCancel={handleCancelModal}
+                    onConfirm={async (reason) => {
+                      setUserLevelLoading(user.userId);
+                      setActionLoading(true);
+                      try {
+                        await handleSelectAllWeeks(user, "REJECTED", reason);
+                      } finally {
+                        setUserLevelLoading(null);
+                        setActionLoading(false);
+                        handleCancelModal();
+                      }
+                    }}
+                    isLoading={actionLoading}
+                    confirmText="Confirm"
+                  />
+                  <ConfirmationModal
+                    title="Approve All Weeks"
+                    message="Are you sure you want to Approve All Weeks Timesheets?"
+                    isOpen={approveAllWeeks}
+                    onCancel={handleApproveAllWeeks}
+                    onConfirm={async () => {
+                      setUserLevelLoading(user.userId);
+                      setActionLoading(true);
+                      try {
+                        await handleSelectAllWeeks(user, "APPROVED");
+                      } finally {
+                        setUserLevelLoading(null);
+                        setActionLoading(false);
+                      }
+                    }}
+                    isLoading={actionLoading}
+                  />
+
+                  {isExpanded && (
+                    <>
+                      <hr className="my-3 border-gray-200" />
+                      {renderUserWeeks(user)}
+                    </>
+                  )}
+                </div>
+              );
+            })
           )}
         </>
       )}
@@ -1076,7 +1123,7 @@ const ManagerApprovalTable = ({
                     if (!holidayData || holidayData.length === 0) {
                       showStatusToast(
                         "No holiday excluded users found. Please create one first.",
-                        "info"
+                        "info",
                       );
                       return;
                     }
@@ -1103,7 +1150,7 @@ const ManagerApprovalTable = ({
                       if (!holidayData || holidayData.length === 0) {
                         showStatusToast(
                           "No holiday excluded users found. Please create one first.",
-                          "info"
+                          "info",
                         );
                         return;
                       }

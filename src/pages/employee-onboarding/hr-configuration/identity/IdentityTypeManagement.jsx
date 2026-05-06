@@ -2,15 +2,20 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import AddEditIdentityModal from "./AddEditIdentityModal";
+import { useNavigate } from "react-router-dom";
 
 export default function IdentityTypeManagement() {
   const [identities, setIdentities] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState(null);
 
+  const [deleteBlocked, setDeleteBlocked] = useState(null);
+
   const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const navigate = useNavigate();
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   /* ---------------- FETCH ALL IDENTITIES ---------------- */
   const fetchIdentities = async () => {
@@ -31,20 +36,44 @@ export default function IdentityTypeManagement() {
     fetchIdentities();
   }, []);
 
+  /* ---------------- ESC KEY CLOSE (UX IMPROVEMENT) ---------------- */
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape") {
+        setDeleteBlocked(null);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   /* ---------------- DELETE ---------------- */
   const handleDelete = async (uuid) => {
-    if (!window.confirm("Are you sure you want to delete this identity type?")) {
+    if (!window.confirm("Are you sure you want to delete this identity type?"))
       return;
-    }
 
     try {
       await axios.delete(`${BASE_URL}/identity/${uuid}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       toast.success("Identity type deleted");
-      fetchIdentities();
-    } catch {
-      toast.error("Failed to delete identity type");
+      setIdentities((prev) =>
+        prev.filter((i) => i.identity_type_uuid !== uuid),
+      );
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+
+      // 🔥 BUSINESS RULE: used in country mappings
+      if (err?.response?.status === 500) {
+        setDeleteBlocked({
+          message:
+            detail?.message ||
+            "This identity type is already used in country identity mappings. Please remove it from country mappings first.",
+        });
+      } else {
+        toast.error("Failed to delete identity type");
+      }
     }
   };
 
@@ -81,8 +110,8 @@ export default function IdentityTypeManagement() {
             <thead className="bg-blue-900 text-white">
               <tr>
                 <th className="px-6 py-3 text-left">Name</th>
-                <th className="px-6 py-3 text-left">Description</th>
-                <th className="px-6 py-3 text-left">Status</th>
+                <th className="px-6 py-3 text-center">Description</th>
+                <th className="px-6 py-3 text-center">Status</th>
                 <th className="px-6 py-3 text-left">Actions</th>
               </tr>
             </thead>
@@ -90,7 +119,10 @@ export default function IdentityTypeManagement() {
             <tbody>
               {identities.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-6 text-center text-gray-500">
+                  <td
+                    colSpan="4"
+                    className="px-6 py-6 text-center text-gray-500"
+                  >
                     No identity types found
                   </td>
                 </tr>
@@ -103,9 +135,7 @@ export default function IdentityTypeManagement() {
                     <td className="px-6 py-3 font-medium">
                       {item.identity_type_name}
                     </td>
-                    <td className="px-6 py-3">
-                      {item.description || "—"}
-                    </td>
+                    <td className="px-6 py-3">{item.description || "—"}</td>
                     <td className="px-6 py-3">
                       <span
                         className={`px-2 py-1 rounded text-sm ${
@@ -128,9 +158,7 @@ export default function IdentityTypeManagement() {
                         Edit
                       </button>
                       <button
-                        onClick={() =>
-                          handleDelete(item.identity_type_uuid)
-                        }
+                        onClick={() => handleDelete(item.identity_type_uuid)}
                         className="text-red-700 hover:underline"
                       >
                         Delete
@@ -144,12 +172,57 @@ export default function IdentityTypeManagement() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* 🔴 DELETE BLOCKED MODAL */}
+      {deleteBlocked && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-[440px]">
+            <h3 className="text-lg font-semibold text-red-600 mb-3">
+              Cannot Delete Identity Type
+            </h3>
+
+            <p className="text-gray-700 mb-6">{deleteBlocked.message}</p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteBlocked(null)}
+                className="px-4 py-2 bg-gray-300 rounded-lg"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={() => {
+                  setDeleteBlocked(null);
+                  navigate("/employee-onboarding/hr-configuration/mapping");
+                }}
+                className="px-4 py-2 bg-blue-700 text-white rounded-lg"
+              >
+                Go to Country Mapping
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD / EDIT MODAL */}
       {showModal && (
         <AddEditIdentityModal
           editData={editData}
           onClose={() => setShowModal(false)}
-          onSuccess={fetchIdentities}
+          onSuccess={(savedItem) => {
+            setIdentities((prev) => {
+              const exists = prev.some(
+                (i) => i.identity_type_uuid === savedItem.identity_type_uuid,
+              );
+              return exists
+                ? prev.map((i) =>
+                    i.identity_type_uuid === savedItem.identity_type_uuid
+                      ? savedItem
+                      : i,
+                  )
+                : [savedItem, ...prev];
+            });
+          }}
         />
       )}
     </div>

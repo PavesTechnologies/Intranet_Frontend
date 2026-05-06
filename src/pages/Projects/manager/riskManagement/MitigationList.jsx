@@ -63,15 +63,17 @@ function MitigationRow({ mitigation, members, onUpdated, onDelete }) {
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState(mitigation);
 
-  const BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
   const token = localStorage.getItem("token");
 
   async function updateStatus(field, value) {
     await axios.patch(
       `${BASE_URL}/api/mitigation-plans/${mitigation.id}/status`,
-      { used: field === "used" ? value : mitigation.used,
-        effective: field === "effective" ? value : mitigation.effective },
-      { headers: { Authorization: `Bearer ${token}` } }
+      {
+        used: field === "used" ? value : mitigation.used,
+        effective: field === "effective" ? value : mitigation.effective,
+      },
+      { headers: { Authorization: `Bearer ${token}` } },
     );
 
     onUpdated({ ...mitigation, [field]: value });
@@ -81,7 +83,7 @@ function MitigationRow({ mitigation, members, onUpdated, onDelete }) {
     const res = await axios.put(
       `${BASE_URL}/api/mitigation-plans/${mitigation.id}`,
       form,
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` } },
     );
     onUpdated(res.data);
     setEdit(false);
@@ -94,25 +96,19 @@ function MitigationRow({ mitigation, members, onUpdated, onDelete }) {
         <div className="space-y-3">
           <textarea
             value={form.mitigation}
-            onChange={(e) =>
-              setForm({ ...form, mitigation: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, mitigation: e.target.value })}
             className="border rounded-lg p-2 w-full text-sm"
           />
 
           <textarea
             value={form.contingency || ""}
-            onChange={(e) =>
-              setForm({ ...form, contingency: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, contingency: e.target.value })}
             className="border rounded-lg p-2 w-full text-sm"
           />
 
           <select
             value={form.ownerId || ""}
-            onChange={(e) =>
-              setForm({ ...form, ownerId: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, ownerId: e.target.value })}
             className="border rounded-lg p-2 text-sm bg-white"
           >
             <option value="">Select owner</option>

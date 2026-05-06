@@ -33,7 +33,7 @@ const ViewSheet = () => {
     if (type === "task") return `/api/tasks/${id}`;
     if (type === "story") return `/api/stories/${id}`;
     if (type === "epic") return `/api/epics/${id}`;
-    if (type === "bug") return `/api/bugs/${id}`; // ✅ Added for bugs
+    if (type === "bug") return `/api/bugs/${id}`;
     return null;
   };
 
@@ -45,7 +45,7 @@ const ViewSheet = () => {
 
       setLoading(true);
       axios
-        .get(`${import.meta.env.VITE_PMS_BASE_URL}${endpoint}`, { headers })
+        .get(`${window.__APP_CONFIG__.PMS_BASE_URL}${endpoint}`, { headers })
         .then((res) => setIssue(res.data))
         .catch((err) => console.error("Failed to fetch issue:", err))
         .finally(() => setLoading(false));
@@ -55,12 +55,17 @@ const ViewSheet = () => {
   // Fetch related entity names
   useEffect(() => {
     if (!issue) return;
-    const base = import.meta.env.VITE_PMS_BASE_URL;
+    const base = window.__APP_CONFIG__.PMS_BASE_URL;
 
     const fetchName = async (endpoint, field) => {
       try {
         const res = await axios.get(`${base}${endpoint}`, { headers });
-        return res.data.name || res.data.title || res.data.sprintName || res.data.fullName;
+        return (
+          res.data.name ||
+          res.data.title ||
+          res.data.sprintName ||
+          res.data.fullName
+        );
       } catch (err) {
         console.warn(`Failed to fetch ${field}:`, err);
         return null;
@@ -70,12 +75,35 @@ const ViewSheet = () => {
     const fetchRelated = async () => {
       const names = {};
 
-      if (issue.epicId) names.epicName = await fetchName(`/api/epics/${issue.epicId}`, "epic");
-      if (issue.storyId) names.storyName = await fetchName(`/api/stories/${issue.storyId}`, "story");
-      if (issue.sprint?.id) names.sprintName = await fetchName(`/api/sprints/${issue.sprint.id}`, "sprint");
-      if (issue.reporterId) names.reporterName = await fetchName(`/api/users/${issue.reporterId}`, "reporter");
-      if (issue.assigneeId) names.assigneeName = await fetchName(`/api/users/${issue.assigneeId}`, "assignee");
-      if (issue.projectId) names.projectName = await fetchName(`/api/projects/${issue.projectId}`, "project");
+      if (issue.epicId)
+        names.epicName = await fetchName(`/api/epics/${issue.epicId}`, "epic");
+      if (issue.storyId)
+        names.storyName = await fetchName(
+          `/api/stories/${issue.storyId}`,
+          "story",
+        );
+
+      const sId = issue.sprintId || issue.sprint?.id;
+      if (sId) {
+        // Fetching from a general sprints endpoint or via project if needed
+        names.sprintName = await fetchName(`/api/sprints/${sId}`, "sprint");
+      }
+
+      if (issue.reporterId)
+        names.reporterName = await fetchName(
+          `/api/users/${issue.reporterId}`,
+          "reporter",
+        );
+      if (issue.assigneeId)
+        names.assigneeName = await fetchName(
+          `/api/users/${issue.assigneeId}`,
+          "assignee",
+        );
+      if (issue.projectId)
+        names.projectName = await fetchName(
+          `/api/projects/${issue.projectId}`,
+          "project",
+        );
 
       setRelatedNames(names);
     };
@@ -84,58 +112,130 @@ const ViewSheet = () => {
   }, [issue]);
 
   if (loading) {
-    return <p className="p-6 text-indigo-600 font-medium">Loading {type} details...</p>;
+    return (
+      <div className="flex justify-center items-center h-64 mt-10">
+        <p className="text-indigo-600 font-medium animate-pulse">
+          Loading {type} details...
+        </p>
+      </div>
+    );
   }
 
   if (!issue) {
-    return <p className="p-6 text-red-500 font-medium">Failed to load {type} details.</p>;
+    return (
+      <div className="flex justify-center items-center h-64 mt-10">
+        <p className="text-red-500 font-medium">
+          Failed to load {type} details.
+        </p>
+      </div>
+    );
   }
 
+  // Safely extract status string to prevent crashes
+  const statusString =
+    issue.status?.name || issue.statusName || issue.status || "Unknown";
+
   return (
-    <div className="max-w-5xl mx-auto mt-8 px-6 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-indigo-800 capitalize">
-          {type} Details
-        </h1>
-        <Button
-          size="medium"
-          variant="primary"
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2"
-        >
-          Back
-        </Button>
+    <div className="max-w-5xl mx-auto mt-8 px-4 sm:px-6 space-y-8 pb-12">
+      {/* HEADER */}
+      <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 capitalize flex items-center gap-2">
+            <span className="text-indigo-600">{type}</span> Details
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {relatedNames.projectName || projectId
+              ? `Project: ${relatedNames.projectName || projectId}`
+              : ""}
+          </p>
+        </div>
+      <button
+  onClick={() => navigate(-1)}
+  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 transition-colors rounded-lg hover:bg-gray-100 hover:text-gray-900"
+>
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="18" height="18" 
+    viewBox="0 0 24 24" fill="none" 
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+  >
+    <path d="m15 18-6-6 6-6"/>
+  </svg>
+  Back
+</button>
       </div>
 
-      {/* Issue Card */}
-      <div className="bg-white border rounded-xl shadow-md p-8 space-y-6">
-        {/* Title */}
-        <h2 className="text-2xl font-semibold text-gray-900">
-          {issue.title || issue.name || "Untitled"}
-        </h2>
+      {/* MAIN ISSUE CARD */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 sm:p-8 space-y-8">
+        {/* Title & Description */}
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold text-gray-900 leading-tight">
+            {issue.title || issue.name || "Untitled"}
+          </h2>
+          <div>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Description
+            </h3>
+            <div className="text-gray-700 leading-relaxed bg-gray-50/50 p-4 rounded-lg border border-gray-100 min-h-[80px]">
+              {issue.description ? (
+                <span className="whitespace-pre-wrap">{issue.description}</span>
+              ) : (
+                <span className="text-gray-400 italic">
+                  No description available.
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
 
-        {/* Description */}
-        <p className="text-gray-700 leading-relaxed">
-          {issue.description || "No description available."}
-        </p>
+        <hr className="border-gray-100" />
 
-        {/* Grid of details */}
-        <dl className="grid grid-cols-2 gap-x-8 gap-y-5 text-sm">
+        {/* DETAILS GRID */}
+        <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6 text-sm">
+          {/* --- COMMON FIELDS --- */}
           <Detail label="Status">
-            <Badge color="blue">{issue.status || issue.statusName || s.status?.name === storyFilter || "Unknown"}</Badge>
+            <Badge color="blue">
+              {String(statusString).replace(/_/g, " ")}
+            </Badge>
           </Detail>
+
           <Detail label="Priority">
             <Badge color="red">{issue.priority || "Not set"}</Badge>
           </Detail>
 
           <Detail
-            label="Reporter"
-            value={relatedNames.reporterName || issue.reporter?.name || issue.reporterName || "-"}
+            label="Assignee"
+            value={
+              relatedNames.assigneeName ||
+              issue.assignee?.name ||
+              issue.assignedTo ||
+              "Unassigned"
+            }
           />
           <Detail
-            label="Assignee"
-            value={relatedNames.assigneeName || issue.assignee?.name || issue.assignedTo || "-"}
+            label="Reporter"
+            value={
+              relatedNames.reporterName ||
+              issue.reporter?.name ||
+              issue.reporterName ||
+              "Unassigned"
+            }
+          />
+
+          <Detail
+            label="Start Date"
+            value={
+              issue.startDate
+                ? new Date(issue.startDate).toLocaleDateString()
+                : "-"
+            }
+          />
+
+          <Detail
+            label="Due Date"
+            value={
+              issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : "-"
+            }
           />
 
           <Detail
@@ -144,98 +244,144 @@ const ViewSheet = () => {
               issue.createdOn
                 ? new Date(issue.createdOn).toLocaleDateString()
                 : issue.createdAt
-                ? new Date(issue.createdAt).toLocaleDateString()
-                : "-"
+                  ? new Date(issue.createdAt).toLocaleDateString()
+                  : "-"
             }
           />
 
-          <Detail
-            label="Due Date"
-            value={issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : "-"}
-          />
-
-          {/* ✅ EPIC */}
+          {/* --- EPIC SPECIFIC --- */}
           {type === "epic" && (
             <>
               <Detail label="Progress">
                 <Badge color="green">{`${issue.progressPercentage || 0}%`}</Badge>
               </Detail>
-              <Detail label="Project" value={relatedNames.projectName || projectId || "-"} />
             </>
           )}
 
-          {/* ✅ STORY */}
+          {/* --- STORY SPECIFIC --- */}
           {type === "story" && (
             <>
-              <Detail label="Story Points" value={issue.storyPoints || "-"} />
-              <Detail label="Acceptance Criteria" value={issue.acceptanceCriteria || "-"} />
-              <Detail label="Epic" value={relatedNames.epicName || "-"} />
-              <Detail label="Sprint" value={relatedNames.sprintName || "-"} />
-              <Detail label="Project" value={relatedNames.projectName || projectId || "-"} />
+              <Detail
+                label="Epic"
+                value={relatedNames.epicName || issue.epic?.name || "-"}
+              />
+              <Detail
+                label="Sprint"
+                value={relatedNames.sprintName || issue.sprint?.name || "-"}
+              />
+              <Detail label="Story Points">
+                {issue.storyPoints ? (
+                  <span className="font-semibold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md">
+                    {issue.storyPoints}
+                  </span>
+                ) : (
+                  "-"
+                )}
+              </Detail>
             </>
           )}
 
-          {/* ✅ TASK */}
-         {/* ✅ TASK */}
-{type === "task" && (
-  <>
-    <Detail label="Story" value={relatedNames.storyName || "-"} />
-    <Detail label="Sprint" value={relatedNames.sprintName || "-"} />
-    <Detail label="Acceptance Criteria" value={issue.acceptanceCriteria || "-"} />
-    <Detail
-      label="Billable"
-      value={
-        issue.billable !== undefined && issue.billable !== null
-          ? issue.billable
-            ? "Yes"
-            : "No"
-          : "-"
-      }
-    />
-    <Detail label="Project" value={relatedNames.projectName || projectId || "-"} />
-  </>
-)}
+          {/* --- TASK SPECIFIC --- */}
+          {type === "task" && (
+            <>
+              <Detail
+                label="Story"
+                value={relatedNames.storyName || issue.storyTitle || "-"}
+              />
+              <Detail
+                label="Sprint"
+                value={relatedNames.sprintName || issue.sprintName || "-"}
+              />
+              <Detail label="Billable">
+                <Badge
+                  color={
+                    issue.billable || String(issue.isBillable) === "true"
+                      ? "green"
+                      : "gray"
+                  }
+                >
+                  {issue.billable || String(issue.isBillable) === "true"
+                    ? "Yes"
+                    : "No"}
+                </Badge>
+              </Detail>
+            </>
+          )}
 
-          {/* ✅ BUG */}
+          {/* --- BUG SPECIFIC --- */}
           {type === "bug" && (
             <>
-              <Detail label="Severity" value={issue.severity || "-"} />
-              <Detail label="Type" value={issue.type || "-"} />
-              <Detail label="Story" value={relatedNames.storyName || "-"} />
-              <Detail label="Sprint" value={relatedNames.sprintName || "-"} />
-              <Detail label="Project" value={relatedNames.projectName || projectId || "-"} />
+              <Detail
+                label="Story"
+                value={relatedNames.storyName || issue.storyTitle || "-"}
+              />
+              <Detail
+                label="Sprint"
+                value={relatedNames.sprintName || issue.sprintName || "-"}
+              />
+              <Detail label="Severity">
+                <Badge color="red">{issue.severity || "-"}</Badge>
+              </Detail>
+              <Detail
+                label="Bug Type"
+                value={issue.bugType || issue.type || "-"}
+              />
             </>
           )}
         </dl>
+
+        {/* ACCEPTANCE CRITERIA (Stories & Tasks) */}
+        {(type === "story" || type === "task") && issue.acceptanceCriteria && (
+          <div className="pt-4">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Acceptance Criteria
+            </h3>
+            <div className="text-gray-700 leading-relaxed bg-amber-50/50 p-4 rounded-lg border border-amber-100">
+              <span className="whitespace-pre-wrap">
+                {issue.acceptanceCriteria}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Comment Section */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border rounded-xl shadow p-6">
-        <h2 className="text-lg font-semibold mb-4 text-indigo-800">💬 Discussion</h2>
-        <CommentBox entityId={id} entityType={type} currentUser={user} />
+      {/* COMMENT SECTION */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 sm:p-8">
+        <h2 className="text-lg font-bold mb-6 text-gray-900 flex items-center gap-2">
+          <span className="text-indigo-600">💬</span> Discussion
+        </h2>
+        <CommentBox 
+  entityId={id} 
+  entityType={type?.toLowerCase()} // or .toLowerCase()
+  currentUser={user} 
+/>
       </div>
     </div>
   );
 };
 
-// ===== Helper Components =====
+// ===== HELPER COMPONENTS =====
 const Detail = ({ label, value, children }) => (
-  <div>
-    <dt className="font-medium text-gray-600">{label}</dt>
-    <dd className="mt-1 text-gray-900">{children || value || "-"}</dd>
+  <div className="flex flex-col gap-1.5">
+    <dt className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+      {label}
+    </dt>
+    <dd className="text-sm font-medium text-gray-900">
+      {children || value || "-"}
+    </dd>
   </div>
 );
 
 const Badge = ({ children, color }) => {
   const colors = {
-    blue: "bg-blue-100 text-blue-800",
-    red: "bg-red-100 text-red-800",
-    green: "bg-green-100 text-green-800",
-    gray: "bg-gray-100 text-gray-800",
+    blue: "bg-blue-50 text-blue-700 border border-blue-200",
+    red: "bg-red-50 text-red-700 border border-red-200",
+    green: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    gray: "bg-slate-50 text-slate-700 border border-slate-200",
   };
   return (
     <span
-      className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${
+      className={`inline-flex items-center px-2.5 py-1 text-[11px] font-bold tracking-wider uppercase rounded-md ${
         colors[color] || colors.gray
       }`}
     >

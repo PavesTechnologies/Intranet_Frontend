@@ -6,6 +6,27 @@ import { X } from "lucide-react";
 import FormInput from "../../../../../components/forms/FormInput";
 import FormTextArea from "../../../../../components/forms/FormTextArea";
 
+// Wrapper component
+const Wrapper = ({ mode, onClose, children }) => {
+  if (mode === "modal") {
+    return (
+      <div
+        className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
+        onClick={onClose}
+      >
+        <div
+          className="bg-white rounded-2xl w-full max-w-lg relative max-h-[90vh] overflow-hidden flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  return <div className="w-full h-full bg-white flex flex-col">{children}</div>;
+};
+
 const CreateTestPlan = ({ projectId, onClose, onSuccess, mode = "modal" }) => {
   const token = localStorage.getItem("token");
   const createdBy = localStorage.getItem("userId");
@@ -17,7 +38,6 @@ const CreateTestPlan = ({ projectId, onClose, onSuccess, mode = "modal" }) => {
 
   const [loading, setLoading] = useState(false);
 
-  // 🚀 FIXED: Stable onChange handler (no "one-letter" issue)
   const handleChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -44,14 +64,14 @@ const CreateTestPlan = ({ projectId, onClose, onSuccess, mode = "modal" }) => {
 
     try {
       await axios.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/plans`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans`,
         payload,
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       toast.success("Test Plan created successfully");
@@ -65,33 +85,12 @@ const CreateTestPlan = ({ projectId, onClose, onSuccess, mode = "modal" }) => {
     }
   };
 
-  // ⭐ Modal wrapper (clean + stable)
-  const Wrapper = ({ children }) => {
-    if (mode === "modal") {
-      return (
-        <div
-          className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
-          onClick={onClose}
-        >
-          <div
-            className="bg-white rounded-2xl w-full max-w-lg relative max-h-[90vh] overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {children}
-          </div>
-        </div>
-      );
-    }
-
-    return <div className="w-full h-full bg-white flex flex-col">{children}</div>;
-  };
-
   return (
-    <Wrapper>
+    <Wrapper mode={mode} onClose={onClose}>
       {/* HEADER */}
       <div className="flex justify-between items-center p-6 border-b">
         <h2 className="text-xl font-semibold">Create Test Plan</h2>
-        <button onClick={onClose}>
+        <button type="button" onClick={onClose}>
           <X className="text-gray-600" />
         </button>
       </div>
@@ -101,7 +100,6 @@ const CreateTestPlan = ({ projectId, onClose, onSuccess, mode = "modal" }) => {
         className="p-6 overflow-y-auto flex-1 space-y-6"
         onSubmit={handleSubmit}
       >
-        {/* Name Input */}
         <FormInput
           label="Test Plan Name *"
           name="name"
@@ -110,7 +108,6 @@ const CreateTestPlan = ({ projectId, onClose, onSuccess, mode = "modal" }) => {
           required
         />
 
-        {/* Objective TextArea */}
         <FormTextArea
           label="Objective"
           name="objective"

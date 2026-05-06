@@ -37,6 +37,13 @@ export default function HrConfiguration() {
       icon: <Link2 />,
       path: "/employee-onboarding/hr-configuration/mapping",
     },
+    {
+      title: "Department ↔ Designation",
+      description: "configure department to designation mapping",
+      icon: <Link2 />,
+      path: "/employee-onboarding/hr-configuration/departments",
+    },
+
    
   ];
 

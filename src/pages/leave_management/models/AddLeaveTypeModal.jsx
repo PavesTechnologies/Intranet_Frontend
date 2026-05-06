@@ -5,7 +5,7 @@ import { Listbox, Transition } from "@headlessui/react";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const useLeavelables = () => {
   const [leavelables, setLeavelables] = useState([]);
@@ -24,7 +24,7 @@ const useLeavelables = () => {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         );
         setaccrualFrequency(accfre.data || []);
         // console.log("res", res);
@@ -128,6 +128,7 @@ const defaultForm = {
   minLeaveDays: "",
   coolDownPeriod: "",
   gender: "",
+  maxNoOfTimes: "",
   // deactivationEffectiveDate: "",
 };
 
@@ -170,81 +171,120 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
     e.preventDefault();
     setSubmitting(true);
 
-    const payload = isGenderBasedLeave(formData.leaveName)
-      ?
-      {
-        updateType: "GENDER_BASED",
-        genderBasedLeave: {
-          leaveTypeId: formData.leaveTypeId || null,
-          leaveName: formData.leaveName,
-          maxLeaveDays: formData.maxLeaveDays
-            ? Number(formData.maxLeaveDays)
-            : null,
-          minLeaveDays: formData.minLeaveDays
-            ? Number(formData.minLeaveDays)
-            : null,
-          waitingPeriodDays: Number(formData.waitingPeriodDays) || 0,
-          advanceNotice: Number(formData.advanceNoticeDays) || 0,
-          coolDownPeriod: Number(formData.coolDownPeriod) || 0,
-          requiresDocumentation: formData.requiresDocumentation,
-          allowNegativeBalance: formData.allowNegativeBalance,
-          noticePeriodRestrictions: formData.noticePeriodRestriction,
-          weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
-          active: formData.active,
-          gender: formData.gender,
-          effectiveStartDate: formData.effectiveStartDate,
-          effectiveEndDate: null,
-        }}
-      : {
-        updateType: "REGULAR",
-        leaveType: {
-          leaveTypeId: formData.leaveTypeId || null,
-          leaveName: formData.leaveName,
-          description: formData.description,
-          accrualFrequency: formData.accrualFrequency,
-          maxDaysPerYear: formData.maxDaysPerYear
-            ? Number(formData.maxDaysPerYear)
-            : null,
-          maxCarryForward: Number(formData.maxCarryForward) || 0,
-          maxCarryForwardPerYear: Number(formData.maxCarryForwardPerYear) || 0,
-          expiryDays: Number(formData.expiryDays) || 0,
-          waitingPeriodDays: Number(formData.waitingPeriodDays) || 0,
-          advanceNoticeDays: Number(formData.advanceNoticeDays) || 0,
-          pastDateLimitDays: Number(formData.pastDateLimitDays) || 0,
-          allowHalfDay: formData.allowHalfDay,
-          allowNegativeBalance: formData.allowNegativeBalance,
-          noticePeriodRestriction: formData.noticePeriodRestriction,
-          weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
-          active: formData.active,
-          effectiveStartDate: formData.effectiveStartDate,
-        }
-      };
+    let payload;
+    const isGender = isGenderBasedLeave(formData.leaveName);
 
+    if (editData) {
+      // --- PAYLOAD FOR UPDATING (Keep your existing structure) ---
+      payload = isGender
+        ? {
+            updateType: "GENDER_BASED",
+            genderBasedLeave: {
+              leaveTypeId: editData.leaveTypeId,
+              leaveName: formData.leaveName,
+              maxLeaveDays: Number(formData.maxLeaveDays) || 0,
+              minLeaveDays: Number(formData.minLeaveDays) || 0,
+              waitingPeriodDays: Number(formData.waitingPeriodDays) || 0,
+              advanceNotice: Number(formData.advanceNoticeDays) || 0,
+              coolDownPeriod: Number(formData.coolDownPeriod) || 0,
+              requiresDocumentation: formData.requiresDocumentation,
+              allowNegativeBalance: formData.allowNegativeBalance,
+              noticePeriodRestrictions: formData.noticePeriodRestriction,
+              weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
+              active: formData.active,
+              gender: formData.gender,
+              effectiveStartDate: formData.effectiveStartDate,
+              maxNoOfTimes: Number(formData.maxNoOfTimes) || 0,
+            },
+          }
+        : {
+            updateType: "REGULAR",
+            leaveType: {
+              leaveTypeId: editData.leaveTypeId,
+              leaveName: formData.leaveName,
+              description: formData.description,
+              accrualFrequency: formData.accrualFrequency,
+              maxDaysPerYear: Number(formData.maxDaysPerYear) || 0,
+              maxCarryForward: Number(formData.maxCarryForward) || 0,
+              maxCarryForwardPerYear:
+                Number(formData.maxCarryForwardPerYear) || 0,
+              expiryDays: Number(formData.expiryDays) || 0,
+              waitingPeriodDays: Number(formData.waitingPeriodDays) || 0,
+              advanceNoticeDays: Number(formData.advanceNoticeDays) || 0,
+              pastDateLimitDays: Number(formData.pastDateLimitDays) || 0,
+              allowHalfDay: formData.allowHalfDay,
+              allowNegativeBalance: formData.allowNegativeBalance,
+              noticePeriodRestriction: formData.noticePeriodRestriction,
+              weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
+              active: formData.active,
+              effectiveStartDate: formData.effectiveStartDate,
+            },
+          };
+    } else {
+      // --- PAYLOAD FOR ADDING (Flat structure, no updateType) ---
+      payload = isGender
+        ? {
+            // Gender-based Add Payload
+            leaveName: formData.leaveName,
+            maxLeaveDays: Number(formData.maxLeaveDays) || 0,
+            minLeaveDays: Number(formData.minLeaveDays) || 0,
+            waitingPeriodDays: Number(formData.waitingPeriodDays) || 0,
+            advanceNotice: Number(formData.advanceNoticeDays) || 0,
+            coolDownPeriod: Number(formData.coolDownPeriod) || 0,
+            requiresDocumentation: formData.requiresDocumentation,
+            allowNegativeBalance: formData.allowNegativeBalance,
+            noticePeriodRestrictions: formData.noticePeriodRestriction,
+            weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
+            active: formData.active,
+            gender: formData.gender,
+            effectiveStartDate: formData.effectiveStartDate,
+            maxNoOfTimes: Number(formData.maxNoOfTimes) || 0,
+          }
+        : {
+            // Regular Add Payload
+            leaveName: formData.leaveName,
+            description: formData.description,
+            accrualFrequency: formData.accrualFrequency,
+            maxDaysPerYear: Number(formData.maxDaysPerYear) || 0,
+            maxCarryForward: Number(formData.maxCarryForward) || 0,
+            maxCarryForwardPerYear:
+              Number(formData.maxCarryForwardPerYear) || 0,
+            expiryDays: Number(formData.expiryDays) || 0,
+            waitingPeriodDays: Number(formData.waitingPeriodDays) || 0,
+            advanceNoticeDays: Number(formData.advanceNoticeDays) || 0,
+            pastDateLimitDays: Number(formData.pastDateLimitDays) || 0,
+            allowHalfDay: formData.allowHalfDay,
+            allowNegativeBalance: formData.allowNegativeBalance,
+            noticePeriodRestriction: formData.noticePeriodRestriction,
+            weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
+            active: formData.active,
+            effectiveStartDate: formData.effectiveStartDate,
+          };
+    }
+
+    // Determine URL and Method
     const url = editData
       ? `${BASE_URL}/api/leave/update-leave-type/${editData.leaveTypeId}`
-      : isGenderBasedLeave(formData.leaveName)
-      ? `${BASE_URL}/api/gender-base-leave/add-leave`
-      : `${BASE_URL}/api/leave/add-leave-type`;
+      : isGender
+        ? `${BASE_URL}/api/gender-base-leave/add-leave`
+        : `${BASE_URL}/api/leave/add-leave-type`;
+
+    const method = editData ? "patch" : "post";
 
     try {
-      const response = editData
-        ? await axios.patch(url, payload, {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          })
-        : await axios.post(url, payload, {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          });
+      const response = await axios({
+        method,
+        url,
+        data: payload,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
       if (response.data?.success) {
         toast.success(
-          response.data.message ||
-            (editData ? "Leave type updated!" : "Leave type added!")
+          response.data.message || (editData ? "Updated!" : "Added!"),
         );
         onSuccess?.();
         onClose();
@@ -252,11 +292,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
         toast.error(response.data?.message || "Something went wrong!");
       }
     } catch (err) {
-      toast.error(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to submit leave type"
-      );
+      toast.error(err.response?.data?.message || "Failed to submit");
     } finally {
       setSubmitting(false);
     }
@@ -309,7 +345,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                   <Listbox.Button className="relative w-full cursor-pointer rounded-lg border border-gray-300 bg-white py-3 pl-4 pr-10 text-left focus:outline-none focus:ring-2 focus:ring-green-500 sm:text-sm">
                     <span className="block truncate">
                       {leavelables.find(
-                        (item) => item.name === formData.leaveName
+                        (item) => item.name === formData.leaveName,
                       )?.label || "Select leave name"}
                     </span>
                     <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -481,6 +517,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               {[
                 "maxLeaveDays",
                 "minLeaveDays",
+                "maxNoOfTimes",
                 "waitingPeriodDays",
                 "advanceNoticePeriod",
                 "coolDownPeriod",
@@ -619,8 +656,8 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               {submitting
                 ? "Submitting..."
                 : editData
-                ? "Update Leave Type"
-                : "Add Leave Type"}
+                  ? "Update Leave Type"
+                  : "Add Leave Type"}
             </button>
           </div>
         </form>

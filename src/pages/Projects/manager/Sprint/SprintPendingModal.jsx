@@ -1,18 +1,17 @@
 import React, { useState } from "react";
 import Button from "../../../../components/Button/Button";
 import axios from "axios";
-import { toast } from "react-toastify";   // <-- FIX ADDED
+import { toast } from "react-toastify"; // <-- FIX ADDED
 
 const SprintPendingModal = ({
   isOpen,
   pendingData,
   sprints,
   onClose,
-  refresh
+  refresh,
 }) => {
-
   // Prevent crash when pendingData is null
-  if (!isOpen || !pendingData) return null;   // <-- FIXED
+  if (!isOpen || !pendingData) return null; // <-- FIXED
 
   const [selectedSprint, setSelectedSprint] = useState("");
 
@@ -22,28 +21,28 @@ const SprintPendingModal = ({
   const completeWithOption = async (option) => {
     try {
       await axios.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/sprints/${pendingData.sprintId}/finish`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${pendingData.sprintId}/finish`,
         {},
         {
-          params: option === "NEXT"
-            ? { option: "NEXT_SPRINT", nextSprintId: selectedSprint }
-            : { option: "BACKLOG" },
-          headers
-        }
+          params:
+            option === "NEXT"
+              ? { option: "NEXT_SPRINT", nextSprintId: selectedSprint }
+              : { option: "BACKLOG" },
+          headers,
+        },
       );
 
-      toast.success("Sprint finalized successfully");
+      toast.success("Sprint finalized successfully", { autoClose: 3000, containerId: "global" });
       refresh();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to finalize sprint");
+      toast.error(err.response?.data?.message || "Failed to finalize sprint", { autoClose: 3000, containerId: "global" });
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-white shadow-xl rounded-2xl w-[600px] p-6 space-y-6 animate-fadeIn">
-
         <h2 className="text-2xl font-semibold text-indigo-900">
           Sprint Completion Validation
         </h2>
@@ -67,7 +66,9 @@ const SprintPendingModal = ({
         {/* Pending Stories */}
         {pendingData.stories?.length > 0 && (
           <div>
-            <h3 className="font-semibold text-orange-500 mt-3">📝 Pending Stories</h3>
+            <h3 className="font-semibold text-orange-500 mt-3">
+              📝 Pending Stories
+            </h3>
             <ul className="list-disc ml-6 text-gray-700">
               {pendingData.stories.map((s, idx) => (
                 <li key={idx}>{s}</li>
@@ -78,7 +79,6 @@ const SprintPendingModal = ({
 
         {/* Options */}
         <div className="mt-6 space-y-3">
-
           {/* Move to next sprint */}
           <div className="flex items-center">
             <select
@@ -88,8 +88,8 @@ const SprintPendingModal = ({
             >
               <option value="">Select Next Sprint</option>
               {sprints
-                .filter(sp => sp.status === "PLANNING")
-                .map(sp => (
+                .filter((sp) => sp.status === "PLANNING")
+                .map((sp) => (
                   <option key={sp.id} value={sp.id}>
                     {sp.name}
                   </option>

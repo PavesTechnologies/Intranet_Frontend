@@ -9,6 +9,35 @@ import FormSelect from "../../../../components/forms/FormSelect";
 import FormTextArea from "../../../../components/forms/FormTextArea";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
 
+// ===================== WRAPPER =====================
+const Wrapper = ({ children, mode, onClose }) => {
+  if (mode === "modal") {
+    return (
+      <div
+        className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
+        onClick={onClose}
+      >
+        <div
+          className="bg-white rounded-2xl w-full max-w-lg relative max-h-[90vh] overflow-hidden flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  // Drawer Mode
+  return (
+    <div
+      className="w-full h-full flex flex-col bg-white"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children}
+    </div>
+  );
+};
+
 const EditStoryForm = ({
   storyId,
   projectId,
@@ -22,11 +51,9 @@ const EditStoryForm = ({
     acceptanceCriteria: "",
     storyPoints: null,
     priority: "MEDIUM",
-
     epicId: null,
     sprintId: null,
     statusId: null,
-
     assigneeId: null,
     reporterId: null,
   });
@@ -52,24 +79,24 @@ const EditStoryForm = ({
         const [storyRes, userRes, epicRes, sprintRes, statusRes] =
           await Promise.all([
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/${storyId}`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
+              axiosConfig,
             ),
             axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/statuses`,
-              axiosConfig
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
+              axiosConfig,
             ),
           ]);
 
@@ -81,15 +108,13 @@ const EditStoryForm = ({
           acceptanceCriteria: data.acceptanceCriteria || "",
           storyPoints: data.storyPoints || "",
           priority: data.priority || "MEDIUM",
-
           epicId: data.epicId || "",
           sprintId: data.sprintId || "",
           statusId: data.statusId || "",
-
           assigneeId: data.assigneeId || "",
           reporterId: data.reporterId || "",
           startDate: data.startDate || "",
-          dueDate: data.dueDate || "",  
+          dueDate: data.dueDate || "",
         });
 
         setUsers(userRes.data.content || userRes.data || []);
@@ -132,6 +157,7 @@ const EditStoryForm = ({
 
   // ===================== SUBMIT =====================
   const handleSubmit = async (e) => {
+    if (!validateForm()) return;
     e.preventDefault();
     setLoading(true);
 
@@ -147,15 +173,21 @@ const EditStoryForm = ({
       sprintId: formData.sprintId,
       statusId: formData.statusId,
       priority: formData.priority,
-      startDate: new Date(formData.startDate).toISOString(),
-      dueDate: new Date(formData.dueDate).toISOString(),
+
+      startDate: formData.startDate
+        ? new Date(formData.startDate).toISOString()
+        : null,
+
+      dueDate: formData.dueDate
+        ? new Date(formData.dueDate).toISOString()
+        : null,
     };
 
     try {
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/${storyId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}`,
         payload,
-        axiosConfig
+        axiosConfig,
       );
 
       toast.success("Story updated successfully!");
@@ -179,54 +211,61 @@ const EditStoryForm = ({
     }
   };
 
+  const validateForm = () => {
+    const title = formData.title?.trim();
+
+    // Required validation
+    if (!title) {
+      toast.error("Story title is required.");
+      return false;
+    }
+
+    // Length validation
+    if (title.length < 2 || title.length > 200) {
+      toast.error("Story title must be between 2 and 200 characters.");
+      return false;
+    }
+
+    // Start Date vs Due Date validation
+    if (formData.startDate && formData.dueDate) {
+      const start = new Date(formData.startDate);
+      const due = new Date(formData.dueDate);
+      if (due < start) {
+        toast.error("Due date cannot be earlier than the start date.");
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   // ===================== LOADING STATE =====================
   if (loading) {
     return (
-      <p className="text-gray-600 text-center py-6">Loading story details...</p>
+      <Wrapper mode={mode} onClose={onClose}>
+        <div className="flex-1 flex items-center justify-center py-10">
+          <p className="text-gray-600">Loading story details...</p>
+        </div>
+      </Wrapper>
     );
   }
 
-  // ===================== WRAPPER =====================
-  const Wrapper = ({ children }) => {
-    if (mode === "modal") {
-      return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="absolute inset-0" onClick={onClose} />
-
-          <div
-            className="relative bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col z-50"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {children}
-          </div>
-        </div>
-      );
-    }
-
-    // Drawer Mode
-    return (
-      <div
-        className="h-full w-full flex flex-col bg-white"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {children}
-      </div>
-    );
-  };
-
   // ===================== UI =====================
   return (
-    <Wrapper>
+    <Wrapper mode={mode} onClose={onClose}>
       {/* HEADER */}
-      <div className="p-6 border-b flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Edit User Story</h2>
-        <button onClick={onClose}>
-          <X className="text-gray-600" />
+      <div className="flex justify-between items-center p-6 border-b shrink-0">
+        <h2 className="text-xl font-semibold text-gray-800">Edit User Story</h2>
+        <button
+          onClick={onClose}
+          className="text-gray-500 hover:text-gray-800 transition-colors"
+        >
+          <X size={20} />
         </button>
       </div>
 
       {/* BODY */}
-      <div className="p-6 flex-1 overflow-y-auto space-y-6">
+      <div className="p-6 overflow-y-auto flex-1 space-y-6">
         <FormInput
           label="Title *"
           name="title"
@@ -329,21 +368,29 @@ const EditStoryForm = ({
               ...users.map((u) => ({ label: u.name, value: u.id })),
             ]}
           />
-         
-    <FormDatePicker label="Start Date" name="startDate" value={formData.startDate || ""} onChange={handleChange}  />
 
-    <FormDatePicker label="Due Date" name="dueDate" value={formData.dueDate || ""} onChange={handleChange}/>
+          <FormDatePicker
+            label="Start Date"
+            name="startDate"
+            value={formData.startDate || ""}
+            onChange={handleChange}
+          />
 
-      
+          <FormDatePicker
+            label="Due Date"
+            name="dueDate"
+            value={formData.dueDate || ""}
+            onChange={handleChange}
+          />
         </div>
       </div>
 
       {/* FOOTER */}
-      <div className="sticky bottom-0 bg-white border-t p-4 flex justify-end gap-3">
+      <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3 shrink-0">
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
+          className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
         >
           Cancel
         </button>
@@ -352,7 +399,7 @@ const EditStoryForm = ({
           type="button"
           disabled={loading}
           onClick={handleSubmit}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
         >
           {loading ? "Saving..." : "Update Story"}
         </button>

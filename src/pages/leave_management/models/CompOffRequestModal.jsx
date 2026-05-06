@@ -1,4 +1,4 @@
-import React, { useState, Fragment } from "react"; // Added Fragment
+import React, { useState, Fragment, useEffect} from "react"; // Added Fragment
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useNotification } from "../../../contexts/NotificationContext";
@@ -28,6 +28,9 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
     start: "none", // 'none' is treated as a full day in calculation
     end: "none",
   });
+
+
+
 
   const formatDate = (date) => {
     if (!date) return null;

@@ -1,211 +1,876 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Users,
+  XCircle,
+  ShieldCheck,
+  Clock,
+  MailCheck,
+  Search,
+  FileText,
+  RefreshCw,
+  CheckCircle2,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { showStatusToast } from "../../../components/toastfy/toast";
+import Button from "../../../components/Button/Button";
+import Table from "../../../components/Table/table";
+import Pagination from "../../../components/Pagination/pagination";
+import EmployeeCreateModal from "../components/employee-create-modal/EmployeeCreateModal";
+import {
+  getNormalizedStatus,
+  getOfferDisplayStatus,
+  isTrackedOnboardingStatus,
+  OFFER_STATUS,
+  persistJoiningStatus,
+} from "../components/offerStatus";
+import { fetchOfferDetailsList } from "../components/fetchOfferDetails";
+import { PAGE_SIZE } from "./constants";
+import ActionMenu from "./components/ActionMenu";
+import JoinModal from "./components/JoinModal";
+import OfferStatusCell from "./components/OfferStatusCell";
+import ReassignJoiningModal from "./components/ReassignJoiningModal";
+import StatCard from "./components/StatCard";
 
 export default function HrOnboardingDashboard() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [employeeUserIds, setEmployeeUserIds] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-
-  /* ---------- PAGINATION STATE ---------- */
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [bulkJoinMode, setBulkJoinMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [loadingEditDetails, setLoadingEditDetails] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [editDisabledUserIds, setEditDisabledUserIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [managerOptions, setManagerOptions] = useState([]);
+  const [loadingManagers, setLoadingManagers] = useState(false);
+  const [joiningCommentsByUser, setJoiningCommentsByUser] = useState({});
+  const [loadingStatusCommentUserId, setLoadingStatusCommentUserId] = useState(null);
 
-  /* ---------- FETCH SUBMITTED EMPLOYEES ---------- */
+  const [joinForm, setJoinForm] = useState({
+    joining_date: "",
+    reporting_time: "",
+    location: "",
+    department: "",
+    reporting_manager: "",
+    custom_message: "",
+  });
+
+  const [editJoinForm, setEditJoinForm] = useState({
+    joining_date: "",
+    reporting_time: "",
+    location: "",
+    department: "",
+    reporting_manager: "",
+    joining_comments: "",
+  });
+
+  const handleKpiClick = (status) => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const fetchEmployees = async () => {
+    setLoading(true);
+    try {
+      const offers = await fetchOfferDetailsList(BASE_URL, token);
+      setData(offers);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCoreEmployees = async () => {
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/permanent-employee/core-employee-details/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const ids = (res.data || []).map((emp) => emp.user_uuid);
+      setEmployeeUserIds(ids);
+    } catch (err) {
+      console.error("Failed to fetch core employees", err);
+    }
+  };
+
   useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        const res = await axios.get(
-          `${BASE_URL}/offerletters/user_id/details`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setData(res.data || []);
-      } catch (error) {
-        console.error("Failed to load onboarding employees", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchEmployees();
+    fetchCoreEmployees();
   }, []);
 
-  /* ---------- STATS ---------- */
-  const totalEmployees = data.length;
-
-  /* ---------- FILTER ---------- */
-  const filteredData = useMemo(() => {
-    return data.filter((emp) => {
-      const name = `${emp.first_name} ${emp.last_name}`.toLowerCase();
-      return name.includes(searchTerm.toLowerCase());
+  const handleOpenCreateModal = (employee) => {
+    setSelectedEmployee({
+      userUuid: employee.user_uuid,
+      firstName: employee.first_name,
+      middleName: employee.middle_name,
+      lastName: employee.last_name,
     });
-  }, [data, searchTerm]);
+    setIsCreateOpen(true);
+  };
 
-  /* ---------- PAGINATED DATA ---------- */
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const handleOpenEditModal = async (employee) => {
+    setEditingEmployee(employee);
+    setEditJoinForm({
+      joining_date: employee.joining_date || "",
+      reporting_time: employee.reporting_time || "",
+      location: employee.location || "",
+      department: employee.department || "",
+      reporting_manager: employee.reporting_manager || "",
+      joining_comments: employee.joining_comments || "",
+    });
+    setShowEditModal(true);
 
-  const paginatedData = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredData.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredData, currentPage]);
+    try {
+      setLoadingEditDetails(true);
 
-  if (loading) {
-    return <div className="p-10 text-center">Loading HR dashboard...</div>;
-  }
+      const res = await axios.get(
+        `${BASE_URL}/hr/offerletters/${employee.user_uuid}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const detail = res.data || {};
+
+      setEditJoinForm({
+        joining_date: String(
+          detail.joining_date || employee.joining_date || "",
+        ).trim(),
+        reporting_time: String(
+          detail.reporting_time || employee.reporting_time || "",
+        ).trim(),
+        location: String(detail.location || employee.location || "").trim(),
+        department: String(
+          detail.department || employee.department || "",
+        ).trim(),
+        reporting_manager: String(
+          detail.reporting_manager || employee.reporting_manager || "",
+        ).trim(),
+        joining_comments: String(
+          detail.joining_comments || employee.joining_comments || ""
+        ).trim(),
+      });
+    } catch (err) {
+      console.error("Failed to load joining details", err);
+      showStatusToast("Failed to load joining details");
+    } finally {
+      setLoadingEditDetails(false);
+    }
+  };
+
+  const handleCloseCreateModal = () => {
+    setIsCreateOpen(false);
+    setSelectedEmployee(null);
+    setCurrentPage(1);
+    fetchCoreEmployees();
+    fetchEmployees();
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingEmployee(null);
+    setEditJoinForm({
+      joining_date: "",
+      reporting_time: "",
+      location: "",
+      department: "",
+      reporting_manager: "",
+      joining_comments: "",
+    });
+  };
+
+  const fetchManagers = async () => {
+    setLoadingManagers(true);
+
+    try {
+      const res = await axios.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      console.log("CORE EMPLOYEE RESPONSE:", res.data);
+      const managers = (res.data || []).map((u) => ({
+        value: `${u.first_name || ""} ${u.last_name || ""}`.trim(),
+        label: `${u.first_name || ""} ${u.last_name || ""}`.trim(),
+      }));
+
+      setManagerOptions(managers);
+    } catch (err) {
+      console.error("Failed to load managers:", err);
+    }
+
+    setLoadingManagers(false);
+  };
+
+  useEffect(() => {
+    fetchManagers();
+  }, []);
+
+  const fetchJoiningCommentForUser = async (userUuid) => {
+    if (!userUuid) return;
+
+    // ✅ prevent duplicate calls while loading
+    if (loadingStatusCommentUserId === userUuid) return;
+
+    try {
+      setLoadingStatusCommentUserId(userUuid);
+
+      const res = await axios.get(
+        `${BASE_URL}/hr/offerletters/${userUuid}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      setJoiningCommentsByUser((prev) => ({
+        ...prev,
+        [userUuid]: res.data?.joining_comments || "",
+      }));
+    } catch (err) {
+      console.error("Failed to fetch joining comments", err);
+    } finally {
+      setLoadingStatusCommentUserId(null);
+    }
+  };
+
+  // const getHrDisplayStatus = (offer) =>
+  //   getOfferDisplayStatus(offer, employeeUserIds);
+  const getHrDisplayStatus = (offer) =>
+    getNormalizedStatus(getOfferDisplayStatus(offer, employeeUserIds));
+
+  const pageData = useMemo(() => {
+    return data.filter(
+      (emp) =>
+        editDisabledUserIds.includes(emp?.user_uuid) ||
+        isTrackedOnboardingStatus(emp, employeeUserIds),
+    );
+  }, [data, employeeUserIds, editDisabledUserIds]);
+
+  const filteredData = useMemo(() => {
+    return pageData.filter((emp) => {
+      const searchText =
+        `${emp.first_name} ${emp.last_name} ${emp.designation}`.toLowerCase();
+
+      const matchesSearch = searchText.includes(searchTerm.toLowerCase());
+
+      const status = getHrDisplayStatus(emp);
+      const filter = statusFilter.trim().toUpperCase();
+
+      if (filter === "ALL") {
+        return matchesSearch;
+      }
+
+      return matchesSearch && status === filter;
+    });
+  }, [
+    pageData,
+    searchTerm,
+    statusFilter,
+    employeeUserIds,
+    editDisabledUserIds,
+  ]);
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const resetBulk = () => {
+    setBulkJoinMode(false);
+    setSelectedIds([]);
+    setShowModal(false);
+    setJoinForm({
+      joining_date: "",
+      reporting_time: "",
+      location: "",
+      department: "",
+      reporting_manager: "",
+      joining_comments: "",
+    });
+  };
+
+  const handleSendJoinEmail = async () => {
+    const {
+      joining_date,
+      reporting_time,
+      location,
+      department,
+      reporting_manager,
+      
+    } = joinForm;
+
+    if (
+      !joining_date ||
+      !reporting_time ||
+      !location ||
+      !department ||
+      !reporting_manager 
+      
+    ) {
+      showStatusToast("Please fill all required fields");
+      return;
+    }
+
+    const selectedEmployees = filteredData.filter((e) =>
+      selectedIds.includes(e.user_uuid),
+    );
+
+    const emails = selectedEmployees
+      .map((emp) => emp.mail)
+      .filter(Boolean);
+
+    if (emails.length === 0) {
+      showStatusToast("No valid emails found");
+      return;
+    }
+
+    const payload = {
+      user_emails_list: emails,
+      ...joinForm,
+    };
+
+    try {
+      setSending(true);
+
+      await axios.post(`${BASE_URL}/hr/offerletters/bulk-join`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      setData((prev) =>
+        prev.map((emp) =>
+          selectedIds.includes(emp.user_uuid)
+            ? {
+              ...emp,
+              ...joinForm,
+              status:
+                getNormalizedStatus(emp.status) === "VERIFIED"
+                  ? "JOINING"
+                  : emp.status,
+            }
+            : emp,
+        ),
+      );
+
+      selectedEmployees.forEach((employee) =>
+        persistJoiningStatus({
+          ...employee,
+          ...joinForm,
+          status: "JOINING",
+        }),
+      );
+
+      await fetchEmployees();
+      showStatusToast("Joining emails sent");
+      resetBulk();
+    } catch (err) {
+      console.log("JOIN ERROR FULL:", err.response?.data);
+      console.log("JOIN ERROR DETAIL:", err.response?.data?.detail);
+      console.log("JOIN PAYLOAD:", payload);
+      console.error(err);
+
+      showStatusToast("Failed to send emails");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleUpdateJoiningPending = async () => {
+    if (!editingEmployee) return;
+
+    const {
+      joining_date,
+      reporting_time,
+      location,
+      department,
+      reporting_manager,
+      joining_comments,
+    } = editJoinForm;
+
+    if (
+      !joining_date ||
+      !reporting_time ||
+      !location ||
+      !department ||
+      !reporting_manager ||
+      !joining_comments
+    ) {
+      showStatusToast("Please fill all required fields");
+      return;
+    }
+
+    const payload = {
+      user_uuid: editingEmployee.user_uuid,
+      new_joining_date: joining_date,
+      reporting_manager,
+      reporting_time,
+      location,
+      department,
+      joining_comments: joining_comments || "",
+    };
+
+    try {
+      setSavingEdit(true);
+
+      const res = await axios.put(`${BASE_URL}/hr/offerletters/reassign-joining`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const updatedStatus =
+        getNormalizedStatus(res.data?.status) ||
+        getHrDisplayStatus(editingEmployee);
+
+      persistJoiningStatus({
+        ...editingEmployee,
+        joining_date,
+        reporting_time,
+        location,
+        department,
+        reporting_manager,
+        joining_comments,
+      });
+
+      setData((prev) =>
+        prev.map((emp) =>
+          emp.user_uuid === editingEmployee.user_uuid
+            ? {
+              ...emp,
+              status: updatedStatus,
+              joining_date,
+              reporting_time,
+              location,
+              department,
+              reporting_manager,
+              joining_comments,
+            }
+            : emp,
+        ),
+      );
+      console.log("UPDATED STATUS:", updatedStatus);
+      fetchEmployees();
+
+      setEditDisabledUserIds((prev) =>
+        prev.includes(editingEmployee.user_uuid)
+          ? prev
+          : [...prev, editingEmployee.user_uuid],
+      );
+
+      showStatusToast("Joining date updated");
+      handleCloseEditModal();
+    } catch (err) {
+      console.error("Failed to update joining date", err);
+      showStatusToast("Failed to update joining date");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const headers = [
+  bulkJoinMode ? (
+    <input
+      type="checkbox"
+      className="h-4 w-4 cursor-pointer"
+      onChange={(e) => {
+        if (e.target.checked) {
+          // Select only IDs of candidates who are VERIFIED
+          const verifiedIds = filteredData
+            .filter((emp) => getHrDisplayStatus(emp) === "VERIFIED")
+            .map((emp) => emp.user_uuid);
+          setSelectedIds(verifiedIds);
+        } else {
+          setSelectedIds([]);
+        }
+      }}
+      // Check if all available verified candidates are selected
+      checked={
+        selectedIds.length > 0 &&
+        selectedIds.length === filteredData.filter(e => getHrDisplayStatus(e) === "VERIFIED").length
+      }
+    />
+  ) : null,
+  "Name",
+  "Email",
+  "Contact",
+  "Role",
+  "Status",
+  "Action",
+].filter(Boolean);
+
+  const columns = [
+    bulkJoinMode ? "select" : null,
+    "name",
+    "mail",
+    "contact",
+    "designation",
+    "status",
+    "action",
+  ].filter(Boolean);
+
+  const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+
+  useEffect(() => {
+    if (totalPages === 0) {
+      setCurrentPage(1);
+      return;
+    }
+
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const rows = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+
+    return filteredData
+      .slice(startIndex, startIndex + PAGE_SIZE)
+      .map((emp) => {
+        const displayStatus = getHrDisplayStatus(emp);
+        const isEmployeeCreated = displayStatus === "COMPLETED";
+        const isVerified = displayStatus === "VERIFIED";
+        const isJoining = displayStatus === "JOINING";
+        const isJoiningPending = displayStatus === "JOINING_PENDING";
+        const isRescheduled = displayStatus === OFFER_STATUS.RESCHEDULED;
+
+        const isEditDisabled = editDisabledUserIds.includes(emp.user_uuid);
+
+        return {
+          rowClass: isEmployeeCreated ? "bg-green-100" : "",
+          select: bulkJoinMode ? (
+    <input
+      type="checkbox"
+      className="h-4 w-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+      checked={selectedIds.includes(emp.user_uuid)}
+      onChange={() => toggleSelect(emp.user_uuid)}
+      // Only allow clicking if the status is VERIFIED
+      disabled={!isVerified}
+      title={!isVerified ? "Only verified candidates can be selected" : ""}
+    />
+  ) : null,
+
+          name: `${emp.first_name} ${emp.last_name}`,
+          mail: emp.mail || "—",
+          contact: emp.contact_number || "—",
+          designation: emp.designation || "—",
+
+          status: (
+            <OfferStatusCell
+              employee={emp}
+              displayStatus={displayStatus}
+              joiningCommentsByUser={joiningCommentsByUser}
+              loadingStatusCommentUserId={loadingStatusCommentUserId}
+              fetchJoiningCommentForUser={fetchJoiningCommentForUser}
+            />
+          ),
+          action: (
+            <ActionMenu
+              onView={() =>
+                navigate(`/employee-onboarding/hr/profile/${emp.user_uuid}`)
+              }
+              onCreate={() => handleOpenCreateModal(emp)}
+              onEdit={() => handleOpenEditModal(emp)}
+              showCreate={
+                (isVerified || isJoining || isJoiningPending || isRescheduled) &&
+                !isEmployeeCreated
+              }
+              showEdit={(isJoiningPending || isRescheduled) && !isEditDisabled}
+            />
+          ),
+        };
+      });
+  }, [
+    filteredData,
+    currentPage,
+    selectedIds,
+    navigate,
+    employeeUserIds,
+    editDisabledUserIds,
+    joiningCommentsByUser,
+    loadingStatusCommentUserId,
+  ]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen bg-slate-50/50 p-6 space-y-8 font-sans">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+      <div className="px-1">
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
           HR Onboarding Dashboard
         </h1>
-        <p className="text-gray-500">
+        <p className="text-sm font-medium text-slate-500 mt-1">
           Verify employee documents & profiles
         </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          title="Total Submitted Profiles"
-          value={totalEmployees}
-          icon={Users}
-        />
+      {/* KPI Cards — Two-Tier Layout */}
+      <div className="flex flex-col gap-4">
+        {/* Row 1: 6 Small Cards */}
+        <div className="flex flex-wrap gap-3">
+          <StatCard
+            title="Total Profiles"
+            value={loading ? "0" : pageData.length}
+            icon={Users}
+            iconBg="bg-slate-100"
+            iconColor="text-slate-600"
+            isActive={statusFilter === "ALL"}
+            onClick={() => handleKpiClick("ALL")}
+          />
+          <StatCard
+            title="Submitted"
+            value={
+              loading
+                ? "0"
+                : pageData.filter((e) => getHrDisplayStatus(e) === "SUBMITTED").length
+            }
+            icon={FileText}
+            iconBg="bg-blue-50"
+            iconColor="text-blue-600"
+            isActive={statusFilter === "SUBMITTED"}
+            onClick={() => handleKpiClick("SUBMITTED")}
+          />
+          <StatCard
+            title="Verified"
+            value={
+              loading
+                ? "0"
+                : pageData.filter((e) => getHrDisplayStatus(e) === "VERIFIED").length
+            }
+            icon={ShieldCheck}
+            iconBg="bg-green-50"
+            iconColor="text-green-600"
+            isActive={statusFilter === "VERIFIED"}
+            onClick={() => handleKpiClick("VERIFIED")}
+          />
+          <StatCard
+            title="Completed"
+            value={
+              loading
+                ? "0"
+                : pageData.filter((e) => getHrDisplayStatus(e) === "COMPLETED").length
+            }
+            icon={CheckCircle2}
+            iconBg="bg-emerald-50"
+            iconColor="text-emerald-600"
+            isActive={statusFilter === "COMPLETED"}
+            onClick={() => handleKpiClick("COMPLETED")}
+          />
+          <StatCard
+            title="Rescheduled"
+            value={
+              loading
+                ? "0"
+                : pageData.filter((e) => getHrDisplayStatus(e) === "RESCHEDULED").length
+            }
+            icon={RefreshCw}
+            iconBg="bg-orange-50"
+            iconColor="text-orange-600"
+            isActive={statusFilter === "RESCHEDULED"}
+            onClick={() => handleKpiClick("RESCHEDULED")}
+          />
+          <StatCard
+            title="Rejected"
+            value={
+              loading
+                ? "0"
+                : pageData.filter((e) => getHrDisplayStatus(e) === "REJECTED").length
+            }
+            icon={XCircle}
+            iconBg="bg-red-50"
+            iconColor="text-red-600"
+            isActive={statusFilter === "REJECTED"}
+            onClick={() => handleKpiClick("REJECTED")}
+          />
+        </div>
+
+        {/* Row 2: 2 Long Cards */}
+        <div className="flex flex-wrap gap-3">
+          <StatCard
+            title="Joining Pending"
+            value={
+              loading
+                ? "0"
+                : pageData.filter((e) => getHrDisplayStatus(e) === "JOINING_PENDING").length
+            }
+            icon={Clock}
+            iconBg="bg-amber-50"
+            iconColor="text-amber-600"
+            isActive={statusFilter === "JOINING_PENDING"}
+            onClick={() => handleKpiClick("JOINING_PENDING")}
+          />
+          <StatCard
+            title="Joining"
+            value={
+              loading
+                ? "0"
+                : pageData.filter((e) => getHrDisplayStatus(e) === "JOINING").length
+            }
+            icon={MailCheck}
+            iconBg="bg-teal-50"
+            iconColor="text-teal-600"
+            isActive={statusFilter === "JOINING"}
+            onClick={() => handleKpiClick("JOINING")}
+          />
+        </div>
       </div>
 
-      {/* Search */}
-      <input
-        type="text"
-        placeholder="Search employee name..."
-        value={searchTerm}
-        onChange={(e) => {
-          setSearchTerm(e.target.value);
-          setCurrentPage(1); // reset page on search
-        }}
-        className="w-full md:w-1/3 px-3 py-2 border rounded-lg"
+      {/* Search & Table Section */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        {/* Toolbar */}
+        <div className="bg-slate-50/50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-3 flex-1">
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by candidate name or role…"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 text-slate-900 text-sm rounded-xl shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium"
+              />
+            </div>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full md:w-48 px-3 py-2 bg-white border border-slate-300 text-slate-900 text-sm rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium"
+            >
+              <option value="ALL">All Status</option>
+              <option value="SUBMITTED">Submitted</option>
+              <option value="VERIFIED">Verified</option>
+              <option value="JOINING">Joining</option>
+              <option value="JOINING_PENDING">Joining Pending</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="RESCHEDULED">Rescheduled</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {!bulkJoinMode ? (
+             // FIND THE "Bulk Join" BUTTON AND UPDATE onClick:
+<Button
+  varient="primary"
+  size="small"
+  onClick={() => {
+    const hasVerified = filteredData.some(
+      (e) => getHrDisplayStatus(e) === "VERIFIED",
+    );
+
+    if (!hasVerified) {
+      showStatusToast("No verified candidates available for bulk join");
+      return;
+    }
+
+    setBulkJoinMode(true);
+    // OPTIONAL: Automatically filter to Verified to show selectable users
+    setStatusFilter("VERIFIED"); 
+    setCurrentPage(1);
+  }}
+>
+  Bulk Join
+</Button>
+            ) : (
+              <div className="flex gap-3">
+                <Button
+                  varient="primary"
+                  size="small"
+                  disabled={selectedIds.length === 0}
+                  onClick={() => setShowModal(true)}
+                >
+                  Send ({selectedIds.length})
+                </Button>
+
+                <Button varient="secondary" size="small" onClick={resetBulk}>
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="relative overflow-visible">
+          <Table
+            headers={headers}
+            columns={columns}
+            rows={rows}
+            loading={loading}
+          />
+
+          {filteredData.length > PAGE_SIZE && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+              onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+            />
+          )}
+        </div>
+      </div>
+
+      <JoinModal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        onSubmit={handleSendJoinEmail}
+        loading={sending}
+        form={joinForm}
+        setForm={setJoinForm}
+        managerOptions={managerOptions}
+        loadingManagers={loadingManagers}
       />
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-indigo-900 text-white">
-            <tr>
-              <th className="px-4 py-3 text-left">Employee Name</th>
-              <th className="px-4 py-3 text-left">Email</th>
-              <th className="px-4 py-3 text-left">Designation</th>
-              <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-left">Action</th>
-            </tr>
-          </thead>
+      <ReassignJoiningModal
+        open={showEditModal}
+        onClose={handleCloseEditModal}
+        onSubmit={handleUpdateJoiningPending}
+        loading={savingEdit}
+        loadingDetails={loadingEditDetails}
+        form={editJoinForm}
+        setForm={setEditJoinForm}
+        managerOptions={managerOptions}
+        loadingManagers={loadingManagers}
+      />
 
-          <tbody>
-            {paginatedData.map((emp) => (
-              <tr key={emp.user_uuid} className="border-b">
-                <td className="px-4 py-3">
-                  {emp.first_name} {emp.last_name}
-                </td>
-                <td className="px-4 py-3">{emp.mail}</td>
-                <td className="px-4 py-3">{emp.designation}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={emp.onboarding_status} />
-                </td>
-                <td className="px-4 py-3 text-indigo-600 cursor-pointer">
-                  <span
-                    onClick={() =>
-                      navigate(
-                        `/employee-onboarding/hr/profile/${emp.user_uuid}`
-                      )
-                    }
-                  >
-                    View
-                  </span>
-                </td>
-              </tr>
-            ))}
-
-            {paginatedData.length === 0 && (
-              <tr>
-                <td colSpan="5" className="text-center py-6 text-gray-500">
-                  No records found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      <div className="flex justify-center items-center gap-4 mt-6">
-        <button
-          disabled={currentPage === 1}
-          onClick={() => setCurrentPage(currentPage - 1)}
-          className={`w-10 h-10 rounded-lg ${
-            currentPage === 1
-              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
-        >
-          &lt;
-        </button>
-
-        <span className="text-sm font-medium">
-          Page {currentPage} / {totalPages || 1}
-        </span>
-
-        <button
-          disabled={currentPage === totalPages}
-          onClick={() => setCurrentPage(currentPage + 1)}
-          className={`w-10 h-10 rounded-lg ${
-            currentPage === totalPages
-              ? "bg-indigo-200 text-white cursor-not-allowed"
-              : "bg-indigo-900 text-white hover:bg-indigo-800"
-          }`}
-        >
-          &gt;
-        </button>
-      </div>
+      <EmployeeCreateModal
+        isOpen={isCreateOpen}
+        onClose={handleCloseCreateModal}
+        userUuid={selectedEmployee?.userUuid}
+        firstName={selectedEmployee?.firstName}
+        middleName={selectedEmployee?.middleName}
+        lastName={selectedEmployee?.lastName}
+      />
     </div>
-  );
-}
-
-/* ---------- COMPONENTS ---------- */
-
-function StatCard({ title, value, icon: Icon }) {
-  return (
-    <div className="bg-white rounded-xl p-4 shadow-sm flex items-center gap-4">
-      <Icon className="h-6 w-6 text-indigo-600" />
-      <div>
-        <p className="text-sm text-gray-500">{title}</p>
-        <p className="text-xl font-semibold text-gray-900">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({ status }) {
-  const styles = {
-    SUBMITTED: "bg-blue-100 text-blue-700",
-    VERIFIED: "bg-green-100 text-green-700",
-    REJECTED: "bg-red-100 text-red-700",
-  };
-
-  return (
-    <span
-      className={`px-3 py-1 rounded-full text-sm font-medium ${
-        styles[status] || "bg-gray-100 text-gray-700"
-      }`}
-    >
-      {status || "PENDING"}
-    </span>
   );
 }

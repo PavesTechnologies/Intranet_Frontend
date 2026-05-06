@@ -1,14 +1,43 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // ⭐ 1. Added useEffect
 import axiosInstance from "../../api/axiosInstance";
 import { X } from "lucide-react";
+import toast from "react-hot-toast";
 
-export default function AddCaseModal({ scenarioId, onClose }) {
+// ⭐ 2. Added caseToEdit prop
+export default function AddCaseModal({
+  scenarioId,
+  caseToEdit,
+  onClose,
+  onCreated,
+}) {
   const [title, setTitle] = useState("");
   const [preConditions, setPreConditions] = useState("");
   const [priority, setPriority] = useState("LOW");
   const [type, setType] = useState("FUNCTIONAL");
   const [steps, setSteps] = useState([{ action: "", expectedResult: "" }]);
   const [saving, setSaving] = useState(false);
+
+  // ⭐ 3. Added useEffect to pre-fill the form when editing
+  useEffect(() => {
+    if (caseToEdit) {
+      setTitle(caseToEdit.title || "");
+      setPreConditions(caseToEdit.preConditions || "");
+      setPriority(caseToEdit.priority || "LOW");
+      setType(caseToEdit.type || "FUNCTIONAL");
+
+      // If the case already has steps, pre-fill them. Otherwise, leave one blank row.
+      if (caseToEdit.steps && caseToEdit.steps.length > 0) {
+        setSteps(
+          caseToEdit.steps.map((s) => ({
+            action: s.action || "",
+            expectedResult: s.expectedResult || s.expected || "", // Safely handle DTO variations
+          })),
+        );
+      } else {
+        setSteps([{ action: "", expectedResult: "" }]);
+      }
+    }
+  }, [caseToEdit]);
 
   const addStep = () => {
     setSteps([...steps, { action: "", expectedResult: "" }]);
@@ -26,8 +55,9 @@ export default function AddCaseModal({ scenarioId, onClose }) {
   };
 
   const handleSave = async () => {
-    if (!title.trim()) return alert("Case title is required");
-    if (!scenarioId) return alert("No scenario selected");
+    if (!title.trim()) return toast.error("Case title is required");
+    // Only strictly require scenarioId if we are creating a new case
+    if (!caseToEdit && !scenarioId) return toast.error("No scenario selected");
 
     setSaving(true);
 
@@ -42,18 +72,34 @@ export default function AddCaseModal({ scenarioId, onClose }) {
           .filter((s) => s.action.trim() || s.expectedResult.trim())
           .map((s) => ({
             action: s.action,
-            expectedResult: s.expectedResult
-          }))
+            expectedResult: s.expectedResult,
+          })),
       };
 
-      await axiosInstance.post(`${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases`, payload);
+      // ⭐ 4. Conditional logic for PUT (Edit) vs POST (Create)
+      if (caseToEdit) {
+        await axiosInstance.put(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/${caseToEdit.id}`,
+          payload,
+        );
+        toast.success("Test Case updated successfully!");
+      } else {
+        await axiosInstance.post(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases`,
+          payload,
+        );
+        toast.success("Test Case created successfully!");
+      }
 
-      alert("Test Case Created");
+      if (onCreated) onCreated();
       onClose();
-      window.location.reload();
     } catch (err) {
-      console.error("Create Case FAILED →", err);
-      alert("Failed to create test case");
+      console.error("Action FAILED →", err);
+      toast.error(
+        caseToEdit
+          ? "Failed to update test case"
+          : "Failed to create test case",
+      );
     } finally {
       setSaving(false);
     }
@@ -63,12 +109,14 @@ export default function AddCaseModal({ scenarioId, onClose }) {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white w-[650px] max-h-[80vh] overflow-auto p-5 rounded-xl shadow-lg">
         <div className="flex justify-between mb-4">
-          <h2 className="text-lg font-semibold">Add Test Case</h2>
+          {/* ⭐ 5. Dynamic Modal Title */}
+          <h2 className="text-lg font-semibold">
+            {caseToEdit ? "Edit Test Case" : "Add Test Case"}
+          </h2>
           <X className="cursor-pointer" onClick={onClose} />
         </div>
 
         <div className="space-y-4">
-
           <div>
             <label className="text-sm">Title</label>
             <input
@@ -123,7 +171,12 @@ export default function AddCaseModal({ scenarioId, onClose }) {
           <div>
             <div className="flex justify-between">
               <label className="text-sm">Steps</label>
-              <button onClick={addStep} className="text-blue-600 text-sm">+ Add Step</button>
+              <button
+                onClick={addStep}
+                className="text-blue-600 text-sm hover:text-blue-800"
+              >
+                + Add Step
+              </button>
             </div>
 
             <div className="space-y-2 mt-2">
@@ -139,11 +192,14 @@ export default function AddCaseModal({ scenarioId, onClose }) {
                     className="col-span-6 border rounded px-2 py-1"
                     placeholder="Expected Result"
                     value={step.expectedResult}
-                    onChange={(e) => updateStep(i, "expectedResult", e.target.value)}
+                    onChange={(e) =>
+                      updateStep(i, "expectedResult", e.target.value)
+                    }
                   />
                   <button
-                    className="col-span-1 text-red-500"
+                    className="col-span-1 text-red-500 hover:bg-red-50 rounded p-1 flex items-center justify-center"
                     onClick={() => removeStep(i)}
+                    title="Remove Step"
                   >
                     ✕
                   </button>
@@ -152,21 +208,27 @@ export default function AddCaseModal({ scenarioId, onClose }) {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <button className="px-4 py-2 bg-gray-200 rounded" onClick={onClose}>
+          <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+            <button
+              className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              onClick={onClose}
+            >
               Cancel
             </button>
             <button
-              className="px-4 py-2 bg-blue-600 text-white rounded"
+              className={`px-4 py-2 bg-blue-600 text-white rounded-lg transition-colors ${saving ? "opacity-70 cursor-not-allowed" : "hover:bg-blue-700"}`}
               onClick={handleSave}
               disabled={saving}
             >
-              {saving ? "Saving..." : "Create Case"}
+              {/* ⭐ 6. Dynamic Save Button Text */}
+              {saving
+                ? "Saving..."
+                : caseToEdit
+                  ? "Update Case"
+                  : "Create Case"}
             </button>
           </div>
-
         </div>
-
       </div>
     </div>
   );

@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Users, CheckCircle, XCircle, PauseCircle, Clock } from "lucide-react";
+import {
+  Users,
+  CheckCircle,
+  XCircle,
+  PauseCircle,
+  Clock,
+  Loader2,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import Pagination from "../../../components/Pagination/pagination";
+import {useAuth} from "../../../contexts/AuthContext";
 
 /* ============================
    ADMIN APPROVAL DASHBOARD
@@ -12,31 +21,59 @@ import axios from "axios";
 export default function AdminApprovalDashboard() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+
+ /* ---------- ROLE LOGIC ---------- */
+const { user, loading: authLoading } = useAuth();
+
+const userRoles = useMemo(() => {
+  const rawRoles = user?.roles || [];
+  // Handle both Array and comma-separated string formats
+  const rolesArray = Array.isArray(rawRoles) 
+    ? rawRoles 
+    : typeof rawRoles === 'string' ? rawRoles.split(',').map(r => r.trim()) : [];
+  
+  return rolesArray;
+}, [user]);
+
+// Match the casing used in ViewEmpDetails
+const isHR = userRoles.includes("HR");
+const isAdmin = userRoles.includes("Admin");
+const isManager = userRoles.includes("Manager");
+
+// Permission flag for this specific page
+const isAuthorizedManager = isManager || isAdmin;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const PAGE_SIZE = 5;
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-   const getStatus = (row) => {
+  const handleKpiClick = (status) => {
+    setStatusFilter(status);
+  };
+
+  const getStatus = (row) => {
     return row.action ? row.action.toUpperCase() : "PENDING";
   };
 
-
   /* ---------- FETCH DATA (ONE API) ---------- */
   useEffect(() => {
+    if (!isAuthorizedManager) return;
+
     const fetchApprovals = async () => {
+      setLoading(true);
       try {
-        const res = await axios.get(
-          `${BASE_URL}/offer-approval/my-actions`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await axios.get(`${BASE_URL}/offer-approval/my-actions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         setData(res.data || []);
+        setCurrentPage(1);
       } catch (error) {
         console.error("Failed to load admin approvals", error);
       } finally {
@@ -45,22 +82,23 @@ export default function AdminApprovalDashboard() {
     };
 
     fetchApprovals();
-  }, []);
+  }, [BASE_URL, token, isAuthorizedManager]);
+  // Redirect if not authorized
+if (!authLoading && !isAuthorizedManager) {
+  return <Navigate to="/unauthorized" replace />;
+}
 
   /* ---------- STATS ---------- */
   const totalRequests = data.length;
-  const approvedCount = data.filter(d => getStatus(d) === "APPROVED").length;
-  const rejectedCount = data.filter(d => getStatus(d) === "REJECTED").length;
-  const onHoldCount = data.filter(d => getStatus(d) === "ON_HOLD").length;
-  const pendingCount = data.filter(d => getStatus(d) === "PENDING").length;
-  
-
- 
+  const approvedCount = data.filter((d) => getStatus(d) === "APPROVED").length;
+  const rejectedCount = data.filter((d) => getStatus(d) === "REJECTED").length;
+  const onHoldCount = data.filter((d) => getStatus(d) === "ON_HOLD").length;
+  const pendingCount = data.filter((d) => getStatus(d) === "PENDING").length;
 
   /* ---------- FILTERED DATA ---------- */
   const filteredData = useMemo(() => {
     return data.filter((row) => {
-      const name = `${row.first_name} ${row.last_name}`.toLowerCase();
+      const name = `${row.first_name} ${row.middle_name ? row.middle_name + " " : ""}${row.last_name}`.toLowerCase();
       const role = row.designation?.toLowerCase() || "";
 
       const matchesSearch =
@@ -75,48 +113,62 @@ export default function AdminApprovalDashboard() {
     });
   }, [data, searchTerm, statusFilter]);
 
-  if (loading) {
-    return <div className="p-10 text-center">Loading admin approvals...</div>;
-  }
+  const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
+  // if (loading) {
+  //   return <div className="p-10 text-center">Loading admin approvals...</div>;
+  // }
 
   return (
     <div className="p-6 space-y-6">
-
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Employee Onboarding
-          </h1>
-          <p className="text-gray-500">
-            Manage approval requests
-          </p>
-        </div>
+<div className="flex justify-between items-center">
+  
 
-        {/* Role Switch */}
-        <div className="flex rounded-lg border overflow-hidden">
-          <button
-            onClick={() => navigate("/employee-onboarding")}
-            className="px-4 py-2 text-sm font-medium bg-white text-gray-700"
-          >
-            HR View
-          </button>
-
-          <button
-            className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white"
-          >
-            Admin View
-          </button>
-        </div>
-      </div>
+  
+</div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard title="Total Requests" value={totalRequests} icon={Users} />
-        <StatCard title="Approved" value={approvedCount} icon={CheckCircle} color="text-green-600" />
-        <StatCard title="Rejected" value={rejectedCount} icon={XCircle} color="text-red-600" />
-        <StatCard title="On Hold" value={onHoldCount} icon={PauseCircle} color="text-yellow-600" />
-        <StatCard title="Pending" value={pendingCount} icon={Clock} color="text-gray-600" />
+        <StatCard
+          title="Total Requests"
+          value={totalRequests}
+          icon={Users}
+          onClick={() => handleKpiClick("ALL")}
+        />
+        <StatCard
+          title="Approved"
+          value={approvedCount}
+          icon={CheckCircle}
+          color="text-green-600"
+          onClick={() => handleKpiClick("APPROVED")}
+        />
+        <StatCard
+          title="Rejected"
+          value={rejectedCount}
+          icon={XCircle}
+          color="text-red-600"
+          onClick={() => handleKpiClick("REJECTED")}
+        />
+        <StatCard
+          title="On Hold"
+          value={onHoldCount}
+          icon={PauseCircle}
+          color="text-yellow-600"
+          onClick={() => handleKpiClick("ON_HOLD")}
+        />
+        <StatCard
+          title="Pending"
+          value={pendingCount}
+          icon={Clock}
+          color="text-gray-600"
+          onClick={() => handleKpiClick("PENDING")}
+        />
       </div>
 
       {/* Search & Filter */}
@@ -125,13 +177,19 @@ export default function AdminApprovalDashboard() {
           type="text"
           placeholder="Search by candidate name... or Role"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setCurrentPage(1);
+          }}
           className="w-full md:w-1/3 px-3 py-2 border rounded-lg"
         />
 
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setCurrentPage(1);
+          }}
           className="w-full md:w-1/4 px-3 py-2 border rounded-lg"
         >
           <option value="ALL">All Status</option>
@@ -148,20 +206,32 @@ export default function AdminApprovalDashboard() {
           <thead className="bg-indigo-900 text-white">
             <tr>
               <th className="px-4 py-3 text-left">Candidate Name</th>
-              <th className="px-4 py-3 text-left">Email</th>
-              <th className="px-4 py-3 text-left">Role</th>
-              <th className="px-4 py-3 text-left">Approval Status</th>
+              <th className="px-4 py-3 text-center">Email</th>
+              <th className="px-4 py-3 text-center">Role</th>
+              <th className="px-4 py-3 text-center">Approval Status</th>
               <th className="px-4 py-3">requested by</th>
-              <th className="px-4 py-3 text-left">Action</th>
-              
+              <th className="px-4 py-3 text-center">Action</th>
             </tr>
           </thead>
 
           <tbody>
-            {filteredData.map((row) => (
-              <tr key={row.id} className="border-b">
-                <td className="px-4 py-3">
-                  {row.first_name} {row.last_name}
+            {loading ? (
+              <tr>
+                <td colSpan="6" className="py-10 text-center">
+                  <Loader2 className="h-6 w-6 mx-auto animate-spin text-indigo-600" />
+                </td>
+              </tr>
+            ) : filteredData.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="py-10 text-center text-gray-500">
+                  No approval requests found
+                </td>
+              </tr>
+            ) : (
+              paginatedData.map((row) => (
+                <tr key={row.id} className="border-b">
+                    <td className="px-4 py-3">
+                  {row.first_name}{row.middle_name ? ` ${row.middle_name}` : ""} {row.last_name}
                 </td>
                 <td className="px-4 py-3">{row.mail}</td>
                 <td className="px-4 py-3">{row.designation}</td>
@@ -179,27 +249,46 @@ export default function AdminApprovalDashboard() {
                   </span>
                 </td>
               </tr>
+              )
             ))}
 
-            {filteredData.length === 0 && (
+            {/* {! loading && filteredData.length === 0 && (
               <tr>
-                <td colSpan="5" className="text-center py-6 text-gray-500">
+                <td colSpan="6" className="text-center py-6 text-gray-500">
                   No approval requests found
                 </td>
               </tr>
-            )}
+            )} */}
           </tbody>
         </table>
       </div>
-
+      {filteredData.length > PAGE_SIZE && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+          onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+        />
+      )}
     </div>
   );
 }
 
 /* ---------- STAT CARD ---------- */
-function StatCard({ title, value, icon: Icon, color = "text-gray-700" }) {
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  color = "text-gray-700",
+  onClick,
+}) {
   return (
-    <div className="bg-white rounded-xl p-4 shadow-sm flex items-center gap-4">
+    <div
+      onClick={onClick}
+      className="bg-white rounded-xl p-4 border border-black/20 shadow-sm 
+                 flex items-center gap-4 transition-all duration-300 
+                 hover:-translate-y-1 hover:shadow-xl cursor-pointer"
+    >
       <Icon className={`h-6 w-6 ${color}`} />
       <div>
         <p className="text-sm text-gray-500">{title}</p>
@@ -219,7 +308,9 @@ function StatusBadge({ status }) {
   };
 
   return (
-    <span className={`px-3 py-1 rounded-full text-sm font-medium ${styles[status]}`}>
+    <span
+      className={`px-3 py-1 rounded-full text-sm font-medium ${styles[status]}`}
+    >
       {status}
     </span>
   );

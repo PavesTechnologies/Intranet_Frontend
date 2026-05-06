@@ -18,7 +18,9 @@ const ScopeAndProgress = lazy(() => import("./widgets/ScopeAndProgress"));
 const StatusOverview = lazy(() => import("./widgets/StatusOverview"));
 const TypesOfWork = lazy(() => import("./widgets/TypesOfWork"));
 const TeamWorkload = lazy(() => import("./widgets/TeamWorkload"));
-const PriorityDistribution = lazy(() => import("./widgets/PriorityDistribution"));
+const PriorityDistribution = lazy(
+  () => import("./widgets/PriorityDistribution"),
+);
 const EpicProgress = lazy(() => import("./widgets/EpicProgress"));
 
 const Summary = ({ projectId, projectName }) => {
@@ -32,7 +34,8 @@ const Summary = ({ projectId, projectName }) => {
     stage: null,
   });
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   useEffect(() => {
     // Preload widgets in idle time
@@ -41,24 +44,35 @@ const Summary = ({ projectId, projectName }) => {
 
   useEffect(() => {
     if (!projectId || !token) return;
-    const base = import.meta.env.VITE_PMS_BASE_URL;
+    const base = window.__APP_CONFIG__.PMS_BASE_URL;
     const headers = { Authorization: `Bearer ${token}` };
 
     // Fetch all APIs in parallel using Promise.allSettled
     const requests = [
-      axios.get(`${base}/api/projects/${projectId}`, { headers })
+      axios
+        .get(`${base}/api/projects/${projectId}`, { headers })
         .then((res) => ({ stage: res.data?.currentStage || "INITIATION" })),
-      axios.get(`${base}/api/projects/${projectId}/epics`, { headers })
+      axios
+        .get(`${base}/api/projects/${projectId}/epics`, { headers })
         .then((res) => ({ epics: res.data || [] })),
-      axios.get(`${base}/api/projects/${projectId}/stories`, { headers })
+      axios
+        .get(`${base}/api/projects/${projectId}/stories`, { headers })
         .then((res) => ({ stories: res.data || [] })),
-      axios.get(`${base}/api/projects/${projectId}/tasks`, { headers })
+      axios
+        .get(`${base}/api/projects/${projectId}/tasks`, { headers })
         .then((res) => ({ tasks: res.data || [] })),
-      axios.get(`${base}/api/testing/bugs/projects/${projectId}/summaries`, { headers })
+      axios
+        .get(`${base}/api/testing/bugs/projects/${projectId}/summaries`, {
+          headers,
+        })
         .then((res) => ({ bugs: res.data || [] })),
-      axios.get(`${base}/api/projects/${projectId}/statuses`, { headers })
+      axios
+        .get(`${base}/api/projects/${projectId}/statuses`, { headers })
         .then((res) => ({ statuses: res.data || [] })),
-      axios.get(`${base}/api/projects/${projectId}/members-with-owner`, { headers })
+      axios
+        .get(`${base}/api/projects/${projectId}/members-with-owner`, {
+          headers,
+        })
         .then((res) => ({ users: res.data || [] })),
     ];
 
@@ -75,15 +89,32 @@ const Summary = ({ projectId, projectName }) => {
   }, [projectId, token]);
 
   const isDataReady = {
-    work: projectData.epics && projectData.stories && projectData.tasks && projectData.bugs,
+    work:
+      projectData.epics &&
+      projectData.stories &&
+      projectData.tasks &&
+      projectData.bugs,
     statuses: projectData.statuses,
     users: projectData.users,
   };
 
   const allWork = useMemo(() => {
     if (!isDataReady.work) return [];
-    return [...projectData.tasks, ...projectData.stories, ...projectData.bugs];
-  }, [projectData.epics, projectData.stories, projectData.tasks, projectData.bugs, isDataReady.work]);
+
+    return [
+      ...(projectData.tasks || []).map(t => ({
+        status: { name: t.statusName || "UNKNOWN" }
+      })),
+
+      ...(projectData.stories || []).map(s => ({
+        status: { name: s.statusName || "UNKNOWN" }
+      })),
+
+      ...(projectData.bugs || []).map(b => ({
+        status: { name: b.status || "UNKNOWN" }
+      })),
+    ];
+  }, [projectData.tasks, projectData.stories, projectData.bugs, isDataReady.work]);
 
   return (
     <motion.div
@@ -99,12 +130,12 @@ const Summary = ({ projectId, projectName }) => {
         <div className="mb-6 px-1">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-slate-800 tracking-tight">
+              {/* <h1 className="text-2xl font-semibold text-slate-800 tracking-tight">
                 {projectName || "Project"}
               </h1>
               <p className="text-sm text-slate-500 mt-0.5">
                 Overview & progress at a glance
-              </p>
+              </p> */}
             </div>
             <div>
               <span className="px-3 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
@@ -138,7 +169,10 @@ const Summary = ({ projectId, projectName }) => {
           <StatusSkeleton />
         ) : (
           <Suspense fallback={<StatusSkeleton />}>
-            <StatusOverview workItems={allWork} statuses={projectData.statuses} />
+            <StatusOverview
+              workItems={allWork}
+              statuses={projectData.statuses}
+            />
           </Suspense>
         )}
       </div>

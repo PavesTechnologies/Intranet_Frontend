@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, Settings } from "lucide-react";
+import { Plus } from "lucide-react";
 import axios from "axios";
 
 import CreateRiskModal from "./createRiskModal";
@@ -18,6 +18,10 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
 
   const [showCreateRisk, setShowCreateRisk] = useState(false);
   const [showRiskModal, setShowRiskModal] = useState(false);
+
+  /* ---------- Refresh Trigger ---------- */
+
+  const [refreshKey, setRefreshKey] = useState(0);
 
   /* ---------- Issue Summary ---------- */
 
@@ -44,13 +48,13 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
     async function fetchSummary() {
       try {
         const token = localStorage.getItem("token");
-        const BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+        const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 
         const res = await axios.get(
           `${BASE_URL}/api/risk-links/${projectId}/risk-summary/by-issue-type`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
 
         setIssueTypeSummary(res.data || []);
@@ -60,7 +64,7 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
     }
 
     fetchSummary();
-  }, [projectId]);
+  }, [projectId, refreshKey]);
 
   /* =========================
      Issue Type Cards
@@ -69,7 +73,7 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
   const issueTypeCards = useMemo(() => {
     const total = issueTypeSummary.reduce(
       (sum, it) => sum + (it.riskCount || 0),
-      0
+      0,
     );
 
     return [
@@ -92,7 +96,7 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
   }
 
   /* =========================
-     ✅ Load Risks (ALL + Specific)
+     Load Risks
   ========================= */
 
   useEffect(() => {
@@ -103,17 +107,16 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
 
       try {
         const token = localStorage.getItem("token");
-        const BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+        const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 
         const params = {
           projectId,
           page: riskPage,
           size: RISKS_PAGE_SIZE,
-          linkedType:null,
-          linkedId:null,
+          linkedType: null,
+          linkedId: null,
         };
 
-        // ✅ only when NOT "All"
         if (selectedIssue) {
           params.linkedType = selectedIssue.linkedType;
           params.linkedId = selectedIssue.linkedId;
@@ -124,9 +127,7 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (!cancelled) {
-          setRiskData(res.data);
-        }
+        if (!cancelled) setRiskData(res.data);
       } catch (err) {
         console.error("Failed loading risks", err);
         if (!cancelled) setRiskData(null);
@@ -136,10 +137,10 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
     }
 
     loadRisks();
-    return () => (cancelled = true);
-
-    // ✅ IMPORTANT FIX
-  }, [selectedIssue, activeIssueType, riskPage, projectId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedIssue, activeIssueType, riskPage, projectId, refreshKey]);
 
   /* =========================
      Render
@@ -148,35 +149,31 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Risk Register</h1>
-            {/* <p className="text-sm text-slate-500">Project {projectId}</p> */}
-          </div>
+      <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between">
+        <h1 className="text-3xl font-bold"></h1>
 
-          <button
-            onClick={() => setShowCreateRisk(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            New Risk
-          </button>
+        <button
+          onClick={() => setShowCreateRisk(true)}
+          className="px-4 py-2 bg-indigo-900 text-white rounded-lg flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          New Risk
+        </button>
 
-          <CreateRiskModal
-            projectId={projectId}
-            isOpen={showCreateRisk}
-            onClose={() => setShowCreateRisk(false)}
-            onCreate={() => {
-              setShowCreateRisk(false);
-              setRiskPage(1);
-            }}
-          />
-        </div>
+        <CreateRiskModal
+          projectId={projectId}
+          isOpen={showCreateRisk}
+          onClose={() => setShowCreateRisk(false)}
+          onCreate={() => {
+            setShowCreateRisk(false);
+            setRiskPage(1);
+            setRefreshKey((prev) => prev + 1);
+          }}
+        />
       </div>
 
       {/* Issue Type Cards */}
-      <div className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-5 gap-4">
+      <div className="max-w-5xl mx-auto px-3 py-3 grid grid-cols-5 gap-4">
         {issueTypeCards.map((t) => {
           const label = issueTypeLabel(t.issueType);
           const active = activeIssueType === label;
@@ -188,11 +185,11 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
                 setActiveIssueType(label);
                 setIssuePage(1);
                 setRiskPage(1);
-                setSelectedIssue(null); // ✅ All
+                setSelectedIssue(null);
                 setRiskData(null);
               }}
-              className={`p-4 rounded-lg ${
-                active ? "bg-indigo-600 text-white" : "bg-white border"
+              className={`p-3 rounded-lg ${
+                active ? "bg-indigo-900 text-white" : "bg-white border"
               }`}
             >
               <div className="font-semibold">{label}</div>
@@ -231,8 +228,13 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
 
       <RiskDetailModal
         risk={showRiskModal ? selectedRisk : null}
+        selectedIssue={selectedIssue}
         onClose={() => setShowRiskModal(false)}
         projectId={projectId}
+        onUpdated={() => {
+          setRefreshKey((prev) => prev + 1);
+          setRiskPage(1);
+        }}
       />
     </div>
   );

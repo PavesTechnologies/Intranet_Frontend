@@ -12,23 +12,34 @@ export default function AddCountryIdentityMappingModal({
   const [mandatory, setMandatory] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const token = localStorage.getItem("token");
+  const headers = { Authorization: `Bearer ${token}` };
 
+  /* -------- LOAD IDENTITIES -------- */
   useEffect(() => {
     const loadIdentities = async () => {
-      const res = await axios.get(`${BASE_URL}/identity`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setIdentities(res.data);
+      try {
+        const res = await axios.get(`${BASE_URL}/identity`, { headers });
+        setIdentities(res.data);
+      } catch {
+        toast.error("Failed to load identities");
+      }
     };
     loadIdentities();
   }, []);
 
+  /* -------- SAVE -------- */
   const handleSave = async () => {
+    if (!identityUuid) {
+      toast.error("Select identity type");
+      return;
+    }
+
     try {
       setSaving(true);
-      await axios.post(
+
+      const res = await axios.post(
         `${BASE_URL}/identity/country-mapping`,
         {
           country_uuid: countryUuid,
@@ -40,11 +51,24 @@ export default function AddCountryIdentityMappingModal({
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
+
+      // ✅ Build mapping object for parent (NO reload)
+      const identity = identities.find(
+        (i) => i.identity_type_uuid === identityUuid,
+      );
+
+      const newMapping = {
+        mapping_uuid: res.data.mapping_uuid,
+        identity_type_uuid: identityUuid,
+        identity_type_name: identity?.identity_type_name || "",
+        is_mandatory: mandatory,
+      };
+
       toast.success("Identity mapped successfully");
+      onSuccess(newMapping); // ✅ parent updates table instantly
       onClose();
-      onSuccess();
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to create mapping");
     } finally {
@@ -55,9 +79,7 @@ export default function AddCountryIdentityMappingModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold mb-4">
-          Add Identity to Country
-        </h2>
+        <h2 className="text-xl font-semibold mb-4">Add Identity to Country</h2>
 
         <label className="block text-sm mb-1">Identity Type</label>
         <select
@@ -83,13 +105,18 @@ export default function AddCountryIdentityMappingModal({
         </label>
 
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded-lg">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-200 rounded-lg transition-all duration-100 ease-in-out
+            active:translate-y-[1px]"
+          >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={!identityUuid || saving}
-            className={`px-4 py-2 rounded-lg text-white ${
+            className={`px-4 py-2 rounded-lg text-white transition-all duration-100 ease-in-out
+            active:translate-y-[1px] ${
               saving || !identityUuid
                 ? "bg-gray-400"
                 : "bg-blue-700 hover:bg-blue-800"

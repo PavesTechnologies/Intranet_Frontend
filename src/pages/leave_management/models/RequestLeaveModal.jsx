@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Fragment } from "react";
+import React, { useState, useEffect, Fragment, useMemo } from "react";
 import axios from "axios";
 import { X } from "lucide-react";
 import { Listbox, Transition } from "@headlessui/react";
@@ -7,66 +7,68 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import { format } from "date-fns";
 import DateRangePicker from "./DateRangePicker";
+// import {useLeaveConsumption} from "../hooks/useLeaveConsumption";
+import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 // const token = localStorage.getItem("token");
 
 // -- Helper: Massage leaves to dropdown options --
-function mapLeaveBalancesToDropdown(balances) {
-  // This helper function remains unchanged.
-  const [leaveTypes, setLeaveTypes] = useState([]);
-  const fetchLeaveTypes = async () => {
-    try {
-      const res = await axios.get(`${BASE_URL}/api/leave/types`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      setLeaveTypes(res.data);
-    } catch (err) {
-      toast.error(response?.data?.message || err || "Failed to load leave type details.");
-    }
-  };
-  useEffect(() => {
-    fetchLeaveTypes();
-  }, []);
+// function mapLeaveBalancesToDropdown(balances) {
+//   // This helper function remains unchanged.
+//   const [leaveTypes, setLeaveTypes] = useState([]);
+//   const fetchLeaveTypes = async () => {
+//     try {
+//       const res = await axios.get(`${BASE_URL}/api/leave/types`, {
+//         headers: {
+//           Authorization: `Bearer ${localStorage.getItem("token")}`,
+//         },
+//       });
+//       setLeaveTypes(res.data);
+//     } catch (err) {
+//       toast.error(response?.data?.message || err || "Failed to load leave type details.");
+//     }
+//   };
+//   useEffect(() => {
+//     fetchLeaveTypes();
+//   }, []);
 
-  return balances.map((balance) => {
-    const leaveTypeId = balance.leaveType.leaveTypeId;
-    const originalName = balance.leaveType.leaveName.replace(/^L-/, "");
+//   return balances.map((balance) => {
+//     const leaveTypeId = balance.leaveType.leaveTypeId;
+//     const originalName = balance.leaveType.leaveName.replace(/^L-/, "");
 
-    const matchingType = leaveTypes.find(
-      (type) => type.name === balance.leaveType.leaveName
-    );
-    const leaveName = matchingType ? matchingType.label : originalName;
+//     const matchingType = leaveTypes.find(
+//       (type) => type.name === balance.leaveType.leaveName
+//     );
+//     const leaveName = matchingType ? matchingType.label : originalName;
 
-    let availableText;
-    let isInfinite = false;
-    if (leaveTypeId === "L-UP" || leaveName.toLowerCase().includes("unpaid")) {
-      availableText = "infinite balance";
-      isInfinite = true;
-    } else if (balance.remainingLeaves > 0) {
-      availableText =
-        (balance.remainingLeaves % 1 === 0
-          ? balance.remainingLeaves
-          : balance.remainingLeaves), " days available";
-    } else {
-      availableText = "Not Available";
-    }
-    return {
-      balanceId: balance.balanceId,
-      leaveTypeId,
-      leaveName,
-      availableText,
-      availableDays: isInfinite ? Infinity : balance.remainingLeaves,
-      isInfinite,
-      disabled: (!isInfinite && balance.remainingLeaves <= 0) || balance.isBlocked,
-      allowHalfDay: !!balance.leaveType.allowHalfDay,
-      requiresDocumentation: !!balance.leaveType.requiresDocumentation,
-      raw: balance,
-    };
-  });
-}
+//     let availableText;
+//     let isInfinite = false;
+//     if (leaveTypeId === "L-UP" || leaveName.toLowerCase().includes("unpaid")) {
+//       availableText = "infinite balance";
+//       isInfinite = true;
+//     } else if (balance.remainingLeaves > 0) {
+//       availableText =
+//         (balance.remainingLeaves % 1 === 0
+//           ? balance.remainingLeaves
+//           : balance.remainingLeaves), " days available";
+//     } else {
+//       availableText = "Not Available";
+//     }
+//     return {
+//       balanceId: balance.balanceId,
+//       leaveTypeId,
+//       leaveName,
+//       availableText,
+//       availableDays: isInfinite ? Infinity : balance.remainingLeaves,
+//       isInfinite,
+//       disabled: (!isInfinite && balance.remainingLeaves <= 0) || balance.isBlocked,
+//       allowHalfDay: !!balance.leaveType.allowHalfDay,
+//       requiresDocumentation: !!balance.leaveType.requiresDocumentation,
+//       raw: balance,
+//     };
+//   });
+// }
 
 // -- Helpers: Date logic --
 function getTodayDateString() {
@@ -92,12 +94,12 @@ function formatDateForDisplay(dateStr) {
 
 // --- MODIFIED ---
 // Updated function signature to accept leaveTypeId
-function countWeekdaysBetween(
+export function countWeekdaysBetween(
   fromDate,
   toDate,
   halfDayConfig,
   holidays = [],
-  leaveTypeId = null // --- NEW ---
+  leaveTypeId = null, // --- NEW ---
 ) {
   if (!fromDate || !toDate || !halfDayConfig) return 0;
 
@@ -119,7 +121,7 @@ function countWeekdaysBetween(
         if (typeof h === "string") return h;
         return null;
       })
-      .filter(Boolean)
+      .filter(Boolean),
   );
 
   let total = 0;
@@ -168,7 +170,7 @@ function countWeekdaysBetween(
 }
 
 // -- The HeadlessUI Leave Type Dropdown -- (Unchanged)
-function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
+export function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
   const sel = options.find((o) => o.leaveTypeId === selectedId) ?? null;
   return (
     <Listbox value={sel} onChange={(opt) => setSelectedId(opt.leaveTypeId)}>
@@ -245,7 +247,12 @@ function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
 }
 
 // ---- THE MAIN MODAL COMPONENT ----
-export default function RequestLeaveModal({ isOpen, onClose, onSuccess, year }) {
+export default function RequestLeaveModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  year,
+}) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [leaveTypeId, setLeaveTypeId] = useState("");
@@ -259,13 +266,25 @@ export default function RequestLeaveModal({ isOpen, onClose, onSuccess, year }) 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [balances, setBalances] = useState([]);
+  const [balances, setBalances] = useState({
+    regular: [],
+    genderBasedLeaveBalances: [],
+  });
+  const allBalances = useMemo(
+    () => [
+      ...(balances?.regular ?? []),
+      ...(balances?.genderBasedLeaveBalances ?? []),
+    ],
+    [balances],
+  );
   const [loadingBalances, setLoadingBalances] = useState(false);
   const [balanceError, setBalanceError] = useState("");
   const [driveLink, setDriveLink] = useState("");
-  const leaveTypeOptions = mapLeaveBalancesToDropdown(balances);
+  // const leaveTypeOptions = mapLeaveBalancesToDropdown(balances);
+  // console.log("allBalances",allBalances);
+  const leaveTypeOptions = useLeaveDropdownOptions(allBalances);
   const selectedLeaveType = leaveTypeOptions.find(
-    (o) => o.leaveTypeId === leaveTypeId
+    (o) => o.leaveTypeId === leaveTypeId,
   );
 
   const employeeId = useAuth()?.user?.user_id;
@@ -277,7 +296,7 @@ export default function RequestLeaveModal({ isOpen, onClose, onSuccess, year }) 
     endDate,
     halfDayConfig,
     holidays,
-    leaveTypeId
+    leaveTypeId,
   );
 
   const shouldShowDriveLink = () => {
@@ -291,6 +310,8 @@ export default function RequestLeaveModal({ isOpen, onClose, onSuccess, year }) 
     }
     return requiredDocs;
   };
+
+  // const leaveTypeOptions = useLeaveDropdownOptions(allBalances)
 
   useEffect(() => {
     if (!isOpen) {
@@ -330,6 +351,7 @@ export default function RequestLeaveModal({ isOpen, onClose, onSuccess, year }) 
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       .then((response) => {
+        console.log(response.data.data);
         setBalances(response.data.data);
         setLoadingBalances(false);
       })
@@ -340,10 +362,15 @@ export default function RequestLeaveModal({ isOpen, onClose, onSuccess, year }) 
     const fetchHolidays = async () => {
       try {
         // Replace with your actual holiday API endpoint
-        const res = await axios.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
-          params: { state: "All", country: "India" },
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        const res = await axios.get(
+          `${BASE_URL}/api/holidays/by-location/${year}`,
+          {
+            params: { state: "All", country: "India" },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
+        );
 
         // Map the JSON response to an array of Date objects
         const holidayDates = res.data.data.map((holiday) => {
@@ -397,7 +424,7 @@ export default function RequestLeaveModal({ isOpen, onClose, onSuccess, year }) 
       endDate,
       halfDayConfig,
       holidays,
-      leaveTypeId
+      leaveTypeId,
     );
 
     const payload = {
@@ -406,6 +433,7 @@ export default function RequestLeaveModal({ isOpen, onClose, onSuccess, year }) 
       startDate,
       endDate: endDate || startDate,
       daysRequested,
+      year,
       reason,
       // isHalfDay: showCustomHalfDay,
       startSession: halfDayConfig.start,
@@ -431,11 +459,9 @@ export default function RequestLeaveModal({ isOpen, onClose, onSuccess, year }) 
     } catch (err) {
       setError(
         "Failed to submit leave request: " +
-          (err.response?.data?.message || err.message)
+          (err.response?.data?.message || err.message),
       );
-      toast.error(
-        "Failed to submit leave request: "
-      );
+      toast.error("Failed to submit leave request: ");
     } finally {
       setSubmitting(false);
     }
@@ -502,8 +528,8 @@ export default function RequestLeaveModal({ isOpen, onClose, onSuccess, year }) 
                 endDate
                   ? new Date(endDate + "T00:00:00")
                   : startDate
-                  ? new Date(startDate + "T00:00:00")
-                  : null
+                    ? new Date(startDate + "T00:00:00")
+                    : null
               }
               align="right"
               disabledDays={[
@@ -532,7 +558,8 @@ export default function RequestLeaveModal({ isOpen, onClose, onSuccess, year }) 
             </label>
             {loadingBalances ? (
               <div className="flex items-center justify-center p-4 text-gray-500 text-sm rounded-xl bg-gray-50">
-                <span className="animate-pulse mr-2 rotate-45">⏳</span> Loading...
+                <span className="animate-pulse mr-2 rotate-45">⏳</span>{" "}
+                Loading...
               </div>
             ) : balanceError ? (
               <div className="text-red-600 text-sm bg-red-50 rounded-xl p-2">

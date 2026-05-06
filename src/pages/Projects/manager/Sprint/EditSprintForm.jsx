@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { showStatusToast } from "../../../../components/toastfy/toast";
+import { toast } from "react-toastify";
 
 const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
   const token = localStorage.getItem("token");
@@ -22,8 +22,8 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
       try {
         setLoading(true);
         const res = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/sprints/${sprintId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         const sprint = res.data;
@@ -37,7 +37,7 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
           projectId: sprint.projectId,
         });
       } catch (err) {
-        showStatusToast("Failed to load sprint details", "error", 3000);
+        toast.success("Sprint updated successfully!", { autoClose: 3000, containerId: "global" });
       } finally {
         setLoading(false);
       }
@@ -61,9 +61,9 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
 
     try {
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/sprints/${sprintId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}`,
         payload,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       showStatusToast("Sprint updated successfully!", "success", 3000);
@@ -71,11 +71,7 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
       onUpdated?.();
       onClose?.();
     } catch (err) {
-      showStatusToast(
-        err.response?.data?.message || "Failed to update sprint",
-        "error",
-        4000
-      );
+      toast.error("Failed to load sprint details", { autoClose: 3000, containerId: "global" });
     } finally {
       setLoading(false);
     }
@@ -86,7 +82,6 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-
       <div>
         <label className="block font-medium">Sprint Name</label>
         <input

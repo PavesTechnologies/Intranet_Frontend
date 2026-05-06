@@ -8,10 +8,13 @@ let stompClient = null;
 
 const useLeaveConsumption = (employeeId, refreshKey, year) => {
   const token = localStorage.getItem("token");
-  const [leaveData, setLeaveData] = useState([]);
+  const [leaveData, setLeaveData] = useState({
+    regular: [],
+    genderBasedLeaveBalances: [],
+  });
   const [loading, setLoading] = useState(true);
 
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
   // ---------------------------
   // FUNCTION TO FETCH LEAVE DATA
@@ -20,11 +23,13 @@ const useLeaveConsumption = (employeeId, refreshKey, year) => {
     if (!employeeId) return;
 
     setLoading(true);
-    axios.get(`${BASE_URL}/api/leave-balance/employee/${employeeId}/${year}`, {
+    axios
+      .get(`${BASE_URL}/api/leave-balance/employee/${employeeId}/${year}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
-        setLeaveData(res.data);
+        // console.log(res.data);
+        setLeaveData(res.data.data);
         setLoading(false);
       })
       .catch(() => {

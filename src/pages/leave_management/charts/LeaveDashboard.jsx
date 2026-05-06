@@ -6,64 +6,75 @@ import useLeaveConsumption from "../hooks/useLeaveConsumption";
 import LeaveUsageChart from "./LeaveUsageChart";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+
+const CARD_ACCENTS = {
+  EARNED_LEAVE: "border-l-emerald-400",
+  SICK_LEAVE: "border-l-red-400",
+  COMPENSATORY_LEAVE: "border-l-blue-400",
+  UNPAID_LEAVE: "border-l-stone-400",
+};
+
+const SPECIAL_THEMES = {
+  MATERNITY_LEAVE: {
+    bg: "bg-pink-50",
+    border: "border-pink-200",
+    text: "text-pink-700",
+    dot: "bg-pink-400",
+  },
+  PATERNITY_LEAVE: {
+    bg: "bg-sky-50",
+    border: "border-sky-200",
+    text: "text-sky-700",
+    dot: "bg-sky-400",
+  },
+  DEFAULT: {
+    bg: "bg-violet-50",
+    border: "border-violet-200",
+    text: "text-violet-700",
+    dot: "bg-violet-400",
+  },
+};
 
 export default function LeaveDashboard({ employeeId, refreshKey, year }) {
   const [leaveTypes, setLeaveTypes] = useState([]);
   const { leaveData, loading } = useLeaveConsumption(
     employeeId,
     refreshKey,
-    year
+    year,
   );
   const navigate = useNavigate();
 
-  const fetchLeaveTypes = async () => {
-    try {
-      const res = await axios.get(`${BASE_URL}/api/leave/types`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      setLeaveTypes(res.data);
-    } catch (err) {
-      toast.error(err.message || "Failed to fetch leave types");
-    }
-  };
-
   useEffect(() => {
-    fetchLeaveTypes();
+    axios
+      .get(`${BASE_URL}/api/leave/types`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
+      .then((res) => setLeaveTypes(res.data))
+      .catch((err) =>
+        toast.error(err.message || "Failed to fetch leave types"),
+      );
   }, []);
 
   const getDisplayName = useCallback(
-    (leaveName) => {
-      const matchingType = leaveTypes.find((type) => type.name === leaveName);
-      return matchingType ? matchingType.label : leaveName;
-    },
-    [leaveTypes]
+    (leaveName) =>
+      leaveTypes.find((t) => t.name === leaveName)?.label ?? leaveName,
+    [leaveTypes],
   );
 
   const { sortedMainLeaves, specialLeaves, allLeaveTypesForNav } =
     useMemo(() => {
-      // Wait until both data sources are available before doing anything.
-      if (leaveData.length === 0 || leaveTypes.length === 0) {
+      const regular = leaveData?.regular ?? [];
+      const genderBased = leaveData?.genderBasedLeaveBalances ?? [];
+      if (
+        (regular.length === 0 && genderBased.length === 0) ||
+        leaveTypes.length === 0
+      )
         return {
           sortedMainLeaves: [],
           specialLeaves: [],
           allLeaveTypesForNav: [],
         };
-      }
-
-      const leaves = Array.isArray(leaveData?.data) ? leaveData.data : [];
-
-      const mainLeaves = leaves.filter((leave) => {
-        const name = getDisplayName(leave.leaveType?.leaveName || "").toLowerCase();
-        return !name.includes("paternity") && !name.includes("maternity");
-      });
-
-      const specialLeaves = leaves.filter((leave) => {
-        const name = getDisplayName(leave.leaveType.leaveName || "").toLowerCase();
-        return name.includes("paternity") || name.includes("maternity");
-      });
 
       const desiredOrder = [
         "Earned Leave",
@@ -71,26 +82,24 @@ export default function LeaveDashboard({ employeeId, refreshKey, year }) {
         "Unpaid Leave",
         "CompOff Leave",
       ];
-
-      const sortedMainLeaves = [...mainLeaves].sort((a, b) => {
-        const nameA = getDisplayName(a.leaveType.leaveName);
-        const nameB = getDisplayName(b.leaveType.leaveName);
-        const indexA = desiredOrder.indexOf(nameA);
-        const indexB = desiredOrder.indexOf(nameB);
-        return (
-          (indexA === -1 ? Infinity : indexA) -
-          (indexB === -1 ? Infinity : indexB)
-        );
+      const sortedMainLeaves = [...regular].sort((a, b) => {
+        const iA = desiredOrder.indexOf(getDisplayName(a.leaveType.leaveName));
+        const iB = desiredOrder.indexOf(getDisplayName(b.leaveType.leaveName));
+        return (iA === -1 ? Infinity : iA) - (iB === -1 ? Infinity : iB);
       });
 
-      const allLeaveTypesForNav = [...sortedMainLeaves, ...specialLeaves].map(
-        (leave) => ({
-          name: leave.leaveType.leaveName,
-          label: getDisplayName(leave.leaveType.leaveName),
-        })
+      const allLeaveTypesForNav = [...sortedMainLeaves, ...genderBased].map(
+        (l) => ({
+          name: l.leaveType.leaveName,
+          label: getDisplayName(l.leaveType.leaveName),
+        }),
       );
 
-      return { sortedMainLeaves, specialLeaves, allLeaveTypesForNav };
+      return {
+        sortedMainLeaves,
+        specialLeaves: genderBased,
+        allLeaveTypesForNav,
+      };
     }, [leaveData, leaveTypes, getDisplayName]);
 
   if (loading)
@@ -100,107 +109,117 @@ export default function LeaveDashboard({ employeeId, refreshKey, year }) {
       </div>
     );
 
-  const handleViewDetails = (leave, displayName) => {
-    navigate(`/leave-details/${employeeId}/${leave.leaveType.leaveName}`, {
-      state: {
-        leaveTypeName: displayName,
-        allLeaveTypes: allLeaveTypesForNav,
-      },
-    });
-  };
+  // console.log("special leaves", specialLeaves);
+
+  const isEmpty =
+    leaveData?.regular?.length === 0 &&
+    leaveData?.genderBasedLeaveBalances?.length === 0;
 
   return (
-    <>
-      {leaveData.data.length === 0 && (
-        console.log("No leave balances available for the selected year.", leaveData.length),
-        <div className="text-center">
-          <p className="text-gray-500 italic font-semibold">No leave balances available in {year}.</p>
-        </div>
+    <div className="space-y-6">
+      {isEmpty && (
+        <p className="text-center text-gray-400 italic py-8">
+          No leave balances available in {year}.
+        </p>
       )}
-      {/* Top grid for normal leaves */}
-      <div className="grid grid-cols-1  md:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-        {sortedMainLeaves.map((leave) => {
+
+      {/* Main leave cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
+        {sortedMainLeaves.map((leave, i) => {
           const displayName = getDisplayName(leave.leaveType.leaveName);
-          const isCompOff = leave.leaveType.leaveName === "COMPENSATORY_LEAVE";
-          const isUnpaid = leave.leaveType.leaveName === "UNPAID_LEAVE";
+          const accentClass =
+            CARD_ACCENTS[leave.leaveType.leaveName] ?? "border-l-violet-400";
 
           return (
             <div
               key={leave.balanceId}
-              className="bg-white p-6 rounded-lg shadow-sm"
+              className={`
+                bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 ${accentClass}
+                hover:shadow-md hover:-translate-y-0.5 transition-all duration-200
+                p-5 flex flex-col gap-4
+              `}
+              style={{ animationDelay: `${i * 80}ms` }}
             >
-              <div className="flex items-center w-full justify-between mb-3">
-                <h3 className="font-semibold text-gray-900">{displayName}</h3>
+              {/* Card header */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm leading-tight">
+                    {displayName}
+                  </h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {year} Balance
+                  </p>
+                </div>
                 <button
-                  onClick={() => handleViewDetails(leave, displayName)}
-                  className="text-indigo-600 text-xs hover:text-indigo-800 transition-colors"
+                  onClick={() =>
+                    navigate(
+                      `/leave-details/${employeeId}/${leave.leaveType.leaveName}`,
+                      {
+                        state: {
+                          leaveTypeName: displayName,
+                          allLeaveTypes: allLeaveTypesForNav,
+                        },
+                      },
+                    )
+                  }
+                  className="text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors whitespace-nowrap ml-2"
                 >
-                  View details
+                  Details →
                 </button>
               </div>
 
-              {/* Always show chart for main leaves */}
+              {/* Chart */}
               <LeaveUsageChart leave={leave} />
-
-              {/* Stats section */}
-              <div className="space-y-2 mt-4">
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">AVAILABLE</span>
-                  <span className="text-gray-500 text-right">CONSUMED</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  {isUnpaid ? (
-                    "∞ Days"
-                  ) : (
-                    <span>{Math.max(leave.remainingLeaves, 0)} days</span>
-                  )}
-                  <span>{leave.usedLeaves} days</span>
-                </div>
-                {!isCompOff && (
-                  <div className="flex justify-between text-xs">
-                    {!isUnpaid && (
-                      <span className="text-gray-500">ACCRUED SO FAR</span>
-                    )}
-                    <span className="text-gray-500 text-right">
-                      ANNUAL QUOTA
-                    </span>
-                  </div>
-                )}
-                {!isCompOff && (
-                  <div className="flex justify-between text-sm">
-                    {!isUnpaid && <span>{leave.accruedLeaves} days</span>}
-                    {isUnpaid ? (
-                      "∞ Days"
-                    ) : (
-                      <span>{leave.totalLeaves || "-"} days</span>
-                    )}
-                  </div>
-                )}
-              </div>
             </div>
           );
         })}
       </div>
 
-      {/* Bottom section for Paternity & Maternity */}
+      {/* Special / Gender-based leaves */}
       {specialLeaves.length > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow flex text-sm font-medium mb-4">
-          <h4>Other Leave Types Available:</h4>
-          <div className="space-y-4">
+        <div>
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3 px-1">
+            Special Leave Entitlements
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {specialLeaves.map((leave) => {
               const displayName = getDisplayName(leave.leaveType.leaveName);
+              const theme =
+                SPECIAL_THEMES[leave.leaveType.leaveName] ??
+                SPECIAL_THEMES.DEFAULT;
+              const remaining = Math.max(leave.remainingDays, 0);
 
               return (
-                <div key={leave.balanceId}>
-                  <span className="ml-3 text-sm font-medium text-gray-700">
-                    {displayName}
-                  </span>
+                <div
+                  key={leave.balanceId}
+                  className={`${theme.bg} ${theme.border} border rounded-xl p-4 flex items-center gap-4
+                    hover:shadow-sm transition-all duration-200`}
+                >
+                  <div
+                    className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${theme.dot}`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`text-sm font-semibold ${theme.text} truncate`}
+                    >
+                      {displayName}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {remaining} days remaining ·{" "}
+                      {leave.totalEntitledDays ?? "-"} total
+                    </p>
+                  </div>
+                  <div
+                    className={`text-xl font-bold ${theme.text} flex-shrink-0`}
+                  >
+                    {remaining}
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

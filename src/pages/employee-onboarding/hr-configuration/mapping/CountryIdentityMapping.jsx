@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import AddCountryIdentityMappingModal from "./AddCountryIdentityMappingModal";
 
 export default function CountryIdentityMapping() {
   const [countries, setCountries] = useState([]);
@@ -17,14 +18,13 @@ export default function CountryIdentityMapping() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deletingDocUuid, setDeletingDocUuid] = useState(null);
 
-
   // 🔴 NEW: holds backend business error
   const [deleteError, setDeleteError] = useState(null);
 
   const [identityTypeUuid, setIdentityTypeUuid] = useState("");
   const [isMandatory, setIsMandatory] = useState(true);
 
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -42,13 +42,28 @@ export default function CountryIdentityMapping() {
   const fetchMappings = async (countryUuid) => {
     try {
       setLoading(true);
+
       const res = await axios.get(
         `${BASE_URL}/identity/country-mapping/identities/${countryUuid}`,
-        { headers }
+        { headers },
       );
+
+      // ✅ handle empty list
+      if (!res.data || res.data.length === 0) {
+        setMappings([]);
+        toast.info("No mappings found");
+        return;
+      }
+
       setMappings(res.data);
-    } catch {
-      toast.error("Failed to load mappings");
+    } catch (err) {
+      // ✅ handle "no mappings" from backend (404)
+      if (err?.response?.status === 404) {
+        setMappings([]);
+        toast.info("No mappings found");
+      } else {
+        toast.error("Failed to load mappings");
+      }
     } finally {
       setLoading(false);
     }
@@ -72,7 +87,7 @@ export default function CountryIdentityMapping() {
             identity_type_uuid: identityTypeUuid,
             is_mandatory: isMandatory,
           },
-          { headers }
+          { headers },
         );
 
         setMappings((prev) =>
@@ -83,12 +98,12 @@ export default function CountryIdentityMapping() {
                   identity_type_uuid: identityTypeUuid,
                   identity_type_name:
                     identityTypes.find(
-                      (i) => i.identity_type_uuid === identityTypeUuid
+                      (i) => i.identity_type_uuid === identityTypeUuid,
                     )?.identity_type_name || m.identity_type_name,
                   is_mandatory: isMandatory,
                 }
-              : m
-          )
+              : m,
+          ),
         );
 
         toast.success("Mapping updated");
@@ -100,7 +115,7 @@ export default function CountryIdentityMapping() {
             identity_type_uuid: identityTypeUuid,
             is_mandatory: isMandatory,
           },
-          { headers }
+          { headers },
         );
 
         setMappings((prev) => [
@@ -110,7 +125,7 @@ export default function CountryIdentityMapping() {
             identity_type_uuid: identityTypeUuid,
             identity_type_name:
               identityTypes.find(
-                (i) => i.identity_type_uuid === identityTypeUuid
+                (i) => i.identity_type_uuid === identityTypeUuid,
               )?.identity_type_name || "",
             is_mandatory: isMandatory,
           },
@@ -134,11 +149,11 @@ export default function CountryIdentityMapping() {
 
       await axios.delete(
         `${BASE_URL}/identity/country-mapping/${confirmDelete.mapping_uuid}`,
-        { headers }
+        { headers },
       );
 
       setMappings((prev) =>
-        prev.filter((m) => m.mapping_uuid !== confirmDelete.mapping_uuid)
+        prev.filter((m) => m.mapping_uuid !== confirmDelete.mapping_uuid),
       );
 
       toast.success("Mapping removed");
@@ -157,31 +172,30 @@ export default function CountryIdentityMapping() {
     }
   };
 
+  const deleteEmployeeDocument = async (document_uuid) => {
+    try {
+      setDeletingDocUuid(document_uuid);
 
-  const deleteEmployeeDocument = async (documentUuid) => {
-  try {
-    setDeletingDocUuid(documentUuid);
+      await axios.delete(
+        `${BASE_URL}/employee-details/identity/${document_uuid}`,
+        { headers },
+      );
 
-    await axios.delete(
-      `${BASE_URL}/employee-details/identity/{document_uuid}`,
-      { headers }
-    );
+      // remove only this document from deleteError
+      setDeleteError((prev) => ({
+        ...prev,
+        employees: prev.employees.filter(
+          (e) => e.document_uuid !== document_uuid,
+        ),
+      }));
 
-    // remove only this document from deleteError
-    setDeleteError((prev) => ({
-      ...prev,
-      employees: prev.employees.filter(
-        (e) => e.document_uuid !== documentUuid
-      ),
-    }));
-
-    toast.success("Document deleted");
-  } catch {
-    toast.error("Failed to delete document");
-  } finally {
-    setDeletingDocUuid(null);
-  }
-};
+      toast.success("Document deleted");
+    } catch {
+      toast.error("Failed to delete document");
+    } finally {
+      setDeletingDocUuid(null);
+    }
+  };
 
   /* ---------------- RESET ---------------- */
   const resetForm = () => {
@@ -210,9 +224,7 @@ export default function CountryIdentityMapping() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-2">
-        Country Identity Mapping
-      </h1>
+      <h1 className="text-2xl font-semibold mb-2">Country Identity Mapping</h1>
       <p className="text-gray-600 mb-6">
         Configure required identity documents per country
       </p>
@@ -230,6 +242,16 @@ export default function CountryIdentityMapping() {
           </option>
         ))}
       </select>
+      {showForm && (
+        <AddCountryIdentityMappingModal
+          countryUuid={selectedCountry}
+          onClose={() => setShowForm(false)}
+          onSuccess={(newMapping) => {
+            setMappings((prev) => [...prev, newMapping]); // ✅ AUTO UPDATE
+            setShowForm(false);
+          }}
+        />
+      )}
 
       {selectedCountry && (
         <button
@@ -263,9 +285,7 @@ export default function CountryIdentityMapping() {
             <tbody>
               {mappings.map((item) => (
                 <tr key={item.mapping_uuid} className="border-b">
-                  <td className="px-6 py-3">
-                    {item.identity_type_name}
-                  </td>
+                  <td className="px-6 py-3">{item.identity_type_name}</td>
                   <td className="px-6 py-3">
                     {item.is_mandatory ? "Yes" : "No"}
                   </td>
@@ -297,23 +317,27 @@ export default function CountryIdentityMapping() {
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl w-[380px]">
-            <h3 className="text-lg font-semibold mb-3">
-              Confirm Delete
-            </h3>
+            <h3 className="text-lg font-semibold mb-3">Confirm Delete</h3>
             <p className="text-gray-600 mb-6">
               Remove <strong>{confirmDelete.identity_type_name}</strong>?
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="px-4 py-2 bg-gray-300 rounded-lg"
+                className="px-4 py-2 bg-gray-300 rounded-lg transition-all duration-100 ease-in-out
+        active:translate-y-[1px]
+        disabled:opacity-60 disabled:cursor-not-allowed
+        flex items-center justify-center gap-2"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDeleteMapping}
                 disabled={deleteLoading}
-                className="px-4 py-2 bg-red-700 text-white rounded-lg"
+                className="px-4 py-2 bg-red-700 text-white rounded-lg transition-all duration-100 ease-in-out
+        active:translate-y-[1px]
+        disabled:opacity-60 disabled:cursor-not-allowed
+        flex items-center justify-center gap-2"
               >
                 {deleteLoading ? "Removing..." : "Delete"}
               </button>
@@ -330,9 +354,7 @@ export default function CountryIdentityMapping() {
               Cannot Delete Mapping
             </h3>
 
-            <p className="text-gray-700 mb-4">
-              {deleteError.message}
-            </p>
+            <p className="text-gray-700 mb-4">{deleteError.message}</p>
 
             <div className="border rounded-lg max-h-64 overflow-y-auto">
               <table className="w-full text-sm">
@@ -350,7 +372,9 @@ export default function CountryIdentityMapping() {
                       </td>
                       <td className="px-3 py-2 text-center">
                         <button
-                          onClick={() => deleteEmployeeDocument(emp.document_uuid)}
+                          onClick={() =>
+                            deleteEmployeeDocument(emp.document_uuid)
+                          }
                           disabled={deletingDocUuid === emp.document_uuid}
                           className="px-3 py-1.5 bg-red-600 text-white rounded text-xs"
                         >
@@ -359,7 +383,6 @@ export default function CountryIdentityMapping() {
                             : "Delete Document"}
                         </button>
                       </td>
-
                     </tr>
                   ))}
                 </tbody>
@@ -372,7 +395,10 @@ export default function CountryIdentityMapping() {
                   setDeleteError(null);
                   setConfirmDelete(null);
                 }}
-                className="px-4 py-2 bg-blue-700 text-white rounded-lg"
+                className="px-4 py-2 bg-blue-700 text-white rounded-lg transition-all duration-100 ease-in-out
+        active:translate-y-[1px]
+        disabled:opacity-60 disabled:cursor-not-allowed
+        flex items-center justify-center gap-2"
               >
                 OK
               </button>

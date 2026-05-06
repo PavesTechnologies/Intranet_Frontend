@@ -1,43 +1,51 @@
+"use client";
+
 import { useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-export default function AddCountryModal({ onClose, onSuccess }) {
+export default function AddCountryModal({ onClose, onSuccess, BASE_URL, token }) {
   const [callingCode, setCallingCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
-
-  const isValidCallingCode =
-    callingCode.length >= 1 && callingCode.length <= 4;
+  const isValidCallingCode = callingCode.length >= 1 && callingCode.length <= 4;
 
   const handleSave = async () => {
     try {
       setSaving(true);
       setError(null);
 
-      const res = await axios.post(
+      // Create country
+      await axios.post(
         `${BASE_URL}/masters/country`,
-        null, // ❗ NO body
+        null,
         {
-          params: {
-            calling_code: callingCode,
-          },
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          params: { calling_code: callingCode },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      toast.success(res.data.message || "Country created successfully");
+      // Fetch the newly added country
+      const countriesRes = await axios.get(`${BASE_URL}/masters/country`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const newCountry = countriesRes.data.find(
+        (c) => c.calling_code === callingCode
+      );
+
+      if (!newCountry) {
+        toast.error("Failed to fetch new country");
+        return;
+      }
+
+      toast.success("Country added successfully");
+
+      onSuccess(newCountry); // Add instantly
       onClose();
-      onSuccess();
     } catch (err) {
       setError(
-        err.response?.data?.detail ||
-          "Failed to create country. Please check the calling code."
+        err.response?.data?.detail || "Failed to add country. Check calling code."
       );
     } finally {
       setSaving(false);
@@ -54,9 +62,7 @@ export default function AddCountryModal({ onClose, onSuccess }) {
         </label>
         <input
           value={callingCode}
-          onChange={(e) =>
-            setCallingCode(e.target.value.replace(/\D/g, ""))
-          }
+          onChange={(e) => setCallingCode(e.target.value.replace(/\D/g, ""))}
           placeholder="Ex: 91"
           className="w-full border rounded-lg px-3 py-2"
         />
@@ -65,15 +71,16 @@ export default function AddCountryModal({ onClose, onSuccess }) {
           Enter international calling code without +
         </p>
 
-        {error && (
-          <p className="text-sm text-red-600 mt-3">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
 
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 bg-gray-200 rounded-lg"
+            className="px-4 py-2 bg-gray-200 rounded-lg transition-all duration-100 ease-in-out
+            active:translate-y-[1px]
+            disabled:opacity-60 disabled:cursor-not-allowed
+            flex items-center justify-center gap-2"
           >
             Cancel
           </button>
@@ -81,7 +88,10 @@ export default function AddCountryModal({ onClose, onSuccess }) {
           <button
             onClick={handleSave}
             disabled={!isValidCallingCode || saving}
-            className={`px-4 py-2 rounded-lg text-white ${
+            className={`px-4 py-2 rounded-lg text-white transition-all duration-100 ease-in-out
+            active:translate-y-[1px]
+            disabled:opacity-60 disabled:cursor-not-allowed
+            flex items-center justify-center gap-2 ${
               !isValidCallingCode || saving
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-blue-700 hover:bg-blue-800"

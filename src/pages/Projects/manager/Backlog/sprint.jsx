@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { X } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { X } from "lucide-react";
 
 const CreateSprint = ({ onClose }) => {
   const [formData, setFormData] = useState({
-    name: '',
-    goal: '',
-    startDate: '',
-    endDate: '',
-    status: 'PLANNING',
-    projectId: '',
+    name: "",
+    goal: "",
+    startDate: "",
+    endDate: "",
+    status: "PLANNING",
+    projectId: "",
   });
 
   const [projects, setProjects] = useState([]);
@@ -20,17 +20,20 @@ const CreateSprint = ({ onClose }) => {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
+        const response = await axios.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           },
-        });
+        );
         const content = Array.isArray(response.data.content)
           ? response.data.content
           : response.data;
         setProjects(content);
       } catch (error) {
-        console.error('Error fetching projects:', error);
+        console.error("Error fetching projects:", error);
       }
     };
     fetchProjects();
@@ -60,24 +63,31 @@ const CreateSprint = ({ onClose }) => {
     };
 
     try {
-      await axios.post(`${import.meta.env.VITE_PMS_BASE_URL}/api/sprints`, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      await axios.post(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
-      alert('✅ Sprint created successfully!');
+      );
+      alert("✅ Sprint created successfully!");
       setFormData({
-        name: '',
-        goal: '',
-        startDate: '',
-        endDate: '',
-        status: 'PLANNING',
-        projectId: '',
+        name: "",
+        goal: "",
+        startDate: "",
+        endDate: "",
+        status: "PLANNING",
+        projectId: "",
       });
       if (onClose) onClose();
     } catch (error) {
-      console.error('❌ Error creating sprint:', error.response?.data || error.message);
-      alert('Failed to create sprint. Check console for details.');
+      console.error(
+        "❌ Error creating sprint:",
+        error.response?.data || error.message,
+      );
+      alert("Failed to create sprint. Check console for details.");
     }
   };
 
@@ -93,11 +103,15 @@ const CreateSprint = ({ onClose }) => {
         </button>
       )}
 
-      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Create a New Sprint</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
+        Create a New Sprint
+      </h2>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block font-medium text-gray-700 mb-1">Sprint Name</label>
+          <label className="block font-medium text-gray-700 mb-1">
+            Sprint Name
+          </label>
           <input
             type="text"
             name="name"
@@ -120,7 +134,9 @@ const CreateSprint = ({ onClose }) => {
         </div>
 
         <div>
-          <label className="block font-medium text-gray-700 mb-1">Start Date</label>
+          <label className="block font-medium text-gray-700 mb-1">
+            Start Date
+          </label>
           <input
             type="datetime-local"
             name="startDate"
@@ -132,7 +148,9 @@ const CreateSprint = ({ onClose }) => {
         </div>
 
         <div>
-          <label className="block font-medium text-gray-700 mb-1">End Date</label>
+          <label className="block font-medium text-gray-700 mb-1">
+            End Date
+          </label>
           <input
             type="datetime-local"
             name="endDate"
@@ -158,7 +176,9 @@ const CreateSprint = ({ onClose }) => {
         </div>
 
         <div>
-          <label className="block font-medium text-gray-700 mb-1">Project</label>
+          <label className="block font-medium text-gray-700 mb-1">
+            Project
+          </label>
           <select
             name="projectId"
             value={formData.projectId}

@@ -14,13 +14,13 @@ export default function EditUserHr() {
     axios
       .get(
         `${
-          import.meta.env.VITE_USER_MANAGEMENT_URL
+          window.__APP_CONFIG__.USER_MANAGEMENT_URL
         }/general_user/edit-user/${user_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       )
       .then((res) => setForm(res.data))
       .catch(() => {
@@ -40,14 +40,14 @@ export default function EditUserHr() {
     try {
       await axios.put(
         `${
-          import.meta.env.VITE_USER_MANAGEMENT_URL
+          window.__APP_CONFIG__.USER_MANAGEMENT_URL
         }/general_user/edit-user/${user_id}`,
         form,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
       alert("User updated successfully");
       navigate("/home");

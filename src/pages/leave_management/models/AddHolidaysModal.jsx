@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL || "";
+const BASE_URL = window.__APP_CONFIG__.BASE_URL || "";
 
 export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
   const [holidays, setHolidays] = useState([]);
@@ -77,7 +77,11 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
     }),
     option: (base, { isFocused, isSelected }) => ({
       ...base,
-      background: isSelected ? "#4f46e5" : isFocused ? "#eef2ff" : "transparent",
+      background: isSelected
+        ? "#4f46e5"
+        : isFocused
+          ? "#eef2ff"
+          : "transparent",
       color: isSelected ? "#fff" : "#111827",
       padding: "10px 14px",
       borderRadius: 8,
@@ -155,20 +159,26 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
     setDate("");
     setDescription("");
     setSelectedCountry(null);
-    setSelectedState(type === "NATIONAL" ? { label: "ALL", value: "ALL" } : null);
+    setSelectedState(
+      type === "NATIONAL" ? { label: "ALL", value: "ALL" } : null,
+    );
     setStateOptions([]);
   };
 
-  const handleRemoveHoliday = (id) => setHolidays((p) => p.filter((h) => h.id !== id));
+  const handleRemoveHoliday = (id) =>
+    setHolidays((p) => p.filter((h) => h.id !== id));
 
   // download template
   const handleDownloadTemplate = async () => {
     setDownloading(true);
     try {
-      const res = await axios.get(`${BASE_URL}/api/holidays/template/download`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        responseType: "blob",
-      });
+      const res = await axios.get(
+        `${BASE_URL}/api/holidays/template/download`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          responseType: "blob",
+        },
+      );
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement("a");
       link.href = url;
@@ -190,12 +200,15 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const wb = XLSX.read(evt.target.result, { type: "array" });
+        const wb = XLSX.read(evt.target.result, {
+          type: "array",
+          cellDates: true,
+        });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(sheet);
         const parsed = rows.map((row, idx) => ({
           id: Date.now() + idx,
-          date: row.holiday_date,
+          date: row.holiday_date.toISOString().split("T")[0],
           description: row.holiday_name,
           type: row.type || "NATIONAL",
           country: row.country || "India",
@@ -203,6 +216,7 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
           year: new Date(row.holiday_date).getFullYear(),
         }));
         setHolidays((p) => [...p, ...parsed]);
+        console.log("holidays", parsed);
         toast.success(`${parsed.length} holidays imported.`);
       } catch {
         toast.error("Failed to parse Excel.");
@@ -238,7 +252,7 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
       toast.success(res.data.message || "Holidays added successfully!");
       onSuccess?.();
       onClose();
-    } catch(err) {
+    } catch (err) {
       toast.error(err.response?.data?.message || "Failed to submit holidays.");
     } finally {
       setSubmitting(false);
@@ -256,7 +270,10 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
         {/* Header */}
         <div className="p-4 border-b flex justify-between items-center">
           <h2 className="text-lg font-semibold">Add Holidays</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 rounded-full"
+          >
             <X className="w-5 h-5 text-gray-600" />
           </button>
         </div>
@@ -264,7 +281,9 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
         {/* Body */}
         <div className="p-6 overflow-y-auto space-y-6">
           <div className="bg-gray-50 border rounded-lg p-6 space-y-6">
-            <h3 className="font-semibold text-gray-700 border-b pb-2">Holiday Information</h3>
+            <h3 className="font-semibold text-gray-700 border-b pb-2">
+              Holiday Information
+            </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Date */}
@@ -346,7 +365,13 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
                     options={stateOptions}
                     value={selectedState}
                     onChange={(opt) => setSelectedState(opt)}
-                    placeholder={type === "NATIONAL" ? "ALL" : selectedCountry ? "Search state..." : "Select country first"}
+                    placeholder={
+                      type === "NATIONAL"
+                        ? "ALL"
+                        : selectedCountry
+                          ? "Search state..."
+                          : "Select country first"
+                    }
                     styles={customSelectStyles}
                     theme={customTheme}
                     isClearable={type !== "NATIONAL"}
@@ -406,15 +431,25 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
           {/* Holiday list */}
           {holidays.length > 0 && (
             <div className="space-y-2">
-              <h3 className="font-semibold text-gray-700">Holidays Added ({holidays.length})</h3>
+              <h3 className="font-semibold text-gray-700">
+                Holidays Added ({holidays.length})
+              </h3>
               <ul className="border rounded-lg divide-y max-h-64 overflow-y-auto">
                 {holidays.map((h) => (
-                  <li key={h.id} className="flex justify-between p-3 items-center">
+                  <li
+                    key={h.id}
+                    className="flex justify-between p-3 items-center"
+                  >
                     <div>
                       <p className="font-semibold">{h.description}</p>
-                      <p className="text-sm text-gray-500">{h.date} • {h.type} • {h.country} • {h.state}</p>
+                      <p className="text-sm text-gray-500">
+                        {h.date} • {h.type} • {h.country} • {h.state}
+                      </p>
                     </div>
-                    <button onClick={() => handleRemoveHoliday(h.id)} className="text-red-600 hover:bg-red-100 p-2 rounded-full">
+                    <button
+                      onClick={() => handleRemoveHoliday(h.id)}
+                      className="text-red-600 hover:bg-red-100 p-2 rounded-full"
+                    >
                       <Trash2 size={18} />
                     </button>
                   </li>
@@ -431,7 +466,9 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
             disabled={submitting || holidays.length === 0}
             className="px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700"
           >
-            {submitting ? "Submitting..." : `Submit ${holidays.length} Holiday(s)`}
+            {submitting
+              ? "Submitting..."
+              : `Submit ${holidays.length} Holiday(s)`}
           </button>
         </div>
       </div>

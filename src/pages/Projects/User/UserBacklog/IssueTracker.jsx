@@ -38,10 +38,22 @@ const UserIssueTracker = () => {
     try {
       setLoading(true);
       const [epicsRes, storiesRes, tasksRes, bugsRes] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`, { headers }),
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`, { headers }),
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/tasks`, { headers }),
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/bugs/project/${projectId}`, { headers }),
+        axios.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+          { headers },
+        ),
+        axios.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
+          { headers },
+        ),
+        axios.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
+          { headers },
+        ),
+        axios.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/bugs/project/${projectId}`,
+          { headers },
+        ),
       ]);
 
       const epicsData = epicsRes.data.map((e) => ({
@@ -77,7 +89,12 @@ const UserIssueTracker = () => {
         status: b.status || "OPEN",
       }));
 
-      const allIssues = [...epicsData, ...storiesData, ...tasksData, ...bugsData];
+      const allIssues = [
+        ...epicsData,
+        ...storiesData,
+        ...tasksData,
+        ...bugsData,
+      ];
       setIssues(allIssues);
       setFilteredIssues(allIssues);
     } catch (err) {
@@ -91,7 +108,10 @@ const UserIssueTracker = () => {
   // ===== FETCH PROJECTS =====
   const fetchProjects = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`, { headers });
+      const res = await axios.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
+        { headers },
+      );
       setProjects(res.data || []);
     } catch (err) {
       console.error(err);
@@ -110,25 +130,37 @@ const UserIssueTracker = () => {
   useEffect(() => {
     let filtered = [...issues];
     if (searchTerm)
-      filtered = filtered.filter((i) => i.title?.toLowerCase().includes(searchTerm.toLowerCase()));
+      filtered = filtered.filter((i) =>
+        i.title?.toLowerCase().includes(searchTerm.toLowerCase()),
+      );
     if (filterType) filtered = filtered.filter((i) => i.type === filterType);
-    if (filterPriority) filtered = filtered.filter((i) => i.priority === filterPriority);
-    if (filterStatus) filtered = filtered.filter((i) => i.status === filterStatus);
+    if (filterPriority)
+      filtered = filtered.filter((i) => i.priority === filterPriority);
+    if (filterStatus)
+      filtered = filtered.filter((i) => i.status === filterStatus);
     if (filterUser)
       filtered = filtered.filter(
         (i) =>
           i.reporterName?.toLowerCase() === filterUser.toLowerCase() ||
-          i.assigneeName?.toLowerCase() === filterUser.toLowerCase()
+          i.assigneeName?.toLowerCase() === filterUser.toLowerCase(),
       );
     if (filterBillable)
       filtered = filtered.filter((i) =>
         filterBillable === "Yes"
           ? i.billable === true || i.billable === "Yes"
-          : i.billable === false || i.billable === "No"
+          : i.billable === false || i.billable === "No",
       );
 
     setFilteredIssues(filtered);
-  }, [searchTerm, filterType, filterPriority, filterStatus, filterUser, filterBillable, issues]);
+  }, [
+    searchTerm,
+    filterType,
+    filterPriority,
+    filterStatus,
+    filterUser,
+    filterBillable,
+    issues,
+  ]);
 
   const currentProject = projects.find((p) => p.id === Number(projectId));
   const projectName = currentProject ? currentProject.name : projectId;
@@ -136,17 +168,23 @@ const UserIssueTracker = () => {
   // ===== Extract unique user names =====
   const userNames = Array.from(
     new Set(
-      issues.flatMap((i) => [i.reporterName, i.assigneeName].filter(Boolean))
-    )
+      issues.flatMap((i) => [i.reporterName, i.assigneeName].filter(Boolean)),
+    ),
   ).sort();
 
   // ===== Stats =====
   const totalIssues = issues.length;
-  const openIssues = issues.filter((i) => ["OPEN", "TODO", "BACKLOG"].includes(i.status)).length;
+  const openIssues = issues.filter((i) =>
+    ["OPEN", "TODO", "BACKLOG"].includes(i.status),
+  ).length;
   const inProgress = issues.filter((i) => i.status === "IN_PROGRESS").length;
   const review = issues.filter((i) => i.status === "REVIEW").length;
-  const resolved = issues.filter((i) => ["RESOLVED", "DONE", "CLOSED"].includes(i.status)).length;
-  const highPriority = issues.filter((i) => ["HIGH", "CRITICAL"].includes(i.priority)).length;
+  const resolved = issues.filter((i) =>
+    ["RESOLVED", "DONE", "CLOSED"].includes(i.status),
+  ).length;
+  const highPriority = issues.filter((i) =>
+    ["HIGH", "CRITICAL"].includes(i.priority),
+  ).length;
 
   return (
     <div className="max-w-7xl mx-auto mt-6 px-4 space-y-6">
@@ -289,7 +327,10 @@ const UserIssueTracker = () => {
             <tbody>
               {filteredIssues.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="p-6 text-center text-gray-500 italic">
+                  <td
+                    colSpan="10"
+                    className="p-6 text-center text-gray-500 italic"
+                  >
                     No issues found
                   </td>
                 </tr>
@@ -301,25 +342,27 @@ const UserIssueTracker = () => {
                       issue.type === "Epic"
                         ? "bg-purple-50"
                         : issue.type === "Bug"
-                        ? "bg-red-50"
-                        : issue.type === "Story"
-                        ? "bg-blue-50"
-                        : issue.type === "Task"
-                        ? "bg-green-50"
-                        : ""
+                          ? "bg-red-50"
+                          : issue.type === "Story"
+                            ? "bg-blue-50"
+                            : issue.type === "Task"
+                              ? "bg-green-50"
+                              : ""
                     }`}
                   >
-                    <td className="border px-4 py-2 font-semibold text-indigo-900">{issue.title}</td>
+                    <td className="border px-4 py-2 font-semibold text-indigo-900">
+                      {issue.title}
+                    </td>
                     <td className="border px-4 py-2">
                       <span
                         className={`px-2 py-1 rounded text-xs font-medium ${
                           issue.type === "Epic"
                             ? "bg-purple-200 text-purple-900"
                             : issue.type === "Story"
-                            ? "bg-blue-200 text-blue-900"
-                            : issue.type === "Task"
-                            ? "bg-green-200 text-green-900"
-                            : "bg-red-200 text-red-900"
+                              ? "bg-blue-200 text-blue-900"
+                              : issue.type === "Task"
+                                ? "bg-green-200 text-green-900"
+                                : "bg-red-200 text-red-900"
                         }`}
                       >
                         {issue.type}
@@ -331,21 +374,25 @@ const UserIssueTracker = () => {
                     <td className="border px-4 py-2">
                       <BadgeStatus status={issue.status} />
                     </td>
-                    <td className="border px-4 py-2">{issue.reporterName || "-"}</td>
-                    <td className="border px-4 py-2">{issue.assigneeName || "-"}</td>
+                    <td className="border px-4 py-2">
+                      {issue.reporterName || "-"}
+                    </td>
+                    <td className="border px-4 py-2">
+                      {issue.assigneeName || "-"}
+                    </td>
                     <td className="border px-4 py-2">
                       {issue.createdAt
                         ? new Date(issue.createdAt).toLocaleDateString()
                         : issue.createdDate
-                        ? new Date(issue.createdDate).toLocaleDateString()
-                        : "-"}
+                          ? new Date(issue.createdDate).toLocaleDateString()
+                          : "-"}
                     </td>
                     <td className="border px-4 py-2">
                       {issue.dueDate
                         ? new Date(issue.dueDate).toLocaleDateString()
                         : issue.type === "Story" || issue.type === "Bug"
-                        ? "No Due Date"
-                        : "-"}
+                          ? "No Due Date"
+                          : "-"}
                     </td>
                     <td className="border px-4 py-2 text-center">
                       <ActionIcon
@@ -353,7 +400,7 @@ const UserIssueTracker = () => {
                         onClick={() =>
                           navigate(
                             `/projects/${projectId}/issues/${issue.type.toLowerCase()}/${issue.id}/view`,
-                            { state: { issue } }
+                            { state: { issue } },
                           )
                         }
                       >

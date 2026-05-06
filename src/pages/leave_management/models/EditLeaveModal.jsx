@@ -1,6 +1,13 @@
-import React, { useState, useEffect, Fragment } from "react";
-import axios from "axios";
-import { X, Lock } from "lucide-react";
+import React, { useState, useEffect, Fragment, useMemo } from "react";
+import axios, { all } from "axios";
+import {
+  X,
+  Lock,
+  CalendarDays,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+} from "lucide-react";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { toast } from "react-toastify";
@@ -8,18 +15,30 @@ import { format } from "date-fns";
 import { useRecordLock } from "../hooks/useRecordLock";
 import { useAuth } from "../../../contexts/AuthContext";
 import DateRangePicker from "./DateRangePicker";
+import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+const GENDER_BASED_IDS = ["L-ML", "L-PL"];
 
-// --- Helper 1: Maps leave balances to dropdown options (Unchanged) ---
-function mapLeaveBalancesToDropdown(balances, leaveTypes) {
-  return balances.data.map((balance) => {
-    const leaveTypeId = balance.leaveType.leaveTypeId;
-    const originalName = balance.leaveType.leaveName;
+// --- Helper 1: Maps leave balances to dropdown options ---
+export function mapLeaveBalancesToDropdown(balances, leaveTypes) {
+  const allBalances = [
+    ...(balances?.data?.regular ?? []),
+    ...(balances?.data?.genderBasedLeaveBalances ?? []),
+  ];
+
+  return allBalances.map((balance) => {
+    const leaveTypeId = balance.leaveType?.leaveTypeId;
+    const originalName = balance.leaveType?.leaveName;
     const matchingType = leaveTypes.find((type) => type.name === originalName);
     const leaveName = matchingType
       ? matchingType.label
-      : originalName.replace(/^L-/, "");
+      : (originalName || "").replace(/^L-/, "");
+
+    const isGenderBased = GENDER_BASED_IDS.includes(leaveTypeId);
+    const remaining = isGenderBased
+      ? balance.remainingDays
+      : balance.remainingLeaves;
 
     let availableText;
     let isInfinite = false;
@@ -27,11 +46,8 @@ function mapLeaveBalancesToDropdown(balances, leaveTypes) {
     if (leaveTypeId === "L-UP" || leaveName.toLowerCase().includes("unpaid")) {
       availableText = "Infinite balance";
       isInfinite = true;
-    } else if (balance.remainingLeaves > 0) {
-      availableText =
-        (balance.remainingLeaves % 1 === 0
-          ? balance.remainingLeaves
-          : balance.remainingLeaves) + " days available";
+    } else if (remaining > 0) {
+      availableText = `${remaining} days available`;
     } else {
       availableText = "Not Available";
     }
@@ -40,16 +56,16 @@ function mapLeaveBalancesToDropdown(balances, leaveTypes) {
       leaveTypeId,
       leaveName,
       availableText,
-      availableDays: isInfinite ? Infinity : balance.remainingLeaves,
+      availableDays: isInfinite ? Infinity : remaining,
       isInfinite,
-      disabled: (!isInfinite && balance.remainingLeaves <= 0) || balance.isBlocked,
-      allowHalfDay: !!balance.leaveType.allowHalfDay,
-      requiresDocumentation: !!balance.leaveType.requiresDocumentation,
+      disabled: (!isInfinite && remaining <= 0) || balance.isBlocked,
+      allowHalfDay: !!balance.leaveType?.allowHalfDay,
+      requiresDocumentation: !!balance.leaveType?.requiresDocumentation,
     };
   });
 }
 
-// --- Helper 2: Date and Formatting Logic (Unchanged) ---
+// --- Helper 2: Date Formatting ---
 function formatDateForDisplay(dateStr) {
   if (!dateStr) return "";
   const date = new Date(`${dateStr}T00:00:00`);
@@ -60,14 +76,13 @@ function formatDateForDisplay(dateStr) {
   });
 }
 
-// --- Helper 3: **UPDATED** Robust day calculation to conditionally exclude holidays ---
+// --- Helper 3: Day calculation ---
 function countWeekdaysBetween(
   fromDate,
   toDate,
   halfDayConfig,
   holidays = [],
-  // NEW: Flag to include weekends/holidays for specific leave types (like Maternity)
-  includeNonWorkingDays = false 
+  includeNonWorkingDays = false,
 ) {
   if (!fromDate || !toDate || !halfDayConfig) return 0;
 
@@ -75,19 +90,17 @@ function countWeekdaysBetween(
     holidays
       .filter(Boolean)
       .map((h) => {
-        if (h instanceof Date && !isNaN(h)) {
+        if (h instanceof Date && !isNaN(h))
           return new Date(h.getTime() - h.getTimezoneOffset() * 60000)
             .toISOString()
             .split("T")[0];
-        }
         if (typeof h === "string") return h;
         return null;
       })
-      .filter(Boolean)
+      .filter(Boolean),
   );
 
   let total = 0;
-  // Use UTC to prevent timezone issues shifting the date
   const current = new Date(fromDate + "T00:00:00Z");
   const end = new Date(toDate + "T00:00:00Z");
 
@@ -97,32 +110,26 @@ function countWeekdaysBetween(
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const isHoliday = holidaySet.has(currentDateStr);
 
-    // MODIFIED CONDITION: If includeNonWorkingDays is true, it bypasses the weekend/holiday check.
     if (includeNonWorkingDays || (!isWeekend && !isHoliday)) {
       const isStartDate = currentDateStr === fromDate;
       const isEndDate = currentDateStr === toDate;
 
-      // CORRECTED LOGIC
       if (isStartDate && isEndDate) {
-        // Handle single-day case first
         total +=
           halfDayConfig.start === "first" || halfDayConfig.start === "second"
             ? 0.5
             : 1;
       } else if (isStartDate) {
-        // Multi-day start
         total +=
           halfDayConfig.start === "first" || halfDayConfig.start === "second"
             ? 0.5
             : 1;
       } else if (isEndDate) {
-        // Multi-day end
         total +=
           halfDayConfig.end === "first" || halfDayConfig.end === "second"
             ? 0.5
             : 1;
       } else {
-        // Full day in between
         total += 1;
       }
     }
@@ -131,33 +138,37 @@ function countWeekdaysBetween(
   return total;
 }
 
-// --- Component 1: The HeadlessUI Leave Type Dropdown (Unchanged) ---
+// --- Leave Type Dropdown ---
 function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
   const sel = options.find((o) => o.leaveTypeId === selectedId) ?? null;
   return (
     <Listbox value={sel} onChange={(opt) => setSelectedId(opt.leaveTypeId)}>
       <div className="relative mt-1">
-        <Listbox.Button className="cursor-default w-full rounded-lg border border-gray-300 py-3 pl-4 pr-12 text-left bg-white hover:border-indigo-400 focus:ring-2 focus:ring-indigo-500 transition">
+        <Listbox.Button className="cursor-default w-full rounded-xl border border-gray-200 py-2.5 pl-4 pr-12 text-left bg-gray-50 hover:bg-white hover:border-indigo-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-150 shadow-sm">
           <span className="flex items-center justify-between">
             <span>
               {sel ? (
-                <span className="font-medium text-gray-800">
+                <span className="font-semibold text-gray-800 text-sm">
                   {sel.leaveName}
                 </span>
               ) : (
-                <span className="text-gray-400">Select leave type</span>
+                <span className="text-gray-400 text-sm">Select leave type</span>
               )}
             </span>
             <span
-              className={`text-xs ml-4 ${
-                sel?.disabled ? "text-gray-400" : "text-gray-500"
+              className={`text-xs ml-4 font-medium px-2 py-0.5 rounded-full ${
+                sel?.isInfinite
+                  ? "bg-blue-50 text-blue-600"
+                  : sel?.disabled
+                    ? "bg-red-50 text-red-400"
+                    : "bg-green-50 text-green-600"
               }`}
             >
               {sel?.availableText}
             </span>
           </span>
           <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-            <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
+            <ChevronUpDownIcon className="h-4 w-4 text-gray-400" />
           </span>
         </Listbox.Button>
         <Transition
@@ -166,24 +177,38 @@ function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <Listbox.Options className="absolute z-40 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white py-1 shadow-2xl ring-1 ring-black ring-opacity-5">
+          <Listbox.Options className="absolute z-40 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white py-1 shadow-2xl ring-1 ring-black/5 border border-gray-100">
             {options.map((option) => (
               <Listbox.Option
                 key={option.leaveTypeId}
                 value={option}
                 disabled={option.disabled}
                 className={({ active, disabled }) =>
-                  `py-3 px-4 flex items-center justify-between cursor-pointer select-none rounded-lg ${
-                    active && !disabled ? "bg-indigo-50 text-indigo-900" : ""
+                  `py-2.5 px-4 flex items-center justify-between cursor-pointer select-none transition-colors ${
+                    active && !disabled ? "bg-indigo-50" : ""
                   } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`
                 }
               >
                 {({ selected }) => (
                   <>
-                    <span className="font-medium">{option.leaveName}</span>
-                    <span className="ml-4 text-xs">{option.availableText}</span>
+                    <span
+                      className={`text-sm font-medium ${selected ? "text-indigo-700" : "text-gray-800"}`}
+                    >
+                      {option.leaveName}
+                    </span>
+                    <span
+                      className={`ml-2 text-xs font-medium px-2  py-0.5 rounded-full ${
+                        option.isInfinite
+                          ? "bg-blue-50 text-blue-500"
+                          : option.disabled
+                            ? "bg-red-50 text-red-400"
+                            : "text-grey-600"
+                      }`}
+                    >
+                      {option.availableText}
+                    </span>
                     {selected && (
-                      <CheckIcon className="h-4 w-4 text-indigo-600 absolute right-2" />
+                      <CheckIcon className="h-4 w-4 text-indigo-600 ml-2 shrink-0" />
                     )}
                   </>
                 )}
@@ -196,7 +221,7 @@ function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
   );
 }
 
-// ---- Component 2: The Main Edit Leave Modal ----
+// ---- Main Modal ----
 export default function EditLeaveModal({
   isOpen,
   onClose,
@@ -219,6 +244,8 @@ export default function EditLeaveModal({
     start: "none",
     end: "none",
   });
+  const [balanceWarning, setBalanceWarning] = useState("");
+
   const { user } = useAuth();
   const { locked, lockedBy, lockMessage, manualReleaseLock } = useRecordLock({
     tableName: "leave_request",
@@ -226,8 +253,8 @@ export default function EditLeaveModal({
     user: user?.name,
   });
   const isLockedByOther = locked && lockedBy && lockedBy !== user?.name;
-  
-  // --- Step 3: Fetch leave types and HOLIDAYS when modal opens (Unchanged) ---
+
+  // Fetch leave types and holidays on open
   useEffect(() => {
     if (!isOpen || !initialData) return;
 
@@ -244,16 +271,20 @@ export default function EditLeaveModal({
 
     const fetchHolidays = async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
-          params: { state: "All", country: "India" }, 
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        const res = await axios.get(
+          `${BASE_URL}/api/holidays/by-location/${year}`,
+          {
+            params: { state: "All", country: "India" },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
+        );
         const holidayDates = res.data.data.map(
-          (holiday) => new Date(holiday.holidayDate + "T00:00:00")
+          (holiday) => new Date(holiday.holidayDate + "T00:00:00"),
         );
         setHolidays(holidayDates);
       } catch (err) {
-        console.log("Failed to fetch holidays Error:", err);
         toast.error("Could not load company holidays.");
       }
     };
@@ -262,66 +293,104 @@ export default function EditLeaveModal({
     fetchHolidays();
   }, [isOpen, initialData]);
 
-  // Populate form with initial data (Unchanged)
+  // ✅ Populate form — uses flat DTO fields (initialData.leaveTypeId, initialData.employeeId)
   useEffect(() => {
     if (isOpen && initialData) {
       setStartDate(initialData.startDate || "");
       setEndDate(initialData.endDate || "");
+      // ✅ Fixed: use flat leaveTypeId from DTO, fallback for old shape
       setLeaveTypeId(
-        initialData.leaveType?.leaveTypeId || initialData.leaveTypeId || ""
+        initialData.leaveTypeId || initialData.leaveType?.leaveTypeId || "",
       );
       setReason(initialData.reason || "");
       setDriveLink(initialData.driveLink || "");
 
       const isCustom =
         initialData.isHalfDay ||
-        (initialData.startSession && initialData.startSession !== "none");
+        (initialData.startSession &&
+          initialData.startSession !== "none" &&
+          initialData.startSession !== "fullday");
       setShowCustomHalfDay(isCustom);
 
-      if (isCustom) {
-        setHalfDayConfig({
-          start:
-            initialData.startSession && initialData.startSession !== "none"
-              ? initialData.startSession
-              : "fullday",
-          end:
-            initialData.endSession && initialData.endSession !== "none"
-              ? initialData.endSession
-              : "fullday",
-        });
-      } else {
-        setHalfDayConfig({ start: "none", end: "none" });
-      }
+      setHalfDayConfig({
+        start:
+          isCustom && initialData.startSession !== "none"
+            ? initialData.startSession
+            : "none",
+        end:
+          isCustom && initialData.endSession !== "none"
+            ? initialData.endSession
+            : "none",
+      });
     }
   }, [isOpen, initialData]);
 
-  const leaveTypeOptions = mapLeaveBalancesToDropdown(
-    leaveBalances,
-    leaveTypes
-  );
+  const normalizedBalances = useMemo(() => {
+    if (!leaveBalances) return [];
+
+    // ✅ If already flat → use directly
+    if (Array.isArray(leaveBalances)) {
+      return leaveBalances;
+    }
+
+    // ✅ If API format → flatten
+    return [
+      ...(leaveBalances?.data?.regular ?? []),
+      ...(leaveBalances?.data?.genderBasedLeaveBalances ?? []),
+    ];
+  }, [leaveBalances]);
+
+  console.log(normalizedBalances);
+
+  const leaveTypeOptions = useLeaveDropdownOptions(normalizedBalances);
   const selectedLeaveType = leaveTypeOptions.find(
-    (o) => o.leaveTypeId === leaveTypeId
+    (o) => o.leaveTypeId === leaveTypeId,
   );
-
-  // NEW: Check if the selected leave type is Maternity Leave (Assuming L-ML)
   const isMaternityLeave = selectedLeaveType?.leaveTypeId === "L-ML";
-
-  // --- Step 4: UPDATED CALCULATIONS to conditionally include holidays/weekends ---
   const isMultiDay = startDate && endDate && startDate !== endDate;
   const weekdays = countWeekdaysBetween(
     startDate,
     endDate,
     halfDayConfig,
     holidays,
-    isMaternityLeave // Pass the new flag
+    isMaternityLeave,
   );
+
+  // ✅ Balance warning check
+  useEffect(() => {
+    if (!leaveTypeId || leaveTypeOptions.length === 0) {
+      setBalanceWarning("");
+      return;
+    }
+    const selected = leaveTypeOptions.find(
+      (o) => o.leaveTypeId === leaveTypeId,
+    );
+    if (!selected) {
+      setBalanceWarning("");
+      return;
+    }
+
+    if (selected.isInfinite) {
+      setBalanceWarning("");
+    } else if (selected.availableDays <= 0) {
+      setBalanceWarning(
+        `No balance available for ${selected.leaveName}. You have 0 days remaining.`,
+      );
+    } else if (weekdays > 0 && selected.availableDays < weekdays) {
+      setBalanceWarning(
+        `Insufficient balance. You have ${selected.availableDays} day(s) available but requested ${weekdays} day(s).`,
+      );
+    } else {
+      setBalanceWarning("");
+    }
+  }, [leaveTypeId, leaveTypeOptions, weekdays]);
 
   const shouldShowDriveLink = () => {
     if (!selectedLeaveType) return false;
-    const requiresDocs = selectedLeaveType.requiresDocumentation;
-    const isSickLeave = selectedLeaveType.leaveTypeId === "L-SL";
-    const enoughDays = weekdays > 3;
-    return requiresDocs || (isSickLeave && enoughDays);
+    return (
+      selectedLeaveType.requiresDocumentation ||
+      (selectedLeaveType.leaveTypeId === "L-SL" && weekdays > 3)
+    );
   };
 
   const handleHalfDayModeChange = (isCustom) => {
@@ -329,24 +398,21 @@ export default function EditLeaveModal({
     setHalfDayConfig(
       isCustom
         ? { start: "fullday", end: "fullday" }
-        : { start: "none", end: "none" }
+        : { start: "none", end: "none" },
     );
   };
 
-  // --- Step 5: New handlers for DateRangePicker (Unchanged) ---
   const handleStartDateChange = (date) => {
     if (!date) return;
     const dateString = format(date, "yyyy-MM-dd");
     setStartDate(dateString);
-    if (!endDate || new Date(endDate) < new Date(dateString)) {
+    if (!endDate || new Date(endDate) < new Date(dateString))
       setEndDate(dateString);
-    }
   };
 
   const handleEndDateChange = (date) => {
     if (!date) return;
-    const dateString = format(date, "yyyy-MM-dd");
-    setEndDate(dateString);
+    setEndDate(format(date, "yyyy-MM-dd"));
   };
 
   const handleClose = async () => {
@@ -361,7 +427,8 @@ export default function EditLeaveModal({
 
     const payload = {
       leaveId: initialData.leaveId,
-      employeeId: initialData.employee.employeeId,
+      // ✅ Fixed: use flat employeeId from DTO, fallback for old shape
+      employeeId: initialData.employeeId || initialData.employee?.employeeId,
       leaveTypeId,
       startDate,
       endDate,
@@ -370,8 +437,8 @@ export default function EditLeaveModal({
       reason,
       driveLink,
       startSession: halfDayConfig.start,
-      // CORRECTED: If it's a single day, endSession should mirror startSession, not be 'none'.
-      endSession: isMultiDay ? halfDayConfig.end : halfDayConfig.start, 
+      endSession: isMultiDay ? halfDayConfig.end : halfDayConfig.start,
+      year: year
     };
 
     try {
@@ -380,15 +447,14 @@ export default function EditLeaveModal({
         payload,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        },
       );
       toast.success("Leave request updated successfully");
       if (onSuccess) onSuccess(data);
       handleClose();
     } catch (err) {
       setError(
-        "Failed to update leave request: " +
-          (err.response?.data?.message || err.message)
+        "Failed to update: " + (err.response?.data?.message || err.message),
       );
     } finally {
       setSubmitting(false);
@@ -397,110 +463,178 @@ export default function EditLeaveModal({
 
   if (!isOpen) return null;
 
+  const hasBalanceError =
+    balanceWarning !== "" && !selectedLeaveType?.isInfinite;
+
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
       aria-modal="true"
       onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
-      <div className={`bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-2 sm:mx-4 max-h-[90vh] border border-gray-100 relative overflow-y-auto ${isLockedByOther ? 'overflow-y-hidden' : 'overflow-y-auto' }`}> 
+      <div
+        className={`bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-2 sm:mx-4 border border-gray-100 relative flex flex-col ${isLockedByOther ? "overflow-hidden" : "overflow-y-auto"} max-h-[92vh]`}
+      >
+        {/* Lock overlay */}
         {isLockedByOther && (
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-center p-6 rounded-2xl">
-            <Lock className="w-16 h-16 text-yellow-500 mb-4" />
-            <h3 className="text-2xl font-bold text-gray-800">Record Locked</h3>
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-center p-6 rounded-2xl">
+            <div className="w-16 h-16 rounded-full bg-yellow-50 flex items-center justify-center mb-4">
+              <Lock className="w-8 h-8 text-yellow-500" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800">Record Locked</h3>
             {lockMessage && (
-              <p className="text-gray-600 mt-2">
-                {lockMessage}
-              </p>
+              <p className="text-gray-500 mt-2 text-sm">{lockMessage}</p>
             )}
-            <p className="text-gray-600 text-sm mt-2">Please try again later.</p>
-            <button type="button" onClick={onClose} className="mt-6 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
+            <p className="text-gray-400 text-xs mt-1">
+              Please try again later.
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-5 px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition"
+            >
               Close
             </button>
           </div>
         )}
-        <div className="sticky top-0 bg-white z-10 p-3 border-b border-gray-200 ">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">
+
+        {/* Header */}
+        <div className="sticky top-0 bg-white z-10 px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+              <CalendarDays className="w-4 h-4 text-indigo-600" />
+            </div>
+            <h2 className="text-base font-bold text-gray-900">
               Edit Leave Request
             </h2>
-            <button
-              onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-              type="button"
-              aria-label="Close"
-            >
-              <X className="w-6 h-6" />
-            </button>
           </div>
+          <button
+            onClick={handleClose}
+            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors rounded-lg p-1.5"
+            type="button"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        <form onSubmit={handleUpdate} className="px-6 py-5 space-y-6">
+
+        <form onSubmit={handleUpdate} className="px-5 py-4 space-y-4">
+          {/* Error banner */}
           {error && (
-            <div className="bg-red-50 p-3 rounded-lg text-red-700 text-sm">
-              {error}
+            <div className="flex items-start gap-2 bg-red-50 border border-red-100 p-3 rounded-xl text-red-700 text-sm">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
-          <fieldset disabled={isLockedByOther}>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <DateRangePicker
-                label="Start Date"
-                defaultDate={
-                  startDate ? new Date(startDate + "T00:00:00") : null
-                }
-                onChange={handleStartDateChange}
-                defaultMonth={
-                  startDate ? new Date(startDate + "T00:00:00") : undefined
-                }
-                // Only disable if it's NOT maternity leave
-                disabledDays={isMaternityLeave ? [] : [{ dayOfWeek: [0, 6] }, ...holidays]}
-                year={year}
-              />
-              <DateRangePicker
-                label="End Date"
-                align="right"
-                defaultDate={endDate ? new Date(endDate + "T00:00:00") : null}
-                onChange={handleEndDateChange}
-                defaultMonth={
-                  endDate ? new Date(endDate + "T00:00:00") : undefined
-                }
-                disabledDays={[
-                  // Only disable if it's NOT maternity leave
-                  ...(isMaternityLeave ? [] : [{ dayOfWeek: [0, 6] }, ...holidays]),
-                  startDate
-                    ? { before: new Date(startDate + "T00:00:00") }
-                    : {},
-                ]}
-                year={year}
-              />
+          <fieldset disabled={isLockedByOther} className="space-y-4">
+            {/* Date pickers */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
+                Leave Period
+              </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DateRangePicker
+                  label="Start Date"
+                  defaultDate={
+                    startDate ? new Date(startDate + "T00:00:00") : null
+                  }
+                  onChange={handleStartDateChange}
+                  defaultMonth={
+                    startDate ? new Date(startDate + "T00:00:00") : undefined
+                  }
+                  disabledDays={
+                    isMaternityLeave ? [] : [{ dayOfWeek: [0, 6] }, ...holidays]
+                  }
+                  year={year}
+                />
+                <DateRangePicker
+                  label="End Date"
+                  align="right"
+                  defaultDate={endDate ? new Date(endDate + "T00:00:00") : null}
+                  onChange={handleEndDateChange}
+                  defaultMonth={
+                    endDate ? new Date(endDate + "T00:00:00") : undefined
+                  }
+                  disabledDays={[
+                    ...(isMaternityLeave
+                      ? []
+                      : [{ dayOfWeek: [0, 6] }, ...holidays]),
+                    startDate
+                      ? { before: new Date(startDate + "T00:00:00") }
+                      : {},
+                  ]}
+                  year={year}
+                />
+              </div>
+
+              {/* Days badge */}
+              <div className="flex items-center gap-2 mt-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-100">
+                  <CalendarDays className="w-3 h-3" />
+                  {weekdays} {weekdays === 1 ? "day" : "days"} selected
+                </span>
+                {isMaternityLeave && (
+                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                    <Info className="w-3 h-3" /> All calendar days included
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="text-center space-y-1 mt-2">
-              <span className="inline-flex items-center px-2 py-1 bg-indigo-50 text-indigo-700 text-sm font-semibold rounded-md border border-indigo-200 shadow-sm">
-                {weekdays} {weekdays === 1 ? "day" : "days"}
-              </span>
+            {/* Leave type */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+                Leave Type
+              </label>
+              <LeaveTypeDropdown
+                options={leaveTypeOptions}
+                selectedId={leaveTypeId}
+                setSelectedId={setLeaveTypeId}
+              />
+
+              {/* ✅ Balance warning */}
+              {balanceWarning ? (
+                <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-amber-700 text-xs">{balanceWarning}</p>
+                </div>
+              ) : selectedLeaveType &&
+                !selectedLeaveType.isInfinite &&
+                selectedLeaveType.availableDays > 0 ? (
+                <div className="mt-2 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                  <p className="text-green-600 text-xs font-medium">
+                    {selectedLeaveType.availableDays} day(s) available
+                  </p>
+                </div>
+              ) : null}
             </div>
 
-            {(selectedLeaveType && selectedLeaveType.allowHalfDay && !isMaternityLeave) && (
-              <div className="space-y-3 mt-2">
-                <div className="p-1 inline-flex items-center bg-gray-200 rounded-lg">
+             {/* Half day toggle */}
+            {selectedLeaveType?.allowHalfDay && !isMaternityLeave && (
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block">
+                  Day Type
+                </label>
+                <div className="p-1 inline-flex items-center bg-gray-100 rounded-lg">
                   <button
                     type="button"
                     onClick={() => handleHalfDayModeChange(false)}
-                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
                       !showCustomHalfDay
-                        ? "bg-white text-gray-800 shadow"
+                        ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
-                    Full days
+                    Full Days
                   </button>
                   <button
                     type="button"
                     onClick={() => handleHalfDayModeChange(true)}
-                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
                       showCustomHalfDay
-                        ? "bg-white text-gray-800 shadow"
+                        ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
@@ -509,10 +643,10 @@ export default function EditLeaveModal({
                 </div>
 
                 {showCustomHalfDay && (
-                  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border">
+                  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
                     <div className="flex-1 space-y-1">
-                      <label className="text-xs font-medium text-gray-600">
-                        From {formatDateForDisplay(startDate)}
+                      <label className="text-xs font-medium text-gray-500">
+                        Start — {formatDateForDisplay(startDate)}
                       </label>
                       <select
                         value={halfDayConfig.start}
@@ -522,7 +656,7 @@ export default function EditLeaveModal({
                             start: e.target.value,
                           }))
                         }
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm"
+                        className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
                       >
                         <option value="fullday">Full Day</option>
                         <option value="first">First Half</option>
@@ -531,10 +665,10 @@ export default function EditLeaveModal({
                     </div>
                     {isMultiDay && (
                       <>
-                        <div className="pt-8 text-gray-500 font-medium">–</div>
+                        <div className="pt-7 text-gray-300 font-bold">—</div>
                         <div className="flex-1 space-y-1">
-                          <label className="text-xs font-medium text-gray-600">
-                            To {formatDateForDisplay(endDate)}
+                          <label className="text-xs font-medium text-gray-500">
+                            End — {formatDateForDisplay(endDate)}
                           </label>
                           <select
                             value={halfDayConfig.end}
@@ -544,7 +678,7 @@ export default function EditLeaveModal({
                                 end: e.target.value,
                               }))
                             }
-                            className="w-full p-2 border border-gray-300 rounded-md shadow-sm"
+                            className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
                           >
                             <option value="fullday">Full Day</option>
                             <option value="first">First Half</option>
@@ -558,61 +692,70 @@ export default function EditLeaveModal({
               </div>
             )}
 
-            <div className="mt-2">
-              <label className="text-sm font-medium text-gray-700">
-                Leave Type
-              </label>
-              <LeaveTypeDropdown
-                options={leaveTypeOptions}
-                selectedId={leaveTypeId}
-                setSelectedId={setLeaveTypeId}
-              />
-            </div>
-
-            <div className="mt-2">
-              <label className="text-sm font-medium text-gray-700">
+            {/* Reason */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
                 Reason
               </label>
               <textarea
                 maxLength="100"
                 rows="3"
-                cols="40"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                className="mt-1 w-full border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 p-2 rounded-lg text-sm"
+                placeholder="Add a reason for your leave..."
+                className="w-full border border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 focus:outline-none p-3 rounded-xl text-sm resize-none transition-all"
               />
+              <p className="text-right text-xs text-gray-400 mt-0.5">
+                {reason.length}/100
+              </p>
             </div>
 
+            {/* Drive link */}
             {shouldShowDriveLink() && (
               <div>
-                <label className="text-sm font-medium text-gray-700">
-                  Supporting Document (Google Drive Link)
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+                  Supporting Document
                 </label>
                 <input
                   type="url"
                   value={driveLink}
                   onChange={(e) => setDriveLink(e.target.value)}
-                  className="mt-1 w-full border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 p-2 rounded-lg text-sm"
+                  placeholder="https://drive.google.com/..."
+                  className="w-full border border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 focus:outline-none p-3 rounded-xl text-sm transition-all"
                 />
+                {selectedLeaveType?.leaveTypeId === "L-SL" && weekdays > 3 && (
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                    <Info className="w-3 h-3" /> Required for sick leave
+                    exceeding 3 days
+                  </p>
+                )}
               </div>
             )}
           </fieldset>
 
-          <div className="flex justify-end gap-3 pt-2">
+          {/* Actions */}
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
             <button
               type="button"
               onClick={handleClose}
               disabled={submitting || isLockedByOther}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+              className="px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={submitting || isLockedByOther}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
+              disabled={submitting || isLockedByOther || hasBalanceError}
+              className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {submitting ? "Updating..." : "Update Request"}
+              {submitting ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Update Request"
+              )}
             </button>
           </div>
         </form>

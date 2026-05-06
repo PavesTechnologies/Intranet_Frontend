@@ -4,7 +4,7 @@ import RunListForCycle from "./RunListForCycle";
 import AddCasesModal from "./AddCasesModal";
 import CreateTestRunForm from "./CreateRun";
 import axiosInstance from "../api/axiosInstance";
-import { useState } from "react";
+import { useState, useEffect } from "react";   // ✅ UPDATED
 import { toast } from "react-toastify";
 
 export default function CycleRunsPage() {
@@ -17,12 +17,31 @@ export default function CycleRunsPage() {
   const [availableCases, setAvailableCases] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // ✅ NEW STATE
+  const [cycleName, setCycleName] = useState("");
+
+  // ✅ NEW API CALL
+  useEffect(() => {
+    const fetchCycle = async () => {
+      try {
+        const res = await axiosInstance.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-cycles/${cycleId}`
+        );
+        setCycleName(res.data?.name || "");
+      } catch (err) {
+        console.error("Failed to fetch cycle", err);
+      }
+    };
+
+    if (cycleId) fetchCycle();
+  }, [cycleId]);
+
   const openAddCasesModal = async (runId) => {
     setSelectedRunId(runId);
 
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-cases/getcases/${projectId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/getcases/${projectId}`,
       );
       setAvailableCases(res.data || []);
       setShowAddCasesModal(true);
@@ -35,8 +54,8 @@ export default function CycleRunsPage() {
   const handleAddCasesSubmit = async (ids) => {
     try {
       await axiosInstance.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-execution/test-runs/${selectedRunId}/add-cases`,
-        { testCaseIds: ids }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-runs/${selectedRunId}/add-cases`,
+        { testCaseIds: ids },
       );
       toast.success("Test cases added!");
       setShowAddCasesModal(false);
@@ -48,7 +67,6 @@ export default function CycleRunsPage() {
 
   return (
     <div className="p-6">
-
       {/* Back button */}
       <button
         className="mb-4 bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
@@ -58,7 +76,9 @@ export default function CycleRunsPage() {
       </button>
 
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-xl font-bold">Test Runs for Cycle</h1>
+        <h1 className="text-xl font-bold">
+          Test Runs for Cycle {cycleName ? `- ${cycleName}` : ""}
+        </h1>
 
         <button
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -91,6 +111,7 @@ export default function CycleRunsPage() {
             <CreateTestRunForm
               projectId={projectId}
               cycleId={cycleId}
+              cycleName={cycleName}   // ✅ NEW PROP
               onSuccess={() => {
                 setShowRunModal(false);
                 setRefreshKey((x) => x + 1);
@@ -107,7 +128,6 @@ export default function CycleRunsPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

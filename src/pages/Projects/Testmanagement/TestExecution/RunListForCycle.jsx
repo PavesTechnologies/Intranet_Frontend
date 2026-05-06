@@ -1,9 +1,13 @@
-// src/components/RunListForCycle.jsx
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
 import TestRunAccordion from "./TestRuns";
 
-export default function RunListForCycle({ projectId, cycleId, onAddCases, refreshKey }) {
+export default function RunListForCycle({
+  projectId,
+  cycleId,
+  onAddCases,
+  refreshKey,
+}) {
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -12,11 +16,8 @@ export default function RunListForCycle({ projectId, cycleId, onAddCases, refres
     setLoading(true);
     try {
       const res = await axiosInstance.get(
-        `${
-          import.meta.env.VITE_PMS_BASE_URL
-        }/api/test-execution/test-runs/cycles/${cycleId}`
+        `/test-execution/test-runs/cycles/${cycleId}` // ✅ correct
       );
-      // Expect each run object to optionally include run.testCases = [...]
       setRuns(res.data || []);
     } catch (err) {
       console.error("Error loading runs:", err);
@@ -27,7 +28,6 @@ export default function RunListForCycle({ projectId, cycleId, onAddCases, refres
 
   useEffect(() => {
     loadRuns();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleId, refreshKey]);
 
   if (!cycleId) return null;

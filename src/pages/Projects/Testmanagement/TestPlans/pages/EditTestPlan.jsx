@@ -6,7 +6,35 @@ import { X } from "lucide-react";
 import FormInput from "../../../../../components/forms/FormInput";
 import FormTextArea from "../../../../../components/forms/FormTextArea";
 
-const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" }) => {
+// Wrapper component
+const Wrapper = ({ mode, onClose, children }) => {
+  if (mode === "modal") {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+
+        {/* Modal content */}
+        <div
+          className="relative bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  return <div className="w-full h-full flex flex-col bg-white">{children}</div>;
+};
+
+const EditTestPlan = ({
+  projectId,
+  planId,
+  onClose,
+  onSuccess,
+  mode = "modal",
+}) => {
   const token = localStorage.getItem("token");
 
   const [formData, setFormData] = useState({
@@ -17,15 +45,14 @@ const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" })
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // Load plan details once
   useEffect(() => {
     if (!planId) return;
 
     const fetchPlan = async () => {
       try {
         const response = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/plans/${planId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/${planId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         const plan = response.data;
@@ -70,14 +97,14 @@ const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" })
 
     try {
       await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/plans/update/${planId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/update/${planId}`,
         payload,
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       toast.success("Test Plan updated successfully");
@@ -91,56 +118,29 @@ const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" })
     }
   };
 
-  // Modal/drawer wrapper
-  const Wrapper = ({ children }) => {
-    if (mode === "modal") {
-      return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={onClose}
-          />
-
-          {/* Modal content */}
-          <div
-            className="relative bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()} // Prevent closing on click inside
-          >
-            {children}
-          </div>
-        </div>
-      );
-    }
-
-    // Full page or drawer mode
-    return (
-      <div className="w-full h-full flex flex-col bg-white">
-        {children}
-      </div>
-    );
-  };
-
   if (initialLoading) {
     return (
-      <Wrapper>
+      <Wrapper mode={mode} onClose={onClose}>
         <div className="p-6 text-center">Loading test plan...</div>
       </Wrapper>
     );
   }
 
   return (
-    <Wrapper>
+    <Wrapper mode={mode} onClose={onClose}>
       {/* HEADER */}
       <div className="flex justify-between items-center p-6 border-b">
         <h2 className="text-xl font-semibold">Update Test Plan</h2>
-        <button onClick={onClose}>
+        <button type="button" onClick={onClose}>
           <X className="text-gray-600" />
         </button>
       </div>
 
       {/* BODY */}
-      <form className="p-6 overflow-y-auto flex-1 space-y-6" onSubmit={handleSubmit}>
+      <form
+        className="p-6 overflow-y-auto flex-1 space-y-6"
+        onSubmit={handleSubmit}
+      >
         <FormInput
           label="Test Plan Name *"
           name="name"

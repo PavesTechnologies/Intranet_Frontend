@@ -4,7 +4,7 @@ import axios from "axios";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import AllHolidaysGrid from "./AllHolidaysGrid";
 
-export default function UpcomingHolidays({year}) {
+export default function UpcomingHolidays({ year }) {
   const today = new Date();
   const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,8 +20,13 @@ export default function UpcomingHolidays({year}) {
     const fetchHolidays = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/holidays/year/${year}`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+          `${window.__APP_CONFIG__.BASE_URL}/api/holidays/year/${year}`,
+
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
         );
         setHolidays(res.data);
       } catch (err) {
@@ -35,7 +40,7 @@ export default function UpcomingHolidays({year}) {
 
   // Compute today holiday once
   const todayHoliday = holidays.find(
-    (h) => new Date(h.holidayDate).toDateString() === today.toDateString()
+    (h) => new Date(h.holidayDate).toDateString() === today.toDateString(),
   );
 
   // Upcoming holidays carousel
@@ -133,7 +138,7 @@ export default function UpcomingHolidays({year}) {
             <span className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-600 text-xs sm:text-sm font-medium rounded-full">
               {new Date(upcoming[currentIndex].holidayDate).toLocaleDateString(
                 "en-US",
-                { day: "2-digit", month: "short" }
+                { day: "2-digit", month: "short" },
               )}
             </span>
             {upcoming[currentIndex].holidayDescription && (

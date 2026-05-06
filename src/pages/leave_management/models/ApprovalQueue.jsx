@@ -18,7 +18,10 @@ const ApprovalQueue = ({ actionType, payload }) => {
     key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase());
 
   const isEmptyVal = (v) =>
-    v === null || v === "" || v === false || (Array.isArray(v) && v.length === 0);
+    v === null ||
+    v === "" ||
+    v === false ||
+    (Array.isArray(v) && v.length === 0);
 
   const KeyValueTable = ({ obj }) => {
     const entries = Object.entries(obj || {}).filter(([, v]) => !isEmptyVal(v));
@@ -33,7 +36,7 @@ const ApprovalQueue = ({ actionType, payload }) => {
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Field
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Value
               </th>
             </tr>
@@ -60,7 +63,10 @@ const ApprovalQueue = ({ actionType, payload }) => {
 
   const DiffTable = ({ before, after }) => {
     const allKeys = Array.from(
-      new Set([...(before ? Object.keys(before) : []), ...(after ? Object.keys(after) : [])])
+      new Set([
+        ...(before ? Object.keys(before) : []),
+        ...(after ? Object.keys(after) : []),
+      ]),
     );
 
     const rows = allKeys
@@ -70,7 +76,7 @@ const ApprovalQueue = ({ actionType, payload }) => {
         const changed = JSON.stringify(b ?? null) !== JSON.stringify(a ?? null);
         return { k, b, a, changed };
       })
-      .filter((row) => row.changed || (!isEmptyVal(row.a) || !isEmptyVal(row.b)));
+      .filter((row) => row.changed || !isEmptyVal(row.a) || !isEmptyVal(row.b));
 
     if (rows.length === 0) {
       return <p className="text-sm text-gray-500">No changes detected.</p>;
@@ -84,10 +90,10 @@ const ApprovalQueue = ({ actionType, payload }) => {
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Field
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Before
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                 After
               </th>
             </tr>
@@ -100,8 +106,8 @@ const ApprovalQueue = ({ actionType, payload }) => {
               const rowClass = changed
                 ? "bg-yellow-50"
                 : isHighlighted
-                ? "bg-blue-100"
-                : "";
+                  ? "bg-blue-100"
+                  : "";
 
               return (
                 <tr key={k} className={rowClass}>
@@ -199,8 +205,8 @@ const ApprovalQueue = ({ actionType, payload }) => {
       const oldArray = hasBeforeArray
         ? parsed.beforeData
         : hasOldObjectArray
-        ? parsed.oldData.balances
-        : [];
+          ? parsed.oldData.balances
+          : [];
 
       const newData = (parsed && parsed.newData) || {};
       const newArray = Array.isArray(newData.balances) ? newData.balances : [];
@@ -236,7 +242,7 @@ const ApprovalQueue = ({ actionType, payload }) => {
       });
 
       const allLeaveTypes = Array.from(
-        new Set([...Object.keys(oldMap), ...Object.keys(newMap)])
+        new Set([...Object.keys(oldMap), ...Object.keys(newMap)]),
       );
 
       const DiffRow = ({ lt }) => {
@@ -334,19 +340,79 @@ const ApprovalQueue = ({ actionType, payload }) => {
     }
     default: {
       if (parsed && parsed.newData) {
-        // Check if newData is an array (like ADD_HOLIDAY)
+        // ✅ Render full holiday list instead of just the first item
         if (Array.isArray(parsed.newData) && parsed.newData.length > 0) {
-          return <KeyValueTable obj={parsed.newData[0]} />;
+          return <HolidayListTable holidays={parsed.newData} />;
         }
-        // Check if newData is a non-array object
-        if (typeof parsed.newData === "object" && !Array.isArray(parsed.newData)) {
+        if (
+          typeof parsed.newData === "object" &&
+          !Array.isArray(parsed.newData)
+        ) {
           return <KeyValueTable obj={parsed.newData} />;
         }
       }
-      // Fallback for simple payloads (like DELETE_HOLIDAY or DEACTIVATE_LEAVE_TYPE)
       return <KeyValueTable obj={parsed} />;
     }
   }
+};
+
+// Add this new component alongside the other table components (e.g. after BalancesTable)
+const HolidayListTable = ({ holidays }) => {
+  if (!Array.isArray(holidays) || holidays.length === 0) {
+    return <p className="text-sm text-gray-500">No holidays to display.</p>;
+  }
+  return (
+    <div className="overflow-x-auto mt-4 border border-gray-200 rounded-lg">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              #
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Date
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Holiday Name
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Type
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Country
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              State
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {holidays.map((h, idx) => (
+            <tr key={idx} className="hover:bg-gray-50">
+              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                {idx + 1}
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-800">
+                {h.holidayDate ?? "-"}
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                {h.description ?? h.holidayName ?? "-"}
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                {h.type ?? "-"}
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                {h.country ?? "-"}
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                {h.state ?? "-"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 };
 
 export default ApprovalQueue;

@@ -5,6 +5,7 @@ import FormSelect from "../../../../../components/forms/FormSelect";
 import FormDatePicker from "../../../../../components/forms/FormDatePicker";
 
 const EpicFields = ({ formData, onChange, statuses, today }) => (
+  
   <>
     <FormInput label="Epic Name *" name="name" value={formData.name || ""} onChange={onChange} required />
 

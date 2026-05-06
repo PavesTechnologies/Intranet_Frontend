@@ -1,37 +1,59 @@
 import React, { useEffect, useState } from "react";
-import { AlertCircle, Plus, X, User, Tag, Pencil, Check } from "lucide-react";
+import {
+  AlertCircle,
+  Plus,
+  X,
+  User,
+  Tag,
+  Pencil,
+  Check,
+  ShieldAlert,
+  Trash2,
+} from "lucide-react";
 import axios from "axios";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 import AddMitigationForm from "./AddMitigationForm";
 import MitigationList from "./MitigationList";
 import CreateRiskModal from "./createRiskModal";
 
-export default function RiskDetailModal({ risk, onClose, projectId }) {
+export default function RiskDetailModal({
+  risk,
+  onClose,
+  projectId,
+  selectedIssue,
+  onUpdated,
+}) {
   const [riskDetail, setRiskDetail] = useState(null);
   const [mitigations, setMitigations] = useState([]);
   const [members, setMembers] = useState([]);
-
   const [category, setCategory] = useState(null);
   const [owner, setOwner] = useState(null);
   const [reporter, setReporter] = useState(null);
 
-  /* ===== STATUS ===== */
   const [status, setStatus] = useState(null);
   const [statuses, setStatuses] = useState([]);
   const [editingStatus, setEditingStatus] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
 
-  /* ===== EDIT RISK ===== */
   const [showEdit, setShowEdit] = useState(false);
-
   const [showAdd, setShowAdd] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
 
-  const BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
   const token = localStorage.getItem("token");
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
 
   useEffect(() => {
     if (!risk?.id) return;
+
     let mounted = true;
 
     async function load() {
@@ -40,45 +62,45 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
 
       try {
         const riskReq = axios.get(`${BASE_URL}/api/risks/${risk.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
         });
 
         const mitigationReq = axios
           .get(`${BASE_URL}/api/mitigation-plans/risk/${risk.id}`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers,
           })
           .catch(() => ({ data: [] }));
 
         const membersReq = axios.get(
           `${BASE_URL}/api/projects/${projectId}/members`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers },
         );
 
         const riskRes = (await riskReq).data;
 
         const categoryReq = riskRes.categoryId
           ? axios.get(`${BASE_URL}/api/risk/category/${riskRes.categoryId}`, {
-              headers: { Authorization: `Bearer ${token}` },
+              headers,
             })
-          : null;
+          : Promise.resolve({ data: null });
 
         const ownerReq = riskRes.ownerId
           ? axios.get(`${BASE_URL}/api/users/${riskRes.ownerId}`, {
-              headers: { Authorization: `Bearer ${token}` },
+              headers,
             })
-          : null;
+          : Promise.resolve({ data: null });
 
         const reporterReq = riskRes.reporterId
           ? axios.get(`${BASE_URL}/api/users/${riskRes.reporterId}`, {
-              headers: { Authorization: `Bearer ${token}` },
+              headers,
             })
-          : null;
+          : Promise.resolve({ data: null });
 
         const statusReq = riskRes.statusId
           ? axios.get(`${BASE_URL}/api/risk-statuses/${riskRes.statusId}`, {
-              headers: { Authorization: `Bearer ${token}` },
+              headers,
             })
-          : null;
+          : Promise.resolve({ data: null });
 
         const [
           mitigationRes,
@@ -110,34 +132,111 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
         console.error(err);
         if (mounted) setError("Failed to load risk details");
       } finally {
-        mounted && setLoading(false);
+        if (mounted) setLoading(false);
       }
     }
 
     load();
-    return () => (mounted = false);
+
+    return () => {
+      mounted = false;
+    };
   }, [risk?.id, projectId, BASE_URL, token]);
 
-  /* ===== STATUS EDIT ===== */
   async function startEditStatus() {
-    const res = await axios.get(
-      `${BASE_URL}/api/projects/${projectId}/risk-statuses`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    setStatuses(res.data || []);
-    setEditingStatus(true);
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/projects/${projectId}/risk-statuses`,
+        { headers },
+      );
+
+      setStatuses(res.data || []);
+      setEditingStatus(true);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load risk statuses");
+    }
   }
 
   async function saveStatus() {
-    await axios.patch(
-      `${BASE_URL}/api/risks/${risk.id}/status`,
-      { statusId: selectedStatusId },
-      { headers: { Authorization: `Bearer ${token}` } }
+    try {
+      await axios.patch(
+        `${BASE_URL}/api/risks/${risk.id}/status`,
+        { statusId: selectedStatusId },
+        { headers },
+      );
+
+      const updated = statuses.find((s) => s.id === selectedStatusId);
+      setStatus(updated || null);
+      setEditingStatus(false);
+
+      toast.success("Risk status updated successfully");
+      onUpdated?.();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update risk status");
+    }
+  }
+
+  async function executeDeleteRisk() {
+    try {
+      setDeleting(true);
+
+      await axios.delete(`${BASE_URL}/api/risks/${risk.id}`, {
+        headers,
+      });
+
+      toast.success("Risk deleted successfully");
+      onUpdated?.();
+      onClose?.();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete risk");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function handleDeleteRisk() {
+    const ConfirmToast = ({ closeToast }) => (
+      <div className="flex flex-col gap-3 py-1">
+        <p className="text-sm text-gray-800 font-medium">
+          Are you sure you want to delete this risk?
+        </p>
+
+        <p className="text-xs text-gray-500">
+          This action cannot be undone.
+        </p>
+
+        <div className="flex justify-end gap-2 mt-1">
+          <button
+            onClick={closeToast}
+            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-200 transition-colors"
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={() => {
+              executeDeleteRisk();
+              closeToast();
+            }}
+            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
     );
 
-    const updated = statuses.find((s) => s.id === selectedStatusId);
-    setStatus(updated || null);
-    setEditingStatus(false);
+    toast.warn(<ConfirmToast />, {
+      position: "top-center",
+      autoClose: false,
+      closeOnClick: false,
+      draggable: false,
+      closeButton: false,
+      icon: false,
+    });
   }
 
   function handleCreated(plan) {
@@ -155,26 +254,120 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
 
   if (!risk) return null;
 
+  const editRiskData = riskDetail
+    ? {
+        ...riskDetail,
+
+        linkedType:
+          riskDetail.linkedType ||
+          risk.linkedType ||
+          selectedIssue?.linkedType ||
+          null,
+
+        linkedId:
+          riskDetail.linkedId ||
+          risk.linkedId ||
+          selectedIssue?.linkedId ||
+          null,
+
+        linkedName:
+          riskDetail.linkedName ||
+          riskDetail.linkedTitle ||
+          risk.linkedName ||
+          risk.linkedTitle ||
+          selectedIssue?.title ||
+          selectedIssue?.name ||
+          null,
+      }
+    : null;
+
+  const score = riskDetail?.riskScore ?? 0;
+
+  const scoreColor =
+    score >= 20
+      ? "text-red-600 bg-red-50 border-red-200"
+      : score >= 12
+        ? "text-orange-600 bg-orange-50 border-orange-200"
+        : score >= 6
+          ? "text-amber-600 bg-amber-50 border-amber-200"
+          : "text-emerald-600 bg-emerald-50 border-emerald-200";
+
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl max-w-4xl w-full shadow-xl overflow-hidden">
-        {/* Header */}
-        <div className="bg-indigo-600 text-white p-5 flex justify-between items-center">
-          <div>
-            <h2 className="font-semibold text-lg">Risk #{risk.id}</h2>
-            <p className="text-xs opacity-80">{riskDetail?.title || "-"}</p>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center sm:justify-center">
+      <ToastContainer position="top-right" autoClose={3000} />
+
+      <div
+        className="
+          bg-white w-full
+          sm:max-w-3xl sm:mx-4
+          rounded-t-2xl sm:rounded-2xl
+          shadow-2xl flex flex-col
+          max-h-[92dvh] sm:max-h-[88vh]
+          overflow-hidden
+        "
+      >
+        <div className="bg-indigo-600 text-white px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-start sm:items-center flex-shrink-0">
+          <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-sm sm:text-base">
+                  Risk #{risk.id}
+                </h2>
+
+                {riskDetail?.priority && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/20 uppercase tracking-wide">
+                    {riskDetail.priority}
+                  </span>
+                )}
+              </div>
+
+              <p className="text-xs text-white/70 truncate max-w-[200px] sm:max-w-sm mt-0.5">
+                {riskDetail?.title || "Loading…"}
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowEdit(true)}
-              className="flex items-center gap-1 text-sm text-white/90 hover:text-white"
+          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+            {/* <button
+              onClick={handleDeleteRisk}
+              disabled={deleting}
+              className="hidden sm:flex items-center gap-1 text-xs text-white/90 hover:text-white bg-red-500/25 hover:bg-red-500/40 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-60"
             >
-              <Pencil size={16} /> Edit Risk
+              <Trash2 size={12} />
+              {deleting ? "Deleting..." : "Delete"}
+            </button> */}
+
+            <button
+              onClick={handleDeleteRisk}
+              disabled={deleting}
+              className="sm:hidden w-7 h-7 flex items-center justify-center rounded-lg bg-red-500/25 hover:bg-red-500/40 disabled:opacity-60"
+            >
+              <Trash2 size={13} />
             </button>
 
-            <button onClick={onClose}>
-              <X />
+            <button
+              onClick={() => setShowEdit(true)}
+              className="hidden sm:flex items-center gap-1 text-xs text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg transition-colors"
+            >
+              <Pencil size={12} /> Edit
+            </button>
+
+            <button
+              onClick={() => setShowEdit(true)}
+              className="sm:hidden w-7 h-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20"
+            >
+              <Pencil size={13} />
+            </button>
+
+            <button
+              onClick={onClose}
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+            >
+              <X size={15} />
             </button>
           </div>
         </div>
@@ -183,165 +376,252 @@ export default function RiskDetailModal({ risk, onClose, projectId }) {
           isOpen={showEdit}
           onClose={() => setShowEdit(false)}
           projectId={projectId}
-          risk={riskDetail} // ✅ THIS IS KEY
-          onSuccess={() => window.location.reload()}
+          risk={editRiskData}
+          onSuccess={() => {
+            setShowEdit(false);
+            onUpdated?.();
+          }}
         />
 
-        <div className="p-6 space-y-6">
-          {loading && <p className="text-center text-sm">Loading...</p>}
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-
-          {riskDetail && (
-            <>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <Info
-                  label="Category"
-                  value={category?.name}
-                  icon={<Tag size={14} />}
+        <div className="flex-1 overflow-y-auto">
+          {loading && (
+            <div className="flex items-center justify-center py-12">
+              <svg
+                className="animate-spin w-6 h-6 text-indigo-500"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
                 />
-                <Info
-                  label="Owner"
-                  value={owner?.name}
-                  icon={<User size={14} />}
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8z"
                 />
-                <Info
-                  label="Reporter"
-                  value={reporter?.name}
-                  icon={<User size={14} />}
-                />
-                <Info label="Triggers" value={riskDetail.triggers || "-"} />
-              </div>
-
-              {/* Status */}
-              <div className="flex items-center justify-between border rounded-lg p-3">
-                <div>
-                  <div className="text-xs text-slate-500 mb-1">Status</div>
-
-                  {!editingStatus ? (
-                    <span className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 text-sm font-medium">
-                      {status?.name || "-"}
-                    </span>
-                  ) : (
-                    <select
-                      value={selectedStatusId}
-                      onChange={(e) =>
-                        setSelectedStatusId(Number(e.target.value))
-                      }
-                      className="border rounded-md px-3 py-2 text-sm"
-                    >
-                      {statuses.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                {!editingStatus ? (
-                  <button
-                    onClick={startEditStatus}
-                    className="text-indigo-600 text-sm flex items-center gap-1"
-                  >
-                    <Pencil size={14} /> Edit
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setEditingStatus(false)}
-                      className="text-sm text-slate-500"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={saveStatus}
-                      className="bg-indigo-600 text-white px-3 py-1 rounded-md text-sm flex items-center gap-1"
-                    >
-                      <Check size={14} /> Save
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Metrics */}
-              <div className="grid grid-cols-3 gap-4">
-                <Metric label="Probability" value={riskDetail.probability} />
-                <Metric label="Impact" value={riskDetail.impact} />
-                <Metric label="Risk Score" value={riskDetail.riskScore} />
-              </div>
-
-              <div>
-                <h4 className="font-medium mb-1">Description</h4>
-                <p className="text-sm text-slate-700">
-                  {riskDetail.description || "-"}
-                </p>
-              </div>
-            </>
+              </svg>
+            </div>
           )}
 
-          {/* Mitigations */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <h4 className="font-semibold flex gap-2">
-                <AlertCircle size={18} />
-                Mitigation Plans
-              </h4>
-              <button
-                onClick={() => setShowAdd(true)}
-                className="flex items-center gap-1 text-indigo-600 text-sm"
-              >
-                <Plus size={16} /> Add
-              </button>
+          {error && (
+            <div className="mx-4 sm:mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+              {error}
             </div>
+          )}
 
-            {showAdd && (
-              <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center">
-                <div className="bg-white w-full max-w-md rounded-xl shadow-lg">
-                  <AddMitigationForm
-                    riskId={risk.id}
-                    members={members}
-                    onAdd={handleCreated}
-                    onClose={() => setShowAdd(false)}
-                  />
+          {riskDetail && (
+            <div className="px-4 sm:px-6 py-4 space-y-4">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <Metric label="Probability" value={riskDetail.probability} />
+                <Metric label="Impact" value={riskDetail.impact} />
+
+                <div
+                  className={`border rounded-xl p-3 sm:p-4 text-center ${scoreColor}`}
+                >
+                  <div className="text-[10px] uppercase tracking-wide font-semibold opacity-70">
+                    Risk Score
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black mt-0.5">
+                    {riskDetail.riskScore ?? "—"}
+                  </div>
                 </div>
               </div>
-            )}
 
-            {mitigations.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No mitigation plans added yet.
-              </p>
-            ) : (
-              <MitigationList
-                mitigations={mitigations}
-                members={members}
-                onUpdated={handleUpdated}
-                onDelete={handleDeleted}
-              />
-            )}
-          </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                <InfoCard
+                  label="Category"
+                  value={category?.name}
+                  icon={<Tag size={13} className="text-slate-400" />}
+                />
+
+                <InfoCard
+                  label="Owner"
+                  value={owner?.name}
+                  icon={<User size={13} className="text-slate-400" />}
+                />
+
+                <InfoCard
+                  label="Reporter"
+                  value={reporter?.name}
+                  icon={<User size={13} className="text-slate-400" />}
+                />
+
+                <InfoCard label="Triggers" value={riskDetail.triggers || "—"} />
+              </div>
+
+              <div className="border border-slate-200 rounded-xl p-3 sm:p-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-1.5">
+                      Status
+                    </p>
+
+                    {!editingStatus ? (
+                      <span className="px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                        {status?.name || "—"}
+                      </span>
+                    ) : (
+                      <select
+                        value={selectedStatusId || ""}
+                        onChange={(e) =>
+                          setSelectedStatusId(Number(e.target.value))
+                        }
+                        className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                      >
+                        {statuses.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {!editingStatus ? (
+                    <button
+                      onClick={startEditStatus}
+                      className="flex items-center gap-1 text-indigo-600 text-xs font-medium hover:text-indigo-700 transition-colors"
+                    >
+                      <Pencil size={12} /> Edit
+                    </button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingStatus(false)}
+                        className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg border border-slate-200 transition-colors"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        onClick={saveStatus}
+                        className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-colors"
+                      >
+                        <Check size={12} /> Save
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {riskDetail.description && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-2">
+                    Description
+                  </p>
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {riskDetail.description}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-semibold text-sm flex items-center gap-2 text-slate-800">
+                    <AlertCircle size={15} className="text-indigo-500" />
+                    Mitigation Plans
+
+                    {mitigations.length > 0 && (
+                      <span className="text-[10px] bg-indigo-100 text-indigo-600 font-bold px-1.5 py-0.5 rounded-full">
+                        {mitigations.length}
+                      </span>
+                    )}
+                  </h4>
+
+                  <button
+                    onClick={() => setShowAdd(true)}
+                    className="flex items-center gap-1 text-indigo-600 text-xs font-semibold hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Plus size={13} /> Add
+                  </button>
+                </div>
+
+                {mitigations.length === 0 && !loading ? (
+                  <div className="text-center py-6 text-slate-400 text-sm border border-dashed border-slate-200 rounded-xl">
+                    No mitigation plans yet
+                  </div>
+                ) : (
+                  <MitigationList
+                    mitigations={mitigations}
+                    members={members}
+                    onUpdated={handleUpdated}
+                    onDelete={handleDeleted}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-slate-100 bg-slate-50/60 px-4 sm:px-6 py-3 flex justify-between items-center flex-shrink-0">
+          <button
+            onClick={handleDeleteRisk}
+            disabled={deleting}
+            className="px-4 py-2 rounded-xl border border-red-200 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-60 flex items-center gap-2"
+          >
+            <Trash2 size={14} />
+            {deleting ? "Deleting..." : "Delete Risk"}
+          </button>
+
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-white transition-colors"
+          >
+            Close
+          </button>
         </div>
       </div>
+
+      {showAdd && (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center sm:justify-center">
+          <div className="bg-white w-full sm:max-w-md sm:mx-4 rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden max-h-[85dvh]">
+            <AddMitigationForm
+              riskId={risk.id}
+              members={members}
+              onAdd={handleCreated}
+              onClose={() => setShowAdd(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function Metric({ label, value }) {
   return (
-    <div className="border rounded-lg p-4 text-center">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="text-xl font-bold">{value ?? "-"}</div>
+    <div className="border border-slate-200 rounded-xl p-3 sm:p-4 text-center bg-white">
+      <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+        {label}
+      </div>
+      <div className="text-xl sm:text-2xl font-black text-slate-800 mt-0.5">
+        {value ?? "—"}
+      </div>
     </div>
   );
 }
 
-function Info({ label, value, icon }) {
+function InfoCard({ label, value, icon }) {
   return (
-    <div className="flex items-center gap-2 border rounded-lg p-3">
-      {icon}
-      <div>
-        <div className="text-xs text-slate-500">{label}</div>
-        <div className="text-sm font-medium">{value || "-"}</div>
+    <div className="flex items-start gap-2.5 border border-slate-200 rounded-xl p-3 bg-white">
+      {icon && (
+        <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+          {icon}
+        </div>
+      )}
+
+      <div className="min-w-0">
+        <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+          {label}
+        </div>
+        <div className="text-sm font-medium text-slate-700 mt-0.5 truncate">
+          {value || "—"}
+        </div>
       </div>
     </div>
   );

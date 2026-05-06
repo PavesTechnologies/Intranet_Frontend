@@ -1,13 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
-import { MoreHorizontal, MessageSquare, Calendar, FileText } from 'lucide-react';
-import ChangeLeaveDatesModal from './ChangeLeaveDatesModal';
-import ChangeLeaveTypeModal from './ChangeLeaveTypeModal';
-import CommentModal from './CommentModal';
-import toast from 'react-hot-toast';
+import React, { useState, useRef, useEffect } from "react";
+import axios from "axios";
+import {
+  MoreHorizontal,
+  MessageSquare,
+  Calendar,
+  FileText,
+} from "lucide-react";
+import ChangeLeaveDatesModal from "./ChangeLeaveDatesModal";
+import ChangeLeaveTypeModal from "./ChangeLeaveTypeModal";
+import CommentModal from "./CommentModal";
+import toast from "react-hot-toast";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-const token = localStorage.getItem('token');
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+const token = localStorage.getItem("token");
 
 const ActionDropdown = ({
   employeeId,
@@ -33,10 +38,10 @@ const ActionDropdown = ({
   const [isBalancesLoading, setIsBalancesLoading] = useState(false);
 
   // Store selected values here
-  const [leaveTypeId, setLeaveTypeId] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [reason, setReason] = useState('');
+  const [leaveTypeId, setLeaveTypeId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [reason, setReason] = useState("");
 
   useEffect(() => {
     const fetchBalances = async () => {
@@ -45,7 +50,7 @@ const ActionDropdown = ({
         try {
           const res = await axios.get(
             `${BASE_URL}/api/leave-balance/employee/${employeeId}/${new Date().getFullYear()}`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` } },
           );
           setEmployeeLeaveBalances(res.data || []);
         } catch (error) {
@@ -66,7 +71,7 @@ const ActionDropdown = ({
 
   useEffect(() => {
     if (isChangeLeaveTypeOpen) {
-      setLeaveTypeId(currentLeaveType?.leaveTypeId || '');
+      setLeaveTypeId(currentLeaveType?.leaveTypeId || "");
     }
   }, [isChangeLeaveTypeOpen, currentLeaveType]);
 
@@ -90,9 +95,9 @@ const ActionDropdown = ({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -117,11 +122,11 @@ const ActionDropdown = ({
 
   const handleAction = (action) => {
     setIsOpen(false);
-    if (action === 'Add Comment') {
+    if (action === "Add Comment") {
       setIsCommentOpen(true);
-    } else if (action === 'Change Leave Type') {
+    } else if (action === "Change Leave Type") {
       setIsChangeLeaveTypeOpen(true);
-    } else if (action === 'Change Leave Dates') {
+    } else if (action === "Change Leave Dates") {
       setIsChangeLeaveDatesOpen(true);
     }
   };
@@ -139,21 +144,21 @@ const ActionDropdown = ({
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
           <div className="py-1">
             <button
-              onClick={() => handleAction('Add Comment')}
+              onClick={() => handleAction("Add Comment")}
               className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <MessageSquare className="w-4 h-4 mr-3" />
               Add Comment
             </button>
             <button
-              onClick={() => handleAction('Change Leave Type')}
+              onClick={() => handleAction("Change Leave Type")}
               className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <FileText className="w-4 h-4 mr-3" />
               Change Leave Type
             </button>
             <button
-              onClick={() => handleAction('Change Leave Dates')}
+              onClick={() => handleAction("Change Leave Dates")}
               className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <Calendar className="w-4 h-4 mr-3" />
@@ -170,7 +175,7 @@ const ActionDropdown = ({
         onSave={handleSaveLeaveType}
         currentTypeId={leaveTypeId}
         // allTypes={allLeaveTypes}
-        leaveBalances={employeeLeaveBalances} 
+        leaveBalances={employeeLeaveBalances}
       />
 
       {/* Change Leave Dates Modal */}

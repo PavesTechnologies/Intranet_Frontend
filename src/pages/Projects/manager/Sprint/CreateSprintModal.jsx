@@ -2,12 +2,18 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { X } from "lucide-react";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+const getCurrentDateTime = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  const local = new Date(now.getTime() - offset * 60 * 1000);
+  return local.toISOString().slice(0, 16);
+};
 const CreateSprintModal = ({
   isOpen,
-  sprint,            // <-- EDIT MODE sprint object
+  sprint, // <-- EDIT MODE sprint object
   projectId,
   onClose,
   onCreated,
@@ -33,6 +39,13 @@ const CreateSprintModal = ({
   const [customWeeks, setCustomWeeks] = useState("");
   const [projectName, setProjectName] = useState("");
   const [showDecimalWarning, setShowDecimalWarning] = useState(false);
+  const [currentDateTime, setCurrentDateTime] = useState(getCurrentDateTime());
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentDateTime(getCurrentDateTime());
+    }
+  }, [isOpen]);
 
   // ---------------------------
   // Fetch Project Name
@@ -41,8 +54,8 @@ const CreateSprintModal = ({
     const load = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         setProjectName(res.data.name);
       } catch (e) {
@@ -60,12 +73,8 @@ const CreateSprintModal = ({
       setFormData({
         name: sprint.name || "",
         goal: sprint.goal || "",
-        startDate: sprint.startDate
-          ? sprint.startDate.slice(0, 16)
-          : "",
-        endDate: sprint.endDate
-          ? sprint.endDate.slice(0, 16)
-          : "",
+        startDate: sprint.startDate ? sprint.startDate.slice(0, 16) : "",
+        endDate: sprint.endDate ? sprint.endDate.slice(0, 16) : "",
         status: sprint.status || "PLANNING",
         projectId: projectId.toString(),
       });
@@ -82,8 +91,7 @@ const CreateSprintModal = ({
   // ---------------------------
   // Helpers
   // ---------------------------
-  const toLocalDateTime = (val) =>
-    val.length === 16 ? `${val}:00` : val;
+  const toLocalDateTime = (val) => (val.length === 16 ? `${val}:00` : val);
 
   const calculateEndDate = (start, weeks) => {
     if (!start || !weeks) return "";
@@ -97,6 +105,10 @@ const CreateSprintModal = ({
   // ---------------------------
   const handleStartDateChange = (e) => {
     const newStart = e.target.value;
+    if (!sprint && new Date(newStart) < new Date()) {
+      toast.error("Start date cannot be in the past");
+      return;
+    }
     let newEnd = formData.endDate;
 
     if (duration !== "CUSTOM") {
@@ -153,37 +165,41 @@ const CreateSprintModal = ({
     try {
       let res;
 
-      if (sprint) {
+  if (sprint) {
         // -------------------------
         // EDIT MODE
         // -------------------------
         res = await axios.put(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/sprints/${sprint.id}`,
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprint.id}`,
           payload,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
-        toast.success("Sprint updated successfully!");
+        toast.success("Sprint updated successfully!", {containerId: "global"});
       } else {
         // -------------------------
         // CREATE MODE
         // -------------------------
         res = await axios.post(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/sprints`,
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`,
           payload,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
-        toast.success("Sprint created successfully!");
+        toast.success("Sprint created successfully!", {containerId: "global"});
       }
 
       onCreated(res.data);
+      onClose(); // ← close immediately, toast will show on top of nothing
 
-      setTimeout(() => onClose(), 600);
     } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Error saving sprint"
-      );
+      console.log('[sprint-modal] handleSubmit - caught error', { err: err?.response?.data || err?.message, ts: Date.now() });
+
+      toast.error(err.response?.data?.message || "Error saving sprint", {
+          autoClose: 3000,
+          toastId: `sprint-error-${Date.now()}`, // ✅ prevents duplicate toasts on rapid clicks
+          containerId: "global",
+      });
     }
   };
 
@@ -191,9 +207,11 @@ const CreateSprintModal = ({
   // Render
   // ---------------------------
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex justify-center items-center">
+    //<div className="fixed inset-0 bg-black/40 z-50 flex justify-center items-center">
+    <div className="fixed inset-0 bg-black/40 z-[100] flex justify-center items-center">
+  <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto relative z-[101]"></div>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto relative">
-        <ToastContainer />
+  {/* Use global ToastContainer in App.jsx */}
 
         {/* Close Button */}
         <button
@@ -247,6 +265,7 @@ const CreateSprintModal = ({
               name="startDate"
               value={formData.startDate}
               onChange={handleStartDateChange}
+              min={!sprint ? currentDateTime : undefined}
               required
               className="border rounded-lg w-full p-2"
             />
@@ -297,14 +316,10 @@ const CreateSprintModal = ({
                     setShowDecimalWarning(false);
                     setCustomWeeks(value);
 
-                    if (
-                      value !== "" &&
-                      value !== "0" &&
-                      formData.startDate
-                    ) {
+                    if (value !== "" && value !== "0" && formData.startDate) {
                       const end = calculateEndDate(
                         formData.startDate,
-                        Number(value)
+                        Number(value),
                       );
                       setFormData({ ...formData, endDate: end });
                     }

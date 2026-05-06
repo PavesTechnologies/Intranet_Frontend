@@ -1,8 +1,6 @@
-// src/pages/Projects/manager/Sprint/StoryCard.jsx
-
 import React, { useState } from "react";
 import { useDrag } from "react-dnd";
-import { MoreVertical, Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Bookmark } from "lucide-react";
 
 const StoryCard = ({
   story,
@@ -12,9 +10,12 @@ const StoryCard = ({
   onSelectEpic,
   onClick,
 }) => {
-  const [, dragRef] = useDrag({
+  const [{ isDragging }, dragRef] = useDrag({
     type: "STORY",
     item: { id: story.id, type: "STORY" },
+    collect: (monitor) => ({
+      isDragging: !!monitor.isDragging(),
+    }),
   });
 
   const [showMenu, setShowMenu] = useState(false);
@@ -30,86 +31,107 @@ const StoryCard = ({
     setShowEpicList(false);
   };
 
-  const statusText =
-    story.statusText || story.status?.name || story.statusName || "";
+  const rawStatus =
+    story.statusText || story.status?.name || story.statusName || "BACKLOG";
+  const statusText = String(rawStatus).replace(/_/g, " ");
 
   return (
     <div
       ref={dragRef}
-      className="relative bg-white p-3 rounded shadow-sm border hover:shadow-md cursor-pointer flex justify-between items-start transition"
-      onClick={() => onClick?.()}   // ENTIRE CARD clickable
+      onClick={() => onClick?.()}
+      className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm hover:border-indigo-300 cursor-pointer flex items-center gap-3 transition-all ${
+        isDragging ? "opacity-50 scale-95 ring-2 ring-indigo-400" : ""
+      }`}
     >
-      {/* LEFT + MIDDLE (no extra wrapper) */}
-      <div className="flex-1">
-        <div className="flex items-center gap-1">
-          <span className="text-blue-500 text-sm">📑</span>
-          <p className="text-sm font-semibold text-indigo-900">{story.title}</p>
-        </div>
-
-        <p className="text-xs text-pink-800">
-          Status: {story.statusText || story.status?.name || story.statusName}
-        </p>
+      {/* STORY label */}
+      <div className="flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[10px] font-bold shrink-0">
+        <Bookmark size={12} strokeWidth={3} />
+        STORY
       </div>
+     
+      {/* Title */}
+      <p className="flex-1 text-sm text-gray-800 truncate group-hover:text-indigo-700">
+        {story.title}
+      </p>
+      
+     <p className="flex-0 text-sm text-gray-500 truncate group-hover:text-indigo-600">
+  <span className="font-medium">Epic:</span> {story.epicTitle|| story.epicName || "None"}
+</p>
+      {/* Status */}
+      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200 shrink-0">
+        {statusText}
+      </span>
 
-      {/* RIGHT SECTION (stop events from opening form) */}
-      <div
-        className="relative flex items-start gap-2"
-        onClick={(e) => e.stopPropagation()} // prevent form popup
-      >
-        {/* + Epic Button */}
-        {story.epicId === null && (
-          <button
-            type="button"
-            onClick={() => setShowEpicList((prev) => !prev)}
-            className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
-          >
-            <Plus size={12} /> Epic
-          </button>
-        )}
-
-        {/* Epic List Dropdown */}
-        {showEpicList && (
-          <div className="absolute right-10 top-6 w-48 bg-white border rounded-md shadow-lg z-50">
-            {epics.length === 0 ? (
-              <p className="text-xs text-gray-500 p-2 text-center">No epics available</p>
-            ) : (
-              epics.map((epic) => (
-                <button
-                  key={epic.id}
-                  onClick={() => handleSelectEpic(epic.id)}
-                  className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
-                >
-                  {epic.name}
-                </button>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* 3-Dot Menu */}
+      {/* Add Epic */}
+      {story.epicId === null && (
         <button
-          onClick={() => setShowMenu((prev) => !prev)}
-          className="p-1 rounded hover:bg-gray-100"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowEpicList((prev) => !prev);
+          }}
+          className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 shrink-0"
         >
-          <MoreVertical size={16} />
+          <Plus size={13} /> Epic
+        </button>
+      )}
+
+      {/* Menu */}
+      <div
+        className="relative shrink-0"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={() => {
+            setShowMenu((prev) => !prev);
+            setShowEpicList(false);
+          }}
+          className="p-1 text-gray-400 hover:text-gray-800 rounded opacity-0 group-hover:opacity-100"
+        >
+          <MoreHorizontal size={16} />
         </button>
 
-        {/* Sprint Dropdown */}
         {showMenu && (
-          <div className="absolute right-0 mt-6 w-40 bg-white border rounded-md shadow-lg z-50">
-            {sprints.length === 0 ? (
-              <p className="text-xs text-gray-500 p-2 text-center">No sprints</p>
-            ) : (
-              sprints.map((sprint) => (
-                <button
-                  key={sprint.id}
-                  onClick={() => handleSelectSprint(sprint.id)}
-                  className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
-                >
-                  Add to {sprint.name}
-                </button>
-              ))
-            )}
+            <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-100 rounded-lg shadow-xl z-50 py-1 overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-50 bg-gray-50/50">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Move to Sprint
+                </span>
+              </div>
+              {sprints.length === 0 ? (
+                <p className="text-xs text-gray-400 p-3 text-center italic">No active sprints</p>
+              ) : (
+                <div className="max-h-40 overflow-y-auto">
+                  {sprints.map((sprint) => (
+                    <button
+                      key={sprint.id}
+                      onClick={() => handleSelectSprint(sprint.id)}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+                    >
+                      {sprint.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        
+
+        {showEpicList && (
+          <div className="absolute right-0 bottom-full mb-2 w-48 bg-white border rounded shadow-lg z-50">
+            <div className="px-3 py-2 border-b border-gray-50 bg-gray-50/50">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Move to Epic
+                </span>
+              </div>
+            {epics.map((epic) => (
+              <button
+                key={epic.id}
+                onClick={() => handleSelectEpic(epic.id)}
+                className="block w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 truncate"
+              >
+                {epic.name}
+              </button>
+            ))}
           </div>
         )}
       </div>
