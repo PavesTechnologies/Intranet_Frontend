@@ -9,10 +9,15 @@ export const getProjects = async ({ page, size, search, filters }) => {
   };
 
   if (search) params.search = search;
-  // if (filters.readinessStatus) params.readinessStatus = filters.readinessStatus;
-  // if (filters.projectStatus) params.projectStatus = filters.projectStatus;
-  // if (filters.priorityLevel) params.priorityLevel = filters.priorityLevel;
-  // if (filters.riskLevel) params.riskLevel = filters.riskLevel;
+  if (filters?.readinessStatus) {
+    params.readinessStatus = filters.readinessStatus;
+  }
+  if (filters?.projectStatus) {
+    params.projectStatus = filters.projectStatus;
+  }
+  if (filters?.riskLevel) {
+    params.riskLevel = filters.riskLevel;
+  }
 
   try {
     const res = await axios.get(`${BASE_URL}/api/projects/get-projects`, {

@@ -10,6 +10,7 @@ const SIZE_CLASSES = {
 const VARIANT_CLASSES = {
   primary: "bg-[#0A0082] text-white hover:bg-[#080066]",
   secondary: "bg-pink-700 text-white hover:bg-pink-600",
+  success: "bg-emerald-600 text-white hover:bg-emerald-500",
   danger: "bg-rose-700 text-white hover:bg-rose-600",
   destructive:
     "bg-destructive text-destructive-foreground hover:bg-destructive/90",

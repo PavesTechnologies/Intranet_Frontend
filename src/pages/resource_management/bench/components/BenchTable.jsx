@@ -265,13 +265,13 @@ const BenchTable = ({
                   </td>
                   <td className="px-4 py-4 align-middle text-center">
                     <div className="flex flex-col items-center gap-1">
-                      <span className={`text-[13px] font-bold ${row.allocation < 50 ? 'text-rose-600' : 'text-slate-900'}`}>
-                        {row.allocation}%
+                      <span className={`text-[13px] font-bold ${row.availability < 50 ? 'text-rose-600' : 'text-slate-900'}`}>
+                        {row.availability}%
                       </span>
                       <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
                         <div
-                          className={`h-full ${row.allocation >= 75 ? 'bg-emerald-500' : row.allocation >= 25 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                          style={{ width: `${row.allocation}%` }}
+                          className={`h-full ${row.availability >= 75 ? 'bg-emerald-500' : row.availability >= 25 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                          style={{ width: `${row.availability}%` }}
                         />
                       </div>
                     </div>
