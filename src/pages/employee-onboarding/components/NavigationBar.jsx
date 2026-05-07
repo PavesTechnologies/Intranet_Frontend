@@ -10,14 +10,14 @@ export default function OnboardingNavBar() {
   const { hasRole } = useAuth();
 
   const isAdmin = hasRole(["ADMIN"]);
-  const isManager = hasRole(["MANAGER"]);
+  const isManager = hasRole(["REPORTING_MANAGER"]);
   const isGeneral = hasRole(["GENERAL"]);
   const isHR = hasRole(["HR"]);
   
   const isOnlyGeneral =
     hasRole(["GENERAL"]) &&
     !hasRole(["HR"]) &&
-    !hasRole(["MANAGER"]) &&
+    !hasRole(["REPORTING_MANAGER"]) &&
     !hasRole(["ADMIN"]);
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export default function OnboardingNavBar() {
 
   const parentNav = [
     // ✅ Insights & Analytics → HR, MANAGER
-    ...(hasRole(["HR", "MANAGER"]) ? [{
+    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
       label: "Insights & Analytics",
       match: [
         "/employee-onboarding/onboarding-summary",
@@ -80,7 +80,7 @@ export default function OnboardingNavBar() {
     },
 
     // ✅ Document Center → HR, MANAGER
-    ...(hasRole(["HR", "MANAGER"]) ? [{
+    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
       label: "Document Center",
       match: [
         "/employee-onboarding/employeedocuments",
@@ -91,14 +91,14 @@ export default function OnboardingNavBar() {
     }] : []),
 
     // ✅ Workforce Reports → HR, MANAGER
-    ...(hasRole(["HR", "MANAGER"]) ? [{
+    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
       label: "Workforce Reports",
       match: ["/employee-onboarding/weekly-joining-report-dashboard"],
       redirect: "/employee-onboarding/weekly-joining-report-dashboard",
     }] : []),
 
     // ✅ Compliance & Verification (Parent → HR + MANAGER)
-    ...(hasRole(["HR", "MANAGER"]) ? [{
+    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
       label: "Compliance & Verification",
       redirect: hasRole(["HR"])
         ? "/employee-onboarding/hr"
@@ -108,14 +108,14 @@ export default function OnboardingNavBar() {
           { label: "Internal Audit", path: "/employee-onboarding/hr" },
           { label: "BGC Screening", path: "/employee-onboarding/backgroundcheck" },
         ] : []),
-        ...(hasRole(["HR", "MANAGER"]) ? [
+        ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [
           { label: "Profile Hub", path: "/employee-onboarding/core-employee" }
         ] : []),
       ]
     }] : []),
 
     // ✅ Offboarding → HR, MANAGER
-    ...(hasRole(["HR", "MANAGER"]) ? [{
+    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
       label: "Offboarding",
       match: ["/employee-exit"],
       redirect: "/employee-exit",
@@ -155,7 +155,7 @@ export default function OnboardingNavBar() {
   ];
 
   const documentsNav = [
-    ...(hasRole(["HR", "MANAGER"]) ? [{ label: "Personnel Files", path: "/employee-onboarding/employeedocuments" }] : []),
+    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{ label: "Personnel Files", path: "/employee-onboarding/employeedocuments" }] : []),
     ...(hasRole(["HR"]) ? [
       { label: "e-Form Templates", path: "/employee-onboarding/document-templates" },
       { label: "Corporate Policies", path: "/employee-onboarding/organization-documents" }
@@ -167,7 +167,7 @@ export default function OnboardingNavBar() {
       { label: "Internal Audit", path: "/employee-onboarding/hr" },
       { label: "BGC Screening", path: "/employee-onboarding/backgroundcheck" }
     ] : []),
-    ...(hasRole(["HR", "ADMIN", "MANAGER"]) ? [{ label: "Profile Hub", path: "/employee-onboarding/core-employee" }] : []),
+    ...(hasRole(["HR", "ADMIN", "REPORTING_MANAGER"]) ? [{ label: "Profile Hub", path: "/employee-onboarding/core-employee" }] : []),
   ];
 
   const reportsNav = [

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 export default function EmployeeCredentialsPage() {
-  const roles = ["EMPLOYEE", "MANAGER", "HR", "ADMIN"];
+  const roles = ["EMPLOYEE", "REPORTING_MANAGER", "HR", "ADMIN"];
   const deptMap = {
     Engineering: "ENG",
     HR: "HR",
@@ -230,7 +230,7 @@ const styles = {
 // import React, { useState } from "react";
 
 // export default function EmployeeCredentialsPage() {
-//   const roles = ["EMPLOYEE", "MANAGER", "HR", "ADMIN"];
+//   const roles = ["EMPLOYEE", "REPORTING_MANAGER", "HR", "ADMIN"];
 //   const deptMap = {
 //     Engineering: "ENG",
 //     HR: "HR",
