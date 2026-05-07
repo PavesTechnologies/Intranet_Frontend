@@ -227,12 +227,14 @@ const ManagerApprovalPage = () => {
         </select>
 
         {/* Reset Button */}
-        <button
+        <Button
+          variant="destructive"
+          size="medium"
           onClick={handleResetFilters}
-          className="bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-full transition-colors"
+        // className="bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-full transition-colors"
         >
           Reset
-        </button>
+        </Button>
       </div>
 
       {/* ✅ Timesheet Table */}

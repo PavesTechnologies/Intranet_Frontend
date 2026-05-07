@@ -1,12 +1,19 @@
-import { useEffect, useState } from "react";
-import { Pencil, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { Pencil, Loader2, Plus, Trash2, X } from "lucide-react";
 import axios from "axios";
+
 import Button from "../../../../components/Button/Button";
 import Pagination from "../../../../components/Pagination/pagination";
 import FormInput from "../../../../components/forms/FormInput";
 import Modal from "../../../../components/Modal/modal";
 import SearchInput from "../../../../components/filter/Searchbar";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import StatusBadge from "../../../../components/status/statusbadge";
 import { showStatusToast } from "../../../../components/toastfy/toast";
+import { Fonts } from "../../../../components/Fonts/Fonts";
+
+const ITEMS_PER_PAGE = 5;
+const MANDATORY_ROLES = ["Admin", "Super Admin", "HR", "General"];
 
 export default function RoleForm({
   roles,
@@ -25,7 +32,6 @@ export default function RoleForm({
 
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
 
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,12 +41,14 @@ export default function RoleForm({
 
   const token = localStorage.getItem("token") || "";
 
-  const axiosInstance = axios.create({
-    baseURL: `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}`,
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  const mandatoryRoles = ["Admin", "Super Admin", "HR", "General"];
+  const axiosInstance = useMemo(() => {
+    return axios.create({
+      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }, [token]);
 
   useEffect(() => {
     setLocalRoles(roles || []);
@@ -59,12 +67,16 @@ export default function RoleForm({
     setSelectedRoleUuids([]);
   }, [searchTerm, localRoles]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredRoles.length / itemsPerPage));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredRoles.length / ITEMS_PER_PAGE)
+  );
+
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedRoles = filteredRoles.slice(
-    (safeCurrentPage - 1) * itemsPerPage,
-    safeCurrentPage * itemsPerPage
+    (safeCurrentPage - 1) * ITEMS_PER_PAGE,
+    safeCurrentPage * ITEMS_PER_PAGE
   );
 
   useEffect(() => {
@@ -92,7 +104,7 @@ export default function RoleForm({
 
     try {
       const res = await axiosInstance.get("/admin/roles");
-      const latestRoles = res.data || [];
+      const latestRoles = Array.isArray(res.data) ? res.data : [];
 
       syncRoles(latestRoles);
 
@@ -105,7 +117,7 @@ export default function RoleForm({
 
         const newTotalPages = Math.max(
           1,
-          Math.ceil(filteredAfterDelete.length / itemsPerPage)
+          Math.ceil(filteredAfterDelete.length / ITEMS_PER_PAGE)
         );
 
         setCurrentPage((prev) => Math.min(prev, newTotalPages));
@@ -171,7 +183,7 @@ export default function RoleForm({
   const handleEditRole = async () => {
     if (!validateRoleName(editRole?.role_name || "")) return;
 
-    if (mandatoryRoles.includes(editRole.original_name)) {
+    if (MANDATORY_ROLES.includes(editRole.original_name)) {
       showToast(
         `Role '${editRole.original_name}' is mandatory and cannot be renamed`,
         "error"
@@ -289,95 +301,110 @@ export default function RoleForm({
     }
   };
 
+  const handleSearch = useCallback((value) => {
+    setSearchTerm(value || "");
+  }, []);
+
+  const isCurrentPageFullySelected =
+    paginatedRoles.length > 0 &&
+    paginatedRoles.every((role) =>
+      selectedRoleUuids.includes(role.role_uuid)
+    );
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-6 flex justify-between items-center gap-3">
+    <div className="mx-auto w-full max-w-6xl">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Role Management</h2>
-          <p className="text-sm text-gray-600">
-            Create, edit, select, and bulk delete roles
+          <h2 className={Fonts.heading3}>Role Management</h2>
+          <p className={Fonts.paragraphMuted}>
+            Create, edit, select, and bulk delete roles.
           </p>
         </div>
 
-        <Button onClick={() => setAddModalOpen(true)}>Add Role</Button>
+        <Button
+          onClick={() => setAddModalOpen(true)}
+          variant="primary"
+          size="medium"
+          className="w-full sm:w-auto"
+        >
+          <Plus size={16} />
+          Add Role
+        </Button>
       </div>
 
-      <Modal isOpen={addModalOpen} onClose={() => setAddModalOpen(false)}>
-        <h3 className="text-lg font-semibold mb-3">Add New Role</h3>
+      <Modal
+        isOpen={addModalOpen}
+        onClose={() => {
+          setAddModalOpen(false);
+          setNewRoleName("");
+        }}
+        title="Add New Role"
+        subtitle="Create a new role using letters, spaces, hyphens, or underscores."
+        className="!mt-16 !max-h-[calc(100vh-8rem)] overflow-y-auto"
+      >
+        <div className="space-y-5">
+          <FormInput
+            label="Role Name"
+            name="role_name"
+            value={newRoleName}
+            onChange={(e) => setNewRoleName(e.target.value)}
+            placeholder="e.g., Project_Manager"
+          />
 
-        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-          <div className="flex-1">
-            <FormInput
-              label="Role Name"
-              name="role_name"
-              value={newRoleName}
-              onChange={(e) => setNewRoleName(e.target.value)}
-              placeholder="e.g., Project_Manager"
-            />
-          </div>
-
-          <div className="flex gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
-              onClick={handleAddRole}
-              disabled={saving}
-              className="flex items-center gap-2"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Add Role"
-              )}
-            </Button>
-
-            <Button
-              variant="secondary"
+              variant="outline"
               onClick={() => {
                 setAddModalOpen(false);
                 setNewRoleName("");
               }}
               disabled={saving}
+              className="w-full sm:w-auto"
             >
               Cancel
+            </Button>
+
+            <Button
+              onClick={handleAddRole}
+              loading={saving}
+              loadingText="Saving..."
+              disabled={saving}
+              className="w-full sm:w-auto"
+            >
+              Add Role
             </Button>
           </div>
         </div>
       </Modal>
 
-      <div className="bg-white p-4 rounded shadow">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h3 className="text-lg font-semibold">Existing Roles</h3>
-            <p className="text-sm text-gray-500">
-              {filteredRoles.length} role(s) found
+            <h3 className={Fonts.heading4}>Existing Roles</h3>
+            <p className={Fonts.paragraphMuted}>
+              {filteredRoles.length} role(s) found.
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+          <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto lg:items-center">
             {selectedRoleUuids.length > 0 && (
               <Button
                 variant="danger"
                 size="medium"
                 onClick={handleBulkDeleteRoles}
+                loading={bulkDeletingRoles}
+                loadingText="Deleting..."
                 disabled={bulkDeletingRoles}
-                className="flex items-center gap-2 justify-center"
+                className="w-full justify-center sm:w-auto"
               >
-                {bulkDeletingRoles ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  <>Delete Selected ({selectedRoleUuids.length})</>
-                )}
+                <Trash2 size={16} />
+                Delete Selected ({selectedRoleUuids.length})
               </Button>
             )}
 
-            <div className="w-full sm:w-[420px]">
+            <div className="w-full sm:min-w-[320px] lg:w-[420px]">
               <SearchInput
-                onSearch={(value) => setSearchTerm(value || "")}
+                onSearch={handleSearch}
                 delay={300}
                 placeholder="Search roles by name..."
                 className="w-full"
@@ -387,77 +414,84 @@ export default function RoleForm({
         </div>
 
         {selectedRoleUuids.length > 0 && (
-          <div className="mb-3 rounded bg-red-50 border border-red-200 text-red-700 px-3 py-2 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="mb-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
             <span>{selectedRoleUuids.length} role(s) selected for deletion.</span>
 
             <button
               type="button"
               onClick={clearSelectedRoles}
-              className="text-red-700 underline text-left sm:text-right"
+              className="inline-flex items-center gap-1 text-left font-medium text-red-700 underline sm:text-right"
             >
+              <X size={14} />
               Clear selection
             </button>
           </div>
         )}
 
         {loading ? (
-          <p className="text-gray-500">Loading roles...</p>
+          <div className="rounded-xl border border-gray-200 bg-white py-12">
+            <LoadingSpinner text="Loading roles..." />
+          </div>
         ) : filteredRoles.length === 0 ? (
-          <p className="text-gray-500">
-            {searchTerm
-              ? "No roles found matching your search."
-              : "No roles available. Create a new role to get started."}
-          </p>
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center">
+            <p className="text-sm text-gray-500">
+              {searchTerm
+                ? "No roles found matching your search."
+                : "No roles available. Create a new role to get started."}
+            </p>
+          </div>
         ) : (
           <>
-            <div className="mb-3 flex items-center gap-2 text-sm text-gray-700">
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
               <input
                 type="checkbox"
-                checked={
-                  paginatedRoles.length > 0 &&
-                  paginatedRoles.every((role) =>
-                    selectedRoleUuids.includes(role.role_uuid)
-                  )
-                }
+                checked={isCurrentPageFullySelected}
                 onChange={handleSelectAllCurrentPage}
-                className="w-4 h-4"
+                className="h-4 w-4 rounded accent-[#0A0082]"
               />
               <span>Select all on this page</span>
             </div>
 
             <ul className="space-y-3">
               {paginatedRoles.map((role) => {
-                const isMandatory = mandatoryRoles.includes(role.role_name);
+                const isMandatory = MANDATORY_ROLES.includes(role.role_name);
 
                 return (
                   <li
                     key={role.role_uuid}
-                    className="flex justify-between items-center border-b pb-3 gap-3"
+                    className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 transition hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex min-w-0 items-start gap-3 sm:items-center">
                       <input
                         type="checkbox"
                         checked={selectedRoleUuids.includes(role.role_uuid)}
                         onChange={() =>
                           handleRoleCheckboxChange(role.role_uuid)
                         }
-                        className="w-4 h-4"
+                        className="mt-1 h-4 w-4 shrink-0 rounded accent-[#0A0082] sm:mt-0"
                       />
 
                       <div className="min-w-0">
-                        <span className="font-semibold text-gray-800 break-words">
-                          {role.role_name}
-                        </span>
-
-                        {isMandatory && (
-                          <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                            Protected
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="break-words font-semibold text-gray-800">
+                            {role.role_name}
                           </span>
-                        )}
+
+                          {isMandatory && (
+                            <StatusBadge label="Protected" size="sm" />
+                          )}
+                        </div>
+
+                        <p className="mt-1 text-xs text-gray-400">
+                          UUID: {role.role_uuid}
+                        </p>
                       </div>
                     </div>
 
-                    <button
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="small"
                       onClick={() => {
                         setEditRole({
                           ...role,
@@ -465,20 +499,18 @@ export default function RoleForm({
                         });
                         setEditModalOpen(true);
                       }}
-                      className="p-2 rounded hover:bg-blue-100 text-blue-900"
-                      title="Edit"
-                      type="button"
-                      aria-label={`Edit ${role.role_name}`}
+                      className="w-full sm:w-auto"
                     >
-                      <Pencil className="w-4 h-4" />
-                    </button>
+                      <Pencil size={15} />
+                      Edit
+                    </Button>
                   </li>
                 );
               })}
             </ul>
 
-            {filteredRoles.length > itemsPerPage && (
-              <div className="mt-4">
+            {filteredRoles.length > ITEMS_PER_PAGE && (
+              <div className="mt-5">
                 <Pagination
                   currentPage={safeCurrentPage}
                   totalPages={totalPages}
@@ -495,50 +527,51 @@ export default function RoleForm({
         )}
       </div>
 
-      <Modal isOpen={editModalOpen} onClose={() => setEditModalOpen(false)}>
-        <h3 className="text-lg font-semibold mb-3">Edit Role</h3>
+      <Modal
+        isOpen={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false);
+          setEditRole(null);
+        }}
+        title="Edit Role"
+        subtitle="Update the selected role name."
+        className="!mt-16 !max-h-[calc(100vh-8rem)] overflow-y-auto"
+      >
+        <div className="space-y-5">
+          <FormInput
+            label="Role Name"
+            name="edit_role_name"
+            value={editRole?.role_name || ""}
+            onChange={(e) =>
+              setEditRole((prev) => ({
+                ...prev,
+                role_name: e.target.value,
+              }))
+            }
+            placeholder="e.g., Manager"
+          />
 
-        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-          <div className="flex-1">
-            <FormInput
-              label="Role Name"
-              name="edit_role_name"
-              value={editRole?.role_name || ""}
-              onChange={(e) =>
-                setEditRole((prev) => ({
-                  ...prev,
-                  role_name: e.target.value,
-                }))
-              }
-              placeholder="e.g., Manager"
-            />
-          </div>
-
-          <div className="flex gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
-              onClick={handleEditRole}
-              disabled={saving}
-              className="flex items-center gap-2"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                "Update"
-              )}
-            </Button>
-
-            <Button
-              variant="secondary"
+              variant="outline"
               onClick={() => {
                 setEditModalOpen(false);
                 setEditRole(null);
               }}
               disabled={saving}
+              className="w-full sm:w-auto"
             >
               Cancel
+            </Button>
+
+            <Button
+              onClick={handleEditRole}
+              loading={saving}
+              loadingText="Updating..."
+              disabled={saving}
+              className="w-full sm:w-auto"
+            >
+              Update
             </Button>
           </div>
         </div>

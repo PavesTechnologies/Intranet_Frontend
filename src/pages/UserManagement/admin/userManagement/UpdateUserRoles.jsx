@@ -1,33 +1,55 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { showStatusToast } from "../../../../components/toastfy/toast";
+import { ArrowLeft, Pencil } from "lucide-react";
 
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import SearchInput from "../../../../components/filter/Searchbar";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import StatusBadge from "../../../../components/status/statusbadge";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 const ITEMS_PER_PAGE = 10;
-const SORT_DIRECTIONS = { ASC: "asc", DESC: "desc" };
+
+const SORT_DIRECTIONS = {
+  ASC: "asc",
+  DESC: "desc",
+};
 
 export default function UpdateUserRole() {
   const [users, setUsers] = useState([]);
   const [totalUsers, setTotalUsers] = useState(0);
+
   const [loading, setLoading] = useState(true);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortDirection, setSortDirection] = useState(SORT_DIRECTIONS.ASC);
+
+  const [sortDirection, setSortDirection] = useState(
+    SORT_DIRECTIONS.ASC
+  );
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser_uuId, setSelectedUser_uuId] = useState(null);
 
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
+  const totalPages = Math.ceil(totalUsers / ITEMS_PER_PAGE);
+
   const axiosInstance = useMemo(() => {
-    const headers = { "Content-Type": "application/json" };
-    if (token) headers.Authorization = `Bearer ${token}`;
+    const headers = {
+      "Content-Type": "application/json",
+    };
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
     return axios.create({
       baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
       headers,
@@ -36,14 +58,18 @@ export default function UpdateUserRole() {
 
   useEffect(() => {
     if (!token) {
-      showStatusToast("Session expired. Please login again.", "warning");
+      showStatusToast(
+        "Session expired. Please login again.",
+        "warning"
+      );
+
       navigate("/");
     }
   }, [token, navigate]);
 
-  // ✅ Fetch users from backend with pagination
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
+
     try {
       const res = await axiosInstance.get("/admin/users/roles", {
         params: {
@@ -52,63 +78,120 @@ export default function UpdateUserRole() {
           search: searchTerm || "",
         },
       });
-      if (res.data) {
-        setUsers(res.data.users || []);
-        setTotalUsers(res.data.total || 0);
-      } else {
-        setUsers([]);
-        setTotalUsers(0);
-      }
+
+      setUsers(res.data.users || []);
+      setTotalUsers(res.data.total || 0);
     } catch (err) {
       console.error("Failed to fetch users with roles:", err);
+
       const msg =
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
         err.message ||
         "Failed to load user roles.";
+
       showStatusToast(msg, "error");
-      if (err.response?.status === 401 || err.response?.status === 403) {
+
+      if (
+        err.response?.status === 401 ||
+        err.response?.status === 403
+      ) {
         navigate("/dashboard");
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    axiosInstance,
+    currentPage,
+    searchTerm,
+    navigate,
+  ]);
 
   useEffect(() => {
     fetchUsers();
-  }, [currentPage, searchTerm]);
+  }, [fetchUsers]);
 
-  const totalPages = Math.ceil(totalUsers / ITEMS_PER_PAGE);
+  const handleSearch = useCallback((value) => {
+    setSearchTerm(value || "");
+    setCurrentPage(1);
+  }, []);
+
+  const handlePreviousPage = useCallback(() => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  }, []);
+
+  const handleNextPage = useCallback(() => {
+    setCurrentPage((prev) =>
+      Math.min(prev + 1, totalPages)
+    );
+  }, [totalPages]);
 
   const toggleSort = () => {
     setSortDirection((prev) =>
-      prev === SORT_DIRECTIONS.ASC ? SORT_DIRECTIONS.DESC : SORT_DIRECTIONS.ASC,
+      prev === SORT_DIRECTIONS.ASC
+        ? SORT_DIRECTIONS.DESC
+        : SORT_DIRECTIONS.ASC
     );
+
     setUsers((prev) => [...prev].reverse());
   };
 
   const headers = [
     "S.no",
-    <span key="name" className="cursor-pointer" onClick={toggleSort}>
-      Name {sortDirection === SORT_DIRECTIONS.ASC ? "▲" : "▼"}
+    <span
+      key="name"
+      className="cursor-pointer select-none"
+      onClick={toggleSort}
+    >
+      Name{" "}
+      {sortDirection === SORT_DIRECTIONS.ASC
+        ? "▲"
+        : "▼"}
     </span>,
     "Email",
     "Assigned Roles",
     "Actions",
   ];
-  const columns = ["Serial no", "name", "mail", "roles", "actions"];
+
+  const columns = [
+    "serial_no",
+    "name",
+    "mail",
+    "roles",
+    "actions",
+  ];
 
   const tableRows = users.map((user, index) => ({
-    "Serial no": ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
-    name: `${user.name || ""}`,
-    mail: user.mail || <span className="text-gray-400 italic">N/A</span>,
+    serial_no: (
+      (currentPage - 1) * ITEMS_PER_PAGE +
+      index +
+      1
+    ).toString(),
+
+    name: user.name || "N/A",
+
+    mail: user.mail || (
+      <span className="italic text-gray-400">
+        N/A
+      </span>
+    ),
+
     roles:
       user.roles?.length > 0 ? (
-        user.roles.join(", ")
+        <div className="flex flex-wrap gap-1">
+          {user.roles.map((role, idx) => (
+            <StatusBadge
+              key={idx}
+              label={role}
+              size="sm"
+            />
+          ))}
+        </div>
       ) : (
-        <span className="text-gray-700">General</span>
+        <StatusBadge label="General" size="sm" />
       ),
+
     actions: (
       <Button
         onClick={() => {
@@ -118,67 +201,88 @@ export default function UpdateUserRole() {
         variant="primary"
         size="small"
       >
-        Edit Roles
+        <Pencil size={15} />
+        Edit
       </Button>
     ),
   }));
 
-  const handleRolesSaved = (userUuid, updatedRoleNames) => {
+  const handleRolesSaved = (
+    userUuid,
+    updatedRoleNames
+  ) => {
     setUsers((prev) =>
       prev.map((u) =>
-        u.user_uuid === userUuid ? { ...u, roles: updatedRoleNames } : u,
-      ),
+        u.user_uuid === userUuid
+          ? {
+              ...u,
+              roles: updatedRoleNames,
+            }
+          : u
+      )
     );
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* ✅ Top Bar */}
-      <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
-        <h2 className="text-xl font-semibold text-blue-700">
-          Update User Roles
-        </h2>
+    <div className="px-6 py-4">
+      {/* Header */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className={Fonts.heading3}>
+            Update User Roles
+          </h2>
+
+          <p className={Fonts.paragraphMuted}>
+            Assign and manage roles for users.
+          </p>
+        </div>
+
         <Button
           variant="secondary"
           size="small"
-          onClick={() => navigate("/user-management/users")}
+          onClick={() =>
+            navigate("/user-management/users")
+          }
         >
-          ← Back
+          <ArrowLeft size={15} />
+          Back
         </Button>
       </div>
 
-      {/* ✅ Search Bar */}
-      <SearchInput
-        onSearch={(value) => {
-          setSearchTerm(value || "");
-          setCurrentPage(1);
-        }}
-        placeholder="Search by name, email or role..."
-        delay={300}
-        className="mb-4 max-w-md"
-      />
-
-      {/* ✅ Table */}
-      <GenericTable
-        headers={headers}
-        rows={tableRows}
-        columns={columns}
-        loading={loading}
-      />
-
-      {/* ✅ Pagination */}
-      {!loading && totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          onNext={() =>
-            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-          }
+      {/* Search */}
+      <div className="mb-4 max-w-md">
+        <SearchInput
+          onSearch={handleSearch}
+          placeholder="Search by name, email or role..."
         />
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div className="rounded-xl border border-gray-200 bg-white py-16">
+          <LoadingSpinner text="Loading user roles..." />
+        </div>
+      ) : (
+        <>
+          <GenericTable
+            headers={headers}
+            rows={tableRows}
+            columns={columns}
+          />
+
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevious={handlePreviousPage}
+              onNext={handleNextPage}
+              className="mt-4"
+            />
+          )}
+        </>
       )}
 
-      {/* ✅ Modal */}
+      {/* Modal */}
       {isModalOpen && selectedUser_uuId && (
         <EditUserRoleModal
           user_uuId={selectedUser_uuId}
@@ -188,7 +292,10 @@ export default function UpdateUserRole() {
           }}
           axiosInstance={axiosInstance}
           onSaved={(updatedRoleNames) =>
-            handleRolesSaved(selectedUser_uuId, updatedRoleNames)
+            handleRolesSaved(
+              selectedUser_uuId,
+              updatedRoleNames
+            )
           }
         />
       )}
@@ -196,69 +303,117 @@ export default function UpdateUserRole() {
   );
 }
 
-/* ------------------------------
-   Modal component (internal)
-   ------------------------------ */
-function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
+/* ---------------------------------------------------------
+   Edit Modal
+--------------------------------------------------------- */
+
+function EditUserRoleModal({
+  user_uuId,
+  onClose,
+  axiosInstance,
+  onSaved,
+}) {
   const [user, setUser] = useState(null);
+
   const [roles, setRoles] = useState([]);
-  const [selectedRoleIds, setSelectedRoleIds] = useState([]);
+
+  const [selectedRoleIds, setSelectedRoleIds] =
+    useState([]);
+
   const [loading, setLoading] = useState(true);
+
   const [saving, setSaving] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState("");
 
   const token = localStorage.getItem("token");
+
   const authHeader = {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   };
 
   useEffect(() => {
-    console.log("EditUserRoleModal mounted for userId:", user_uuId);
     if (!user_uuId) return;
+
     let mounted = true;
 
     const loadData = async () => {
       setLoading(true);
+
       try {
-        const [userRes, rolesRes, assignedRes] = await Promise.all([
-          axiosInstance.get(`/admin/users/uuid/${user_uuId}`, authHeader),
-          axiosInstance.get(`/admin/roles`, authHeader),
-          axiosInstance.get(`/admin/users/uuid/${user_uuId}/roles`, authHeader),
-        ]);
-        console.log(
-          "Fetched user, roles, assigned:",
+        const [
           userRes,
           rolesRes,
           assignedRes,
-        );
+        ] = await Promise.all([
+          axiosInstance.get(
+            `/admin/users/uuid/${user_uuId}`,
+            authHeader
+          ),
+
+          axiosInstance.get(
+            `/admin/roles`,
+            authHeader
+          ),
+
+          axiosInstance.get(
+            `/admin/users/uuid/${user_uuId}/roles`,
+            authHeader
+          ),
+        ]);
 
         if (!mounted) return;
 
         setUser(userRes.data);
-        setRoles(Array.isArray(rolesRes.data) ? rolesRes.data : []);
+
+        setRoles(
+          Array.isArray(rolesRes.data)
+            ? rolesRes.data
+            : []
+        );
 
         let assignedIds = [];
 
-        if (assignedRes.data?.roles && Array.isArray(assignedRes.data.roles)) {
-          const roleNameToId = rolesRes.data.reduce((acc, r) => {
-            acc[r.role_name] = r.role_uuid;
-            return acc;
-          }, {});
+        if (
+          assignedRes.data?.roles &&
+          Array.isArray(assignedRes.data.roles)
+        ) {
+          const roleNameToId =
+            rolesRes.data.reduce((acc, r) => {
+              acc[r.role_name] = r.role_uuid;
+              return acc;
+            }, {});
+
           assignedIds = assignedRes.data.roles
-            .map((roleName) => roleNameToId[roleName])
+            .map(
+              (roleName) =>
+                roleNameToId[roleName]
+            )
             .filter(Boolean);
         }
 
         setSelectedRoleIds(assignedIds);
       } catch (err) {
-        console.error("Failed to load roles", err);
-        showStatusToast("Unable to fetch user role data.", "error");
+        console.error(
+          "Failed to load roles",
+          err
+        );
+
+        showStatusToast(
+          "Unable to fetch user role data.",
+          "error"
+        );
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
     loadData();
+
     return () => {
       mounted = false;
     };
@@ -268,109 +423,152 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
     setSelectedRoleIds((prev) =>
       prev.includes(roleId)
         ? prev.filter((id) => id !== roleId)
-        : [...prev, roleId],
+        : [...prev, roleId]
     );
   };
 
   const handleSave = async () => {
     if (!user_uuId) return;
+
     setSaving(true);
+
     try {
       const response = await axiosInstance.put(
         `/admin/users/uuid/${user_uuId}/role`,
-        { role_ids: selectedRoleIds },
-        authHeader,
+        {
+          role_ids: selectedRoleIds,
+        },
+        authHeader
       );
 
       const updatedRoleNames = roles
-        .filter((r) => selectedRoleIds.includes(r.role_uuid))
+        .filter((r) =>
+          selectedRoleIds.includes(r.role_uuid)
+        )
         .map((r) => r.role_name);
 
-      console.log(response);
-
       showStatusToast(
-        response?.data?.message || "Roles updated successfully!",
-        "success",
+        response?.data?.message ||
+          "Roles updated successfully!",
+        "success"
       );
-      if (typeof onSaved === "function") onSaved(updatedRoleNames);
-      console.log("Updated roles:", updatedRoleNames);
+
+      if (typeof onSaved === "function") {
+        onSaved(updatedRoleNames);
+      }
+
       onClose();
     } catch (err) {
-      console.error("Failed to update roles", err);
-      showStatusToast("Update failed.", "error");
+      console.error(
+        "Failed to update roles",
+        err
+      );
+
+      showStatusToast(
+        "Update failed.",
+        "error"
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  // ✅ Filter roles dynamically using search term
   const filteredRoles = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+    const term = searchTerm
+      .trim()
+      .toLowerCase();
+
     if (!term) return roles;
-    return roles.filter((r) => r.role_name.toLowerCase().includes(term));
+
+    return roles.filter((r) =>
+      r.role_name
+        .toLowerCase()
+        .includes(term)
+    );
   }, [roles, searchTerm]);
 
   return (
-    <Modal isOpen={true} onClose={onClose}>
-      <div className="p-4 max-w-lg">
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Edit User Roles"
+      subtitle="Assign or remove roles for the selected user."
+      className="!mt-16 !max-h-[calc(100vh-8rem)] overflow-hidden"
+    >
+      <div className="p-2">
         {loading ? (
-          <div className="text-blue-600">Loading user data...</div>
+          <LoadingSpinner text="Loading role data..." />
         ) : (
           <>
-            <h2 className="text-xl font-semibold mb-4">
-              Edit Roles for{" "}
-              <span className="text-blue-600">
-                {user?.first_name} {user?.last_name}
-              </span>
-            </h2>
+            <div className="mb-5">
+              <h3 className={Fonts.heading4}>
+                {user?.first_name}{" "}
+                {user?.last_name}
+              </h3>
 
-            <p className="text-gray-500 mb-4">
-              Select or deselect roles below:
-            </p>
+              <p className="mt-1 text-sm text-gray-500">
+                Select or deselect roles below.
+              </p>
+            </div>
 
-            {/* ✅ Role search input */}
-            <SearchInput
-              placeholder="Search roles..."
-              value={searchTerm}
-              onSearch={(val) => setSearchTerm(val)}
-              delay={300}
-              className="mb-4"
-            />
+            <div className="mb-4">
+              <SearchInput
+                placeholder="Search roles..."
+                onSearch={(val) =>
+                  setSearchTerm(val)
+                }
+              />
+            </div>
 
-            <div className="grid grid-cols-2 gap-3 mb-6 max-h-40 overflow-y-auto">
+            <div className="mb-6 grid max-h-56 grid-cols-2 gap-3 overflow-y-auto rounded-lg border border-gray-200 p-4">
               {filteredRoles.length > 0 ? (
                 filteredRoles.map((role) => (
                   <label
                     key={role.role_uuid}
-                    className="flex items-center gap-3 text-gray-700"
+                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-2 transition hover:bg-gray-50"
                   >
                     <input
                       type="checkbox"
-                      checked={selectedRoleIds.includes(role.role_uuid)}
-                      onChange={() => toggleRole(role.role_uuid)}
-                      className="accent-blue-600 w-4 h-4"
+                      checked={selectedRoleIds.includes(
+                        role.role_uuid
+                      )}
+                      onChange={() =>
+                        toggleRole(
+                          role.role_uuid
+                        )
+                      }
+                      className="h-4 w-4 accent-[#0A0082]"
                     />
-                    <span>{role.role_name}</span>
+
+                    <span className="text-sm text-gray-700">
+                      {role.role_name}
+                    </span>
                   </label>
                 ))
               ) : (
-                <div className="col-span-2 text-gray-400 italic">
+                <div className="col-span-2 text-sm italic text-gray-400">
                   No roles found.
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-4">
+            <div className="flex justify-end gap-3">
+              <Button
+                onClick={onClose}
+                variant="outline"
+                size="small"
+              >
+                Cancel
+              </Button>
+
               <Button
                 onClick={handleSave}
                 variant="primary"
-                size="medium"
-                disabled={saving}
+                size="small"
+                loading={saving}
+                loadingText="Saving..."
               >
-                {saving ? "Saving..." : "Save Changes"}
-              </Button>
-              <Button onClick={onClose} variant="secondary" size="medium">
-                Cancel
+                Save Changes
               </Button>
             </div>
           </>

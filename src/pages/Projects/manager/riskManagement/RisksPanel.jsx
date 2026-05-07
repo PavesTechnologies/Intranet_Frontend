@@ -73,6 +73,16 @@ export default function RisksPanel({
             <h2 className="font-semibold text-slate-900">
               Risks {selectedIssue ? `for ${selectedIssue.title}` : ""}
             </h2>
+            {selectedIssue && (
+              <div className="text-xs text-slate-500 mt-1 space-y-1">
+                <div>
+                  Issue ID: <span className="font-semibold text-slate-800">{selectedIssue.linkedType}-{selectedIssue.linkedId}</span>
+                </div>
+                <div>
+                  Source: <span className="font-semibold text-slate-800">{selectedIssue.linkedType}</span>
+                </div>
+              </div>
+            )}
             <p className="text-xs text-slate-500 mt-1">
               {isLoadingRisks
                 ? "Loading..."
