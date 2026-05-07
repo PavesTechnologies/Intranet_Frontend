@@ -1,12 +1,15 @@
+import { useEffect, useState } from "react";
+import axios from "axios";
+import { Pencil, Loader2, ShieldCheck } from "lucide-react";
+import { toast } from "react-toastify";
+
 import Button from "../../../../components/Button/Button";
 import Pagination from "../../../../components/Pagination/pagination";
 import FormInput from "../../../../components/forms/FormInput";
-import { Pencil, Loader2 } from "lucide-react";
 import Modal from "../../../../components/Modal/modal";
 import SearchInput from "../../../../components/filter/Searchbar";
-import { useEffect, useState } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
 export default function PermissionManagement() {
@@ -27,14 +30,16 @@ export default function PermissionManagement() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
 
   const [adding, setAdding] = useState(false);
   const [creatingPermission, setCreatingPermission] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [selectedPermissionUuids, setSelectedPermissionUuids] = useState([]);
+
+  const itemsPerPage = 5;
 
   const token = localStorage.getItem("token");
 
@@ -49,24 +54,23 @@ export default function PermissionManagement() {
   };
 
   const filteredPermissions = permissions.filter((perm) =>
-    perm?.permission_code?.toLowerCase().includes(searchTerm.toLowerCase()),
+    perm?.permission_code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredPermissions.length / itemsPerPage),
+    Math.ceil(filteredPermissions.length / itemsPerPage)
   );
 
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedPermissions = filteredPermissions.slice(
     (safeCurrentPage - 1) * itemsPerPage,
-    safeCurrentPage * itemsPerPage,
+    safeCurrentPage * itemsPerPage
   );
 
   useEffect(() => {
-    fetchPermissions();
-    fetchGroups();
+    initialize();
   }, []);
 
   useEffect(() => {
@@ -79,6 +83,16 @@ export default function PermissionManagement() {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  const initialize = async () => {
+    setLoading(true);
+
+    try {
+      await Promise.all([fetchPermissions(), fetchGroups()]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchPermissions = async (options = {}) => {
     const { afterDelete = false } = options;
@@ -93,12 +107,12 @@ export default function PermissionManagement() {
         const filteredAfterDelete = latestPermissions.filter((perm) =>
           perm?.permission_code
             ?.toLowerCase()
-            .includes(searchTerm.toLowerCase()),
+            .includes(searchTerm.toLowerCase())
         );
 
         const newTotalPages = Math.max(
           1,
-          Math.ceil(filteredAfterDelete.length / itemsPerPage),
+          Math.ceil(filteredAfterDelete.length / itemsPerPage)
         );
 
         setCurrentPage((prev) => Math.min(prev, newTotalPages));
@@ -129,8 +143,8 @@ export default function PermissionManagement() {
 
     if (!permissionCodePattern.test(code.trim())) {
       showSingleToast(
-        "Invalid format. Use uppercase letters and underscores only. Example: VIEW_USER_PUBLIC",
-        "error",
+        "Invalid format. Use uppercase letters and underscores only.",
+        "error"
       );
       return false;
     }
@@ -149,7 +163,7 @@ export default function PermissionManagement() {
     if (!textOnlyRegex.test(desc)) {
       showSingleToast(
         "Description should contain only valid text format",
-        "error",
+        "error"
       );
       return false;
     }
@@ -177,8 +191,10 @@ export default function PermissionManagement() {
       });
 
       showSingleToast("Permission created successfully!", "success");
+
       resetForm();
       setAddPermissionModal(false);
+
       await fetchPermissions();
     } catch (err) {
       console.error("Error creating permission", err);
@@ -196,9 +212,11 @@ export default function PermissionManagement() {
 
   const handleEdit = (permission) => {
     setEditingPermission(permission);
+
     setEditCode(permission.permission_code);
     setEditDescription(permission.description || "");
     setEditGroup(permission.group_uuid || "");
+
     setShowModal(true);
   };
 
@@ -214,7 +232,7 @@ export default function PermissionManagement() {
         {
           permission_code: editCode.trim(),
           description: editDescription.trim(),
-        },
+        }
       );
 
       if (editGroup) {
@@ -222,16 +240,18 @@ export default function PermissionManagement() {
           `/admin/permissions/${editingPermission.permission_uuid}/group`,
           {
             group_uuid: editGroup,
-          },
+          }
         );
       }
 
       showSingleToast("Permission updated successfully!", "success");
+
       setShowModal(false);
       setEditingPermission(null);
       setEditCode("");
       setEditDescription("");
       setEditGroup("");
+
       await fetchPermissions();
     } catch (err) {
       console.error("Error updating permission", err);
@@ -283,22 +303,22 @@ export default function PermissionManagement() {
     setSelectedPermissionUuids((prev) =>
       prev.includes(permissionUuid)
         ? prev.filter((id) => id !== permissionUuid)
-        : [...prev, permissionUuid],
+        : [...prev, permissionUuid]
     );
   };
 
   const handleSelectAllCurrentPage = () => {
     const currentPageUuids = paginatedPermissions.map(
-      (perm) => perm.permission_uuid,
+      (perm) => perm.permission_uuid
     );
 
     const allSelected = currentPageUuids.every((id) =>
-      selectedPermissionUuids.includes(id),
+      selectedPermissionUuids.includes(id)
     );
 
     if (allSelected) {
       setSelectedPermissionUuids((prev) =>
-        prev.filter((id) => !currentPageUuids.includes(id)),
+        prev.filter((id) => !currentPageUuids.includes(id))
       );
     } else {
       setSelectedPermissionUuids((prev) => [
@@ -315,7 +335,7 @@ export default function PermissionManagement() {
     if (selectedPermissionUuids.length === 0) {
       return showSingleToast(
         "Please select at least one permission.",
-        "warning",
+        "warning"
       );
     }
 
@@ -335,18 +355,19 @@ export default function PermissionManagement() {
       if (deletedCount > 0 && failedPermissions.length === 0) {
         showSingleToast(
           `${deletedCount} permission(s) deleted successfully.`,
-          "success",
+          "success"
         );
       } else if (deletedCount > 0 && failedPermissions.length > 0) {
         showSingleToast(
           `${deletedCount} permission(s) deleted. ${failedPermissions.length} failed.`,
-          "warning",
+          "warning"
         );
       } else {
         showSingleToast("No permissions were deleted.", "error");
       }
 
       setSelectedPermissionUuids([]);
+
       await fetchPermissions({ afterDelete: true });
     } catch (err) {
       console.error("Failed to delete permissions", err);
@@ -356,14 +377,14 @@ export default function PermissionManagement() {
       if (typeof detail === "object") {
         showSingleToast(
           detail.message || "Failed to delete permissions",
-          "error",
+          "error"
         );
       } else {
         showSingleToast(
           detail ||
             err?.response?.data?.message ||
             "Failed to delete permissions",
-          "error",
+          "error"
         );
       }
     } finally {
@@ -382,26 +403,33 @@ export default function PermissionManagement() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-6 flex justify-between items-center gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold">Permission Management</h2>
-          <p className="text-sm text-gray-500">
-            Create, update, search, and bulk delete permissions.
-          </p>
-        </div>
+    <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 lg:px-6">
+      <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0A0082]/10 text-[#0A0082]">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
 
-        <Button
-          onClick={handleAddPermission}
-          disabled={adding}
-          className={`px-6 py-2 text-white rounded transition-colors font-medium ${
-            adding
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-900 hover:bg-blue-950"
-          }`}
-        >
-          {adding ? "Opening..." : "Add Permission"}
-        </Button>
+            <div>
+              <h2 className={Fonts.heading3}>Permission Management</h2>
+
+              <p className={Fonts.paragraphMuted}>
+                Create, update, search, and bulk delete permissions.
+              </p>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleAddPermission}
+            disabled={adding}
+            variant="primary"
+            size="medium"
+            className="w-full sm:w-auto"
+          >
+            {adding ? "Opening..." : "Add Permission"}
+          </Button>
+        </div>
       </div>
 
       <Modal
@@ -410,60 +438,46 @@ export default function PermissionManagement() {
           setAddPermissionModal(false);
           resetForm();
         }}
+        title="Add New Permission"
+        subtitle="Create a new permission and assign it to a group."
+        className="!w-full !max-w-2xl"
       >
-        <div className="flex flex-col gap-[8px] bg-white p-4 rounded shadow mb-6">
-          <h3 className="text-lg font-semibold mb-3">Add New Permission</h3>
-
+        <div className="space-y-4">
           <FormInput
             label="Permission Code"
             name="permission_code"
             value={newPermission}
             onChange={handlePermissionChange}
             placeholder="Example: READ_USER"
-            className="mb-3"
           />
 
           <FormInput
             type="text"
             label="Description"
-            padding="medium"
             placeholder="Enter description"
             value={description}
             onChange={handleDescriptionChange}
-            className="w-full p-2 border rounded mb-3"
           />
 
-          <select
-            value={selectedGroup}
-            onChange={(e) => setSelectedGroup(String(e.target.value))}
-            className="w-full p-2 border rounded mb-3"
-          >
-            <option value="">Default Group</option>
-            {groups.map((g) => (
-              <option key={g.group_uuid} value={g.group_uuid}>
-                {g.group_name}
-              </option>
-            ))}
-          </select>
+          <div className="space-y-1">
+            <label className={Fonts.label}>Permission Group</label>
 
-          <div className="flex gap-3 mt-3">
-            <Button
-              onClick={handleCreate}
-              variant="primary"
-              size="medium"
-              disabled={creatingPermission}
-              className="flex items-center gap-2"
+            <select
+              value={selectedGroup}
+              onChange={(e) => setSelectedGroup(String(e.target.value))}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
             >
-              {creatingPermission ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Add Permission"
-              )}
-            </Button>
+              <option value="">Default Group</option>
 
+              {groups.map((g) => (
+                <option key={g.group_uuid} value={g.group_uuid}>
+                  {g.group_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <Button
               onClick={() => {
                 setAddPermissionModal(false);
@@ -472,35 +486,49 @@ export default function PermissionManagement() {
               variant="secondary"
               size="medium"
               disabled={creatingPermission}
+              className="w-full sm:w-auto"
             >
               Cancel
+            </Button>
+
+            <Button
+              onClick={handleCreate}
+              variant="primary"
+              size="medium"
+              disabled={creatingPermission}
+              loading={creatingPermission}
+              loadingText="Creating..."
+              className="w-full sm:w-auto"
+            >
+              Add Permission
             </Button>
           </div>
         </div>
       </Modal>
 
-      <div className="bg-white p-4 rounded shadow">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-lg font-semibold">Existing Permissions</h3>
-            <p className="text-sm text-gray-500">
+            <h3 className={Fonts.heading4}>Existing Permissions</h3>
+
+            <p className={Fonts.paragraphMuted}>
               {filteredPermissions.length} permission(s) found
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+          <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:items-center">
             {selectedPermissionUuids.length > 0 && (
               <Button
                 size="medium"
                 variant="danger"
                 onClick={handleBulkDeletePermissions}
                 type="button"
-                className="flex items-center gap-2 justify-center"
                 disabled={bulkDeleting}
+                className="w-full lg:w-auto"
               >
                 {bulkDeleting ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Deleting...
                   </>
                 ) : (
@@ -509,7 +537,7 @@ export default function PermissionManagement() {
               </Button>
             )}
 
-            <div className="w-full sm:w-80 md:w-96">
+            <div className="w-full lg:w-96">
               <SearchInput
                 onSearch={(value) => setSearchTerm(value)}
                 delay={500}
@@ -521,7 +549,7 @@ export default function PermissionManagement() {
         </div>
 
         {selectedPermissionUuids.length > 0 && (
-          <div className="mb-3 rounded bg-red-50 border border-red-200 text-red-700 px-3 py-2 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="mb-4 flex flex-col gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
             <span>
               {selectedPermissionUuids.length} permission(s) selected for
               deletion.
@@ -530,33 +558,38 @@ export default function PermissionManagement() {
             <button
               type="button"
               onClick={clearSelectedPermissions}
-              className="text-red-700 underline text-left sm:text-right"
+              className="text-left underline sm:text-right"
             >
               Clear selection
             </button>
           </div>
         )}
 
-        {paginatedPermissions.length === 0 ? (
-          <p className="text-gray-500">
+        {loading ? (
+          <div className="py-14">
+            <LoadingSpinner text="Loading permissions..." />
+          </div>
+        ) : paginatedPermissions.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center text-gray-500">
             {searchTerm
               ? "No permissions found matching your search."
               : "No permissions available. Create a new permission to get started."}
-          </p>
+          </div>
         ) : (
           <>
-            <div className="mb-3 flex items-center gap-2 text-sm text-gray-700">
+            <div className="mb-4 flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
                 checked={
                   paginatedPermissions.length > 0 &&
                   paginatedPermissions.every((perm) =>
-                    selectedPermissionUuids.includes(perm.permission_uuid),
+                    selectedPermissionUuids.includes(perm.permission_uuid)
                   )
                 }
                 onChange={handleSelectAllCurrentPage}
-                className="w-4 h-4"
+                className="h-4 w-4"
               />
+
               <span>Select all on this page</span>
             </div>
 
@@ -564,45 +597,48 @@ export default function PermissionManagement() {
               {paginatedPermissions.map((perm) => (
                 <li
                   key={perm.permission_uuid}
-                  className="flex justify-between items-start border-b pb-3 gap-3"
+                  className="flex flex-col gap-4 rounded-xl border border-gray-200 p-4 transition hover:border-[#0A0082]/30 sm:flex-row sm:items-start sm:justify-between"
                 >
-                  <div className="flex gap-3 flex-1 min-w-0">
+                  <div className="flex min-w-0 flex-1 gap-3">
                     <input
                       type="checkbox"
                       checked={selectedPermissionUuids.includes(
-                        perm.permission_uuid,
+                        perm.permission_uuid
                       )}
                       onChange={() =>
                         handlePermissionCheckboxChange(perm.permission_uuid)
                       }
-                      className="w-4 h-4 mt-1"
+                      className="mt-1 h-4 w-4 shrink-0"
                     />
 
-                    <div className="flex-1 min-w-0">
-                      <span className="font-semibold break-words text-gray-800">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="break-words font-semibold text-gray-800">
                         {perm.permission_code}
-                      </span>
-                      <p className="text-sm text-gray-600 break-words whitespace-pre-wrap mt-1 leading-relaxed">
+                      </h4>
+
+                      <p className="mt-1 break-words whitespace-pre-wrap text-sm leading-relaxed text-gray-600">
                         {perm.description || "No description available."}
                       </p>
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleEdit(perm)}
-                    className="p-2 rounded hover:bg-blue-100 text-blue-900 flex-shrink-0"
-                    title="Edit"
-                    type="button"
-                    aria-label={`Edit ${perm.permission_code}`}
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
+                  <div className="flex justify-end sm:justify-start">
+                    <button
+                      onClick={() => handleEdit(perm)}
+                      className="rounded-lg p-2 text-[#0A0082] transition hover:bg-[#0A0082]/10"
+                      title="Edit"
+                      type="button"
+                      aria-label={`Edit ${perm.permission_code}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
 
             {filteredPermissions.length > itemsPerPage && (
-              <div className="mt-4">
+              <div className="mt-6">
                 <Pagination
                   currentPage={safeCurrentPage}
                   totalPages={totalPages}
@@ -610,7 +646,9 @@ export default function PermissionManagement() {
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   onNext={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                    setCurrentPage((prev) =>
+                      Math.min(prev + 1, totalPages)
+                    )
                   }
                 />
               </div>
@@ -619,68 +657,71 @@ export default function PermissionManagement() {
         )}
       </div>
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
-        <h2 className="text-lg font-semibold mb-4">Edit Permission</h2>
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Edit Permission"
+        subtitle="Update permission details and group mapping."
+        className="!w-full !max-w-2xl"
+      >
+        <div className="space-y-4">
+          <FormInput
+            label="Permission Code"
+            name="edit_permission_code"
+            value={editCode}
+            onChange={handleEditPermissionChange}
+            placeholder="Example: READ_USER"
+          />
 
-        <FormInput
-          label="Permission Code"
-          name="edit_permission_code"
-          value={editCode}
-          onChange={handleEditPermissionChange}
-          placeholder="Example: READ_USER"
-          className="mb-3"
-        />
+          <FormInput
+            type="text"
+            label="Description"
+            placeholder="Enter description"
+            value={editDescription}
+            onChange={handleEditDescriptionChange}
+          />
 
-        <FormInput
-          type="text"
-          label="Description"
-          placeholder="Enter description"
-          value={editDescription}
-          onChange={handleEditDescriptionChange}
-          className="w-full p-2 border rounded mb-3"
-        />
+          <div className="space-y-1">
+            <label className={Fonts.label}>Permission Group</label>
 
-        <select
-          value={editGroup}
-          onChange={(e) => setEditGroup(String(e.target.value))}
-          className="w-full p-2 border rounded mb-3"
-        >
-          <option value="">Keep current / Default Group</option>
-          {groups.map((g) => (
-            <option key={g.group_uuid} value={g.group_uuid}>
-              {g.group_name}
-            </option>
-          ))}
-        </select>
+            <select
+              value={editGroup}
+              onChange={(e) => setEditGroup(String(e.target.value))}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
+            >
+              <option value="">Keep current / Default Group</option>
 
-        <div className="flex gap-3 mt-4">
-          <Button
-            onClick={handleUpdate}
-            disabled={updating}
-            className={`px-6 py-2 text-white rounded transition-colors font-medium flex items-center gap-2 ${
-              updating
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-green-600 hover:bg-green-700"
-            }`}
-          >
-            {updating ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Updating...
-              </>
-            ) : (
-              "Update"
-            )}
-          </Button>
+              {groups.map((g) => (
+                <option key={g.group_uuid} value={g.group_uuid}>
+                  {g.group_name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <Button
-            onClick={() => setShowModal(false)}
-            variant="secondary"
-            size="medium"
-            disabled={updating}
-          >
-            Cancel
-          </Button>
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+            <Button
+              onClick={() => setShowModal(false)}
+              variant="secondary"
+              size="medium"
+              disabled={updating}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              onClick={handleUpdate}
+              disabled={updating}
+              variant="success"
+              size="medium"
+              loading={updating}
+              loadingText="Updating..."
+              className="w-full sm:w-auto"
+            >
+              Update
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
