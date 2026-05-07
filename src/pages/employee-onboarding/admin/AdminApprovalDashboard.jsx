@@ -9,7 +9,7 @@ import {
   Clock,
   Loader2,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import axios from "axios";
 import Pagination from "../../../components/Pagination/pagination";
 import {useAuth} from "../../../contexts/AuthContext";
@@ -38,7 +38,7 @@ const userRoles = useMemo(() => {
 // Match the casing used in ViewEmpDetails
 const isHR = userRoles.includes("HR");
 const isAdmin = userRoles.includes("Admin");
-const isManager = userRoles.includes("REPORTING_MANAGER");
+const isManager = userRoles.includes("Reporting_Manager");
 
 // Permission flag for this specific page
 const isAuthorizedManager = isManager || isAdmin;

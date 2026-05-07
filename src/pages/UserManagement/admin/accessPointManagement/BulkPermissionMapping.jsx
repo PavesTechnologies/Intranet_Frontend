@@ -1,24 +1,28 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
+import { toast } from "react-toastify";
+import {
+  UploadCloud,
+  FileSpreadsheet,
+  Info,
+  CheckCircle2,
+} from "lucide-react";
+
 import Button from "../../../../components/Button/Button";
 import FileUpload from "../../../../components/forms/FileUpload";
 import Navbar from "../../../../components/Navbar/Navbar";
-import axios from "axios";
-import { toast } from "react-toastify";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
-/**
- * BulkPermissionMapping
- * - Allows bulk permission mapping from Excel (.xlsx)
- * - Mirrors BulkAccessPointCreate layout and functionality
- */
 const BulkPermissionMapping = ({ onClose, onSuccess }) => {
   const navigate = useNavigate();
   const location = useLocation();
+
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // ✅ Navbar Items (same as AccessPointManagement)
   const navItems = [
     {
       name: "Access Points",
@@ -28,7 +32,8 @@ const BulkPermissionMapping = ({ onClose, onSuccess }) => {
     {
       name: "Add New",
       onClick: () => navigate("/user-management/access-points/create"),
-      isActive: location.pathname === "/user-management/access-points/create",
+      isActive:
+        location.pathname === "/user-management/access-points/create",
     },
     {
       name: "Permission Mapping",
@@ -40,9 +45,11 @@ const BulkPermissionMapping = ({ onClose, onSuccess }) => {
     },
     {
       name: "Access Point Create Bulk",
-      onClick: () => navigate("/user-management/access-points/create-bulk"),
+      onClick: () =>
+        navigate("/user-management/access-points/create-bulk"),
       isActive:
-        location.pathname === "/user-management/access-points/create-bulk",
+        location.pathname ===
+        "/user-management/access-points/create-bulk",
     },
     {
       name: "Access Permission Mapping Bulk",
@@ -54,28 +61,31 @@ const BulkPermissionMapping = ({ onClose, onSuccess }) => {
     },
   ];
 
-  // ✅ Handle File Selection
   const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+    setFile(e.target.files?.[0] || null);
   };
 
-  // ✅ Handle Cancel Button
   const handleCancel = () => {
     setFile(null);
-    if (typeof onClose === "function") onClose();
+
+    if (typeof onClose === "function") {
+      onClose();
+    }
   };
 
-  // ✅ Handle Upload Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!file) {
-      showStatusToast("Please select a file before submitting.", "error");
+      showStatusToast(
+        "Please select an Excel file before submitting.",
+        "error"
+      );
       return;
     }
 
     if (!file.name.endsWith(".xlsx")) {
-      showStatusToast("Only .xlsx Excel files are allowed.", "error");
+      showStatusToast("Only .xlsx files are allowed.", "error");
       return;
     }
 
@@ -83,11 +93,14 @@ const BulkPermissionMapping = ({ onClose, onSuccess }) => {
     formData.append("file", file);
 
     let toastId;
+
     try {
       setIsUploading(true);
-      toastId = toast("Uploading file and mapping permissions...");
 
-      // 🔗 API endpoint for bulk permission mapping
+      toastId = toast.loading(
+        "Uploading file and mapping permissions..."
+      );
+
       const response = await axios.post(
         `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/access-points/access-point-map-permission-bulk`,
         formData,
@@ -96,14 +109,14 @@ const BulkPermissionMapping = ({ onClose, onSuccess }) => {
             "Content-Type": "multipart/form-data",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        },
+        }
       );
 
       const { mapped_count, failed_count } = response.data;
 
       if (failed_count === 0) {
         toast.update(toastId, {
-          render: `✅ ${mapped_count} permissions mapped successfully.`,
+          render: `✅ ${mapped_count} permission mappings created successfully.`,
           type: "success",
           isLoading: false,
           autoClose: 4000,
@@ -118,9 +131,13 @@ const BulkPermissionMapping = ({ onClose, onSuccess }) => {
       }
 
       setFile(null);
-      if (typeof onSuccess === "function") onSuccess();
+
+      if (typeof onSuccess === "function") {
+        onSuccess();
+      }
     } catch (error) {
       console.error(error);
+
       toast.update(toastId, {
         render: `❌ Upload failed: ${
           error.response?.data?.detail || error.message
@@ -135,83 +152,131 @@ const BulkPermissionMapping = ({ onClose, onSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* ✅ Shared Navbar */}
+    <div className="min-h-screen bg-gray-50">
       <Navbar logo="Access Points" navItems={navItems} />
 
-      {/* ✅ Centered Upload Form */}
-      <main className="flex-grow flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg">
-          <h2 className="text-2xl font-bold text-gray-800 text-center mb-2">
-            Bulk Permission Mapping
-          </h2>
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl">
+          {/* Header */}
+          <div className="mb-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                  <UploadCloud className="h-5 w-5" />
+                </div>
 
-          <p className="text-sm text-gray-600 text-center mb-4">
-            Upload an Excel file (<strong>.xlsx</strong>) containing Access
-            Point–Permission mapping details. Ensure your file follows the
-            required format.
-          </p>
+                <div className="min-w-0">
+                  <h2 className={Fonts.heading4}>
+                    Bulk Permission Mapping
+                  </h2>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <FileUpload
-              label="Select Excel File (.xlsx)"
-              name="permissionMappingFile"
-              onChange={handleFileChange}
-              accept=".xlsx"
-            />
-
-            {file && (
-              <div className="text-sm text-gray-600 text-center">
-                Selected file:{" "}
-                <span className="font-medium text-blue-600">{file.name}</span>
+                  <p className={Fonts.paragraphMuted}>
+                    Upload Excel files to map permissions with access
+                    points in bulk.
+                  </p>
+                </div>
               </div>
+            </div>
+          </div>
+
+          {/* Upload Card */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+            {isUploading ? (
+              <div className="py-12">
+                <LoadingSpinner text="Uploading and processing file..." />
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Upload Section */}
+                <div className="rounded-xl border border-dashed border-blue-300 bg-blue-50/40 p-5">
+                  <div className="mb-4 flex items-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5 text-blue-700" />
+
+                    <h3 className="font-semibold text-gray-800">
+                      Upload Excel File
+                    </h3>
+                  </div>
+
+                  <FileUpload
+                    label="Select Excel File (.xlsx)"
+                    name="permissionMappingFile"
+                    onChange={handleFileChange}
+                    accept=".xlsx"
+                  />
+
+                  {file && (
+                    <div className="mt-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+
+                      <span className="truncate font-medium">
+                        {file.name}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Instructions */}
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Info className="h-4 w-4 text-blue-700" />
+
+                    <h4 className="text-sm font-semibold text-blue-800">
+                      Instructions
+                    </h4>
+                  </div>
+
+                  <ul className="space-y-2 pl-5 text-sm text-blue-700">
+                    <li className="list-disc">
+                      Accepted format:{" "}
+                      <strong>.xlsx</strong>
+                    </li>
+
+                    <li className="list-disc">
+                      Access Point IDs and Permission IDs must
+                      already exist.
+                    </li>
+
+                    <li className="list-disc">
+                      Invalid or duplicate mappings are skipped
+                      automatically.
+                    </li>
+
+                    <li className="list-disc">
+                      Use the provided sample template for best
+                      results.
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="medium"
+                    onClick={handleCancel}
+                    disabled={isUploading}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="medium"
+                    disabled={!file || isUploading}
+                    className="w-full sm:w-auto"
+                  >
+                    <UploadCloud className="h-4 w-4" />
+                    Upload File
+                  </Button>
+                </div>
+              </form>
             )}
-
-            <div className="flex justify-between gap-4">
-              <Button
-                type="submit"
-                variant="primary"
-                size="medium"
-                disabled={isUploading}
-                className="w-1/2"
-              >
-                {isUploading ? "Uploading..." : "Upload"}
-              </Button>
-
-              <Button
-                type="button"
-                variant="secondary"
-                size="medium"
-                onClick={handleCancel}
-                disabled={isUploading}
-                className="w-1/2"
-              >
-                Cancel
-              </Button>
-            </div>
-
-            {/* ✅ Helpful Notes */}
-            <div className="mt-4 bg-blue-50 border border-blue-200 text-blue-700 text-sm rounded-lg p-3">
-              <p className="font-semibold mb-1">Instructions:</p>
-              <ul className="list-disc  space-y-1 list m-2">
-                <li>
-                  Accepted format: <strong>.xlsx</strong>
-                </li>
-                <li>
-                  Ensure Access Point IDs and Permission IDs match existing
-                  records.
-                </li>
-                <li>
-                  Duplicate or invalid mappings will be skipped automatically.
-                </li>
-                <li>
-                  Download a sample file from the admin panel for reference.
-                </li>
-              </ul>
-            </div>
-          </form>
+          </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 };

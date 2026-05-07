@@ -207,11 +207,9 @@ const CreateSprintModal = ({
   // Render
   // ---------------------------
   return (
-    //<div className="fixed inset-0 bg-black/40 z-50 flex justify-center items-center">
     <div className="fixed inset-0 bg-black/40 z-[100] flex justify-center items-center">
-  <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto relative z-[101]"></div>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto relative">
-  {/* Use global ToastContainer in App.jsx */}
+        {/* Use global ToastContainer in App.jsx */}
 
         {/* Close Button */}
         <button

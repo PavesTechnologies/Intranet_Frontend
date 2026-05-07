@@ -1,16 +1,19 @@
 import { useState } from "react";
-import Button from "../../../../components/Button/Button";
 import axios from "axios";
-import FileUpload from "../../../../components/forms/FileUpload";
 import { toast } from "react-toastify";
+import { UploadCloud, FileSpreadsheet } from "lucide-react";
+
+import Button from "../../../../components/Button/Button";
+import FileUpload from "../../../../components/forms/FileUpload";
 import { showStatusToast } from "../../../../components/toastfy/toast";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 const BulkUserUpload = ({ onClose, onSuccess }) => {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
   const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+    setFile(e.target.files?.[0] || null);
   };
 
   const handleSubmit = async (e) => {
@@ -25,9 +28,11 @@ const BulkUserUpload = ({ onClose, onSuccess }) => {
     formData.append("file", file);
 
     let toastId;
+
     try {
       setIsUploading(true);
-      toastId = toast("Uploading file and reading data...");
+
+      toastId = toast.loading("Uploading file and reading data...");
 
       const response = await axios.post(
         `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/multiple-users`,
@@ -37,21 +42,21 @@ const BulkUserUpload = ({ onClose, onSuccess }) => {
             "Content-Type": "multipart/form-data",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        },
+        }
       );
 
-      const { created_count, failed_count } = response.data;
+      const { created_count = 0, failed_count = 0 } = response.data || {};
 
       if (failed_count === 0) {
         toast.update(toastId, {
-          render: `✅ ${created_count} users created successfully.`,
+          render: `${created_count} users created successfully.`,
           type: "success",
           isLoading: false,
           autoClose: 4000,
         });
       } else {
         toast.update(toastId, {
-          render: `⚠️ ${created_count} users created, ${failed_count} failed.`,
+          render: `${created_count} users created, ${failed_count} failed.`,
           type: "warning",
           isLoading: false,
           autoClose: 5000,
@@ -59,11 +64,17 @@ const BulkUserUpload = ({ onClose, onSuccess }) => {
       }
 
       setFile(null);
-      if (typeof onSuccess === "function") onSuccess();
+
+      if (typeof onSuccess === "function") {
+        onSuccess();
+      }
     } catch (error) {
       console.error(error);
+
       toast.update(toastId, {
-        render: `❌ Upload failed: ${error.response?.data?.detail || error.message}`,
+        render: `Upload failed: ${
+          error.response?.data?.detail || error.message
+        }`,
         type: "error",
         isLoading: false,
         autoClose: 5000,
@@ -74,44 +85,58 @@ const BulkUserUpload = ({ onClose, onSuccess }) => {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white p-6 rounded-2xl shadow-md space-y-4">
-      <h2 className="text-xl font-semibold text-gray-800 text-center">
-        Bulk User Upload
-      </h2>
+    <div className="mx-auto w-full max-w-2xl rounded-xl bg-white">
+      <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
+            <FileSpreadsheet size={22} />
+          </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <h2 className={Fonts.heading4}>Bulk User Upload</h2>
+            <p className={Fonts.paragraphMuted}>
+              Upload an Excel file to create multiple users at once.
+            </p>
+          </div>
+        </div>
+
         <FileUpload
           label="Select Excel File (.xlsx)"
           name="userFile"
+          accept=".xlsx,.xls"
           onChange={handleFileChange}
         />
 
         {file && (
-          <p className="text-sm text-gray-600">
-            Selected file: <span className="font-medium">{file.name}</span>
-          </p>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+            <p className="text-sm text-gray-600">
+              Selected file:{" "}
+              <span className="font-semibold text-gray-800">{file.name}</span>
+            </p>
+          </div>
         )}
 
-        <div className="flex justify-between gap-3">
+        <div className="flex justify-end gap-3 border-t pt-4">
           <Button
-            type="submit"
-            variant="primary"
-            size="small"
+            type="button"
+            variant="outline"
+            size="medium"
+            onClick={onClose}
             disabled={isUploading}
-            className="w-1/2"
           >
-            {isUploading ? "Uploading..." : "Upload"}
+            Cancel
           </Button>
 
           <Button
-            type="button"
-            variant="secondary"
-            size="small"
-            onClick={onClose}
+            type="submit"
+            variant="primary"
+            size="medium"
+            loading={isUploading}
+            loadingText="Uploading..."
             disabled={isUploading}
-            className="w-1/2"
           >
-            Cancel
+            <UploadCloud size={16} />
+            Upload
           </Button>
         </div>
       </form>

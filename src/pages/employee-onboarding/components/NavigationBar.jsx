@@ -17,7 +17,7 @@ export default function OnboardingNavBar() {
   const isOnlyGeneral =
     hasRole(["GENERAL"]) &&
     !hasRole(["HR"]) &&
-    !hasRole(["REPORTING_MANAGER"]) &&
+    !hasRole(["Reporting_Manager"]) &&
     !hasRole(["ADMIN"]);
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export default function OnboardingNavBar() {
 
   const parentNav = [
     // ✅ Insights & Analytics → HR, MANAGER
-    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
+    ...(hasRole(["HR", "Reporting_Manager"]) ? [{
       label: "Insights & Analytics",
       match: [
         "/employee-onboarding/onboarding-summary",
@@ -80,7 +80,7 @@ export default function OnboardingNavBar() {
     },
 
     // ✅ Document Center → HR, MANAGER
-    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
+    ...(hasRole(["HR", "Reporting_Manager"]) ? [{
       label: "Document Center",
       match: [
         "/employee-onboarding/employeedocuments",
@@ -91,7 +91,7 @@ export default function OnboardingNavBar() {
     }] : []),
 
     // ✅ Workforce Reports → HR, MANAGER
-    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
+    ...(hasRole(["HR", "Reporting_Manager"]) ? [{
       label: "Workforce Reports",
       match: ["/employee-onboarding/weekly-joining-report-dashboard"],
       redirect: "/employee-onboarding/weekly-joining-report-dashboard",
