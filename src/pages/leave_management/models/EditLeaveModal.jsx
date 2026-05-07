@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Fragment, useMemo } from "react";
-import axios from "axios";
+import axios, { all } from "axios";
 import {
   X,
   Lock,
@@ -21,47 +21,49 @@ const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const GENDER_BASED_IDS = ["L-ML", "L-PL"];
 
 // --- Helper 1: Maps leave balances to dropdown options ---
-// export function mapLeaveBalancesToDropdown(balances, leaveTypes) {
-//   const allBalances = [
-//     ...(balances?.data?.regular ?? []),
-//     ...(balances?.data?.genderBasedLeaveBalances ?? []),
-//   ];
+export function mapLeaveBalancesToDropdown(balances, leaveTypes) {
+  const allBalances = [
+    ...(balances?.data?.regular ?? []),
+    ...(balances?.data?.genderBasedLeaveBalances ?? []),
+  ];
 
-//   return allBalances.map((balance) => {
-//     const leaveTypeId = balance.leaveType?.leaveTypeId;
-//     const originalName = balance.leaveType?.leaveName;
-//     const matchingType = leaveTypes.find((type) => type.name === originalName);
-//     const leaveName = matchingType
-//       ? matchingType.label
-//       : (originalName || "").replace(/^L-/, "");
+  return allBalances.map((balance) => {
+    const leaveTypeId = balance.leaveType?.leaveTypeId;
+    const originalName = balance.leaveType?.leaveName;
+    const matchingType = leaveTypes.find((type) => type.name === originalName);
+    const leaveName = matchingType
+      ? matchingType.label
+      : (originalName || "").replace(/^L-/, "");
 
-//     const isGenderBased = GENDER_BASED_IDS.includes(leaveTypeId);
-//     const remaining = isGenderBased ? balance.remainingDays : balance.remainingLeaves;
+    const isGenderBased = GENDER_BASED_IDS.includes(leaveTypeId);
+    const remaining = isGenderBased
+      ? balance.remainingDays
+      : balance.remainingLeaves;
 
-//     let availableText;
-//     let isInfinite = false;
+    let availableText;
+    let isInfinite = false;
 
-//     if (leaveTypeId === "L-UP" || leaveName.toLowerCase().includes("unpaid")) {
-//       availableText = "Infinite balance";
-//       isInfinite = true;
-//     } else if (remaining > 0) {
-//       availableText = `${remaining} days available`;
-//     } else {
-//       availableText = "Not Available";
-//     }
+    if (leaveTypeId === "L-UP" || leaveName.toLowerCase().includes("unpaid")) {
+      availableText = "Infinite balance";
+      isInfinite = true;
+    } else if (remaining > 0) {
+      availableText = `${remaining} days available`;
+    } else {
+      availableText = "Not Available";
+    }
 
-//     return {
-//       leaveTypeId,
-//       leaveName,
-//       availableText,
-//       availableDays: isInfinite ? Infinity : remaining,
-//       isInfinite,
-//       disabled: (!isInfinite && remaining <= 0) || balance.isBlocked,
-//       allowHalfDay: !!balance.leaveType?.allowHalfDay,
-//       requiresDocumentation: !!balance.leaveType?.requiresDocumentation,
-//     };
-//   });
-// }
+    return {
+      leaveTypeId,
+      leaveName,
+      availableText,
+      availableDays: isInfinite ? Infinity : remaining,
+      isInfinite,
+      disabled: (!isInfinite && remaining <= 0) || balance.isBlocked,
+      allowHalfDay: !!balance.leaveType?.allowHalfDay,
+      requiresDocumentation: !!balance.leaveType?.requiresDocumentation,
+    };
+  });
+}
 
 // --- Helper 2: Date Formatting ---
 function formatDateForDisplay(dateStr) {
@@ -195,12 +197,12 @@ function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
                       {option.leaveName}
                     </span>
                     <span
-                      className={`ml-4 text-xs font-medium px-2 py-0.5 rounded-full ${
+                      className={`ml-2 text-xs font-medium px-2  py-0.5 rounded-full ${
                         option.isInfinite
                           ? "bg-blue-50 text-blue-500"
                           : option.disabled
                             ? "bg-red-50 text-red-400"
-                            : "bg-green-50 text-green-600"
+                            : "text-grey-600"
                       }`}
                     >
                       {option.availableText}
@@ -323,15 +325,24 @@ export default function EditLeaveModal({
     }
   }, [isOpen, initialData]);
 
-  const allBalances = useMemo(
-    () => [
+  const normalizedBalances = useMemo(() => {
+    if (!leaveBalances) return [];
+
+    // ✅ If already flat → use directly
+    if (Array.isArray(leaveBalances)) {
+      return leaveBalances;
+    }
+
+    // ✅ If API format → flatten
+    return [
       ...(leaveBalances?.data?.regular ?? []),
       ...(leaveBalances?.data?.genderBasedLeaveBalances ?? []),
-    ],
-    [leaveBalances],
-  );
+    ];
+  }, [leaveBalances]);
 
-  const leaveTypeOptions = useLeaveDropdownOptions(allBalances);
+  console.log(normalizedBalances);
+
+  const leaveTypeOptions = useLeaveDropdownOptions(normalizedBalances);
   const selectedLeaveType = leaveTypeOptions.find(
     (o) => o.leaveTypeId === leaveTypeId,
   );
@@ -427,6 +438,7 @@ export default function EditLeaveModal({
       driveLink,
       startSession: halfDayConfig.start,
       endSession: isMultiDay ? halfDayConfig.end : halfDayConfig.start,
+      year: year
     };
 
     try {
@@ -570,7 +582,36 @@ export default function EditLeaveModal({
               </div>
             </div>
 
-            {/* Half day toggle */}
+            {/* Leave type */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+                Leave Type
+              </label>
+              <LeaveTypeDropdown
+                options={leaveTypeOptions}
+                selectedId={leaveTypeId}
+                setSelectedId={setLeaveTypeId}
+              />
+
+              {/* ✅ Balance warning */}
+              {balanceWarning ? (
+                <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-amber-700 text-xs">{balanceWarning}</p>
+                </div>
+              ) : selectedLeaveType &&
+                !selectedLeaveType.isInfinite &&
+                selectedLeaveType.availableDays > 0 ? (
+                <div className="mt-2 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                  <p className="text-green-600 text-xs font-medium">
+                    {selectedLeaveType.availableDays} day(s) available
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+             {/* Half day toggle */}
             {selectedLeaveType?.allowHalfDay && !isMaternityLeave && (
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block">
@@ -650,35 +691,6 @@ export default function EditLeaveModal({
                 )}
               </div>
             )}
-
-            {/* Leave type */}
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
-                Leave Type
-              </label>
-              <LeaveTypeDropdown
-                options={leaveTypeOptions}
-                selectedId={leaveTypeId}
-                setSelectedId={setLeaveTypeId}
-              />
-
-              {/* ✅ Balance warning */}
-              {balanceWarning ? (
-                <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
-                  <p className="text-amber-700 text-xs">{balanceWarning}</p>
-                </div>
-              ) : selectedLeaveType &&
-                !selectedLeaveType.isInfinite &&
-                selectedLeaveType.availableDays > 0 ? (
-                <div className="mt-2 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                  <p className="text-green-600 text-xs font-medium">
-                    {selectedLeaveType.availableDays} day(s) available
-                  </p>
-                </div>
-              ) : null}
-            </div>
 
             {/* Reason */}
             <div>

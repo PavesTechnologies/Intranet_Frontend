@@ -281,6 +281,7 @@ export default function RequestLeaveModal({
   const [balanceError, setBalanceError] = useState("");
   const [driveLink, setDriveLink] = useState("");
   // const leaveTypeOptions = mapLeaveBalancesToDropdown(balances);
+  // console.log("allBalances",allBalances);
   const leaveTypeOptions = useLeaveDropdownOptions(allBalances);
   const selectedLeaveType = leaveTypeOptions.find(
     (o) => o.leaveTypeId === leaveTypeId,
