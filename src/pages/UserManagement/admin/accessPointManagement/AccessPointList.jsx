@@ -6,7 +6,6 @@ import {
   updateAccessPoint,
   listModules,
 } from "../../../../services/accessPointService";
-import { useNavigate } from "react-router-dom";
 import {
   Eye,
   Pencil,
@@ -14,31 +13,53 @@ import {
   MoreVertical,
   X,
   Loader2,
+  Search,
+  Link,
+  Settings,
+  Package,
+  Globe,
+  Shield,
 } from "lucide-react";
 import Button from "../../../../components/Button/Button";
-import Pagination from "../../../../components/Pagination/pagination";
 import Modal from "../../../../components/Modal/modal";
+import AppCard from "../../../../components/Cards/AppCard";
+import DynamicCardGrid from "../../../../components/Cards/DynamicCardGrid";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { toast } from "react-toastify";
 
+const ACCESS_POINT_GRID_CONFIG = {
+  layoutMode: "grid",
+  columnMode: "fixed",
+  cardsPerRow: 3,
+  cardsPerPage: 6,
+  gapClassName: "gap-6",
+  gridClassName: "items-stretch",
+  paginationWrapperClassName: "mt-6 flex justify-center",
+};
+
 const AccessPointList = ({ searchTerm }) => {
   const [aps, setAps] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [loadingAccessPoints, setLoadingAccessPoints] = useState(false);
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+
   const [openMenuId, setOpenMenuId] = useState(null);
   const [selectedAccessPointId, setSelectedAccessPointId] = useState(null);
-
-  const itemsPerPage = 6;
-  const navigate = useNavigate();
+  const [selectedViewAccessPointId, setSelectedViewAccessPointId] =
+    useState(null);
 
   const fetchAccessPoints = () => {
+    setLoadingAccessPoints(true);
+
     listAccessPoints()
       .then((res) => setAps(res.data || []))
       .catch(() => {
         showStatusToast("Failed to fetch access points", "error");
         setAps([]);
-      });
+      })
+      .finally(() => setLoadingAccessPoints(false));
   };
 
   useEffect(() => {
@@ -76,9 +97,10 @@ const AccessPointList = ({ searchTerm }) => {
     });
   }, [aps, searchTerm]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+  const handleViewClick = (id) => {
+    setSelectedViewAccessPointId(id);
+    setShowViewModal(true);
+  };
 
   const handleEditClick = (id) => {
     setSelectedAccessPointId(id);
@@ -113,38 +135,35 @@ const AccessPointList = ({ searchTerm }) => {
     setSelectedAccessPointId(null);
   };
 
-  const totalPages = Math.ceil(filteredAps.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-
-  const paginatedAps = filteredAps.slice(
-    startIndex,
-    startIndex + itemsPerPage,
-  );
-
-  const handlePrevious = () => {
-    setCurrentPage((prev) => Math.max(prev - 1, 1));
-  };
-
-  const handleNext = () => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
-  };
-
   return (
-    <div className="bg-gray-100 min-h-screen -mx-6 -mt-6 p-6">
-      {filteredAps.length === 0 ? (
+    <div className="bg-white min-h-screen -mx-6 -mt-6 p-6">
+      {loadingAccessPoints ? (
+        <DynamicCardGrid
+          data={[]}
+          loading
+          skeletonCount={ACCESS_POINT_GRID_CONFIG.cardsPerPage}
+          {...ACCESS_POINT_GRID_CONFIG}
+          renderCard={() => null}
+          getKey={(_, index) => index}
+        />
+      ) : filteredAps.length === 0 ? (
         <div className="text-center text-gray-500 mt-20">
           {searchTerm
             ? `No access points found matching "${searchTerm}".`
-            : "Loading..."}
+            : "No access points found."}
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-            {paginatedAps.map((ap) => (
-              <div
-                key={ap.access_uuid}
-                className="bg-white p-5 rounded-xl shadow-md hover:shadow-lg transition-all border flex flex-col min-w-0 overflow-hidden"
-              >
+        <DynamicCardGrid
+          data={filteredAps}
+          getKey={(ap) => ap.access_uuid}
+          resetPageDependency={searchTerm}
+          wrapperClassName="w-full"
+          emptyMessage="No access points found."
+          {...ACCESS_POINT_GRID_CONFIG}
+          renderCard={(ap) => (
+            <AppCard
+              className="min-h-[260px]"
+              renderHeader={() => (
                 <div className="flex justify-between items-start gap-3 mb-4 min-w-0">
                   <div className="min-w-0 flex-1">
                     <h3
@@ -166,9 +185,7 @@ const AccessPointList = ({ searchTerm }) => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(
-                          `/user-management/access-points/${ap.access_uuid}`,
-                        );
+                        handleViewClick(ap.access_uuid);
                       }}
                       className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors shadow-sm"
                       title="View"
@@ -180,7 +197,9 @@ const AccessPointList = ({ searchTerm }) => {
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenMenuId(
-                          openMenuId === ap.access_uuid ? null : ap.access_uuid,
+                          openMenuId === ap.access_uuid
+                            ? null
+                            : ap.access_uuid,
                         );
                       }}
                       className="p-1.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shadow-sm"
@@ -218,8 +237,9 @@ const AccessPointList = ({ searchTerm }) => {
                     )}
                   </div>
                 </div>
-
-                <div className="flex-grow space-y-3 min-w-0">
+              )}
+              renderBody={() => (
+                <div className="space-y-3 min-w-0">
                   <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
                     <span className="font-medium shrink-0">Method:</span>
                     <span
@@ -263,21 +283,10 @@ const AccessPointList = ({ searchTerm }) => {
                     </p>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="mt-6">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPrevious={handlePrevious}
-                onNext={handleNext}
-              />
-            </div>
+              )}
+            />
           )}
-        </>
+        />
       )}
 
       <Modal
@@ -308,6 +317,17 @@ const AccessPointList = ({ searchTerm }) => {
         </div>
       </Modal>
 
+      {showViewModal && selectedViewAccessPointId && (
+        <AccessPointViewModal
+          isOpen={showViewModal}
+          accessUuid={selectedViewAccessPointId}
+          onClose={() => {
+            setShowViewModal(false);
+            setSelectedViewAccessPointId(null);
+          }}
+        />
+      )}
+
       {showEditModal && selectedAccessPointId && (
         <AccessPointEditModal
           accessUuid={selectedAccessPointId}
@@ -325,6 +345,79 @@ const AccessPointList = ({ searchTerm }) => {
     </div>
   );
 };
+
+function AccessPointViewModal({ isOpen, accessUuid, onClose }) {
+  const [ap, setAp] = useState(null);
+
+  useEffect(() => {
+    if (!accessUuid) return;
+
+    setAp(null);
+
+    getAccessPoint(accessUuid)
+      .then((res) => setAp(res.data))
+      .catch(() => {
+        showStatusToast("Failed to load access point details", "error");
+        setAp(null);
+      });
+  }, [accessUuid]);
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Access Point Details"
+      subtitle={`Access UUID: ${accessUuid}`}
+      className="max-w-2xl"
+      bodyClassName="p-6"
+    >
+      {!ap ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="text-gray-500 text-lg">Loading...</div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <h2 className="text-2xl font-semibold text-indigo-600 mb-6 text-center flex items-center justify-center gap-2">
+            <Search className="w-6 h-6" />
+            Access Point Details
+          </h2>
+
+          <div className="space-y-4 text-gray-800">
+            <p className="flex items-center gap-2 break-all">
+              <Link className="w-5 h-5 text-gray-600 shrink-0" />
+              <span className="font-medium text-gray-600">Path:</span>
+              {ap.endpoint_path || "N/A"}
+            </p>
+
+            <p className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-gray-600 shrink-0" />
+              <span className="font-medium text-gray-600">Method:</span>
+              {ap.method || "N/A"}
+            </p>
+
+            <p className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-gray-600 shrink-0" />
+              <span className="font-medium text-gray-600">Module:</span>
+              {ap.module || "N/A"}
+            </p>
+
+            <p className="flex items-center gap-2">
+              <Globe className="w-5 h-5 text-gray-600 shrink-0" />
+              <span className="font-medium text-gray-600">Public:</span>
+              {ap.is_public ? "Yes" : "No"}
+            </p>
+
+            <p className="flex items-center gap-2 break-all">
+              <Shield className="w-5 h-5 text-gray-600 shrink-0" />
+              <span className="font-medium text-gray-600">Permission:</span>
+              {ap.permission_code || "N/A"}
+            </p>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
 
 function AccessPointEditModal({ accessUuid, onClose, onUpdated }) {
   const [form, setForm] = useState(null);
@@ -479,7 +572,7 @@ function AccessPointEditModal({ accessUuid, onClose, onUpdated }) {
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 px-4">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[85vh] overflow-hidden">
-        <div className="p-5 border-b bg-gray-50">
+        <div className="p-5 border-b bg-white">
           <div className="flex justify-between items-start gap-4">
             <div className="min-w-0 flex-1">
               <h3 className="text-lg font-semibold text-gray-800">
@@ -496,7 +589,7 @@ function AccessPointEditModal({ accessUuid, onClose, onUpdated }) {
 
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-gray-200 text-gray-500 shrink-0"
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 shrink-0"
               type="button"
             >
               <X className="w-5 h-5" />
