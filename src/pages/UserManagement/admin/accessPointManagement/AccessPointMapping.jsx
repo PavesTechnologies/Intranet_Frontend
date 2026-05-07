@@ -29,11 +29,12 @@ import { showStatusToast } from "../../../../components/toastfy/toast";
 
 const ACCESS_POINT_GRID_CONFIG = {
   layoutMode: "grid",
-  columnMode: "fixed",
+  columnMode: "auto",
   cardsPerRow: 3,
   cardsPerPage: 6,
-  gapClassName: "gap-6",
-  gridClassName: "items-stretch",
+  minCardWidth: "300px",
+  gapClassName: "gap-4",
+  gridClassName: "items-stretch auto-rows-fr",
   paginationWrapperClassName: "mt-6 flex justify-center",
 };
 
@@ -124,7 +125,7 @@ const AccessPointMapping = () => {
   }, []);
 
   const filteredAps = useMemo(() => {
-    if (!searchTerm) return aps;
+    if (!searchTerm.trim()) return aps;
 
     const lowerCaseSearch = searchTerm.toLowerCase();
 
@@ -158,7 +159,7 @@ const AccessPointMapping = () => {
       await deleteAccessPoint(selectedAccessPointId);
 
       setAps((prev) =>
-        prev.filter((ap) => ap.access_uuid !== selectedAccessPointId),
+        prev.filter((ap) => ap.access_uuid !== selectedAccessPointId)
       );
 
       showStatusToast("Access Point successfully deleted", "success");
@@ -204,7 +205,7 @@ const AccessPointMapping = () => {
     try {
       await assignPermissionToAccessPoint(
         selectedAccessPoint.access_uuid,
-        selectedPermission.permission_uuid,
+        selectedPermission.permission_uuid
       );
 
       showStatusToast("Permission assigned successfully!", "success");
@@ -222,27 +223,27 @@ const AccessPointMapping = () => {
     <div>
       <Navbar logo="Access Points" navItems={navItems} />
 
-      <div className="bg-white min-h-screen -mx-6 -mt-6 p-6">
-        <div className="sticky top-0 z-10 bg-white pb-4 pt-1">
-          <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
+      <div className="min-h-screen bg-gray-50 -mx-6 -mt-6 p-4 sm:p-6">
+        <div className="sticky top-0 z-10 bg-gray-50 pb-4 pt-1">
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-700">
                 Access Point Mapping
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="mt-1 text-sm text-gray-500">
                 Assign unmapped permissions to access points.
               </p>
             </div>
 
-            <div className="relative w-full max-w-sm">
+            <div className="relative w-full lg:w-80">
               <input
                 type="text"
                 placeholder="Search endpoint or module..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             </div>
           </div>
         </div>
@@ -257,7 +258,7 @@ const AccessPointMapping = () => {
             getKey={(_, index) => index}
           />
         ) : filteredAps.length === 0 ? (
-          <div className="text-center text-gray-500 mt-20">
+          <div className="mt-20 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-gray-500">
             {searchTerm
               ? `No unmapped access points found matching "${searchTerm}".`
               : "No unmapped access points found."}
@@ -272,35 +273,36 @@ const AccessPointMapping = () => {
             {...ACCESS_POINT_GRID_CONFIG}
             renderCard={(ap) => (
               <AppCard
-                className="min-h-[260px]"
+                className="h-full min-h-[240px] border-gray-200 bg-white"
                 renderHeader={() => (
-                  <div className="flex justify-between items-start gap-3 mb-4 min-w-0">
+                  <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <h3
-                        className="text-lg font-semibold text-gray-800 truncate"
+                        className="truncate text-lg font-semibold text-gray-800"
                         title={ap.endpoint_path}
                       >
                         {ap.endpoint_path || "N/A"}
                       </h3>
 
                       <p
-                        className="text-xs text-gray-400 mt-1 truncate"
+                        className="mt-1 truncate text-xs text-gray-400"
                         title={ap.access_uuid}
                       >
                         {ap.access_uuid}
                       </p>
                     </div>
 
-                    <div className="flex gap-2 shrink-0 relative dropdown-menu-container">
+                    <div className="dropdown-menu-container relative flex shrink-0 items-center gap-2">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleViewClick(ap.access_uuid);
                         }}
-                        className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors shadow-sm"
+                        className="rounded-lg bg-blue-50 p-1.5 text-blue-600 shadow-sm transition-colors hover:bg-blue-100"
                         title="View"
+                        type="button"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="h-4 w-4" />
                       </button>
 
                       <button
@@ -309,26 +311,28 @@ const AccessPointMapping = () => {
                           setOpenMenuId(
                             openMenuId === ap.access_uuid
                               ? null
-                              : ap.access_uuid,
+                              : ap.access_uuid
                           );
                         }}
-                        className="p-1.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shadow-sm"
+                        className="rounded-lg bg-gray-50 p-1.5 text-gray-600 shadow-sm transition-colors hover:bg-gray-100"
                         title="Actions"
+                        type="button"
                       >
-                        <MoreVertical className="w-4 h-4" />
+                        <MoreVertical className="h-4 w-4" />
                       </button>
 
                       {openMenuId === ap.access_uuid && (
-                        <div className="absolute right-0 top-10 w-36 bg-white border rounded-lg shadow-lg z-20 overflow-hidden py-1 animate-in fade-in zoom-in duration-200">
+                        <div className="absolute right-0 top-10 z-20 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setOpenMenuId(null);
                               handleAddPermission(ap);
                             }}
-                            className="flex items-center w-full px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 gap-2 transition-colors"
+                            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                            type="button"
                           >
-                            <Plus className="w-4 h-4 text-blue-600 shrink-0" />
+                            <Plus className="h-4 w-4 shrink-0 text-blue-600" />
                             <span>Add</span>
                           </button>
 
@@ -338,9 +342,10 @@ const AccessPointMapping = () => {
                               setOpenMenuId(null);
                               handleDeleteClick(ap.access_uuid);
                             }}
-                            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 gap-2 transition-colors border-t border-gray-50"
+                            className="flex w-full items-center gap-2 border-t border-gray-100 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                            type="button"
                           >
-                            <Trash2 className="w-4 h-4 text-red-600 shrink-0" />
+                            <Trash2 className="h-4 w-4 shrink-0 text-red-600" />
                             <span>Delete</span>
                           </button>
                         </div>
@@ -349,31 +354,31 @@ const AccessPointMapping = () => {
                   </div>
                 )}
                 renderBody={() => (
-                  <div className="space-y-3 min-w-0">
-                    <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
-                      <span className="font-medium shrink-0">Method:</span>
+                  <div className="min-w-0 space-y-3">
+                    <div className="flex min-w-0 items-start gap-2 text-sm text-gray-600">
+                      <span className="shrink-0 font-medium">Method:</span>
                       <span
-                        className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold truncate max-w-full"
+                        className="max-w-full truncate rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700"
                         title={ap.method}
                       >
                         {ap.method || "N/A"}
                       </span>
                     </div>
 
-                    <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
-                      <span className="font-medium shrink-0">Module:</span>
+                    <div className="flex min-w-0 items-start gap-2 text-sm text-gray-600">
+                      <span className="shrink-0 font-medium">Module:</span>
                       <span
-                        className="truncate min-w-0 flex-1"
+                        className="min-w-0 flex-1 truncate"
                         title={ap.module}
                       >
                         {ap.module || "N/A"}
                       </span>
                     </div>
 
-                    <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
-                      <span className="font-medium shrink-0">Public:</span>
+                    <div className="flex min-w-0 items-start gap-2 text-sm text-gray-600">
+                      <span className="shrink-0 font-medium">Public:</span>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                           ap.is_public
                             ? "bg-green-50 text-green-700"
                             : "bg-gray-100 text-gray-700"
@@ -383,10 +388,10 @@ const AccessPointMapping = () => {
                       </span>
                     </div>
 
-                    <div className="text-sm text-gray-600 min-w-0">
+                    <div className="min-w-0 text-sm text-gray-600">
                       <span className="font-medium">Permission:</span>
                       <p
-                        className="mt-1 text-gray-700 break-all line-clamp-2"
+                        className="mt-1 line-clamp-2 break-all text-gray-700"
                         title={ap.permission_code || "N/A"}
                       >
                         {ap.permission_code || "N/A"}
@@ -427,23 +432,26 @@ const AccessPointMapping = () => {
           isOpen={showDeleteModal}
           onClose={handleCancelDelete}
           title="Confirm Deletion"
+          className="!w-full !max-w-md"
         >
           <div className="p-4">
-            <p className="text-gray-600 mb-6">
+            <p className="mb-6 text-gray-600">
               Please confirm you really want to delete the access point.
             </p>
 
-            <div className="flex justify-end space-x-4">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <Button
                 onClick={handleCancelDelete}
-                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all"
+                variant="outline"
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
 
               <Button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
+                variant="danger"
+                className="w-full sm:w-auto"
               >
                 Confirm
               </Button>
@@ -477,47 +485,47 @@ function AccessPointViewModal({ isOpen, accessUuid, onClose }) {
       onClose={onClose}
       title="Access Point Details"
       subtitle={`Access UUID: ${accessUuid}`}
-      className="max-w-2xl"
+      className="!w-full !max-w-3xl"
       bodyClassName="p-6"
     >
       {!ap ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="text-gray-500 text-lg">Loading...</div>
+        <div className="flex items-center justify-center py-20">
+          <div className="text-lg text-gray-500">Loading...</div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <h2 className="text-2xl font-semibold text-indigo-600 mb-6 text-center flex items-center justify-center gap-2">
-            <Search className="w-6 h-6" />
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
+          <h2 className="mb-6 flex items-center justify-center gap-2 text-center text-xl font-semibold text-indigo-600 sm:text-2xl">
+            <Search className="h-6 w-6" />
             Access Point Details
           </h2>
 
           <div className="space-y-4 text-gray-800">
-            <p className="flex items-center gap-2 break-all">
-              <Link className="w-5 h-5 text-gray-600 shrink-0" />
+            <p className="flex items-start gap-2 break-all">
+              <Link className="mt-0.5 h-5 w-5 shrink-0 text-gray-600" />
               <span className="font-medium text-gray-600">Path:</span>
               {ap.endpoint_path || "N/A"}
             </p>
 
-            <p className="flex items-center gap-2">
-              <Settings className="w-5 h-5 text-gray-600 shrink-0" />
+            <p className="flex items-start gap-2">
+              <Settings className="mt-0.5 h-5 w-5 shrink-0 text-gray-600" />
               <span className="font-medium text-gray-600">Method:</span>
               {ap.method || "N/A"}
             </p>
 
-            <p className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-gray-600 shrink-0" />
+            <p className="flex items-start gap-2">
+              <Package className="mt-0.5 h-5 w-5 shrink-0 text-gray-600" />
               <span className="font-medium text-gray-600">Module:</span>
               {ap.module || "N/A"}
             </p>
 
-            <p className="flex items-center gap-2">
-              <Globe className="w-5 h-5 text-gray-600 shrink-0" />
+            <p className="flex items-start gap-2">
+              <Globe className="mt-0.5 h-5 w-5 shrink-0 text-gray-600" />
               <span className="font-medium text-gray-600">Public:</span>
               {ap.is_public ? "Yes" : "No"}
             </p>
 
-            <p className="flex items-center gap-2 break-all">
-              <Shield className="w-5 h-5 text-gray-600 shrink-0" />
+            <p className="flex items-start gap-2 break-all">
+              <Shield className="mt-0.5 h-5 w-5 shrink-0 text-gray-600" />
               <span className="font-medium text-gray-600">Permission:</span>
               {ap.permission_code || "N/A"}
             </p>
@@ -552,7 +560,7 @@ const PermissionModal = ({
     return unmappedPermissions.filter(
       (p) =>
         formatCode(p).toLowerCase().includes(q) ||
-        formatDesc(p).toLowerCase().includes(q),
+        formatDesc(p).toLowerCase().includes(q)
     );
   }, [unmappedPermissions, query]);
 
@@ -566,14 +574,14 @@ const PermissionModal = ({
       onClose={onClose}
       title="Assign Permission"
       subtitle={`Access Point: ${selectedAccessPoint?.endpoint_path || "N/A"}`}
-      className="max-w-2xl"
+      className="!w-full !max-w-3xl"
       bodyClassName="p-5"
     >
       <div className="mb-3 space-y-2">
-        <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
-          <strong className="font-medium shrink-0">Endpoint:</strong>
+        <div className="flex min-w-0 items-start gap-2 text-sm text-gray-600">
+          <strong className="shrink-0 font-medium">Endpoint:</strong>
           <span
-            className="truncate min-w-0 flex-1"
+            className="min-w-0 flex-1 truncate"
             title={selectedAccessPoint?.endpoint_path}
           >
             {selectedAccessPoint?.endpoint_path || "N/A"}
@@ -581,9 +589,9 @@ const PermissionModal = ({
         </div>
 
         <div className="flex items-start gap-2 text-sm text-gray-600">
-          <strong className="font-medium shrink-0">Method:</strong>
+          <strong className="shrink-0 font-medium">Method:</strong>
           <span
-            className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold"
+            className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700"
             title={selectedAccessPoint?.method}
           >
             {selectedAccessPoint?.method || "N/A"}
@@ -592,12 +600,12 @@ const PermissionModal = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="mb-2 block text-sm font-medium text-gray-700">
           Select Permission
         </label>
 
         <div className="relative" ref={dropdownRef}>
-          <div className="flex items-center gap-2 mb-2 min-w-0">
+          <div className="mb-2 flex min-w-0 items-center gap-2">
             <input
               type="text"
               value={selectedDisplay}
@@ -606,7 +614,7 @@ const PermissionModal = ({
                 setSelectedPermission(null);
               }}
               placeholder="Search permissions..."
-              className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 truncate"
+              className="min-w-0 flex-1 truncate rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               title={selectedDisplay}
             />
 
@@ -616,13 +624,14 @@ const PermissionModal = ({
                 setSelectedPermission(null);
               }}
               type="button"
-              className="px-3 py-2 text-gray-500 hover:text-gray-700 shrink-0"
+              variant="outline"
+              className="shrink-0 px-3 py-2 text-gray-500 hover:text-gray-700"
             >
-              <X className="w-4 h-4" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className="border border-gray-200 rounded-lg max-h-[220px] overflow-auto bg-white shadow-sm">
+          <div className="max-h-[260px] overflow-auto rounded-xl border border-gray-200 bg-white shadow-sm">
             {filtered.length === 0 ? (
               <div className="px-4 py-3 text-sm text-gray-500">
                 No matching permissions
@@ -635,7 +644,7 @@ const PermissionModal = ({
                     setSelectedPermission(permission);
                     setQuery("");
                   }}
-                  className={`cursor-pointer px-4 py-2.5 hover:bg-indigo-50 flex flex-col transition min-w-0 ${
+                  className={`flex min-w-0 cursor-pointer flex-col px-4 py-2.5 transition hover:bg-indigo-50 ${
                     selectedPermission?.permission_uuid ===
                     permission.permission_uuid
                       ? "bg-indigo-100"
@@ -643,7 +652,7 @@ const PermissionModal = ({
                   }`}
                 >
                   <div
-                    className="font-semibold text-sm truncate text-gray-900"
+                    className="truncate text-sm font-semibold text-gray-900"
                     title={formatCode(permission)}
                   >
                     {formatCode(permission)}
@@ -651,7 +660,7 @@ const PermissionModal = ({
 
                   {formatDesc(permission) && (
                     <div
-                      className="text-xs text-gray-500 line-clamp-1"
+                      className="line-clamp-1 text-xs text-gray-500"
                       title={formatDesc(permission)}
                     >
                       {formatDesc(permission)}
@@ -664,11 +673,12 @@ const PermissionModal = ({
         </div>
       </div>
 
-      <div className="sticky bottom-0 pt-4 mt-4 border-t bg-white flex justify-end gap-2">
+      <div className="sticky bottom-0 mt-5 flex flex-col-reverse gap-2 border-t bg-white pt-4 sm:flex-row sm:justify-end">
         <Button
           onClick={onClose}
-          className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+          variant="outline"
           disabled={loading}
+          className="w-full sm:w-auto"
         >
           Cancel
         </Button>
@@ -676,7 +686,8 @@ const PermissionModal = ({
         <Button
           onClick={onAssign}
           disabled={!selectedPermission || loading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          variant="primary"
+          className="w-full sm:w-auto"
         >
           {loading ? "Assigning..." : "Assign"}
         </Button>
