@@ -566,7 +566,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
       </h2> */}
       <h2 className="text-xl font-semibold">
   {/* {projectName ?? "Project Board"} */}
-  Active Sprint
+  {activeSprintName ? "Active Sprint" : "No Active Sprint"}
   {activeSprintName && (
     <span className="ml-3 text-sm font-normal text-gray-500 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100">
       {activeSprintName}
@@ -1034,20 +1034,22 @@ const Board = ({ projectId, sprintId, projectName }) => {
                             )}
                           </Droppable>
                           {/* Create Task button */}
-                          <div className="mt-3">
-                            <button
-                              onClick={() =>
-                                setOpenCreateTaskModal({
-                                  projectId,
-                                  statusId: status.id,
-                                  activeSprintId,
-                                })
-                              }
-                              className="text-indigo-600 hover:underline text-sm flex items-center gap-1"
-                            >
-                              <Plus className="w-4 h-4" /> Create Task
-                            </button>
-                          </div>
+                          {activeSprintId && (
+                            <div className="mt-3">
+                              <button
+                                onClick={() =>
+                                  setOpenCreateTaskModal({
+                                    projectId,
+                                    statusId: status.id,
+                                    activeSprintId,
+                                  })
+                                }
+                                className="text-indigo-600 hover:underline text-sm flex items-center gap-1"
+                              >
+                                <Plus className="w-4 h-4" /> Create Task
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </Draggable>
