@@ -4,6 +4,9 @@ import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { Pencil, Trash2, Settings, Users, CalendarDays, ClipboardCheck, History } from "lucide-react";
 import { toast } from "react-toastify";
+import Button from "../../components/Button/Button";
+
+
 
 // Modals
 import AddEmployeeModal from "./models/AddEmployeeModal";
@@ -122,12 +125,13 @@ const HRManageTools = ({ employeeId }) => {
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800">System Leave Types</h3>
-                <button
+                <Button
                   onClick={() => { setEditLeaveType(null); setIsAddLeaveTypeModalOpen(true); }}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-all"
+                  variant="primary"
+                  size="medium"
                 >
                   + Add Leave Type
-                </button>
+                </Button>
               </div>
 
               {isLoading ? (

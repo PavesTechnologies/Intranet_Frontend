@@ -17,6 +17,7 @@ import {
   Upload,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL || "";
 
@@ -385,12 +386,13 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
 
             {/* Add button */}
             <div className="flex justify-center">
-              <button
+              <Button
                 onClick={handleAddHoliday}
-                className="px-6 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700"
+                variant="primary"
+                size="medium"
               >
                 <Plus className="inline mr-2" /> Add Holiday
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -400,14 +402,14 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
             <p className="text-gray-500 text-sm">Download → Fill → Upload</p>
 
             <div className="flex flex-col md:flex-row gap-4 justify-center mt-4">
-              <button
+              <Button
                 onClick={handleDownloadTemplate}
                 disabled={downloading}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg"
+                variant="primary"
               >
                 <Download size={18} className="inline mr-2" />
                 {downloading ? "Downloading..." : "Download Template"}
-              </button>
+              </Button>
 
               <input
                 ref={fileInputRef}
@@ -417,14 +419,15 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
                 onChange={handleFileUpload}
               />
 
-              <button
+              <Button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+                variant="secondary"
+                size="medium"
               >
                 <Upload size={18} className="inline mr-2" />
                 {uploading ? "Processing..." : "Upload Excel"}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -461,15 +464,16 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
 
         {/* Footer */}
         <div className="p-4 border-t bg-gray-100 flex justify-end">
-          <button
+          <Button
             onClick={handleSubmit}
             disabled={submitting || holidays.length === 0}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700"
+            variant="primary"
+            size="medium"
           >
             {submitting
               ? "Submitting..."
               : `Submit ${holidays.length} Holiday(s)`}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

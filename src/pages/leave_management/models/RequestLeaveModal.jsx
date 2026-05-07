@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import DateRangePicker from "./DateRangePicker";
 // import {useLeaveConsumption} from "../hooks/useLeaveConsumption";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 // const token = localStorage.getItem("token");
@@ -481,14 +482,15 @@ export default function RequestLeaveModal({
         <div className="sticky top-0 bg-white z-10 p-3 border-b border-gray-200 ">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-900">Request Leave</h2>
-            <button
+            <Button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              variant=" hover:bg-accent hover:text-accent-foreground hover:bg-gray-200 "
               type="button"
               aria-label="Close"
+              size="icon"
             >
               <X className="w-6 h-6" />
-            </button>
+            </Button>
           </div>
         </div>
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
@@ -694,33 +696,27 @@ export default function RequestLeaveModal({
           )}
 
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-5 border-t border-gray-200">
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="px-5 py-3 rounded-lg font-medium text-gray-800 border border-gray-300 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              variant="ghost"
+              size="medium"
               disabled={submitting}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="px-5 py-3 rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
+              variant="primary"
+              size="medium"
+              loading={submitting}
+              loadingText="Requesting..."
               disabled={
-                submitting ||
-                loadingBalances ||
-                !startDate ||
-                !endDate ||
-                !leaveTypeId
+                loadingBalances || !startDate || !endDate || !leaveTypeId
               }
             >
-              {submitting ? (
-                <span className="flex items-center justify-center">
-                  <span className="animate-spin mr-2">⟳</span> Requesting...
-                </span>
-              ) : (
-                "Request Leave"
-              )}
-            </button>
+              Request Leave
+            </Button>
           </div>
         </form>
         <style>{`

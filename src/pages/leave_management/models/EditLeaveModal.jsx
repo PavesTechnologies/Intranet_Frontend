@@ -16,6 +16,7 @@ import { useRecordLock } from "../hooks/useRecordLock";
 import { useAuth } from "../../../contexts/AuthContext";
 import DateRangePicker from "./DateRangePicker";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const GENDER_BASED_IDS = ["L-ML", "L-PL"];
@@ -735,18 +736,20 @@ export default function EditLeaveModal({
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-            <button
+            <Button
               type="button"
               onClick={handleClose}
               disabled={submitting || isLockedByOther}
-              className="px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+              variant="ghost"
+              size="medium"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={submitting || isLockedByOther || hasBalanceError}
-              className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              variant="primary"
+              size="medium"
             >
               {submitting ? (
                 <>
@@ -756,7 +759,7 @@ export default function EditLeaveModal({
               ) : (
                 "Update Request"
               )}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
