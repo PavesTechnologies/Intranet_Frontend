@@ -4,29 +4,57 @@ import {
   deleteAccessPoint,
   getUnmappedPermissions,
   assignPermissionToAccessPoint,
+  getAccessPoint,
 } from "../../../../services/accessPointService";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Eye, Plus, Trash2, X, Search, MoreVertical } from "lucide-react";
+import {
+  Eye,
+  Plus,
+  Trash2,
+  X,
+  Search,
+  MoreVertical,
+  Link,
+  Settings,
+  Package,
+  Globe,
+  Shield,
+} from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import Navbar from "../../../../components/Navbar/Navbar";
-import Pagination from "../../../../components/Pagination/pagination";
 import Modal from "../../../../components/Modal/modal";
+import AppCard from "../../../../components/Cards/AppCard";
+import DynamicCardGrid from "../../../../components/Cards/DynamicCardGrid";
 import { showStatusToast } from "../../../../components/toastfy/toast";
+
+const ACCESS_POINT_GRID_CONFIG = {
+  layoutMode: "grid",
+  columnMode: "fixed",
+  cardsPerRow: 3,
+  cardsPerPage: 6,
+  gapClassName: "gap-6",
+  gridClassName: "items-stretch",
+  paginationWrapperClassName: "mt-6 flex justify-center",
+};
 
 const AccessPointMapping = () => {
   const [aps, setAps] = useState([]);
   const [unmappedPermissions, setUnmappedPermissions] = useState([]);
+
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+
   const [selectedAccessPoint, setSelectedAccessPoint] = useState(null);
   const [selectedAccessPointId, setSelectedAccessPointId] = useState(null);
+  const [selectedViewAccessPointId, setSelectedViewAccessPointId] =
+    useState(null);
   const [selectedPermission, setSelectedPermission] = useState(null);
+
   const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [loadingAccessPoints, setLoadingAccessPoints] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
-
-  const cardsPerPage = 6;
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -78,15 +106,17 @@ const AccessPointMapping = () => {
   }, []);
 
   const fetchData = () => {
+    setLoadingAccessPoints(true);
+
     listAccessPointsumapped()
       .then((res) => {
         setAps(res.data || []);
-        setCurrentPage(1);
       })
       .catch(() => {
         showStatusToast("Failed to fetch unmapped access points", "error");
         setAps([]);
-      });
+      })
+      .finally(() => setLoadingAccessPoints(false));
   };
 
   useEffect(() => {
@@ -113,9 +143,10 @@ const AccessPointMapping = () => {
     });
   }, [aps, searchTerm]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+  const handleViewClick = (id) => {
+    setSelectedViewAccessPointId(id);
+    setShowViewModal(true);
+  };
 
   const handleDeleteClick = (id) => {
     setSelectedAccessPointId(id);
@@ -187,25 +218,12 @@ const AccessPointMapping = () => {
     }
   };
 
-  const totalPages = Math.ceil(filteredAps.length / cardsPerPage);
-  const indexOfLastCard = currentPage * cardsPerPage;
-  const indexOfFirstCard = indexOfLastCard - cardsPerPage;
-  const currentCards = filteredAps.slice(indexOfFirstCard, indexOfLastCard);
-
-  const handlePrevious = () => {
-    setCurrentPage((prev) => Math.max(prev - 1, 1));
-  };
-
-  const handleNext = () => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
-  };
-
   return (
     <div>
       <Navbar logo="Access Points" navItems={navItems} />
 
-      <div className="bg-gray-100 min-h-screen -mx-6 -mt-6 p-6">
-        <div className="sticky top-0 z-10 bg-gray-100 pb-4 pt-1">
+      <div className="bg-white min-h-screen -mx-6 -mt-6 p-6">
+        <div className="sticky top-0 z-10 bg-white pb-4 pt-1">
           <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
             <div>
               <h2 className="text-2xl font-bold text-gray-700">
@@ -229,20 +247,33 @@ const AccessPointMapping = () => {
           </div>
         </div>
 
-        {filteredAps.length === 0 ? (
+        {loadingAccessPoints ? (
+          <DynamicCardGrid
+            data={[]}
+            loading
+            skeletonCount={ACCESS_POINT_GRID_CONFIG.cardsPerPage}
+            {...ACCESS_POINT_GRID_CONFIG}
+            renderCard={() => null}
+            getKey={(_, index) => index}
+          />
+        ) : filteredAps.length === 0 ? (
           <div className="text-center text-gray-500 mt-20">
             {searchTerm
               ? `No unmapped access points found matching "${searchTerm}".`
               : "No unmapped access points found."}
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-              {currentCards.map((ap) => (
-                <div
-                  key={ap.access_uuid}
-                  className="bg-white p-5 rounded-xl shadow-md hover:shadow-lg transition-all border flex flex-col min-w-0 overflow-hidden"
-                >
+          <DynamicCardGrid
+            data={filteredAps}
+            getKey={(ap) => ap.access_uuid}
+            resetPageDependency={searchTerm}
+            wrapperClassName="w-full"
+            emptyMessage="No unmapped access points found."
+            {...ACCESS_POINT_GRID_CONFIG}
+            renderCard={(ap) => (
+              <AppCard
+                className="min-h-[260px]"
+                renderHeader={() => (
                   <div className="flex justify-between items-start gap-3 mb-4 min-w-0">
                     <div className="min-w-0 flex-1">
                       <h3
@@ -264,9 +295,7 @@ const AccessPointMapping = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(
-                            `/user-management/access-points/${ap.access_uuid}`,
-                          );
+                          handleViewClick(ap.access_uuid);
                         }}
                         className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors shadow-sm"
                         title="View"
@@ -318,8 +347,9 @@ const AccessPointMapping = () => {
                       )}
                     </div>
                   </div>
-
-                  <div className="flex-grow space-y-3 min-w-0">
+                )}
+                renderBody={() => (
+                  <div className="space-y-3 min-w-0">
                     <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
                       <span className="font-medium shrink-0">Method:</span>
                       <span
@@ -363,25 +393,15 @@ const AccessPointMapping = () => {
                       </p>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            {filteredAps.length > cardsPerPage && (
-              <div className="mt-6">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPrevious={handlePrevious}
-                  onNext={handleNext}
-                />
-              </div>
+                )}
+              />
             )}
-          </>
+          />
         )}
 
         {showModal && (
           <PermissionModal
+            isOpen={showModal}
             unmappedPermissions={unmappedPermissions}
             selectedAccessPoint={selectedAccessPoint}
             selectedPermission={selectedPermission}
@@ -389,6 +409,17 @@ const AccessPointMapping = () => {
             onClose={() => setShowModal(false)}
             onAssign={handleAssignPermission}
             loading={loading}
+          />
+        )}
+
+        {showViewModal && selectedViewAccessPointId && (
+          <AccessPointViewModal
+            isOpen={showViewModal}
+            accessUuid={selectedViewAccessPointId}
+            onClose={() => {
+              setShowViewModal(false);
+              setSelectedViewAccessPointId(null);
+            }}
           />
         )}
 
@@ -424,10 +455,84 @@ const AccessPointMapping = () => {
   );
 };
 
+function AccessPointViewModal({ isOpen, accessUuid, onClose }) {
+  const [ap, setAp] = useState(null);
+
+  useEffect(() => {
+    if (!accessUuid) return;
+
+    setAp(null);
+
+    getAccessPoint(accessUuid)
+      .then((res) => setAp(res.data))
+      .catch(() => {
+        showStatusToast("Failed to load access point details", "error");
+        setAp(null);
+      });
+  }, [accessUuid]);
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Access Point Details"
+      subtitle={`Access UUID: ${accessUuid}`}
+      className="max-w-2xl"
+      bodyClassName="p-6"
+    >
+      {!ap ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="text-gray-500 text-lg">Loading...</div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <h2 className="text-2xl font-semibold text-indigo-600 mb-6 text-center flex items-center justify-center gap-2">
+            <Search className="w-6 h-6" />
+            Access Point Details
+          </h2>
+
+          <div className="space-y-4 text-gray-800">
+            <p className="flex items-center gap-2 break-all">
+              <Link className="w-5 h-5 text-gray-600 shrink-0" />
+              <span className="font-medium text-gray-600">Path:</span>
+              {ap.endpoint_path || "N/A"}
+            </p>
+
+            <p className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-gray-600 shrink-0" />
+              <span className="font-medium text-gray-600">Method:</span>
+              {ap.method || "N/A"}
+            </p>
+
+            <p className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-gray-600 shrink-0" />
+              <span className="font-medium text-gray-600">Module:</span>
+              {ap.module || "N/A"}
+            </p>
+
+            <p className="flex items-center gap-2">
+              <Globe className="w-5 h-5 text-gray-600 shrink-0" />
+              <span className="font-medium text-gray-600">Public:</span>
+              {ap.is_public ? "Yes" : "No"}
+            </p>
+
+            <p className="flex items-center gap-2 break-all">
+              <Shield className="w-5 h-5 text-gray-600 shrink-0" />
+              <span className="font-medium text-gray-600">Permission:</span>
+              {ap.permission_code || "N/A"}
+            </p>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 const formatCode = (p) => p?.code ?? p?.permission_code ?? "(no code)";
 const formatDesc = (p) => p?.description ?? p?.permission_description ?? "";
 
 const PermissionModal = ({
+  isOpen,
   unmappedPermissions,
   selectedAccessPoint,
   selectedPermission,
@@ -451,165 +556,132 @@ const PermissionModal = ({
     );
   }, [unmappedPermissions, query]);
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        // reserved for dropdown close logic if needed
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   const selectedDisplay = selectedPermission
-    ? `${formatCode(selectedPermission)} — ${formatDesc(selectedPermission)}`
+    ? formatCode(selectedPermission)
     : query;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl mx-auto max-h-[88vh] overflow-hidden flex flex-col">
-        <div className="p-5 border-b bg-gray-50 shrink-0">
-          <div className="flex justify-between items-start gap-4">
-            <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Assign Permission
-              </h3>
-
-              <p className="text-sm text-gray-500 mt-1 truncate">
-                Access Point:{" "}
-                <span
-                  className="font-medium text-blue-700"
-                  title={selectedAccessPoint?.endpoint_path}
-                >
-                  {selectedAccessPoint?.endpoint_path || "N/A"}
-                </span>
-              </p>
-            </div>
-
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 shrink-0"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Assign Permission"
+      subtitle={`Access Point: ${selectedAccessPoint?.endpoint_path || "N/A"}`}
+      className="max-w-2xl"
+      bodyClassName="p-5"
+    >
+      <div className="mb-3 space-y-2">
+        <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
+          <strong className="font-medium shrink-0">Endpoint:</strong>
+          <span
+            className="truncate min-w-0 flex-1"
+            title={selectedAccessPoint?.endpoint_path}
+          >
+            {selectedAccessPoint?.endpoint_path || "N/A"}
+          </span>
         </div>
 
-        <div className="p-5 overflow-y-auto flex-1">
-          <div className="mb-4 space-y-2">
-            <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
-              <strong className="font-medium shrink-0">Endpoint:</strong>
-              <span
-                className="truncate min-w-0 flex-1"
-                title={selectedAccessPoint?.endpoint_path}
-              >
-                {selectedAccessPoint?.endpoint_path || "N/A"}
-              </span>
-            </div>
-
-            <div className="flex items-start gap-2 text-sm text-gray-600">
-              <strong className="font-medium shrink-0">Method:</strong>
-              <span
-                className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold"
-                title={selectedAccessPoint?.method}
-              >
-                {selectedAccessPoint?.method || "N/A"}
-              </span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Permission:
-            </label>
-
-            <div className="relative" ref={dropdownRef}>
-              <div className="flex items-center gap-2 mb-2 min-w-0">
-                <input
-                  type="text"
-                  value={selectedDisplay}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    setSelectedPermission(null);
-                  }}
-                  placeholder="Search permissions..."
-                  className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 truncate"
-                  title={selectedDisplay}
-                />
-
-                <Button
-                  onClick={() => {
-                    setQuery("");
-                    setSelectedPermission(null);
-                  }}
-                  type="button"
-                  className="text-gray-500 hover:text-gray-700 shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="border border-gray-200 rounded-lg max-h-[360px] overflow-auto bg-white shadow-sm">
-                {filtered.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-gray-500">
-                    No matching permissions
-                  </div>
-                ) : (
-                  filtered.map((permission) => (
-                    <div
-                      key={permission.permission_uuid}
-                      onClick={() => {
-                        setSelectedPermission(permission);
-                        setQuery("");
-                      }}
-                      className={`cursor-pointer px-4 py-3 hover:bg-indigo-50 flex flex-col transition min-w-0 ${
-                        selectedPermission?.permission_uuid ===
-                        permission.permission_uuid
-                          ? "bg-indigo-100"
-                          : ""
-                      }`}
-                    >
-                      <div
-                        className="font-semibold text-sm truncate text-gray-900"
-                        title={formatCode(permission)}
-                      >
-                        {formatCode(permission)}
-                      </div>
-
-                      <div
-                        className="text-xs text-gray-500 truncate"
-                        title={formatDesc(permission)}
-                      >
-                        {formatDesc(permission)}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5 border-t bg-white shrink-0 flex justify-end gap-2">
-          <Button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
-            disabled={loading}
+        <div className="flex items-start gap-2 text-sm text-gray-600">
+          <strong className="font-medium shrink-0">Method:</strong>
+          <span
+            className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold"
+            title={selectedAccessPoint?.method}
           >
-            Cancel
-          </Button>
-
-          <Button
-            onClick={onAssign}
-            disabled={!selectedPermission || loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? "Assigning..." : "Assign Permission"}
-          </Button>
+            {selectedAccessPoint?.method || "N/A"}
+          </span>
         </div>
       </div>
-    </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Select Permission
+        </label>
+
+        <div className="relative" ref={dropdownRef}>
+          <div className="flex items-center gap-2 mb-2 min-w-0">
+            <input
+              type="text"
+              value={selectedDisplay}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSelectedPermission(null);
+              }}
+              placeholder="Search permissions..."
+              className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 truncate"
+              title={selectedDisplay}
+            />
+
+            <Button
+              onClick={() => {
+                setQuery("");
+                setSelectedPermission(null);
+              }}
+              type="button"
+              className="px-3 py-2 text-gray-500 hover:text-gray-700 shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <div className="border border-gray-200 rounded-lg max-h-[220px] overflow-auto bg-white shadow-sm">
+            {filtered.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-gray-500">
+                No matching permissions
+              </div>
+            ) : (
+              filtered.map((permission) => (
+                <div
+                  key={permission.permission_uuid}
+                  onClick={() => {
+                    setSelectedPermission(permission);
+                    setQuery("");
+                  }}
+                  className={`cursor-pointer px-4 py-2.5 hover:bg-indigo-50 flex flex-col transition min-w-0 ${
+                    selectedPermission?.permission_uuid ===
+                    permission.permission_uuid
+                      ? "bg-indigo-100"
+                      : ""
+                  }`}
+                >
+                  <div
+                    className="font-semibold text-sm truncate text-gray-900"
+                    title={formatCode(permission)}
+                  >
+                    {formatCode(permission)}
+                  </div>
+
+                  {formatDesc(permission) && (
+                    <div
+                      className="text-xs text-gray-500 line-clamp-1"
+                      title={formatDesc(permission)}
+                    >
+                      {formatDesc(permission)}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="sticky bottom-0 pt-4 mt-4 border-t bg-white flex justify-end gap-2">
+        <Button
+          onClick={onClose}
+          className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+          disabled={loading}
+        >
+          Cancel
+        </Button>
+
+        <Button
+          onClick={onAssign}
+          disabled={!selectedPermission || loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
+          {loading ? "Assigning..." : "Assign"}
+        </Button>
+      </div>
+    </Modal>
   );
 };
 

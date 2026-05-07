@@ -6,6 +6,8 @@ import Pagination from "../../../../components/Pagination/pagination";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { toast } from "react-toastify";
 import Modal from "../../../../components/Modal/modal";
+import AppCard from "../../../../components/Cards/AppCard";
+import DynamicCardGrid from "../../../../components/Cards/DynamicCardGrid";
 import {
   Pencil,
   Loader2,
@@ -18,7 +20,16 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-const ITEMS_PER_PAGE = 6;
+const GROUP_GRID_CONFIG = {
+  layoutMode: "grid",
+  columnMode: "fixed",
+  cardsPerRow: 3,
+  cardsPerPage: 6,
+  gapClassName: "gap-4",
+  gridClassName: "items-stretch",
+  paginationWrapperClassName: "mt-6 flex justify-center",
+};
+
 const PERMISSION_ITEMS_PER_PAGE = 6;
 
 export default function PermissionGroupManagement() {
@@ -43,7 +54,6 @@ export default function PermissionGroupManagement() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [bulkDeletingGroups, setBulkDeletingGroups] = useState(false);
 
-  const [currentPage, setCurrentPage] = useState(1);
   const [permissionCurrentPage, setPermissionCurrentPage] = useState(1);
 
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -121,7 +131,6 @@ export default function PermissionGroupManagement() {
   }, []);
 
   useEffect(() => {
-    setCurrentPage(1);
     setSelectedGroupUuids([]);
   }, [groupSearchTerm]);
 
@@ -130,14 +139,6 @@ export default function PermissionGroupManagement() {
       group?.group_name?.toLowerCase().includes(groupSearchTerm.toLowerCase()),
     );
   }, [groups, groupSearchTerm]);
-
-  const totalPages = Math.ceil(filteredGroups.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-
-  const currentGroups = filteredGroups.slice(
-    startIndex,
-    startIndex + ITEMS_PER_PAGE,
-  );
 
   const enrichWithCode = (permissionList) => {
     if (!Array.isArray(permissionList)) return [];
@@ -188,12 +189,14 @@ export default function PermissionGroupManagement() {
     resetPermissionSelection();
   };
 
-  const unassignedPermissions = allPermissions.filter(
-    (permission) =>
-      !groupPermissions.some(
-        (gp) => gp.permission_uuid === permission.permission_uuid,
-      ),
-  );
+  const unassignedPermissions = useMemo(() => {
+    return allPermissions.filter(
+      (permission) =>
+        !groupPermissions.some(
+          (gp) => gp.permission_uuid === permission.permission_uuid,
+        ),
+    );
+  }, [allPermissions, groupPermissions]);
 
   const permissionsToDisplay = useMemo(() => {
     let list = [];
@@ -236,6 +239,7 @@ export default function PermissionGroupManagement() {
     selectedToAdd,
     selectedToRemove,
     permissionSearchTerm,
+    allPermissions,
   ]);
 
   const permissionTotalPages = Math.ceil(
@@ -416,20 +420,20 @@ export default function PermissionGroupManagement() {
     );
   };
 
-  const handleSelectAllCurrentPage = () => {
-    const currentPageUuids = currentGroups.map((group) => group.group_uuid);
+  const handleSelectAllFiltered = () => {
+    const filteredUuids = filteredGroups.map((group) => group.group_uuid);
 
-    const allSelected = currentPageUuids.every((id) =>
+    const allSelected = filteredUuids.every((id) =>
       selectedGroupUuids.includes(id),
     );
 
     if (allSelected) {
       setSelectedGroupUuids((prev) =>
-        prev.filter((id) => !currentPageUuids.includes(id)),
+        prev.filter((id) => !filteredUuids.includes(id)),
       );
     } else {
       setSelectedGroupUuids((prev) => [
-        ...new Set([...prev, ...currentPageUuids]),
+        ...new Set([...prev, ...filteredUuids]),
       ]);
     }
   };
@@ -469,7 +473,7 @@ export default function PermissionGroupManagement() {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       <div className="space-y-6">
         <div className="bg-white rounded-xl shadow-sm border p-6">
           <div className="flex justify-between items-center flex-wrap gap-4">
@@ -529,19 +533,21 @@ export default function PermissionGroupManagement() {
               <div className="w-full sm:w-72">
                 <SearchInput
                   placeholder="Search group..."
-                  onSearch={(value) => {
-                    setGroupSearchTerm(value || "");
-                    setCurrentPage(1);
-                  }}
+                  onSearch={(value) => setGroupSearchTerm(value || "")}
                 />
               </div>
             </div>
           </div>
 
           {loading ? (
-            <div className="text-center text-gray-500 py-10">
-              Loading groups...
-            </div>
+            <DynamicCardGrid
+              data={[]}
+              loading
+              skeletonCount={GROUP_GRID_CONFIG.cardsPerPage}
+              {...GROUP_GRID_CONFIG}
+              renderCard={() => null}
+              getKey={(_, index) => index}
+            />
           ) : groups.length === 0 ? (
             <div className="text-center text-gray-500 py-10 border rounded-xl bg-gray-50">
               No groups found.
@@ -556,95 +562,87 @@ export default function PermissionGroupManagement() {
                 <input
                   type="checkbox"
                   checked={
-                    currentGroups.length > 0 &&
-                    currentGroups.every((group) =>
+                    filteredGroups.length > 0 &&
+                    filteredGroups.every((group) =>
                       selectedGroupUuids.includes(group.group_uuid),
                     )
                   }
-                  onChange={handleSelectAllCurrentPage}
+                  onChange={handleSelectAllFiltered}
                   className="w-4 h-4"
                 />
-                <span>Select all on this page</span>
+                <span>Select all filtered groups</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentGroups.map((group) => {
+              <DynamicCardGrid
+                data={filteredGroups}
+                getKey={(group) => group.group_uuid}
+                resetPageDependency={groupSearchTerm}
+                emptyMessage="No matching groups found."
+                wrapperClassName="w-full"
+                {...GROUP_GRID_CONFIG}
+                renderCard={(group) => {
                   const isSelected = selectedGroupUuids.includes(
                     group.group_uuid,
                   );
 
                   return (
-                    <div
-                      key={group.group_uuid}
-                      className={`bg-white rounded-xl border shadow-sm hover:shadow-md transition-all p-5 ${
-                        isSelected ? "border-red-300 bg-red-50" : ""
-                      }`}
-                    >
-                      <div className="flex justify-between items-start gap-3">
-                        <div className="flex items-start gap-3 min-w-0 flex-1">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() =>
-                              handleGroupCheckboxChange(group.group_uuid)
-                            }
-                            className="w-4 h-4 mt-3 shrink-0"
-                          />
+                    <AppCard
+                      selected={isSelected}
+                      variantClassMap={{
+                        selected: "border-red-300 bg-red-50",
+                      }}
+                      className="min-h-[175px]"
+                      renderHeader={() => (
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() =>
+                                handleGroupCheckboxChange(group.group_uuid)
+                              }
+                              className="w-4 h-4 mt-3 shrink-0"
+                            />
 
-                          <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
-                            <ShieldCheck className="w-5 h-5" />
+                            <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                              <ShieldCheck className="w-5 h-5" />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <h4
+                                className="text-lg font-semibold text-gray-800 truncate"
+                                title={group.group_name}
+                              >
+                                {group.group_name}
+                              </h4>
+
+                              <p className="text-sm text-gray-500 mt-1 truncate">
+                                Manage assigned permissions
+                              </p>
+                            </div>
                           </div>
 
-                          <div className="min-w-0 flex-1">
-                            <h4
-                              className="text-lg font-semibold text-gray-800 truncate"
-                              title={group.group_name}
-                            >
-                              {group.group_name}
-                            </h4>
-
-                            <p className="text-sm text-gray-500 mt-1 truncate">
-                              Manage assigned permissions
-                            </p>
-                          </div>
+                          <button
+                            onClick={() => handleEditClick(group)}
+                            className="p-2 rounded-lg hover:bg-blue-100 text-blue-900 shrink-0"
+                            title={`Edit ${group.group_name}`}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
                         </div>
-
-                        <button
-                          onClick={() => handleEditClick(group)}
-                          className="p-2 rounded-lg hover:bg-blue-100 text-blue-900 shrink-0"
-                          title={`Edit ${group.group_name}`}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="mt-5 flex justify-end">
+                      )}
+                      actions={
                         <Button
                           onClick={() => openPermissionModal(group, "view")}
                           className="px-4 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-950 transition-all"
                         >
                           Manage Permissions
                         </Button>
-                      </div>
-                    </div>
+                      }
+                    />
                   );
-                })}
-              </div>
-
-              {totalPages > 1 && (
-                <div className="mt-6">
-                  <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPrevious={() =>
-                      setCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
-                    onNext={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                    }
-                  />
-                </div>
-              )}
+                }}
+              />
             </>
           )}
         </div>
