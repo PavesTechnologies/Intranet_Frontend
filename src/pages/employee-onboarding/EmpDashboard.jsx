@@ -37,7 +37,7 @@ export default function EmployeeOnboardingDashboard() {
   }, [rawRoles]);
 
   const isHR = userRoles.includes("HR");
-  const isManager = userRoles.includes("Manager");
+  const isManager = userRoles.includes("REPORTING_MANAGER");
   const isAdmin = userRoles.includes("Admin");
 
   // Determine if the "Admin View" (Manager Portal) should even be an option

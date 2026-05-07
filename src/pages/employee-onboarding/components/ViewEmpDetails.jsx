@@ -87,7 +87,7 @@ export default function ViewEmpDetails() {
 
   const isHR = userRoles.includes("HR");
   const isAdmin = userRoles.includes("Admin");
-  const isManager = userRoles.includes("Manager");
+  const isManager = userRoles.includes("REPORTING_MANAGER");
   const canEditOrDelete = isHR || isAdmin;
   const canRequestApproval = isHR || isAdmin;
 

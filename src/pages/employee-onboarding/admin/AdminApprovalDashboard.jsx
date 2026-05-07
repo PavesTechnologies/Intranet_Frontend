@@ -38,7 +38,7 @@ const userRoles = useMemo(() => {
 // Match the casing used in ViewEmpDetails
 const isHR = userRoles.includes("HR");
 const isAdmin = userRoles.includes("Admin");
-const isManager = userRoles.includes("Manager");
+const isManager = userRoles.includes("REPORTING_MANAGER");
 
 // Permission flag for this specific page
 const isAuthorizedManager = isManager || isAdmin;
