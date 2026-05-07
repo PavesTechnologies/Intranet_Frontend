@@ -47,8 +47,8 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
           <div className="grid grid-cols-2 gap-4">
             <div className={statCardClassName}>
               <div className={`${cardIconWrapperClass} from-blue-400 to-indigo-500`} />
-              <p className="relative z-10 text-[10px] font-bold capitalize tracking-widest text-slate-500">Utilization</p>
-              <p className="relative z-10 mt-2 text-3xl font-black text-slate-900 tracking-tighter">{resource.allocation}<span className="text-lg text-slate-400 font-bold ml-0.5">%</span></p>
+              <p className="relative z-10 text-[10px] font-bold capitalize tracking-widest text-slate-500">Availability</p>
+              <p className="relative z-10 mt-2 text-3xl font-black text-slate-900 tracking-tighter">{resource.availability}<span className="text-lg text-slate-400 font-bold ml-0.5">%</span></p>
             </div>
             <div className={statCardClassName}>
               <div className={`${cardIconWrapperClass} from-rose-400 to-orange-500`} />

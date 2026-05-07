@@ -312,7 +312,6 @@ export default function CreateOffer() {
                 name="mail"
                 value={formData.mail}
                 onChange={handleChange}
-                bgClass={formData.mail ? "bg-slate-50/80" : "bg-white"}
               />
 
               <div className="grid grid-cols-2 gap-6">
@@ -551,14 +550,14 @@ export default function CreateOffer() {
 
 /* SMALL COMPONENTS */
 
-function Input({ label, bgClass, ...props }) {
+function Input({ label, ...props }) {
   const isFilled = props.value && props.value.toString().length > 0;
   return (
     <div>
       <label className="text-sm font-medium text-gray-700 block mb-1.5">{label}</label>
       <input
         {...props}
-        className={`w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm transition-all hover:border-gray-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none placeholder-gray-400 ${bgClass || (isFilled ? 'bg-blue-50/50' : 'bg-white')} shadow-sm`}
+        className={`w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm transition-all hover:border-gray-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none placeholder-gray-400 ${isFilled ? 'bg-blue-50' : 'bg-white'} shadow-sm`}
       />
     </div>
   );

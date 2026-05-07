@@ -20,6 +20,9 @@ const formatReason = (str) => {
 const isPendingStatus = (status) =>
   status === "Pending" || status === "Pending Approval";
 
+const isDmActionableStatus = (status) =>
+  status === "Pending" || status === "Pending Approval" || status === "Approved";
+
 const impactStyles = {
   Low: "border-teal-200 bg-teal-50 text-teal-700",
   Medium: "border-amber-200 bg-amber-50 text-amber-700",
@@ -232,7 +235,7 @@ const RoleOffSidePanel = ({
   const isReadOnlyPm = isPM && actionType === "view";
   const showRejectedDetails =
     isPM &&
-    pmTab === "process" &&
+    (pmTab === "process" || pmTab === "rejected") &&
     (
       String(record.roleOffStatus || "").trim() === "Rejected" ||
       Boolean(record.rejectedBy) ||
@@ -264,8 +267,8 @@ const RoleOffSidePanel = ({
 
   const showRmApproveAction = isRM && (!isBulkRecord || isRmBulkApproveFlow);
   const showRmRejectAction = isRM && (!isBulkRecord || isRmBulkRejectFlow);
-  const showDmApproveAction = isDM && (!isBulkRecord || isDmBulkApproveFlow);
-  const showDmRejectAction = isDM && (!isBulkRecord || isDmBulkRejectFlow);
+  const showDmApproveAction = isDM && isDmActionableStatus(record.status) && (!isBulkRecord || isDmBulkApproveFlow);
+  const showDmRejectAction = isDM && isDmActionableStatus(record.status) && (!isBulkRecord || isDmBulkRejectFlow);
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));

@@ -6,7 +6,7 @@ import { reviewTimesheet, handleBulkReview } from "../api";
 import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
-import { MoreVertical, X } from "lucide-react";
+import { MoreVertical, X, ChevronDown, ChevronUp } from "lucide-react";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 import ConfirmationModal from "../../leave_management/models/ConfirmationModal";
 import { set } from "date-fns";
@@ -39,6 +39,11 @@ const ManagerApprovalTable = ({
   const [actionLoadingUser, setActionLoadingUser] = useState(null);
   const [userLevelLoading, setUserLevelLoading] = useState(null); // for Approve/Reject All Weeks
   const [weekLevelLoading, setWeekLevelLoading] = useState({}); // for per-week Approve/Reject
+
+  // ✅ Per-user expand/collapse state — collapsed by default
+  const [expandedUsers, setExpandedUsers] = useState({});
+  const toggleUser = (userId) =>
+    setExpandedUsers((prev) => ({ ...prev, [userId]: !prev[userId] }));
 
   // -----------------------------
   // Fetch project info
@@ -897,91 +902,129 @@ const ManagerApprovalTable = ({
               No Approvals
             </div>
           ) : (
-            enrichedGroupedData.map((user) => (
-              <div
-                key={user.userId}
-                className="bg-white rounded-xl shadow-md border p-4"
-              >
-                {/* ✅ One-line layout for username and action buttons */}
-                {console.log("user: ", user)}
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-xl font-bold text-gray-800">
-                    {user.userName} (ID: {user.userId})
-                  </h2>
+            enrichedGroupedData.map((user) => {
+              const isExpanded = !!expandedUsers[user.userId];
+              const totalWeeks = user.weeklySummary?.length || 0;
+              const pendingWeeks =
+                user.weeklySummary?.filter((w) => {
+                  const s = w.weeklyStatus?.toUpperCase();
+                  return (
+                    s === "SUBMITTED" ||
+                    s === "PARTIALLY APPROVED" ||
+                    s === "PARTIALLY_APPROVED"
+                  );
+                }).length || 0;
 
-                  <div className="flex gap-3">
-                    {userLevelLoading === user.userId ? (
-                      <LoadingSpinner text="Processing..." />
-                    ) : (
-                      <>
-                        <Button
-                          variant="success"
-                          size="small"
-                          disabled={
-                            userLevelLoading !== null || disableButton(user)
-                          }
-                          onClick={handleApproveAllWeeks}
-                          className={`disabled:opacity-50 disabled:cursor-not-allowed`}
-                        >
-                          Approve All Weeks
-                        </Button>
+              return (
+                <div
+                  key={user.userId}
+                  className="bg-white rounded-xl shadow-md border p-4"
+                >
+                  {/* ✅ Collapsible user header */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => toggleUser(user.userId)}
+                      className="flex items-center gap-3 text-left flex-1 min-w-0 py-1 hover:bg-gray-50 rounded-md px-2 -mx-2 transition-colors"
+                      aria-expanded={isExpanded}
+                    >
+                      {isExpanded ? (
+                        <ChevronUp size={20} className="text-gray-500 shrink-0" />
+                      ) : (
+                        <ChevronDown size={20} className="text-gray-500 shrink-0" />
+                      )}
+                      <h2 className="text-xl font-bold text-gray-800 truncate">
+                        {user.userName} (ID: {user.userId})
+                      </h2>
+                      <span className="text-sm text-gray-500 shrink-0">
+                        • {totalWeeks} {totalWeeks === 1 ? "week" : "weeks"}
+                      </span>
+                      {pendingWeeks > 0 && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300 shrink-0">
+                          {pendingWeeks} pending
+                        </span>
+                      )}
+                    </button>
 
-                        <Button
-                          variant="danger"
-                          size="small"
-                          disabled={
-                            userLevelLoading !== null || disableButton(user)
-                          }
-                          className={`disabled:opacity-50 disabled:cursor-not-allowed`}
-                          onClick={handleCancelModal}
-                        >
-                          Reject All Weeks
-                        </Button>
-                      </>
-                    )}
+                    <div className="flex gap-3 shrink-0">
+                      {userLevelLoading === user.userId ? (
+                        <LoadingSpinner text="Processing..." />
+                      ) : (
+                        <>
+                          <Button
+                            variant="success"
+                            size="small"
+                            disabled={
+                              userLevelLoading !== null || disableButton(user)
+                            }
+                            onClick={handleApproveAllWeeks}
+                            className={`disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            Approve All Weeks
+                          </Button>
+
+                          <Button
+                            variant="danger"
+                            size="small"
+                            disabled={
+                              userLevelLoading !== null || disableButton(user)
+                            }
+                            className={`disabled:opacity-50 disabled:cursor-not-allowed`}
+                            onClick={handleCancelModal}
+                          >
+                            Reject All Weeks
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <CancellationModal
-                  title="Reject All Weeks"
-                  subtitle="Are you sure you want to Reject All Weeks Timesheets?"
-                  isOpen={rejectAllCancellationModal}
-                  onCancel={handleCancelModal}
-                  onConfirm={async (reason) => {
-                    setUserLevelLoading(user.userId);
-                    setActionLoading(true);
-                    try {
-                      await handleSelectAllWeeks(user, "REJECTED", reason);
-                    } finally {
-                      setUserLevelLoading(null);
-                      setActionLoading(false);
-                      handleCancelModal();
-                    }
-                  }}
-                  isLoading={actionLoading}
-                  confirmText="Confirm"
-                />
-                <ConfirmationModal
-                  title="Approve All Weeks"
-                  message="Are you sure you want to Approve All Weeks Timesheets?"
-                  isOpen={approveAllWeeks}
-                  onCancel={handleApproveAllWeeks}
-                  onConfirm={async () => {
-                    setUserLevelLoading(user.userId);
-                    setActionLoading(true);
-                    try {
-                      await handleSelectAllWeeks(user, "APPROVED");
-                    } finally {
-                      setUserLevelLoading(null);
-                      setActionLoading(false);
-                    }
-                  }}
-                  isLoading={actionLoading}
-                />
-                <hr className="my-3 border-gray-200" />
-                {renderUserWeeks(user)}
-              </div>
-            ))
+                  <CancellationModal
+                    title="Reject All Weeks"
+                    subtitle="Are you sure you want to Reject All Weeks Timesheets?"
+                    isOpen={rejectAllCancellationModal}
+                    onCancel={handleCancelModal}
+                    onConfirm={async (reason) => {
+                      setUserLevelLoading(user.userId);
+                      setActionLoading(true);
+                      try {
+                        await handleSelectAllWeeks(user, "REJECTED", reason);
+                      } finally {
+                        setUserLevelLoading(null);
+                        setActionLoading(false);
+                        handleCancelModal();
+                      }
+                    }}
+                    isLoading={actionLoading}
+                    confirmText="Confirm"
+                  />
+                  <ConfirmationModal
+                    title="Approve All Weeks"
+                    message="Are you sure you want to Approve All Weeks Timesheets?"
+                    isOpen={approveAllWeeks}
+                    onCancel={handleApproveAllWeeks}
+                    onConfirm={async () => {
+                      setUserLevelLoading(user.userId);
+                      setActionLoading(true);
+                      try {
+                        await handleSelectAllWeeks(user, "APPROVED");
+                      } finally {
+                        setUserLevelLoading(null);
+                        setActionLoading(false);
+                      }
+                    }}
+                    isLoading={actionLoading}
+                  />
+
+                  {isExpanded && (
+                    <>
+                      <hr className="my-3 border-gray-200" />
+                      {renderUserWeeks(user)}
+                    </>
+                  )}
+                </div>
+              );
+            })
           )}
         </>
       )}

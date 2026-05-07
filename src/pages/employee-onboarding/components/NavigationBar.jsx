@@ -3,6 +3,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useEffect } from "react";
+
 export default function OnboardingNavBar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -12,20 +13,22 @@ export default function OnboardingNavBar() {
   const isManager = hasRole(["MANAGER"]);
   const isGeneral = hasRole(["GENERAL"]);
   const isHR = hasRole(["HR"]);
- const isOnlyGeneral =
-  hasRole(["GENERAL"]) &&
-  !hasRole(["HR"]) &&
-  !hasRole(["MANAGER"]) &&
-  !hasRole(["ADMIN"]);
+  
+  const isOnlyGeneral =
+    hasRole(["GENERAL"]) &&
+    !hasRole(["HR"]) &&
+    !hasRole(["MANAGER"]) &&
+    !hasRole(["ADMIN"]);
 
- useEffect(() => {
-  if (
-    isOnlyGeneral &&
-    location.pathname === "/employee-onboarding"
-  ) {
-    navigate("/employee-onboarding/employee-directory", { replace: true });
-  }
-}, [isOnlyGeneral, location.pathname]);
+  useEffect(() => {
+    if (
+      isOnlyGeneral &&
+      location.pathname === "/employee-onboarding"
+    ) {
+      navigate("/employee-onboarding/employee-directory", { replace: true });
+    }
+  }, [isOnlyGeneral, location.pathname, navigate]);
+
   /* ================= HIDE NAVBAR ================= */
 
   const hideNavbarRoutes = [
@@ -39,10 +42,9 @@ export default function OnboardingNavBar() {
   /* ================= PARENT NAV ================= */
 
   const parentNav = [
-
-    // ✅ Dashboard → HR, MANAGER
+    // ✅ Insights & Analytics → HR, MANAGER
     ...(hasRole(["HR", "MANAGER"]) ? [{
-      label: "Onboarding Dashboard",
+      label: "Insights & Analytics",
       match: [
         "/employee-onboarding/onboarding-summary",
         "/employee-onboarding/analytics"
@@ -50,24 +52,23 @@ export default function OnboardingNavBar() {
       redirect: "/employee-onboarding/onboarding-summary",
     }] : []),
 
-    // ✅ Task → HR, ADMIN, MANAGER
+    // ✅ Onboarding Management → HR, ADMIN, MANAGER
     ...((isHR || isAdmin || isManager) ? [{
-      label: "Onboarding Task",
+      label: "Onboarding Management",
       match: [
         "/employee-onboarding",
         "/employee-onboarding/create",
         "/employee-onboarding/bulk-upload",
         "/employee-onboarding/onboarding-task",
         "/employee-onboarding/hr-configuration",
-        // "/employee-onboarding/admin",
       ],
       exactRoot: true,
       redirect: isManager && isGeneral
-      ? "/employee-onboarding/admin/approval-dashboard"
-      :"/employee-onboarding",
+        ? "/employee-onboarding/admin/approval-dashboard"
+        : "/employee-onboarding",
     }] : []),
 
-    // ✅ Directory → ALL
+    // ✅ People Directory → ALL
     {
       label: "Employee Directory",
       match: [
@@ -78,9 +79,9 @@ export default function OnboardingNavBar() {
       redirect: "/employee-onboarding/employee-directory",
     },
 
-    // ✅ Documents → HR, MANAGER
+    // ✅ Document Center → HR, MANAGER
     ...(hasRole(["HR", "MANAGER"]) ? [{
-      label: "Employee Documents",
+      label: "Document Center",
       match: [
         "/employee-onboarding/employeedocuments",
         "/employee-onboarding/document-templates",
@@ -89,287 +90,178 @@ export default function OnboardingNavBar() {
       redirect: "/employee-onboarding/employeedocuments",
     }] : []),
 
-    // ✅ Weekly → HR, MANAGER
+    // ✅ Workforce Reports → HR, MANAGER
     ...(hasRole(["HR", "MANAGER"]) ? [{
-      label: "Weekly Workforce Summary",
+      label: "Workforce Reports",
       match: ["/employee-onboarding/weekly-joining-report-dashboard"],
       redirect: "/employee-onboarding/weekly-joining-report-dashboard",
     }] : []),
 
-
-//  Employee Verification (Parent → HR + MANAGER)
-...(hasRole(["HR", "MANAGER"]) ? [{
-  label: "Employee Verification",
-  redirect: hasRole(["HR"])
-    ? "/employee-onboarding/hr"
-    : "/employee-onboarding/core-employee",
-  children: [
-    ...(hasRole(["HR"]) ? [
-      { label: "HR Verification", path: "/employee-onboarding/hr" },
-      { label: "Background Check", path: "/employee-onboarding/backgroundcheck" },
-    ] : []),
-
-    ...(hasRole(["HR", "MANAGER"]) ? [
-      { label: "Core Employee", path: "/employee-onboarding/core-employee" }
-    ] : []),
-  ]
-}] : []),
-    // ✅ Exit → HR, MANAGER
+    // ✅ Compliance & Verification (Parent → HR + MANAGER)
     ...(hasRole(["HR", "MANAGER"]) ? [{
-      label: "Employee Exit",
+      label: "Compliance & Verification",
+      redirect: hasRole(["HR"])
+        ? "/employee-onboarding/hr"
+        : "/employee-onboarding/core-employee",
+      children: [
+        ...(hasRole(["HR"]) ? [
+          { label: "Internal Audit", path: "/employee-onboarding/hr" },
+          { label: "BGC Screening", path: "/employee-onboarding/backgroundcheck" },
+        ] : []),
+        ...(hasRole(["HR", "MANAGER"]) ? [
+          { label: "Profile Hub", path: "/employee-onboarding/core-employee" }
+        ] : []),
+      ]
+    }] : []),
+
+    // ✅ Offboarding → HR, MANAGER
+    ...(hasRole(["HR", "MANAGER"]) ? [{
+      label: "Offboarding",
       match: ["/employee-exit"],
       redirect: "/employee-exit",
     }] : []),
-
   ];
 
-  /* ================= TASK NAV ================= */
+  /* ================= SUB-NAV DEFINITIONS ================= */
 
-  const taskNav = [
-  ...(!isOnlyGeneral
-      ? [{ label: "Task Dashboard", path: "/employee-onboarding" }]
+  const managementNav = [
+    ...(!isOnlyGeneral
+      ? [{ label: "Workflow Overview", path: "/employee-onboarding" }]
       : []),
-
     ...(hasRole(["HR"]) ? [
-      { label: "Create Offer", path: "/employee-onboarding/create" },
-      { label: "Bulk Upload", path: "/employee-onboarding/bulk-upload" }
+      { label: "Offer Management", path: "/employee-onboarding/create" },
+      { label: "Data Import", path: "/employee-onboarding/bulk-upload" }
     ] : []),
-
     ...(hasRole(["HR", "ADMIN"]) ? [
-      { label: "Add Tasks", path: "/employee-onboarding/onboarding-task" }
+      { label: "Task Configuration", path: "/employee-onboarding/onboarding-task" }
     ] : []),
-
     ...(hasRole(["HR", "ADMIN"]) ? [
-      { label: "HR Configuration", path: "/employee-onboarding/hr-configuration" }
+      { label: "System Settings", path: "/employee-onboarding/hr-configuration" }
     ] : []),
-
-
     ...(isManager && !isAdmin ? [
-      { label: "Approval Dashboard", path: "/employee-onboarding/admin/approval-dashboard" }
+      { label: "Pending Approvals", path: "/employee-onboarding/admin/approval-dashboard" }
     ] : []),
   ];
 
-  /* ================= DASHBOARD NAV ================= */
-
-  const dashboardNav = [
-    { label: "Summary", path: "/employee-onboarding/onboarding-summary" },
-    { label: "Analytics", path: "/employee-onboarding/analytics" },
+  const insightsNav = [
+    { label: "Executive Summary", path: "/employee-onboarding/onboarding-summary" },
+    { label: "Operational Metrics", path: "/employee-onboarding/analytics" },
   ];
-
-  /* ================= DIRECTORY NAV ================= */
 
   const directoryNav = [
-  // ✅ ALL
-  {
-    label: "Employee Directory",
-    path: "/employee-onboarding/employee-directory",
-  },
-
-  // ✅ ONLY HR + MANAGER
-  ...(isHR || isManager
-    ? [
-        {
-          label: "Employee List",
-          path: "/employee-onboarding/employeelist",
-        },
-      ]
-    : []),
-
-  // ✅ ALL
-  {
-    label: "Organization Tree",
-    path: "/employee-onboarding/organization-tree",
-  },
-];
-
-  /* ================= DOCUMENT NAV ================= */
+    { label: "Employee Directory", path: "/employee-onboarding/employee-directory" },
+    ...(isHR || isManager ? [{ label: "Member Records", path: "/employee-onboarding/employeelist" }] : []),
+    { label: "Org Chart", path: "/employee-onboarding/organization-tree" },
+  ];
 
   const documentsNav = [
-    ...(hasRole(["HR", "MANAGER"]) ? [
-      { label: "Employee Documents", path: "/employee-onboarding/employeedocuments" }
-    ] : []),
-
+    ...(hasRole(["HR", "MANAGER"]) ? [{ label: "Personnel Files", path: "/employee-onboarding/employeedocuments" }] : []),
     ...(hasRole(["HR"]) ? [
-      { label: "Document Templates", path: "/employee-onboarding/document-templates" },
-      { label: "Organization Documents", path: "/employee-onboarding/organization-documents" }
+      { label: "e-Form Templates", path: "/employee-onboarding/document-templates" },
+      { label: "Corporate Policies", path: "/employee-onboarding/organization-documents" }
     ] : []),
   ];
 
-  /* ================= HR NAV ================= */
-
-  const hrNav = [
+  const complianceNav = [
     ...(hasRole(["HR"]) ? [
-      { label: "HR Verification", path: "/employee-onboarding/hr" },
-      { label: "Background Check", path: "/employee-onboarding/backgroundcheck" }
+      { label: "Internal Audit", path: "/employee-onboarding/hr" },
+      { label: "BGC Screening", path: "/employee-onboarding/backgroundcheck" }
     ] : []),
-
-    ...(hasRole(["HR", "ADMIN", "MANAGER"]) ? [
-      { label: "Core Employee", path: "/employee-onboarding/core-employee" }
-    ] : []),
+    ...(hasRole(["HR", "ADMIN", "MANAGER"]) ? [{ label: "Profile Hub", path: "/employee-onboarding/core-employee" }] : []),
   ];
 
-  /* ================= WEEKLY NAV ================= */
-
-  const weeklyNav = [
-    { label: "Weekly Dashboard", path: "/employee-onboarding/weekly-joining-report-dashboard" },
+  const reportsNav = [
+    { label: "Reporting Dashboard", path: "/employee-onboarding/weekly-joining-report-dashboard" },
   ];
 
-  /* ================= EXIT NAV ================= */
-
-  const exitNav = [
-    { label: "Exit Dashboard", path: "/employee-exit" },
+  const offboardingNav = [
+    { label: "Offboarding Overview", path: "/employee-exit" },
   ];
 
-  /* ================= NAV SWITCH ================= */
+  /* ================= NAV SWITCH LOGIC ================= */
 
-  // let navToRender = taskNav;
-  let navToRender =  taskNav;
+  let navToRender = managementNav; // Default
 
-  if (location.pathname.startsWith("/employee-onboarding/onboarding-summary") ||
-      location.pathname.startsWith("/employee-onboarding/analytics")) {
-    navToRender = dashboardNav;
-  }
-  else if (location.pathname.startsWith("/employee-onboarding/employee-directory") ||
-           location.pathname.startsWith("/employee-onboarding/employeelist") ||
-           location.pathname.startsWith("/employee-onboarding/organization-tree")) {
+  const path = location.pathname;
+
+  if (path.startsWith("/employee-onboarding/onboarding-summary") || path.startsWith("/employee-onboarding/analytics")) {
+    navToRender = insightsNav;
+  } 
+  else if (path.startsWith("/employee-onboarding/employee-directory") || path.startsWith("/employee-onboarding/employeelist") || path.startsWith("/employee-onboarding/organization-tree")) {
     navToRender = directoryNav;
-  }
-  else if (location.pathname.startsWith("/employee-onboarding/employeedocuments") ||
-           location.pathname.startsWith("/employee-onboarding/document-templates") ||
-           location.pathname.startsWith("/employee-onboarding/organization-documents")) {
+  } 
+  else if (path.startsWith("/employee-onboarding/employeedocuments") || path.startsWith("/employee-onboarding/document-templates") || path.startsWith("/employee-onboarding/organization-documents")) {
     navToRender = documentsNav;
-  }
-  else if (location.pathname.startsWith("/employee-onboarding/hr") ||
-           location.pathname.startsWith("/employee-onboarding/backgroundcheck") ||
-           location.pathname.startsWith("/employee-onboarding/core-employee")) {
-    navToRender = hrNav;
-  }
-  else if (location.pathname.startsWith("/employee-onboarding/weekly-joining-report-dashboard")) {
-    navToRender = weeklyNav;
-  }
-  else if (location.pathname.startsWith("/employee-exit")) {
-    navToRender = exitNav;
+  } 
+  else if (path.startsWith("/employee-onboarding/hr") || path.startsWith("/employee-onboarding/backgroundcheck") || path.startsWith("/employee-onboarding/core-employee")) {
+    // 💡 This block handles compliance. Since 'hr-configuration' starts with 'hr', 
+    // we explicitly check to ensure hr-configuration stays in Management Nav.
+    if (path.startsWith("/employee-onboarding/hr-configuration")) {
+        navToRender = managementNav;
+    } else {
+        navToRender = complianceNav;
+    }
+  } 
+  else if (path.startsWith("/employee-onboarding/weekly-joining-report-dashboard")) {
+    navToRender = reportsNav;
+  } 
+  else if (path.startsWith("/employee-exit")) {
+    navToRender = offboardingNav;
+  } 
+  else if (path.startsWith("/employee-onboarding")) {
+    navToRender = managementNav;
   }
 
   /* ================= RENDER ================= */
-   return (
+  return (
     <div>
+      {/* PARENT NAVBAR */}
+      <div className="relative border-b bg-white z-30">
+        <div className="flex gap-6 px-6 py-1">
+          {parentNav.map((item) => {
+            const isActive = (() => {
+              if (item.match) {
+                return item.match.some((p) => {
+                  if (item.exactRoot && p === "/employee-onboarding") return path === "/employee-onboarding";
+                  if (path.startsWith("/employee-onboarding/admin")) return p === "/employee-onboarding/admin";
+                  return path === p || path.startsWith(p + "/");
+                });
+              }
+              if (item.children) {
+                return item.children.some((child) => path === child.path || path.startsWith(child.path + "/"));
+              }
+              return false;
+            })();
 
-    {/* ================= PARENT NAVBAR (TOP) ================= */}
-
-    <div className="relative border-b bg-white z-30">
-      <div className="flex gap-6 px-6 py-1">
-
-        {parentNav.map((item) => {
-
-
-const isActive = (() => {
-
-  if (item.match) {
-    return item.match.some((path) => {
-
-      // ✅ Fix: exact root should NOT match subroutes
-      if (item.exactRoot && path === "/employee-onboarding") {
-        return location.pathname === "/employee-onboarding";
-      }
-
-      // ✅ Prevent admin route matching for non-admin tabs
-      if (location.pathname.startsWith("/employee-onboarding/admin")) {
-        return path === "/employee-onboarding/admin";
-      }
-
-      return (
-        location.pathname === path ||
-        location.pathname.startsWith(path + "/")
-      );
-    });
-  }
-
-  if (item.children) {
-    return item.children.some((child) =>
-      location.pathname === child.path ||
-      location.pathname.startsWith(child.path + "/")
-    );
-  }
-
-  return false;
-})();
-          return (
-            <div
-              key={item.label}
-              onClick={() => navigate(item.redirect)}
-              className="relative cursor-pointer py-1 text-sm font-semibold"
-            >
-              <span
-                className={
-                  isActive
-                    ? "text-gray-900"
-                    : "text-gray-500 hover:text-gray-900"
-                }
-              >
-                {item.label}
-               </span>
-
-              {/* Green triangle indicator */}
-              {isActive && (
-                <span
-                 className="absolute left-1/2 -bottom-[6px] -translate-x-1/2
-                  h-0 w-0 z-40
-                  border-l-8 border-r-8 border-b-8
-                  border-l-transparent border-r-transparent border-b-blue-700"
-                />
-              )}
-            </div>
-          );
-        })}
+            return (
+              <div key={item.label} onClick={() => navigate(item.redirect)} className="relative cursor-pointer py-1 text-sm font-semibold">
+                <span className={isActive ? "text-gray-900" : "text-gray-500 hover:text-gray-900"}>{item.label}</span>
+                {isActive && (
+                  <span className="absolute left-1/2 -bottom-[6px] -translate-x-1/2 h-0 w-0 z-40 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent border-b-blue-700" />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
 
-     <div className="relative border-b bg-gray-200 mt-4 z-10">
-       <div className="flex gap-6 px-6">
-         {navToRender.map((item) => {
+      {/* SECONDARY NAVBAR */}
+      <div className="relative border-b bg-gray-200 mt-4 z-10">
+        <div className="flex gap-6 px-6">
+          {navToRender.map((item) => {
+            let isActive = item.path === "/employee-onboarding" ? path === "/employee-onboarding" : path === item.path || path.startsWith(item.path + "/");
 
-          let isActive = false;
-
-          // 🔴 FIX: First tab should match EXACTLY only
-          if (item.path === "/employee-onboarding") {
-            isActive = location.pathname === "/employee-onboarding";
-          } else {
-            isActive =
-              location.pathname === item.path ||
-              location.pathname.startsWith(item.path + "/");
-          }
-
-          return (
-            <div
-              key={item.label}
-              onClick={() => navigate(item.path)}
-              className="relative cursor-pointer py-1 text-sm font-medium"
-            >
-              <span
-                className={
-                  isActive
-                    ? "text-gray-900"
-                    : "text-gray-500 hover:text-gray-900"
-                }
-              >
-                {item.label}
-              </span>
-
-              {isActive && (
-                <span
-                  className="absolute left-1/2 -bottom-1 h-0 w-0 
-                  -translate-x-1/2 
-                  border-l-8 border-r-8 border-t-8
-                  border-l-transparent border-r-transparent border-t-green-500"
-                />
-              )}
-            </div>
-          );
-        })}
+            return (
+              <div key={item.label} onClick={() => navigate(item.path)} className="relative cursor-pointer py-1 text-sm font-medium">
+                <span className={isActive ? "text-gray-900" : "text-gray-500 hover:text-gray-900"}>{item.label}</span>
+                {isActive && (
+                  <span className="absolute left-1/2 -bottom-1 h-0 w-0 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-green-500" />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
     </div>
   );
 }
-  

@@ -315,12 +315,26 @@ const TimesheetHistoryPage = () => {
       });
     });
 
+    // ✅ Include a week when at least one of its days has a logged entry
+    //    whose workDate falls inside the selected [start, end] range.
+    //    Compare as YYYY-MM-DD strings to avoid timezone drift.
+    const toYMD = (d) => {
+      if (!d) return "";
+      if (typeof d === "string") return d.slice(0, 10);
+      const dt = new Date(d);
+      return isNaN(dt) ? "" : dt.toISOString().slice(0, 10);
+    };
+
     const matchesDate =
       (!filterStartDate && !filterEndDate) ||
-      ((!filterStartDate ||
-        new Date(weekGroup.weekStart) >= new Date(filterStartDate)) &&
-        (!filterEndDate ||
-          new Date(weekGroup.weekEnd) <= new Date(filterEndDate)));
+      (Array.isArray(weekGroup.timesheets) &&
+        weekGroup.timesheets.some((ts) => {
+          const ymd = toYMD(ts.workDate);
+          if (!ymd) return false;
+          if (filterStartDate && ymd < filterStartDate) return false;
+          if (filterEndDate && ymd > filterEndDate) return false;
+          return Array.isArray(ts.entries) && ts.entries.length > 0;
+        }));
 
     const matchesStatus =
       filterStatus === "All Status" || weekGroup.status === filterStatus;

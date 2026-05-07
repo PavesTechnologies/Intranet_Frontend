@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
 import TestRunAccordion from "./TestRuns";
+import { toast } from "react-toastify";
 
 export default function RunListForCycle({
   projectId,
@@ -16,13 +17,26 @@ export default function RunListForCycle({
     setLoading(true);
     try {
       const res = await axiosInstance.get(
-        `/test-execution/test-runs/cycles/${cycleId}` // ✅ correct
+        `/test-execution/test-runs/cycles/${cycleId}`
       );
       setRuns(res.data || []);
     } catch (err) {
       console.error("Error loading runs:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ── Delete handler ────────────────────────────────────────────────────────
+  const handleDelete = async (runId) => {
+    if (!window.confirm("Are you sure you want to delete this test run?")) return;
+    try {
+      await axiosInstance.delete(`/test-execution/test-runs/${runId}`);
+      toast.success("Test run deleted successfully");
+      loadRuns();
+    } catch (err) {
+      console.error("Error deleting run:", err);
+      toast.error("Failed to delete test run");
     }
   };
 
@@ -47,6 +61,7 @@ export default function RunListForCycle({
             run={run}
             projectId={projectId}
             refreshRuns={loadRuns}
+            onDelete={handleDelete}         // ✅ NEW
           />
         ))
       )}

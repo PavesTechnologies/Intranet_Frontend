@@ -171,11 +171,10 @@ export default function OffersTable({
               onChange={() =>
                 isCheckboxEnabled && toggleSelect(offer.user_uuid)
               }
-              className={`h-4 w-4 ${
-                isCheckboxEnabled
+              className={`h-4 w-4 ${isCheckboxEnabled
                   ? "cursor-pointer"
                   : "cursor-not-allowed opacity-40"
-              }`}
+                }`}
             />
           ),
         }),
@@ -190,8 +189,8 @@ export default function OffersTable({
         contact: offer.contact_number || "—",
         designation: offer.designation
           ? offer.designation
-              .toLowerCase()
-              .replace(/\b\w/g, (c) => c.toUpperCase())
+            .toLowerCase()
+            .replace(/\b\w/g, (c) => c.toUpperCase())
           : "—",
         employee_type: offer.employee_type || "—",
         status: displayStatus ? (
