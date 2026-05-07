@@ -625,6 +625,7 @@ import DateRangePicker from "./DateRangePicker";
 import { useRecordLock } from "../hooks/useRecordLock";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -816,6 +817,8 @@ export default function ManagerEditLeaveRequest({
     end: "none",
   });
 
+  const [initialSnapshot, setInitialSnapshot] = useState(null);
+
   const { user } = useAuth();
   const { locked, lockedBy, lockMessage, manualReleaseLock } = useRecordLock({
     tableName: "leave_request",
@@ -844,6 +847,17 @@ export default function ManagerEditLeaveRequest({
     setHalfDayConfig({
       start: isCustom ? requestDetails.startSession || "fullday" : "none",
       end: isCustom ? requestDetails.endSession || "fullday" : "none",
+    });
+
+    setInitialSnapshot({
+      startDate: requestDetails.startDate || "",
+      endDate: requestDetails.endDate || "",
+      leaveTypeId: requestDetails.leaveTypeId || "",
+      managerComment: requestDetails.managerComment || "",
+      halfDayConfig: {
+        start: isCustom ? requestDetails.startSession || "fullday" : "none",
+        end: isCustom ? requestDetails.endSession || "fullday" : "none",
+      },
     });
 
     const fetchData = async () => {
@@ -975,7 +989,7 @@ export default function ManagerEditLeaveRequest({
     onClose();
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSubmitting(true);
@@ -992,12 +1006,21 @@ export default function ManagerEditLeaveRequest({
       year,
     };
 
-    onSave(requestDetails.leaveId, updatedData);
-    setSubmitting(false);
+    try {
+      await onSave(requestDetails.leaveId, updatedData);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const hasBalanceError =
     balanceWarning !== "" && !selectedLeaveType?.isInfinite;
+
+
+  const hasChanges = initialSnapshot
+  ? JSON.stringify({ startDate, endDate, leaveTypeId, managerComment, halfDayConfig }) !==
+    JSON.stringify(initialSnapshot)
+  : false;
 
   if (!isOpen) return null;
 
@@ -1266,30 +1289,31 @@ export default function ManagerEditLeaveRequest({
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-            <button
+            <Button
               type="button"
               onClick={handleClose}
               disabled={submitting || isLockedByOther}
-              className="px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+              variant="ghost"
+              size="medium"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={
-                submitting || loadingData || isLockedByOther || hasBalanceError
+                submitting ||
+                loadingData ||
+                isLockedByOther ||
+                hasBalanceError ||
+                !hasChanges
               }
-              className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              variant="primary"
+              size="medium"
+              loading={submitting}
+              loadingText="Saving..."
             >
-              {submitting ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </button>
+              Save Changes
+            </Button>
           </div>
         </form>
       </div>

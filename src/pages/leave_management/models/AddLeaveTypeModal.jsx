@@ -4,6 +4,7 @@ import axios from "axios";
 import { Listbox, Transition } from "@headlessui/react";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -298,6 +299,13 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
     }
   };
 
+  const isGenderBased = isGenderBasedLeave(formData.leaveName);
+
+  const isFormValid =
+    formData.leaveName &&
+    formData.effectiveStartDate &&
+    (isGenderBased ? formData.gender : formData.accrualFrequency);
+
   if (!isOpen) return null;
 
   return (
@@ -316,14 +324,15 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               {editData ? "Edit Leave Type" : "Add New Leave Type"}
             </h2>
           </div>
-          <button
+          <Button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            variant=""
             type="button"
+            size="small"
             disabled={submitting}
           >
             <X className="w-6 h-6" />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
@@ -640,25 +649,25 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
 
           {/* Buttons */}
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200">
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto px-6 py-3 rounded-lg text-gray-800 border border-gray-300 hover:bg-gray-100 font-medium transition-colors"
+              variant="ghost"
+              size="medium"
               disabled={submitting}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="w-full sm:w-auto px-6 py-3 rounded-lg bg-green-600 text-white hover:bg-green-700 font-medium transition-colors flex items-center justify-center"
-              disabled={submitting}
+              variant="primary"
+              size="medium"
+              loading={submitting}
+              loadingText={editData ? "Updating..." : "Adding..."}
+              disabled={!isFormValid}
             >
-              {submitting
-                ? "Submitting..."
-                : editData
-                  ? "Update Leave Type"
-                  : "Add Leave Type"}
-            </button>
+              {editData ? "Update Leave Type" : "Add Leave Type"}
+            </Button>
           </div>
         </form>
       </div>
