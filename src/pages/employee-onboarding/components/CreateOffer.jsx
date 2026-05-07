@@ -38,7 +38,7 @@ export default function CreateOffer() {
     contact_number: "",
     designation: "",
     employee_type: "",
-    cc_mails: [],
+    cc_emails: [],
     currency: "INR",
   });
 
@@ -190,7 +190,7 @@ export default function CreateOffer() {
   const handleCreateOffer = async () => {
     const payload = {
       ...formData,
-      cc_mails: formData.cc_mails.map((c) => c.value) || [],
+      cc_emails: formData.cc_emails.map((c) => c.value) || [],
       compensation_components: components.map((c) => ({
         name: c.name,
         type: c.type,
@@ -356,8 +356,8 @@ export default function CreateOffer() {
                 label="CC Mails"
                 isMulti
                 options={ccOptions}
-                value={formData.cc_mails}
-                onChange={(v) => setFormData({ ...formData, cc_mails: v || [] })}
+                value={formData.cc_emails}
+                onChange={(v) => setFormData({ ...formData, cc_emails: v || [] })}
               />
 
               <div className="flex justify-end">
