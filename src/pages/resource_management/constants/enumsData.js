@@ -2,7 +2,7 @@ export const STATIC_ENUMS = {
     "FieldType": ["STRING", "LONG", "UUID", "ENUM", "BIG_DECIMAL", "LOCAL_DATE_TIME"],
     "AllocationStatus": ["PLANNED", "ACTIVE", "ENDED", "CANCELLED"],
     "DeliveryModel": ["ONSITE", "OFFSHORE", "HYBRID"],
-    "PriorityLevel": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+    "PriorityLevel": ["LOW", "MEDIUM", "HIGH"],
     "RecordStatus": ["ACTIVE", "INACTIVE", "ON_HOLD"],
     "RiskLevel": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
     "AssetCategory": ["DEVICE", "SOFTWARE", "ACCESS", "TOOLS"],

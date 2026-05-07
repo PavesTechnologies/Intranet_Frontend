@@ -4,20 +4,21 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import { toast } from "react-toastify";
 import { User, Briefcase, FileText, Plus, Trash2 } from "lucide-react";
 
 export default function CreateOffer() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
-  // --- ADD THESE LINES HERE ---
+
   // This decodes the JWT payload to get the roles
   const userPayload = token ? JSON.parse(atob(token.split('.')[1])) : {};
   const rawRoles = userPayload.roles || "";
-  
+
   // This turns "HR, General" into ["HR", "General"] so it's easy to check
-  const userRoles = Array.isArray(rawRoles) 
-    ? rawRoles 
+  const userRoles = Array.isArray(rawRoles)
+    ? rawRoles
     : rawRoles.split(',').map(r => r.trim());
 
   const isHR = userRoles.includes("HR");
@@ -30,13 +31,15 @@ export default function CreateOffer() {
 
   const [formData, setFormData] = useState({
     first_name: "",
+    middle_name: "",
     last_name: "",
     mail: "",
     country_code: "",
     contact_number: "",
     designation: "",
     employee_type: "",
-    cc_mails: [],
+    cc_emails: [],
+    currency: "INR",
   });
 
   const [components, setComponents] = useState([
@@ -55,11 +58,37 @@ export default function CreateOffer() {
     { label: "Bonus", value: "Bonus" },
   ];
 
+  const componentOptions = [
+    { label: "Basic Salary", value: "Basic Salary" },
+    { label: "HRA", value: "HRA" },
+    { label: "Special Allowance", value: "Special Allowance" },
+    { label: "Conveyance Allowance", value: "Conveyance Allowance" },
+    { label: "Medical Allowance", value: "Medical Allowance" },
+    { label: "LTA", value: "LTA" },
+    { label: "Performance Bonus", value: "Performance Bonus" },
+    { label: "Food Allowance", value: "Food Allowance" },
+    { label: "Mobile Allowance", value: "Mobile Allowance" },
+    { label: "Gratuity", value: "Gratuity" },
+    { label: "PF (Employer Contribution)", value: "PF" },
+  ];
+
   const frequencyOptions = [
     { label: "Monthly", value: "Monthly" },
     { label: "Quarterly", value: "Quarterly" },
     { label: "Yearly", value: "Yearly" },
   ];
+
+  const currencyOptions = [
+    { label: "INR (₹)", value: "INR", symbol: "₹" },
+    { label: "USD ($)", value: "USD", symbol: "$" },
+    { label: "EUR (€)", value: "EUR", symbol: "€" },
+    { label: "GBP (£)", value: "GBP", symbol: "£" },
+    { label: "AED (د.إ)", value: "AED", symbol: "د.إ" },
+  ];
+
+  const getCurrencySymbol = (code) => {
+    return currencyOptions.find(opt => opt.value === code)?.symbol || "₹";
+  };
 
   /* ================= STEPS ================= */
 
@@ -149,17 +178,19 @@ export default function CreateOffer() {
     setComponents(components.filter((c) => c.id !== id));
   };
 
-  const totalCTC = components.reduce(
-    (sum, c) => sum + Number(c.amount || 0),
-    0,
-  );
+  const totalCTC = components.reduce((sum, c) => {
+    let multiplier = 1;
+    if (c.frequency === "Monthly") multiplier = 12;
+    if (c.frequency === "Quarterly") multiplier = 4;
+    return sum + Number(c.amount || 0) * multiplier;
+  }, 0);
 
   /* ================= CREATE OFFER ================= */
 
   const handleCreateOffer = async () => {
     const payload = {
       ...formData,
-      cc_mails: formData.cc_mails.map((c) => c.value) || [],
+      cc_emails: formData.cc_emails.map((c) => c.value) || [],
       compensation_components: components.map((c) => ({
         name: c.name,
         type: c.type,
@@ -182,13 +213,8 @@ export default function CreateOffer() {
         render: "Offer Created",
         type: "success",
         isLoading: false,
-        autoClose: 1200,
+        autoClose: 3000,
       });
-      //  // 🔥 OPEN PREVIEW IN NEW TAB
-      //   window.open(
-      //     `/employee-onboarding/offer-generated-preview/${res.data.offer_id}`,
-      //     "_blank"
-      //   );
       navigate(
         `/employee-onboarding/offer-generated-preview/${res.data.offer_id}`,
       );
@@ -197,6 +223,7 @@ export default function CreateOffer() {
         render: err.response?.data?.detail || "Error",
         type: "error",
         isLoading: false,
+        autoClose: 3000,
       });
     }
   };
@@ -204,43 +231,42 @@ export default function CreateOffer() {
   /* ================= UI ================= */
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="min-h-screen bg-gray-50 flex">
       {/* ===== PROGRESS SIDEBAR ===== */}
-      <div className="w-80 bg-gradient-to-b from-blue-700 to-blue-900 text-white p-10">
-        <h2 className="text-xl font-semibold mb-10">Offer Creation</h2>
+      <div className="w-80 bg-gradient-to-b from-blue-800 to-blue-950 text-white p-10 shadow-lg relative z-10">
+        <h2 className="text-2xl font-bold mt-6 mb-16 tracking-tight">Offer Creation</h2>
 
-        <div className="relative">
-          <div className="absolute left-5 top-0 bottom-0 w-[2px] bg-blue-500/40" />
+        <div className="relative mt-8">
+          <div className="absolute left-5 top-2 bottom-8 w-[2px] bg-blue-500/30" />
 
-          <div className="space-y-10">
+          <div className="space-y-20">
             {steps.map((step) => {
               const active = activeStep === step.id;
               const completed = activeStep > step.id;
 
               return (
-                <div key={step.id} className="flex gap-4 items-start">
+                <div key={step.id} className="flex gap-4 items-start relative z-10">
                   <div
                     className={`
-                      relative z-10 w-10 h-10 flex items-center justify-center rounded-full
-                      ${
-                        completed
-                          ? "bg-green-500"
-                          : active
-                            ? "bg-white text-blue-700"
-                            : "bg-blue-600"
+                      w-10 h-10 flex items-center justify-center rounded-full shadow-sm transition-all duration-300
+                      ${completed
+                        ? "bg-green-500 text-white"
+                        : active
+                          ? "bg-white text-blue-700 ring-4 ring-blue-500/20"
+                          : "bg-blue-800 text-blue-300 border border-blue-700"
                       }
                     `}
                   >
                     {step.icon}
                   </div>
 
-                  <div>
+                  <div className="pt-0.5">
                     <div
-                      className={`font-medium ${active ? "text-white" : "text-blue-100"}`}
+                      className={`font-semibold ${active ? "text-white" : "text-blue-100"}`}
                     >
                       {step.title}
                     </div>
-                    <div className="text-sm text-blue-200">{step.desc}</div>
+                    <div className="text-sm text-blue-200/80 mt-0.5">{step.desc}</div>
                   </div>
                 </div>
               );
@@ -250,250 +276,273 @@ export default function CreateOffer() {
       </div>
 
       {/* ===== CONTENT ===== */}
-      <div className="flex-1 p-10 space-y-6">
-        {/* STEP 1 */}
-        {activeStep === 1 && (
-          <>
-            <h3 className="text-2xl font-semibold">Candidate Info</h3>
+      <div className="flex-1 py-10 px-12 overflow-y-auto">
+        <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 p-8 space-y-6">
+          {/* STEP 1 */}
+          {activeStep === 1 && (
+            <>
+              <div className="border-b border-gray-100 pb-4 mb-6">
+                <h3 className="text-2xl font-semibold text-gray-800">Candidate Info</h3>
+                <p className="text-sm text-gray-500 mt-1">Provide the candidate's personal and professional details.</p>
+              </div>
 
-            <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-6">
+                <Input
+                  label="First Name"
+                  name="first_name"
+                  value={formData.first_name}
+                  onChange={handleChange}
+                />
+                <Input
+                  label="Middle Name"
+                  name="middle_name"
+                  value={formData.middle_name}
+                  onChange={handleChange}
+                />
+                <Input
+                  label="Last Name"
+                  name="last_name"
+                  value={formData.last_name}
+                  onChange={handleChange}
+                />
+              </div>
+
               <Input
-                label="First Name"
-                name="first_name"
-                value={formData.first_name}
+                label="Email"
+                name="mail"
+                value={formData.mail}
                 onChange={handleChange}
               />
+
+              <div className="grid grid-cols-2 gap-6">
+                <SelectInput
+                  label="Country Code"
+                  options={countries}
+                  value={countries.find(c => c.value === formData.country_code)}
+                  onChange={(v) =>
+                    setFormData({ ...formData, country_code: v?.value })
+                  }
+                />
+                <Input
+                  label="Contact Number"
+                  name="contact_number"
+                  value={formData.contact_number}
+                  onChange={handleChange}
+                />
+              </div>
+
               <Input
-                label="Middle Name"
-                name="middle_name"
-                value={formData.middle_name}
+                label="Designation"
+                name="designation"
+                value={formData.designation}
                 onChange={handleChange}
               />
-              <Input
-                label="Last Name"
-                name="last_name"
-                value={formData.last_name}
-                onChange={handleChange}
-              />
-            </div>
 
-            <Input
-              label="Email"
-              name="mail"
-              value={formData.mail}
-              onChange={handleChange}
-            />
-
-            <div className="grid grid-cols-2 gap-6">
               <SelectInput
-                label="Country Code"
-                options={countries}
+                label="Employee Type"
+                options={[
+                  { label: "Full-Time", value: "Full-Time" },
+                  { label: "Part-Time", value: "Part-Time" },
+                  { label: "Contractor", value: "Contractor" },
+                  { label: "Intern", value: "Intern" },
+                ]}
+                value={formData.employee_type ? { label: formData.employee_type, value: formData.employee_type } : null}
                 onChange={(v) =>
-                  setFormData({ ...formData, country_code: v?.value })
+                  setFormData({ ...formData, employee_type: v?.value })
                 }
               />
-              <Input
-                label="Contact Number"
-                name="contact_number"
-                value={formData.contact_number}
-                onChange={handleChange}
+
+              <SelectInput
+                label="CC Mails"
+                isMulti
+                options={ccOptions}
+                value={formData.cc_emails}
+                onChange={(v) => setFormData({ ...formData, cc_emails: v || [] })}
               />
-            </div>
 
-            <Input
-              label="Designation"
-              name="designation"
-              value={formData.designation}
-              onChange={handleChange}
-            />
-
-            <SelectInput
-              label="Employee Type"
-              options={[
-                { label: "Full-Time", value: "Full-Time" },
-                { label: "Part-Time", value: "Part-Time" },
-                { label: "Contractor", value: "Contractor" },
-                { label: "Intern", value: "Intern" },
-              ]}
-              onChange={(v) =>
-                setFormData({ ...formData, employee_type: v?.value })
-              }
-            />
-
-            <SelectInput
-              label="CC Mails"
-              isMulti
-              options={ccOptions}
-              value={formData.cc_mails}
-              onChange={(v) => setFormData({ ...formData, cc_mails: v || [] })}
-            />
-
-            <div className="flex justify-end">
-              <button
-                onClick={() => setActiveStep(2)}
-                className="px-6 py-2 bg-blue-700 text-white rounded-lg"
-              >
-                Continue →
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* STEP 2 */}
-        {activeStep === 2 && (
-          <>
-            <h3 className="text-2xl font-semibold">Compensation</h3>
-
-            <div className="bg-blue-50 p-4 rounded-lg">
-              Annual CTC: ₹ {totalCTC.toLocaleString()}
-            </div>
-
-            {components.map((c) => (
-              <div key={c.id} className="grid grid-cols-5 gap-4 items-end">
-                <Input
-                  label="Component"
-                  value={c.name}
-                  onChange={(e) =>
-                    handleComponentChange(c.id, "name", e.target.value)
-                  }
-                />
-                <SelectInput
-                  label="Type"
-                  options={typeOptions}
-                  value={typeOptions.find((opt) => opt.value === c.type)}
-                  onChange={(v) =>
-                    handleComponentChange(c.id, "type", v?.value)
-                  }
-                />
-
-                <SelectInput
-                  label="Frequency"
-                  options={frequencyOptions}
-                  value={frequencyOptions.find(
-                    (opt) => opt.value === c.frequency,
-                  )}
-                  onChange={(v) =>
-                    handleComponentChange(c.id, "frequency", v?.value)
-                  }
-                />
-                <Input
-                  type="number"
-                  label="Amount"
-                  value={c.amount}
-                  onChange={(e) =>
-                    handleComponentChange(c.id, "amount", e.target.value)
-                  }
-                />
-                <button onClick={() => removeComponent(c.id)}>
-                  <Trash2 size={18} className="text-red-500" />
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setActiveStep(2)}
+                  className="px-6 py-2 bg-blue-700 text-white rounded-lg"
+                >
+                  Continue →
                 </button>
               </div>
-            ))}
+            </>
+          )}
 
-            <button
-              onClick={addComponent}
-              className="flex items-center gap-2 text-blue-700"
-            >
-              <Plus size={16} /> Add Component
-            </button>
+          {/* STEP 2 */}
+          {activeStep === 2 && (
+            <>
+              <div className="border-b border-gray-100 pb-4 mb-6">
+                <h3 className="text-2xl font-semibold text-gray-800">Compensation</h3>
+                <p className="text-sm text-gray-500 mt-1">Define the salary components and structure.</p>
+              </div>
 
-            <div className="flex justify-between">
+              <div className="grid grid-cols-2 gap-6 items-end">
+                <SelectInput
+                  label="Currency"
+                  options={currencyOptions}
+                  value={currencyOptions.find(opt => opt.value === formData.currency)}
+                  onChange={(v) => setFormData({ ...formData, currency: v?.value })}
+                />
+                <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-2 h-[45px]">
+                  <span className="text-blue-700 font-medium">Annual CTC:</span>
+                  <span className="text-blue-900 font-bold">{getCurrencySymbol(formData.currency)} {totalCTC.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {components.map((c) => (
+                <div key={c.id} className="grid grid-cols-5 gap-4 items-end">
+                  <CreatableSelectInput
+                    label="Component"
+                    options={componentOptions}
+                    value={c.name ? { label: c.name, value: c.name } : null}
+                    onChange={(v) =>
+                      handleComponentChange(c.id, "name", v?.value)
+                    }
+                  />
+                  <SelectInput
+                    label="Type"
+                    options={typeOptions}
+                    value={typeOptions.find((opt) => opt.value === c.type)}
+                    onChange={(v) =>
+                      handleComponentChange(c.id, "type", v?.value)
+                    }
+                  />
+
+                  <SelectInput
+                    label="Frequency"
+                    options={frequencyOptions}
+                    value={frequencyOptions.find(
+                      (opt) => opt.value === c.frequency,
+                    )}
+                    onChange={(v) =>
+                      handleComponentChange(c.id, "frequency", v?.value)
+                    }
+                  />
+                  <Input
+                    type="number"
+                    label="Amount"
+                    value={c.amount}
+                    onChange={(e) =>
+                      handleComponentChange(c.id, "amount", e.target.value)
+                    }
+                  />
+                  <button onClick={() => removeComponent(c.id)}>
+                    <Trash2 size={18} className="text-red-500" />
+                  </button>
+                </div>
+              ))}
+
               <button
-                onClick={() => setActiveStep(1)}
-                className="px-6 py-2 bg-gray-200 rounded-lg"
+                onClick={addComponent}
+                className="flex items-center gap-2 text-blue-700"
               >
-                Back
+                <Plus size={16} /> Add Component
               </button>
-              <button
-                onClick={() => setActiveStep(3)}
-                className="px-6 py-2 bg-blue-700 text-white rounded-lg"
-              >
-                Continue →
-              </button>
-            </div>
-          </>
-        )}
 
-        {/* STEP 3 */}
-        {activeStep === 3 && (
-          <>
-            <h3 className="text-2xl font-semibold">Create Offer</h3>
+              <div className="flex justify-between">
+                <button
+                  onClick={() => setActiveStep(1)}
+                  className="px-6 py-2 bg-gray-200 rounded-lg"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => setActiveStep(3)}
+                  className="px-6 py-2 bg-blue-700 text-white rounded-lg"
+                >
+                  Continue →
+                </button>
+              </div>
+            </>
+          )}
 
-            {/* <div className="border rounded-lg p-6 text-sm space-y-2">
+          {/* STEP 3 */}
+          {activeStep === 3 && (
+            <>
+              <div className="border-b border-gray-100 pb-4 mb-6">
+                <h3 className="text-2xl font-semibold text-gray-800">Create Offer</h3>
+                <p className="text-sm text-gray-500 mt-1">Review the details before generating the official document.</p>
+              </div>
+
+              {/* <div className="border rounded-lg p-6 text-sm space-y-2">
               <p><b>Name:</b> {formData.first_name} {formData.middle_name} {formData.last_name}</p>
               <p><b>Email:</b> {formData.mail}</p>
               <p><b>Designation:</b> {formData.designation}</p>
               <p><b>Employee Type:</b> {formData.employee_type}</p>
               <p><b>Annual CTC:</b> ₹ {totalCTC.toLocaleString()}</p>
             </div> */}
-            <div className="border rounded-lg p-6 text-sm space-y-4">
-              <p>
-                <b>Name:</b> {formData.first_name} {formData.middle_name}{" "}
-                {formData.last_name}
-              </p>
-              <p>
-                <b>Email:</b> {formData.mail}
-              </p>
-              <p>
-                <b>Designation:</b> {formData.designation}
-              </p>
-              <p>
-                <b>Employee Type:</b> {formData.employee_type}
-              </p>
+              <div className="border rounded-lg p-6 text-sm space-y-4">
+                <p>
+                  <b>Name:</b> {formData.first_name} {formData.middle_name}{" "}
+                  {formData.last_name}
+                </p>
+                <p>
+                  <b>Email:</b> {formData.mail}
+                </p>
+                <p>
+                  <b>Designation:</b> {formData.designation}
+                </p>
+                <p>
+                  <b>Employee Type:</b> {formData.employee_type}
+                </p>
 
-              <p>
-                <b>Annual CTC:</b> ₹ {totalCTC.toLocaleString()}
-              </p>
+                <p>
+                  <b>Annual CTC:</b> {getCurrencySymbol(formData.currency)} {totalCTC.toLocaleString()}
+                </p>
 
-              {/* Salary Breakdown Table */}
+                {/* Salary Breakdown Table */}
 
-              <div className="mt-4">
-                <p className="font-semibold mb-2">Salary Breakdown:</p>
+                <div className="mt-4">
+                  <p className="font-semibold mb-2">Salary Breakdown:</p>
 
-                <table className="w-full border text-sm">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="border p-2">Component</th>
-                      <th className="border p-2">Type</th>
-                      <th className="border p-2">Frequency</th>
-                      <th className="border p-2">Amount</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {components.map((c) => (
-                      <tr key={c.id}>
-                        <td className="border p-2">{c.name}</td>
-                        <td className="border p-2">{c.type}</td>
-                        <td className="border p-2">{c.frequency}</td>
-                        <td className="border p-2">
-                          ₹ {Number(c.amount || 0).toLocaleString()}
-                        </td>
+                  <table className="w-full border text-sm">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="border p-2">Component</th>
+                        <th className="border p-2">Type</th>
+                        <th className="border p-2">Frequency</th>
+                        <th className="border p-2">Amount</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                    </thead>
 
-            <div className="flex justify-between">
-              <button onClick={()=>setActiveStep(2)} className="px-6 py-2 bg-gray-200 rounded-lg">Back</button>
-              {isHR ? (
-  <button 
-    onClick={handleCreateOffer} 
-    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-  >
-    Create Offer & Preview
-  </button>
-) : (
-  <div className="text-red-500 font-medium px-4 py-2 bg-red-50 border border-red-100 rounded-lg">
-    ⚠️ You do not have permission to generate this document.
-  </div>
-)}
-      
-            </div>
-          </>
-        )}
+                    <tbody>
+                      {components.map((c) => (
+                        <tr key={c.id}>
+                          <td className="border p-2">{c.name}</td>
+                          <td className="border p-2">{c.type}</td>
+                          <td className="border p-2">{c.frequency}</td>
+                          <td className="border p-2">
+                            {getCurrencySymbol(formData.currency)} {Number(c.amount || 0).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="flex justify-between">
+                <button onClick={() => setActiveStep(2)} className="px-6 py-2 bg-gray-200 rounded-lg">Back</button>
+                {isHR ? (
+                  <button
+                    onClick={handleCreateOffer}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Create Offer & Preview
+                  </button>
+                ) : (
+                  <div className="text-red-500 font-medium px-4 py-2 bg-red-50 border border-red-100 rounded-lg">
+                    ⚠️ You do not have permission to generate this document.
+                  </div>
+                )}
+
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -502,19 +551,137 @@ export default function CreateOffer() {
 /* SMALL COMPONENTS */
 
 function Input({ label, ...props }) {
+  const isFilled = props.value && props.value.toString().length > 0;
   return (
     <div>
-      <label className="text-sm block mb-1">{label}</label>
-      <input {...props} className="w-full border rounded-lg px-3 py-2" />
+      <label className="text-sm font-medium text-gray-700 block mb-1.5">{label}</label>
+      <input
+        {...props}
+        className={`w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm transition-all hover:border-gray-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none placeholder-gray-400 ${isFilled ? 'bg-blue-50' : 'bg-white'} shadow-sm`}
+      />
     </div>
   );
 }
 
 function SelectInput({ label, ...props }) {
+  const isFilled = props.value ? (Array.isArray(props.value) ? props.value.length > 0 : !!props.value) : false;
+  
+  const customStyles = {
+    control: (base, state) => ({
+      ...base,
+      borderRadius: '0.5rem',
+      borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+      backgroundColor: isFilled ? '#eff6ff' : 'white',
+      boxShadow: state.isFocused ? '0 0 0 4px rgba(59, 130, 246, 0.1)' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+      padding: '2px',
+      fontSize: '0.875rem',
+      transition: 'all 0.2s ease',
+      '&:hover': {
+        borderColor: state.isFocused ? '#3b82f6' : '#9ca3af'
+      }
+    }),
+    option: (base, state) => ({
+      ...base,
+      fontSize: '0.875rem',
+      backgroundColor: state.isSelected ? '#2563eb' : state.isFocused ? '#eff6ff' : 'transparent',
+      color: state.isSelected ? 'white' : '#1f2937',
+      cursor: 'pointer',
+    }),
+    menu: (base) => ({
+      ...base,
+      borderRadius: '0.5rem',
+      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+      overflow: 'hidden',
+    }),
+    multiValue: (base) => ({
+      ...base,
+      backgroundColor: '#eef2ff',
+      borderRadius: '6px',
+      border: '1px solid #e0e7ff',
+    }),
+    multiValueLabel: (base) => ({
+      ...base,
+      color: '#4338ca',
+      fontSize: '0.75rem',
+      fontWeight: '600',
+      padding: '2px 6px',
+    }),
+    multiValueRemove: (base) => ({
+      ...base,
+      color: '#4338ca',
+      cursor: 'pointer',
+      '&:hover': {
+        backgroundColor: '#e0e7ff',
+        color: '#3730a3',
+      },
+    }),
+  };
+
   return (
     <div>
-      <label className="text-sm block mb-1">{label}</label>
-      <Select {...props} />
+      <label className="text-sm font-medium text-gray-700 block mb-1.5">{label}</label>
+      <Select styles={customStyles} {...props} />
+    </div>
+  );
+}
+function CreatableSelectInput({ label, ...props }) {
+  const isFilled = props.value ? (Array.isArray(props.value) ? props.value.length > 0 : !!props.value) : false;
+
+  const customStyles = {
+    control: (base, state) => ({
+      ...base,
+      borderRadius: '0.5rem',
+      borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+      backgroundColor: isFilled ? '#eff6ff' : 'white',
+      boxShadow: state.isFocused ? '0 0 0 4px rgba(59, 130, 246, 0.1)' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+      padding: '2px',
+      fontSize: '0.875rem',
+      transition: 'all 0.2s ease',
+      '&:hover': {
+        borderColor: state.isFocused ? '#3b82f6' : '#9ca3af'
+      }
+    }),
+    option: (base, state) => ({
+      ...base,
+      fontSize: '0.875rem',
+      backgroundColor: state.isSelected ? '#2563eb' : state.isFocused ? '#eff6ff' : 'transparent',
+      color: state.isSelected ? 'white' : '#1f2937',
+      cursor: 'pointer',
+    }),
+    menu: (base) => ({
+      ...base,
+      borderRadius: '0.5rem',
+      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+      overflow: 'hidden',
+    }),
+    multiValue: (base) => ({
+      ...base,
+      backgroundColor: '#eef2ff',
+      borderRadius: '6px',
+      border: '1px solid #e0e7ff',
+    }),
+    multiValueLabel: (base) => ({
+      ...base,
+      color: '#4338ca',
+      fontSize: '0.75rem',
+      fontWeight: '600',
+      padding: '2px 6px',
+    }),
+    multiValueRemove: (base) => ({
+      ...base,
+      color: '#4338ca',
+      cursor: 'pointer',
+      '&:hover': {
+        backgroundColor: '#e0e7ff',
+        color: '#3730a3',
+      },
+    }),
+  };
+
+  return (
+    <div>
+      <label className="text-sm font-medium text-gray-700 block mb-1.5">{label}</label>
+      <CreatableSelect styles={customStyles} {...props} />
     </div>
   );
 }

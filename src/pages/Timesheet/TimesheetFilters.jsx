@@ -13,6 +13,22 @@ const TimesheetFilters = ({
   filterStatus,
   setFilterStatus,
 }) => {
+  const today = new Date();
+  const currentMonthStart = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    1,
+  );
+  const currentMonthEnd = new Date(
+    today.getFullYear(),
+    today.getMonth() + 1,
+    0,
+  );
+
+  const isCurrentMonthDate = (date) =>
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth();
+
   const handleDateChange = (update) => {
     const [start, end] = update;
     setFilterStartDate(start ? start.toLocaleDateString("en-CA") : "");
@@ -102,11 +118,16 @@ const TimesheetFilters = ({
           startDate={filterStartDate ? new Date(filterStartDate) : null}
           endDate={filterEndDate ? new Date(filterEndDate) : null}
           onChange={handleDateChange}
+          minDate={currentMonthStart}
+          maxDate={currentMonthEnd}
+          filterDate={isCurrentMonthDate}
+          openToDate={today}
           isClearable
           placeholderText="Select date range"
           dateFormat="yyyy-MM-dd"
           className="date-range-input"
           wrapperClassName="date-range-wrapper"
+          calendarClassName="timesheet-range-datepicker"
           style={{
             border: "none",
             fontSize: 15,

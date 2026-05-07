@@ -1,20 +1,33 @@
 import React from 'react';
-import { PriorityBadge, StateBadge, SLABadge, DemandTypeBadge, ScoreBadge } from './FormalBadges';
-import { Pencil, Trash2, Target, Briefcase, User, Clock } from "lucide-react";
+import { PriorityBadge, StateBadge, SLABadge } from './FormalBadges';
+import { Pencil, Briefcase, User, Clock, Check, Loader2, X, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "../../../../contexts/AuthContext";
 
 /**
  * DemandCardRow: Informative Workforce View
  * Redesigned for maximum clarity and logical information grouping.
  */
-const DemandCardRow = ({ demand, onView, onEdit, activeTab }) => {
-    const { user } = useAuth();
-    const roles = user?.roles || [];
-    const isRM = roles.includes("RESOURCE-MANAGER");
-    const isDM = roles.includes("DELIVERY-MANAGER");
-    const status = demand.lifecycleState?.toUpperCase();
-    const isEditDisabled = status === 'REJECTED' || (isDM && status === 'APPROVED');
+const DM_PENDING_STATUSES = ['REQUESTED', 'DRAFT', 'SOFT', 'PROPOSED', 'PENDING', 'OPEN', 'IN_PROGRESS', 'IN PROGRESS'];
+
+const normalizeRole = (role = "") =>
+    String(role)
+        .toUpperCase()
+        .replace(/^ROLE[-_]/, "")
+        .replace(/[^A-Z0-9]/g, "");
+
+const DemandCardRow = ({ demand, onView, onEdit, onApprove, onReject, onFulfill, onRMReject, decisionState, activeTab, viewerRole }) => {
+    const status = String(demand.lifecycleState || demand.demandStatus || '').toUpperCase();
+    const normalizedViewerRole = normalizeRole(viewerRole);
+    const isDMView = normalizedViewerRole === "DELIVERYMANAGER";
+    const isRMView = normalizedViewerRole === "RESOURCEMANAGER";
+    const canQuickDecision = isDMView && DM_PENDING_STATUSES.includes(status);
+    const canRMCloseDemand = isRMView && status === 'APPROVED';
+    const isFulfilled = status === 'FULFILLED';
+    const isRejected = status === 'REJECTED';
+    const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED');
+    const isApproving = decisionState?.demandId === demand.id && decisionState?.action === "approve";
+    const isRejecting = decisionState?.demandId === demand.id && decisionState?.action === "reject";
+    const isFulfilling = decisionState?.demandId === demand.id && decisionState?.action === "fulfill";
 
     return (
         <div
@@ -111,17 +124,76 @@ const DemandCardRow = ({ demand, onView, onEdit, activeTab }) => {
                 </div>
 
                 {/* 6. Actions */}
-                <div className="col-span-1 flex items-center justify-center gap-4">
-                    <button
-                        title={status === 'REJECTED' ? 'Cannot Edit Rejected Demand' : (isDM && status === 'APPROVED') ? 'Cannot Edit Approved Demand' : 'Edit'}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (onEdit) onEdit(demand);
-                        }}
-                        disabled={isEditDisabled}
-                    >
-                        <Pencil className={`h-3.5 w-3.5 ${isEditDisabled ? 'text-gray-400 cursor-not-allowed' : 'text-blue-700 hover:text-blue-800'}`} />
-                    </button>
+                <div className="col-span-1 flex items-center justify-center">
+                    {canQuickDecision ? (
+                        <div className="flex items-center gap-2.5">
+                            <button
+                                title="Approve demand"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onApprove) onApprove(demand);
+                                }}
+                                disabled={isApproving || isRejecting}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50/70 text-emerald-600 shadow-[0_5px_14px_rgba(16,185,129,0.10)] transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {isApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-[15px] w-[15px] stroke-[2.4]" />}
+                            </button>
+                            <button
+                                title="Reject demand"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onReject) onReject(demand);
+                                }}
+                                disabled={isApproving || isRejecting}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50/70 text-rose-600 shadow-[0_5px_14px_rgba(244,63,94,0.10)] transition hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-100 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {isRejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-[14px] w-[14px] stroke-[2.4]" />}
+                            </button>
+                        </div>
+                    ) : canRMCloseDemand ? (
+                        <div className="flex items-center gap-2">
+                            <button
+                                title="Fulfill demand"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onFulfill) onFulfill(demand);
+                                }}
+                                disabled={isFulfilling || isRejecting}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-[0_5px_14px_rgba(16,185,129,0.12)] transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {isFulfilling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-[15px] w-[15px] stroke-[2.4]" />}
+                            </button>
+                            <button
+                                title="Reject demand"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onRMReject) onRMReject(demand);
+                                }}
+                                disabled={isFulfilling || isRejecting}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 shadow-[0_5px_14px_rgba(244,63,94,0.12)] transition hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {isRejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-[14px] w-[14px] stroke-[2.4]" />}
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            title={isFulfilled ? 'Cannot Edit Fulfilled Demand' : isRejected ? 'Cannot Edit Rejected Demand' : (isDMView && status === 'APPROVED') ? 'Cannot Edit Approved Demand' : 'Edit'}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onEdit) onEdit(demand);
+                            }}
+                            disabled={isEditDisabled}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold transition",
+                                isEditDisabled
+                                    ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
+                                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                            )}
+                        >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                        </button>
+                    )}
                 </div>
 
             </div>

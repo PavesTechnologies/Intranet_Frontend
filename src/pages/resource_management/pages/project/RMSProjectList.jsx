@@ -33,6 +33,7 @@ const RMSProjectList = () => {
   const [page, setPage] = useState(0);
   const size = 6;
   const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filters, setFilters] = useState({
@@ -123,14 +124,18 @@ const RMSProjectList = () => {
         filters,
       });
 
-      setProjects(res.data.content || []);
-      setTotalPages(res.data.totalPages || 0);
+      const pageData = res?.data || {};
+
+      setProjects(pageData.content || []);
+      setTotalPages(pageData.totalPages || 0);
+      setTotalElements(pageData.totalElements || 0);
     } catch (err) {
       console.error("Failed to load projects", err);
       const message = err.response?.data?.message || "Failed to load projects";
       setErrorMsg(message);
       setProjects([]);
       setTotalPages(0);
+      setTotalElements(0);
 
       // Only show toast if it's a real error, not just "no projects found"
       if (err.response?.status !== 400 || !message.includes("No Projects Found")) {
@@ -140,6 +145,17 @@ const RMSProjectList = () => {
       setLoading(false);
     }
   };
+
+  const handlePreviousPage = () => {
+    setPage((currentPage) => Math.max(currentPage - 1, 0));
+  };
+
+  const handleNextPage = () => {
+    setPage((currentPage) => Math.min(currentPage + 1, totalPages - 1));
+  };
+
+  const pageStart = totalElements === 0 ? 0 : page * size + 1;
+  const pageEnd = Math.min((page + 1) * size, totalElements);
 
   // const appliedFiltersCount = Object.values(filters).filter(Boolean).length;
 
@@ -390,12 +406,17 @@ const RMSProjectList = () => {
 
       {/* PAGINATION */}
       {totalPages > 1 && (
-        <Pagination
-          currentPage={page + 1}
-          totalPages={totalPages}
-          onPrevious={() => setPage((p) => Math.max(p - 1, 0))}
-          onNext={() => setPage((p) => Math.min(p + 1, totalPages - 1))}
-        />
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <p className="text-xs font-medium text-gray-500">
+            Showing {pageStart}-{pageEnd} of {totalElements} projects
+          </p>
+          <Pagination
+            currentPage={page + 1}
+            totalPages={totalPages}
+            onPrevious={handlePreviousPage}
+            onNext={handleNextPage}
+          />
+        </div>
       )}
 
       <UpdateProjectStatusModal

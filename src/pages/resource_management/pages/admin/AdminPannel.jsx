@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
+import Pagination from "../../../../components/Pagination/pagination";
 import CreateClient from "../../models/CreateClient";
 import { useNavigate } from "react-router-dom";
 import FilterBar from "../../components/FilterBar";
@@ -246,24 +247,28 @@ const AdminPannel = () => {
         <div className="flex items-center gap-3">
           <Button
             onClick={handleExport}
-            disabled={exporting}
-            className={`px-4 py-2 text-sm font-medium rounded-lg flex items-center transition-all active:scale-[0.98] 
-              ${exporting
-                ? "bg-indigo-400 cursor-not-allowed text-white"
-                : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
-              }`}
+            // disabled={exporting}
+            // className={`px-4 py-2 text-sm font-medium rounded-lg flex items-center transition-all active:scale-[0.98] 
+            //   ${exporting
+            //     ? "bg-indigo-400 cursor-not-allowed text-white"
+            //     : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+            //   }`}
+            variant="primary"
+            size="medium"
+            loading={exporting}
+            loadingText={exporting ? `${exportProgress}%` : "Export Data"}
           >
-            {exporting ? (
+            {/* {exporting ? (
               <span className="flex items-center gap-2">
                 <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 {exportProgress}%
               </span>
-            ) : (
+            ) : ( */}
               <>
                 <Download className="w-4 h-4 mr-1.5" />
                 Export Data
               </>
-            )}
+            {/* )} */}
           </Button>
         </div>
       </div>
@@ -358,51 +363,17 @@ const AdminPannel = () => {
                 ))}
               </div>
 
-              <div className="flex items-center justify-between pt-4 border-t">
-                <p className="text-sm text-gray-600">
-                  Showing{" "}
-                  <span className="font-medium">{clientDetails.length}</span> of{" "}
-                  <span className="font-medium">{pageInfo.totalElements}</span>{" "}
-                  results
-                </p>
-
-                <div className="flex items-center gap-4">
-                  <span className="text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full border">
-                    Page{" "}
-                    <span className="text-indigo-600">
-                      {pageInfo.current + 1}
-                    </span>{" "}
-                    of {Math.max(1, pageInfo.totalPages)}
-                    {pageInfo.current + 1 === pageInfo.totalPages &&
-                      pageInfo.totalPages > 0 && (
-                        <span className="ml-2 text-emerald-600 font-bold">
-                          • Last Page
-                        </span>
-                      )}
-                  </span>
-
-                  <div className="flex gap-2">
-                    <button
-                      disabled={pageInfo.current === 0}
-                      onClick={() =>
-                        setPageInfo((p) => ({ ...p, current: p.current - 1 }))
-                      }
-                      className="p-2 border rounded-md disabled:opacity-50 hover:bg-gray-50 transition-colors"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      disabled={pageInfo.current >= pageInfo.totalPages - 1}
-                      onClick={() =>
-                        setPageInfo((p) => ({ ...p, current: p.current + 1 }))
-                      }
-                      className="p-2 border rounded-md disabled:opacity-50 hover:bg-gray-50 transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+              <div className="flex items-center justify-center pt-4">
+                <Pagination
+                  currentPage={pageInfo.current + 1}
+                  totalPages={Math.max(1, pageInfo.totalPages)}
+                  onPrevious={() =>
+                    setPageInfo((p) => ({ ...p, current: p.current - 1 }))
+                  }
+                  onNext={() =>
+                    setPageInfo((p) => ({ ...p, current: p.current + 1 }))
+                  }
+                />
               </div>
             </>
           ) : (

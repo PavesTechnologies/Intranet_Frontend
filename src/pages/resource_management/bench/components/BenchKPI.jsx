@@ -10,21 +10,21 @@ const ICONS = {
 
 const BenchKPI = ({ items = [] }) => {
   return (
-    <div className="flex flex-nowrap gap-4 overflow-x-auto">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {items.map((item) => {
         const Icon = ICONS[item.label] || Briefcase;
 
         return (
           <div
             key={item.label}
-            className="flex min-w-[220px] flex-1 items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:border-slate-200 hover:shadow-md"
+            className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-indigo-100 hover:shadow-md group"
           >
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm ${item.iconClassName || "border-slate-100 bg-slate-50 text-slate-700"}`}>
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border shadow-sm ${item.iconClassName || "border-slate-100 bg-slate-50 text-slate-700"} group-hover:scale-105 transition-transform duration-300`}>
               <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <p className="mb-0.5 text-xs font-medium tracking-tight text-slate-500">{item.label}</p>
-              <p className="text-2xl font-bold tracking-tight text-slate-900">{item.value}</p>
+              <p className="mb-1 text-[10px] font-black capitalize tracking-widest text-slate-400">{item.label}</p>
+              <p className="text-2xl font-black tracking-tight text-slate-900">{item.value}</p>
             </div>
           </div>
         );

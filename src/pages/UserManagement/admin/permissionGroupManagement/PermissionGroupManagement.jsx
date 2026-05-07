@@ -1,199 +1,82 @@
-import { useEffect, useState, useRef } from "react"; // Added useRef
+import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
 import Button from "../../../../components/Button/Button";
 import SearchInput from "../../../../components/filter/Searchbar";
 import Pagination from "../../../../components/Pagination/pagination";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { toast } from "react-toastify";
 import Modal from "../../../../components/Modal/modal";
-import Navbar from "../../../../components/Navbar/Navbar";
-import { Pencil, Trash, Loader2 } from "lucide-react";
+import {
+  Pencil,
+  Loader2,
+  ShieldCheck,
+  Plus,
+  Trash2,
+  Eye,
+  X,
+  KeyRound,
+  CheckCircle2,
+} from "lucide-react";
 
-// PermissionList Component (As provided by you)
-function PermissionList({
-  permissions,
-  showAdd = false,
-  showDelete = false,
-  onAdd,
-  onDelete,
-  processingItemId = null,
-}) {
-  if (permissions.length === 0)
-    return <div className="text-gray-500 p-2">No permissions found.</div>;
-
-  return (
-    <div className="border p-4 rounded bg-gray-50 max-h-60 overflow-y-auto space-y-2">
-      {permissions.map((perm) => (
-        <div
-          key={perm.permission_uuid}
-          className="flex flex-col sm:flex-row justify-between items-start sm:items-center border p-2 rounded"
-        >
-          <div className="mb-2 sm:mb-0">
-            <p className="font-medium">{perm.permission_code}</p>
-            <p className="text-sm text-gray-600">{perm.description}</p>
-          </div>
-          {(showAdd || showDelete) && (
-            <div className="flex gap-2 flex-wrap">
-              {showAdd && (
-                <Button
-                  size="small"
-                  variant="primary"
-                  onClick={() => onAdd && onAdd(perm.permission_uuid)}
-                  type="button"
-                  className="w-full sm:w-auto flex items-center gap-2 justify-center"
-                  disabled={processingItemId === perm.permission_uuid}
-                >
-                  {processingItemId === perm.permission_uuid ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> Adding
-                    </>
-                  ) : (
-                    "Add"
-                  )}
-                </Button>
-              )}
-              {showDelete && (
-                <Button
-                  size="small"
-                  variant="danger"
-                  onClick={() => onDelete && onDelete(perm.permission_uuid)}
-                  type="button"
-                  className="w-full sm:w-auto flex items-center gap-2 justify-center"
-                  disabled={processingItemId === perm.permission_uuid}
-                >
-                  {processingItemId === perm.permission_uuid ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> Deleting
-                    </>
-                  ) : (
-                    "Delete"
-                  )}
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// PermissionChips Component - displays selected permissions as chips with remove button (As provided by you)
-function PermissionChips({ permissions, onRemove, variant = "add" }) {
-  if (permissions.length === 0) {
-    return <div className="text-gray-500 p-2">No permissions selected.</div>;
-  }
-
-  const chipColor =
-    variant === "add"
-      ? "bg-blue-100 text-blue-800 border-blue-300"
-      : "bg-red-100 text-red-800 border-red-300";
-
-  return (
-    <div className="border p-4 rounded bg-gray-50 max-h-96 overflow-y-auto">
-      <div className="flex flex-wrap gap-2">
-        {permissions.map((perm) => (
-          <div
-            key={perm.permission_uuid}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${chipColor} text-sm font-medium`}
-          >
-            <span>{perm.permission_code}</span>
-            <button
-              onClick={() => onRemove(perm.permission_uuid)}
-              className="hover:opacity-70 transition-opacity font-bold"
-              type="button"
-              aria-label="Remove permission"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+const ITEMS_PER_PAGE = 6;
+const PERMISSION_ITEMS_PER_PAGE = 6;
 
 export default function PermissionGroupManagement() {
   const [groups, setGroups] = useState([]);
-  const [newGroupName, setNewGroupName] = useState("");
-  const [editGroupName, setEditGroupName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [selectedGroupId, setSelectedGroupId] = useState("");
-  const [showPermissionActions, setShowPermissionActions] = useState(false);
   const [allPermissions, setAllPermissions] = useState([]);
   const [groupPermissions, setGroupPermissions] = useState([]);
-  const [showPermissionList, setShowPermissionList] = useState(false);
-  const [showDeleteList, setShowDeleteList] = useState(false);
-  const [showViewList, setShowViewList] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchTrigger, setSearchTrigger] = useState(false);
-  // loading flags for various buttons
-  const [creating, setCreating] = useState(false); // Create modal -> Create
-  const [updating, setUpdating] = useState(false); // Edit modal -> Save
-  const [deletingGroup, setDeletingGroup] = useState(false); // Delete modal -> Yes Delete
-  const [bulkAddLoading, setBulkAddLoading] = useState(false); // Inline Confirm Add
-  const [bulkRemoveLoading, setBulkRemoveLoading] = useState(false); // Inline Confirm Remove
-  const [canceling, setCanceling] = useState(false); // used for showing Cancelling... on modal cancel button
-  // optional per-item processing state (for small Add/Delete buttons per permission item)
-  const [processingItemId, setProcessingItemId] = useState(null);
 
-  // New state for selected permissions to add/remove
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [activeAction, setActiveAction] = useState("view");
+
+  const [groupSearchTerm, setGroupSearchTerm] = useState("");
+  const [permissionSearchTerm, setPermissionSearchTerm] = useState("");
+
   const [selectedToAdd, setSelectedToAdd] = useState([]);
   const [selectedToRemove, setSelectedToRemove] = useState([]);
+  const [selectedGroupUuids, setSelectedGroupUuids] = useState([]);
 
-  // New state for group search and pagination
-  const [groupSearchTerm, setGroupSearchTerm] = useState("");
-  // Search specifically for the dropdown inside Group Permissions view
-  const [groupDropdownSearch, setGroupDropdownSearch] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loadingPermissions, setLoadingPermissions] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [bulkDeletingGroups, setBulkDeletingGroups] = useState(false);
+
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 8;
+  const [permissionCurrentPage, setPermissionCurrentPage] = useState(1);
 
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteGroupId, setDeleteGroupId] = useState(null);
-
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingGroup, setEditingGroup] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // ✅ Ref for the inline permission section
-  const permissionSectionRef = useRef(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  // const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  // const [groupPermissions, setGroupPermissions] = useState([]);
-  const [loadingPermissions, setLoadingPermissions] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [editGroupName, setEditGroupName] = useState("");
+  const [editingGroup, setEditingGroup] = useState(null);
 
   const token = localStorage.getItem("token");
-  const navigate = useNavigate();
 
   const axiosInstance = axios.create({
     baseURL: `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}`,
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  // Validate group name function
+  const showUniqueToast = (message, type) => {
+    toast.dismiss();
+    showStatusToast(message, type, { toastId: "unique-toast" });
+  };
+
   const validateGroupName = (name) => {
     const regex = /^[A-Za-z\s\-_]+$/;
     return regex.test(name.trim());
   };
 
-  // Show toast with unique ID to prevent duplicates
-  const showUniqueToast = (message, type) => {
-    toast.dismiss(); // Dismiss all existing toasts
-    showStatusToast(message, type, { toastId: "unique-toast" });
-  };
-
-  useEffect(() => {
-    fetchGroups();
-    fetchAllPermissions();
-  }, []);
-
   const fetchGroups = async () => {
     setLoading(true);
+
     try {
       const res = await axiosInstance.get("/admin/groups");
-      setGroups(res.data);
+      setGroups(res.data || []);
     } catch (err) {
       showUniqueToast("Failed to fetch groups: " + err.message, "error");
     } finally {
@@ -204,7 +87,7 @@ export default function PermissionGroupManagement() {
   const fetchAllPermissions = async () => {
     try {
       const res = await axiosInstance.get("/admin/permissions/");
-      setAllPermissions(res.data);
+      setAllPermissions(res.data || []);
     } catch (err) {
       showUniqueToast(
         "Failed to fetch all permissions: " + err.message,
@@ -214,16 +97,237 @@ export default function PermissionGroupManagement() {
   };
 
   const fetchGroupPermissions = async (groupId) => {
+    setLoadingPermissions(true);
+
     try {
       const res = await axiosInstance.get(
         `/admin/groups/${groupId}/permissions`,
       );
-      setGroupPermissions(res.data);
+      setGroupPermissions(res.data || []);
     } catch (err) {
       showUniqueToast(
         "Failed to fetch group permissions: " + err.message,
         "error",
       );
+      setGroupPermissions([]);
+    } finally {
+      setLoadingPermissions(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchGroups();
+    fetchAllPermissions();
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedGroupUuids([]);
+  }, [groupSearchTerm]);
+
+  const filteredGroups = useMemo(() => {
+    return groups.filter((group) =>
+      group?.group_name?.toLowerCase().includes(groupSearchTerm.toLowerCase()),
+    );
+  }, [groups, groupSearchTerm]);
+
+  const totalPages = Math.ceil(filteredGroups.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+
+  const currentGroups = filteredGroups.slice(
+    startIndex,
+    startIndex + ITEMS_PER_PAGE,
+  );
+
+  const enrichWithCode = (permissionList) => {
+    if (!Array.isArray(permissionList)) return [];
+
+    return permissionList.map((permission) => {
+      if (permission.permission_code) return permission;
+
+      const found = allPermissions.find(
+        (p) => p.permission_uuid === permission.permission_uuid,
+      );
+
+      return {
+        ...permission,
+        permission_code: found?.permission_code || "Unknown Code",
+        description: found?.description || permission.description || "",
+      };
+    });
+  };
+
+  const resetPermissionSelection = () => {
+    setPermissionSearchTerm("");
+    setSelectedToAdd([]);
+    setSelectedToRemove([]);
+    setPermissionCurrentPage(1);
+  };
+
+  const openPermissionModal = async (group, action = "view") => {
+    setSelectedGroup(group);
+    setActiveAction(action);
+    setShowPermissionModal(true);
+    resetPermissionSelection();
+    await fetchGroupPermissions(group.group_uuid);
+  };
+
+  const handleActionChange = async (action) => {
+    if (!selectedGroup) return;
+
+    setActiveAction(action);
+    resetPermissionSelection();
+    await fetchGroupPermissions(selectedGroup.group_uuid);
+  };
+
+  const closePermissionModal = () => {
+    setShowPermissionModal(false);
+    setSelectedGroup(null);
+    setActiveAction("view");
+    setGroupPermissions([]);
+    resetPermissionSelection();
+  };
+
+  const unassignedPermissions = allPermissions.filter(
+    (permission) =>
+      !groupPermissions.some(
+        (gp) => gp.permission_uuid === permission.permission_uuid,
+      ),
+  );
+
+  const permissionsToDisplay = useMemo(() => {
+    let list = [];
+
+    if (activeAction === "add") {
+      list = unassignedPermissions.filter(
+        (permission) =>
+          !selectedToAdd.some(
+            (selected) =>
+              selected.permission_uuid === permission.permission_uuid,
+          ),
+      );
+    } else if (activeAction === "delete") {
+      list = enrichWithCode(groupPermissions).filter(
+        (permission) =>
+          !selectedToRemove.some(
+            (selected) =>
+              selected.permission_uuid === permission.permission_uuid,
+          ),
+      );
+    } else {
+      list = enrichWithCode(groupPermissions);
+    }
+
+    if (!permissionSearchTerm) return list;
+
+    return list.filter(
+      (permission) =>
+        permission.permission_code
+          ?.toLowerCase()
+          .includes(permissionSearchTerm.toLowerCase()) ||
+        permission.description
+          ?.toLowerCase()
+          .includes(permissionSearchTerm.toLowerCase()),
+    );
+  }, [
+    activeAction,
+    unassignedPermissions,
+    groupPermissions,
+    selectedToAdd,
+    selectedToRemove,
+    permissionSearchTerm,
+  ]);
+
+  const permissionTotalPages = Math.ceil(
+    permissionsToDisplay.length / PERMISSION_ITEMS_PER_PAGE,
+  );
+
+  const permissionStartIndex =
+    (permissionCurrentPage - 1) * PERMISSION_ITEMS_PER_PAGE;
+
+  const currentPermissions = permissionsToDisplay.slice(
+    permissionStartIndex,
+    permissionStartIndex + PERMISSION_ITEMS_PER_PAGE,
+  );
+
+  const selectedPermissions =
+    activeAction === "add" ? selectedToAdd : selectedToRemove;
+
+  const handleSelectPermission = (permission) => {
+    const permissionUuid = permission.permission_uuid;
+
+    if (activeAction === "add") {
+      setSelectedToAdd((prev) =>
+        prev.some((item) => item.permission_uuid === permissionUuid)
+          ? prev.filter((item) => item.permission_uuid !== permissionUuid)
+          : [...prev, permission],
+      );
+    }
+
+    if (activeAction === "delete") {
+      setSelectedToRemove((prev) =>
+        prev.some((item) => item.permission_uuid === permissionUuid)
+          ? prev.filter((item) => item.permission_uuid !== permissionUuid)
+          : [...prev, permission],
+      );
+    }
+  };
+
+  const handleRemoveChip = (permissionUuid) => {
+    if (activeAction === "add") {
+      setSelectedToAdd((prev) =>
+        prev.filter((item) => item.permission_uuid !== permissionUuid),
+      );
+    } else {
+      setSelectedToRemove((prev) =>
+        prev.filter((item) => item.permission_uuid !== permissionUuid),
+      );
+    }
+  };
+
+  const handleSubmitPermissions = async () => {
+    if (selectedPermissions.length === 0) {
+      return showUniqueToast("No permissions selected.", "warning");
+    }
+
+    setSubmitLoading(true);
+
+    try {
+      const permissionIds = selectedPermissions.map((p) => p.permission_uuid);
+
+      if (activeAction === "add") {
+        await axiosInstance.post(
+          `/admin/groups/${selectedGroup.group_uuid}/permissions`,
+          permissionIds,
+        );
+
+        showUniqueToast(
+          `${selectedPermissions.length} permission(s) added successfully.`,
+          "success",
+        );
+      } else {
+        await axiosInstance.delete(
+          `/admin/groups/${selectedGroup.group_uuid}/permissions`,
+          { data: permissionIds },
+        );
+
+        showUniqueToast(
+          `${selectedPermissions.length} permission(s) removed successfully.`,
+          "success",
+        );
+      }
+
+      resetPermissionSelection();
+      await fetchGroupPermissions(selectedGroup.group_uuid);
+    } catch (err) {
+      const errorMessage =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        err.message;
+
+      showUniqueToast("Permission update failed: " + errorMessage, "error");
+    } finally {
+      setSubmitLoading(false);
     }
   };
 
@@ -231,6 +335,7 @@ export default function PermissionGroupManagement() {
     if (!newGroupName.trim()) {
       return showUniqueToast("Enter the group name", "error");
     }
+
     if (!validateGroupName(newGroupName)) {
       return showUniqueToast(
         "Group name can only contain letters, spaces, hyphens, and underscores",
@@ -239,19 +344,22 @@ export default function PermissionGroupManagement() {
     }
 
     setCreating(true);
+
     try {
       await axiosInstance.post("/admin/groups", {
         group_name: newGroupName.trim(),
       });
+
       showUniqueToast("Group created successfully!", "success");
       setNewGroupName("");
-      await fetchGroups();
       setShowCreateModal(false);
+      await fetchGroups();
     } catch (err) {
       const errorMessage =
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
         err.message;
+
       showUniqueToast(errorMessage, "error");
     } finally {
       setCreating(false);
@@ -265,16 +373,24 @@ export default function PermissionGroupManagement() {
   };
 
   const handleUpdate = async () => {
-    if (!editGroupName.trim())
+    if (!editGroupName.trim()) {
       return showUniqueToast("Enter the group name", "error");
-    if (!validateGroupName(editGroupName))
-      return showUniqueToast("Group name can only contain letters...", "error");
+    }
+
+    if (!validateGroupName(editGroupName)) {
+      return showUniqueToast(
+        "Group name can only contain letters, spaces, hyphens, and underscores",
+        "error",
+      );
+    }
 
     setUpdating(true);
+
     try {
       await axiosInstance.put(`/admin/groups/${editingGroup.group_uuid}`, {
         group_name: editGroupName.trim(),
       });
+
       showUniqueToast("Group updated successfully!", "success");
       setShowEditModal(false);
       setEditingGroup(null);
@@ -285,841 +401,572 @@ export default function PermissionGroupManagement() {
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
         err.message;
+
       showUniqueToast(errorMessage, "error");
     } finally {
       setUpdating(false);
     }
   };
 
-  const handleDeleteClick = (group_uuid) => {
-    setDeleteGroupId(group_uuid);
-    setShowDeleteModal(true);
+  const handleGroupCheckboxChange = (groupUuid) => {
+    setSelectedGroupUuids((prev) =>
+      prev.includes(groupUuid)
+        ? prev.filter((id) => id !== groupUuid)
+        : [...prev, groupUuid],
+    );
   };
 
-  const confirmDelete = async () => {
-    setDeletingGroup(true);
+  const handleSelectAllCurrentPage = () => {
+    const currentPageUuids = currentGroups.map((group) => group.group_uuid);
+
+    const allSelected = currentPageUuids.every((id) =>
+      selectedGroupUuids.includes(id),
+    );
+
+    if (allSelected) {
+      setSelectedGroupUuids((prev) =>
+        prev.filter((id) => !currentPageUuids.includes(id)),
+      );
+    } else {
+      setSelectedGroupUuids((prev) => [
+        ...new Set([...prev, ...currentPageUuids]),
+      ]);
+    }
+  };
+
+  const confirmBulkDeleteGroups = async () => {
+    if (selectedGroupUuids.length === 0) {
+      return showUniqueToast("Please select at least one group.", "warning");
+    }
+
+    setBulkDeletingGroups(true);
+
     try {
-      await axiosInstance.delete(`/admin/groups/${deleteGroupId}`);
-      await fetchGroups();
-      showUniqueToast("Group deleted successfully!", "success");
-      if (selectedGroupId === deleteGroupId) {
-        handleCloseActions();
-        setSelectedGroupId("");
-      }
-    } catch (err) {
-      const errorMessage =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        err.message;
-      showUniqueToast("Failed to delete group: " + errorMessage, "error");
-    } finally {
-      setDeletingGroup(false);
-      setShowDeleteModal(false);
-      setDeleteGroupId(null);
-    }
-  };
-
-  const handleGroupSelect = async (groupId) => {
-    if (!groupId) {
-      setShowPermissionActions(false);
-      // Reset inline view states
-      setShowPermissionList(false);
-      setShowDeleteList(false);
-      setShowViewList(false);
-      setSearchTerm("");
-      setSearchTrigger(false);
-      setSelectedToAdd([]);
-      setSelectedToRemove([]);
-      return;
-    }
-    setSelectedGroupId(groupId);
-    setShowPermissionActions(true);
-    // Reset inline view states
-    setShowPermissionList(false);
-    setShowDeleteList(false);
-    setShowViewList(false);
-    setSearchTerm("");
-    setSearchTrigger(false);
-    setSelectedToAdd([]);
-    setSelectedToRemove([]);
-    await fetchGroupPermissions(groupId);
-  };
-
-  // ✅ Scrolls to the section after state update
-  const scrollToPermissionSection = () => {
-    // Use setTimeout to ensure the DOM has updated
-    setTimeout(() => {
-      permissionSectionRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
+      await axiosInstance.delete("/admin/groups/bulk-delete", {
+        data: {
+          group_uuids: selectedGroupUuids,
+        },
       });
-    }, 0);
-  };
 
-  const handleAddClick = () => {
-    if (!selectedGroupId) {
-      return showUniqueToast("Please select a group first.", "warning");
-    }
-    setShowPermissionList(true); // Show Add section
-    setShowDeleteList(false);
-    setShowViewList(false);
-    setSearchTerm("");
-    setSearchTrigger(false);
-    setSelectedToAdd([]); // Reset selections when switching views
-    setSelectedToRemove([]);
-    scrollToPermissionSection(); // ✅ Scroll to section
-  };
-
-  const handleDeleteClickPermission = () => {
-    if (!selectedGroupId) {
-      return showUniqueToast("Please select a group first.", "warning");
-    }
-    setShowDeleteList(true); // Show Delete section
-    setShowPermissionList(false);
-    setShowViewList(false);
-    setSearchTerm("");
-    setSearchTrigger(false);
-    setSelectedToAdd([]); // Reset selections when switching views
-    setSelectedToRemove([]);
-    scrollToPermissionSection(); // ✅ Scroll to section
-  };
-
-  const handleViewClick = () => {
-    if (!selectedGroupId) {
-      return showUniqueToast("Please select a group first.", "warning");
-    }
-    setShowViewList(true); // Show View section
-    setShowPermissionList(false);
-    setShowDeleteList(false);
-    setSearchTerm(""); // Reset search for view
-    setSearchTrigger(false);
-    setSelectedToAdd([]); // Reset selections when switching views
-    setSelectedToRemove([]);
-    scrollToPermissionSection(); // ✅ Scroll to section
-  };
-
-  const handleCloseActions = () => {
-    setShowPermissionActions(false);
-    // Reset inline view states
-    setShowPermissionList(false);
-    setShowDeleteList(false);
-    setShowViewList(false);
-    setSelectedGroupId(""); // Also deselect the group when closing actions entirely
-    setSearchTerm("");
-    setSearchTrigger(false);
-    setSelectedToAdd([]);
-    setSelectedToRemove([]);
-  };
-
-  // Add permission to selected list (for adding to group)
-  const handleSelectToAdd = async (permission_uuid) => {
-    setProcessingItemId(permission_uuid);
-    try {
-      const perm = allPermissions.find(
-        (p) => p.permission_uuid === permission_uuid,
-      );
-      if (
-        perm &&
-        !selectedToAdd.some((p) => p.permission_uuid === permission_uuid)
-      ) {
-        setSelectedToAdd((prev) => [...prev, perm]);
-      }
-    } finally {
-      setProcessingItemId(null);
-    }
-  };
-
-  // Remove permission from selected list (for adding to group)
-  const handleUnselectToAdd = (permission_uuid) => {
-    setSelectedToAdd(
-      selectedToAdd.filter((p) => p.permission_uuid !== permission_uuid),
-    );
-  };
-
-  // Add permission to selected list (for removing from group)
-  // ✅ Replace your handleSelectToRemove with this:
-  const handleSelectToRemove = async (permission_uuid) => {
-    setProcessingItemId(permission_uuid);
-    try {
-      await axiosInstance.delete(
-        `/admin/groups/${selectedGroupId}/permissions`,
-        { data: [permission_uuid] },
-      );
-      showUniqueToast("Permission removed successfully.", "success");
-      await fetchGroupPermissions(selectedGroupId);
-    } catch (err) {
-      const errorMessage =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        err.message;
-      showUniqueToast("Failed to remove permission: " + errorMessage, "error");
-    } finally {
-      setProcessingItemId(null);
-    }
-  };
-
-  // Remove permission from selected list (for removing from group)
-  const handleUnselectToRemove = (permission_uuid) => {
-    setSelectedToRemove(
-      setSelectedToRemove.filter((p) => p.permission_uuid !== permission_uuid),
-    );
-  };
-
-  // Bulk add permissions to group
-  const handleBulkAddPermissions = async () => {
-    if (selectedToAdd.length === 0)
-      return showUniqueToast("No permissions selected to add.", "warning");
-
-    setBulkAddLoading(true);
-    try {
-      const permissionIds = selectedToAdd.map((p) => p.permission_uuid);
-      await axiosInstance.post(
-        `/admin/groups/${selectedGroupId}/permissions`,
-        permissionIds,
-      );
       showUniqueToast(
-        `${selectedToAdd.length} permission(s) added successfully.`,
+        `${selectedGroupUuids.length} group(s) deleted successfully.`,
         "success",
       );
-      setSelectedToAdd([]);
-      await fetchGroupPermissions(selectedGroupId);
+
+      setSelectedGroupUuids([]);
+      await fetchGroups();
     } catch (err) {
       const errorMessage =
+        err?.response?.data?.detail?.message ||
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
         err.message;
-      showUniqueToast("Failed to add permissions: " + errorMessage, "error");
+
+      showUniqueToast("Failed to delete groups: " + errorMessage, "error");
     } finally {
-      setBulkAddLoading(false);
+      setBulkDeletingGroups(false);
     }
   };
-
-  // Bulk remove permissions from group
-  const handleBulkRemovePermissions = async () => {
-    if (selectedToRemove.length === 0)
-      return showUniqueToast("No permissions selected to remove.", "warning");
-
-    setBulkRemoveLoading(true);
-    try {
-      const permissionIds = selectedToRemove.map((p) => p.permission_uuid);
-      await axiosInstance.delete(
-        `/admin/groups/${selectedGroupId}/permissions`,
-        { data: permissionIds },
-      );
-      showUniqueToast(
-        `${selectedToRemove.length} permission(s) removed successfully.`,
-        "success",
-      );
-      setSelectedToRemove([]);
-      await fetchGroupPermissions(selectedGroupId);
-    } catch (err) {
-      const errorMessage =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        err.message;
-      showUniqueToast("Failed to remove permissions: " + errorMessage, "error");
-    } finally {
-      setBulkRemoveLoading(false);
-    }
-  };
-
-  const unassignedPermissions = allPermissions.filter(
-    (perm) =>
-      !groupPermissions.some(
-        (gp) => gp.permission_uuid === perm.permission_uuid,
-      ),
-  );
-
-  const filterPermissions = (list) => {
-    if (!searchTrigger || !searchTerm) return list; // Only filter if search term exists
-    return list.filter(
-      (perm) =>
-        (perm.permission_code?.toLowerCase() || "").includes(
-          searchTerm.toLowerCase(),
-        ) ||
-        (perm.description?.toLowerCase() || "").includes(
-          searchTerm.toLowerCase(),
-        ),
-    );
-  };
-
-  function enrichWithCode(permissionList) {
-    if (!Array.isArray(permissionList)) {
-      console.error(
-        "enrichWithCode expected an array, but received:",
-        permissionList,
-      );
-      return [];
-    }
-    return permissionList.map((perm) => {
-      if (!perm || typeof perm !== "object") {
-        console.error("Invalid item in permissionList:", perm);
-        return { permission_uuid: "invalid", permission_code: "Invalid Item" };
-      }
-      if (perm.permission_code) return perm;
-      const found = allPermissions.find(
-        (p) => p && p.permission_uuid === perm.permission_uuid,
-      );
-      return {
-        ...perm,
-        permission_code: found ? found.permission_code : "Unknown Code",
-      };
-    });
-  }
-
-  // Filter available permissions to exclude already selected ones
-  const availableToAdd = filterPermissions(unassignedPermissions).filter(
-    (perm) =>
-      !selectedToAdd.some((s) => s.permission_uuid === perm.permission_uuid),
-  );
-
-  // Filter group permissions to exclude already selected ones
-  const availableToRemove = filterPermissions(
-    enrichWithCode(groupPermissions),
-  ).filter(
-    (perm) =>
-      !selectedToRemove.some((s) => s.permission_uuid === perm.permission_uuid),
-  );
-
-  // Filter groups based on search term
-  const filteredGroups = groups.filter((group) =>
-    group?.group_name?.toLowerCase().includes(groupSearchTerm.toLowerCase()),
-  );
-
-  // Pagination logic
-  const totalPages = Math.ceil(filteredGroups.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const currentGroups = filteredGroups.slice(startIndex, endIndex);
-
-  // Reset to first page when search term changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [groupSearchTerm]);
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4 text-center sm:text-left">
-        Permission Group Management
-      </h2>
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div>
+              <h3 className="text-2xl font-semibold text-gray-800 flex items-center gap-2">
+                <ShieldCheck className="w-6 h-6 text-blue-700" />
+                Permission Group Management
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Create permission groups and manage permissions inside each
+                group.
+              </p>
+            </div>
 
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex-grow">
-          <Navbar
-            logo="Permission Groups"
-            navItems={[
-              {
-                name: "Manage Groups",
-                onClick: handleCloseActions,
-                isActive: !showPermissionActions,
-              },
-              {
-                name: "Group Permissions",
-                onClick: () => {
-                  setShowPermissionActions(true);
-                  setShowPermissionList(false);
-                  setShowDeleteList(false);
-                  setShowViewList(false);
-                  setSelectedToAdd([]);
-                  setSelectedToRemove([]);
-                  setSearchTerm("");
-                },
-                isActive: showPermissionActions,
-              },
-            ]}
-          />
-        </div>
-        {!showPermissionActions && (
-          <div className="ml-4">
             <Button
-              size="medium"
-              variant="primary"
               onClick={() => setShowCreateModal(true)}
-              type="button"
-              className="whitespace-nowrap"
+              className="px-4 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-950 flex items-center gap-2"
             >
+              <Plus className="w-4 h-4" />
               Create Group
             </Button>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Manage Groups view (hidden when Group Permissions nav is active) */}
-      {!showPermissionActions && (
-        <>
-          <div className="bg-white p-4 rounded shadow mb-6 overflow-x-auto">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold">Existing Groups</h3>
-              <div className="ml-4 max-w-xs w-full sm:w-80">
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <div className="flex justify-between items-center flex-wrap gap-4 mb-4">
+            <div>
+              <h4 className="text-lg font-semibold text-gray-800">
+                Existing Groups
+              </h4>
+              <p className="text-sm text-gray-500">
+                {filteredGroups.length} group(s) found
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              {selectedGroupUuids.length > 0 && (
+                <Button
+                  onClick={confirmBulkDeleteGroups}
+                  disabled={bulkDeletingGroups}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+                >
+                  {bulkDeletingGroups ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete Selected ({selectedGroupUuids.length})
+                    </>
+                  )}
+                </Button>
+              )}
+
+              <div className="w-full sm:w-72">
                 <SearchInput
-                  placeholder="Search existing groups..."
-                  onSearch={(q) => setGroupSearchTerm(q)}
+                  placeholder="Search group..."
+                  onSearch={(value) => {
+                    setGroupSearchTerm(value || "");
+                    setCurrentPage(1);
+                  }}
                 />
               </div>
             </div>
-            {loading ? (
-              <p className="text-gray-500">Loading groups...</p>
-            ) : currentGroups.length === 0 ? (
-              <p className="text-gray-500">
-                {groupSearchTerm
-                  ? "No groups found matching your search."
-                  : "No groups found."}
-              </p>
-            ) : (
-              <>
-                <ul className="space-y-2">
-                  {currentGroups.map((group) => (
-                    <li
-                      key={group?.group_uuid}
-                      className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-2 gap-2"
+          </div>
+
+          {loading ? (
+            <div className="text-center text-gray-500 py-10">
+              Loading groups...
+            </div>
+          ) : groups.length === 0 ? (
+            <div className="text-center text-gray-500 py-10 border rounded-xl bg-gray-50">
+              No groups found.
+            </div>
+          ) : filteredGroups.length === 0 ? (
+            <div className="text-center text-gray-500 py-10 border rounded-xl bg-gray-50">
+              No matching groups found.
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={
+                    currentGroups.length > 0 &&
+                    currentGroups.every((group) =>
+                      selectedGroupUuids.includes(group.group_uuid),
+                    )
+                  }
+                  onChange={handleSelectAllCurrentPage}
+                  className="w-4 h-4"
+                />
+                <span>Select all on this page</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {currentGroups.map((group) => {
+                  const isSelected = selectedGroupUuids.includes(
+                    group.group_uuid,
+                  );
+
+                  return (
+                    <div
+                      key={group.group_uuid}
+                      className={`bg-white rounded-xl border shadow-sm hover:shadow-md transition-all p-5 ${
+                        isSelected ? "border-red-300 bg-red-50" : ""
+                      }`}
                     >
-                      <span className="font-medium">{group?.group_name}</span>
-                      <div className="flex gap-2 items-center">
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() =>
+                              handleGroupCheckboxChange(group.group_uuid)
+                            }
+                            className="w-4 h-4 mt-3 shrink-0"
+                          />
+
+                          <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                            <ShieldCheck className="w-5 h-5" />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <h4
+                              className="text-lg font-semibold text-gray-800 truncate"
+                              title={group.group_name}
+                            >
+                              {group.group_name}
+                            </h4>
+
+                            <p className="text-sm text-gray-500 mt-1 truncate">
+                              Manage assigned permissions
+                            </p>
+                          </div>
+                        </div>
+
                         <button
                           onClick={() => handleEditClick(group)}
-                          className="p-2 rounded hover:bg-blue-100 text-blue-900"
-                          title={`Edit ${group?.group_name}`}
-                          type="button"
-                          aria-label={`Edit ${group?.group_name}`}
+                          className="p-2 rounded-lg hover:bg-blue-100 text-blue-900 shrink-0"
+                          title={`Edit ${group.group_name}`}
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => handleDeleteClick(group?.group_uuid)}
-                          className="p-2 rounded hover:bg-red-100 text-red-600"
-                          title={`Delete ${group?.group_name}`}
-                          type="button"
-                          aria-label={`Delete ${group?.group_name}`}
-                        >
-                          <Trash className="w-4 h-4" />
-                        </button>
                       </div>
-                    </li>
-                  ))}
-                </ul>
-                {totalPages > 1 && (
-                  <div className="mt-4">
-                    <Pagination
-                      currentPage={currentPage}
-                      totalPages={totalPages}
-                      onPrevious={() =>
-                        setCurrentPage((prev) => Math.max(prev - 1, 1))
-                      }
-                      onNext={() =>
-                        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                      }
+
+                      <div className="mt-5 flex justify-end">
+                        <Button
+                          onClick={() => openPermissionModal(group, "view")}
+                          className="px-4 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-950 transition-all"
+                        >
+                          Manage Permissions
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="mt-6">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPrevious={() =>
+                      setCurrentPage((prev) => Math.max(prev - 1, 1))
+                    }
+                    onNext={() =>
+                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                    }
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {showPermissionModal && selectedGroup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 px-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[85vh] overflow-hidden">
+            <div className="p-5 border-b bg-gray-50">
+              <div className="flex justify-between items-start gap-4">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Manage Permissions
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1 truncate">
+                    Group:{" "}
+                    <span
+                      className="font-medium text-blue-700"
+                      title={selectedGroup.group_name}
+                    >
+                      {selectedGroup.group_name}
+                    </span>
+                  </p>
+                </div>
+
+                <button
+                  onClick={closePermissionModal}
+                  className="p-2 rounded-lg hover:bg-gray-200 text-gray-500 shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mt-4">
+                <button
+                  onClick={() => handleActionChange("view")}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+                    activeAction === "view"
+                      ? "bg-pink-900 text-white"
+                      : "bg-white border text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <Eye className="w-4 h-4" />
+                  View
+                </button>
+
+                <button
+                  onClick={() => handleActionChange("add")}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+                    activeAction === "add"
+                      ? "bg-blue-900 text-white"
+                      : "bg-white border text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <Plus className="w-4 h-4" />
+                  Add
+                </button>
+
+                <button
+                  onClick={() => handleActionChange("delete")}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+                    activeAction === "delete"
+                      ? "bg-red-600 text-white"
+                      : "bg-white border text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5 overflow-y-auto max-h-[calc(85vh-170px)]">
+              {loadingPermissions ? (
+                <div className="text-center text-gray-500 py-10">
+                  Loading permissions...
+                </div>
+              ) : (
+                <>
+                  <div className="mb-5">
+                    <SearchInput
+                      placeholder="Search permission..."
+                      onSearch={(value) => {
+                        setPermissionSearchTerm(value || "");
+                        setPermissionCurrentPage(1);
+                      }}
                     />
                   </div>
-                )}
-              </>
-            )}
+
+                  {permissionsToDisplay.length === 0 ? (
+                    <div className="text-center text-gray-500 py-10 border rounded-xl bg-gray-50">
+                      No permissions found.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-3">
+                        {currentPermissions.map((permission) => {
+                          const permissionUuid = permission.permission_uuid;
+
+                          const isSelected = selectedPermissions.some(
+                            (selected) =>
+                              selected.permission_uuid === permissionUuid,
+                          );
+
+                          return (
+                            <div
+                              key={permissionUuid}
+                              className={`p-4 rounded-xl border bg-white transition-all ${
+                                isSelected
+                                  ? activeAction === "delete"
+                                    ? "border-red-300 bg-red-50"
+                                    : "border-blue-300 bg-blue-50"
+                                  : "hover:shadow-sm"
+                              }`}
+                            >
+                              <div className="flex justify-between items-start gap-3">
+                                <div className="flex items-start gap-3 min-w-0 flex-1">
+                                  <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                                    <KeyRound className="w-4 h-4" />
+                                  </div>
+
+                                  <div className="min-w-0 flex-1">
+                                    <h5
+                                      className="font-medium text-gray-800 truncate"
+                                      title={permission.permission_code}
+                                    >
+                                      {permission.permission_code}
+                                    </h5>
+
+                                    <p
+                                      className="text-xs text-gray-500 mt-1 break-words"
+                                      title={permission.description}
+                                    >
+                                      {permission.description ||
+                                        "No description available."}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {activeAction !== "view" && (
+                                  <button
+                                    onClick={() =>
+                                      handleSelectPermission(permission)
+                                    }
+                                    className={`shrink-0 px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1 ${
+                                      isSelected
+                                        ? "bg-green-600 text-white"
+                                        : activeAction === "delete"
+                                        ? "bg-red-600 text-white hover:bg-red-700"
+                                        : "bg-blue-600 text-white hover:bg-blue-700"
+                                    }`}
+                                  >
+                                    {isSelected && (
+                                      <CheckCircle2 className="w-3 h-3" />
+                                    )}
+                                    {isSelected ? "Selected" : "Select"}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {permissionTotalPages > 1 && (
+                        <div className="mt-5">
+                          <Pagination
+                            currentPage={permissionCurrentPage}
+                            totalPages={permissionTotalPages}
+                            onPrevious={() =>
+                              setPermissionCurrentPage((prev) =>
+                                Math.max(prev - 1, 1),
+                              )
+                            }
+                            onNext={() =>
+                              setPermissionCurrentPage((prev) =>
+                                Math.min(prev + 1, permissionTotalPages),
+                              )
+                            }
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {activeAction !== "view" && (
+                    <div className="mt-5 border-t pt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Selected permissions
+                      </label>
+
+                      {selectedPermissions.length === 0 ? (
+                        <p className="text-sm text-gray-500">
+                          No permissions selected yet.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {selectedPermissions.map((permission) => (
+                            <span
+                              key={permission.permission_uuid}
+                              className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium max-w-full ${
+                                activeAction === "delete"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              <span
+                                className="truncate max-w-[220px]"
+                                title={permission.permission_code}
+                              >
+                                {permission.permission_code}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  handleRemoveChip(permission.permission_uuid)
+                                }
+                                className="font-bold hover:text-red-600 shrink-0"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-3 mt-5">
+                        <Button
+                          onClick={closePermissionModal}
+                          className="px-5 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                        >
+                          Cancel
+                        </Button>
+
+                        <Button
+                          onClick={handleSubmitPermissions}
+                          disabled={
+                            selectedPermissions.length === 0 || submitLoading
+                          }
+                          className={`px-5 py-2 text-white rounded-lg font-medium ${
+                            selectedPermissions.length && !submitLoading
+                              ? activeAction === "add"
+                                ? "bg-blue-900 hover:bg-blue-950"
+                                : "bg-red-600 hover:bg-red-700"
+                              : "bg-gray-400 cursor-not-allowed"
+                          }`}
+                        >
+                          {submitLoading
+                            ? activeAction === "add"
+                              ? "Adding..."
+                              : "Removing..."
+                            : activeAction === "add"
+                            ? "Add Permissions"
+                            : "Remove Permissions"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
-        </>
+        </div>
       )}
 
-      {/* Edit Group Modal */}
-      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)}>
-        <h2 className="text-lg font-semibold mb-4">Edit Group</h2>
-        <input
-          type="text"
-          placeholder="Group Name (letters, spaces, hyphens, underscores only)"
-          value={editGroupName}
-          onChange={(e) => setEditGroupName(e.target.value)}
-          className="w-full p-2 border rounded mb-4"
-          onKeyPress={(e) => e.key === "Enter" && handleUpdate()}
-        />
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button
-            onClick={handleUpdate}
-            variant="primary"
-            size="medium"
-            className="w-full sm:w-auto flex items-center gap-2 justify-center"
-            disabled={updating}
-          >
-            {updating ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Saving...
-              </>
-            ) : (
-              "Save"
-            )}
-          </Button>
-
-          <Button
-            onClick={async () => {
-              setCanceling(true);
-              await new Promise((r) => setTimeout(r, 200));
-              setShowEditModal(false);
-              setEditingGroup(null);
-              setEditGroupName("");
-              setCanceling(false);
-            }}
-            variant="secondary"
-            size="medium"
-            className="w-full sm:w-auto"
-            disabled={updating || canceling}
-          >
-            {canceling ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Cancelling...
-              </>
-            ) : (
-              "Cancel"
-            )}
-          </Button>
-        </div>
-      </Modal>
-
-      {/* Delete Group Modal */}
-      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)}>
-        <h2 className="text-lg font-semibold mb-4">Confirm Delete</h2>
-        <p className="mb-4">
-          Are you sure you want to delete this group? This action cannot be
-          undone.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button
-            onClick={confirmDelete}
-            variant="danger"
-            size="medium"
-            className="w-full sm:w-auto flex items-center gap-2 justify-center"
-            disabled={deletingGroup}
-          >
-            {deletingGroup ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Deleting...
-              </>
-            ) : (
-              "Yes, Delete"
-            )}
-          </Button>
-
-          <Button
-            onClick={() => {
-              setShowDeleteModal(false);
-              setDeleteGroupId(null);
-            }}
-            variant="secondary"
-            size="medium"
-            className="w-full sm:w-auto"
-            disabled={deletingGroup}
-          >
-            {deletingGroup ? "Please wait..." : "Cancel"}
-          </Button>
-        </div>
-      </Modal>
-
-      {/* Create Group Modal */}
       <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)}>
         <h2 className="text-lg font-semibold mb-4">Create Group</h2>
+
         <input
           type="text"
-          placeholder="Group Name (letters, spaces, hyphens, underscores only)"
+          placeholder="Group Name"
           value={newGroupName}
           onChange={(e) => setNewGroupName(e.target.value)}
           className="w-full p-2 border rounded mb-4"
-          onKeyPress={(e) => e.key === "Enter" && handleCreate()}
+          onKeyDown={(e) => e.key === "Enter" && handleCreate()}
         />
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button
-            onClick={handleCreate}
-            variant="primary"
-            size="medium"
-            className="w-full sm:w-auto flex items-center gap-2 justify-center"
-            disabled={creating}
-          >
-            {creating ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Creating...
-              </>
-            ) : (
-              "Create"
-            )}
-          </Button>
 
+        <div className="flex justify-end gap-3">
           <Button
-            onClick={async () => {
-              setCanceling(true);
-              await new Promise((r) => setTimeout(r, 250));
+            onClick={() => {
               setShowCreateModal(false);
               setNewGroupName("");
-              setCanceling(false);
             }}
             variant="secondary"
-            size="medium"
-            className="w-full sm:w-auto"
-            disabled={creating || canceling}
           >
-            {canceling ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Cancelling...
-              </>
-            ) : (
-              "Cancel"
-            )}
+            Cancel
+          </Button>
+
+          <Button onClick={handleCreate} disabled={creating} variant="primary">
+            {creating ? "Creating..." : "Create"}
           </Button>
         </div>
       </Modal>
 
-      {/* Group Permissions view (only when Group Permissions nav is active) */}
-      {showPermissionActions && (
-        <div className="bg-white p-4 rounded shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Group Permissions</h3>
-          </div>
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)}>
+        <h2 className="text-lg font-semibold mb-4">Edit Group</h2>
 
-          <div className="flex items-center gap-4 mb-4">
-            <select
-              value={selectedGroupId}
-              onChange={(e) => handleGroupSelect(e.target.value)}
-              className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            >
-              <option value="">Select the group</option>
-              {groups.map((group) => (
-                <option key={group.group_uuid} value={group.group_uuid}>
-                  {group.group_name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <input
+          type="text"
+          placeholder="Group Name"
+          value={editGroupName}
+          onChange={(e) => setEditGroupName(e.target.value)}
+          className="w-full p-2 border rounded mb-4"
+          onKeyDown={(e) => e.key === "Enter" && handleUpdate()}
+        />
 
-          {selectedGroupId && (
-            <div className="flex justify-around items-center mb-4">
-              <Button
-                onClick={handleAddClick}
-                className="px-3 py-2 bg-blue-900 text-white rounded hover:bg-blue-950 transition-colors font-medium"
-              >
-                Add
-              </Button>
-              <Button
-                onClick={handleDeleteClickPermission}
-                className="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors font-medium"
-              >
-                Delete
-              </Button>
-              <Button
-                onClick={handleViewClick}
-                className="px-3 py-2 bg-pink-900 text-white rounded hover:bg-pink-950 transition-colors font-medium"
-              >
-                View
-              </Button>
-            </div>
-          )}
+        <div className="flex justify-end gap-3">
+          <Button
+            onClick={() => {
+              setShowEditModal(false);
+              setEditingGroup(null);
+              setEditGroupName("");
+            }}
+            variant="secondary"
+          >
+            Cancel
+          </Button>
 
-          {/* Inline Add / Delete / View sections */}
-          {/* ✅ Added ref here */}
-          <div ref={permissionSectionRef}>
-            {(showPermissionList || showDeleteList || showViewList) && (
-              <div className="mb-4 mt-6 border-t pt-6">
-                {showPermissionList && (
-                  <div>
-                    <h5 className="text-md font-medium mb-2">
-                      Available Permissions to Add:
-                    </h5>
-                    <div className="mb-4">
-                      <SearchInput
-                        placeholder="Search permissions..."
-                        onSearch={(value) => {
-                          setSearchTerm(value);
-                          setSearchTrigger(true);
-                        }}
-                      />
-                    </div>
-                    <PermissionList
-                      permissions={availableToAdd}
-                      showAdd={true}
-                      showDelete={false}
-                      onAdd={handleSelectToAdd}
-                      processingItemId={processingItemId}
-                    />
-                    <div className="mt-4">
-                      <h5 className="text-md font-medium mb-2">
-                        Selected Permission Names:
-                      </h5>
-                      <PermissionChips
-                        permissions={selectedToAdd}
-                        onRemove={handleUnselectToAdd}
-                        variant="add"
-                      />
-                      {selectedToAdd.length > 0 && (
-                        <div className="mt-4">
-                          <Button
-                            size="medium"
-                            variant="primary"
-                            onClick={handleBulkAddPermissions}
-                            type="button"
-                            className="flex items-center gap-2"
-                            disabled={bulkAddLoading}
-                          >
-                            {bulkAddLoading ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />{" "}
-                                Adding...
-                              </>
-                            ) : (
-                              <>Confirm Add ({selectedToAdd.length})</>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {showDeleteList && (
-                  <div>
-                    <h5 className="text-md font-medium mb-2">
-                      Current Group Permissions (Select to Remove):
-                    </h5>
-                    <div className="mb-4">
-                      <SearchInput
-                        placeholder="Search permissions..."
-                        onSearch={(value) => {
-                          setSearchTerm(value);
-                          setSearchTrigger(true);
-                        }}
-                      />
-                    </div>
-                    <PermissionList
-                      permissions={availableToRemove}
-                      showAdd={false}
-                      showDelete={true}
-                      onDelete={handleSelectToRemove}
-                    />
-                    <div className="mt-4">
-                      {/* <h5 className="text-md font-medium mb-2">Selected Permission Names:</h5> */}
-                      <PermissionChips
-                        permissions={selectedToRemove}
-                        onRemove={handleUnselectToRemove}
-                        variant="remove"
-                      />
-                      {selectedToRemove.length > 0 && (
-                        <div className="mt-4">
-                          <Button
-                            size="medium"
-                            variant="danger"
-                            onClick={handleBulkRemovePermissions}
-                            type="button"
-                            className="flex items-center gap-2"
-                            disabled={bulkRemoveLoading}
-                          >
-                            {bulkRemoveLoading ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />{" "}
-                                Removing...
-                              </>
-                            ) : (
-                              <>Confirm Remove ({selectedToRemove.length})</>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {showViewList && (
-                  <div>
-                    <h5 className="text-md font-medium mb-2">
-                      Current Group Permissions:
-                    </h5>
-                    <div className="mb-4">
-                      <SearchInput
-                        placeholder="Search permissions..."
-                        onSearch={(value) => {
-                          setSearchTerm(value);
-                          setSearchTrigger(true);
-                        }}
-                      />
-                    </div>
-                    <PermissionList
-                      permissions={filterPermissions(
-                        enrichWithCode(groupPermissions),
-                      )}
-                      showAdd={false}
-                      showDelete={false}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <Button onClick={handleUpdate} disabled={updating} variant="primary">
+            {updating ? "Saving..." : "Save"}
+          </Button>
         </div>
-      )}
-    </div>
-  );
-}
-
-// Custom searchable dropdown (combobox-like) for groups (defined but not used)
-function SearchableDropdown({
-  options = [],
-  value,
-  onChange,
-  placeholder = "Select",
-  className = "",
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const ref = useRef(null);
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const filtered = options.filter((option) =>
-    option.label.toLowerCase().includes((search || "").toLowerCase()),
-  );
-
-  const selected = options.find((opt) => opt.value === value);
-
-  return (
-    <div className="relative" ref={ref}>
-      <div
-        onClick={() => setOpen(!open)}
-        className={`border border-gray-300 rounded px-3 py-2 flex items-center justify-between cursor-pointer ${className}`}
-      >
-        <span className={selected ? "text-gray-900" : "text-gray-500"}>
-          {selected ? selected.label : placeholder}
-        </span>
-        <span className="text-gray-400 ml-2">▾</span>
-      </div>
-
-      {open && (
-        <div className="absolute z-[100] mt-1 w-full bg-white border rounded-lg shadow-lg">
-          <div className="p-2 border-b">
-            <input
-              autoFocus
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-2 py-1 border rounded focus:outline-none focus:border-blue-500"
-              placeholder="Search..."
-            />
-          </div>
-          <ul className="max-h-60 overflow-y-auto">
-            {filtered.map((option) => (
-              <li
-                key={option.value}
-                className={`px-4 py-2 hover:bg-gray-100 cursor-pointer ${
-                  option.value === value ? "bg-gray-100" : ""
-                }`}
-                onClick={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                  setSearch("");
-                }}
-              >
-                {option.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

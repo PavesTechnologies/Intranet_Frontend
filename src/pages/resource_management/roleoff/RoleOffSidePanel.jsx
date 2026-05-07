@@ -20,6 +20,9 @@ const formatReason = (str) => {
 const isPendingStatus = (status) =>
   status === "Pending" || status === "Pending Approval";
 
+const isDmActionableStatus = (status) =>
+  status === "Pending" || status === "Pending Approval" || status === "Approved";
+
 const impactStyles = {
   Low: "border-teal-200 bg-teal-50 text-teal-700",
   Medium: "border-amber-200 bg-amber-50 text-amber-700",
@@ -38,6 +41,7 @@ const baseForm = {
   type: "Planned",
   effectiveDate: "",
   reason: "",
+  resourcePerformance: "",
   replacementRequired: false,
   acknowledgeRisk: false,
   reviewConfirmed: false,
@@ -82,6 +86,55 @@ const normalizeReasonValue = (reasonValue, options = []) => {
   return current;
 };
 
+const getBulkSummary = (record) => {
+  const records = Array.isArray(record?.records) ? record.records : [];
+  const totalRequests = records.length;
+  const highImpactCount = records.filter((item) => item?.impact === "High").length;
+  const mediumImpactCount = records.filter((item) => item?.impact === "Medium").length;
+  const uniqueProjects = new Set(records.map((item) => item?.project).filter(Boolean)).size;
+  const uniqueClients = new Set(records.map((item) => item?.client).filter(Boolean)).size;
+  const projectMap = new Map();
+
+  records.forEach((item) => {
+    const project = item?.project || "Unassigned Project";
+    const client = item?.client || "-";
+    const current = projectMap.get(project) || {
+      project,
+      client,
+      requestCount: 0,
+      highImpactCount: 0,
+      resources: [],
+    };
+
+    current.requestCount += 1;
+    if (item?.impact === "High") {
+      current.highImpactCount += 1;
+    }
+    if (item?.resource) {
+      current.resources.push(item.resource);
+    }
+
+    projectMap.set(project, current);
+  });
+
+  return {
+    totalRequests,
+    highImpactCount,
+    mediumImpactCount,
+    uniqueProjects,
+    uniqueClients,
+    projectBreakdown: [...projectMap.values()]
+      .map((entry) => ({
+        ...entry,
+        resources: [...new Set(entry.resources)],
+      }))
+      .sort((left, right) => right.requestCount - left.requestCount),
+    resourceNames: records
+      .map((item) => item?.resource)
+      .filter(Boolean),
+  };
+};
+
 const RoleOffSidePanel = ({
   open,
   mode,
@@ -104,6 +157,8 @@ const RoleOffSidePanel = ({
   const [reasons, setReasons] = useState([]);
   const [reviewState, setReviewState] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const effectiveDateRef = useRef(null);
+  const [isEffectiveDatePickerOpen, setIsEffectiveDatePickerOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -138,6 +193,7 @@ const RoleOffSidePanel = ({
       setReviewState(null);
       setError("");
       setFieldErrors({});
+      setIsEffectiveDatePickerOpen(false);
       return;
     }
 
@@ -146,6 +202,7 @@ const RoleOffSidePanel = ({
       type: isExistingRequest ? (record.type || "Planned") : "Planned",
       effectiveDate: isExistingRequest ? (record.effectiveDateIso || "") : "",
       reason: isExistingRequest ? normalizeReasonValue(record.reason, reasons) : "",
+      resourcePerformance: isExistingRequest ? (record.resourcePerformance || "") : "",
       replacementRequired:
         isExistingRequest
           ? Boolean(record.replacementRequired)
@@ -159,6 +216,7 @@ const RoleOffSidePanel = ({
     setError("");
     setShowRejectError(false);
     setFieldErrors({});
+    setIsEffectiveDatePickerOpen(false);
   }, [record, open, actionType, reasons]);
 
   if (!open || !record) return null;
@@ -167,22 +225,24 @@ const RoleOffSidePanel = ({
   const isRM = mode === "rm";
   const isDM = mode === "dm";
   const isBulkRecord = Boolean(record.isBulk);
-  const isBulkRejectFlow =
-    (isRM && actionType === "bulk-rm") ||
-    (isDM && actionType === "bulk-dm");
+  const isRmBulkApproveFlow = isRM && actionType === "bulk-rm-approve";
+  const isRmBulkRejectFlow = isRM && ["bulk-rm", "bulk-rm-reject"].includes(actionType);
+  const isDmBulkApproveFlow = isDM && actionType === "bulk-dm-approve";
+  const isDmBulkRejectFlow = isDM && ["bulk-dm", "bulk-dm-reject"].includes(actionType);
   const isBulkPmCreate = isPM && actionType === "bulk-create";
   const isBulkPmEdit = isPM && actionType === "update" && Boolean(record.isBulkCreated);
   const isBulkPmFlow = isBulkPmCreate || isBulkPmEdit;
   const isReadOnlyPm = isPM && actionType === "view";
   const showRejectedDetails =
     isPM &&
-    pmTab === "process" &&
+    (pmTab === "process" || pmTab === "rejected") &&
     (
       String(record.roleOffStatus || "").trim() === "Rejected" ||
       Boolean(record.rejectedBy) ||
       Boolean(record.rejectionReason)
     );
   const needsRiskAck = record.impact === "High" && isPM;
+  const bulkSummary = isBulkRecord ? getBulkSummary(record) : null;
   const panelTitle = isPM
     ? actionType === "view"
       ? "View Role-Off"
@@ -192,10 +252,23 @@ const RoleOffSidePanel = ({
           ? "Create Bulk Role-Off"
           : "Create Role-Off"
     : isRM
-      ? (isBulkRecord ? "Bulk Request Operations" : "Request Operations")
-      : actionType === "reject"
-        ? "Reject Request"
-        : (isBulkRecord ? "Bulk Approval Review" : "Approval Review");
+      ? (
+        actionType === "bulk-rm-approve"
+          ? "Bulk Approval Review"
+          : actionType === "bulk-rm-reject"
+            ? "Bulk Rejection Review"
+            : (isBulkRecord ? "Bulk Request Operations" : "Request Operations")
+      )
+      : actionType === "bulk-dm-approve"
+        ? "Bulk Fulfillment Review"
+        : actionType === "bulk-dm-reject" || actionType === "reject"
+          ? "Reject Request"
+          : (isBulkRecord ? "Bulk Approval Review" : "Approval Review");
+
+  const showRmApproveAction = isRM && (!isBulkRecord || isRmBulkApproveFlow);
+  const showRmRejectAction = isRM && (!isBulkRecord || isRmBulkRejectFlow);
+  const showDmApproveAction = isDM && isDmActionableStatus(record.status) && (!isBulkRecord || isDmBulkApproveFlow);
+  const showDmRejectAction = isDM && isDmActionableStatus(record.status) && (!isBulkRecord || isDmBulkRejectFlow);
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -216,6 +289,9 @@ const RoleOffSidePanel = ({
       }
       if (!form.reason) {
         nextFieldErrors.reason = "Reason is required.";
+      }
+      if (!form.resourcePerformance) {
+        nextFieldErrors.resourcePerformance = "Performance is required.";
       }
       if (
         !isBulkPmFlow &&
@@ -351,6 +427,35 @@ const RoleOffSidePanel = ({
     }
   };
 
+  const handleEffectiveDateClick = () => {
+    if (isReadOnlyPm || isSubmitting) return;
+
+    const input = effectiveDateRef.current;
+    if (!input) return;
+
+    if (isEffectiveDatePickerOpen) {
+      input.blur();
+      setIsEffectiveDatePickerOpen(false);
+      return;
+    }
+
+    input.focus();
+
+    if (typeof input.showPicker === "function") {
+      try {
+        input.showPicker();
+        setIsEffectiveDatePickerOpen(true);
+        return;
+      } catch (err) {
+        if (err?.name !== "NotAllowedError") {
+          console.error("Failed to open effective date picker:", err);
+        }
+      }
+    }
+
+    setIsEffectiveDatePickerOpen(true);
+  };
+
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-slate-900/20 backdrop-blur-[1px]">
       <button type="button" disabled={isSubmitting} className="flex-1 cursor-default" onClick={onClose} aria-label="Close panel" />
@@ -364,7 +469,9 @@ const RoleOffSidePanel = ({
             </p>
             <h2 className="mt-1 text-lg font-bold text-[#081534]">{record.resource}</h2>
             <p className="mt-1 text-sm text-gray-500">
-              {record.project} · {record.role}
+              {isBulkRecord
+                ? `${bulkSummary?.uniqueProjects || 0} project(s) · ${record.role}`
+                : `${record.project} · ${record.role}`}
             </p>
           </div>
           <button
@@ -384,56 +491,180 @@ const RoleOffSidePanel = ({
               <h3 className="text-sm font-semibold text-[#081534]">Context</h3>
             </div>
             <div className="space-y-3 text-sm">
-              {isPM ? (
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-gray-500">Role-Off Status</span>
-                  <Badge
-                    className={cn(
-                      "text-[11px] font-semibold",
-                      roleOffStatusStyles[record.roleOffStatus || "Not Requested"] || "border-slate-200 bg-slate-100 text-slate-700"
-                    )}
-                  >
-                    {record.roleOffStatus || "Not Requested"}
-                  </Badge>
-                </div>
-              ) : null}
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-gray-500">Impact</span>
-                <Badge className={cn("text-[11px] font-semibold", impactStyles[record.impact])}>
-                  {record.impact}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-gray-500">Allocation</span>
-                <span className="font-medium text-gray-800">{record.allocationPercent}%</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-gray-500">Client</span>
-                <span className="font-medium text-gray-800">{record.client}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-gray-500">Demand Name</span>
-                <span className="font-medium text-gray-800 text-right">{record.role || "-"}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-gray-500">Demand Skills</span>
-                <span className="font-medium text-gray-800 text-right">{record.skill || "-"}</span>
-              </div>
               {isBulkRecord ? (
                 <>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-gray-500">Selected Resources</span>
-                    <span className="font-medium text-gray-800">{record.selectedCount || 0}</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-md border border-slate-200 bg-white p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        Requests
+                      </p>
+                      <p className="mt-1 text-xl font-bold text-[#081534]">
+                        {bulkSummary?.totalRequests || record.selectedCount || 0}
+                      </p>
+                    </div>
+                    <div className="rounded-md border border-slate-200 bg-white p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        High Impact
+                      </p>
+                      <p className="mt-1 text-xl font-bold text-rose-700">
+                        {bulkSummary?.highImpactCount || 0}
+                      </p>
+                    </div>
+                    <div className="rounded-md border border-slate-200 bg-white p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        Projects
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-[#081534]">
+                        {bulkSummary?.uniqueProjects || 0}
+                      </p>
+                    </div>
+                    <div className="rounded-md border border-slate-200 bg-white p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        Clients
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-[#081534]">
+                        {bulkSummary?.uniqueClients || 0}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-gray-500">Resource List</span>
-                    <p className="mt-2 rounded-md border border-gray-200 bg-white p-3 text-sm text-gray-600">
-                      {(record.resourceNames || []).join(", ") || "-"}
+
+                  <div className="rounded-md border border-blue-100 bg-gradient-to-r from-blue-50 to-white p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">
+                        Overall Impact
+                      </span>
+                      <Badge className={cn("text-[11px] font-semibold", impactStyles[record.impact])}>
+                        {record.impact}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-600">
+                      {record.impactSummary}
                     </p>
+                    {(bulkSummary?.mediumImpactCount || 0) > 0 ? (
+                      <p className="mt-2 text-xs text-gray-500">
+                        {bulkSummary.mediumImpactCount} medium-impact request(s) are also part of this batch.
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {(bulkSummary?.projectBreakdown?.length || 0) > 0 ? (
+                    <div className="rounded-md border border-gray-200 bg-white p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                          Project Breakdown
+                        </span>
+                        <span className="text-xs font-medium text-gray-500">
+                          {bulkSummary.projectBreakdown.length} project group(s)
+                        </span>
+                      </div>
+                      <div className="mt-3 space-y-3">
+                        {bulkSummary.projectBreakdown.map((projectEntry) => (
+                          <div
+                            key={`${projectEntry.project}-${projectEntry.client}`}
+                            className="rounded-md border border-slate-200 bg-slate-50 p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-[#081534]">
+                                  {projectEntry.project}
+                                </p>
+                                <p className="mt-0.5 text-xs text-gray-500">
+                                  Client: {projectEntry.client}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-[#081534]">
+                                  {projectEntry.requestCount}
+                                </p>
+                                <p className="text-[10px] uppercase tracking-[0.14em] text-gray-500">
+                                  Requests
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700">
+                                {projectEntry.resources.length} resource(s)
+                              </span>
+                              {projectEntry.highImpactCount > 0 ? (
+                                <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-700">
+                                  {projectEntry.highImpactCount} high impact
+                                </span>
+                              ) : null}
+                            </div>
+
+                            <p className="mt-3 text-xs leading-5 text-gray-600">
+                              {projectEntry.resources.join(", ")}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        Selected Resources
+                      </span>
+                      <span className="text-sm font-semibold text-[#081534]">
+                        {bulkSummary?.resourceNames?.length || 0}
+                      </span>
+                    </div>
+                    <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-gray-200 bg-white p-3">
+                      <div className="flex flex-wrap gap-2">
+                        {(bulkSummary?.resourceNames || []).map((name, index) => (
+                          <span
+                            key={`${name}-${index}`}
+                            className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </>
-              ) : null}
-              {record.impactSummary ? (
+              ) : (
+                <>
+                  {isPM ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-gray-500">Role-Off Status</span>
+                      <Badge
+                        className={cn(
+                          "text-[11px] font-semibold",
+                          roleOffStatusStyles[record.roleOffStatus || "Not Requested"] || "border-slate-200 bg-slate-100 text-slate-700"
+                        )}
+                      >
+                        {record.roleOffStatus || "Not Requested"}
+                      </Badge>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">Impact</span>
+                    <Badge className={cn("text-[11px] font-semibold", impactStyles[record.impact])}>
+                      {record.impact}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">Allocation</span>
+                    <span className="font-medium text-gray-800">{record.allocationPercent}%</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">Client</span>
+                    <span className="font-medium text-gray-800">{record.client}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">Demand Name</span>
+                    <span className="font-medium text-gray-800 text-right">{record.role || "-"}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">Demand Skills</span>
+                    <span className="font-medium text-gray-800 text-right">{record.skill || "-"}</span>
+                  </div>
+                </>
+              )}
+              {!isBulkRecord && record.impactSummary ? (
                 <p className="rounded-md border border-gray-200 bg-white p-3 text-sm text-gray-600">
                   {record.impactSummary}
                 </p>
@@ -476,11 +707,17 @@ const RoleOffSidePanel = ({
                     Effective Date
                   </label>
                   <input
+                    ref={effectiveDateRef}
                     type="date"
                     min={getTodayDate()}
                     max={record.endDateIso || undefined}
                     value={form.effectiveDate}
-                    onChange={(event) => updateField("effectiveDate", event.target.value)}
+                    onChange={(event) => {
+                      updateField("effectiveDate", event.target.value);
+                      setIsEffectiveDatePickerOpen(false);
+                    }}
+                    onClick={handleEffectiveDateClick}
+                    onBlur={() => setIsEffectiveDatePickerOpen(false)}
                     disabled={isReadOnlyPm || isSubmitting}
                     className={cn(getFieldClassName(fieldErrors.effectiveDate), "h-10 px-3")}
                   />
@@ -512,6 +749,30 @@ const RoleOffSidePanel = ({
                   </select>
                   {fieldErrors.reason ? (
                     <p className="mt-1 text-xs text-rose-600">{fieldErrors.reason}</p>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    Resource Performance
+                  </label>
+                  <select
+                    value={form.resourcePerformance}
+                    onChange={(event) => updateField("resourcePerformance", event.target.value)}
+                    disabled={isReadOnlyPm || isSubmitting}
+                    className={cn(getFieldClassName(fieldErrors.resourcePerformance), "h-10 px-3")}
+                  >
+                    <option value="">Select performance</option>
+                    <option value="HIGH_PERFORMER">High Performer</option>
+                    <option value="AVERAGE_PERFORMER">Average Performer</option>
+                    <option value="LOW_PERFORMER">Low Performer</option>
+                    <option value="EXCEPTIONAL">Exceptional</option>
+                    <option value="NEEDS_IMPROVEMENT">Needs Improvement</option>
+                    <option value="CONSISTENT">Consistent</option>
+                    <option value="NEW_RESOURCE">New Resource</option>
+                  </select>
+                  {fieldErrors.resourcePerformance ? (
+                    <p className="mt-1 text-xs text-rose-600">{fieldErrors.resourcePerformance}</p>
                   ) : null}
                 </div>
 
@@ -623,11 +884,17 @@ const RoleOffSidePanel = ({
                   </p>
                   <p className="mt-1 font-medium text-gray-800">{record.effectiveDate || "-"}</p>
                 </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    Resource Performance
+                  </p>
+                  <p className="mt-1 font-medium text-gray-800">{record.resourcePerformance || "-"}</p>
+                </div>
               </div>
             </section>
           ) : null}
 
-          {isRM ? (
+          {isRM && showRmRejectAction ? (
             <section className="space-y-4 rounded-lg border border-gray-200 p-4">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-gray-500 font-semibold">Status</span>
@@ -665,7 +932,7 @@ const RoleOffSidePanel = ({
             </section>
           ) : null}
 
-          {isDM ? (
+          {isDM && showDmRejectAction ? (
             <section className="space-y-4 rounded-lg border border-gray-200 p-4">
               {record.impact === "High" ? (
                 <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-900">
@@ -744,44 +1011,52 @@ const RoleOffSidePanel = ({
             ) : null}
             {isRM ? (
               <>
-                <Button
-                  onClick={handleRmApproveClick}
-                  disabled={isSubmitting || !isPendingStatus(record.status) || isBulkRejectFlow}
-                  className={`h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting || !isPendingStatus(record.status) ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  {submittingAction === "approve" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Approve
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleRmRejectClick}
-                  disabled={isSubmitting || !isPendingStatus(record.status)}
-                  className={`h-10 border-rose-300 bg-white text-sm text-rose-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting || !isPendingStatus(record.status) ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  {submittingAction === "reject" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Reject
-                </Button>
+                {showRmApproveAction ? (
+                  <Button
+                    onClick={handleRmApproveClick}
+                    disabled={isSubmitting || !isPendingStatus(record.status)}
+                    className={`h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting || !isPendingStatus(record.status) ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    {submittingAction === "approve" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Approve
+                  </Button>
+                ) : null}
+                {showRmRejectAction ? (
+                  <Button
+                    variant="outline"
+                    onClick={handleRmRejectClick}
+                    disabled={isSubmitting || !isPendingStatus(record.status)}
+                    className={`h-10 border-rose-300 bg-white text-sm text-rose-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting || !isPendingStatus(record.status) ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    {submittingAction === "reject" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Reject
+                  </Button>
+                ) : null}
               </>
             ) : null}
             {isDM ? (
               <>
-                <Button
-                  onClick={handleDmApproveClick}
-                  disabled={isSubmitting || isBulkRejectFlow}
-                  className="h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submittingAction === "approve" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Fulfill
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleDmRejectClick}
-                  disabled={isSubmitting}
-                  className="h-10 border-rose-300 bg-white text-sm text-rose-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submittingAction === "reject" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Reject
-                </Button>
+                {showDmApproveAction ? (
+                  <Button
+                    onClick={handleDmApproveClick}
+                    disabled={isSubmitting}
+                    className="h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submittingAction === "approve" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Fulfill
+                  </Button>
+                ) : null}
+                {showDmRejectAction ? (
+                  <Button
+                    variant="outline"
+                    onClick={handleDmRejectClick}
+                    disabled={isSubmitting}
+                    className="h-10 border-rose-300 bg-white text-sm text-rose-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submittingAction === "reject" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Reject
+                  </Button>
+                ) : null}
               </>
             ) : null}
           </div>

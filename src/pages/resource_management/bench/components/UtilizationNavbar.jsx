@@ -15,7 +15,7 @@ const UtilizationNavbar = () => {
          <div className="max-w-[1600px] mx-auto px-8">
             <div className="flex items-center justify-between h-16">
                <div className="flex items-center gap-8">
-                  <h1 className="text-[14px] font-black text-slate-900 uppercase tracking-[0.2em] border-r border-slate-200 pr-8 mr-2">
+                  <h1 className="text-[14px] font-black text-slate-900 capitalize tracking-[0.2em] border-r border-slate-200 pr-8 mr-2">
                      Utilization <span className="text-indigo-600">Intelligence</span>
                   </h1>
                   <nav className="flex items-center gap-1">
@@ -24,7 +24,7 @@ const UtilizationNavbar = () => {
                            key={item.path}
                            to={item.path}
                            className={({ isActive }) => `
-                              flex items-center gap-2.5 px-5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300
+                              flex items-center gap-2.5 px-5 py-2 rounded-xl text-[11px] font-black capitalize tracking-widest transition-all duration-300
                               ${isActive 
                                  ? 'bg-indigo-50 text-indigo-600 shadow-sm border border-indigo-100 scale-105' 
                                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}
@@ -38,7 +38,7 @@ const UtilizationNavbar = () => {
                </div>
                <div className="flex items-center gap-4">
                   <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live Engine Connected</span>
+                  <span className="text-[10px] font-black text-slate-400 capitalize tracking-widest">Live Engine Connected</span>
                </div>
             </div>
          </div>

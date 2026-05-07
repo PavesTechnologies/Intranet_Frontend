@@ -14,19 +14,19 @@ export const defaultFilters = {
 };
 
 const ROLE_PRIORITY = [
-    "RESOURCE-MANAGER",
-    "DELIVERY-MANAGER",
-    "PROJECT-MANAGER",
+    "Resource_Manager",
+    "Delivery_Manager",
+    "Project_Manager",
     "MANAGER",
-    "ADMIN",
+    "Admin",
     "SUPER ADMIN",
     "SUPER-ADMIN",
     "GENERAL"
 ];
 
 const DEMAND_ROLE_LABELS = {
-    "RESOURCE-MANAGER": "Resource Manager",
-    "DELIVERY-MANAGER": "Delivery Manager"
+    "Resource_Manager": "Resource Manager",
+    "Delivery_Manager": "Delivery Manager"
 };
 
 export const DEMAND_STATUSES = [
@@ -53,9 +53,7 @@ export const DELIVERY_MODELS = [
 
 const normalizeRoleKey = (role = "") => {
     if (!role) return "";
-    return role.toUpperCase()
-        .replace(/^ROLE[-_]/, "") // Strip ROLE- or ROLE_ prefix
-        .replace(/_/g, "-")       // Standardize underscores to hyphens
+    return role.replace(/^ROLE[-_]/i, "") // Strip ROLE- or ROLE_ prefix
         .trim();
 };
 
@@ -227,6 +225,7 @@ export function useDemand(projectId = null) {
 
     const activeKPIs = useMemo(() => {
         if (!kpiData) return [];
+
         return [
             { label: "Active", count: kpiData.active || 0 },
             { label: "Approved", count: kpiData.approved || 0 },
