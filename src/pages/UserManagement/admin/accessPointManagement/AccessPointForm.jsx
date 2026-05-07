@@ -8,6 +8,7 @@ import {
   Globe,
   Shield,
   RotateCcw,
+  Eye,
 } from "lucide-react";
 
 import Button from "../../../../components/Button/Button";
