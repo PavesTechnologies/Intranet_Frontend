@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   listAccessPoints,
   deleteAccessPoint,
@@ -20,20 +20,26 @@ import {
   Globe,
   Shield,
 } from "lucide-react";
+
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
 import AppCard from "../../../../components/Cards/AppCard";
 import DynamicCardGrid from "../../../../components/Cards/DynamicCardGrid";
+import FormInput from "../../../../components/forms/FormInput";
+import FormSelect from "../../../../components/forms/FormSelect";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { toast } from "react-toastify";
 
 const ACCESS_POINT_GRID_CONFIG = {
   layoutMode: "grid",
-  columnMode: "fixed",
+  columnMode: "auto",
   cardsPerRow: 3,
   cardsPerPage: 6,
-  gapClassName: "gap-6",
-  gridClassName: "items-stretch",
+  minCardWidth: "300px",
+  gapClassName: "gap-4",
+  gridClassName: "items-stretch auto-rows-fr",
   paginationWrapperClassName: "mt-6 flex justify-center",
 };
 
@@ -78,7 +84,7 @@ const AccessPointList = ({ searchTerm }) => {
   }, []);
 
   const filteredAps = useMemo(() => {
-    if (!searchTerm) return aps;
+    if (!searchTerm?.trim()) return aps;
 
     const lowerCaseSearch = searchTerm.toLowerCase();
 
@@ -117,7 +123,7 @@ const AccessPointList = ({ searchTerm }) => {
       await deleteAccessPoint(selectedAccessPointId);
 
       setAps((prev) =>
-        prev.filter((ap) => ap.access_uuid !== selectedAccessPointId),
+        prev.filter((ap) => ap.access_uuid !== selectedAccessPointId)
       );
 
       showStatusToast("Access Point successfully deleted", "success");
@@ -136,7 +142,7 @@ const AccessPointList = ({ searchTerm }) => {
   };
 
   return (
-    <div className="bg-white min-h-screen -mx-6 -mt-6 p-6">
+    <div className="min-h-screen bg-gray-50">
       {loadingAccessPoints ? (
         <DynamicCardGrid
           data={[]}
@@ -147,7 +153,7 @@ const AccessPointList = ({ searchTerm }) => {
           getKey={(_, index) => index}
         />
       ) : filteredAps.length === 0 ? (
-        <div className="text-center text-gray-500 mt-20">
+        <div className="mt-8 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-sm text-gray-500">
           {searchTerm
             ? `No access points found matching "${searchTerm}".`
             : "No access points found."}
@@ -157,40 +163,41 @@ const AccessPointList = ({ searchTerm }) => {
           data={filteredAps}
           getKey={(ap) => ap.access_uuid}
           resetPageDependency={searchTerm}
-          wrapperClassName="w-full"
+          wrapperClassName="w-full min-w-0"
           emptyMessage="No access points found."
           {...ACCESS_POINT_GRID_CONFIG}
           renderCard={(ap) => (
             <AppCard
-              className="min-h-[260px]"
+              className="h-full min-h-[240px] border-gray-200 bg-white"
               renderHeader={() => (
-                <div className="flex justify-between items-start gap-3 mb-4 min-w-0">
+                <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <h3
-                      className="text-lg font-semibold text-gray-800 truncate"
+                      className="truncate text-lg font-semibold text-gray-800"
                       title={ap.endpoint_path}
                     >
                       {ap.endpoint_path || "N/A"}
                     </h3>
 
                     <p
-                      className="text-xs text-gray-400 mt-1 truncate"
+                      className="mt-1 truncate text-xs text-gray-400"
                       title={ap.access_uuid}
                     >
                       {ap.access_uuid}
                     </p>
                   </div>
 
-                  <div className="flex gap-2 shrink-0 relative dropdown-menu-container">
+                  <div className="dropdown-menu-container relative flex shrink-0 items-center gap-2">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleViewClick(ap.access_uuid);
                       }}
-                      className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors shadow-sm"
+                      className="rounded-lg bg-blue-50 p-1.5 text-blue-600 shadow-sm transition-colors hover:bg-blue-100"
                       title="View"
+                      type="button"
                     >
-                      <Eye className="w-4 h-4" />
+                      <Eye className="h-4 w-4" />
                     </button>
 
                     <button
@@ -199,26 +206,28 @@ const AccessPointList = ({ searchTerm }) => {
                         setOpenMenuId(
                           openMenuId === ap.access_uuid
                             ? null
-                            : ap.access_uuid,
+                            : ap.access_uuid
                         );
                       }}
-                      className="p-1.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shadow-sm"
+                      className="rounded-lg bg-gray-50 p-1.5 text-gray-600 shadow-sm transition-colors hover:bg-gray-100"
                       title="Actions"
+                      type="button"
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <MoreVertical className="h-4 w-4" />
                     </button>
 
                     {openMenuId === ap.access_uuid && (
-                      <div className="absolute right-0 top-10 w-32 bg-white border rounded-lg shadow-lg z-20 overflow-hidden py-1 animate-in fade-in zoom-in duration-200">
+                      <div className="absolute right-0 top-10 z-20 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenMenuId(null);
                             handleEditClick(ap.access_uuid);
                           }}
-                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 gap-2 transition-colors"
+                          className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+                          type="button"
                         >
-                          <Pencil className="w-4 h-4 text-amber-600 shrink-0" />
+                          <Pencil className="h-4 w-4 shrink-0 text-amber-600" />
                           <span>Edit</span>
                         </button>
 
@@ -228,9 +237,10 @@ const AccessPointList = ({ searchTerm }) => {
                             setOpenMenuId(null);
                             handleDeleteClick(ap.access_uuid);
                           }}
-                          className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 gap-2 transition-colors border-t border-gray-50"
+                          className="flex w-full items-center gap-2 border-t border-gray-100 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                          type="button"
                         >
-                          <Trash2 className="w-4 h-4 text-red-600 shrink-0" />
+                          <Trash2 className="h-4 w-4 shrink-0 text-red-600" />
                           <span>Delete</span>
                         </button>
                       </div>
@@ -239,31 +249,31 @@ const AccessPointList = ({ searchTerm }) => {
                 </div>
               )}
               renderBody={() => (
-                <div className="space-y-3 min-w-0">
-                  <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
-                    <span className="font-medium shrink-0">Method:</span>
+                <div className="min-w-0 space-y-3">
+                  <div className="flex min-w-0 items-start gap-2 text-sm text-gray-600">
+                    <span className="shrink-0 font-medium">Method:</span>
                     <span
-                      className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold truncate max-w-full"
+                      className="max-w-full truncate rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700"
                       title={ap.method}
                     >
                       {ap.method || "N/A"}
                     </span>
                   </div>
 
-                  <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
-                    <span className="font-medium shrink-0">Module:</span>
+                  <div className="flex min-w-0 items-start gap-2 text-sm text-gray-600">
+                    <span className="shrink-0 font-medium">Module:</span>
                     <span
-                      className="truncate min-w-0 flex-1"
+                      className="min-w-0 flex-1 truncate"
                       title={ap.module}
                     >
                       {ap.module || "N/A"}
                     </span>
                   </div>
 
-                  <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
-                    <span className="font-medium shrink-0">Public:</span>
+                  <div className="flex min-w-0 items-start gap-2 text-sm text-gray-600">
+                    <span className="shrink-0 font-medium">Public:</span>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                         ap.is_public
                           ? "bg-green-50 text-green-700"
                           : "bg-gray-100 text-gray-700"
@@ -273,10 +283,10 @@ const AccessPointList = ({ searchTerm }) => {
                     </span>
                   </div>
 
-                  <div className="text-sm text-gray-600 min-w-0">
+                  <div className="min-w-0 text-sm text-gray-600">
                     <span className="font-medium">Permission:</span>
                     <p
-                      className="mt-1 text-gray-700 break-all line-clamp-2"
+                      className="mt-1 line-clamp-2 break-all text-gray-700"
                       title={ap.permission_code || "N/A"}
                     >
                       {ap.permission_code || "N/A"}
@@ -293,23 +303,26 @@ const AccessPointList = ({ searchTerm }) => {
         isOpen={showDeleteModal}
         onClose={handleCancelDelete}
         title="Confirm Deletion"
+        className="!w-full !max-w-md"
       >
         <div className="p-4">
-          <p className="text-gray-600 mb-6">
+          <p className="mb-6 text-gray-600">
             Please confirm you really want to delete the access point.
           </p>
 
-          <div className="flex justify-end space-x-4">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
               onClick={handleCancelDelete}
-              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all"
+              variant="outline"
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
 
             <Button
               onClick={handleConfirmDelete}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
+              variant="danger"
+              className="w-full sm:w-auto"
             >
               Confirm
             </Button>
@@ -368,47 +381,47 @@ function AccessPointViewModal({ isOpen, accessUuid, onClose }) {
       onClose={onClose}
       title="Access Point Details"
       subtitle={`Access UUID: ${accessUuid}`}
-      className="max-w-2xl"
+      className="!w-full !max-w-3xl"
       bodyClassName="p-6"
     >
       {!ap ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="text-gray-500 text-lg">Loading...</div>
+        <div className="flex items-center justify-center py-20">
+          <LoadingSpinner text="Loading access point details..." />
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <h2 className="text-2xl font-semibold text-indigo-600 mb-6 text-center flex items-center justify-center gap-2">
-            <Search className="w-6 h-6" />
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
+          <h2 className="mb-6 flex items-center justify-center gap-2 text-center text-xl font-semibold text-indigo-600 sm:text-2xl">
+            <Search className="h-6 w-6" />
             Access Point Details
           </h2>
 
           <div className="space-y-4 text-gray-800">
-            <p className="flex items-center gap-2 break-all">
-              <Link className="w-5 h-5 text-gray-600 shrink-0" />
+            <p className="flex items-start gap-2 break-all">
+              <Link className="mt-0.5 h-5 w-5 shrink-0 text-gray-600" />
               <span className="font-medium text-gray-600">Path:</span>
               {ap.endpoint_path || "N/A"}
             </p>
 
-            <p className="flex items-center gap-2">
-              <Settings className="w-5 h-5 text-gray-600 shrink-0" />
+            <p className="flex items-start gap-2">
+              <Settings className="mt-0.5 h-5 w-5 shrink-0 text-gray-600" />
               <span className="font-medium text-gray-600">Method:</span>
               {ap.method || "N/A"}
             </p>
 
-            <p className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-gray-600 shrink-0" />
+            <p className="flex items-start gap-2">
+              <Package className="mt-0.5 h-5 w-5 shrink-0 text-gray-600" />
               <span className="font-medium text-gray-600">Module:</span>
               {ap.module || "N/A"}
             </p>
 
-            <p className="flex items-center gap-2">
-              <Globe className="w-5 h-5 text-gray-600 shrink-0" />
+            <p className="flex items-start gap-2">
+              <Globe className="mt-0.5 h-5 w-5 shrink-0 text-gray-600" />
               <span className="font-medium text-gray-600">Public:</span>
               {ap.is_public ? "Yes" : "No"}
             </p>
 
-            <p className="flex items-center gap-2 break-all">
-              <Shield className="w-5 h-5 text-gray-600 shrink-0" />
+            <p className="flex items-start gap-2 break-all">
+              <Shield className="mt-0.5 h-5 w-5 shrink-0 text-gray-600" />
               <span className="font-medium text-gray-600">Permission:</span>
               {ap.permission_code || "N/A"}
             </p>
@@ -490,40 +503,38 @@ function AccessPointEditModal({ accessUuid, onClose, onUpdated }) {
     if (!validateEndpointPath(form.endpoint_path)) {
       return showUniqueToast(
         "Endpoint path must start with '/' and contain only valid URL characters",
-        "error",
+        "error"
       );
     }
 
     if (!validateModuleName(form.module)) {
       return showUniqueToast(
         "Module name can only contain letters, spaces, hyphens, and underscores",
-        "error",
+        "error"
       );
     }
 
     setLoading(true);
 
     try {
-      const formDataToUpdate = {
+      await updateAccessPoint(accessUuid, {
         ...form,
         endpoint_path: form.endpoint_path.trim(),
         module: form.module.trim(),
-      };
-
-      await updateAccessPoint(accessUuid, formDataToUpdate);
+      });
 
       showUniqueToast("Access point updated successfully!", "success");
       onUpdated();
     } catch (error) {
       console.error("Error updating access point:", error);
 
-      const errorMessage =
+      showUniqueToast(
         error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to update access point";
-
-      showUniqueToast(errorMessage, "error");
+          error?.response?.data?.message ||
+          error?.message ||
+          "Failed to update access point",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
@@ -543,23 +554,22 @@ function AccessPointEditModal({ accessUuid, onClose, onUpdated }) {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
-        },
+        }
       );
 
       if (response.ok) {
         const updatedData = await getAccessPoint(accessUuid);
         setAccessPointData(updatedData.data);
-
         showUniqueToast("Permission unmapped successfully", "success");
       } else {
         const errorData = await response.json();
 
-        const errorMessage =
+        showUniqueToast(
           errorData?.detail ||
-          errorData?.message ||
-          "Failed to unmap permission";
-
-        showUniqueToast(errorMessage, "error");
+            errorData?.message ||
+            "Failed to unmap permission",
+          "error"
+        );
       }
     } catch (error) {
       console.error("Error unmapping permission:", error);
@@ -569,19 +579,30 @@ function AccessPointEditModal({ accessUuid, onClose, onUpdated }) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 px-4">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[85vh] overflow-hidden">
-        <div className="p-5 border-b bg-white">
-          <div className="flex justify-between items-start gap-4">
-            <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Edit Access Point
-              </h3>
+  const methodOptions = [
+    { label: "GET", value: "GET" },
+    { label: "POST", value: "POST" },
+    { label: "PUT", value: "PUT" },
+    { label: "DELETE", value: "DELETE" },
+    { label: "PATCH", value: "PATCH" },
+  ];
 
-              <p className="text-sm text-gray-500 mt-1 truncate">
+  const moduleOptions = [
+    { label: "Select Module", value: "" },
+    ...modules.map((mod) => ({ label: mod, value: mod })),
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-3 py-4 sm:px-6">
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+        <div className="shrink-0 border-b bg-white p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className={Fonts.heading4}>Edit Access Point</h3>
+
+              <p className="mt-1 truncate text-sm text-gray-500">
                 Access UUID:{" "}
-                <span className="font-medium text-blue-700" title={accessUuid}>
+                <span className="font-medium text-[#0A0082]" title={accessUuid}>
                   {accessUuid}
                 </span>
               </p>
@@ -589,114 +610,81 @@ function AccessPointEditModal({ accessUuid, onClose, onUpdated }) {
 
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 shrink-0"
+              className="shrink-0 rounded-lg p-2 text-gray-500 transition hover:bg-gray-100"
               type="button"
+              aria-label="Close modal"
             >
-              <X className="w-5 h-5" />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        <div className="p-5 overflow-y-auto max-h-[calc(85vh-90px)]">
+        <div className="flex-1 overflow-y-auto bg-white p-4 sm:p-5">
           {!form ? (
-            <div className="text-center text-gray-500 py-10">
-              Loading access point...
+            <div className="rounded-xl border border-gray-200 bg-white py-16">
+              <LoadingSpinner text="Loading access point..." />
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-gray-700 font-medium mb-1">
-                  Endpoint Path <span className="text-red-500">*</span>
-                </label>
+              <FormInput
+                label="Endpoint Path"
+                name="endpoint_path"
+                value={form.endpoint_path}
+                onChange={handleChange}
+                placeholder="/api/resource"
+                onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
+              />
 
-                <input
-                  name="endpoint_path"
-                  value={form.endpoint_path}
-                  onChange={handleChange}
-                  required
-                  className="w-full border border-gray-300 p-2 rounded-lg focus:ring focus:ring-blue-300 focus:border-blue-500"
-                  placeholder="/api/resource"
-                  onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
-                  title={form.endpoint_path}
-                />
+              <p className="-mt-2 text-sm text-gray-500">
+                Must start with '/' and contain valid URL characters.
+              </p>
 
-                <p className="text-sm text-gray-500 mt-1">
-                  Must start with '/' and contain valid URL characters.
-                </p>
-              </div>
+              <FormSelect
+                label="Method"
+                name="method"
+                value={form.method}
+                onChange={handleChange}
+                options={methodOptions}
+              />
 
-              <div>
-                <label className="block text-gray-700 font-medium mb-1">
-                  Method <span className="text-red-500">*</span>
-                </label>
+              <FormSelect
+                label="Module"
+                name="module"
+                value={form.module}
+                onChange={handleChange}
+                options={moduleOptions}
+              />
 
-                <select
-                  name="method"
-                  value={form.method}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 p-2 rounded-lg focus:ring focus:ring-blue-300 focus:border-blue-500"
-                >
-                  <option value="GET">GET</option>
-                  <option value="POST">POST</option>
-                  <option value="PUT">PUT</option>
-                  <option value="DELETE">DELETE</option>
-                  <option value="PATCH">PATCH</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-gray-700 font-medium mb-1">
-                  Module <span className="text-red-500">*</span>
-                </label>
-
-                <select
-                  name="module"
-                  value={form.module}
-                  onChange={handleChange}
-                  required
-                  className="w-full border border-gray-300 p-2 rounded-lg focus:ring focus:ring-blue-300 focus:border-blue-500"
-                >
-                  <option value="">Select Module</option>
-                  {modules.map((mod, idx) => (
-                    <option key={idx} value={mod}>
-                      {mod}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   name="is_public"
                   checked={form.is_public}
                   onChange={handleChange}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   id="is_public_edit_modal"
                 />
 
                 <label
                   htmlFor="is_public_edit_modal"
-                  className="text-gray-700 font-medium cursor-pointer"
+                  className="cursor-pointer text-sm font-medium text-gray-700"
                 >
                   Public Access Point
                 </label>
               </div>
 
-              <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+              <div className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
                 <strong>Note:</strong> Public access points don't require
                 authentication. Use carefully.
               </div>
 
               {accessPointData?.permission_code && (
                 <div className="border-t pt-4">
-                  <label className="block text-gray-700 font-medium mb-1">
-                    Mapped Permission
-                  </label>
+                  <label className={Fonts.label}>Mapped Permission</label>
 
-                  <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 min-w-0">
+                  <div className="mt-2 flex min-w-0 flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-center sm:justify-between">
                     <span
-                      className="font-medium text-gray-800 truncate min-w-0 flex-1"
+                      className="min-w-0 flex-1 truncate font-medium text-gray-800"
                       title={accessPointData.permission_code}
                     >
                       {accessPointData.permission_code}
@@ -706,55 +694,45 @@ function AccessPointEditModal({ accessUuid, onClose, onUpdated }) {
                       type="button"
                       onClick={handleDeletePermission}
                       disabled={isDeleting}
+                      loading={isDeleting}
+                      loadingText="Unmapping..."
                       variant="danger"
                       size="small"
-                      className="shrink-0"
+                      className="w-full sm:w-auto"
                     >
-                      {isDeleting ? (
-                        <span className="flex items-center gap-1">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          Unmapping...
-                        </span>
-                      ) : (
-                        "Unmap"
-                      )}
+                      Unmap
                     </Button>
                   </div>
                 </div>
               )}
-
-              <div className="flex justify-end gap-3 pt-2">
-                <Button
-                  type="button"
-                  onClick={onClose}
-                  variant="secondary"
-                  className="px-5 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className={`px-5 py-2 rounded-lg text-white ${
-                    loading
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700"
-                  }`}
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Updating...
-                    </span>
-                  ) : (
-                    "Update Access Point"
-                  )}
-                </Button>
-              </div>
             </form>
           )}
+        </div>
+
+        <div className="shrink-0 border-t bg-white p-4">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+              disabled={loading}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={loading || !form}
+              loading={loading}
+              loadingText="Updating..."
+              variant="primary"
+              className="w-full sm:w-auto"
+            >
+              Update Access Point
+            </Button>
+          </div>
         </div>
       </div>
     </div>
