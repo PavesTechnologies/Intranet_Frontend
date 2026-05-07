@@ -1,214 +1,198 @@
-import { useEffect, useState, useRef } from "react";
+import { useState } from "react";
 import axios from "axios";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import FormInput from "../../../../components/forms/FormInput";
 import Button from "../../../../components/Button/Button";
-import { showStatusToast } from "../../../../components/toastfy/toast";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
-import { parsePhoneNumberFromString } from "libphonenumber-js";
-import { FiEye, FiEyeOff } from "react-icons/fi";
-
-export default function EditUserForm({ userId, onSuccess, onClose }) {
+export default function CreateUserForm({ onSuccess, onClose }) {
   const token = localStorage.getItem("token");
 
-  const [user, setUser] = useState({
+  const [form, setForm] = useState({
     first_name: "",
     last_name: "",
     mail: "",
-    contact: "", // raw phone (no "+")
+    contact: "",
     password: "",
     is_active: true,
   });
 
+  const [generatedPassword, setGeneratedPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const isSubmittingRef = useRef(false);
+  const [toastActive, setToastActive] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
-  // ✅ Fetch user details
-  useEffect(() => {
-    console.log("Fetching user with ID:", userId);
-    if (userId) {
-      axios
-        .get(
-          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        )
-        .then((res) => {
-          const { password, contact, ...rest } = res.data;
-          setUser((prev) => ({
-            ...prev,
-            ...rest,
-            contact: contact?.replace(/^\+/, "") || "", // store without "+"
-          }));
-        })
-        .catch((err) => {
-          console.error("Failed to fetch user:", err);
-          showStatusToast("Access denied or user not found.", "error");
-          onClose();
-        });
+  const showSingleToast = (message, type = "error") => {
+    if (!toastActive) {
+      setToastActive(true);
+      showStatusToast(message, type);
+      setTimeout(() => setToastActive(false), 3000);
     }
-  }, [userId, token, onClose]);
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setUser((prev) => ({
+    setForm((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
   };
 
-  // ✅ Validation
-  const validateForm = () => {
-    if (!user.first_name.trim()) return "First Name is required.";
-    if (!/^[A-Za-z ]*$/.test(user.first_name))
-      return "First Name must contain only letters and spaces.";
-    if (!user.last_name.trim()) return "Last Name is required.";
-    if (!/^[A-Za-z ]*$/.test(user.last_name))
-      return "Last Name must contain only letters and spaces.";
-    if (!user.mail.trim()) return "Email is required.";
-    if (!/^[a-zA-Z0-9@._-]+$/.test(user.mail))
-      return "Email contains invalid characters.";
-    if (!user.contact.trim()) return "Contact number is required.";
+  const generatePasswordFromUser = (firstName, mobile) => {
+    if (!firstName.trim()) return showSingleToast("First Name is required.");
+    if (!/^[A-Za-z ]*$/.test(form.first_name))
+      return showSingleToast(
+        "First Name must contain only letters and spaces.",
+      );
 
-    // ✅ Always prefix with "+"
-    const phoneNumber = parsePhoneNumberFromString("+" + user.contact);
-    if (!phoneNumber || !phoneNumber.isValid()) {
-      return "Invalid phone number for the selected country.";
-    }
+    const namePart = (firstName || "").slice(0, 4);
+    const digits = String(mobile || "").replace(/\D/g, "");
+    const mobilePart = digits.slice(-4);
 
-    if (
-      phoneNumber.countryCallingCode === "91" &&
-      phoneNumber.nationalNumber.length !== 10
-    ) {
-      return "Indian contact number must be exactly 10 digits.";
-    }
-    if (
-      phoneNumber.countryCallingCode === "1" &&
-      phoneNumber.nationalNumber.length !== 10
-    ) {
-      return "US contact number must be exactly 10 digits.";
-    }
-
-    return null;
+    let base = `${namePart}@${mobilePart}`;
+    if (!/[A-Z]/.test(base))
+      base = base.replace(/^[a-z]/, (c) => c.toUpperCase()) || `T${base}`;
+    if (!/[a-z]/.test(base)) base += "a";
+    if (!/\d/.test(base)) base += "1";
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(base)) base += "!";
+    while (base.length < 8) base += "0";
+    return base;
   };
 
-  // ✅ Submit
+  const validateForm = () => {
+    if (!form.first_name.trim())
+      return showSingleToast("First Name is required.");
+    if (!/^[A-Za-z ]*$/.test(form.first_name))
+      return showSingleToast(
+        "First Name must contain only letters and spaces.",
+      );
+    if (!form.last_name.trim())
+      return showSingleToast("Last Name is required.");
+    if (!/^[A-Za-z ]*$/.test(form.last_name))
+      return showSingleToast("Last Name must contain only letters and spaces.");
+    if (!form.mail.trim()) return showSingleToast("Email is required.");
+    if (!/^[a-zA-Z0-9@._-]+$/.test(form.mail))
+      return showSingleToast("Email contains invalid characters.");
+    if (!form.contact.trim())
+      return showSingleToast("Contact number is required.");
+
+    const digitsOnly = form.contact.replace(/\D/g, "");
+    if (digitsOnly.length < 8)
+      return showSingleToast("Phone number seems too short.");
+
+    if (!form.password.trim()) return showSingleToast("Password is required.");
+    if (form.password.length < 6)
+      return showSingleToast("Password must be at least 6 characters long.");
+
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading || !validateForm()) return;
+    setLoading(true);
 
-    if (loading || isSubmittingRef.current) return;
-    isSubmittingRef.current = true;
-
-    const validationError = validateForm();
-    if (validationError) {
-      showStatusToast(validationError, "error");
-      isSubmittingRef.current = false;
+    const password = generatePasswordFromUser(form.first_name, form.contact);
+    if (form.password !== password) {
+      showSingleToast(
+        "Password does not match the criteria. Please click 'Generate' again.",
+        "error",
+      );
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-
     try {
-      const payload = { ...user };
-
-      // ✅ Normalize phone with "+" prefix
-      if (payload.contact && !payload.contact.startsWith("+")) {
-        payload.contact = `+${payload.contact}`;
-      }
-
-      if (!payload.password) delete payload.password;
-
-      await axios.put(
-        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userId}`,
-        payload,
+      await axios.post(
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users`,
+        form,
         { headers: { Authorization: `Bearer ${token}` } },
       );
-
       onSuccess();
     } catch (err) {
-      console.error("Update failed:", err);
-      showStatusToast(
-        err.response?.data?.detail || "Failed to update user.",
+      console.error("User creation failed:", err);
+      showSingleToast(
+        err?.response?.data?.detail || "Failed to create user.",
         "error",
       );
     } finally {
       setLoading(false);
-      isSubmittingRef.current = false;
     }
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div className="flex flex-col max-h-[80vh] bg-white rounded-md">
+      {/* Scrollable form area */}
       <form
         onSubmit={handleSubmit}
-        className="space-y-4 p-4 max-h-[60vh] overflow-y-auto"
+        className="flex-grow overflow-y-auto p-4 space-y-3"
       >
         {/* First + Last Name */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormInput
             label="First Name"
             name="first_name"
-            value={user.first_name}
+            value={form.first_name}
             onChange={(e) => {
-              if (/^[a-zA-Z\s]*$/.test(e.target.value)) handleChange(e);
+              if (/^[A-Za-z ]*$/.test(e.target.value)) handleChange(e);
             }}
             placeholder="Enter first name"
+            required
+            labelClassName="text-xs"
+            inputClassName="text-sm"
           />
           <FormInput
             label="Last Name"
             name="last_name"
-            value={user.last_name}
+            value={form.last_name}
             onChange={(e) => {
-              if (/^[a-zA-Z\s]*$/.test(e.target.value)) handleChange(e);
+              if (/^[A-Za-z ]*$/.test(e.target.value)) handleChange(e);
             }}
             placeholder="Enter last name"
+            required
+            labelClassName="text-xs"
+            inputClassName="text-sm"
           />
         </div>
 
         {/* Email */}
         <FormInput
           label="Email"
-          name="mail"
           type="email"
-          value={user.mail}
+          name="mail"
+          value={form.mail}
           onChange={(e) => {
             if (/^[a-zA-Z0-9@._-]*$/.test(e.target.value)) handleChange(e);
           }}
           placeholder="Enter email"
+          required
+          labelClassName="text-xs"
+          inputClassName="text-sm"
         />
 
-        {/* ✅ Updated Contact Input (latest format) */}
+        {/* Contact */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-xs font-medium text-gray-700 mb-1">
             Contact
           </label>
           <PhoneInput
-            country={"us"} // default to US
-            value={user.contact}
+            country={"us"}
+            value={form.contact}
             onChange={(phone) =>
-              setUser((prev) => ({
-                ...prev,
-                contact: phone,
-              }))
+              setForm((prev) => ({ ...prev, contact: phone }))
             }
-            enableSearch={true}
             countryCodeEditable={false}
-            disableDropdown={false}
             placeholder="Enter phone number"
+            enableSearch={true}
             inputStyle={{
               width: "100%",
               padding: "6px 10px 6px 40px",
               border: "1px solid #d1d5db",
               borderRadius: "6px",
               fontSize: "0.875rem",
-              boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
               backgroundColor: "white",
             }}
             buttonStyle={{
-              // border: "1px solid",
-              // borderRadius: "6px",
-              // marginRight: "0px",
               backgroundColor: "white",
               display: "flex",
               alignItems: "center",
@@ -217,59 +201,107 @@ export default function EditUserForm({ userId, onSuccess, onClose }) {
               maxHeight: "250px",
               overflowY: "auto",
             }}
-            containerStyle={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-between",
-            }}
           />
         </div>
 
-        {/* Password */}
-        <FormInput
-          label="New Password (Optional)"
-          name="password"
-          type="password"
-          value={user.password}
-          onChange={handleChange}
-          placeholder="Leave blank to keep current password"
-        />
+        {/* Password + Generate */}
+        <div className="flex gap-2 items-end">
+          <div className="flex-1">
+            <FormInput
+              type="text"
+              name="password"
+              value={form.password}
+              onChange={handleChange}
+              onFocus={() => {
+                if (!form.password) {
+                  const localGenerated = generatePasswordFromUser(
+                    form.first_name,
+                    form.contact,
+                  );
+                  if (localGenerated) {
+                    setForm((prev) => ({ ...prev, password: localGenerated }));
+                    setGeneratedPassword(localGenerated);
+                  }
+                }
+              }}
+              placeholder="Generate or enter a password"
+              minLength={8}
+              labelClassName="text-xs"
+              inputClassName="text-sm"
+            />
+          </div>
 
-        {/* Active checkbox */}
-        {/* <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            name="is_active"
-            checked={user.is_active}
-            onChange={handleChange}
-            id="is_active"
-            className="rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-          />
-          <label htmlFor="is_active" className="text-sm text-gray-700">
-            Is Active
-          </label>
-        </div> */}
-
-        {/* Buttons */}
-        <div className="flex gap-4 pt-4 border-t sticky bottom-0 bg-white">
-          <Button
-            type="submit"
-            disabled={loading || isSubmittingRef.current}
-            className="flex-1 sm:flex-none"
-          >
-            {loading ? "Saving..." : "Save Changes"}
-          </Button>
           <Button
             type="button"
             variant="secondary"
-            onClick={onClose}
-            disabled={loading || isSubmittingRef.current}
-            className="flex-1 sm:flex-none"
+            size="small"
+            disabled={generating} // disable while generating
+            onClick={() => {
+              setGenerating(true);
+              setTimeout(() => {
+                const suggestion = generatePasswordFromUser(
+                  form.first_name,
+                  form.contact,
+                );
+                if (suggestion) {
+                  setForm((prev) => ({ ...prev, password: suggestion }));
+                  setGeneratedPassword(suggestion);
+                  showStatusToast(
+                    "Password generated from current First Name & Contact.",
+                    "info",
+                  );
+                } else {
+                  showStatusToast("Failed to generate password.", "error");
+                }
+                setGenerating(false);
+              }, 600); // short delay for UX (optional)
+            }}
+            className="whitespace-nowrap h-[34px]"
           >
-            Cancel
+            {generating ? "Generating..." : "Generate"}
           </Button>
         </div>
+
+        {/* Active checkbox */}
+        <div className="flex items-center gap-2 pt-1">
+          <input
+            type="checkbox"
+            id="is_active_modal"
+            name="is_active"
+            checked={form.is_active}
+            onChange={handleChange}
+            className="h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+          />
+          <label htmlFor="is_active_modal" className="text-xs text-gray-700">
+            Active
+          </label>
+        </div>
       </form>
+
+      {/* Fixed Footer (does not scroll) */}
+      <div className="flex justify-start gap-3 p-3 border-t bg-gray-50 sticky bottom-0">
+        <Button
+          type="submit"
+          variant="primary"
+          size="small"
+          disabled={loading}
+          className="px-4"
+          onClick={handleSubmit}
+        >
+          {loading ? "Creating..." : "Create User"}
+        </Button>
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="small"
+          onClick={onClose}
+          disabled={loading}
+          className="px-4"
+        >
+          Cancel
+        </Button>
+      </div>
     </div>
   );
 }

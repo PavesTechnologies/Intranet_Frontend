@@ -1,34 +1,47 @@
-import { useState, useEffect } from "react";
- 
+import { useState, useEffect, useRef } from "react";
+
 export default function SearchInput({
+  value,
+  onChange,
   onSearch,
   delay = 300,
   placeholder = "Search...",
   className = "",
 }) {
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
- 
+  const [query, setQuery] = useState(value || "");
+  const isFirstRender = useRef(true);
+
   useEffect(() => {
+    setQuery(value || "");
+  }, [value]);
+
+  useEffect(() => {
+    if (!onSearch) return;
+
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
     const handler = setTimeout(() => {
-      setDebouncedQuery(query);
+      onSearch(query.trim());
     }, delay);
- 
+
     return () => clearTimeout(handler);
-  }, [query, delay]);
- 
-  useEffect(() => {
-    onSearch(debouncedQuery.trim());
-  }, [debouncedQuery]);
- 
+  }, [query, delay, onSearch]);
+
+  const handleChange = (e) => {
+    setQuery(e.target.value);
+    onChange?.(e);
+  };
+
   return (
     <input
       type="text"
       value={query}
-      onChange={(e) => setQuery(e.target.value)}
+      onChange={handleChange}
       placeholder={placeholder}
-      className={`border border-gray-300 rounded px-3 py-2 w-full ${className}`}
+      className={`w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20 ${className}`}
     />
   );
 }
- 
