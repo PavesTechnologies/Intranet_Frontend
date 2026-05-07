@@ -7,16 +7,20 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Pencil, UserX, UserCheck, Plus, Upload } from "lucide-react";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
+
+import { useAuth } from "../../../../contexts/AuthContext";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
 import Button from "../../../../components/Button/Button";
 import SearchInput from "../../../../components/filter/Searchbar";
 import Modal from "../../../../components/Modal/modal";
-import { Pencil, UserX, UserCheck } from "lucide-react";
-import { parsePhoneNumberFromString } from "libphonenumber-js";
-import { useAuth } from "../../../../contexts/AuthContext";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
+import StatusBadge from "../../../../components/status/statusbadge";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 const CreateUserForm = React.lazy(() => import("./CreateUser"));
 const EditUserForm = React.lazy(() => import("./EditUser"));
@@ -27,22 +31,28 @@ const ITEMS_PER_PAGE = 10;
 export default function UsersTable() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [totalUsers, setTotalUsers] = useState(0);
+
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
+  const [userBulkUploadModalOpen, setUserBulkUploadModalOpen] = useState(false);
+
   const [selectedUseruuId, setSelectedUseruuId] = useState(null);
+
   const [isConfirmModalOpen, setConfirmModalOpen] = useState(false);
   const [userToToggle, setUserToToggle] = useState(null);
   const [actionType, setActionType] = useState("");
-  const [userBulkUploadModalOpen, setUserBulkUploadModalOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
   const accessDeniedShownRef = useRef(false);
   const { logout } = useAuth();
+
+  const totalPages = Math.ceil(totalUsers / ITEMS_PER_PAGE);
 
   useEffect(() => {
     if (!token) {
@@ -52,6 +62,8 @@ export default function UsersTable() {
   }, [token, logout]);
 
   const fetchUsers = useCallback(async () => {
+    if (!token) return;
+
     try {
       setLoading(true);
 
@@ -64,7 +76,7 @@ export default function UsersTable() {
             search: searchTerm,
           },
           headers: { Authorization: `Bearer ${token}` },
-        },
+        }
       );
 
       setUsers(res.data.users || []);
@@ -79,7 +91,7 @@ export default function UsersTable() {
         }
         navigate("/dashboard");
       } else if (err.response?.status === 401) {
-        showStatusToast("Token tampered", "error");
+        showStatusToast("Token tampered.", "error");
         logout();
       } else {
         showStatusToast("Failed to load users.", "error");
@@ -92,6 +104,19 @@ export default function UsersTable() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  const handleSearch = useCallback((value) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  }, []);
+
+  const handlePreviousPage = useCallback(() => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  }, []);
+
+  const handleNextPage = useCallback(() => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  }, [totalPages]);
 
   const handleUserCreated = () => {
     setCreateModalOpen(false);
@@ -122,14 +147,24 @@ export default function UsersTable() {
     setConfirmModalOpen(true);
   };
 
+  const closeConfirmModal = () => {
+    if (confirming) return;
+
+    setConfirmModalOpen(false);
+    setUserToToggle(null);
+    setActionType("");
+  };
+
   const confirmToggle = async () => {
     if (!userToToggle) return;
 
     try {
+      setConfirming(true);
+
       if (actionType === "deactivate") {
         await axios.delete(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}`,
-          { headers: { Authorization: `Bearer ${token}` } },
+          { headers: { Authorization: `Bearer ${token}` } }
         );
 
         showStatusToast("User deactivated successfully.", "success");
@@ -137,35 +172,31 @@ export default function UsersTable() {
         await axios.patch(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}/activate`,
           {},
-          { headers: { Authorization: `Bearer ${token}` } },
+          { headers: { Authorization: `Bearer ${token}` } }
         );
 
         showStatusToast("User activated successfully.", "success");
       }
 
-      fetchUsers();
+      await fetchUsers();
+      closeConfirmModal();
     } catch (err) {
       console.error(`${actionType} failed:`, err);
       showStatusToast(`Failed to ${actionType} user.`, "error");
     } finally {
-      setConfirmModalOpen(false);
-      setUserToToggle(null);
-      setActionType("");
+      setConfirming(false);
     }
   };
 
-  const totalPages = Math.ceil(totalUsers / ITEMS_PER_PAGE);
-
-  // ✅ changed ID column to number-wise serial number
   const headers = ["S.no", "Name", "Email", "Contact", "Status", "Actions"];
   const columns = ["serial_no", "name", "mail", "contact", "status", "actions"];
 
   const tableData = users.map((user, index) => {
-    let formattedContact = user.contact;
+    let formattedContact = user.contact || "N/A";
 
     if (user.contact) {
       const phoneNumber = parsePhoneNumberFromString(
-        "+" + user.contact.replace(/\D/g, ""),
+        "+" + user.contact.replace(/\D/g, "")
       );
 
       if (phoneNumber) {
@@ -174,38 +205,45 @@ export default function UsersTable() {
     }
 
     return {
-      // ✅ page-based serial number: page 1 => 1-10, page 2 => 11-20
       serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
-      name: `${user.first_name} ${user.last_name}`,
-      mail: user.mail,
+      name: `${user.first_name || ""} ${user.last_name || ""}`.trim() || "N/A",
+      mail: user.mail || "N/A",
       contact: formattedContact,
-      status: user.is_active ? "Active" : "Inactive",
+      status: (
+        <StatusBadge
+          label={user.is_active ? "Active" : "Inactive"}
+          size="sm"
+        />
+      ),
       actions: (
-        <div className="flex gap-4 items-center">
-          <span
-            className="cursor-pointer text-blue-600 hover:text-blue-800"
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
             onClick={() => handleEditClick(user.user_uuid)}
             title="Edit"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 transition hover:bg-blue-50 hover:text-blue-800"
           >
-            <Pencil size={18} />
-          </span>
+            <Pencil size={17} />
+          </button>
 
           {user.is_active ? (
-            <span
-              className="cursor-pointer text-red-600 hover:text-red-800"
+            <button
+              type="button"
               onClick={() => handleToggleClick(user.user_uuid, true)}
               title="Deactivate"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-800"
             >
-              <UserX size={18} />
-            </span>
+              <UserX size={17} />
+            </button>
           ) : (
-            <span
-              className="cursor-pointer text-green-600 hover:text-green-800"
+            <button
+              type="button"
               onClick={() => handleToggleClick(user.user_uuid, false)}
               title="Activate"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 transition hover:bg-green-50 hover:text-green-800"
             >
-              <UserCheck size={18} />
-            </span>
+              <UserCheck size={17} />
+            </button>
           )}
         </div>
       ),
@@ -214,61 +252,75 @@ export default function UsersTable() {
 
   return (
     <div className="px-6 py-4">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <h2 className="text-2xl font-semibold text-gray-800">Users</h2>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className={Fonts.heading3}>Users</h2>
+          <p className={Fonts.paragraphMuted}>
+            Manage user creation, bulk upload, roles, and activation status.
+          </p>
+        </div>
 
-        <div className="space-x-3 flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             onClick={() => setUserBulkUploadModalOpen(true)}
             variant="primary"
             size="medium"
+            className="whitespace-nowrap"
           >
-            + Add User Bulk
+            <Upload size={16} />
+            Bulk Upload
           </Button>
 
           <Button
             onClick={() => setCreateModalOpen(true)}
             variant="primary"
             size="medium"
+            className="whitespace-nowrap"
           >
-            + Add User
+            <Plus size={16} />
+            Add User
           </Button>
 
           <Button
             onClick={() => navigate("/user-management/users/roles")}
             variant="secondary"
             size="medium"
+            className="whitespace-nowrap"
           >
             User Roles
           </Button>
         </div>
       </div>
 
-      <SearchInput
-        onSearch={(value) => {
-          setSearchTerm(value);
-          setCurrentPage(1);
-        }}
-        placeholder="Search users by name, email, or contact..."
-        className="mb-4 max-w-md"
-      />
-
-      <GenericTable
-        headers={headers}
-        rows={tableData}
-        columns={columns}
-        loading={loading}
-      />
-
-      {!loading && totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          onNext={() =>
-            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-          }
+      <div className="mb-4 max-w-md">
+        <SearchInput
+          onSearch={handleSearch}
+          placeholder="Search users by name, email, or contact..."
         />
+      </div>
+
+      {loading ? (
+        <div className="rounded-xl border border-gray-200 bg-white py-16">
+          <LoadingSpinner text="Loading users..." />
+        </div>
+      ) : (
+        <>
+          <GenericTable
+            headers={headers}
+            rows={tableData}
+            columns={columns}
+          />
+
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevious={handlePreviousPage}
+              onNext={handleNextPage}
+              className="mt-4"
+            />
+          )}
+        </>
       )}
 
       <Modal
@@ -290,7 +342,7 @@ export default function UsersTable() {
         isOpen={userBulkUploadModalOpen}
         onClose={() => setUserBulkUploadModalOpen(false)}
         title="Bulk Upload Users"
-        subtitle="Excel should contain 4 columns: first_name, last_name, mail, and contact (as headers)."
+        subtitle="Upload Excel with first_name, last_name, mail, and contact columns."
         className="!mt-16 !max-h-[calc(100vh-8rem)] !overflow-hidden"
       >
         <Suspense fallback={<LoadingSpinner text="Loading bulk upload..." />}>
@@ -319,51 +371,24 @@ export default function UsersTable() {
         )}
       </Modal>
 
-      <Modal
+      <ConfirmationModal
         isOpen={isConfirmModalOpen}
-        onClose={() => setConfirmModalOpen(false)}
         title={
           actionType === "deactivate"
             ? "Confirm Deactivation"
             : "Confirm Activation"
         }
-        subtitle={
+        message={
           actionType === "deactivate"
             ? "Are you sure you want to deactivate this user?"
             : "Are you sure you want to activate this user?"
         }
-        className="!mt-16 !max-h-[calc(100vh-8rem)] !overflow-hidden"
-      >
-        <div className="flex justify-end gap-3 mt-6">
-          <Button
-            onClick={() => setConfirmModalOpen(false)}
-            variant="secondary"
-            size="medium"
-          >
-            Cancel
-          </Button>
-
-          <Button
-            onClick={async () => {
-              setConfirming(true);
-              try {
-                await confirmToggle();
-              } finally {
-                setConfirming(false);
-              }
-            }}
-            variant={actionType === "deactivate" ? "danger" : "success"}
-            size="medium"
-            disabled={confirming}
-          >
-            {confirming
-              ? actionType === "deactivate"
-                ? "Deactivating..."
-                : "Activating..."
-              : "Confirm"}
-          </Button>
-        </div>
-      </Modal>
+        confirmText={actionType === "deactivate" ? "Deactivate" : "Activate"}
+        variant={actionType === "deactivate" ? "danger" : "success"}
+        isLoading={confirming}
+        onCancel={closeConfirmModal}
+        onConfirm={confirmToggle}
+      />
     </div>
   );
 }
