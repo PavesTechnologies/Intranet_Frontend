@@ -247,24 +247,28 @@ const AdminPannel = () => {
         <div className="flex items-center gap-3">
           <Button
             onClick={handleExport}
-            disabled={exporting}
-            className={`px-4 py-2 text-sm font-medium rounded-lg flex items-center transition-all active:scale-[0.98] 
-              ${exporting
-                ? "bg-indigo-400 cursor-not-allowed text-white"
-                : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
-              }`}
+            // disabled={exporting}
+            // className={`px-4 py-2 text-sm font-medium rounded-lg flex items-center transition-all active:scale-[0.98] 
+            //   ${exporting
+            //     ? "bg-indigo-400 cursor-not-allowed text-white"
+            //     : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+            //   }`}
+            variant="primary"
+            size="medium"
+            loading={exporting}
+            loadingText={exporting ? `${exportProgress}%` : "Export Data"}
           >
-            {exporting ? (
+            {/* {exporting ? (
               <span className="flex items-center gap-2">
                 <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 {exportProgress}%
               </span>
-            ) : (
+            ) : ( */}
               <>
                 <Download className="w-4 h-4 mr-1.5" />
                 Export Data
               </>
-            )}
+            {/* )} */}
           </Button>
         </div>
       </div>
