@@ -468,126 +468,130 @@ const PermissionModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md mx-auto max-h-[85vh] overflow-hidden">
-        <div className="flex justify-between items-start gap-4 mb-4">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Assign Permission
-            </h3>
+      <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl mx-auto max-h-[88vh] overflow-hidden flex flex-col">
+        <div className="p-5 border-b bg-gray-50 shrink-0">
+          <div className="flex justify-between items-start gap-4">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Assign Permission
+              </h3>
 
-            <p className="text-sm text-gray-500 mt-1 truncate">
-              Access Point:{" "}
+              <p className="text-sm text-gray-500 mt-1 truncate">
+                Access Point:{" "}
+                <span
+                  className="font-medium text-blue-700"
+                  title={selectedAccessPoint?.endpoint_path}
+                >
+                  {selectedAccessPoint?.endpoint_path || "N/A"}
+                </span>
+              </p>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 shrink-0"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5 overflow-y-auto flex-1">
+          <div className="mb-4 space-y-2">
+            <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
+              <strong className="font-medium shrink-0">Endpoint:</strong>
               <span
-                className="font-medium text-blue-700"
+                className="truncate min-w-0 flex-1"
                 title={selectedAccessPoint?.endpoint_path}
               >
                 {selectedAccessPoint?.endpoint_path || "N/A"}
               </span>
-            </p>
-          </div>
+            </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 shrink-0"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="mb-4 space-y-2">
-          <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
-            <strong className="font-medium shrink-0">Endpoint:</strong>
-            <span
-              className="truncate min-w-0 flex-1"
-              title={selectedAccessPoint?.endpoint_path}
-            >
-              {selectedAccessPoint?.endpoint_path || "N/A"}
-            </span>
-          </div>
-
-          <div className="flex items-start gap-2 text-sm text-gray-600">
-            <strong className="font-medium shrink-0">Method:</strong>
-            <span
-              className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold"
-              title={selectedAccessPoint?.method}
-            >
-              {selectedAccessPoint?.method || "N/A"}
-            </span>
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Permission:
-          </label>
-
-          <div className="relative" ref={dropdownRef}>
-            <div className="flex items-center gap-2 mb-2 min-w-0">
-              <input
-                type="text"
-                value={selectedDisplay}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setSelectedPermission(null);
-                }}
-                placeholder="Search permissions..."
-                className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 truncate"
-                title={selectedDisplay}
-              />
-
-              <Button
-                onClick={() => {
-                  setQuery("");
-                  setSelectedPermission(null);
-                }}
-                type="button"
-                className="text-gray-500 hover:text-gray-700 shrink-0"
+            <div className="flex items-start gap-2 text-sm text-gray-600">
+              <strong className="font-medium shrink-0">Method:</strong>
+              <span
+                className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold"
+                title={selectedAccessPoint?.method}
               >
-                <X className="w-4 h-4" />
-              </Button>
+                {selectedAccessPoint?.method || "N/A"}
+              </span>
             </div>
+          </div>
 
-            <div className="border border-gray-200 rounded-lg max-h-60 overflow-auto bg-white shadow-sm">
-              {filtered.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-gray-500">
-                  No matching permissions
-                </div>
-              ) : (
-                filtered.map((permission) => (
-                  <div
-                    key={permission.permission_uuid}
-                    onClick={() => {
-                      setSelectedPermission(permission);
-                      setQuery("");
-                    }}
-                    className={`cursor-pointer px-4 py-3 hover:bg-indigo-50 flex flex-col transition min-w-0 ${
-                      selectedPermission?.permission_uuid ===
-                      permission.permission_uuid
-                        ? "bg-indigo-100"
-                        : ""
-                    }`}
-                  >
-                    <div
-                      className="font-semibold text-sm truncate text-gray-900"
-                      title={formatCode(permission)}
-                    >
-                      {formatCode(permission)}
-                    </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Permission:
+            </label>
 
-                    <div
-                      className="text-xs text-gray-500 truncate"
-                      title={formatDesc(permission)}
-                    >
-                      {formatDesc(permission)}
-                    </div>
+            <div className="relative" ref={dropdownRef}>
+              <div className="flex items-center gap-2 mb-2 min-w-0">
+                <input
+                  type="text"
+                  value={selectedDisplay}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setSelectedPermission(null);
+                  }}
+                  placeholder="Search permissions..."
+                  className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 truncate"
+                  title={selectedDisplay}
+                />
+
+                <Button
+                  onClick={() => {
+                    setQuery("");
+                    setSelectedPermission(null);
+                  }}
+                  type="button"
+                  className="text-gray-500 hover:text-gray-700 shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="border border-gray-200 rounded-lg max-h-[360px] overflow-auto bg-white shadow-sm">
+                {filtered.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-500">
+                    No matching permissions
                   </div>
-                ))
-              )}
+                ) : (
+                  filtered.map((permission) => (
+                    <div
+                      key={permission.permission_uuid}
+                      onClick={() => {
+                        setSelectedPermission(permission);
+                        setQuery("");
+                      }}
+                      className={`cursor-pointer px-4 py-3 hover:bg-indigo-50 flex flex-col transition min-w-0 ${
+                        selectedPermission?.permission_uuid ===
+                        permission.permission_uuid
+                          ? "bg-indigo-100"
+                          : ""
+                      }`}
+                    >
+                      <div
+                        className="font-semibold text-sm truncate text-gray-900"
+                        title={formatCode(permission)}
+                      >
+                        {formatCode(permission)}
+                      </div>
+
+                      <div
+                        className="text-xs text-gray-500 truncate"
+                        title={formatDesc(permission)}
+                      >
+                        {formatDesc(permission)}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2">
+        <div className="p-5 border-t bg-white shrink-0 flex justify-end gap-2">
           <Button
             onClick={onClose}
             className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
