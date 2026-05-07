@@ -300,6 +300,13 @@ export default function RequestLeaveModal({
     leaveTypeId,
   );
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, onClose]);
+
   const shouldShowDriveLink = () => {
     if (!selectedLeaveType) return false;
     const requiredDocs = selectedLeaveType.requiresDocumentation === true;

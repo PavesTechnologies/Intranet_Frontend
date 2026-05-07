@@ -28,15 +28,19 @@ const MONTHS = [
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
-const LeaveHistory = ({ employeeId }) => {
-  // ✅ Removed refreshKey + setRefreshKey props — self-sufficient now
+const LeaveHistory = ({ employeeId, year }) => {
   const [leaves, setLeaves] = useState([]);
   const [leaveTypeOptions, setLeaveTypeOptions] = useState([]);
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState(year ?? new Date().getFullYear());
+
+  // Sync with parent year when it changes
+  useEffect(() => {
+    if (year != null) setSelectedYear(year);
+  }, [year]);
   const [selectedMonth, setSelectedMonth] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterLeaveType, setFilterLeaveType] = useState("All");

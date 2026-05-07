@@ -12,6 +12,7 @@ import { Plus } from "lucide-react";
 import LeaveUploadWizard from "./LeaveUploadWizard";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "../../../components/Button/Button";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 export const YearDropdown = ({ value, onChange }) => {
   const currentYear = new Date().getFullYear();
@@ -357,6 +358,11 @@ const EmployeeLeaveBalances = () => {
   const handleNext = () =>
     setCurrentPage((prev) => Math.min(prev + 1, totalPages));
 
+  const yearOptions = Array.from(
+    { length: 3 },
+    (_, i) => new Date().getFullYear() - i,
+  ).map((y) => ({ value: y, label: String(y) }));
+
   return (
     <div className="p-6 overflow-auto">
       {/* Loading Spinner Overlay */}
@@ -421,12 +427,13 @@ const EmployeeLeaveBalances = () => {
           )}
         </div>
 
-        <div className="relative z-60">
-          <YearDropdown
+        <div className="w-32">
+          <FilterListbox
+            options={yearOptions}
             value={currentYear}
             onChange={(year) => {
               setCurrentYear(year);
-              setCurrentPage(1); // ✅ reset page on year change
+              setCurrentPage(1);
             }}
           />
         </div>

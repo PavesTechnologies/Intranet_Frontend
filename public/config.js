@@ -5,7 +5,7 @@ window.__APP_CONFIG__ = {
   USER_MANAGEMENT_URL: "http://13.204.95.26:8000",
   // BASE_URL: "http://13.204.95.26:9999",
   BASE_URL: "http://localhost:9999",
-  PMS_BASE_URL: "http://localhost:8080",
+  PMS_BASE_URL: "http://13.204.95.26:8080",
   MSOffice_USER_MANAGEMENT_URL: "http://13.48.18.145",
   EMPLOYEE_ONBOARDING_URL: "http://13.204.95.26:8001",
   RMS_BASE_URL: "http://13.204.95.26:8002",

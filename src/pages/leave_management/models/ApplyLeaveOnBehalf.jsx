@@ -149,6 +149,13 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
     onClose();
   }, [resetForm, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e) => { if (e.key === "Escape") handleClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, handleClose]);
+
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
 
