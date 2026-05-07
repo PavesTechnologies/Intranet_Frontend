@@ -3,6 +3,7 @@ import Button from "../../components/Button/Button";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import ManagerMonthlyReport from "./ManagerMonthlyReport";
+import { ArrowLeft } from "lucide-react";
 
 const TimesheetHeader = () => {
   const navigate = useNavigate();
@@ -14,19 +15,31 @@ const TimesheetHeader = () => {
   return (
     <div className="flex justify-between items-center">
       {/* --- Left Section --- */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">
-          <Link to="/timesheet/dashboard">
-            {pathname === "/timesheet/dashboard"
-              ? "Dashboard"
-              : pathname === "/managerapproval"
-              ? "Manager Approvals"
-              : "Timesheets"}
-          </Link>
-        </h1>
-        <p className="text-gray-600">
-          Track and manage timesheets, projects, and productivity
-        </p>
+      <div className="flex items-center gap-3">
+        {(pathname === "/timesheet/dashboard" || pathname === "/managerapproval") && (
+          <div>
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          </div>
+        )}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            <Link to="/timesheet/dashboard">
+              {pathname === "/timesheet/dashboard"
+                ? "Dashboard"
+                : pathname === "/managerapproval"
+                  ? "Manager Approvals"
+                  : "Timesheets"}
+            </Link>
+          </h1>
+          <p className="text-gray-600">
+            Track and manage timesheets, projects, and productivity
+          </p>
+        </div>
       </div>
 
       {/* --- Right Section: Buttons --- */}

@@ -503,9 +503,9 @@ const MonthlyTSReport = () => {
             weeklyRows.push([
               formatDate(ts.workDate),
               getProjectName(e.projectId) ||
-                (e.projectId ? `Project ${e.projectId}` : ""),
+              (e.projectId ? `Project ${e.projectId}` : ""),
               getTaskName(e.projectId, e.taskId) ||
-                (e.taskId != null ? String(e.taskId) : ""),
+              (e.taskId != null ? String(e.taskId) : ""),
               formatDateTime(e.startTime || ""),
               formatDateTime(e.endTime || ""),
               Number(e.hoursWorked || 0).toFixed(2),
@@ -725,11 +725,11 @@ const MonthlyTSReport = () => {
                         ))}
                       </select>
 
-                      <button className="apply-btn" onClick={handleFilterApply}>
+                      <Button variant="primary" size="small" onClick={handleFilterApply}>
                         Apply
-                      </button>
+                      </Button>
                       <XCircle
-                        className="close-icon"
+                        className="text-red-600"
                         onClick={() => setIsFilterOpen(false)}
                       />
                     </div>
@@ -745,26 +745,30 @@ const MonthlyTSReport = () => {
               </p>
               <p className="employee-name">Employee: {apiData.employeeName}</p>
             </div>
-            <div>
+            <div className="flex gap-2">
               <Button
-                className={`download-btn ${
-                  pdfLoading ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                // className={`download-btn ${
+                //   pdfLoading ? "opacity-50 cursor-not-allowed" : ""
+                // }`}
                 onClick={handleDownloadPDF}
                 variant="primary"
-                size="small"
+                size="medium"
                 disabled={pdfLoading}
+                loading={pdfLoading}
+                loadingText={pdfLoading ? "Downloading..." : ""}
               >
-                {pdfLoading ? "Downloading..." : "Download PDF Report"}
+                Download PDF Report
               </Button>
               <Button
                 variant="secondary"
-                size="small"
-                className={`ml-3 ${mailLoading ? "is-sending" : ""}`}
+                size="medium"
+                // className={`ml-3 ${mailLoading ? "is-sending" : ""}`}
                 onClick={sendMailPDF}
                 disabled={mailLoading}
+                loading={mailLoading}
+                loadingText={mailLoading ? "Sending..." : ""}
               >
-                {mailLoading ? "Sending..." : "Send Report via Email"}
+                Send Report via Email
               </Button>
             </div>
           </div>

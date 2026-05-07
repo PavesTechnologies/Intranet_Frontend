@@ -3,7 +3,7 @@ import classNames from "classnames";
 
 const SIZE_CLASSES = {
   large: "text-base px-8 py-3",
-  medium: "text-sm px-6 py-3",
+  medium: "text-[12px] px-5 py-2.5",
   small: "text-xs px-3 py-1.5",
 };
 

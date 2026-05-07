@@ -152,8 +152,7 @@ const ReportingManagerApprovalTable = ({
       }));
 
       const res = await fetch(
-        `${
-          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/timesheets/review/internal/bulk`,
         {
           method: "POST",
@@ -168,8 +167,7 @@ const ReportingManagerApprovalTable = ({
       if (!res.ok) throw new Error("Bulk review failed");
 
       showStatusToast(
-        `All submitted weeks ${status.toLowerCase()} successfully for ${
-          user.userName
+        `All submitted weeks ${status.toLowerCase()} successfully for ${user.userName
         }`,
         "success",
       );
@@ -537,10 +535,10 @@ const ReportingManagerApprovalTable = ({
       ) : (
         <>
           <div className="flex justify-end gap-3 mb-4">
-            <Button variant="primary" size="small" onClick={exportCSV}>
+            <Button variant="primary" size="medium" onClick={exportCSV}>
               Export CSV
             </Button>
-            <Button variant="primary" size="small" onClick={exportPDF}>
+            <Button variant="secondary" size="medium" onClick={exportPDF}>
               Export PDF
             </Button>
           </div>

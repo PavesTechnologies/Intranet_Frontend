@@ -2,8 +2,12 @@ import React, { useEffect, useState, useRef } from "react";
 import ReportingManagerApprovalTable from "./ReportingManagerApprovalTable";
 import { useMemo } from "react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import Button from "../../../components/Button/Button";
+import { ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const ReportingManagerApprovalPage = () => {
+  const navigate = useNavigate();
   const [groupedTimesheets, setGroupedTimesheets] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,8 +27,7 @@ const ReportingManagerApprovalPage = () => {
   const fetchGroupedTimesheets = async () => {
     try {
       const response = await fetch(
-        `${
-          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheets/internal/summary/reportingManager`,
         {
           headers: {
@@ -143,7 +146,13 @@ const ReportingManagerApprovalPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
+        >
+          <ArrowLeft size={18} />
+        </button>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Reporting Manager Approvals
         </h1>
@@ -197,12 +206,14 @@ const ReportingManagerApprovalPage = () => {
         </select>
 
         {/* Reset Button */}
-        <button
+        <Button
+          variant="destructive"
+          size="medium"
           onClick={handleResetFilters}
-          className="bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-full transition-colors"
+        // className="bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-full transition-colors"
         >
           Reset
-        </button>
+        </Button>
       </div>
 
       {/* ✅ Timesheet Table */}
