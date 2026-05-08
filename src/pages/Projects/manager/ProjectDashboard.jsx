@@ -5,10 +5,12 @@ import { useAuth } from "../../../contexts/AuthContext";
 import CreateProjectModal from "./CreateProjectModal";
 import Button from "../../../components/Button/Button";
 import Pagination from "../../../components/Pagination/pagination";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../components/toastfy/toast";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { MoreVertical } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import SearchInput from "../../../components/filter/Searchbar";
+import StatusBadge from "../../../components/status/statusbadge";
 
 // -------------------- 3 DOTS MENU --------------------
 const ProjectMenu = ({ project, onEdit, onDelete }) => {
@@ -68,6 +70,8 @@ const ProjectDashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [projectsPerPage] = useState(6);
   const [roleFilter, setRoleFilter] = useState("ALL");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [projectIdToDelete, setProjectIdToDelete] = useState(null);
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -97,7 +101,7 @@ const ProjectDashboard = () => {
       setProjects(data);
     } catch (error) {
       console.error("❌ Failed to load projects", error);
-      toast.error("Failed to load projects.");
+      showStatusToast("Failed to load projects.", "error");
     } finally {
       setLoading(false);
     }
@@ -112,48 +116,26 @@ const ProjectDashboard = () => {
   }, [filterStatus]);
 
   // ------------------ DELETE PROJECT ------------------
-  const confirmDeleteToast = (onConfirm) => {
-    toast.warn(
-      ({ closeToast }) => (
-        <div className="flex flex-col gap-3">
-          <p className="font-semibold text-red-600">Delete this project?</p>
-          <div className="flex justify-end gap-2">
-            <button
-              className="px-3 py-1 rounded bg-gray-200"
-              onClick={closeToast}
-            >
-              Cancel
-            </button>
-            <button
-              className="px-3 py-1 rounded bg-red-600 text-white"
-              onClick={() => {
-                onConfirm();
-                closeToast();
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      ),
-      { closeOnClick: false, autoClose: false, position: "top-center" },
-    );
+  const handleDelete = (projectId) => {
+    setProjectIdToDelete(projectId);
+    setDeleteConfirmOpen(true);
   };
 
-  const handleDelete = (projectId) => {
-    confirmDeleteToast(async () => {
-      try {
-        await axios.delete(
-          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
-        setProjects((prev) => prev.filter((p) => p.project.id !== projectId));
-        toast.success("Project deleted successfully!");
-      } catch (err) {
-        console.error("❌ Delete failed", err);
-        toast.error("Failed to delete project.");
-      }
-    });
+  const executeDeleteProject = async () => {
+    try {
+      await axios.delete(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectIdToDelete}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setProjects((prev) => prev.filter((p) => p.project.id !== projectIdToDelete));
+      showStatusToast("Project deleted successfully!", "success");
+    } catch (err) {
+      console.error("❌ Delete failed", err);
+      showStatusToast("Failed to delete project.", "error");
+    } finally {
+      setDeleteConfirmOpen(false);
+      setProjectIdToDelete(null);
+    }
   };
 
   // FIX: startEdit no longer builds formData — modal fetches its own data
@@ -244,12 +226,11 @@ const ProjectDashboard = () => {
 
         {/* SEARCH + FILTER */}
         <div className="flex justify-between items-center mb-6">
-          <input
-            type="text"
-            placeholder="Search by name or key"
-            className="border px-3 py-2 rounded-xl w-64"
+          <SearchInput
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by name or key"
+            className="w-64"
           />
 
           <div className="flex items-center gap-3">
@@ -318,19 +299,7 @@ const ProjectDashboard = () => {
                   </p>
 
                   <div className="mt-4 flex justify-between items-center">
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full font-medium ${
-                        p.status === "ACTIVE"
-                          ? "bg-green-100 text-green-700"
-                          : p.status === "PLANNING"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : p.status === "COMPLETED"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {p.status}
-                    </span>
+                    <StatusBadge label={p.status} size="sm" />
                   </div>
                 </div>
               );
@@ -368,7 +337,16 @@ const ProjectDashboard = () => {
         }}
       />
 
-      <ToastContainer position="top-right" />
+      <ConfirmationModal
+        isOpen={deleteConfirmOpen}
+        title="Delete Project"
+        message="Are you sure you want to delete this project? This action cannot be undone."
+        onConfirm={executeDeleteProject}
+        onCancel={() => { setDeleteConfirmOpen(false); setProjectIdToDelete(null); }}
+        confirmText="Delete"
+        variant="danger"
+      />
+
     </div>
   );
 };

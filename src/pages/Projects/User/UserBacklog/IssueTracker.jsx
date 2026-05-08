@@ -4,9 +4,9 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import Button from "../../../../components/Button/Button";
 import { FiEye } from "react-icons/fi";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
+import SearchInput from "../../../../components/filter/Searchbar";
 
 const UserIssueTracker = () => {
   const { projectId: paramProjectId } = useParams();
@@ -99,7 +99,7 @@ const UserIssueTracker = () => {
       setFilteredIssues(allIssues);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load issues");
+      showStatusToast("Failed to load issues", "error");
     } finally {
       setLoading(false);
     }
@@ -115,7 +115,7 @@ const UserIssueTracker = () => {
       setProjects(res.data || []);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load projects");
+      showStatusToast("Failed to load projects", "error");
     }
   };
 
@@ -188,7 +188,6 @@ const UserIssueTracker = () => {
 
   return (
     <div className="max-w-7xl mx-auto mt-6 px-4 space-y-6">
-      <ToastContainer />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-indigo-900">
           Issue Tracker ({projectName})
@@ -210,12 +209,11 @@ const UserIssueTracker = () => {
 
       {/* Filters */}
       <div className="bg-white p-5 rounded-lg shadow-md flex flex-wrap gap-3 items-center border border-gray-100">
-        <input
-          type="text"
-          placeholder="Search by title..."
+        <SearchInput
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          placeholder="Search by title..."
+          className="w-64"
         />
         <select
           className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"

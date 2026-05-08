@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Button from "../../../../components/Button/Button";
 
 const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
   const token = localStorage.getItem("token");
@@ -37,7 +38,7 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
           projectId: sprint.projectId,
         });
       } catch (err) {
-        toast.success("Sprint updated successfully!", { autoClose: 3000, containerId: "global" });
+        showStatusToast("Sprint updated successfully!", "success");
       } finally {
         setLoading(false);
       }
@@ -66,12 +67,12 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      showStatusToast("Sprint updated successfully!", "success", 3000);
+      showStatusToast("Sprint updated successfully!", "success");
 
       onUpdated?.();
       onClose?.();
     } catch (err) {
-      toast.error("Failed to load sprint details", { autoClose: 3000, containerId: "global" });
+      showStatusToast("Failed to load sprint details", "error");
     } finally {
       setLoading(false);
     }
@@ -142,20 +143,9 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
       </div>
 
       <div className="flex justify-end gap-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 bg-gray-300 rounded"
-        >
-          Cancel
-        </button>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
 
-        <button
-          type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded"
-        >
-          Update Sprint
-        </button>
+        <Button variant="primary" type="submit">Update Sprint</Button>
       </div>
     </form>
   );

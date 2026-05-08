@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { X } from "lucide-react";
+import Button from "../../../../components/Button/Button";
 
 const CreateSprint = ({ onClose }) => {
   const [formData, setFormData] = useState({
@@ -196,12 +197,9 @@ const CreateSprint = ({ onClose }) => {
         </div>
 
         <div className="text-center">
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition"
-          >
+          <Button variant="primary" type="submit">
             Create Sprint
-          </button>
+          </Button>
         </div>
       </form>
     </div>

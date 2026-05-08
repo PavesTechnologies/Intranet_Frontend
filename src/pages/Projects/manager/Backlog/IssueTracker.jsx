@@ -2,13 +2,14 @@ import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { FiEdit, FiTrash, FiX, FiFilter } from "react-icons/fi";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import { ChevronDown, ChevronRight, ArrowLeft, LayoutList } from "lucide-react";
 import EditStoryForm from "./EditStoryForm";
 import EditTaskForm from "./EditTaskForm";
 import EditEpicForm from "./EditEpicForm";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
+import Button from "../../../../components/Button/Button";
 
 const IssueTracker = () => {
   const location = useLocation();
@@ -35,6 +36,8 @@ const IssueTracker = () => {
 
   const [openEpics, setOpenEpics] = useState([]);
   const [openStories, setOpenStories] = useState([]);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [issueToDelete, setIssueToDelete] = useState(null);
 
   const token = localStorage.getItem("token");
   const headers = {
@@ -125,7 +128,7 @@ const IssueTracker = () => {
 
       setIssues({ epicsData, storiesData, tasksData });
     } catch (err) {
-      toast.error("Failed to load issues");
+      showStatusToast("Failed to load issues", "error");
     } finally {
       setLoading(false);
     }
@@ -139,7 +142,7 @@ const IssueTracker = () => {
       );
       setProjects(res.data || []);
     } catch (err) {
-      toast.error("Failed to load projects");
+      showStatusToast("Failed to load projects", "error");
     }
   };
 
@@ -162,48 +165,15 @@ const IssueTracker = () => {
         headers,
       });
       fetchIssues();
-      toast.success(`${issue.type} deleted successfully!`);
+      showStatusToast(`${issue.type} deleted successfully!`, "success");
     } catch (err) {
-      toast.error(`Failed to delete ${issue.type}`);
+      showStatusToast(`Failed to delete ${issue.type}`, "error");
     }
   };
 
   const handleDelete = (issue) => {
-    // Custom UI injected directly into the Toast
-    const ConfirmToast = ({ closeToast }) => (
-      <div className="flex flex-col gap-3 py-1">
-        <p className="text-sm text-gray-800 font-medium">
-          Are you sure you want to delete this {issue.type}?
-        </p>
-        <div className="flex justify-end gap-2 mt-1">
-          <button
-            onClick={closeToast}
-            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-200 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              executeDelete(issue);
-              closeToast();
-            }}
-            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    );
-
-    // Trigger the custom toast
-    toast.warn(<ConfirmToast />, {
-      position: "top-center",
-      autoClose: false, // Stays open until they click a button
-      closeOnClick: false, // Clicking the toast body won't close it
-      draggable: false, // Prevents accidental swiping
-      closeButton: false, // Hides the default 'X' button
-      icon: false, // Hides the default warning icon to save space
-    });
+    setIssueToDelete(issue);
+    setDeleteConfirmOpen(true);
   };
 
   const handleEdit = (issue) =>
@@ -545,7 +515,6 @@ const IssueTracker = () => {
 
   return (
     <div className="max-w-7xl mx-auto mt-8 px-6 pb-12 space-y-6">
-      <ToastContainer position="top-right" autoClose={3000} />
 
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
@@ -670,12 +639,7 @@ const IssueTracker = () => {
                 </div>
 
                 <div className="mt-5 pt-4 border-t border-gray-100 flex justify-end">
-                  <button
-                    onClick={() => setFilterOpen(false)}
-                    className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
-                  >
-                    Apply Filters
-                  </button>
+                  <Button variant="primary" className="w-full" onClick={() => setFilterOpen(false)}>Apply Filters</Button>
                 </div>
               </div>
             )}
@@ -733,6 +697,16 @@ const IssueTracker = () => {
           )}
         </Modal>
       )}
+
+      <ConfirmationModal
+        isOpen={deleteConfirmOpen}
+        title={`Delete ${issueToDelete?.type || "Issue"}`}
+        message={`Are you sure you want to delete this ${issueToDelete?.type?.toLowerCase() || "issue"}? This action cannot be undone.`}
+        onConfirm={() => { setDeleteConfirmOpen(false); executeDelete(issueToDelete); setIssueToDelete(null); }}
+        onCancel={() => { setDeleteConfirmOpen(false); setIssueToDelete(null); }}
+        confirmText="Delete"
+        variant="danger"
+      />
     </div>
   );
 };
