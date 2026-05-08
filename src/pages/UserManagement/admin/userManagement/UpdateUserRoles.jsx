@@ -57,7 +57,6 @@ export default function UpdateUserRole() {
   useEffect(() => {
     if (!token) {
       showStatusToast("Session expired. Please login again.", "warning");
-
       navigate("/");
     }
   }, [token, navigate]);
@@ -114,7 +113,7 @@ export default function UpdateUserRole() {
 
   const toggleSort = () => {
     setSortDirection((prev) =>
-      prev === SORT_DIRECTIONS.ASC ? SORT_DIRECTIONS.DESC : SORT_DIRECTIONS.ASC,
+      prev === SORT_DIRECTIONS.ASC ? SORT_DIRECTIONS.DESC : SORT_DIRECTIONS.ASC
     );
 
     setUsers((prev) => [...prev].reverse());
@@ -157,10 +156,10 @@ export default function UpdateUserRole() {
     actions: (
       <Button
         type="button"
+        variant="link"
         size="icon"
-        variant="icon"
         title="Edit"
-        className="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+        className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
         onClick={() => {
           setSelectedUser_uuId(user.user_uuid);
           setIsModalOpen(true);
@@ -179,16 +178,15 @@ export default function UpdateUserRole() {
               ...u,
               roles: updatedRoleNames,
             }
-          : u,
-      ),
+          : u
+      )
     );
   };
 
   return (
-    <div className="px-6 py-4">
-      {/* Header */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <div className="w-full min-w-0 px-4 py-4 sm:px-6">
+      <div className="mb-5 flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
           <h2 className={Fonts.heading3}>Update User Roles</h2>
 
           <p className={Fonts.paragraphMuted}>
@@ -200,42 +198,57 @@ export default function UpdateUserRole() {
           variant="secondary"
           size="medium"
           onClick={() => navigate("/user-management/users")}
+          className="w-full sm:w-auto"
         >
           <ArrowLeft size={15} />
           Back
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="mb-4 max-w-md">
-        <SearchInput
-          onSearch={handleSearch}
-          placeholder="Search by name, email or role..."
-        />
+      <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="w-full lg:max-w-md">
+          <SearchInput
+            onSearch={handleSearch}
+            placeholder="Search by name, email or role..."
+          />
+        </div>
       </div>
 
-      {/* Table */}
-      {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white py-16">
-          <LoadingSpinner text="Loading user roles..." />
-        </div>
-      ) : (
-        <>
-          <GenericTable headers={headers} rows={tableRows} columns={columns} />
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        {loading ? (
+          <div className="py-16">
+            <LoadingSpinner text="Loading user roles..." />
+          </div>
+        ) : users.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+            {searchTerm
+              ? `No users found matching "${searchTerm}".`
+              : "No users found."}
+          </div>
+        ) : (
+          <>
+            <div className="w-full overflow-x-auto">
+              <GenericTable
+                headers={headers}
+                rows={tableRows}
+                columns={columns}
+              />
+            </div>
 
-          {totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPrevious={handlePreviousPage}
-              onNext={handleNextPage}
-              className="mt-4"
-            />
-          )}
-        </>
-      )}
+            {totalPages > 1 && (
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPrevious={handlePreviousPage}
+                  onNext={handleNextPage}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
-      {/* Modal */}
       {isModalOpen && selectedUser_uuId && (
         <EditUserRoleModal
           user_uuId={selectedUser_uuId}
@@ -253,21 +266,12 @@ export default function UpdateUserRole() {
   );
 }
 
-/* ---------------------------------------------------------
-   Edit Modal
---------------------------------------------------------- */
-
 function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
   const [user, setUser] = useState(null);
-
   const [roles, setRoles] = useState([]);
-
   const [selectedRoleIds, setSelectedRoleIds] = useState([]);
-
   const [loading, setLoading] = useState(true);
-
   const [saving, setSaving] = useState(false);
-
   const [searchTerm, setSearchTerm] = useState("");
 
   const token = localStorage.getItem("token");
@@ -289,16 +293,13 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
       try {
         const [userRes, rolesRes, assignedRes] = await Promise.all([
           axiosInstance.get(`/admin/users/uuid/${user_uuId}`, authHeader),
-
           axiosInstance.get(`/admin/roles`, authHeader),
-
           axiosInstance.get(`/admin/users/uuid/${user_uuId}/roles`, authHeader),
         ]);
 
         if (!mounted) return;
 
         setUser(userRes.data);
-
         setRoles(Array.isArray(rolesRes.data) ? rolesRes.data : []);
 
         let assignedIds = [];
@@ -317,7 +318,6 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
         setSelectedRoleIds(assignedIds);
       } catch (err) {
         console.error("Failed to load roles", err);
-
         showStatusToast("Unable to fetch user role data.", "error");
       } finally {
         if (mounted) {
@@ -337,7 +337,7 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
     setSelectedRoleIds((prev) =>
       prev.includes(roleId)
         ? prev.filter((id) => id !== roleId)
-        : [...prev, roleId],
+        : [...prev, roleId]
     );
   };
 
@@ -352,7 +352,7 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
         {
           role_ids: selectedRoleIds,
         },
-        authHeader,
+        authHeader
       );
 
       const updatedRoleNames = roles
@@ -361,7 +361,7 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
 
       showStatusToast(
         response?.data?.message || "Roles updated successfully!",
-        "success",
+        "success"
       );
 
       if (typeof onSaved === "function") {
@@ -371,7 +371,6 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
       onClose();
     } catch (err) {
       console.error("Failed to update roles", err);
-
       showStatusToast("Update failed.", "error");
     } finally {
       setSaving(false);
@@ -391,75 +390,97 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
       isOpen={true}
       onClose={onClose}
       title="Edit User Roles"
-      subtitle="Assign or remove roles for the selected user."
-      className="!mt-16 !max-h-[calc(100vh-8rem)] overflow-hidden"
+      subtitle={
+        user
+          ? `User: ${user.first_name || ""} ${user.last_name || ""}`.trim()
+          : "Assign or remove roles for the selected user."
+      }
+      size="2xl"
+      fullScreenMobile
+      maxHeight="max-h-[92vh]"
+      bodyClassName="p-0 overflow-hidden"
+      scrollable={false}
+      closeOnBackdrop={!saving}
+      footer={
+        !loading && (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+              disabled={saving}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="button"
+              onClick={handleSave}
+              variant="primary"
+              loading={saving}
+              loadingText="Saving..."
+              disabled={saving}
+              className="w-full sm:w-auto"
+            >
+              Save Changes
+            </Button>
+          </div>
+        )
+      }
     >
-      <div className="p-2">
-        {loading ? (
+      {loading ? (
+        <div className="py-16">
           <LoadingSpinner text="Loading role data..." />
-        ) : (
-          <>
-            <div className="mb-5">
-              <h3 className={Fonts.heading4}>
-                {user?.first_name} {user?.last_name}
-              </h3>
+        </div>
+      ) : (
+        <div className="flex max-h-[calc(92vh-190px)] flex-col overflow-hidden">
+          <div className="shrink-0 border-b border-gray-100 p-4 sm:p-5">
+            <p className="text-sm text-gray-500">
+              Select or deselect roles below.
+            </p>
 
-              <p className="mt-1 text-sm text-gray-500">
-                Select or deselect roles below.
-              </p>
-            </div>
-
-            <div className="mb-4">
+            <div className="mt-4">
               <SearchInput
                 placeholder="Search roles..."
-                onSearch={(val) => setSearchTerm(val)}
+                onSearch={(val) => setSearchTerm(val || "")}
               />
             </div>
+          </div>
 
-            <div className="mb-6 grid max-h-56 grid-cols-2 gap-3 overflow-y-auto rounded-lg border border-gray-200 p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {filteredRoles.length > 0 ? (
                 filteredRoles.map((role) => (
                   <label
                     key={role.role_uuid}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-2 transition hover:bg-gray-50"
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition ${
+                      selectedRoleIds.includes(role.role_uuid)
+                        ? "border-blue-300 bg-blue-50"
+                        : "border-gray-200 bg-white hover:bg-gray-50"
+                    }`}
                   >
                     <input
                       type="checkbox"
                       checked={selectedRoleIds.includes(role.role_uuid)}
                       onChange={() => toggleRole(role.role_uuid)}
-                      className="h-4 w-4 accent-[#0A0082]"
+                      className="h-4 w-4 shrink-0 accent-[#0A0082]"
                     />
 
-                    <span className="text-sm text-gray-700">
+                    <span className="min-w-0 truncate text-sm font-medium text-gray-700">
                       {role.role_name}
                     </span>
                   </label>
                 ))
               ) : (
-                <div className="col-span-2 text-sm italic text-gray-400">
+                <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm italic text-gray-400 sm:col-span-2">
                   No roles found.
                 </div>
               )}
             </div>
-
-            <div className="flex justify-end gap-3">
-              <Button onClick={onClose} variant="outline" size="small">
-                Cancel
-              </Button>
-
-              <Button
-                onClick={handleSave}
-                variant="primary"
-                size="small"
-                loading={saving}
-                loadingText="Saving..."
-              >
-                Save Changes
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }
