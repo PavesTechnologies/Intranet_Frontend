@@ -1,10 +1,12 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import FormInput from "../../../../components/forms/FormInput";
 import FormTextArea from "../../../../components/forms/FormTextArea";
 import FormSelect from "../../../../components/forms/FormSelect";
+import Button from "../../../../components/Button/Button";
+import Modal from "../../../../components/Modal/modal";
 
 const CreateStoryForm = ({
   projectId,
@@ -53,7 +55,7 @@ const CreateStoryForm = ({
         setEpics(epicsRes.data || []);
         setUsers(usersRes.data || []);
       } catch (err) {
-        toast.error("Failed to load epics or users");
+        showStatusToast("Failed to load epics or users", "error");
       }
     };
 
@@ -67,8 +69,8 @@ const CreateStoryForm = ({
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!formData.title) return toast.error("Title is required");
-    if (!formData.reporterId) return toast.error("Reporter is required");
+    if (!formData.title) return showStatusToast("Title is required", "error");
+    if (!formData.reporterId) return showStatusToast("Reporter is required", "error");
 
     const payload = {
       title: formData.title,
@@ -91,34 +93,19 @@ const CreateStoryForm = ({
         payload,
         axiosConfig,
       );
-      toast.success("Story created successfully!");
+      showStatusToast("Story created successfully!", "success");
       onCreated?.();
       onClose?.();
     } catch (err) {
-      toast.error("Failed to create story");
+      showStatusToast("Failed to create story", "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 overflow-auto p-4">
-      <ToastContainer />
-      <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-6 relative">
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-600 hover:text-black"
-        >
-          ✕
-        </button>
-
-        <h2 className="text-xl font-bold mb-4 text-center">Create Story</h2>
-
-        <form
-          onSubmit={submit}
-          className="space-y-4 max-h-[80vh] overflow-y-auto pr-2"
-        >
+    <Modal isOpen={true} onClose={onClose} title="Create Story" bodyClassName="p-4 pr-2">
+      <form onSubmit={submit} className="space-y-4">
           <FormInput
             label="Title *"
             name="title"
@@ -189,16 +176,18 @@ const CreateStoryForm = ({
             options={users.map((u) => ({ label: u.name, value: u.id }))}
           />
 
-          <button
+          <Button
             type="submit"
+            variant="primary"
+            className="w-full"
             disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg"
+            loading={loading}
+            loadingText="Creating..."
           >
-            {loading ? "Creating..." : "Create Story"}
-          </button>
+            Create Story
+          </Button>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import BugReportModal from "./BugReportModal";
 import { se } from "date-fns/locale";
 
@@ -26,7 +26,7 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
       setTestCase({ title: `Executing Test Case ${testCaseId}` });
       setIsLoading(false);
     } catch (err) {
-      toast.error("Failed to load steps");
+      showStatusToast("Failed to load steps", "error");
     }
   };
 
@@ -64,9 +64,9 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
       );
 
       setStepResults((prev) => ({ ...prev, [stepId]: apiStatus }));
-      toast.success(`Step updated: ${apiStatus}`);
+      showStatusToast(`Step updated: ${apiStatus}`, "success");
     } catch (err) {
-      toast.error("Failed to update step");
+      showStatusToast("Failed to update step", "error");
     }
   };
 
@@ -96,7 +96,7 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
         testCaseIds: testCaseId,
       });
 
-      toast.success(`${selectedSteps.length} steps updated`);
+      showStatusToast(`${selectedSteps.length} steps updated`, "success");
 
       setSteps((prev) =>
         prev.map((s) =>
@@ -106,7 +106,7 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
 
       setSelectedSteps([]);
     } catch (err) {
-      toast.error("Bulk update failed");
+      showStatusToast("Bulk update failed", "error");
     }
   };
 

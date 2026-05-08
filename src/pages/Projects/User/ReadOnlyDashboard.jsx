@@ -2,10 +2,10 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../../../contexts/AuthContext";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { toast, ToastContainer } from "react-toastify";
+import { showStatusToast } from "../../../components/toastfy/toast";
 import { useNavigate } from "react-router-dom";
-import "react-toastify/dist/ReactToastify.css";
 import Button from "../../../components/Button/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const ReadOnlyDashboard = () => {
   const { user } = useAuth();
@@ -62,7 +62,7 @@ const ReadOnlyDashboard = () => {
       } catch (err) {
         console.error("Error fetching data:", err.response || err);
         setError("Failed to load user data");
-        toast.error("Failed to load user data");
+        showStatusToast("Failed to load user data", "error");
       } finally {
         setLoading(false);
       }
@@ -293,13 +293,12 @@ const ReadOnlyDashboard = () => {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <ToastContainer />
 
       <h1 className="text-2xl font-bold mb-4 text-indigo-900">
         {userName} — Your Projects
       </h1>
 
-      {loading && <p className="text-gray-600">Loading data...</p>}
+      {loading && <LoadingSpinner size="md" text="Loading data..." />}
       {error && <p className="text-red-500">{error}</p>}
 
       {/* PROJECTS */}

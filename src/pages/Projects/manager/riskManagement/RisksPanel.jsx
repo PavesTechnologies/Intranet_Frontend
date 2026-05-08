@@ -1,10 +1,6 @@
-import {
-  AlertCircle,
-  Download,
-  User,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { AlertCircle, User } from "lucide-react";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import Pagination from "../../../../components/Pagination/pagination";
 
 /* ---------- UI utils ---------- */
 
@@ -155,28 +151,14 @@ export default function RisksPanel({
         </div>
 
         {/* Pagination */}
-        {pagination?.totalPages > 1 && (
-          <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-            <div className="text-xs text-slate-600">
-              Page <span className="font-semibold">{pagination.page}</span> of{" "}
-              <span className="font-semibold">{pagination.totalPages}</span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => onPageChange(pagination.page - 1)}
-                disabled={pagination.page === 1}
-                className="p-1 hover:bg-slate-300 disabled:opacity-50 rounded transition"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => onPageChange(pagination.page + 1)}
-                disabled={pagination.page === pagination.totalPages}
-                className="p-1 hover:bg-slate-300 disabled:opacity-50 rounded transition"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+        {pagination && (
+          <div className="border-t border-slate-200">
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              onPrevious={() => onPageChange(pagination.page - 1)}
+              onNext={() => onPageChange(pagination.page + 1)}
+            />
           </div>
         )}
       </div>
@@ -211,12 +193,7 @@ function EmptyState() {
 }
 
 function LoadingState() {
-  return (
-    <div className="p-8 text-center">
-      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      <p className="text-sm text-slate-500 mt-2">Loading risks...</p>
-    </div>
-  );
+  return <LoadingSpinner size="md" text="Loading risks..." />;
 }
 
 function EmptyRisks() {

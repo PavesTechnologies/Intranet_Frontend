@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import Button from "../../../../components/Button/Button";
 
 const CreateEpic = ({ onClose }) => {
   const [projects, setProjects] = useState([]);
@@ -222,12 +223,9 @@ const CreateEpic = ({ onClose }) => {
 
         {/* Submit Button */}
         <div className="text-right">
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
+          <Button variant="primary" type="submit">
             Create Epic
-          </button>
+          </Button>
         </div>
       </form>
     </div>

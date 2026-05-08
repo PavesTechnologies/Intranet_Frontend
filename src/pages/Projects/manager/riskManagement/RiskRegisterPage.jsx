@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import axios from "axios";
+import Button from "../../../../components/Button/Button";
 
 import CreateRiskModal from "./createRiskModal";
 import IssuesPanel from "./IssuesPanel";
@@ -32,7 +33,6 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [selectedRisk, setSelectedRisk] = useState(null);
 
-  const [isLoadingIssues] = useState(false);
   const [isLoadingRisks, setIsLoadingRisks] = useState(false);
 
   /* ---------- Risks ---------- */
@@ -152,13 +152,9 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
       <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between">
         <h1 className="text-3xl font-bold"></h1>
 
-        <button
-          onClick={() => setShowCreateRisk(true)}
-          className="px-4 py-2 bg-indigo-900 text-white rounded-lg flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          New Risk
-        </button>
+        <Button variant="primary" size="medium" onClick={() => setShowCreateRisk(true)}>
+          <Plus className="w-4 h-4" /> New Risk
+        </Button>
 
         <CreateRiskModal
           projectId={projectId}
@@ -205,8 +201,8 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
           projectId={projectId}
           activeIssueType={activeIssueType}
           issuePage={issuePage}
+          setIssuePage={setIssuePage}
           selectedIssue={selectedIssue}
-          isLoadingIssues={isLoadingIssues}
           onSelectIssue={(issue) => {
             setSelectedIssue(issue);
             setRiskPage(1);

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../../components/toastfy/toast";
 import { X } from "lucide-react";
 
 import FormInput from "../../../../../components/forms/FormInput";
 import FormTextArea from "../../../../../components/forms/FormTextArea";
+import Button from "../../../../../components/Button/Button";
 
 // Wrapper component
 const Wrapper = ({ mode, onClose, children }) => {
@@ -63,7 +64,7 @@ const EditTestPlan = ({
         });
       } catch (err) {
         console.error(err);
-        toast.error("Failed to load test plan details");
+        showStatusToast("Failed to load test plan details", "error");
       } finally {
         setInitialLoading(false);
       }
@@ -83,7 +84,7 @@ const EditTestPlan = ({
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      toast.error("Test Plan Name is required.");
+      showStatusToast("Test Plan Name is required.", "error");
       return;
     }
 
@@ -107,12 +108,12 @@ const EditTestPlan = ({
         },
       );
 
-      toast.success("Test Plan updated successfully");
+      showStatusToast("Test Plan updated successfully", "success");
       onSuccess?.();
       onClose?.();
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || "Failed to update Test Plan");
+      showStatusToast(err.response?.data?.message || "Failed to update Test Plan", "error");
     } finally {
       setLoading(false);
     }
@@ -159,23 +160,9 @@ const EditTestPlan = ({
 
         {/* FOOTER */}
         <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
-          >
-            Cancel
-          </button>
+          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className={`px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 ${
-              loading ? "opacity-60" : ""
-            }`}
-          >
-            {loading ? "Updating..." : "Update Plan"}
-          </button>
+          <Button variant="primary" type="submit" disabled={loading} loading={loading} loadingText="Updating...">Update Plan</Button>
         </div>
       </form>
     </Wrapper>

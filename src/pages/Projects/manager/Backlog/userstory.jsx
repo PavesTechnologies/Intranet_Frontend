@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import Button from "../../../../components/Button/Button";
 
 const CreateUserStory = ({ onClose }) => {
   const [title, setTitle] = useState("");
@@ -241,19 +242,8 @@ const CreateUserStory = ({ onClose }) => {
 
         {/* Buttons */}
         <div className="flex justify-end gap-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
-          >
-            Create
-          </button>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" type="submit">Create</Button>
         </div>
       </form>
     </div>
