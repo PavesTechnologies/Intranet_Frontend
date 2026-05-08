@@ -29,7 +29,9 @@ export default function UpdateUserRole() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [sortDirection, setSortDirection] = useState(SORT_DIRECTIONS.ASC);
+  const [sortDirection, setSortDirection] = useState(
+    SORT_DIRECTIONS.ASC
+  );
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser_uuId, setSelectedUser_uuId] = useState(null);
@@ -56,7 +58,10 @@ export default function UpdateUserRole() {
 
   useEffect(() => {
     if (!token) {
-      showStatusToast("Session expired. Please login again.", "warning");
+      showStatusToast(
+        "Session expired. Please login again.",
+        "warning"
+      );
 
       navigate("/");
     }
@@ -87,13 +92,21 @@ export default function UpdateUserRole() {
 
       showStatusToast(msg, "error");
 
-      if (err.response?.status === 401 || err.response?.status === 403) {
+      if (
+        err.response?.status === 401 ||
+        err.response?.status === 403
+      ) {
         navigate("/dashboard");
       }
     } finally {
       setLoading(false);
     }
-  }, [axiosInstance, currentPage, searchTerm, navigate]);
+  }, [
+    axiosInstance,
+    currentPage,
+    searchTerm,
+    navigate,
+  ]);
 
   useEffect(() => {
     fetchUsers();
@@ -109,12 +122,16 @@ export default function UpdateUserRole() {
   }, []);
 
   const handleNextPage = useCallback(() => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+    setCurrentPage((prev) =>
+      Math.min(prev + 1, totalPages)
+    );
   }, [totalPages]);
 
   const toggleSort = () => {
     setSortDirection((prev) =>
-      prev === SORT_DIRECTIONS.ASC ? SORT_DIRECTIONS.DESC : SORT_DIRECTIONS.ASC,
+      prev === SORT_DIRECTIONS.ASC
+        ? SORT_DIRECTIONS.DESC
+        : SORT_DIRECTIONS.ASC
     );
 
     setUsers((prev) => [...prev].reverse());
@@ -127,27 +144,48 @@ export default function UpdateUserRole() {
       className="cursor-pointer select-none"
       onClick={toggleSort}
     >
-      Name {sortDirection === SORT_DIRECTIONS.ASC ? "▲" : "▼"}
+      Name{" "}
+      {sortDirection === SORT_DIRECTIONS.ASC
+        ? "▲"
+        : "▼"}
     </span>,
     "Email",
     "Assigned Roles",
     "Actions",
   ];
 
-  const columns = ["serial_no", "name", "mail", "roles", "actions"];
+  const columns = [
+    "serial_no",
+    "name",
+    "mail",
+    "roles",
+    "actions",
+  ];
 
   const tableRows = users.map((user, index) => ({
-    serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
+    serial_no: (
+      (currentPage - 1) * ITEMS_PER_PAGE +
+      index +
+      1
+    ).toString(),
 
     name: user.name || "N/A",
 
-    mail: user.mail || <span className="italic text-gray-400">N/A</span>,
+    mail: user.mail || (
+      <span className="italic text-gray-400">
+        N/A
+      </span>
+    ),
 
     roles:
       user.roles?.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {user.roles.map((role, idx) => (
-            <StatusBadge key={idx} label={role} size="sm" />
+            <StatusBadge
+              key={idx}
+              label={role}
+              size="sm"
+            />
           ))}
         </div>
       ) : (
@@ -156,22 +194,23 @@ export default function UpdateUserRole() {
 
     actions: (
       <Button
-        type="button"
-        size="icon"
-        variant="icon"
-        title="Edit"
-        className="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
         onClick={() => {
           setSelectedUser_uuId(user.user_uuid);
           setIsModalOpen(true);
         }}
+        variant="primary"
+        size="small"
       >
-        <Pencil size={17} />
+        <Pencil size={15} />
+        Edit
       </Button>
     ),
   }));
 
-  const handleRolesSaved = (userUuid, updatedRoleNames) => {
+  const handleRolesSaved = (
+    userUuid,
+    updatedRoleNames
+  ) => {
     setUsers((prev) =>
       prev.map((u) =>
         u.user_uuid === userUuid
@@ -179,8 +218,8 @@ export default function UpdateUserRole() {
               ...u,
               roles: updatedRoleNames,
             }
-          : u,
-      ),
+          : u
+      )
     );
   };
 
@@ -189,7 +228,9 @@ export default function UpdateUserRole() {
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className={Fonts.heading3}>Update User Roles</h2>
+          <h2 className={Fonts.heading3}>
+            Update User Roles
+          </h2>
 
           <p className={Fonts.paragraphMuted}>
             Assign and manage roles for users.
@@ -198,8 +239,10 @@ export default function UpdateUserRole() {
 
         <Button
           variant="secondary"
-          size="medium"
-          onClick={() => navigate("/user-management/users")}
+          size="small"
+          onClick={() =>
+            navigate("/user-management/users")
+          }
         >
           <ArrowLeft size={15} />
           Back
@@ -221,7 +264,11 @@ export default function UpdateUserRole() {
         </div>
       ) : (
         <>
-          <GenericTable headers={headers} rows={tableRows} columns={columns} />
+          <GenericTable
+            headers={headers}
+            rows={tableRows}
+            columns={columns}
+          />
 
           {totalPages > 1 && (
             <Pagination
@@ -245,7 +292,10 @@ export default function UpdateUserRole() {
           }}
           axiosInstance={axiosInstance}
           onSaved={(updatedRoleNames) =>
-            handleRolesSaved(selectedUser_uuId, updatedRoleNames)
+            handleRolesSaved(
+              selectedUser_uuId,
+              updatedRoleNames
+            )
           }
         />
       )}
@@ -257,12 +307,18 @@ export default function UpdateUserRole() {
    Edit Modal
 --------------------------------------------------------- */
 
-function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
+function EditUserRoleModal({
+  user_uuId,
+  onClose,
+  axiosInstance,
+  onSaved,
+}) {
   const [user, setUser] = useState(null);
 
   const [roles, setRoles] = useState([]);
 
-  const [selectedRoleIds, setSelectedRoleIds] = useState([]);
+  const [selectedRoleIds, setSelectedRoleIds] =
+    useState([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -287,38 +343,68 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
       setLoading(true);
 
       try {
-        const [userRes, rolesRes, assignedRes] = await Promise.all([
-          axiosInstance.get(`/admin/users/uuid/${user_uuId}`, authHeader),
+        const [
+          userRes,
+          rolesRes,
+          assignedRes,
+        ] = await Promise.all([
+          axiosInstance.get(
+            `/admin/users/uuid/${user_uuId}`,
+            authHeader
+          ),
 
-          axiosInstance.get(`/admin/roles`, authHeader),
+          axiosInstance.get(
+            `/admin/roles`,
+            authHeader
+          ),
 
-          axiosInstance.get(`/admin/users/uuid/${user_uuId}/roles`, authHeader),
+          axiosInstance.get(
+            `/admin/users/uuid/${user_uuId}/roles`,
+            authHeader
+          ),
         ]);
 
         if (!mounted) return;
 
         setUser(userRes.data);
 
-        setRoles(Array.isArray(rolesRes.data) ? rolesRes.data : []);
+        setRoles(
+          Array.isArray(rolesRes.data)
+            ? rolesRes.data
+            : []
+        );
 
         let assignedIds = [];
 
-        if (assignedRes.data?.roles && Array.isArray(assignedRes.data.roles)) {
-          const roleNameToId = rolesRes.data.reduce((acc, r) => {
-            acc[r.role_name] = r.role_uuid;
-            return acc;
-          }, {});
+        if (
+          assignedRes.data?.roles &&
+          Array.isArray(assignedRes.data.roles)
+        ) {
+          const roleNameToId =
+            rolesRes.data.reduce((acc, r) => {
+              acc[r.role_name] = r.role_uuid;
+              return acc;
+            }, {});
 
           assignedIds = assignedRes.data.roles
-            .map((roleName) => roleNameToId[roleName])
+            .map(
+              (roleName) =>
+                roleNameToId[roleName]
+            )
             .filter(Boolean);
         }
 
         setSelectedRoleIds(assignedIds);
       } catch (err) {
-        console.error("Failed to load roles", err);
+        console.error(
+          "Failed to load roles",
+          err
+        );
 
-        showStatusToast("Unable to fetch user role data.", "error");
+        showStatusToast(
+          "Unable to fetch user role data.",
+          "error"
+        );
       } finally {
         if (mounted) {
           setLoading(false);
@@ -337,7 +423,7 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
     setSelectedRoleIds((prev) =>
       prev.includes(roleId)
         ? prev.filter((id) => id !== roleId)
-        : [...prev, roleId],
+        : [...prev, roleId]
     );
   };
 
@@ -352,16 +438,19 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
         {
           role_ids: selectedRoleIds,
         },
-        authHeader,
+        authHeader
       );
 
       const updatedRoleNames = roles
-        .filter((r) => selectedRoleIds.includes(r.role_uuid))
+        .filter((r) =>
+          selectedRoleIds.includes(r.role_uuid)
+        )
         .map((r) => r.role_name);
 
       showStatusToast(
-        response?.data?.message || "Roles updated successfully!",
-        "success",
+        response?.data?.message ||
+          "Roles updated successfully!",
+        "success"
       );
 
       if (typeof onSaved === "function") {
@@ -370,20 +459,32 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
 
       onClose();
     } catch (err) {
-      console.error("Failed to update roles", err);
+      console.error(
+        "Failed to update roles",
+        err
+      );
 
-      showStatusToast("Update failed.", "error");
+      showStatusToast(
+        "Update failed.",
+        "error"
+      );
     } finally {
       setSaving(false);
     }
   };
 
   const filteredRoles = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+    const term = searchTerm
+      .trim()
+      .toLowerCase();
 
     if (!term) return roles;
 
-    return roles.filter((r) => r.role_name.toLowerCase().includes(term));
+    return roles.filter((r) =>
+      r.role_name
+        .toLowerCase()
+        .includes(term)
+    );
   }, [roles, searchTerm]);
 
   return (
@@ -401,7 +502,8 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
           <>
             <div className="mb-5">
               <h3 className={Fonts.heading4}>
-                {user?.first_name} {user?.last_name}
+                {user?.first_name}{" "}
+                {user?.last_name}
               </h3>
 
               <p className="mt-1 text-sm text-gray-500">
@@ -412,7 +514,9 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
             <div className="mb-4">
               <SearchInput
                 placeholder="Search roles..."
-                onSearch={(val) => setSearchTerm(val)}
+                onSearch={(val) =>
+                  setSearchTerm(val)
+                }
               />
             </div>
 
@@ -425,8 +529,14 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
                   >
                     <input
                       type="checkbox"
-                      checked={selectedRoleIds.includes(role.role_uuid)}
-                      onChange={() => toggleRole(role.role_uuid)}
+                      checked={selectedRoleIds.includes(
+                        role.role_uuid
+                      )}
+                      onChange={() =>
+                        toggleRole(
+                          role.role_uuid
+                        )
+                      }
                       className="h-4 w-4 accent-[#0A0082]"
                     />
 
@@ -443,7 +553,11 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
             </div>
 
             <div className="flex justify-end gap-3">
-              <Button onClick={onClose} variant="outline" size="small">
+              <Button
+                onClick={onClose}
+                variant="outline"
+                size="small"
+              >
                 Cancel
               </Button>
 

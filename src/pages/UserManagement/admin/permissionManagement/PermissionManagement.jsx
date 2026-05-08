@@ -40,6 +40,7 @@ export default function PermissionManagement() {
   const [selectedPermissionUuids, setSelectedPermissionUuids] = useState([]);
 
   const itemsPerPage = 5;
+
   const token = localStorage.getItem("token");
 
   const axiosInstance = axios.create({
@@ -176,13 +177,6 @@ export default function PermissionManagement() {
     setSelectedGroup("");
   };
 
-  const resetEditForm = () => {
-    setEditingPermission(null);
-    setEditCode("");
-    setEditDescription("");
-    setEditGroup("");
-  };
-
   const handleCreate = async () => {
     if (!validatePermissionCode(newPermission)) return;
     if (!validateDescription(description)) return;
@@ -218,9 +212,11 @@ export default function PermissionManagement() {
 
   const handleEdit = (permission) => {
     setEditingPermission(permission);
+
     setEditCode(permission.permission_code);
     setEditDescription(permission.description || "");
     setEditGroup(permission.group_uuid || "");
+
     setShowModal(true);
   };
 
@@ -251,7 +247,10 @@ export default function PermissionManagement() {
       showSingleToast("Permission updated successfully!", "success");
 
       setShowModal(false);
-      resetEditForm();
+      setEditingPermission(null);
+      setEditCode("");
+      setEditDescription("");
+      setEditGroup("");
 
       await fetchPermissions();
     } catch (err) {
@@ -556,15 +555,13 @@ export default function PermissionManagement() {
               deletion.
             </span>
 
-            <Button
+            <button
               type="button"
-              variant="link"
-              size="small"
               onClick={clearSelectedPermissions}
-              className="text-left text-red-700 underline sm:text-right"
+              className="text-left underline sm:text-right"
             >
               Clear selection
-            </Button>
+            </button>
           </div>
         )}
 
@@ -626,17 +623,15 @@ export default function PermissionManagement() {
                   </div>
 
                   <div className="flex justify-end sm:justify-start">
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="icon"
-                      title="Edit"
-                      aria-label={`Edit ${perm.permission_code}`}
-                      className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+                    <button
                       onClick={() => handleEdit(perm)}
+                      className="rounded-lg p-2 text-[#0A0082] transition hover:bg-[#0A0082]/10"
+                      title="Edit"
+                      type="button"
+                      aria-label={`Edit ${perm.permission_code}`}
                     >
-                      <Pencil size={17} />
-                    </Button>
+                      <Pencil className="h-4 w-4" />
+                    </button>
                   </div>
                 </li>
               ))}
@@ -651,7 +646,9 @@ export default function PermissionManagement() {
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   onNext={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                    setCurrentPage((prev) =>
+                      Math.min(prev + 1, totalPages)
+                    )
                   }
                 />
               </div>
@@ -662,10 +659,7 @@ export default function PermissionManagement() {
 
       <Modal
         isOpen={showModal}
-        onClose={() => {
-          setShowModal(false);
-          resetEditForm();
-        }}
+        onClose={() => setShowModal(false)}
         title="Edit Permission"
         subtitle="Update permission details and group mapping."
         className="!w-full !max-w-2xl"
@@ -707,10 +701,7 @@ export default function PermissionManagement() {
 
           <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <Button
-              onClick={() => {
-                setShowModal(false);
-                resetEditForm();
-              }}
+              onClick={() => setShowModal(false)}
               variant="secondary"
               size="medium"
               disabled={updating}

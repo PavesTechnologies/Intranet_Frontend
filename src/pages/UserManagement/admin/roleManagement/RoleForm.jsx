@@ -58,7 +58,7 @@ export default function RoleForm({
   useEffect(() => {
     const filtered = searchTerm
       ? localRoles.filter((role) =>
-          role.role_name?.toLowerCase().includes(searchTerm.toLowerCase()),
+          role.role_name?.toLowerCase().includes(searchTerm.toLowerCase())
         )
       : localRoles;
 
@@ -69,14 +69,14 @@ export default function RoleForm({
 
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredRoles.length / ITEMS_PER_PAGE),
+    Math.ceil(filteredRoles.length / ITEMS_PER_PAGE)
   );
 
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedRoles = filteredRoles.slice(
     (safeCurrentPage - 1) * ITEMS_PER_PAGE,
-    safeCurrentPage * ITEMS_PER_PAGE,
+    safeCurrentPage * ITEMS_PER_PAGE
   );
 
   useEffect(() => {
@@ -111,13 +111,13 @@ export default function RoleForm({
       if (afterDelete) {
         const filteredAfterDelete = searchTerm
           ? latestRoles.filter((role) =>
-              role.role_name?.toLowerCase().includes(searchTerm.toLowerCase()),
+              role.role_name?.toLowerCase().includes(searchTerm.toLowerCase())
             )
           : latestRoles;
 
         const newTotalPages = Math.max(
           1,
-          Math.ceil(filteredAfterDelete.length / ITEMS_PER_PAGE),
+          Math.ceil(filteredAfterDelete.length / ITEMS_PER_PAGE)
         );
 
         setCurrentPage((prev) => Math.min(prev, newTotalPages));
@@ -141,7 +141,7 @@ export default function RoleForm({
     if (!regex.test(roleName.trim())) {
       showToast(
         "Role name can only contain letters, spaces, hyphens, and underscores",
-        "error",
+        "error"
       );
       return false;
     }
@@ -186,7 +186,7 @@ export default function RoleForm({
     if (MANDATORY_ROLES.includes(editRole.original_name)) {
       showToast(
         `Role '${editRole.original_name}' is mandatory and cannot be renamed`,
-        "error",
+        "error"
       );
       setEditModalOpen(false);
       return;
@@ -197,7 +197,7 @@ export default function RoleForm({
     try {
       const res = await axiosInstance.put(
         `/admin/roles/uuid/${editRole.role_uuid}`,
-        { role_name: editRole.role_name.trim() },
+        { role_name: editRole.role_name.trim() }
       );
 
       if (res.status === 200) {
@@ -225,7 +225,7 @@ export default function RoleForm({
     setSelectedRoleUuids((prev) =>
       prev.includes(roleUuid)
         ? prev.filter((id) => id !== roleUuid)
-        : [...prev, roleUuid],
+        : [...prev, roleUuid]
     );
   };
 
@@ -233,12 +233,12 @@ export default function RoleForm({
     const currentPageUuids = paginatedRoles.map((role) => role.role_uuid);
 
     const allSelected = currentPageUuids.every((id) =>
-      selectedRoleUuids.includes(id),
+      selectedRoleUuids.includes(id)
     );
 
     if (allSelected) {
       setSelectedRoleUuids((prev) =>
-        prev.filter((id) => !currentPageUuids.includes(id)),
+        prev.filter((id) => !currentPageUuids.includes(id))
       );
     } else {
       setSelectedRoleUuids((prev) => [
@@ -273,7 +273,7 @@ export default function RoleForm({
       } else if (deletedCount > 0 && failedRoles.length > 0) {
         showToast(
           `${deletedCount} role(s) deleted. ${failedRoles.length} failed.`,
-          "warning",
+          "warning"
         );
       } else {
         showToast("No roles were deleted.", "error");
@@ -293,7 +293,7 @@ export default function RoleForm({
       } else {
         showToast(
           detail || err?.response?.data?.message || "Failed to delete roles",
-          "error",
+          "error"
         );
       }
     } finally {
@@ -307,7 +307,9 @@ export default function RoleForm({
 
   const isCurrentPageFullySelected =
     paginatedRoles.length > 0 &&
-    paginatedRoles.every((role) => selectedRoleUuids.includes(role.role_uuid));
+    paginatedRoles.every((role) =>
+      selectedRoleUuids.includes(role.role_uuid)
+    );
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -413,9 +415,7 @@ export default function RoleForm({
 
         {selectedRoleUuids.length > 0 && (
           <div className="mb-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              {selectedRoleUuids.length} role(s) selected for deletion.
-            </span>
+            <span>{selectedRoleUuids.length} role(s) selected for deletion.</span>
 
             <button
               type="button"
@@ -488,7 +488,7 @@ export default function RoleForm({
                       </div>
                     </div>
 
-                    {/* <Button
+                    <Button
                       type="button"
                       variant="outline"
                       size="small"
@@ -503,23 +503,6 @@ export default function RoleForm({
                     >
                       <Pencil size={15} />
                       Edit
-                    </Button> */}
-                    {/* Small icon button using shared Button component */}
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="icon"
-                      onClick={() => {
-                        setEditRole({
-                          ...role,
-                          original_name: role.role_name,
-                        });
-                        setEditModalOpen(true);
-                      }}
-                      title="Edit"
-                      className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
-                    >
-                      <Pencil size={17} />
                     </Button>
                   </li>
                 );
