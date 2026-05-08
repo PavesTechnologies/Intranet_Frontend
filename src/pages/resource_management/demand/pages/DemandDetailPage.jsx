@@ -51,6 +51,55 @@ const InfoRow = ({ label, value, icon: Icon, colorClass = "text-slate-900" }) =>
     </div>
 );
 
+const normalizeDemandDetail = (demand = {}) => {
+    const normalizedDemandType =
+        demand.demandType ||
+        demand.type ||
+        demand.demand_type ||
+        demand.type_of_demand;
+
+    const normalizedPriority = demand.demandPriority || demand.priority;
+    const normalizedResourcesRequired = demand.resourceRequired || demand.resourcesRequired || demand.resource_required;
+    const normalizedAllocation = demand.allocation ?? demand.allocationPercentage ?? demand.allocation_percentage;
+    const normalizedStatus = demand.demandStatus || demand.lifecycleState || demand.status;
+
+    return {
+        ...demand,
+        demandType: normalizedDemandType,
+        type: demand.type || normalizedDemandType,
+        demandPriority: normalizedPriority,
+        priority: demand.priority || normalizedPriority,
+        resourceRequired: normalizedResourcesRequired,
+        resourcesRequired: demand.resourcesRequired || normalizedResourcesRequired,
+        allocation: normalizedAllocation,
+        allocationPercentage: demand.allocationPercentage ?? normalizedAllocation,
+        demandStatus: normalizedStatus,
+        lifecycleState: demand.lifecycleState || normalizedStatus,
+        demandCommitment: demand.demandCommitment || demand.commitment || demand.demand_commitment,
+        demandJustification: demand.demandJustification || demand.justification,
+    };
+};
+
+const mergeDemandDetail = (fetchedData, overrideDemand) => {
+    if (!overrideDemand) return normalizeDemandDetail(fetchedData || {});
+
+    const fetched = fetchedData || {};
+    const mergedDemand = normalizeDemandDetail({
+        ...fetched,
+        ...overrideDemand,
+    });
+
+    return {
+        ...fetched,
+        ...mergedDemand,
+        projectInfo: {
+            ...(fetched.projectInfo || {}),
+            ...(overrideDemand.projectInfo || {}),
+            projectName: fetched.projectInfo?.projectName || overrideDemand.projectName,
+        },
+    };
+};
+
 /**
  * --- TAB 1: OVERVIEW ---
  */
@@ -1075,11 +1124,12 @@ const DemandResourcesTab = ({ demandId, demand, user }) => {
     );
 };
 
-const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
+const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialDemand = null }) => {
     const { demandId: urlDemandId } = useParams();
     const demandId = propDemandId || urlDemandId;
     const { state } = useLocation();
     const passedClientName = state?.clientName;
+    const passedDemand = initialDemand || state?.demand;
     const navigate = useNavigate();
     const { user } = useAuth();
 
@@ -1098,15 +1148,20 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack }) => {
             setIsLoading(true);
             try {
                 const result = await demandService.getDemandById(demandId);
-                setData(result);
+                setData(mergeDemandDetail(result, passedDemand));
             } catch (err) {
-                setError(err.message);
+                if (passedDemand) {
+                    setData(mergeDemandDetail(null, passedDemand));
+                    setError(null);
+                } else {
+                    setError(err.message);
+                }
             } finally {
                 setIsLoading(false);
             }
         };
         if (demandId) fetchDetail();
-    }, [demandId]);
+    }, [demandId, passedDemand]);
 
     // Loading & Error States
     if (isLoading) return (

@@ -249,7 +249,7 @@ const AssetDetail = () => {
   }, [formData.projectId]);
 
   const [returnData, setReturnData] = useState({
-    conditionOnReturn: "Good",
+    conditionOnReturn: "",
     returnNotes: "",
   });
   const [clientProjects, setClientProjects] = useState([]);
@@ -410,6 +410,10 @@ const AssetDetail = () => {
 
   const handleReturnSubmit = async (e) => {
     e.preventDefault();
+    if (!returnData.conditionOnReturn) {
+      toast.warning("Please select the condition on return.");
+      return;
+    }
     setReturnLoading(true);
     try {
       const res = await returnAssetAssignment(
@@ -455,6 +459,7 @@ const AssetDetail = () => {
       expectedReturnDate: a.expectedReturnDate || "",
       assignmentStatus: a.assignmentStatus || "ASSIGNED",
       assignedBy: a.assignedBy || getLoggedInUserName(), // 🔥 fallback
+      locationType: a.locationType || "",
       locationDetails: a.locationDetails || "",
       description: a.description || "",
       serialNumber: a.serialNumber || "",
@@ -681,6 +686,10 @@ const AssetDetail = () => {
                           </button>
                           <button
                             onClick={() => {
+                              setReturnData({
+                                conditionOnReturn: "",
+                                returnNotes: "",
+                              });
                               setReturnItem(a);
                               setReturnModal(true);
                             }}
@@ -869,7 +878,7 @@ const AssetDetail = () => {
                   name="assignmentStatus"
                   value={formData.assignmentStatus}
                   onChange={handleFormChange}
-                  options={["ASSIGNED", "REQUESTED", "RETURNED", "REJECTED"]}
+                  options={["ASSIGNED", "REQUESTED", "REJECTED"]}
                 />
                 <Input
                   label="Location"
@@ -885,6 +894,7 @@ const AssetDetail = () => {
                   <select
                     id="locationType"
                     name="locationType"
+                    value={formData.locationType || ""}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
@@ -894,7 +904,7 @@ const AssetDetail = () => {
                     required
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                   >
-                    <option value="" disabled selected>
+                    <option value="" disabled>
                       Select work mode
                     </option>
                     <option value="HYBRID">Hybrid</option>
@@ -975,8 +985,8 @@ const AssetDetail = () => {
                 >
                   <div className="relative">
                     <Listbox.Button className="relative w-full cursor-pointer bg-slate-50 border border-slate-200 rounded-xl py-2 pl-3 pr-10 text-left text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
-                      <span className="block truncate text-slate-700">
-                        {returnData.conditionOnReturn}
+                      <span className={`block truncate ${!returnData.conditionOnReturn ? "text-slate-400 italic" : "text-slate-700"}`}>
+                        {returnData.conditionOnReturn || "Select Condition Type"}
                       </span>
                       <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                         <ChevronDown

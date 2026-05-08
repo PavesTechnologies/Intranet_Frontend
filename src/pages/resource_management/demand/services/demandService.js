@@ -281,6 +281,23 @@ export const demandService = {
       throw error;
     }
   },
+
+  /**
+   * Deletes a demand by Project Manager
+   * @param {string|number} demandId
+   */
+  deleteDemandByPM: async (demandId) => {
+    try {
+      const response = await axios.delete(
+        `${BASE_URL}/api/demand/delete/pm/${demandId}`,
+        getAuthHeader(),
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error in deleteDemandByPM for ID ${demandId}:`, error);
+      throw error;
+    }
+  },
 };
 
 export default demandService;

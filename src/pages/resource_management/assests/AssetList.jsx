@@ -469,6 +469,7 @@ const AssetList = () => {
                       type="number"
                       min="1"
                       defaultValue={editingAsset?.quantity}
+                      onWheel={(e) => e.target.blur()}
                       placeholder="e.g. 10"
                       error={validationErrors.quantity}
                       disabled={isQuantityLocked}

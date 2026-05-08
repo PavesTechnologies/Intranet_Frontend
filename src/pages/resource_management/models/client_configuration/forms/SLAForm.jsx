@@ -43,6 +43,7 @@ const SLAForm = ({ formData, setFormData }) => {
             name="slaDurationDays"
             value={formData.slaDurationDays || ""}
             onChange={handleChange}
+            onWheel={(e) => e.target.blur()}
             placeholder="e.g. 15"
             className="w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
           />
@@ -58,6 +59,7 @@ const SLAForm = ({ formData, setFormData }) => {
             name="warningThresholdDays"
             value={formData.warningThresholdDays || ""}
             onChange={handleChange}
+            onWheel={(e) => e.target.blur()}
             placeholder="e.g. 5"
             className="w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
           />
