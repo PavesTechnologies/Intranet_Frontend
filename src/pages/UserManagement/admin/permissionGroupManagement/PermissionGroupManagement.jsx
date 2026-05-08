@@ -88,11 +88,12 @@ const GroupCard = ({
           <Button
             type="button"
             onClick={() => onEdit(group)}
-            size="small"
-            variant="outline"
-            className="w-full sm:w-auto"
+            size="icon"
+            variant="icon"
+            title="Edit"
+            className="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
           >
-            <Pencil className="h-4 w-4" />
+            <Pencil size={17} />
           </Button>
         </div>
       }
@@ -123,8 +124,8 @@ const PermissionCard = ({ permission, activeAction, isSelected, onSelect }) => (
             isSelected
               ? "success"
               : activeAction === "delete"
-              ? "danger"
-              : "primary"
+                ? "danger"
+                : "primary"
           }
           className="w-full sm:w-auto"
         >
@@ -198,7 +199,10 @@ export default function PermissionGroupManagement() {
       const res = await axiosInstance.get("/admin/permissions/");
       setAllPermissions(res.data || []);
     } catch (err) {
-      showUniqueToast(`Failed to fetch all permissions: ${err.message}`, "error");
+      showUniqueToast(
+        `Failed to fetch all permissions: ${err.message}`,
+        "error",
+      );
     }
   };
 
@@ -206,10 +210,15 @@ export default function PermissionGroupManagement() {
     setLoadingPermissions(true);
 
     try {
-      const res = await axiosInstance.get(`/admin/groups/${groupId}/permissions`);
+      const res = await axiosInstance.get(
+        `/admin/groups/${groupId}/permissions`,
+      );
       setGroupPermissions(res.data || []);
     } catch (err) {
-      showUniqueToast(`Failed to fetch group permissions: ${err.message}`, "error");
+      showUniqueToast(
+        `Failed to fetch group permissions: ${err.message}`,
+        "error",
+      );
       setGroupPermissions([]);
     } finally {
       setLoadingPermissions(false);
@@ -231,7 +240,7 @@ export default function PermissionGroupManagement() {
     if (!term) return groups;
 
     return groups.filter((group) =>
-      group?.group_name?.toLowerCase().includes(term)
+      group?.group_name?.toLowerCase().includes(term),
     );
   }, [groups, groupSearchTerm]);
 
@@ -242,7 +251,7 @@ export default function PermissionGroupManagement() {
       if (permission.permission_code) return permission;
 
       const found = allPermissions.find(
-        (p) => p.permission_uuid === permission.permission_uuid
+        (p) => p.permission_uuid === permission.permission_uuid,
       );
 
       return {
@@ -287,8 +296,8 @@ export default function PermissionGroupManagement() {
     return allPermissions.filter(
       (permission) =>
         !groupPermissions.some(
-          (gp) => gp.permission_uuid === permission.permission_uuid
-        )
+          (gp) => gp.permission_uuid === permission.permission_uuid,
+        ),
     );
   }, [allPermissions, groupPermissions]);
 
@@ -299,15 +308,17 @@ export default function PermissionGroupManagement() {
       list = unassignedPermissions.filter(
         (permission) =>
           !selectedToAdd.some(
-            (selected) => selected.permission_uuid === permission.permission_uuid
-          )
+            (selected) =>
+              selected.permission_uuid === permission.permission_uuid,
+          ),
       );
     } else if (activeAction === "delete") {
       list = enrichWithCode(groupPermissions).filter(
         (permission) =>
           !selectedToRemove.some(
-            (selected) => selected.permission_uuid === permission.permission_uuid
-          )
+            (selected) =>
+              selected.permission_uuid === permission.permission_uuid,
+          ),
       );
     } else {
       list = enrichWithCode(groupPermissions);
@@ -320,7 +331,7 @@ export default function PermissionGroupManagement() {
     return list.filter(
       (permission) =>
         permission.permission_code?.toLowerCase().includes(term) ||
-        permission.description?.toLowerCase().includes(term)
+        permission.description?.toLowerCase().includes(term),
     );
   }, [
     activeAction,
@@ -342,7 +353,7 @@ export default function PermissionGroupManagement() {
       setSelectedToAdd((prev) =>
         prev.some((item) => item.permission_uuid === permissionUuid)
           ? prev.filter((item) => item.permission_uuid !== permissionUuid)
-          : [...prev, permission]
+          : [...prev, permission],
       );
     }
 
@@ -350,7 +361,7 @@ export default function PermissionGroupManagement() {
       setSelectedToRemove((prev) =>
         prev.some((item) => item.permission_uuid === permissionUuid)
           ? prev.filter((item) => item.permission_uuid !== permissionUuid)
-          : [...prev, permission]
+          : [...prev, permission],
       );
     }
   };
@@ -358,11 +369,11 @@ export default function PermissionGroupManagement() {
   const handleRemoveChip = (permissionUuid) => {
     if (activeAction === "add") {
       setSelectedToAdd((prev) =>
-        prev.filter((item) => item.permission_uuid !== permissionUuid)
+        prev.filter((item) => item.permission_uuid !== permissionUuid),
       );
     } else {
       setSelectedToRemove((prev) =>
-        prev.filter((item) => item.permission_uuid !== permissionUuid)
+        prev.filter((item) => item.permission_uuid !== permissionUuid),
       );
     }
   };
@@ -380,22 +391,22 @@ export default function PermissionGroupManagement() {
       if (activeAction === "add") {
         await axiosInstance.post(
           `/admin/groups/${selectedGroup.group_uuid}/permissions`,
-          permissionIds
+          permissionIds,
         );
 
         showUniqueToast(
           `${selectedPermissions.length} permission(s) added successfully.`,
-          "success"
+          "success",
         );
       } else {
         await axiosInstance.delete(
           `/admin/groups/${selectedGroup.group_uuid}/permissions`,
-          { data: permissionIds }
+          { data: permissionIds },
         );
 
         showUniqueToast(
           `${selectedPermissions.length} permission(s) removed successfully.`,
-          "success"
+          "success",
         );
       }
 
@@ -421,7 +432,7 @@ export default function PermissionGroupManagement() {
     if (!validateGroupName(newGroupName)) {
       return showUniqueToast(
         "Group name can only contain letters, spaces, hyphens, and underscores",
-        "error"
+        "error",
       );
     }
 
@@ -462,7 +473,7 @@ export default function PermissionGroupManagement() {
     if (!validateGroupName(editGroupName)) {
       return showUniqueToast(
         "Group name can only contain letters, spaces, hyphens, and underscores",
-        "error"
+        "error",
       );
     }
 
@@ -494,7 +505,7 @@ export default function PermissionGroupManagement() {
     setSelectedGroupUuids((prev) =>
       prev.includes(groupUuid)
         ? prev.filter((id) => id !== groupUuid)
-        : [...prev, groupUuid]
+        : [...prev, groupUuid],
     );
   };
 
@@ -502,12 +513,12 @@ export default function PermissionGroupManagement() {
     const filteredUuids = filteredGroups.map((group) => group.group_uuid);
 
     const allSelected = filteredUuids.every((id) =>
-      selectedGroupUuids.includes(id)
+      selectedGroupUuids.includes(id),
     );
 
     if (allSelected) {
       setSelectedGroupUuids((prev) =>
-        prev.filter((id) => !filteredUuids.includes(id))
+        prev.filter((id) => !filteredUuids.includes(id)),
       );
     } else {
       setSelectedGroupUuids((prev) => [
@@ -530,7 +541,7 @@ export default function PermissionGroupManagement() {
 
       showUniqueToast(
         `${selectedGroupUuids.length} group(s) deleted successfully.`,
-        "success"
+        "success",
       );
 
       setSelectedGroupUuids([]);
@@ -584,7 +595,7 @@ export default function PermissionGroupManagement() {
             <Button
               onClick={() => setShowCreateModal(true)}
               variant="primary"
-              size="small"
+              size="medium"
               className="w-full sm:w-auto"
             >
               <Plus className="h-4 w-4" />
@@ -627,7 +638,7 @@ export default function PermissionGroupManagement() {
                 checked={
                   filteredGroups.length > 0 &&
                   filteredGroups.every((group) =>
-                    selectedGroupUuids.includes(group.group_uuid)
+                    selectedGroupUuids.includes(group.group_uuid),
                   )
                 }
                 onChange={handleSelectAllFiltered}
@@ -742,7 +753,7 @@ export default function PermissionGroupManagement() {
                   renderCard={(permission) => {
                     const isSelected = selectedPermissions.some(
                       (selected) =>
-                        selected.permission_uuid === permission.permission_uuid
+                        selected.permission_uuid === permission.permission_uuid,
                     );
 
                     return (

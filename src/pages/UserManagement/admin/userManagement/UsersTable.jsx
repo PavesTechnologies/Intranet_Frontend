@@ -76,7 +76,7 @@ export default function UsersTable() {
             search: searchTerm,
           },
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
       setUsers(res.data.users || []);
@@ -164,7 +164,7 @@ export default function UsersTable() {
       if (actionType === "deactivate") {
         await axios.delete(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         showStatusToast("User deactivated successfully.", "success");
@@ -172,7 +172,7 @@ export default function UsersTable() {
         await axios.patch(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}/activate`,
           {},
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         showStatusToast("User activated successfully.", "success");
@@ -196,7 +196,7 @@ export default function UsersTable() {
 
     if (user.contact) {
       const phoneNumber = parsePhoneNumberFromString(
-        "+" + user.contact.replace(/\D/g, "")
+        "+" + user.contact.replace(/\D/g, ""),
       );
 
       if (phoneNumber) {
@@ -210,40 +210,43 @@ export default function UsersTable() {
       mail: user.mail || "N/A",
       contact: formattedContact,
       status: (
-        <StatusBadge
-          label={user.is_active ? "Active" : "Inactive"}
-          size="sm"
-        />
+        <StatusBadge label={user.is_active ? "Active" : "Inactive"} size="sm" />
       ),
       actions: (
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
-            onClick={() => handleEditClick(user.user_uuid)}
+            size="icon"
+            variant="icon"
             title="Edit"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 transition hover:bg-blue-50 hover:text-blue-800"
+            className="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+            onClick={() => handleEditClick(user.user_uuid)}
           >
             <Pencil size={17} />
-          </button>
+          </Button>
 
           {user.is_active ? (
-            <button
+            <Button
               type="button"
-              onClick={() => handleToggleClick(user.user_uuid, true)}
+              size="icon"
+              variant="icon"
               title="Deactivate"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-800"
+              className="text-red-600 hover:bg-red-50 hover:text-red-800"
+              onClick={() => handleToggleClick(user.user_uuid, true)}
             >
               <UserX size={17} />
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
-              onClick={() => handleToggleClick(user.user_uuid, false)}
+              size="icon"
+              variant="icon"
               title="Activate"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 transition hover:bg-green-50 hover:text-green-800"
+              className="text-green-600 hover:bg-green-50 hover:text-green-800"
+              onClick={() => handleToggleClick(user.user_uuid, false)}
             >
               <UserCheck size={17} />
-            </button>
+            </Button>
           )}
         </div>
       ),
@@ -305,11 +308,7 @@ export default function UsersTable() {
         </div>
       ) : (
         <>
-          <GenericTable
-            headers={headers}
-            rows={tableData}
-            columns={columns}
-          />
+          <GenericTable headers={headers} rows={tableData} columns={columns} />
 
           {totalPages > 1 && (
             <Pagination
