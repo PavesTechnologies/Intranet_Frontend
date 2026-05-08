@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Save, Trash2, X, CheckCircle, AlertCircle, Edit3, Search, Filter, Download, Upload, RefreshCw, ChevronDown } from 'lucide-react';
+import FilterListbox from '../../components/filter/FilterListbox';
 
 const EnterpriseConfigManager = () => {
   const [activeTab, setActiveTab] = useState('leave');
@@ -137,20 +138,14 @@ const EnterpriseConfigManager = () => {
 
     if (field.type === 'select') {
       return (
-        <div className="relative">
-          <select
-            value={value || ''}
-            onChange={(e) => handleFormChange(field.name, e.target.value)}
-            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none text-slate-700"
-            required={field.required}
-          >
-            <option value="">Select {field.label}</option>
-            {field.options.map(opt => (
-              <option key={opt} value={opt}>{opt.replace(/_/g, ' ')}</option>
-            ))}
-          </select>
-          <ChevronDown className="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" />
-        </div>
+        <FilterListbox
+          options={[
+            { value: '', label: `Select ${field.label}` },
+            ...field.options.map(opt => ({ value: opt, label: opt.replace(/_/g, ' ') })),
+          ]}
+          value={value || ''}
+          onChange={(val) => handleFormChange(field.name, val)}
+        />
       );
     }
 

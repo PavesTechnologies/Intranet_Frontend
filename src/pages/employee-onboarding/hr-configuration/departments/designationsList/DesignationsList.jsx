@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Pencil, Trash } from "lucide-react";
 import { toast } from "react-toastify";
 import Pagination from "../../../../../components/Pagination/pagination";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 export default function DesignationManagement() {
   const [departments, setDepartments] = useState([]);
@@ -142,19 +143,11 @@ export default function DesignationManagement() {
           className="border px-3 py-2 rounded w-64"
         />
 
-        <select
+        <FilterListbox
+          options={[{value:"",label:"All Departments"}, ...departments.map((d) => ({value: d.department_uuid, label: d.department_name}))]}
           value={departmentFilter}
-          onChange={(e) => setDepartmentFilter(e.target.value)}
-          className="border px-3 py-2 rounded"
-        >
-          <option value="">All Departments</option>
-
-          {departments.map((d) => (
-            <option key={d.department_uuid} value={d.department_uuid}>
-              {d.department_name}
-            </option>
-          ))}
-        </select>
+          onChange={setDepartmentFilter}
+        />
       </div>
 
       {/* TABLE */}
@@ -327,19 +320,11 @@ function DesignationModal({ editData, departments, onClose, onSuccess }) {
 
         <label className="block mb-1">Department</label>
 
-        <select
-          className="w-full border px-3 py-2 rounded mb-3"
+        <FilterListbox
+          options={[{value:"",label:"Select Department"}, ...departments.map((d) => ({value: d.department_uuid, label: d.department_name}))]}
           value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-        >
-          <option value="">Select Department</option>
-
-          {departments.map((d) => (
-            <option key={d.department_uuid} value={d.department_uuid}>
-              {d.department_name}
-            </option>
-          ))}
-        </select>
+          onChange={setDepartment}
+        />
 
         <label className="block mb-1">Designation Name</label>
 

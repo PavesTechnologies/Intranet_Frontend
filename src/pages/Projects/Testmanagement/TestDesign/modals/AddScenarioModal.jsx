@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../../api/axiosInstance";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 import { useParams } from "react-router-dom";
 import { showStatusToast } from "../../../../../components/toastfy/toast";
 import Button from "../../../../../components/Button/Button";
@@ -151,18 +152,11 @@ export default function AddScenarioModal({
             <label className="text-sm font-medium text-gray-700 mb-1 block">
               Select Test Plan *
             </label>
-            <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            <FilterListbox
+              options={[{value:"",label:"-- Select Test Plan --"},...testPlans.map(plan=>({value:plan.id,label:plan.title||plan.name||`Plan ${plan.id}`}))]}
               value={testPlanId}
-              onChange={(e) => setTestPlanId(e.target.value)}
-            >
-              <option value="">-- Select Test Plan --</option>
-              {testPlans.map((plan) => (
-                <option key={plan.id} value={plan.id}>
-                  {plan.title || plan.name || `Plan ${plan.id}`}
-                </option>
-              ))}
-            </select>
+              onChange={setTestPlanId}
+            />
           </div>
 
           {/* Linked Story */}
@@ -170,18 +164,11 @@ export default function AddScenarioModal({
             <label className="text-sm font-medium text-gray-700 mb-1 block">
               Link PMS Story (optional)
             </label>
-            <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            <FilterListbox
+              options={[{value:"",label:"-- None --"},...pmsStories.map(story=>({value:story.id,label:story.title}))]}
               value={linkedStoryId}
-              onChange={(e) => setLinkedStoryId(e.target.value)}
-            >
-              <option value="">-- None --</option>
-              {pmsStories.map((story) => (
-                <option key={story.id} value={story.id}>
-                  {story.title}
-                </option>
-              ))}
-            </select>
+              onChange={setLinkedStoryId}
+            />
           </div>
 
           {/* Title */}
@@ -202,16 +189,11 @@ export default function AddScenarioModal({
             <label className="text-sm font-medium text-gray-700 mb-1 block">
               Priority
             </label>
-            <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            <FilterListbox
+              options={[{value:"LOW",label:"LOW"},{value:"MEDIUM",label:"MEDIUM"},{value:"HIGH",label:"HIGH"},{value:"CRITICAL",label:"CRITICAL"}]}
               value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-            >
-              <option value="LOW">LOW</option>
-              <option value="MEDIUM">MEDIUM</option>
-              <option value="HIGH">HIGH</option>
-              <option value="CRITICAL">CRITICAL</option>
-            </select>
+              onChange={setPriority}
+            />
           </div>
 
           {/* Description */}

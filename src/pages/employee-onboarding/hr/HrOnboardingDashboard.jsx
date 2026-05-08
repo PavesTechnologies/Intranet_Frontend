@@ -33,6 +33,7 @@ import JoinModal from "./components/JoinModal";
 import OfferStatusCell from "./components/OfferStatusCell";
 import ReassignJoiningModal from "./components/ReassignJoiningModal";
 import StatCard from "./components/StatCard";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 export default function HrOnboardingDashboard() {
   const navigate = useNavigate();
@@ -758,23 +759,25 @@ export default function HrOnboardingDashboard() {
               />
             </div>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full md:w-48 px-3 py-2 bg-white border border-slate-300 text-slate-900 text-sm rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium"
-            >
-              <option value="ALL">All Status</option>
-              <option value="SUBMITTED">Submitted</option>
-              <option value="VERIFIED">Verified</option>
-              <option value="JOINING">Joining</option>
-              <option value="JOINING_PENDING">Joining Pending</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="RESCHEDULED">Rescheduled</option>
-              <option value="REJECTED">Rejected</option>
-            </select>
+            <div className="w-full md:w-48">
+              <FilterListbox
+                options={[
+                  { value: "ALL", label: "All Status" },
+                  { value: "SUBMITTED", label: "Submitted" },
+                  { value: "VERIFIED", label: "Verified" },
+                  { value: "JOINING", label: "Joining" },
+                  { value: "JOINING_PENDING", label: "Joining Pending" },
+                  { value: "COMPLETED", label: "Completed" },
+                  { value: "RESCHEDULED", label: "Rescheduled" },
+                  { value: "REJECTED", label: "Rejected" },
+                ]}
+                value={statusFilter}
+                onChange={(val) => {
+                  setStatusFilter(val);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-3">

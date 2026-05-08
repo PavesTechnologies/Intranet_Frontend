@@ -8,6 +8,7 @@ import SprintColumn from "./SprintColumn";
 import Button from "../../../../components/Button/Button";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import SprintPendingModal from "./SprintPendingModal";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 const SprintBoard = ({ projectId, projectName }) => {
   const [stories, setStories] = useState([]);
@@ -216,23 +217,22 @@ const SprintBoard = ({ projectId, projectName }) => {
         {/* ===== Filter Dropdown ===== */}
         <div className="flex items-center gap-3">
           <label
-            htmlFor="sprintFilter"
             className="text-base font-medium text-gray-700"
           >
             Filter Sprints:
           </label>
-          <select
-            id="sprintFilter"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="border border-gray-300 rounded-lg px-4 py-3 text-base w-48 
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="ALL">ALL</option>
-            <option value="PLANNING">PLANNING</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="COMPLETED">COMPLETED</option>
-          </select>
+          <div className="w-48">
+            <FilterListbox
+              options={[
+                { value: "ALL", label: "ALL" },
+                { value: "PLANNING", label: "PLANNING" },
+                { value: "ACTIVE", label: "ACTIVE" },
+                { value: "COMPLETED", label: "COMPLETED" },
+              ]}
+              value={filter}
+              onChange={setFilter}
+            />
+          </div>
 
           {/* ✅ Debug Reload Button */}
           {/* <Button

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   ShieldCheck,
   Layers,
@@ -92,25 +93,25 @@ const GroupCard = ({ group, isSelected, activeAction, onSelect }) => {
       renderActions={
         activeAction !== "view"
           ? () => (
-              <div className="mt-3 flex justify-end">
-                <Button
-                  type="button"
-                  size="small"
-                  variant={
-                    isSelected
-                      ? "success"
-                      : activeAction === "delete"
+            <div className="mt-3 flex justify-end">
+              <Button
+                type="button"
+                size="small"
+                variant={
+                  isSelected
+                    ? "success"
+                    : activeAction === "delete"
                       ? "danger"
                       : "primary"
-                  }
-                  onClick={() => onSelect(group)}
-                  className="w-full sm:w-auto"
-                >
-                  {isSelected && <CheckCircle2 className="h-3 w-3" />}
-                  {isSelected ? "Selected" : "Select"}
-                </Button>
-              </div>
-            )
+                }
+                onClick={() => onSelect(group)}
+                className="w-full sm:w-auto"
+              >
+                {isSelected && <CheckCircle2 className="h-3 w-3" />}
+                {isSelected ? "Selected" : "Select"}
+              </Button>
+            </div>
+          )
           : undefined
       }
     />
@@ -440,17 +441,16 @@ const PermissionGroupManagement = ({ roles = [] }) => {
                   />
                 </div>
 
-                <select
+                <FilterListbox
+                  options={modules.map((module) => ({
+                    value: module,
+                    label: module,
+                  }))}
                   value={selectedModule}
-                  onChange={(e) => setSelectedModule(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
-                >
-                  {modules.map((module) => (
-                    <option key={module} value={module}>
-                      {module}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => {
+                    setSelectedModule(val);
+                  }}
+                />
               </div>
             )}
           </div>
@@ -508,11 +508,10 @@ const PermissionGroupManagement = ({ roles = [] }) => {
                 {selectedGroupNames.map((name) => (
                   <span
                     key={name}
-                    className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${
-                      activeAction === "delete"
+                    className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${activeAction === "delete"
                         ? "bg-red-100 text-red-800"
                         : "bg-blue-100 text-blue-800"
-                    }`}
+                      }`}
                   >
                     <span className="max-w-[180px] truncate">{name}</span>
 

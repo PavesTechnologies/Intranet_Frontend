@@ -7,6 +7,7 @@ import React, {
   useEffect,
 } from "react";
 import axios from "axios";
+import FilterListbox from "../../components/filter/FilterListbox";
 import {
   Chart as ChartJS,
   ArcElement,
@@ -1595,27 +1596,17 @@ const ManagerMonthlyReport = () => {
 
               {isFilterOpen && (
                 <div className="report-filters">
-                  <select
+                  <FilterListbox
+                    options={filteredMonths.map((m) => ({ value: m.value, label: m.name }))}
                     value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  >
-                    {filteredMonths.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedMonth}
+                  />
 
-                  <select
+                  <FilterListbox
+                    options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
                     value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  >
-                    {yearOptions.map((y) => (
-                      <option key={y} value={y}>
-                        {y}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedYear}
+                  />
 
                   <button className="apply-btn" onClick={handleFilterApply}>
                     Apply
