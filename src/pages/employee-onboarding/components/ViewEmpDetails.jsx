@@ -50,6 +50,17 @@ const EMP_STYLES = `
   .emp-name   { font-family: "Fraunces", serif; }
 `;
 
+const CURRENCY_OPTIONS = [
+  { label: "INR (₹)", value: "INR", symbol: "₹" },
+  { label: "USD ($)", value: "USD", symbol: "$" },
+  { label: "EUR (€)", value: "EUR", symbol: "€" },
+  { label: "GBP (£)", value: "GBP", symbol: "£" },
+  { label: "AED (د.إ)", value: "AED", symbol: "د.إ" },
+];
+
+const getCurrencySymbol = (code) =>
+  CURRENCY_OPTIONS.find((currency) => currency.value === code)?.symbol || "₹";
+
 (function injectEmpStyles() {
   if (typeof document === "undefined") return;
   if (document.getElementById("emp-details-styles")) return;
@@ -105,7 +116,7 @@ export default function ViewEmpDetails() {
     contact_number: "",
     designation: "",
     employee_type: "",
-    // currency: "",
+    currency: "INR",
     total_ctc: "",
     compensation_components: [],
     cc_emails: "",
@@ -131,6 +142,7 @@ export default function ViewEmpDetails() {
       setEmployee(offerData);
       setEditData({
         ...offerData,
+        currency: offerData.currency || "INR",
         cc_emails:
         offerData?.cc_emails?.join(", ") ||
         "",
@@ -266,6 +278,7 @@ export default function ViewEmpDetails() {
   contact_number: editData.contact_number,
   designation: editData.designation,
   employee_type: editData.employee_type,
+  currency: editData.currency || "INR",
 
   total_ctc: Number(editData.total_ctc || 0),
 
@@ -426,6 +439,7 @@ export default function ViewEmpDetails() {
                 onClick={() => {
                   setEditData({
                     ...employee,
+                    currency: employee.currency || "INR",
                    cc_emails:
                   employee?.cc_emails?.join(", ") ||
                   employee?.cc_mails?.join(", ") ||
@@ -485,7 +499,9 @@ export default function ViewEmpDetails() {
                 {
                   icon: <Wallet size={16} />,
                   label: "Annual CTC",
-                  value: employee.total_ctc ? `₹ ${Number(employee.total_ctc).toLocaleString("en-IN")}` : "—",
+                  value: employee.total_ctc
+                    ? `${getCurrencySymbol(employee.currency)} ${Number(employee.total_ctc).toLocaleString("en-IN")}`
+                    : "—",
                   delay: 240,
                 },
                 { icon: <UserCheck size={16} />, label: "Employee Type", value: employee.employee_type, delay: 300 },
@@ -597,7 +613,7 @@ export default function ViewEmpDetails() {
                   .filter((key) =>
                     [
                       "first_name","middle_name","last_name","mail","country_code",
-                      "contact_number","designation","employee_type","total_ctc","cc_emails",
+                      "contact_number","designation","employee_type","currency","total_ctc","cc_emails",
                     ].includes(key)
                   )
                   .map((key) => (
@@ -617,6 +633,18 @@ export default function ViewEmpDetails() {
                           value={editData[key] || ""}
                           onChange={(val) => setEditData({ ...editData, [key]: val })}
                         />
+                      ) : key === "currency" ? (
+                        <select
+                          value={editData[key] || "INR"}
+                          onChange={(e) => setEditData({ ...editData, [key]: e.target.value })}
+                          className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 ring-0 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
+                        >
+                          {CURRENCY_OPTIONS.map((currency) => (
+                            <option key={currency.value} value={currency.value}>
+                              {currency.label}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
                         <input
                           value={editData[key] || ""}

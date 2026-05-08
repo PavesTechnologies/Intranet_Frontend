@@ -8,9 +8,12 @@ import {
   bugSummaries,
 } from "../api/bugApi";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
+import Pagination from "../../../../components/Pagination/pagination";
+import Button from "../../../../components/Button/Button";
 import axios from "axios";
 import Select from "react-select";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Modal from "../../../../components/Modal/modal";
 
 const BugPage = () => {
   const { projectId } = useParams();
@@ -151,10 +154,10 @@ const BugPage = () => {
           },
         },
       );
-      toast.success("Assignee added successfully");
+      showStatusToast("Assignee added successfully", "success");
       // fetchBugs();
     } catch (err) {
-      toast.error("Failed to add assignee");
+      showStatusToast("Failed to add assignee", "error");
       console.error("Error adding assignee:", err);
     } finally {
       setAssignLoading(false);
@@ -299,60 +302,47 @@ const BugPage = () => {
           </tbody>
         </table>
 
-        {/* Pagination */}
-        <div className="flex justify-between p-4">
-          <button
-            disabled={page === 0}
-            onClick={() => setPage(page - 1)}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-40"
-          >
-            Prev
-          </button>
-          <span className="text-sm">
-            Page {page + 1} of {totalPages}
-          </span>
-          <button
-            disabled={page + 1 >= totalPages}
-            onClick={() => setPage(page + 1)}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
+        <Pagination
+          currentPage={page + 1}
+          totalPages={totalPages}
+          onPrevious={() => setPage((p) => Math.max(p - 1, 0))}
+          onNext={() => setPage((p) => p + 1)}
+        />
       </div>
 
       {/* CREATE BUG MODAL */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center p-4">
-          <div className="bg-white rounded-lg p-6 shadow-xl w-full max-w-2xl">
-            <h3 className="text-xl font-semibold mb-4">Create Bug</h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Form Inputs */}
-              {[
-                "runCaseId",
-                "runCaseStepId",
-                "title",
-                "description",
-                "expected",
-                "actual",
-                "reproductionSteps",
-                "assignedTo",
-              ].map((field) => (
-                <div className="col-span-2" key={field}>
-                  <label className="block text-sm font-medium capitalize">
-                    {field.replace(/([A-Z])/g, " $1")}
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full border rounded px-3 py-2 mt-1"
-                    value={form[field]}
-                    onChange={(e) =>
-                      setForm({ ...form, [field]: e.target.value })
-                    }
-                  />
-                </div>
-              ))}
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Create Bug"
+        className="max-w-2xl"
+      >
+        <div className="grid grid-cols-2 gap-4">
+          {/* Form Inputs */}
+          {[
+            "runCaseId",
+            "runCaseStepId",
+            "title",
+            "description",
+            "expected",
+            "actual",
+            "reproductionSteps",
+            "assignedTo",
+          ].map((field) => (
+            <div className="col-span-2" key={field}>
+              <label className="block text-sm font-medium capitalize">
+                {field.replace(/([A-Z])/g, " $1")}
+              </label>
+              <input
+                type="text"
+                className="w-full border rounded px-3 py-2 mt-1"
+                value={form[field]}
+                onChange={(e) =>
+                  setForm({ ...form, [field]: e.target.value })
+                }
+              />
+            </div>
+          ))}
 
               {/* Severity */}
               <div>
@@ -375,24 +365,16 @@ const BugPage = () => {
               </div>
             </div>
 
-            {/* Button Row */}
-            <div className="flex justify-end mt-6 space-x-3">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-gray-300 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateBug}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow"
-              >
-                Create Bug
-              </button>
-            </div>
-          </div>
+        {/* Button Row */}
+        <div className="flex justify-end mt-6 space-x-3">
+          <Button variant="secondary" onClick={() => setShowModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleCreateBug}>
+            Create Bug
+          </Button>
         </div>
-      )}
+      </Modal>
 
       {selectedBug && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-slate-900/60 backdrop-blur-sm">
@@ -568,15 +550,15 @@ const BugPage = () => {
 
                 {/* Footer */}
                 <div className="flex items-center justify-end pt-2 border-t border-slate-100 mt-2">
-                  <button
+                  <Button
+                    variant="primary"
                     onClick={() => {
                       setSelectedBug(null);
                       setBugDetails(null);
                     }}
-                    className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1 focus:ring-offset-slate-900 transition"
                   >
                     Close
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

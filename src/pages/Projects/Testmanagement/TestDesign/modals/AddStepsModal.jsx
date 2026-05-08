@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../../api/axiosInstance";
-import { X } from "lucide-react";
-import toast from "react-hot-toast"; // ⭐ 1. Imported toast
+import { showStatusToast } from "../../../../../components/toastfy/toast";
+import Button from "../../../../../components/Button/Button";
+import Modal from "../../../../../components/Modal/modal";
 
 // ⭐ Added 'onCreated' to the props
 export default function AddStepsModal({ caseId, onClose, onCreated }) {
@@ -44,8 +45,7 @@ export default function AddStepsModal({ caseId, onClose, onCreated }) {
     );
 
     if (!validSteps.length) {
-      // ⭐ 2. Replaced alert with toast.error
-      toast.error("Please add at least one valid step");
+      showStatusToast("Please add at least one valid step", "error");
       return;
     }
 
@@ -73,35 +73,26 @@ export default function AddStepsModal({ caseId, onClose, onCreated }) {
         updatedSteps,
       );
 
-      // ⭐ 3. Added success toast
-      toast.success("Steps saved successfully!");
+      showStatusToast("Steps saved successfully!", "success");
 
       // Call onCreated instead, so the parent does the silent background update!
       if (onCreated) onCreated();
       onClose();
     } catch (err) {
       console.error("Failed to save steps", err);
-      // ⭐ 4. Replaced alert with toast.error
-      toast.error("Failed to add steps");
+      showStatusToast("Failed to add steps", "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white w-[600px] p-6 rounded-xl shadow-lg max-h-[80vh] overflow-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-5">
-          <h2 className="text-lg font-semibold text-gray-800">Add Steps</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Add Steps"
+      className="max-w-[600px]"
+    >
         <div className="space-y-4">
           <div className="flex justify-between items-center border-b pb-2">
             <label className="text-sm font-medium text-gray-700">
@@ -154,22 +145,10 @@ export default function AddStepsModal({ caseId, onClose, onCreated }) {
 
         {/* Footer */}
         <div className="flex justify-end gap-3 pt-4 border-t mt-6">
-          <button
-            className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-            onClick={onClose}
-          >
-            Cancel
-          </button>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
 
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className={`px-4 py-2 bg-blue-600 text-white rounded-lg transition-colors ${loading ? "opacity-70 cursor-not-allowed" : "hover:bg-blue-700"}`}
-          >
-            {loading ? "Saving..." : "Save Steps"}
-          </button>
+          <Button variant="primary" onClick={handleSave} disabled={loading} loading={loading} loadingText="Saving...">Save Steps</Button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

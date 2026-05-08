@@ -4,10 +4,13 @@ import CreateTestCycleForm from "./CreateCycle";
 import CreateTestRunForm from "./CreateRun";
 import RunListForCycle from "./RunListForCycle";
 import { useParams } from "react-router-dom";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import StatusBadge from "../../../../components/status/statusbadge";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
+import SearchInput from "../../../../components/filter/Searchbar";
+import Button from "../../../../components/Button/Button";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 
 export default function TestExecution() {
   const { projectId } = useParams();
@@ -27,6 +30,8 @@ export default function TestExecution() {
   const [runsRefreshKey, setRunsRefreshKey] = useState(0);
   const [openDropdownId, setOpenDropdownId] = useState(null);
   const [cycleName, setCycleName] = useState("");
+  const [deleteCycleConfirmOpen, setDeleteCycleConfirmOpen] = useState(false);
+  const [cycleIdToDelete, setCycleIdToDelete] = useState(null);
 
   useEffect(() => {
     const selectedCycle = cycles.find(c => c.id === selectedCycleId);
@@ -39,11 +44,11 @@ const executeDeleteCycle = async (cycleId) => {
       // Make sure this URL matches your backend endpoint for deleting a cycle
       await axiosInstance.delete(`/test-execution/test-cycles/${cycleId}`);
       
-      toast.success("Cycle deleted successfully!");
+      showStatusToast("Cycle deleted successfully!", "success");
       loadCycles(); // Refresh the list so the deleted cycle disappears
     } catch (err) {
       console.error("Failed to delete cycle:", err);
-      toast.error("Failed to delete cycle.");
+      showStatusToast("Failed to delete cycle.", "error");
     }
   };
   // ── Close dropdown on outside click ──────────────────────────────────────
@@ -84,7 +89,7 @@ const executeDeleteCycle = async (cycleId) => {
       }
     } catch (err) {
       console.error("Error loading cycles:", err);
-      toast.error("Failed to load cycles");
+      showStatusToast("Failed to load cycles", "error");
     } finally {
       setLoadingCycles(false);
     }
@@ -103,42 +108,10 @@ const executeDeleteCycle = async (cycleId) => {
   });
 
   // ── Delete ────────────────────────────────────────────────────────────────
- const handleDeleteCycle = (cycleId) => {
-  toast.warn(
-    ({ closeToast }) => (
-      <div>
-        <p className="text-sm font-medium text-gray-800 mb-3">
-          Are you sure you want to delete this cycle? All test runs inside it will also be deleted.
-        </p>
-        <div className="flex justify-end space-x-2">
-          <button
-            onClick={closeToast}
-            className="px-3 py-1.5 text-xs font-medium bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              executeDeleteCycle(cycleId);
-              closeToast();
-            }}
-            className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700 transition"
-          >
-            Yes, Delete
-          </button>
-        </div>
-      </div>
-    ),
-    {
-      // Toast configuration for confirmations
-      position: "top-center",
-      autoClose: false, // Keep open until user clicks an option
-      closeOnClick: false,
-      draggable: false,
-      closeButton: false, // Hide the default 'x' so they use our buttons
-    }
-  );
-};
+  const handleDeleteCycle = (cycleId) => {
+    setCycleIdToDelete(cycleId);
+    setDeleteCycleConfirmOpen(true);
+  };
   // ── Edit ──────────────────────────────────────────────────────────────────
   const handleEditClick = (e, cycle) => {
     e.stopPropagation();
@@ -151,7 +124,7 @@ const executeDeleteCycle = async (cycleId) => {
     setShowEditModal(false);
     setEditingCycle(null);
     loadCycles();
-    toast.success("Cycle updated successfully");
+    showStatusToast("Cycle updated successfully", "success");
   };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -177,34 +150,24 @@ const executeDeleteCycle = async (cycleId) => {
 
         {showCyclesView ? (
           <div className="flex items-center gap-4">
-            <input
-              type="text"
+            <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search cycles by name or status..."
-              className="px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 w-64 outline-none"
+              className="w-64"
             />
-            <button
-              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-              onClick={() => setShowCycleModal(true)}
-            >
+            <Button variant="primary" onClick={() => setShowCycleModal(true)}>
               + Create Cycle
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="flex items-center gap-4">
-            <button
-              className="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
-              onClick={() => setShowCyclesView(true)}
-            >
+            <Button variant="secondary" onClick={() => setShowCyclesView(true)}>
               ← Back to Cycles
-            </button>
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              onClick={() => setShowRunModal(true)}
-            >
+            </Button>
+            <Button variant="primary" onClick={() => setShowRunModal(true)}>
               + Create Run
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -284,8 +247,9 @@ const executeDeleteCycle = async (cycleId) => {
               {/* ROW 3 — status + create run */}
               <div className="flex justify-between items-center mt-6">
                 <StatusBadge label={cycle.status} />
-                <button
-                  className="bg-blue-600 text-white px-4 py-1 text-sm rounded hover:bg-blue-700"
+                <Button
+                  variant="primary"
+                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedCycleId(cycle.id);
@@ -293,7 +257,7 @@ const executeDeleteCycle = async (cycleId) => {
                   }}
                 >
                   + Create Run
-                </button>
+                </Button>
               </div>
             </div>
           ))}
@@ -306,6 +270,17 @@ const executeDeleteCycle = async (cycleId) => {
           refreshKey={runsRefreshKey}
         />
       )}
+
+      {/* DELETE CYCLE CONFIRMATION */}
+      <ConfirmationModal
+        isOpen={deleteCycleConfirmOpen}
+        title="Delete Cycle"
+        message="Are you sure you want to delete this cycle? All test runs inside it will also be deleted."
+        onConfirm={() => { executeDeleteCycle(cycleIdToDelete); setDeleteCycleConfirmOpen(false); setCycleIdToDelete(null); }}
+        onCancel={() => { setDeleteCycleConfirmOpen(false); setCycleIdToDelete(null); }}
+        confirmText="Delete"
+        variant="danger"
+      />
 
       {/* CREATE CYCLE MODAL */}
       {showCycleModal && (

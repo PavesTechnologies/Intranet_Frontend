@@ -12,9 +12,11 @@ import {
   Trash2,
 } from "lucide-react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 
+import Button from "../../../../components/Button/Button";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
 import AddMitigationForm from "./AddMitigationForm";
 import MitigationList from "./MitigationList";
 import CreateRiskModal from "./createRiskModal";
@@ -40,6 +42,7 @@ export default function RiskDetailModal({
 
   const [showEdit, setShowEdit] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
@@ -155,7 +158,7 @@ export default function RiskDetailModal({
       setEditingStatus(true);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load risk statuses");
+      showStatusToast("Failed to load risk statuses", "error");
     }
   }
 
@@ -171,11 +174,11 @@ export default function RiskDetailModal({
       setStatus(updated || null);
       setEditingStatus(false);
 
-      toast.success("Risk status updated successfully");
+      showStatusToast("Risk status updated successfully", "success");
       onUpdated?.();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to update risk status");
+      showStatusToast("Failed to update risk status", "error");
     }
   }
 
@@ -187,57 +190,19 @@ export default function RiskDetailModal({
         headers,
       });
 
-      toast.success("Risk deleted successfully");
+      showStatusToast("Risk deleted successfully", "success");
       onUpdated?.();
       onClose?.();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to delete risk");
+      showStatusToast("Failed to delete risk", "error");
     } finally {
       setDeleting(false);
     }
   }
 
   function handleDeleteRisk() {
-    const ConfirmToast = ({ closeToast }) => (
-      <div className="flex flex-col gap-3 py-1">
-        <p className="text-sm text-gray-800 font-medium">
-          Are you sure you want to delete this risk?
-        </p>
-
-        <p className="text-xs text-gray-500">
-          This action cannot be undone.
-        </p>
-
-        <div className="flex justify-end gap-2 mt-1">
-          <button
-            onClick={closeToast}
-            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-200 transition-colors"
-          >
-            Cancel
-          </button>
-
-          <button
-            onClick={() => {
-              executeDeleteRisk();
-              closeToast();
-            }}
-            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    );
-
-    toast.warn(<ConfirmToast />, {
-      position: "top-center",
-      autoClose: false,
-      closeOnClick: false,
-      draggable: false,
-      closeButton: false,
-      icon: false,
-    });
+    setDeleteConfirmOpen(true);
   }
 
   function handleCreated(plan) {
@@ -295,7 +260,6 @@ export default function RiskDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center sm:justify-center">
-      <ToastContainer position="top-right" autoClose={3000} />
 
       <div
         className="
@@ -385,29 +349,7 @@ export default function RiskDetailModal({
         />
 
         <div className="flex-1 overflow-y-auto">
-          {loading && (
-            <div className="flex items-center justify-center py-12">
-              <svg
-                className="animate-spin w-6 h-6 text-indigo-500"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v8z"
-                />
-              </svg>
-            </div>
-          )}
+          {loading && <LoadingSpinner size="md" text="Loading…" />}
 
           {error && (
             <div className="mx-4 sm:mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
@@ -552,21 +494,19 @@ export default function RiskDetailModal({
         </div>
 
         <div className="border-t border-slate-100 bg-slate-50/60 px-4 sm:px-6 py-3 flex justify-between items-center flex-shrink-0">
-          <button
+          <Button
+            variant="danger"
+            size="medium"
             onClick={handleDeleteRisk}
             disabled={deleting}
-            className="px-4 py-2 rounded-xl border border-red-200 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-60 flex items-center gap-2"
+            loading={deleting}
+            loadingText="Deleting..."
           >
-            <Trash2 size={14} />
-            {deleting ? "Deleting..." : "Delete Risk"}
-          </button>
-
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-white transition-colors"
-          >
+            <Trash2 size={14} /> Delete Risk
+          </Button>
+          <Button variant="outline" size="medium" onClick={onClose}>
             Close
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -582,6 +522,17 @@ export default function RiskDetailModal({
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={deleteConfirmOpen}
+        title="Delete Risk"
+        message="Are you sure you want to delete this risk? This action cannot be undone."
+        onConfirm={() => { setDeleteConfirmOpen(false); executeDeleteRisk(); }}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        confirmText="Delete"
+        variant="danger"
+        isLoading={deleting}
+      />
     </div>
   );
 }

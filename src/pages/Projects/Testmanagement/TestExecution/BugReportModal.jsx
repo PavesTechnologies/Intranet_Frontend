@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import axiosInstance from "../api/axiosInstance";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import Select from "react-select";
+import Button from "../../../../components/Button/Button";
 
 export default function BugReportModal({ step, runCaseId, onClose }) {
   const [title, setTitle] = useState("");
@@ -53,10 +54,10 @@ export default function BugReportModal({ step, runCaseId, onClose }) {
         },
       );
 
-      toast.success("Bug created successfully!");
+      showStatusToast("Bug created successfully!", "success");
       onClose();
     } catch (err) {
-      toast.error("Failed to create bug");
+      showStatusToast("Failed to create bug", "error");
     }
   };
 
@@ -177,19 +178,9 @@ export default function BugReportModal({ step, runCaseId, onClose }) {
 
         {/* FOOTER */}
         <div className="flex justify-end gap-3 px-5 py-3 border-t bg-gray-50">
-          <button
-            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-200"
-            onClick={onClose}
-          >
-            Cancel
-          </button>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
 
-          <button
-            className="px-5 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 shadow-md"
-            onClick={submitBug}
-          >
-            Submit Bug
-          </button>
+          <Button variant="danger" onClick={submitBug}>Submit Bug</Button>
         </div>
       </div>
     </div>

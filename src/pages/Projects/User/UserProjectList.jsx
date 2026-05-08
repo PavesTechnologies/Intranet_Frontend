@@ -10,9 +10,11 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../components/toastfy/toast";
+import SearchInput from "../../../components/filter/Searchbar";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import FilterListbox from "../../../components/filter/FilterListbox";
 
 const ProjectList = () => {
@@ -26,6 +28,8 @@ const ProjectList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [projectsPerPage] = useState(5);
+  const [deleteProjectConfirmOpen, setDeleteProjectConfirmOpen] = useState(false);
+  const [projectIdToDelete, setProjectIdToDelete] = useState(null);
 
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
@@ -98,9 +102,9 @@ const ProjectList = () => {
     const { name, value } = e.target;
 
     if (formData.status === "ARCHIVED" && name !== "status") {
-      toast.warn(
+      showStatusToast(
         "Archived projects can only have their status changed to ACTIVE.",
-        { position: "top-right" },
+        "warn",
       );
       return;
     }
@@ -114,9 +118,9 @@ const ProjectList = () => {
 
   const handleMemberToggle = (userId) => {
     if (formData.status === "ARCHIVED") {
-      toast.warn(
+      showStatusToast(
         "Archived projects can only have their status changed to ACTIVE.",
-        { position: "top-right" },
+        "warn",
       );
       return;
     }
@@ -140,7 +144,7 @@ const ProjectList = () => {
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success("Project updated successfully!", { position: "top-right" });
+      showStatusToast("Project updated successfully!", "success");
       setEditingProjectId(null);
       fetchProjects();
     } catch (err) {
@@ -150,18 +154,24 @@ const ProjectList = () => {
     }
   };
 
-  const handleDelete = async (projectId) => {
-    if (!window.confirm("Are you sure you want to delete this project?"))
-      return;
+  const handleDelete = (projectId) => {
+    setProjectIdToDelete(projectId);
+    setDeleteProjectConfirmOpen(true);
+  };
+
+  const executeDeleteProject = async () => {
     try {
       await axios.delete(
-        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectIdToDelete}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success("Project deleted successfully!", { position: "top-right" });
+      showStatusToast("Project deleted successfully!", "success");
       fetchProjects();
     } catch (err) {
       console.error("Failed to delete project", err);
+    } finally {
+      setDeleteProjectConfirmOpen(false);
+      setProjectIdToDelete(null);
     }
   };
 
@@ -181,21 +191,29 @@ const ProjectList = () => {
   const totalPages = Math.ceil(filteredProjects.length / projectsPerPage);
 
   return (
+    <>
+    <ConfirmationModal
+      isOpen={deleteProjectConfirmOpen}
+      title="Delete Project"
+      message="Are you sure you want to delete this project? This action cannot be undone."
+      onConfirm={executeDeleteProject}
+      onCancel={() => { setDeleteProjectConfirmOpen(false); setProjectIdToDelete(null); }}
+      confirmText="Delete"
+      variant="danger"
+    />
     <div className="p-6 bg-gray-50 min-h-screen">
       <h1 className="text-2xl font-bold text-black mb-6">Projects</h1>
 
       <div className="flex justify-between items-center mb-6">
-        <input
-          type="text"
-          placeholder="Search by name or key"
-          className="border px-3 py-2 rounded-xl"
+        <SearchInput
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search by name or key"
         />
       </div>
 
       {loading ? (
-        <p className="text-gray-600">Loading projects...</p>
+        <LoadingSpinner size="md" text="Loading projects..." />
       ) : currentProjects.length === 0 ? (
         <p className="text-gray-600">No projects found.</p>
       ) : (
@@ -374,8 +392,8 @@ const ProjectList = () => {
         />
       )}
 
-      <ToastContainer position="top-right" />
     </div>
+    </>
   );
 };
 

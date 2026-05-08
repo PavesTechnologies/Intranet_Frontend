@@ -1,6 +1,8 @@
 // ProjectStatusReport.jsx
 import React, { useMemo, useRef, useState } from 'react';
 import FilterListbox from '../../../components/filter/FilterListbox';
+import Button from '../../../components/Button/Button';
+import StatusBadge from '../../../components/status/statusbadge';
 import {
   PieChart,
   Pie,
@@ -131,18 +133,12 @@ export default function ProjectStatusReport({ projectData }) {
             Project Status Report — {projectData.project.name}
           </h1>
           <div className="flex gap-2">
-            <button
-              onClick={downloadCSV}
-              className="px-3 py-2 rounded shadow-sm border hover:bg-gray-100"
-            >
+            <Button variant="secondary" onClick={downloadCSV}>
               Download CSV
-            </button>
-            <button
-              onClick={downloadPDF}
-              className="px-3 py-2 rounded bg-indigo-600 text-white shadow-sm hover:opacity-90"
-            >
+            </Button>
+            <Button variant="primary" onClick={downloadPDF}>
               Download PDF
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -334,7 +330,7 @@ export default function ProjectStatusReport({ projectData }) {
                       <td className="px-3 py-2">{i.assignee?.name || i.assignee || '-'}</td>
                       <td className="px-3 py-2">{i.type ?? '-'}</td>
                       <td className="px-3 py-2">
-                        <StatusBadge status={i.status} />
+                        <StatusBadge label={i.status} size="sm" />
                       </td>
                       <td className="px-3 py-2 text-right">{i.storyPoints ?? '-'}</td>
                       <td className="px-3 py-2 text-right">{i.estimate ?? '-'}</td>
@@ -355,15 +351,3 @@ export default function ProjectStatusReport({ projectData }) {
   );
 }
 
-function StatusBadge({ status }) {
-  const map = {
-    DONE: 'bg-green-100 text-green-700',
-    IN_PROGRESS: 'bg-yellow-100 text-yellow-700',
-    TODO: 'bg-gray-100 text-gray-700',
-  };
-  return (
-    <span className={`px-2 py-1 rounded text-xs ${map[status] || 'bg-gray-100 text-gray-700'}`}>
-      {status?.replace('_', ' ')}
-    </span>
-  );
-}

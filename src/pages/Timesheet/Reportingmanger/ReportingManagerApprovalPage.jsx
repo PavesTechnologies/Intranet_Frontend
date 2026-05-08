@@ -37,13 +37,27 @@ const ReportingManagerApprovalPage = () => {
         },
       );
 
-      if (!response.ok) throw new Error("Failed to fetch timesheets");
+      // Read body once — Spring error responses carry `message`, success carries the data.
+      const payload = await response.json().catch(() => null);
 
-      const data = await response.json();
-      setGroupedTimesheets(data);
-      setLoading(false);
+      if (!response.ok) {
+        const message =
+          payload?.message ||
+          payload?.error ||
+          `Failed to fetch timesheets (${response.status})`;
+        showStatusToast(message, "error");
+        setGroupedTimesheets([]);
+        return;
+      }
+
+      setGroupedTimesheets(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error("Error fetching timesheets:", error);
+      showStatusToast(
+        error?.message || "Failed to fetch timesheets",
+        "error",
+      );
+    } finally {
       setLoading(false);
     }
   };

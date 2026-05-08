@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { X, AlertTriangle, ShieldCheck, Info, TrendingUp } from "lucide-react";
+import Button from "../../../../components/Button/Button";
 
 const RISK_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
@@ -283,45 +284,20 @@ const RiskHealthModal = ({ projectId, open, onClose }) => {
               : "Matches system recommendation"}
           </span>
           <div className="flex gap-2 w-full sm:w-auto">
-            <button
-              onClick={onClose}
-              className="flex-1 sm:flex-none px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-white transition-colors"
-            >
+            <Button variant="outline" size="medium" onClick={onClose} className="flex-1 sm:flex-none">
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
+              size="medium"
               onClick={updateRiskLevel}
               disabled={loading || isNoChange}
-              className="flex-1 sm:flex-none px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold
-                hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+              loading={loading}
+              loadingText="Updating…"
+              className="flex-1 sm:flex-none"
             >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg
-                    className="animate-spin w-3.5 h-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v8z"
-                    />
-                  </svg>
-                  Updating…
-                </span>
-              ) : (
-                "Apply Risk Level"
-              )}
-            </button>
+              Apply Risk Level
+            </Button>
           </div>
         </div>
       </div>

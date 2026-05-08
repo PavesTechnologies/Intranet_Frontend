@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axiosInstance from "../api/axiosInstance";
 import FilterListbox from "../../../../components/filter/FilterListbox";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Button from "../../../../components/Button/Button";
 
 export default function CreateTestCycleForm({
   projectId,
@@ -85,7 +86,7 @@ export default function CreateTestCycleForm({
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.cycleType || !form.startDate) {
-      toast.error("Please fill all required fields");
+      showStatusToast("Please fill all required fields", "error");
       return;
     }
 
@@ -106,21 +107,22 @@ export default function CreateTestCycleForm({
           `/test-execution/test-cycles/${editingCycle.id}`, // ✅ correct
           payload
         );
-        toast.success("Test Cycle Updated Successfully!");
+        showStatusToast("Test Cycle Updated Successfully!", "success");
       } else {
         await axiosInstance.post(
           `/test-execution/test-cycles`, // ✅ correct
           payload
         );
-        toast.success("Test Cycle Created Successfully!");
+        showStatusToast("Test Cycle Created Successfully!", "success");
       }
       onSuccess && onSuccess();
     } catch (error) {
       console.error(error);
-      toast.error(
+      showStatusToast(
         isEditMode
           ? "Failed to update test cycle"
-          : "Failed to create test cycle"
+          : "Failed to create test cycle",
+        "error"
       );
     } finally {
       setLoading(false);
@@ -223,19 +225,16 @@ export default function CreateTestCycleForm({
 
         {/* Submit */}
         <div className="md:col-span-2">
-          <button
+          <Button
             type="submit"
+            variant="primary"
+            className="w-full"
             disabled={loading}
-            className="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:opacity-60 transition"
+            loading={loading}
+            loadingText={isEditMode ? "Updating..." : "Creating..."}
           >
-            {loading
-              ? isEditMode
-                ? "Updating..."
-                : "Creating..."
-              : isEditMode
-              ? "Update Cycle"
-              : "Create Cycle"}
-          </button>
+            {isEditMode ? "Update Cycle" : "Create Cycle"}
+          </Button>
         </div>
       </form>
     </div>

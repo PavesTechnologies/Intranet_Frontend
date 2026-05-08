@@ -6,8 +6,7 @@ import StoryCard from "./StoryCard";
 import CreateSprintModal from "./CreateSprintModal";
 import SprintColumn from "./SprintColumn";
 import Button from "../../../../components/Button/Button";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import SprintPendingModal from "./SprintPendingModal";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 
@@ -51,7 +50,7 @@ const SprintBoard = ({ projectId, projectName }) => {
         "❌ Failed to load stories:",
         err.response?.data || err.message,
       );
-      toast.error("Failed to load stories. Check console for details.");
+      showStatusToast("Failed to load stories. Check console for details.", "error");
       setStories([]);
     }
   };
@@ -79,7 +78,7 @@ const SprintBoard = ({ projectId, projectName }) => {
         "❌ Failed to load sprints:",
         err.response?.data || err.message,
       );
-      toast.error("Failed to load sprints. Check console for details.");
+      showStatusToast("Failed to load sprints. Check console for details.", "error");
       setSprints([]);
     }
   };
@@ -94,14 +93,14 @@ const SprintBoard = ({ projectId, projectName }) => {
         { sprintId },
         { headers },
       );
-      toast.success("Story assigned to sprint successfully!");
+      showStatusToast("Story assigned to sprint successfully!", "success");
       await fetchStories();
     } catch (err) {
       console.error(
         "Error assigning story to sprint:",
         err.response?.data || err.message,
       );
-      toast.error("Failed to assign story to sprint.");
+      showStatusToast("Failed to assign story to sprint.", "error");
     }
   };
 
@@ -115,7 +114,7 @@ const SprintBoard = ({ projectId, projectName }) => {
               {},
               { headers },
           );
-          toast.success(`Sprint ${action} successful`);  // no containerId
+          showStatusToast(`Sprint ${action} successful`, "success");
           fetchStories();
           fetchSprints();
 
@@ -154,9 +153,9 @@ const SprintBoard = ({ projectId, projectName }) => {
 
           // Check 3 — another active sprint
           if (errorData.message?.toLowerCase().includes("another active sprint")) {
-              toast.warn(
+              showStatusToast(
                   "Cannot start sprint: Another active sprint already exists in this project.",
-                  { autoClose: 3000 }  // ← no containerId
+                  "warn"
               );
               fetchSprints();
               return;
@@ -167,19 +166,19 @@ const SprintBoard = ({ projectId, projectName }) => {
               errorData.message?.toLowerCase().includes("empty sprint") ||
               errorData.message?.toLowerCase().includes("at least one task or story")
           ) {
-              toast.warn(errorData.message, { autoClose: 3000 });
+              showStatusToast(errorData.message, "warn");
               return;
           }
 
           // ✅ Check 5 — epic not assigned
           if (errorData.message?.toLowerCase().includes("epic")) {
-              toast.warn(errorData.message, { autoClose: 3000 });
+              showStatusToast(errorData.message, "warn");
               return;
           }
 
           // Fallback — no containerId
           const errorMsg = errorData.message || error.message || "Operation failed";
-          toast.error(errorMsg, { autoClose: 2000 });  // ← no containerId
+          showStatusToast(errorMsg, "error");
       }
   };
   /** ==============================
