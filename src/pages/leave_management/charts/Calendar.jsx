@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 const token = localStorage.getItem("token");
 
@@ -98,30 +99,18 @@ export default function Calendar() {
 
         <div className="flex items-center space-x-3">
           {/* Month Selector */}
-          <select
+          <FilterListbox
+            options={months.map((month, index) => ({ value: index, label: month }))}
             value={currentMonth}
-            onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
-            className="appearance-none bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 cursor-pointer transition"
-          >
-            {months.map((month, index) => (
-              <option key={month} value={index}>
-                {month}
-              </option>
-            ))}
-          </select>
+            onChange={setCurrentMonth}
+          />
 
           {/* Year Selector */}
-          <select
+          <FilterListbox
+            options={yearOptions.map((year) => ({ value: year, label: String(year) }))}
             value={currentYear}
-            onChange={(e) => setCurrentYear(parseInt(e.target.value))}
-            className="appearance-none bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 cursor-pointer transition"
-          >
-            {yearOptions.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
+            onChange={setCurrentYear}
+          />
         </div>
 
         <button

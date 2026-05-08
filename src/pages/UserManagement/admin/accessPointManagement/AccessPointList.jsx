@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   listAccessPoints,
   deleteAccessPoint,
@@ -537,18 +538,17 @@ function AccessPointEditModal({ accessUuid, onClose, onUpdated }) {
                   Method <span className="text-red-500">*</span>
                 </label>
 
-                <select
-                  name="method"
+                <FilterListbox
+                  options={[
+                    { value: "GET", label: "GET" },
+                    { value: "POST", label: "POST" },
+                    { value: "PUT", label: "PUT" },
+                    { value: "DELETE", label: "DELETE" },
+                    { value: "PATCH", label: "PATCH" },
+                  ]}
                   value={form.method}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 p-2 rounded-lg focus:ring focus:ring-blue-300 focus:border-blue-500"
-                >
-                  <option value="GET">GET</option>
-                  <option value="POST">POST</option>
-                  <option value="PUT">PUT</option>
-                  <option value="DELETE">DELETE</option>
-                  <option value="PATCH">PATCH</option>
-                </select>
+                  onChange={(val) => handleChange({ target: { name: "method", value: val } })}
+                />
               </div>
 
               <div>
@@ -556,20 +556,14 @@ function AccessPointEditModal({ accessUuid, onClose, onUpdated }) {
                   Module <span className="text-red-500">*</span>
                 </label>
 
-                <select
-                  name="module"
+                <FilterListbox
+                  options={[
+                    { value: "", label: "Select Module" },
+                    ...modules.map((mod) => ({ value: mod, label: mod })),
+                  ]}
                   value={form.module}
-                  onChange={handleChange}
-                  required
-                  className="w-full border border-gray-300 p-2 rounded-lg focus:ring focus:ring-blue-300 focus:border-blue-500"
-                >
-                  <option value="">Select Module</option>
-                  {modules.map((mod, idx) => (
-                    <option key={idx} value={mod}>
-                      {mod}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => handleChange({ target: { name: "module", value: val } })}
+                />
               </div>
 
               <div className="flex items-center space-x-2">

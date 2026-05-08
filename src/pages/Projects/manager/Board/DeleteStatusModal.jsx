@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 /* -------------------
   Delete Status Modal
@@ -65,18 +66,11 @@ export const DeleteStatusModal = ({
             <div className="text-xs text-gray-500">
               Move existing work items to
             </div>
-            <select
+            <FilterListbox
+              options={[{value:"",label:"-- Select destination status --"},...otherStatuses.map(s=>({value:s.id,label:s.name??s.statusName}))]}
               value={selectedNewStatus}
-              onChange={(e) => setSelectedNewStatus(e.target.value)}
-              className="w-full mt-2 border rounded px-3 py-2"
-            >
-              <option value="">-- Select destination status --</option>
-              {otherStatuses.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name ?? s.statusName}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedNewStatus}
+            />
           </div>
         </div>
 

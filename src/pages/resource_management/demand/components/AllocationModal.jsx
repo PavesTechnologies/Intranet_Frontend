@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { X, Calendar, User, Percent, Activity, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -303,23 +304,14 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                         </label>
                         {isBenchMode && !demand ? (
                             <div className="relative">
-                                <select
+                                <FilterListbox
+                                    options={[
+                                        { value: "", label: "Select a demand..." },
+                                        ...availableBenchDemands.map((d, i) => ({ value: d.demandId || d.id || i, label: d.demandName || "Unnamed Demand" }))
+                                    ]}
                                     value={formData.demandId}
-                                    onChange={handleDemandChange}
-                                    className={cn("bg-white border-slate-200 font-bold text-slate-900 h-10 w-full rounded-xl focus-visible:ring-2 focus-visible:ring-indigo-500 pl-4 text-xs appearance-none cursor-pointer", errors.demandId && "border-rose-500")}
-                                >
-                                    <option value="" disabled>Select a demand...</option>
-                                    {availableBenchDemands.map((d, i) => (
-                                        <option key={d.demandId || d.id || i} value={d.demandId || d.id}>
-                                            {d.demandName || "Unnamed Demand"}
-                                        </option>
-                                    ))}
-                                </select>
-                                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                                    </svg>
-                                </span>
+                                    onChange={(val) => handleDemandChange({ target: { value: val } })}
+                                />
                             </div>
                         ) : (
                             <Input
@@ -488,24 +480,16 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                                 <Activity className="h-3 w-3 text-indigo-500" /> Status
                             </label>
                             <div className="relative">
-                                <select
+                                <FilterListbox
+                                    options={[
+                                        { value: "PLANNED", label: "PLANNED" },
+                                        { value: "ACTIVE", label: "ACTIVE" },
+                                        { value: "ENDED", label: "ENDED" },
+                                        { value: "CANCELLED", label: "CANCELLED" },
+                                    ]}
                                     value={formData.allocationStatus}
-                                    onChange={(e) => setFormData({ ...formData, allocationStatus: e.target.value })}
-                                    className={cn(
-                                        "h-10 w-full rounded-xl border font-bold text-slate-900 text-xs px-3 bg-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-0 transition-colors",
-                                        errors.allocationStatus ? "border-rose-500" : "border-slate-200"
-                                    )}
-                                >
-                                    <option value="PLANNED">PLANNED</option>
-                                    <option value="ACTIVE">ACTIVE</option>
-                                    <option value="ENDED">ENDED</option>
-                                    <option value="CANCELLED">CANCELLED</option>
-                                </select>
-                                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                                    </svg>
-                                </span>
+                                    onChange={(val) => setFormData({ ...formData, allocationStatus: val })}
+                                />
                             </div>
                             {errors.allocationStatus && <p className="text-[9px] font-bold text-rose-500 mt-1">{errors.allocationStatus}</p>}
                         </div>

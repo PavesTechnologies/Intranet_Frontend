@@ -3,6 +3,7 @@ import axios from "axios";
 import { X } from "lucide-react";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { useAuth } from "../../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import { format } from "date-fns";
@@ -611,20 +612,15 @@ export default function RequestLeaveModal({
                     <label className="text-xs font-medium text-gray-600">
                       Start Day {formatDateForDisplay(startDate)}
                     </label>
-                    <select
+                    <FilterListbox
+                      options={[
+                        { value: "fullday", label: "Full Day" },
+                        { value: "first", label: "First Half" },
+                        { value: "second", label: "Second Half" },
+                      ]}
                       value={halfDayConfig.start}
-                      onChange={(e) =>
-                        setHalfDayConfig((p) => ({
-                          ...p,
-                          start: e.target.value,
-                        }))
-                      }
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="fullday">Full Day</option>
-                      <option value="first">First Half</option>
-                      <option value="second">Second Half</option>
-                    </select>
+                      onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                    />
                   </div>
 
                   {/* End Date Section */}
@@ -635,20 +631,15 @@ export default function RequestLeaveModal({
                         <label className="text-xs font-medium text-gray-600">
                           End Day {formatDateForDisplay(endDate)}
                         </label>
-                        <select
+                        <FilterListbox
+                          options={[
+                            { value: "fullday", label: "Full Day" },
+                            { value: "first", label: "First Half" },
+                            { value: "second", label: "Second Half" },
+                          ]}
                           value={halfDayConfig.end}
-                          onChange={(e) =>
-                            setHalfDayConfig((p) => ({
-                              ...p,
-                              end: e.target.value,
-                            }))
-                          }
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                        >
-                          <option value="fullday">Full Day</option>
-                          <option value="first">First Half</option>
-                          <option value="second">Second Half</option>
-                        </select>
+                          onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                        />
                       </div>
                     </>
                   )}

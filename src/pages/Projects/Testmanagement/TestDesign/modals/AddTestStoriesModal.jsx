@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axiosInstance from "../../api/axiosInstance";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 import { X } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -135,18 +136,11 @@ export default function AddTestStoryModal({
                 <span className="animate-pulse mr-2">●</span> Loading stories…
               </div>
             ) : (
-              <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-shadow bg-white"
+              <FilterListbox
+                options={[{value:"",label:"-- Select a PMS story --"},...pmsStories.map(story=>({value:story.id,label:story.title||story.name||`Story #${story.id}`}))]}
                 value={linkedStoryId}
-                onChange={(e) => setLinkedStoryId(e.target.value)}
-              >
-                <option value="">-- Select a PMS story --</option>
-                {pmsStories.map((story) => (
-                  <option key={story.id} value={story.id}>
-                    {story.title || story.name || `Story #${story.id}`}
-                  </option>
-                ))}
-              </select>
+                onChange={setLinkedStoryId}
+              />
             )}
           </div>
 

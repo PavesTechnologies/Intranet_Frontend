@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import axios from "axios";
 import {
   FileText,
@@ -214,13 +215,7 @@ export default function DocumentTemplates() {
         return (
           <div className="relative">
             <Shield className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-            <select required className={`pl-10 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)}>
-              <option value="" disabled hidden>Select Employment Type</option>
-              <option value="Full-Time">Full-Time</option>
-              <option value="Part-Time">Part-Time</option>
-              <option value="Contract">Contract</option>
-              <option value="Internship">Internship</option>
-            </select>
+            <FilterListbox options={[{value:"",label:"Select Employment Type"},{value:"Full-Time",label:"Full-Time"},{value:"Part-Time",label:"Part-Time"},{value:"Contract",label:"Contract"},{value:"Internship",label:"Internship"}]} value={formData[field] || ""} onChange={(val) => handleInputChange(field, val)} />
           </div>
         );
       case "date":

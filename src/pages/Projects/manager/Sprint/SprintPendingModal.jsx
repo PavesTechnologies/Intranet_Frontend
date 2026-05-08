@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Button from "../../../../components/Button/Button";
 import axios from "axios";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { toast } from "react-toastify"; // <-- FIX ADDED
 
 const SprintPendingModal = ({
@@ -81,20 +82,11 @@ const SprintPendingModal = ({
         <div className="mt-6 space-y-3">
           {/* Move to next sprint */}
           <div className="flex items-center">
-            <select
-              className="border px-4 py-2 rounded-lg w-full"
+            <FilterListbox
+              options={[{value:"",label:"Select Next Sprint"},...sprints.filter(sp=>sp.status==="PLANNING").map(sp=>({value:sp.id,label:sp.name}))]}
               value={selectedSprint}
-              onChange={(e) => setSelectedSprint(e.target.value)}
-            >
-              <option value="">Select Next Sprint</option>
-              {sprints
-                .filter((sp) => sp.status === "PLANNING")
-                .map((sp) => (
-                  <option key={sp.id} value={sp.id}>
-                    {sp.name}
-                  </option>
-                ))}
-            </select>
+              onChange={setSelectedSprint}
+            />
             <Button
               disabled={!selectedSprint}
               className="ml-4 bg-green-600 text-white px-4 py-2 rounded-lg disabled:bg-green-300"

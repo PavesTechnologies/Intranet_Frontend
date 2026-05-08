@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { POOL_OPTIONS } from "../constants/benchConstants";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 const baseForm = {
   poolType: "CoE",
@@ -47,18 +48,11 @@ const MoveToPoolModal = ({ open, resources = [], onClose, onSubmit }) => {
           <div className="group">
             <label className="text-[10px] font-bold capitalize tracking-widest text-slate-400 group-focus-within:text-indigo-600 transition-colors">Target Pool Environment</label>
             <div className="relative mt-2">
-              <select
+              <FilterListbox
+                options={POOL_OPTIONS.map((option) => ({ value: option, label: option }))}
                 value={form.poolType}
-                onChange={(event) => setForm((prev) => ({ ...prev, poolType: event.target.value }))}
-                className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 outline-none transition-all hover:border-slate-300 focus:border-indigo-500 focus:bg-indigo-50/30 focus:ring-2 focus:ring-indigo-500/20"
-              >
-                {POOL_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-              </div>
+                onChange={(val) => setForm((prev) => ({ ...prev, poolType: val }))}
+              />
             </div>
           </div>
 

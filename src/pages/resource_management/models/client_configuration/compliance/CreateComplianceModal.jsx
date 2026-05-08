@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 const CreateComplianceModal = ({ open, onClose }) => {
   const [formData, setFormData] = useState({
@@ -56,17 +57,16 @@ const CreateComplianceModal = ({ open, onClose }) => {
             <label className="text-sm font-medium text-gray-700">
               Requirement Type <span className="text-red-500">*</span>
             </label>
-            <select
-              name="requirement_type"
+            <FilterListbox
+              options={[
+                { value: "", label: "Select type" },
+                { value: "Certification", label: "Certification" },
+                { value: "Clearance", label: "Clearance" },
+                { value: "Tool Access", label: "Tool Access" },
+              ]}
               value={formData.requirement_type}
-              onChange={handleChange}
-              className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Select type</option>
-              <option value="Certification">Certification</option>
-              <option value="Clearance">Clearance</option>
-              <option value="Tool Access">Tool Access</option>
-            </select>
+              onChange={(val) => handleChange({ target: { name: "requirement_type", value: val } })}
+            />
           </div>
 
           {/* Requirement Name */}
@@ -88,20 +88,14 @@ const CreateComplianceModal = ({ open, onClose }) => {
             <label className="text-sm font-medium text-gray-700">
               Mandatory
             </label>
-            <select
-              name="mandatory_flag"
-              value={formData.mandatory_flag}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  mandatory_flag: e.target.value === "true",
-                }))
-              }
-              className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="true">Yes</option>
-              <option value="false">No</option>
-            </select>
+            <FilterListbox
+              options={[
+                { value: "true", label: "Yes" },
+                { value: "false", label: "No" },
+              ]}
+              value={String(formData.mandatory_flag)}
+              onChange={(val) => setFormData((prev) => ({ ...prev, mandatory_flag: val === "true" }))}
+            />
           </div>
 
           {/* Status */}
@@ -109,20 +103,14 @@ const CreateComplianceModal = ({ open, onClose }) => {
             <label className="text-sm font-medium text-gray-700">
               Status
             </label>
-            <select
-              name="active_flag"
-              value={formData.active_flag}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  active_flag: e.target.value === "true",
-                }))
-              }
-              className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
-            </select>
+            <FilterListbox
+              options={[
+                { value: "true", label: "Active" },
+                { value: "false", label: "Inactive" },
+              ]}
+              value={String(formData.active_flag)}
+              onChange={(val) => setFormData((prev) => ({ ...prev, active_flag: val === "true" }))}
+            />
           </div>
         </div>
 

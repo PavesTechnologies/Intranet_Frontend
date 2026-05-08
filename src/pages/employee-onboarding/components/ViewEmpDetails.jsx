@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import StatusBadge from "../../../components/status/statusbadge";
@@ -605,17 +606,17 @@ export default function ViewEmpDetails() {
                         {toTitleCase(key.replace(/_/g, " "))}
                       </span>
                       {key === "employee_type" ? (
-                        <select
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "Select Employee Type" },
+                            { value: "Full-Time", label: "Full-Time" },
+                            { value: "Part-Time", label: "Part-Time" },
+                            { value: "Intern", label: "Intern" },
+                            { value: "Contract", label: "Contract" },
+                          ]}
                           value={editData[key] || ""}
-                          onChange={(e) => setEditData({ ...editData, [key]: e.target.value })}
-                          className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 ring-0 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
-                        >
-                          <option value="">Select Employee Type</option>
-                          <option value="Full-Time">Full-Time</option>
-                          <option value="Part-Time">Part-Time</option>
-                          <option value="Intern">Intern</option>
-                          <option value="Contract">Contract</option>
-                        </select>
+                          onChange={(val) => setEditData({ ...editData, [key]: val })}
+                        />
                       ) : (
                         <input
                           value={editData[key] || ""}
@@ -671,16 +672,11 @@ export default function ViewEmpDetails() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
                 Approver
               </label>
-              <select
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
+              <FilterListbox
+                options={[{value:"",label:"Select Approver"}, ...adminUsers.map((a) => ({value: String(a.user_id), label: a.name}))]}
                 value={selectedAdmin}
-                onChange={(e) => setSelectedAdmin(e.target.value)}
-              >
-                <option value="">Select Approver</option>
-                {adminUsers.map((a) => (
-                  <option key={a.user_id} value={a.user_id}>{a.name}</option>
-                ))}
-              </select>
+                onChange={setSelectedAdmin}
+              />
             </div>
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
               <button

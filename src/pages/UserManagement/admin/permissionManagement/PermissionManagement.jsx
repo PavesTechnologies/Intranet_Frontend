@@ -1,4 +1,5 @@
 import Button from "../../../../components/Button/Button";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import Pagination from "../../../../components/Pagination/pagination";
 import FormInput from "../../../../components/forms/FormInput";
 import { Pencil, Loader2 } from "lucide-react";
@@ -433,18 +434,14 @@ export default function PermissionManagement() {
             className="w-full p-2 border rounded mb-3"
           />
 
-          <select
+          <FilterListbox
+            options={[
+              { value: "", label: "Default Group" },
+              ...groups.map((g) => ({ value: g.group_uuid, label: g.group_name })),
+            ]}
             value={selectedGroup}
-            onChange={(e) => setSelectedGroup(String(e.target.value))}
-            className="w-full p-2 border rounded mb-3"
-          >
-            <option value="">Default Group</option>
-            {groups.map((g) => (
-              <option key={g.group_uuid} value={g.group_uuid}>
-                {g.group_name}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedGroup}
+          />
 
           <div className="flex gap-3 mt-3">
             <Button
@@ -640,18 +637,14 @@ export default function PermissionManagement() {
           className="w-full p-2 border rounded mb-3"
         />
 
-        <select
+        <FilterListbox
+          options={[
+            { value: "", label: "Keep current / Default Group" },
+            ...groups.map((g) => ({ value: g.group_uuid, label: g.group_name })),
+          ]}
           value={editGroup}
-          onChange={(e) => setEditGroup(String(e.target.value))}
-          className="w-full p-2 border rounded mb-3"
-        >
-          <option value="">Keep current / Default Group</option>
-          {groups.map((g) => (
-            <option key={g.group_uuid} value={g.group_uuid}>
-              {g.group_name}
-            </option>
-          ))}
-        </select>
+          onChange={setEditGroup}
+        />
 
         <div className="flex gap-3 mt-4">
           <Button

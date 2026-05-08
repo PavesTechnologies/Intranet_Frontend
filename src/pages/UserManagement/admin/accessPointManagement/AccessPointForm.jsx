@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import FilterListbox from '../../../../components/filter/FilterListbox';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createAccessPoint } from '../../../../services/accessPointService';
 import Button from "../../../../components/Button/Button";
@@ -176,18 +177,17 @@ const AccessPointForm = () => {
             <label className="block text-gray-700 font-medium mb-1">
               Method <span className="text-red-500">*</span>
             </label>
-            <select
-              name="method"
+            <FilterListbox
+              options={[
+                { value: "GET", label: "GET" },
+                { value: "POST", label: "POST" },
+                { value: "PUT", label: "PUT" },
+                { value: "DELETE", label: "DELETE" },
+                { value: "PATCH", label: "PATCH" },
+              ]}
               value={form.method}
-              onChange={handleChange}
-              className="w-full border border-gray-300 p-2 rounded-lg focus:ring focus:ring-blue-300 focus:border-blue-500"
-            >
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
-              <option value="PATCH">PATCH</option>
-            </select>
+              onChange={(val) => handleChange({ target: { name: "method", value: val } })}
+            />
           </div>
 
           <div>

@@ -9,6 +9,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { MoreVertical } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 // -------------------- 3 DOTS MENU --------------------
 const ProjectMenu = ({ project, onEdit, onDelete }) => {
@@ -253,27 +254,31 @@ const ProjectDashboard = () => {
           />
 
           <div className="flex items-center gap-3">
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="border w-40 h-10 px-3 py-2 rounded-xl"
-            >
-              <option value="All">All</option>
-              <option value="ACTIVE">Active</option>
-              <option value="PLANNING">Planning</option>
-              <option value="ARCHIVED">Archived</option>
-              <option value="COMPLETED">Completed</option>
-            </select>
+            <div className="w-40">
+              <FilterListbox
+                options={[
+                  { value: "All", label: "All" },
+                  { value: "ACTIVE", label: "Active" },
+                  { value: "PLANNING", label: "Planning" },
+                  { value: "ARCHIVED", label: "Archived" },
+                  { value: "COMPLETED", label: "Completed" },
+                ]}
+                value={filterStatus}
+                onChange={setFilterStatus}
+              />
+            </div>
 
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="border w-40 h-10 px-3 py-2 rounded-xl"
-            >
-              <option value="ALL">All</option>
-              <option value="OWNER">Managed by me</option>
-              <option value="MEMBER">I am a member</option>
-            </select>
+            <div className="w-40">
+              <FilterListbox
+                options={[
+                  { value: "ALL", label: "All" },
+                  { value: "OWNER", label: "Managed by me" },
+                  { value: "MEMBER", label: "I am a member" },
+                ]}
+                value={roleFilter}
+                onChange={setRoleFilter}
+              />
+            </div>
           </div>
         </div>
 

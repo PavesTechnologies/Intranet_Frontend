@@ -1,5 +1,6 @@
 // ✅ UserIssueTracker.jsx (Final View-Only Version)
 import React, { useEffect, useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import Button from "../../../../components/Button/Button";
@@ -217,68 +218,35 @@ const UserIssueTracker = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
         />
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
+        <FilterListbox
+          options={[{value:"",label:"All Types"},{value:"Epic",label:"Epic"},{value:"Story",label:"Story"},{value:"Task",label:"Task"},{value:"Bug",label:"Bug"}]}
           value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-        >
-          <option value="">All Types</option>
-          <option value="Epic">Epic</option>
-          <option value="Story">Story</option>
-          <option value="Task">Task</option>
-          <option value="Bug">Bug</option>
-        </select>
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
+          onChange={setFilterType}
+        />
+        <FilterListbox
+          options={[{value:"",label:"All Priorities"},{value:"LOW",label:"Low"},{value:"MEDIUM",label:"Medium"},{value:"HIGH",label:"High"},{value:"CRITICAL",label:"Critical"}]}
           value={filterPriority}
-          onChange={(e) => setFilterPriority(e.target.value)}
-        >
-          <option value="">All Priorities</option>
-          <option value="LOW">Low</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="HIGH">High</option>
-          <option value="CRITICAL">Critical</option>
-        </select>
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
+          onChange={setFilterPriority}
+        />
+        <FilterListbox
+          options={[{value:"",label:"All Status"},{value:"BACKLOG",label:"Backlog"},{value:"TODO",label:"Todo"},{value:"IN_PROGRESS",label:"In Progress"},{value:"REVIEW",label:"Review"},{value:"RESOLVED",label:"Resolved"},{value:"DONE",label:"Done"},{value:"CLOSED",label:"Closed"},{value:"BLOCKED",label:"Blocked"}]}
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-        >
-          <option value="">All Status</option>
-          <option value="BACKLOG">Backlog</option>
-          <option value="TODO">Todo</option>
-          <option value="IN_PROGRESS">In Progress</option>
-          <option value="REVIEW">Review</option>
-          <option value="RESOLVED">Resolved</option>
-          <option value="DONE">Done</option>
-          <option value="CLOSED">Closed</option>
-          <option value="BLOCKED">Blocked</option>
-        </select>
+          onChange={setFilterStatus}
+        />
 
         {/* User Filter */}
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
+        <FilterListbox
+          options={[{value:"",label:"All Users"},...userNames.map(u=>({value:u,label:u}))]}
           value={filterUser}
-          onChange={(e) => setFilterUser(e.target.value)}
-        >
-          <option value="">All Users</option>
-          {userNames.map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </select>
+          onChange={setFilterUser}
+        />
 
         {/* Billable Filter */}
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
+        <FilterListbox
+          options={[{value:"",label:"All Billable"},{value:"Yes",label:"Yes"},{value:"No",label:"No"}]}
           value={filterBillable}
-          onChange={(e) => setFilterBillable(e.target.value)}
-        >
-          <option value="">All Billable</option>
-          <option value="Yes">Yes</option>
-          <option value="No">No</option>
-        </select>
+          onChange={setFilterBillable}
+        />
 
         {(filterType ||
           filterPriority ||

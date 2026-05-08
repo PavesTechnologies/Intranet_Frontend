@@ -2,6 +2,7 @@
 
 import { createScenario } from "../testDesignApi";
 import { useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 export default function ScenarioModal({ open, close }) {
   const [title, setTitle] = useState("");
@@ -42,15 +43,11 @@ export default function ScenarioModal({ open, close }) {
         />
 
         <label className="text-sm">Priority</label>
-        <select 
+        <FilterListbox
+          options={[{value:"HIGH",label:"High"},{value:"MEDIUM",label:"Medium"},{value:"LOW",label:"Low"}]}
           value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          className="border p-2 rounded w-full mb-4"
-        >
-          <option value="HIGH">High</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="LOW">Low</option>
-        </select>
+          onChange={setPriority}
+        />
 
         <div className="flex justify-end gap-2">
           <button onClick={close} className="px-4 py-1 bg-gray-300 rounded">Cancel</button>

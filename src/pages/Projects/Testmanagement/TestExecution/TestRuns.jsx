@@ -1,4 +1,5 @@
 import axios from "axios";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../api/axiosInstance";
@@ -255,18 +256,11 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
                 required
               />
 
-              <select
+              <FilterListbox
+                options={[{value:"CREATED",label:"CREATED"},{value:"IN_PROGRESS",label:"IN_PROGRESS"},{value:"COMPLETED",label:"COMPLETED"},{value:"CANCELLED",label:"CANCELLED"}]}
                 value={editForm.status}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, status: e.target.value })
-                }
-                className="border p-2 rounded"
-              >
-                <option value="CREATED">CREATED</option>
-                <option value="IN_PROGRESS">IN_PROGRESS</option>
-                <option value="COMPLETED">COMPLETED</option>
-                <option value="CANCELLED">CANCELLED</option>
-              </select>
+                onChange={(val) => setEditForm({ ...editForm, status: val })}
+              />
 
               <textarea
                 value={editForm.description}

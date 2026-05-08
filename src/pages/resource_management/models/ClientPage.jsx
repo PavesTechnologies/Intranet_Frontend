@@ -62,7 +62,7 @@ const ProjectSLA = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No SLA configuration found for this project.
       </div>
     );
@@ -165,7 +165,7 @@ const ProjectCompliance = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No compliance requirements configured for this project.
       </div>
     );
@@ -272,8 +272,8 @@ const ProjectAssets = ({ assets, loading }) => {
 
   if (!assets || assets.length === 0) {
     return (
-      <div className="text-center p-6 border-2 border-dashed rounded-lg text-gray-400">
-        No assets assigned
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
+        No assets assigned for this project.
       </div>
     );
   }
@@ -351,7 +351,7 @@ const ProjectEscalation = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No escalation contacts configured for this project.
       </div>
     );

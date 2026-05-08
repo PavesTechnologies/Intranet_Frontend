@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 const CreateEpic = ({ onClose }) => {
   const [projects, setProjects] = useState([]);
@@ -128,17 +129,11 @@ const CreateEpic = ({ onClose }) => {
           <label htmlFor="status" className="block font-semibold mb-1">
             Status
           </label>
-          <select
-            name="status"
-            id="status"
+          <FilterListbox
+            options={[{value:"TODO",label:"TODO"},{value:"IN_PROGRESS",label:"IN_PROGRESS"},{value:"DONE",label:"DONE"}]}
             value={formData.status}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          >
-            <option value="TODO">TODO</option>
-            <option value="IN_PROGRESS">IN_PROGRESS</option>
-            <option value="DONE">DONE</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+          />
         </div>
 
         {/* Priority */}
@@ -146,18 +141,11 @@ const CreateEpic = ({ onClose }) => {
           <label htmlFor="priority" className="block font-semibold mb-1">
             Priority
           </label>
-          <select
-            name="priority"
-            id="priority"
+          <FilterListbox
+            options={[{value:"LOW",label:"LOW"},{value:"MEDIUM",label:"MEDIUM"},{value:"HIGH",label:"HIGH"},{value:"CRITICAL",label:"CRITICAL"}]}
             value={formData.priority}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          >
-            <option value="LOW">LOW</option>
-            <option value="MEDIUM">MEDIUM</option>
-            <option value="HIGH">HIGH</option>
-            <option value="CRITICAL">CRITICAL</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "priority", value: val } })}
+          />
         </div>
 
         {/* Progress Percentage */}
@@ -201,23 +189,11 @@ const CreateEpic = ({ onClose }) => {
           <label htmlFor="projectId" className="block font-semibold mb-1">
             Project
           </label>
-          <select
-            name="projectId"
-            id="projectId"
+          <FilterListbox
+            options={[{value:0,label:"Select Project"},...projects.map(project=>({value:project.id,label:project.name}))]}
             value={formData.projectId}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            required
-          >
-            <option value={0} disabled>
-              Select Project
-            </option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleChange({ target: { name: "projectId", value: val } })}
+          />
         </div>
 
         {/* Submit Button */}

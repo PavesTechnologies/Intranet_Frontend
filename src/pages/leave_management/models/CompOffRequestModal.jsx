@@ -1,6 +1,7 @@
-import React, { useState, Fragment } from "react";
+import React, { useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { useNotification } from "../../../contexts/NotificationContext";
 import { X, CalendarDays, StickyNote, Clock } from "lucide-react";
 import Button from "../../../components/Button/Button";
@@ -197,17 +198,15 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
                   <p className="text-xs font-semibold text-indigo-600">
                     From {formatDateForDisplay(startDate)}
                   </p>
-                  <select
+                  <FilterListbox
+                    options={[
+                      { value: "fullday", label: "Full Day" },
+                      { value: "first", label: "First Half" },
+                      { value: "second", label: "Second Half" },
+                    ]}
                     value={halfDayConfig.start}
-                    onChange={(e) =>
-                      setHalfDayConfig((p) => ({ ...p, start: e.target.value }))
-                    }
-                    className="w-full p-2 text-sm border border-indigo-200 bg-white rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                  >
-                    <option value="fullday">Full Day</option>
-                    <option value="first">First Half</option>
-                    <option value="second">Second Half</option>
-                  </select>
+                    onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                  />
                 </div>
 
                 {isMultiDay && (
@@ -217,17 +216,15 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
                       <p className="text-xs font-semibold text-indigo-600">
                         To {formatDateForDisplay(endDate)}
                       </p>
-                      <select
+                      <FilterListbox
+                        options={[
+                          { value: "fullday", label: "Full Day" },
+                          { value: "first", label: "First Half" },
+                          { value: "second", label: "Second Half" },
+                        ]}
                         value={halfDayConfig.end}
-                        onChange={(e) =>
-                          setHalfDayConfig((p) => ({ ...p, end: e.target.value }))
-                        }
-                        className="w-full p-2 text-sm border border-indigo-200 bg-white rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                      >
-                        <option value="fullday">Full Day</option>
-                        <option value="first">First Half</option>
-                        <option value="second">Second Half</option>
-                      </select>
+                        onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                      />
                     </div>
                   </>
                 )}

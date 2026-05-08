@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   getPermissionGroupsByRole,
   getAvailablePermissionGroupsForRole,
@@ -407,20 +408,11 @@ const PermissionGroupManagement = ({ roles }) => {
                       />
                     </div>
 
-                    <select
+                    <FilterListbox
+                      options={modules.map((module) => ({ value: module, label: module }))}
                       value={selectedModule}
-                      onChange={(e) => {
-                        setSelectedModule(e.target.value);
-                        setGroupCurrentPage(1);
-                      }}
-                      className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    >
-                      {modules.map((module) => (
-                        <option key={module} value={module}>
-                          {module}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => { setSelectedModule(val); setGroupCurrentPage(1); }}
+                    />
                   </div>
 
                   {filteredGroups.length === 0 ? (

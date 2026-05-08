@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react"; // ⭐ 1. Added useEffect
 import axiosInstance from "../../api/axiosInstance";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 import { X } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -141,30 +142,20 @@ export default function AddCaseModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm">Type</label>
-              <select
-                className="w-full border rounded px-3 py-2"
+              <FilterListbox
+                options={[{value:"FUNCTIONAL",label:"FUNCTIONAL"},{value:"REGRESSION",label:"REGRESSION"},{value:"SMOKE",label:"SMOKE"},{value:"SECURITY",label:"SECURITY"}]}
                 value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value="FUNCTIONAL">FUNCTIONAL</option>
-                <option value="REGRESSION">REGRESSION</option>
-                <option value="SMOKE">SMOKE</option>
-                <option value="SECURITY">SECURITY</option>
-              </select>
+                onChange={setType}
+              />
             </div>
 
             <div>
               <label className="text-sm">Priority</label>
-              <select
-                className="w-full border rounded px-3 py-2"
+              <FilterListbox
+                options={[{value:"LOW",label:"LOW"},{value:"MEDIUM",label:"MEDIUM"},{value:"HIGH",label:"HIGH"},{value:"CRITICAL",label:"CRITICAL"}]}
                 value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-              >
-                <option value="LOW">LOW</option>
-                <option value="MEDIUM">MEDIUM</option>
-                <option value="HIGH">HIGH</option>
-                <option value="CRITICAL">CRITICAL</option>
-              </select>
+                onChange={setPriority}
+              />
             </div>
           </div>
 

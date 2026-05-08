@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { AlertTriangle, Calendar, CheckCircle2, Percent, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -260,28 +261,19 @@ const CreateModificationModal = ({
                   <User className="h-3.5 w-3.5 text-slate-400" />
                   Resource
                 </label>
-                <select
-                  value={form.allocationId}
-                  onChange={handleResourceChange}
-                  className={cn(
-                    "h-10 w-full rounded-lg border bg-white px-3 text-sm text-slate-900 outline-none transition-colors focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15",
-                    errors.allocationId ? "border-rose-300" : "border-slate-200"
-                  )}
-                >
-                  <option value="">Select allocated resource</option>
-                  {resourceOptions.map((resource) => (
-                    <option
-                      key={resource.allocationId || resource.resourceId}
-                      value={resource.allocationId || ""}
-                    >
-                      {String(form.allocationId) === String(resource.allocationId)
+                <FilterListbox
+                  options={[
+                    { value: "", label: "Select allocated resource" },
+                    ...resourceOptions.map((resource) => ({
+                      value: resource.allocationId || "",
+                      label: String(form.allocationId) === String(resource.allocationId)
                         ? resource.resourceName
-                        : `${resource.resourceName} | ${resource.allocationPercentage}% | ${
-                            resource.allocationStartDate || "N/A"
-                          } to ${resource.allocationEndDate || "N/A"}`}
-                    </option>
-                  ))}
-                </select>
+                        : `${resource.resourceName} | ${resource.allocationPercentage}% | ${resource.allocationStartDate || "N/A"} to ${resource.allocationEndDate || "N/A"}`
+                    }))
+                  ]}
+                  value={form.allocationId}
+                  onChange={(val) => handleResourceChange({ target: { value: val } })}
+                />
                 {errors.allocationId && (
                   <p className="text-[11px] text-rose-600">{errors.allocationId}</p>
                 )}

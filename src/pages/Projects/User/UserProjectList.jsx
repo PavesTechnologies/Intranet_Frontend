@@ -13,6 +13,7 @@ import Button from "../../../components/Button/Button";
 import Pagination from "../../../components/Pagination/pagination";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 const ProjectList = () => {
   const [projects, setProjects] = useState([]);
@@ -270,30 +271,23 @@ const ProjectList = () => {
                         placeholder="Project Description"
                         disabled={formData.status === "ARCHIVED"}
                       />
-                      <select
-                        name="status"
+                      <FilterListbox
+                        options={[
+                          { value: "ACTIVE", label: "ACTIVE" },
+                          { value: "PLANNING", label: "PLANNING" },
+                          { value: "ARCHIVED", label: "ARCHIVED" },
+                        ]}
                         value={formData.status || ""}
-                        onChange={handleStatusChange}
-                        className="w-full border px-3 py-2 rounded-xl"
-                      >
-                        <option value="ACTIVE">ACTIVE</option>
-                        <option value="PLANNING">PLANNING</option>
-                        <option value="ARCHIVED">ARCHIVED</option>
-                      </select>
-                      <select
-                        name="ownerId"
+                        onChange={(val) => handleStatusChange({ target: { value: val } })}
+                      />
+                      <FilterListbox
+                        options={[
+                          { value: "", label: "Select Owner" },
+                          ...users.map((u) => ({ value: u.id, label: `${u.name} (${u.role})` })),
+                        ]}
                         value={formData.ownerId || ""}
-                        onChange={handleInputChange}
-                        className="w-full border px-3 py-2 rounded-xl"
-                        disabled={formData.status === "ARCHIVED"}
-                      >
-                        <option value="">Select Owner</option>
-                        {users.map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.name} ({u.role})
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => handleInputChange({ target: { name: "ownerId", value: val } })}
+                      />
                       <div className="grid grid-cols-2 gap-2">
                         {users.map((user) => (
                           <label

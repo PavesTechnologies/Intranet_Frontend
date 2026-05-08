@@ -1,4 +1,5 @@
 import React from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 const SubSkillSelectionModal = ({
   open,
@@ -90,30 +91,20 @@ const SubSkillSelectionModal = ({
                 </label>
 
                 {/* Proficiency */}
-                <select
-                  disabled={!selected}
+                <FilterListbox
+                  options={[
+                    { value: "", label: "Select Proficiency" },
+                    ...proficiencyLevels.map(p => ({ value: p.proficiencyId, label: p.proficiencyName }))
+                  ]}
                   value={selected?.proficiencyId || ""}
-                  onChange={(e) => {
-                    const p = proficiencyLevels.find(
-                      (x) => x.proficiencyId === e.target.value,
-                    );
+                  onChange={(val) => {
+                    const p = proficiencyLevels.find(x => x.proficiencyId === val);
                     updateExpectation(sub.id, {
                       proficiencyId: p?.proficiencyId || "",
                       proficiencyName: p?.proficiencyName || "",
                     });
                   }}
-                  className="border rounded h-8 text-xs px-2 disabled:bg-gray-100"
-                >
-                  <option value="">Select Proficiency</option>
-                  {proficiencyLevels.map((p) => (
-                    <option
-                      key={p.proficiencyId}
-                      value={p.proficiencyId}
-                    >
-                      {p.proficiencyName}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
             );
           })}

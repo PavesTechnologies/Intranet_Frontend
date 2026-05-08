@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   AlertCircle,
   Plus,
@@ -466,19 +467,11 @@ export default function RiskDetailModal({
                         {status?.name || "—"}
                       </span>
                     ) : (
-                      <select
+                      <FilterListbox
+                        options={statuses.map(s=>({value:s.id,label:s.name}))}
                         value={selectedStatusId || ""}
-                        onChange={(e) =>
-                          setSelectedStatusId(Number(e.target.value))
-                        }
-                        className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                      >
-                        {statuses.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setSelectedStatusId}
+                      />
                     )}
                   </div>
 

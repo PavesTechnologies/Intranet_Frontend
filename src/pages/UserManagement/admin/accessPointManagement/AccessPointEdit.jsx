@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   getAccessPoint,
   updateAccessPoint,
@@ -232,38 +233,31 @@ const AccessPointEdit = () => {
             <label className="block text-gray-700 font-medium mb-1">
               Method <span className="text-red-500">*</span>
             </label>
-            <select
-              name="method"
+            <FilterListbox
+              options={[
+                { value: "GET", label: "GET" },
+                { value: "POST", label: "POST" },
+                { value: "PUT", label: "PUT" },
+                { value: "DELETE", label: "DELETE" },
+                { value: "PATCH", label: "PATCH" },
+              ]}
               value={form.method}
-              onChange={handleChange}
-              className="w-full border border-gray-300 p-2 rounded-lg focus:ring focus:ring-blue-300 focus:border-blue-500" // Matched create form style
-            >
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
-              <option value="PATCH">PATCH</option> {/* ✅ Added PATCH */}
-            </select>
+              onChange={(val) => handleChange({ target: { name: "method", value: val } })}
+            />
           </div>
 
           <div>
             <label className="block text-gray-700 font-medium mb-1">
               Module <span className="text-red-500">*</span>
             </label>
-            <select
-              name="module"
+            <FilterListbox
+              options={[
+                { value: "", label: "Select Module" },
+                ...modules.map((mod) => ({ value: mod, label: mod })),
+              ]}
               value={form.module}
-              onChange={handleChange}
-              required
-              className="w-full border border-gray-300 p-2 rounded-lg focus:ring focus:ring-blue-300 focus:border-blue-500" // Matched create form style
-            >
-              <option value="">Select Module</option>
-              {modules.map((mod, idx) => (
-                <option key={idx} value={mod}>
-                  {mod}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => handleChange({ target: { name: "module", value: val } })}
+            />
             <p className="text-sm text-gray-500 mt-1">
               Can contain letters, spaces, hyphens, and underscores only
             </p>
