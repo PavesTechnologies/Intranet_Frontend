@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 export default function AddCountryIdentityMappingModal({
   countryUuid,
@@ -82,18 +83,11 @@ export default function AddCountryIdentityMappingModal({
         <h2 className="text-xl font-semibold mb-4">Add Identity to Country</h2>
 
         <label className="block text-sm mb-1">Identity Type</label>
-        <select
+        <FilterListbox
+          options={[{value:"",label:"Select Identity"}, ...identities.map((i) => ({value: i.identity_type_uuid, label: i.identity_type_name}))]}
           value={identityUuid}
-          onChange={(e) => setIdentityUuid(e.target.value)}
-          className="border rounded-lg px-3 py-2 w-full mb-4"
-        >
-          <option value="">Select Identity</option>
-          {identities.map((i) => (
-            <option key={i.identity_type_uuid} value={i.identity_type_uuid}>
-              {i.identity_type_name}
-            </option>
-          ))}
-        </select>
+          onChange={setIdentityUuid}
+        />
 
         <label className="flex items-center gap-2 mb-6">
           <input

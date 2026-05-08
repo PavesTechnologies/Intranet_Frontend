@@ -1,5 +1,8 @@
 // ProjectStatusReport.jsx
 import React, { useMemo, useRef, useState } from 'react';
+import FilterListbox from '../../../components/filter/FilterListbox';
+import Button from '../../../components/Button/Button';
+import StatusBadge from '../../../components/status/statusbadge';
 import {
   PieChart,
   Pie,
@@ -130,18 +133,12 @@ export default function ProjectStatusReport({ projectData }) {
             Project Status Report — {projectData.project.name}
           </h1>
           <div className="flex gap-2">
-            <button
-              onClick={downloadCSV}
-              className="px-3 py-2 rounded shadow-sm border hover:bg-gray-100"
-            >
+            <Button variant="secondary" onClick={downloadCSV}>
               Download CSV
-            </button>
-            <button
-              onClick={downloadPDF}
-              className="px-3 py-2 rounded bg-indigo-600 text-white shadow-sm hover:opacity-90"
-            >
+            </Button>
+            <Button variant="primary" onClick={downloadPDF}>
               Download PDF
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -150,31 +147,23 @@ export default function ProjectStatusReport({ projectData }) {
           <div className="flex gap-4 h-auto flex-wrap items-center">
             <div className="w-72">
               <label className="block text-xs text-gray-600">Assignee</label>
-              <select
-                value={filterAssignee}
-                onChange={e => setFilterAssignee(e.target.value)}
-                className="mt-1 h-auto block w-full border rounded p-2"
-              >
-                {assignees.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <FilterListbox
+                  options={assignees.map(a => ({ value: a.id, label: a.name }))}
+                  value={filterAssignee}
+                  onChange={setFilterAssignee}
+                />
+              </div>
             </div>
             <div className="w-56">
               <label className="block text-xs text-gray-600">Status</label>
-              <select
-                value={filterStatus}
-                onChange={e => setFilterStatus(e.target.value)}
-                className="mt-1 block w-full border rounded p-2"
-              >
-                {statuses.map(s => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <FilterListbox
+                  options={statuses.map(s => ({ value: s, label: s }))}
+                  value={filterStatus}
+                  onChange={setFilterStatus}
+                />
+              </div>
             </div>
             <div>
               <label className="block text-xs text-gray-600">From</label>
@@ -341,7 +330,7 @@ export default function ProjectStatusReport({ projectData }) {
                       <td className="px-3 py-2">{i.assignee?.name || i.assignee || '-'}</td>
                       <td className="px-3 py-2">{i.type ?? '-'}</td>
                       <td className="px-3 py-2">
-                        <StatusBadge status={i.status} />
+                        <StatusBadge label={i.status} size="sm" />
                       </td>
                       <td className="px-3 py-2 text-right">{i.storyPoints ?? '-'}</td>
                       <td className="px-3 py-2 text-right">{i.estimate ?? '-'}</td>
@@ -362,15 +351,3 @@ export default function ProjectStatusReport({ projectData }) {
   );
 }
 
-function StatusBadge({ status }) {
-  const map = {
-    DONE: 'bg-green-100 text-green-700',
-    IN_PROGRESS: 'bg-yellow-100 text-yellow-700',
-    TODO: 'bg-gray-100 text-gray-700',
-  };
-  return (
-    <span className={`px-2 py-1 rounded text-xs ${map[status] || 'bg-gray-100 text-gray-700'}`}>
-      {status?.replace('_', ' ')}
-    </span>
-  );
-}

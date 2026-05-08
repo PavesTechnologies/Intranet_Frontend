@@ -5,8 +5,10 @@ export default function FormInput({
   required = false,
   disabled = false,
   className = "",
+  bgClass = "",
   ...props
 }) {
+  const isFilled = props.value && props.value.toString().length > 0;
   return (
     <div>
       {label && (
@@ -23,7 +25,7 @@ export default function FormInput({
           px-3 py-2
           border border-gray-300
           rounded-lg
-          bg-white
+          ${bgClass || (isFilled ? "bg-blue-50/50" : "bg-white")}
           text-sm
           focus:outline-none
           focus:border-gray-400

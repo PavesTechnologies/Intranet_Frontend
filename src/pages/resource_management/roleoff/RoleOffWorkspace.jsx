@@ -8,6 +8,7 @@ import {
   Users,
   UserRoundMinus,
 } from "lucide-react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import KPISection from "./KPISection";
@@ -1806,34 +1807,30 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                 {/* RIGHT - FILTERS */}
                 {mode === "pm" ? (
                   <div className="flex items-center gap-3 shrink-0">
-                    <select
+                    <FilterListbox
+                      options={[
+                        { value: "", label: "Impact" },
+                        { value: "Low", label: "Low" },
+                        { value: "Medium", label: "Medium" },
+                        { value: "High", label: "High" },
+                      ]}
                       value={filters.impact}
-                      onChange={(event) =>
-                        setFilters((prev) => ({ ...prev, impact: event.target.value }))
-                      }
-                      className="h-10 min-w-[140px] rounded-md border border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
-                    >
-                      <option value="">Impact</option>
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                    </select>
+                      onChange={(val) => setFilters((prev) => ({ ...prev, impact: val }))}
+                    />
 
-                    <select
+                    <FilterListbox
+                      options={[
+                        { value: "", label: "Reason" },
+                        { value: "Project Completion", label: "Project Completion" },
+                        { value: "Client Ramp Down", label: "Client Ramp Down" },
+                        { value: "Performance Issue", label: "Performance Issue" },
+                        { value: "Budget Realignment", label: "Budget Realignment" },
+                        { value: "Critical Dependency", label: "Critical Dependency" },
+                        { value: "Emergency Transition", label: "Emergency Transition" },
+                      ]}
                       value={filters.reason}
-                      onChange={(event) =>
-                        setFilters((prev) => ({ ...prev, reason: event.target.value }))
-                      }
-                      className="h-10 min-w-[160px] rounded-md border border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
-                    >
-                      <option value="">Reason</option>
-                      <option value="Project Completion">Project Completion</option>
-                      <option value="Client Ramp Down">Client Ramp Down</option>
-                      <option value="Performance Issue">Performance Issue</option>
-                      <option value="Budget Realignment">Budget Realignment</option>
-                      <option value="Critical Dependency">Critical Dependency</option>
-                      <option value="Emergency Transition">Emergency Transition</option>
-                    </select>
+                      onChange={(val) => setFilters((prev) => ({ ...prev, reason: val }))}
+                    />
                   </div>
                 ) : null}
 

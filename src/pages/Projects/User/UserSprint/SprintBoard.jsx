@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import SprintColumn from "./SprintColumn";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 const SprintBoard = ({ projectId, projectName }) => {
   const [stories, setStories] = useState([]);
@@ -75,16 +76,11 @@ const SprintBoard = ({ projectId, projectName }) => {
 
       {/* Filter Dropdown */}
       <div className="flex gap-3">
-        <select
+        <FilterListbox
+          options={[{value:"ALL",label:"ALL"},{value:"PLANNING",label:"PLANNING"},{value:"ACTIVE",label:"ACTIVE"},{value:"COMPLETED",label:"COMPLETED"}]}
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="px-4 py-2 border rounded bg-white text-gray-800"
-        >
-          <option value="ALL">ALL</option>
-          <option value="PLANNING">PLANNING</option>
-          <option value="ACTIVE">ACTIVE</option>
-          <option value="COMPLETED">COMPLETED</option>
-        </select>
+          onChange={setFilter}
+        />
       </div>
 
       {/* Sprint Columns */}

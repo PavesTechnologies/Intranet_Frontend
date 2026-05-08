@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Modal from '../Modal';
+import FilterListbox from '../filter/FilterListbox';
 
 
 
@@ -75,16 +76,15 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Priority
             </label>
-            <select
-              name="priority"
+            <FilterListbox
+              options={[
+                { value: "Low", label: "Low" },
+                { value: "Medium", label: "Medium" },
+                { value: "High", label: "High" },
+              ]}
               value={formData.priority}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#263383] focus:border-transparent"
-            >
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-            </select>
+              onChange={(val) => handleChange({ target: { name: "priority", value: val } })}
+            />
           </div>
         </div>
 

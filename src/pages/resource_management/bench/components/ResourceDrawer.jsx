@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   Briefcase,
   CalendarDays,
@@ -142,34 +143,20 @@ const ResourceDrawer = ({
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <div>
                 <label className={labelClassName}>State</label>
-                <select
+                <FilterListbox
+                  options={getStateOptions()}
                   value={formState.state}
-                  disabled={readOnly || saving}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, state: event.target.value }))}
-                  className={fieldClassName}
-                >
-                  {getStateOptions().map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setFormState((prev) => ({ ...prev, state: val }))}
+                />
               </div>
 
               <div>
                 <label className={labelClassName}>SubState</label>
-                <select
+                <FilterListbox
+                  options={subStateOptions}
                   value={formState.subState}
-                  disabled={readOnly || saving}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, subState: event.target.value }))}
-                  className={fieldClassName}
-                >
-                  {subStateOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setFormState((prev) => ({ ...prev, subState: val }))}
+                />
               </div>
             </div>
           </section>

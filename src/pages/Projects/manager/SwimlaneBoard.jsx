@@ -6,6 +6,7 @@ import React, {
   useRef,
 } from "react";
 import axios from "axios";
+import Button from "../../../components/Button/Button";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
   Plus,
@@ -19,8 +20,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../components/toastfy/toast";
 import EditTaskForm from "./Backlog/EditTaskForm";
 import RightSidePanel from "./Sprint/RightSidePanel";
 import CreateTaskForm from "./Backlog/CreateTask";
@@ -150,7 +150,7 @@ const SwimlaneBoard = ({ projectId, projectName, hideHeader = false }) => {
       }
     } catch (err) {
       console.error("Load swimlane failed", err);
-      toast.error("Failed to load board");
+      showStatusToast("Failed to load board", "error");
       setStatuses([]); setTasks([]); setStories([]); setMembers([]);
     } finally {
       setLoading(false);
@@ -241,7 +241,7 @@ const SwimlaneBoard = ({ projectId, projectName, hideHeader = false }) => {
         const mapping = {};
         newOrder.forEach((s, i) => (mapping[String(s.id)] = i + 1));
         await axios.post(`${BASE}/api/statuses/reorder`, mapping, { headers: headersWithToken() });
-        toast.success("Columns reordered");
+        showStatusToast("Columns reordered", "success");
         return;
       }
       if (String(draggableId).startsWith("task-")) {
@@ -249,22 +249,22 @@ const SwimlaneBoard = ({ projectId, projectName, hideHeader = false }) => {
         const destStatusId = Number(destination.droppableId.split("__")[0]);
         setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, statusId: destStatusId } : t));
         await axios.patch(`${BASE}/api/tasks/${taskId}/status`, { statusId: destStatusId }, { headers: headersWithToken() });
-        toast.success("Task moved");
+        showStatusToast("Task moved", "success");
       }
     } catch (err) {
-      console.error(err); toast.error("Move failed, reloading"); await loadBoard();
+      console.error(err); showStatusToast("Move failed, reloading", "error"); await loadBoard();
     }
   };
 
   const handleCreateStatus = async () => {
     const name = (newStatusName || "").trim();
-    if (!name) { toast.error("Column name required"); return; }
+    if (!name) { showStatusToast("Column name required", "error"); return; }
     setCreatingStatus(true);
     try {
       const res = await axios.post(`${BASE}/api/projects/${projectId}/statuses`, { name }, { headers: headersWithToken() });
       setStatuses((prev) => [...prev, res.data].slice().sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
-      setNewStatusName(""); setShowAddInput(false); toast.success("Column added");
-    } catch (err) { console.error(err); toast.error("Failed to add column"); }
+      setNewStatusName(""); setShowAddInput(false); showStatusToast("Column added", "success");
+    } catch (err) { console.error(err); showStatusToast("Failed to add column", "error"); }
     finally { setCreatingStatus(false); }
   };
 
@@ -277,29 +277,29 @@ const SwimlaneBoard = ({ projectId, projectName, hideHeader = false }) => {
   const doDirectDelete = async (statusId) => {
     try {
       await axios.delete(`${BASE}/api/statuses/${statusId}`, { headers: headersWithToken() });
-      toast.success("Column deleted"); setStatuses((prev) => prev.filter((s) => s.id !== statusId)); await loadBoard();
-    } catch (err) { console.error(err); toast.error("Delete failed"); await loadBoard(); }
+      showStatusToast("Column deleted", "success"); setStatuses((prev) => prev.filter((s) => s.id !== statusId)); await loadBoard();
+    } catch (err) { console.error(err); showStatusToast("Delete failed", "error"); await loadBoard(); }
   };
   const confirmDeleteWithMigration = async (newStatusId) => {
     if (!statusToDelete) return;
     try {
       await axios.delete(`${BASE}/api/statuses/${statusToDelete.id}`, { params: { newStatusId }, headers: headersWithToken() });
-      toast.success("Column deleted and tasks moved");
+      showStatusToast("Column deleted and tasks moved", "success");
       setStatuses((prev) => prev.filter((s) => s.id !== statusToDelete.id));
       setIsDeleteModalOpen(false); setStatusToDelete(null); await loadBoard();
-    } catch (err) { console.error(err); toast.error("Delete/migrate failed"); await loadBoard(); }
+    } catch (err) { console.error(err); showStatusToast("Delete/migrate failed", "error"); await loadBoard(); }
   };
   const startRename  = (s) => { setEditingStatusId(s.id); setEditingStatusName(s.name ?? ""); };
   const cancelRename = ()  => { setEditingStatusId(null); setEditingStatusName(""); };
   const saveRename   = async (statusId) => {
     const name = (editingStatusName || "").trim();
-    if (!name) { toast.error("Name required"); return; }
+    if (!name) { showStatusToast("Name required", "error"); return; }
     try {
       const payload = statuses.map((s) => (s.id === statusId ? { ...s, name } : s));
       await axios.put(`${BASE}/api/projects/${projectId}/statuses`, payload, { headers: headersWithToken() });
       setStatuses((prev) => prev.map((s) => (s.id === statusId ? { ...s, name } : s)));
-      toast.success("Renamed");
-    } catch (err) { console.error(err); toast.error("Rename failed"); await loadBoard(); }
+      showStatusToast("Renamed", "success");
+    } catch (err) { console.error(err); showStatusToast("Rename failed", "error"); await loadBoard(); }
     finally { cancelRename(); }
   };
 
@@ -307,15 +307,15 @@ const SwimlaneBoard = ({ projectId, projectName, hideHeader = false }) => {
     try {
       const res = await axios.get(`${BASE}/api/sprints/${sprintId}/popup-status`, { headers: headersWithToken() });
       if (res.data?.endingSoon === true) setSprintPopup(res.data);
-    } catch (err) { console.error(err); toast.error("Failed to fetch sprint info"); }
+    } catch (err) { console.error(err); showStatusToast("Failed to fetch sprint info", "error"); }
   };
   const finishSprint = async (option) => {
     if (!activeSprintId) return;
     setIsFinishingSprint(true);
     try {
       await axios.post(`${BASE}/api/sprints/${activeSprintId}/finish`, null, { params: { option }, headers: headersWithToken() });
-      toast.success("Sprint finished"); setSprintPopup(null); await loadBoard();
-    } catch (err) { console.error(err); toast.error("Failed to finish sprint"); }
+      showStatusToast("Sprint finished", "success"); setSprintPopup(null); await loadBoard();
+    } catch (err) { console.error(err); showStatusToast("Failed to finish sprint", "error"); }
     finally { setIsFinishingSprint(false); }
   };
 
@@ -333,7 +333,7 @@ const SwimlaneBoard = ({ projectId, projectName, hideHeader = false }) => {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    try { await loadBoard(); toast.info("Board refreshed"); }
+    try { await loadBoard(); showStatusToast("Board refreshed", "info"); }
     finally { setIsRefreshing(false); }
   };
 
@@ -434,8 +434,8 @@ const SwimlaneBoard = ({ projectId, projectName, hideHeader = false }) => {
                         </div>
                       </div>
                       <div className="flex justify-end gap-2 pt-1">
-                        <button onClick={() => { setSelectedAssignees(new Set()); setSelectedPriorities(new Set()); setSelectedStatusesFilter(new Set()); setAssigneeQuery(""); toast.info("Filters cleared"); }} className="px-3 py-1.5 border rounded text-sm">Clear</button>
-                        <button onClick={() => setFilterOpen(false)} className="px-3 py-1.5 rounded bg-indigo-600 text-white text-sm">Apply</button>
+                        <Button variant="secondary" size="small" onClick={() => { setSelectedAssignees(new Set()); setSelectedPriorities(new Set()); setSelectedStatusesFilter(new Set()); setAssigneeQuery(""); showStatusToast("Filters cleared", "info"); }}>Clear</Button>
+                        <Button variant="primary" size="small" onClick={() => setFilterOpen(false)}>Apply</Button>
                       </div>
                     </div>
                   </div>
@@ -446,8 +446,8 @@ const SwimlaneBoard = ({ projectId, projectName, hideHeader = false }) => {
               {showAddInput ? (
                 <div className="flex items-center gap-2">
                   <input value={newStatusName} onChange={(e) => setNewStatusName(e.target.value)} placeholder="Column name" className="px-3 py-2 border rounded text-sm" onKeyDown={(e) => { if (e.key === "Enter") handleCreateStatus(); }} />
-                  <button onClick={handleCreateStatus} disabled={creatingStatus} className="px-3 py-2 rounded bg-indigo-600 text-white text-sm">{creatingStatus ? "Adding…" : "Save"}</button>
-                  <button onClick={() => { setShowAddInput(false); setNewStatusName(""); }} className="px-3 py-2 border rounded text-sm">Cancel</button>
+                  <Button variant="primary" size="small" onClick={handleCreateStatus} disabled={creatingStatus} loading={creatingStatus} loadingText="Adding…">Save</Button>
+                  <Button variant="secondary" size="small" onClick={() => { setShowAddInput(false); setNewStatusName(""); }}>Cancel</Button>
                 </div>
               ) : (
                 <button onClick={() => setShowAddInput(true)} className="flex items-center gap-2 px-3 py-2 rounded border bg-white hover:bg-slate-50 text-sm">
@@ -507,8 +507,8 @@ const SwimlaneBoard = ({ projectId, projectName, hideHeader = false }) => {
                                 <div className="flex items-center gap-1 ml-2">
                                   {editingStatusId === status.id ? (
                                     <>
-                                      <button onClick={() => saveRename(status.id)} className="px-2 py-1 text-xs bg-indigo-600 text-white rounded">Save</button>
-                                      <button onClick={cancelRename} className="px-2 py-1 text-xs border rounded">Cancel</button>
+                                      <Button variant="primary" size="small" onClick={() => saveRename(status.id)}>Save</Button>
+                                      <Button variant="secondary" size="small" onClick={cancelRename}>Cancel</Button>
                                     </>
                                   ) : (
                                     <>
@@ -730,8 +730,8 @@ const SwimlaneBoard = ({ projectId, projectName, hideHeader = false }) => {
             {sprintPopup.hasUnfinishedTasks && <p className="text-sm text-red-600 mb-4">There are unfinished tasks in this sprint.</p>}
             {sprintPopup.endingSoon && <p className="text-sm text-yellow-600 mb-4">Sprint is ending soon.</p>}
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => finishSprint("NEXT_SPRINT")} disabled={isFinishingSprint} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-60">Move to Next Sprint</button>
-              <button onClick={() => finishSprint("BACKLOG")} disabled={isFinishingSprint} className="px-3 py-2 rounded border disabled:opacity-60">Move to Backlog</button>
+              <Button variant="primary" disabled={isFinishingSprint} onClick={() => finishSprint("NEXT_SPRINT")}>Move to Next Sprint</Button>
+              <Button variant="secondary" disabled={isFinishingSprint} onClick={() => finishSprint("BACKLOG")}>Move to Backlog</Button>
             </div>
           </div>
         </div>

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { useAuth } from "../../../contexts/AuthContext";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { toast, ToastContainer } from "react-toastify";
+import { showStatusToast } from "../../../components/toastfy/toast";
 import { useNavigate } from "react-router-dom";
-import "react-toastify/dist/ReactToastify.css";
 import Button from "../../../components/Button/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const ReadOnlyDashboard = () => {
   const { user } = useAuth();
@@ -62,7 +63,7 @@ const ReadOnlyDashboard = () => {
       } catch (err) {
         console.error("Error fetching data:", err.response || err);
         setError("Failed to load user data");
-        toast.error("Failed to load user data");
+        showStatusToast("Failed to load user data", "error");
       } finally {
         setLoading(false);
       }
@@ -293,30 +294,23 @@ const ReadOnlyDashboard = () => {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <ToastContainer />
 
       <h1 className="text-2xl font-bold mb-4 text-indigo-900">
         {userName} — Your Projects
       </h1>
 
-      {loading && <p className="text-gray-600">Loading data...</p>}
+      {loading && <LoadingSpinner size="md" text="Loading data..." />}
       {error && <p className="text-red-500">{error}</p>}
 
       {/* PROJECTS */}
       <section className="mb-6">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-xl font-semibold">Projects</h2>
-          <select
-            className="border rounded px-2 py-1 text-sm"
+          <FilterListbox
+            options={[{value:"ALL",label:"All"},{value:"ACTIVE",label:"Active"},{value:"ARCHIVED",label:"Archived"},{value:"COMPLETED",label:"Completed"},{value:"ON_HOLD",label:"On Hold"}]}
             value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-          >
-            <option value="ALL">All</option>
-            <option value="ACTIVE">Active</option>
-            <option value="ARCHIVED">Archived</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="ON_HOLD">On Hold</option>
-          </select>
+            onChange={setProjectFilter}
+          />
         </div>
 
         {filteredProjects.length === 0 ? (
@@ -330,17 +324,11 @@ const ReadOnlyDashboard = () => {
       <section className="mb-6">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-xl font-semibold">Stories</h2>
-          <select
-            className="border rounded px-2 py-1 text-sm"
+          <FilterListbox
+            options={[{value:"ALL",label:"All"},{value:"BACKLOG",label:"Backlog"},{value:"TO_DO",label:"To Do"},{value:"IN_PROGRESS",label:"In Progress"},{value:"DONE",label:"Done"}]}
             value={storyFilter}
-            onChange={(e) => setStoryFilter(e.target.value)}
-          >
-            <option value="ALL">All</option>
-            <option value="BACKLOG">Backlog</option>
-            <option value="TO_DO">To Do</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="DONE">Done</option>
-          </select>
+            onChange={setStoryFilter}
+          />
         </div>
 
         {filteredStories.length === 0 ? (
@@ -354,17 +342,11 @@ const ReadOnlyDashboard = () => {
       <section className="mb-6">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-xl font-semibold">Tasks</h2>
-          <select
-            className="border rounded px-2 py-1 text-sm"
+          <FilterListbox
+            options={[{value:"ALL",label:"All"},{value:"BACKLOG",label:"Backlog"},{value:"TO_DO",label:"To Do"},{value:"IN_PROGRESS",label:"In Progress"},{value:"DONE",label:"Done"}]}
             value={taskFilter}
-            onChange={(e) => setTaskFilter(e.target.value)}
-          >
-            <option value="ALL">All</option>
-            <option value="BACKLOG">Backlog</option>
-            <option value="TO_DO">To Do</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="DONE">Done</option>
-          </select>
+            onChange={setTaskFilter}
+          />
         </div>
 
         {filteredTasks.length === 0 ? (

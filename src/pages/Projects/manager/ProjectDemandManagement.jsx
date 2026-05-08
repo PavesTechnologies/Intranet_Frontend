@@ -8,7 +8,7 @@ import DemandFilters from '../../resource_management/demand/components/DemandFil
 import demandService from '../../resource_management/demand/services/demandService';
 import { Search, Filter, Plus, FilePlus, Calendar, XCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../components/toastfy/toast";
 import { getProjectById, checkDemandCreation, updateDemandStatus } from '../../resource_management/services/projectService';
 import { getSkillCategoriesTree, getProficiencyLevels } from "../../resource_management/services/workforceService";
 import DemandModal from "../../resource_management/models/DemandModal";
@@ -248,7 +248,7 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
             setKpiData(kpis);
         } catch (err) {
             console.error("Failed to fetch project context", err);
-            toast.error("Failed to load project details for demand creation");
+            showStatusToast("Failed to load project details for demand creation", "error");
         } finally {
             setLoadingProject(false);
         }

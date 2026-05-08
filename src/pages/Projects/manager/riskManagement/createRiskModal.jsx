@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Select from "react-select";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   X,
   ChevronRight,
@@ -634,25 +635,11 @@ const CreateRiskModal = ({
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Field label="Status" required error={errors.statusId}>
-              <select
+              <FilterListbox
+                options={[{value:"",label:"Select status…"},...statuses.map(s=>({value:s.id,label:s.name}))]}
                 value={form.statusId}
-                onChange={(e) => set("statusId", e.target.value)}
-                className={`w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800
-                  focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all
-                  ${
-                    errors.statusId
-                      ? "border-red-400 bg-red-50"
-                      : "border-slate-200"
-                  }`}
-              >
-                <option value="">Select status…</option>
-
-                {statuses.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => set("statusId", val)}
+              />
             </Field>
 
             <Field label="Category" required error={errors.category}>

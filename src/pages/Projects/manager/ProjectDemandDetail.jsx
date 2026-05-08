@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import Button from '../../../components/Button/Button';
+import LoadingSpinner from '../../../components/LoadingSpinner';
 import {
     ArrowLeft, Calendar, Target, Clock, Activity,
     FileText, Building2, ShieldCheck, Code2,
@@ -70,9 +72,8 @@ const ProjectDemandDetail = ({ projectId, demandId, onBack }) => {
     }, [demandId]);
 
     if (isLoading) return (
-        <div className="flex flex-col items-center justify-center min-h-[500px] bg-white rounded-xl">
-            <div className="h-10 w-10 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin mb-4" />
-            <p className="text-sm font-medium text-slate-400 animate-pulse">Loading Demand Details...</p>
+        <div className="flex items-center justify-center min-h-[500px] bg-white rounded-xl">
+            <LoadingSpinner text="Loading Demand Details..." size="lg" />
         </div>
     );
 
@@ -119,9 +120,9 @@ const ProjectDemandDetail = ({ projectId, demandId, onBack }) => {
                         <span className="text-xs font-medium text-slate-500 block">Priority Score</span>
                         <span className="text-lg font-bold text-indigo-600">{demand.priorityScore || 0}</span>
                     </div>
-                    <button className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-indigo-700 transition-all">
+                    <Button variant="primary">
                         Action
-                    </button>
+                    </Button>
                 </div>
             </div>
 

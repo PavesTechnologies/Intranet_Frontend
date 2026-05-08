@@ -20,8 +20,7 @@ import {
   Rows,
 } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../components/toastfy/toast";
 import EditTaskForm from "./Backlog/EditTaskForm";
 import EditStoryForm from "./Backlog/EditStoryForm";
 import RightSidePanel from "./Sprint/RightSidePanel";
@@ -35,6 +34,7 @@ import { Avatar } from "./Board/TaskCard";
 
 // ── NEW: Swimlane view ────────────────────────────────────────
 import SwimlaneBoard from "./SwimlaneBoard";
+import Button from "../../../components/Button/Button";
 
 const headersWithToken = () => {
   const token = localStorage.getItem("token");
@@ -191,7 +191,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
       }
     } catch (err) {
       console.error("Load board failed", err);
-      toast.error("Failed to load board");
+      showStatusToast("Failed to load board", "error");
       setStatuses([]);
       setTasks([]);
       setMembers([]);
@@ -272,7 +272,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
   const handleCreateStatus = async () => {
     const name = (newStatusName || "").trim();
     if (!name) {
-      toast.error("Column name required");
+      showStatusToast("Column name required", "error");
       return;
     }
     setCreatingStatus(true);
@@ -289,10 +289,10 @@ const Board = ({ projectId, sprintId, projectName }) => {
       );
       setNewStatusName("");
       setShowAddInput(false);
-      toast.success("Column added");
+      showStatusToast("Column added", "success");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to add column");
+      showStatusToast("Failed to add column", "error");
     } finally {
       setCreatingStatus(false);
     }
@@ -301,7 +301,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
     setIsRefreshing(true);
     try {
       await loadBoard();
-      toast.info("Board refreshed");
+      showStatusToast("Board refreshed", "info");
     } catch (_) {
     } finally {
       setIsRefreshing(false);
@@ -324,12 +324,12 @@ const Board = ({ projectId, sprintId, projectName }) => {
       await axios.delete(`${BASE}/api/statuses/${statusId}`, {
         headers: headersWithToken(),
       });
-      toast.success("Column deleted");
+      showStatusToast("Column deleted", "success");
       setStatuses((prev) => prev.filter((s) => s.id !== statusId));
       await loadBoard();
     } catch (err) {
       console.error(err);
-      toast.error("Delete failed");
+      showStatusToast("Delete failed", "error");
       await loadBoard();
     }
   };
@@ -340,14 +340,14 @@ const Board = ({ projectId, sprintId, projectName }) => {
         params: { newStatusId },
         headers: headersWithToken(),
       });
-      toast.success("Column deleted and tasks moved");
+      showStatusToast("Column deleted and tasks moved", "success");
       setStatuses((prev) => prev.filter((s) => s.id !== statusToDelete.id));
       setIsDeleteModalOpen(false);
       setStatusToDelete(null);
       await loadBoard();
     } catch (err) {
       console.error(err);
-      toast.error("Delete/migrate failed");
+      showStatusToast("Delete/migrate failed", "error");
       await loadBoard();
     }
   };
@@ -378,12 +378,12 @@ const Board = ({ projectId, sprintId, projectName }) => {
         params: { option },
         headers: headersWithToken(),
       });
-      toast.success("Sprint finished successfully");
+      showStatusToast("Sprint finished successfully", "success");
       setSprintPopup(null);
       await loadBoard();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to finish sprint");
+      showStatusToast("Failed to finish sprint", "error");
     } finally {
       setIsFinishingSprint(false);
     }
@@ -400,7 +400,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
   const saveRename = async (statusId) => {
     const name = (editingStatusName || "").trim();
     if (!name) {
-      toast.error("Name required");
+      showStatusToast("Name required", "error");
       return;
     }
     try {
@@ -413,10 +413,10 @@ const Board = ({ projectId, sprintId, projectName }) => {
       setStatuses((prev) =>
         prev.map((s) => (s.id === statusId ? { ...s, name } : s))
       );
-      toast.success("Renamed");
+      showStatusToast("Renamed", "success");
     } catch (err) {
       console.error(err);
-      toast.error("Rename failed");
+      showStatusToast("Rename failed", "error");
       await loadBoard();
     } finally {
       cancelRename();
@@ -441,7 +441,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
         await axios.post(`${BASE}/api/statuses/reorder`, payload, {
           headers: headersWithToken(),
         });
-        toast.success("Columns reordered");
+        showStatusToast("Columns reordered", "success");
         return;
       }
       const srcStatusId = source.droppableId;
@@ -470,12 +470,12 @@ const Board = ({ projectId, sprintId, projectName }) => {
           { statusId: Number(destStatusId) },
           { headers: headersWithToken() }
         );
-        toast.success("Task moved");
+        showStatusToast("Task moved", "success");
         return;
       }
     } catch (err) {
       console.error(err);
-      toast.error("Move failed, reloading");
+      showStatusToast("Move failed, reloading", "error");
       await loadBoard();
     }
   };
@@ -566,7 +566,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
       </h2> */}
       <h2 className="text-xl font-semibold">
   {/* {projectName ?? "Project Board"} */}
-  Active Sprint
+  {activeSprintName ? "Active Sprint" : "No Active Sprint"}
   {activeSprintName && (
     <span className="ml-3 text-sm font-normal text-gray-500 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100">
       {activeSprintName}
@@ -775,25 +775,23 @@ const Board = ({ projectId, sprintId, projectName }) => {
                     </div> */}
                   </div>
                   <div className="flex justify-end gap-2 mt-4">
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="small"
                       onClick={() => {
                         setSelectedAssignees(new Set());
                         setSelectedPriorities(new Set());
                         setSelectedStatusesFilter(new Set());
                         setSelectedSprints(new Set());
                         setAssigneeQuery("");
-                        toast.info("Filters cleared");
+                        showStatusToast("Filters cleared", "info");
                       }}
-                      className="px-3 py-2 border rounded"
                     >
                       Clear
-                    </button>
-                    <button
-                      onClick={() => setFilterOpen(false)}
-                      className="px-3 py-2 rounded bg-indigo-600 text-white"
-                    >
+                    </Button>
+                    <Button variant="primary" size="small" onClick={() => setFilterOpen(false)}>
                       Apply
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -810,19 +808,23 @@ const Board = ({ projectId, sprintId, projectName }) => {
                 placeholder="Column name"
                 className="px-3 py-2 border rounded"
               />
-              <button
+              <Button
+                variant="primary"
+                size="small"
                 onClick={handleCreateStatus}
                 disabled={creatingStatus}
-                className="px-3 py-2 rounded bg-indigo-600 text-white"
+                loading={creatingStatus}
+                loadingText="Adding..."
               >
-                {creatingStatus ? "Adding..." : "Save"}
-              </button>
-              <button
+                Save
+              </Button>
+              <Button
+                variant="secondary"
+                size="small"
                 onClick={() => { setShowAddInput(false); setNewStatusName(""); }}
-                className="px-3 py-2 border rounded"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           ) : (
             <button
@@ -965,18 +967,12 @@ const Board = ({ projectId, sprintId, projectName }) => {
                             <div className="flex items-center gap-2">
                               {editingStatusId === status.id ? (
                                 <>
-                                  <button
-                                    onClick={() => saveRename(status.id)}
-                                    className="px-2 py-1 text-sm bg-indigo-600 text-white rounded"
-                                  >
+                                  <Button variant="primary" size="small" onClick={() => saveRename(status.id)}>
                                     Save
-                                  </button>
-                                  <button
-                                    onClick={cancelRename}
-                                    className="px-2 py-1 text-sm border rounded"
-                                  >
+                                  </Button>
+                                  <Button variant="secondary" size="small" onClick={cancelRename}>
                                     Cancel
-                                  </button>
+                                  </Button>
                                 </>
                               ) : (
                                 <>
@@ -1034,20 +1030,22 @@ const Board = ({ projectId, sprintId, projectName }) => {
                             )}
                           </Droppable>
                           {/* Create Task button */}
-                          <div className="mt-3">
-                            <button
-                              onClick={() =>
-                                setOpenCreateTaskModal({
-                                  projectId,
-                                  statusId: status.id,
-                                  activeSprintId,
-                                })
-                              }
-                              className="text-indigo-600 hover:underline text-sm flex items-center gap-1"
-                            >
-                              <Plus className="w-4 h-4" /> Create Task
-                            </button>
-                          </div>
+                          {activeSprintId && (
+                            <div className="mt-3">
+                              <button
+                                onClick={() =>
+                                  setOpenCreateTaskModal({
+                                    projectId,
+                                    statusId: status.id,
+                                    activeSprintId,
+                                  })
+                                }
+                                className="text-indigo-600 hover:underline text-sm flex items-center gap-1"
+                              >
+                                <Plus className="w-4 h-4" /> Create Task
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </Draggable>

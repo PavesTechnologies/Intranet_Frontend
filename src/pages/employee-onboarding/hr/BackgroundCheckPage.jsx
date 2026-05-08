@@ -6,6 +6,7 @@ import {
   GraduationCap, Briefcase, MapPin, CreditCard, Award,
   Lock, Upload, Trash2, Plus
 } from "lucide-react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
@@ -843,14 +844,17 @@ export default function BackgroundCheckPage() {
             </div>
           </div>
           <div className="px-3 py-2 border-b border-gray-100">
-            <select value={bgFilter} onChange={e => setBgFilter(e.target.value)}
-              className="w-full text-xs border border-gray-200 px-2 py-1.5 rounded-lg bg-white outline-none">
-              <option value="ALL">All Status</option>
-              <option value="PENDING">Pending</option>
-              <option value="IN_REVIEW">In Review</option>
-              <option value="VERIFIED">Verified</option>
-              <option value="REJECTED">Rejected</option>
-            </select>
+            <FilterListbox
+              options={[
+                { value: "ALL", label: "All Status" },
+                { value: "PENDING", label: "Pending" },
+                { value: "IN_REVIEW", label: "In Review" },
+                { value: "VERIFIED", label: "Verified" },
+                { value: "REJECTED", label: "Rejected" },
+              ]}
+              value={bgFilter}
+              onChange={setBgFilter}
+            />
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1 max-h-[520px]">
             {loadingList ? (
@@ -990,14 +994,17 @@ export default function BackgroundCheckPage() {
                             />
                             Select All
                           </label>
-                          <select value={checkFilter} onChange={e => setCheckFilter(e.target.value)}
-                            className="border border-gray-200 text-xs px-2 py-1.5 rounded-lg bg-white outline-none">
-                            <option value="ALL">All</option>
-                            <option value="PENDING">Pending</option>
-                            <option value="IN_REVIEW">In Review</option>
-                            <option value="VERIFIED">Verified</option>
-                            <option value="REJECTED">Rejected</option>
-                          </select>
+                          <FilterListbox
+                            options={[
+                              { value: "ALL", label: "All" },
+                              { value: "PENDING", label: "Pending" },
+                              { value: "IN_REVIEW", label: "In Review" },
+                              { value: "VERIFIED", label: "Verified" },
+                              { value: "REJECTED", label: "Rejected" },
+                            ]}
+                            value={checkFilter}
+                            onChange={setCheckFilter}
+                          />
                         </div>
                         <div className="flex items-center gap-2">
                           <Button variant="primary" size="small" onClick={() => setIsModalOpen(true)} disabled={selectedIds.length === 0}>

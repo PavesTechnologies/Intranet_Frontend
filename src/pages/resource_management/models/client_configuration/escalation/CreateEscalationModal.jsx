@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 const CreateEscalationModal = ({ open, onClose }) => {
   const [formData, setFormData] = useState({
@@ -114,17 +115,16 @@ const CreateEscalationModal = ({ open, onClose }) => {
             <label className="text-sm font-medium text-gray-700">
               Escalation Level <span className="text-red-500">*</span>
             </label>
-            <select
-              name="escalation_level"
+            <FilterListbox
+              options={[
+                { value: "", label: "Select level" },
+                { value: "1", label: "Level 1" },
+                { value: "2", label: "Level 2" },
+                { value: "3", label: "Level 3" },
+              ]}
               value={formData.escalation_level}
-              onChange={handleChange}
-              className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Select level</option>
-              <option value="1">Level 1</option>
-              <option value="2">Level 2</option>
-              <option value="3">Level 3</option>
-            </select>
+              onChange={(val) => handleChange({ target: { name: "escalation_level", value: val } })}
+            />
           </div>
         </div>
 

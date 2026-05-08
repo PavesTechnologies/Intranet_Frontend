@@ -1,4 +1,5 @@
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 const SLAForm = ({ formData, setFormData }) => {
   const { getEnumValues } = useEnums();
@@ -18,19 +19,14 @@ const SLAForm = ({ formData, setFormData }) => {
           <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
             SLA Type *
           </label>
-          <select
-            name="slaType"
+          <FilterListbox
+            options={[
+              { value: "", label: "Select Type" },
+              ...SLA_TYPES.map((type) => ({ value: type, label: type.replace(/_/g, " ") })),
+            ]}
             value={formData.slaType || ""}
-            onChange={handleChange}
-            className="w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
-          >
-            <option value="">Select Type</option>
-            {SLA_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleChange({ target: { name: "slaType", value: val } })}
+          />
         </div>
 
         {/* SLA Duration */}

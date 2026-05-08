@@ -2,6 +2,7 @@ import React from "react";
 
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import FilterListbox from "../../components/filter/FilterListbox";
 
 const TimesheetFilters = ({
   searchText,
@@ -137,23 +138,18 @@ const TimesheetFilters = ({
         />
       </div>
 
-      <select
-        value={filterStatus}
-        onChange={(e) => setFilterStatus(e.target.value)}
-        style={{
-          border: "1px solid #d0d6de",
-          borderRadius: 4,
-          padding: "8px 10px",
-          fontSize: 15,
-          background: "#f9fafb",
-        }}
-      >
-        <option>All Status</option>
-        {/* <option value={"Pending"}>Pending</option> */}
-        <option value={"Submitted"}>Submitted</option>
-        <option value={"Approved"}>Approved</option>
-        <option value={"Rejected"}>Rejected</option>
-      </select>
+      <div className="w-44">
+        <FilterListbox
+          options={[
+            { value: "All Status", label: "All Status" },
+            { value: "Submitted", label: "Submitted" },
+            { value: "Approved", label: "Approved" },
+            { value: "Rejected", label: "Rejected" },
+          ]}
+          value={filterStatus}
+          onChange={setFilterStatus}
+        />
+      </div>
     </div>
   );
 };

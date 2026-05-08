@@ -1,12 +1,13 @@
 // ✅ UserIssueTracker.jsx (Final View-Only Version)
 import React, { useEffect, useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import Button from "../../../../components/Button/Button";
 import { FiEye } from "react-icons/fi";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
+import SearchInput from "../../../../components/filter/Searchbar";
 
 const UserIssueTracker = () => {
   const { projectId: paramProjectId } = useParams();
@@ -99,7 +100,7 @@ const UserIssueTracker = () => {
       setFilteredIssues(allIssues);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load issues");
+      showStatusToast("Failed to load issues", "error");
     } finally {
       setLoading(false);
     }
@@ -115,7 +116,7 @@ const UserIssueTracker = () => {
       setProjects(res.data || []);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load projects");
+      showStatusToast("Failed to load projects", "error");
     }
   };
 
@@ -188,7 +189,6 @@ const UserIssueTracker = () => {
 
   return (
     <div className="max-w-7xl mx-auto mt-6 px-4 space-y-6">
-      <ToastContainer />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-indigo-900">
           Issue Tracker ({projectName})
@@ -210,75 +210,41 @@ const UserIssueTracker = () => {
 
       {/* Filters */}
       <div className="bg-white p-5 rounded-lg shadow-md flex flex-wrap gap-3 items-center border border-gray-100">
-        <input
-          type="text"
-          placeholder="Search by title..."
+        <SearchInput
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          placeholder="Search by title..."
+          className="w-64"
         />
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
+        <FilterListbox
+          options={[{value:"",label:"All Types"},{value:"Epic",label:"Epic"},{value:"Story",label:"Story"},{value:"Task",label:"Task"},{value:"Bug",label:"Bug"}]}
           value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-        >
-          <option value="">All Types</option>
-          <option value="Epic">Epic</option>
-          <option value="Story">Story</option>
-          <option value="Task">Task</option>
-          <option value="Bug">Bug</option>
-        </select>
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
+          onChange={setFilterType}
+        />
+        <FilterListbox
+          options={[{value:"",label:"All Priorities"},{value:"LOW",label:"Low"},{value:"MEDIUM",label:"Medium"},{value:"HIGH",label:"High"},{value:"CRITICAL",label:"Critical"}]}
           value={filterPriority}
-          onChange={(e) => setFilterPriority(e.target.value)}
-        >
-          <option value="">All Priorities</option>
-          <option value="LOW">Low</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="HIGH">High</option>
-          <option value="CRITICAL">Critical</option>
-        </select>
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
+          onChange={setFilterPriority}
+        />
+        <FilterListbox
+          options={[{value:"",label:"All Status"},{value:"BACKLOG",label:"Backlog"},{value:"TODO",label:"Todo"},{value:"IN_PROGRESS",label:"In Progress"},{value:"REVIEW",label:"Review"},{value:"RESOLVED",label:"Resolved"},{value:"DONE",label:"Done"},{value:"CLOSED",label:"Closed"},{value:"BLOCKED",label:"Blocked"}]}
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-        >
-          <option value="">All Status</option>
-          <option value="BACKLOG">Backlog</option>
-          <option value="TODO">Todo</option>
-          <option value="IN_PROGRESS">In Progress</option>
-          <option value="REVIEW">Review</option>
-          <option value="RESOLVED">Resolved</option>
-          <option value="DONE">Done</option>
-          <option value="CLOSED">Closed</option>
-          <option value="BLOCKED">Blocked</option>
-        </select>
+          onChange={setFilterStatus}
+        />
 
         {/* User Filter */}
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
+        <FilterListbox
+          options={[{value:"",label:"All Users"},...userNames.map(u=>({value:u,label:u}))]}
           value={filterUser}
-          onChange={(e) => setFilterUser(e.target.value)}
-        >
-          <option value="">All Users</option>
-          {userNames.map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </select>
+          onChange={setFilterUser}
+        />
 
         {/* Billable Filter */}
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
+        <FilterListbox
+          options={[{value:"",label:"All Billable"},{value:"Yes",label:"Yes"},{value:"No",label:"No"}]}
           value={filterBillable}
-          onChange={(e) => setFilterBillable(e.target.value)}
-        >
-          <option value="">All Billable</option>
-          <option value="Yes">Yes</option>
-          <option value="No">No</option>
-        </select>
+          onChange={setFilterBillable}
+        />
 
         {(filterType ||
           filterPriority ||

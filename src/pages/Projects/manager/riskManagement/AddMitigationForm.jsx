@@ -1,4 +1,5 @@
 import { useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import axios from "axios";
 
@@ -103,18 +104,11 @@ export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
       {/* Owner */}
       <div>
         <label className="text-xs font-semibold text-slate-600">Owner</label>
-        <select
+        <FilterListbox
+          options={[{value:"",label:"Unassigned"},...members.map(m=>({value:m.id,label:m.name}))]}
           value={form.ownerId}
-          onChange={(e) => setForm({ ...form, ownerId: e.target.value })}
-          className="mt-1 border rounded-lg p-2 w-full text-sm bg-white"
-        >
-          <option value="">Unassigned</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+          onChange={(val) => setForm({...form, ownerId: val})}
+        />
       </div>
 
       {/* Notes toggle */}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../components/toastfy/toast";
 import { motion, AnimatePresence } from "motion/react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
@@ -805,11 +805,12 @@ const Step3 = ({
   toggleMember,
   search,
   setSearch,
+  editingProjectId,
 }) => {
   const allUsers = [...projectManagers, ...resourceManagers, ...deliveryOwners];
-  const filtered = allUsers.filter((u) =>
-    u?.name?.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = resources.filter((r) =>
+  r?.resourceName?.toLowerCase().includes(search.toLowerCase())
+);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div className="pmw-g2">
@@ -828,8 +829,8 @@ const Step3 = ({
 ))}
           </Sel>
         </Field>
-        <Field label="Client" optional>
-          <Sel name="clientId" value={fd.clientId} onChange={onChange}>
+        <Field label="Client" required error={err.clientId}>
+          <Sel name="clientId" value={fd.clientId} onChange={onChange} error={err.clientId}>
             <option value="">Select client</option>
            {clients.map((c) => (
   <option key={c.clientId} value={c.clientId}>
@@ -865,163 +866,83 @@ const Step3 = ({
         </Field>
       </div>
 
-      <div className="pmw-divider" />
+      {editingProjectId && (
+        <>
+          <div className="pmw-divider" />
 
-      <div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 10,
-          }}
-        >
-          <label className="pmw-label" style={{ margin: 0 }}>
-            Team Members{" "}
-            <span
-              style={{
-                color: "#9ca3af",
-                fontWeight: 400,
-                textTransform: "none",
-                letterSpacing: 0,
-                fontSize: 10.5,
-              }}
-            >
-              (optional)
-            </span>
-          </label>
-          <AnimatePresence>
-            {fd.memberIds.length > 0 && (
-              <motion.span
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  background: "#eff6ff",
-                  color: "#1d4ed8",
-                  border: "1px solid #bfdbfe",
-                  borderRadius: 20,
-                  padding: "2px 9px",
-                }}
-              >
-                {fd.memberIds.length} selected
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </div>
+          <div>
+            <label className="pmw-label" style={{ margin: 0 }}>
+              Team Members
+            </label>
 
-        <div style={{ position: "relative", marginBottom: 10 }}>
-          <Search
-            size={14}
-            style={{
-              position: "absolute",
-              left: 11,
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "#9ca3af",
-              pointerEvents: "none",
-            }}
-          />
-          <input
-            className="pmw-srch"
-            placeholder="Search members…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <div
-          className="pmw-scroll"
-          style={{
-            border: "1.5px solid #e9eef5",
-            borderRadius: 9,
-            maxHeight: 156,
-            overflowY: "auto",
-            background: "#fff",
-          }}
-        >
-          {filtered.length === 0 ? (
             <div
+              className="pmw-scroll"
               style={{
-                padding: 16,
-                textAlign: "center",
-                fontSize: 13,
-                color: "#94a3b8",
+                border: "1.5px solid #e9eef5",
+                borderRadius: 9,
+                maxHeight: 200,
+                overflowY: "auto",
+                background: "#fff",
+                marginTop: 10,
               }}
             >
-              No users found
-            </div>
-          ) : (
-            filtered.map((user) => {
-              const isOwner = fd.ownerId?.toString() === user.id?.toString();
-              const isSel = fd.memberIds.includes(user.id);
-              return (
+              {resources.length === 0 ? (
                 <div
-                  key={user.id}
-                  className={`pmw-mrow${isSel ? " sel" : ""}${isOwner ? " dis" : ""}`}
-                  onClick={() => !isOwner && toggleMember(user.id)}
+                  style={{
+                    padding: 16,
+                    textAlign: "center",
+                    fontSize: 13,
+                    color: "#94a3b8",
+                  }}
                 >
+                  No team members found
+                </div>
+              ) : (
+                resources.map((res) => (
                   <div
+                    key={res.resourceId}
                     style={{
-                      width: 16,
-                      height: 16,
-                      borderRadius: 4,
-                      flexShrink: 0,
-                      border: isSel ? "none" : "1.5px solid #d1d5db",
-                      background: isSel ? "#2563eb" : "#fff",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      transition: "background .15s",
+                      gap: 12,
+                      padding: "12px 16px",
+                      borderBottom: "1px solid #f8fafc",
                     }}
                   >
-                    {isSel && <Check size={10} color="#fff" strokeWidth={3} />}
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 1,
-                      minWidth: 0,
-                    }}
-                  >
-                    <span
+                    <div
                       style={{
-                        fontSize: 13,
-                        color: "#111827",
-                        fontWeight: isSel ? 500 : 400,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                        minWidth: 0,
+                        flex: 1,
                       }}
                     >
-                      {user.name}
-                      {isOwner && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: "#94a3b8",
-                            marginLeft: 5,
-                          }}
-                        >
-                          (owner)
-                        </span>
-                      )}
-                    </span>
-                    {user.roles?.length > 0 && (
-                      <span style={{ fontSize: 11, color: "#94a3b8" }}>
-                        {user.roles.join(", ")}
+                      <span
+                        style={{
+                          fontSize: 14,
+                          color: "#111827",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {res.resourceName}
                       </span>
-                    )}
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "#6b7280",
+                        }}
+                      >
+                        {res.resourceRole}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -1210,8 +1131,10 @@ const Step5 = ({ fd, statuses, users, clients, resources }) => {
     if (user) return user.name;
     const client = clients.find((c) => c?.clientId?.toString() === id?.toString());
     if (client) return client.clientName;
-    const resource = resources.find((r) => r?.id?.toString() === id?.toString());
-    if (resource) return resource.name;
+    const resource = resources.find(
+  (r) => r?.resourceId?.toString() === id?.toString()
+);
+if (resource) return resource.resourceName;
     return id;
   };
   const memberNames = fd.memberIds.map(getName).filter(Boolean).join(", ");
@@ -1398,7 +1321,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
           setStatuses(sorted.length ? sorted : DEFAULT_STATUSES);
         })
         .catch(() => {
-          toast.error("Failed to load project data.");
+          showStatusToast("Failed to load project data.", "error");
           setStatuses(DEFAULT_STATUSES);
         })
         .finally(() => setLoading(false));
@@ -1413,18 +1336,18 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
   }, [isOpen, editingProjectId]);
 
   /* ── Fetch users ──────────────────────────────────────────────────────── */
-  useEffect(() => {
-    if (!isOpen) return;
-    axios
-      .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users?page=0&size=100`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        const list = Array.isArray(res.data) ? res.data : res.data?.content;
-        if (Array.isArray(list)) setUsers(list.filter(Boolean));
-      })
-      .catch(console.error);
-  }, [isOpen, token]);
+  // useEffect(() => {
+  //   if (!isOpen) return;
+  //   axios
+  //     .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users?page=0&size=100`, {
+  //       headers: { Authorization: `Bearer ${token}` },
+  //     })
+  //     .then((res) => {
+  //       const list = Array.isArray(res.data) ? res.data : res.data?.content;
+  //       if (Array.isArray(list)) setUsers(list.filter(Boolean));
+  //     })
+  //     .catch(console.error);
+  // }, [isOpen, token]);
 
   /* ── Fetch clients ────────────────────────────────────────────────────── */
   useEffect(() => {
@@ -1442,17 +1365,18 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
 
   /* ── Fetch resources ──────────────────────────────────────────────────── */
   useEffect(() => {
-    if (!isOpen || !editingProjectId) return;
-    axios
-      .get(`${window.__APP_CONFIG__.RMS_BASE_URL}/api/allocation/get-all-resources/${editingProjectId}`, {
+  if (!isOpen || !editingProjectId) return;
+
+  axios
+    .get(`${window.__APP_CONFIG__.RMS_BASE_URL}/api/allocation/get-all-resources/${editingProjectId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((res) => {
-        const list = Array.isArray(res.data) ? res.data : res.data?.content;
-        if (Array.isArray(list)) setResources(list.filter(Boolean));
-      })
-      .catch(console.error);
-  }, [isOpen, editingProjectId, token]);
+    .then((res) => {
+      const list = res.data?.data;
+      if (Array.isArray(list)) setResources(list.filter(Boolean));
+    })
+    .catch(console.error);
+}, [isOpen, editingProjectId]);
 
 
   useEffect(() => {
@@ -1641,15 +1565,17 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
           { headers: { Authorization: `Bearer ${token}` } },
         );
       } catch {
-        toast.warn(
+        showStatusToast(
           "Project saved, but statuses could not be saved — configure them in project settings.",
+          "warn",
         );
       }
 
-      toast.success(
+      showStatusToast(
         editingProjectId
           ? "Project updated successfully."
           : "Project created successfully.",
+        "success",
       );
 
       // FIX: call onProjectCreated BEFORE onClose to avoid calling setState on unmounted component
@@ -1662,8 +1588,9 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
       onClose();
     } catch (err) {
       const b = err.response?.data;
-      toast.error(
+      showStatusToast(
         b?.errors?.[0] || b?.message || "Submission failed. Please try again.",
+        "error",
       );
     } finally {
       setSubmitting(false);
@@ -1723,6 +1650,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
          projectManagers={projectManagers}
   resourceManagers={resourceManagers}
   deliveryOwners={deliveryOwners}
+  editingProjectId={editingProjectId}
         
       />
     ),
