@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { X } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import FormTextArea from "../../../../components/forms/FormTextArea";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
+import Button from "../../../../components/Button/Button";
 
 const Wrapper = ({ children, mode, onClose }) => {
   if (mode === "modal") {
@@ -109,7 +111,7 @@ const EditEpicForm = ({
         }
       } catch (err) {
         console.error("Error loading epic:", err);
-        toast.error("Failed to load epic details.");
+        showStatusToast("Failed to load epic details.", "error");
       } finally {
         setLoading(false);
       }
@@ -128,18 +130,18 @@ const EditEpicForm = ({
   const validateForm = () => {
     const name = formData.name?.trim();
     if (!name || name.length < 2 || name.length > 200) {
-      toast.error("Epic name must be between 2 and 200 characters.");
+      showStatusToast("Epic name must be between 2 and 200 characters.", "error");
       return false;
     }
     if (createdDate && formData.dueDate) {
       if (new Date(formData.dueDate) < new Date(createdDate)) {
-        toast.error("Due date cannot be earlier than the created date.");
+        showStatusToast("Due date cannot be earlier than the created date.", "error");
         return false;
       }
     }
     if (formData.startDate && formData.dueDate) {
       if (new Date(formData.dueDate) < new Date(formData.startDate)) {
-        toast.error("Due date cannot be earlier than the start date.");
+        showStatusToast("Due date cannot be earlier than the start date.", "error");
         return false;
       }
     }
@@ -183,7 +185,7 @@ const EditEpicForm = ({
           updatedPayload,
           axiosConfig,
         );
-        toast.success("Epic updated successfully!");
+        showStatusToast("Epic updated successfully!", "success");
       }
       // Add POST logic here later if needed when creating
 
@@ -193,7 +195,7 @@ const EditEpicForm = ({
       }, 300);
     } catch (err) {
       console.error("Error saving epic:", err);
-      toast.error(err.response?.data?.message || "Failed to save epic.");
+      showStatusToast(err.response?.data?.message || "Failed to save epic.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -204,7 +206,7 @@ const EditEpicForm = ({
     return (
       <Wrapper mode={mode} onClose={onClose}>
         <div className="flex-1 flex items-center justify-center py-10">
-          <p className="text-gray-600">Loading epic details...</p>
+          <LoadingSpinner size="md" text="Loading epic details..." />
         </div>
       </Wrapper>
     );
@@ -299,21 +301,8 @@ const EditEpicForm = ({
 
       {/* FOOTER */}
       <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3 shrink-0">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-        >
-          {isSubmitting ? "Saving..." : epicId ? "Save Changes" : "Create Epic"}
-        </button>
+        <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving..." : epicId ? "Save Changes" : "Create Epic"}</Button>
       </div>
     </Wrapper>
   );

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../components/toastfy/toast";
 import { motion, AnimatePresence } from "motion/react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
@@ -1321,7 +1321,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
           setStatuses(sorted.length ? sorted : DEFAULT_STATUSES);
         })
         .catch(() => {
-          toast.error("Failed to load project data.");
+          showStatusToast("Failed to load project data.", "error");
           setStatuses(DEFAULT_STATUSES);
         })
         .finally(() => setLoading(false));
@@ -1565,15 +1565,17 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
           { headers: { Authorization: `Bearer ${token}` } },
         );
       } catch {
-        toast.warn(
+        showStatusToast(
           "Project saved, but statuses could not be saved — configure them in project settings.",
+          "warn",
         );
       }
 
-      toast.success(
+      showStatusToast(
         editingProjectId
           ? "Project updated successfully."
           : "Project created successfully.",
+        "success",
       );
 
       // FIX: call onProjectCreated BEFORE onClose to avoid calling setState on unmounted component
@@ -1586,8 +1588,9 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
       onClose();
     } catch (err) {
       const b = err.response?.data;
-      toast.error(
+      showStatusToast(
         b?.errors?.[0] || b?.message || "Submission failed. Please try again.",
+        "error",
       );
     } finally {
       setSubmitting(false);

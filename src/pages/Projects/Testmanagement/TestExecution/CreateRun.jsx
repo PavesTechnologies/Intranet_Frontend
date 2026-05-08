@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Button from "../../../../components/Button/Button";
 
 export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuccess, onClose }) {
 
@@ -26,7 +27,7 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
     e.preventDefault();
 
     if (!cycleId || !form.name || !form.status) {
-      toast.error("Cycle, Name & Status are required");
+      showStatusToast("Cycle, Name & Status are required", "error");
       return;
     }
 
@@ -44,11 +45,11 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
         payload,
       );
 
-      toast.success("Test Run Created Successfully");
+      showStatusToast("Test Run Created Successfully", "success");
       onSuccess && onSuccess();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to create test run");
+      showStatusToast("Failed to create test run", "error");
     } finally {
       setLoadingSubmit(false);
     }
@@ -168,13 +169,16 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
 
           {/* Submit Button full width */}
           <div className="md:col-span-2">
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              className="w-full"
               disabled={loadingSubmit}
-              className="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
+              loading={loadingSubmit}
+              loadingText="Creating..."
             >
-              {loadingSubmit ? "Creating..." : "Create Test Run"}
-            </button>
+              Create Test Run
+            </Button>
           </div>
         </form>
     </div>

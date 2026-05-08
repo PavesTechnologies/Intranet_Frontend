@@ -6,7 +6,7 @@ import { ChevronRight, ChevronDown, MoreVertical } from "lucide-react";
 import StoryCard from "./StoryCard";
 import TaskCard from "./TaskCard";
 import { jwtDecode } from "jwt-decode";
-import { toast } from "react-toastify"; // if needed for the modal
+import { showStatusToast } from "../../../../components/toastfy/toast";
 
 
 const SprintColumn = ({

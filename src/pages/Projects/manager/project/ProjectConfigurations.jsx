@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Edit, Trash2, ArrowLeft } from "lucide-react";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 
 // Services & Hooks
 import { getProjectById } from "../../../resource_management/services/projectService";
@@ -74,8 +74,9 @@ const ProjectConfigurations = ({ projectId }) => {
       setProject(res.data);
     } catch (err) {
       console.error("Failed to fetch project details", err);
-      toast.error(
+      showStatusToast(
         err.response?.data?.message || "Failed to fetch project details.",
+        "error",
       );
     } finally {
       setLoading(false);
@@ -500,7 +501,7 @@ const ProjectConfigurations = ({ projectId }) => {
           },
         );
         fetchProjectSLAs();
-        toast.success("SLA configuration deleted successfully.");
+        showStatusToast("SLA configuration deleted successfully.", "success");
       }
       if (deleteType === "compliance") {
         await axios.delete(
@@ -512,7 +513,7 @@ const ProjectConfigurations = ({ projectId }) => {
           },
         );
         fetchProjectCompliance();
-        toast.success("Compliance configuration deleted successfully.");
+        showStatusToast("Compliance configuration deleted successfully.", "success");
       }
       if (deleteType === "escalation") {
         await axios.delete(
@@ -524,11 +525,11 @@ const ProjectConfigurations = ({ projectId }) => {
           },
         );
         fetchProjectEscalations();
-        toast.success("Escalation deleted successfully.");
+        showStatusToast("Escalation deleted successfully.", "success");
       }
       setOpenConfirmModal(false);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Delete failed.");
+      showStatusToast(err.response?.data?.message || "Delete failed.", "error");
     } finally {
       setDeleteLoading(false);
     }

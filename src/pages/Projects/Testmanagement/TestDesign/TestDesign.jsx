@@ -5,14 +5,15 @@ import {
   ChevronRight,
   Layers,
   BookOpen,
-  Loader2,
   AlertCircle,
   Edit,
   Trash2,
 } from "lucide-react";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
 import axiosInstance from "../api/axiosInstance";
 import { useParams } from "react-router-dom";
-import { toast } from "react-hot-toast";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import ScenarioPanel from "./panels/ScenarioPanel";
 import AddScenarioModal from "./modals/AddScenarioModal";
 import AddCaseModal from "./modals/AddCaseModal";
@@ -38,6 +39,7 @@ export default function TestDesign() {
   const [editingStory, setEditingStory] = useState(null);
   const [editingScenario, setEditingScenario] = useState(null); // <-- ADD THIS
   const [editingCase, setEditingCase] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, title: "", message: "", onConfirm: null });
 
   // const [loading, setLoading] = useState(true);
   // const [editingStory, setEditingStory] = useState(null);
@@ -61,22 +63,13 @@ export default function TestDesign() {
   // ---------------------------------------------------------
   // DELETE STORY
   // ---------------------------------------------------------
-  const handleDeleteStory = async (e, storyId) => {
-    e.stopPropagation(); // Prevent row expand/collapse
-
-    if (!window.confirm("Are you sure you want to delete this test story?")) {
-      return;
-    }
-
+  const executeDeleteStory = async (storyId) => {
     try {
       await axiosInstance.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-stories/project-test-data/${storyId}`,
       );
-      toast.success("Test story deleted successfully!");
-
-      // Remove it from the local state
+      showStatusToast("Test story deleted successfully!", "success");
       setTestStories((prev) => prev.filter((s) => s.id !== storyId));
-
       // Clear selections if the deleted story was active
       if (selectedStory?.id === storyId) {
         setSelectedStory(null);
@@ -85,41 +78,46 @@ export default function TestDesign() {
       }
     } catch (err) {
       console.error("❌ Error deleting story", err);
-      toast.error("Failed to delete test story.");
+      showStatusToast("Failed to delete test story.", "error");
     }
+  };
+
+  const handleDeleteStory = (e, storyId) => {
+    e.stopPropagation();
+    setDeleteConfirm({
+      open: true,
+      title: "Delete Test Story",
+      message: "Are you sure you want to delete this test story?",
+      onConfirm: () => executeDeleteStory(storyId),
+    });
   };
 
   // ---------------------------------------------------------
   // DELETE CASE
   // ---------------------------------------------------------
-  const handleDeleteCase = async (caseId, scenarioId, storyId) => {
-    console.log("🚨 handleDeleteCase triggered for ID:", caseId);
-
-    // Use the reliable browser popup just like Story and Scenario!
-    if (!window.confirm("Are you sure you want to delete this test case?")) {
-      return;
-    }
-
+  const executeDeleteCase = async (caseId, storyId) => {
     try {
-      // 1. Delete from backend
       await axiosInstance.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/${caseId}`,
       );
-
-      // 2. Show standard success toast
-      toast.success("Test case deleted successfully!");
-
-      // 3. Refresh the story contents silently in the background
+      showStatusToast("Test case deleted successfully!", "success");
       await loadStoryContents(storyId);
-
-      // 4. Clear the right panel if the deleted case was currently selected
       if (selectedCase?.id === caseId) {
         setSelectedCase(null);
       }
     } catch (err) {
       console.error("❌ Error deleting case", err);
-      toast.error("Failed to delete test case.");
+      showStatusToast("Failed to delete test case.", "error");
     }
+  };
+
+  const handleDeleteCase = (caseId, scenarioId, storyId) => {
+    setDeleteConfirm({
+      open: true,
+      title: "Delete Test Case",
+      message: "Are you sure you want to delete this test case?",
+      onConfirm: () => executeDeleteCase(caseId, storyId),
+    });
   };
   // ---------------------------------------------------------
   // FETCH SCENARIOS by STORY ID
@@ -157,38 +155,35 @@ export default function TestDesign() {
   // ---------------------------------------------------------
   // DELETE SCENARIO
   // ---------------------------------------------------------
-  const handleDeleteScenario = async (e, scenarioId, storyId) => {
-    e.stopPropagation(); // Prevent row selection/collapse
-
-    if (
-      !window.confirm("Are you sure you want to delete this test scenario?")
-    ) {
-      return;
-    }
-
+  const executeDeleteScenario = async (scenarioId, storyId) => {
     try {
       await axiosInstance.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios/${scenarioId}`,
       );
-      toast.success("Scenario deleted successfully!");
-
-      // Silently refresh the story contents to remove it from the list
+      showStatusToast("Scenario deleted successfully!", "success");
       await loadStoryContents(storyId);
-
-      // Clear selections if the deleted scenario was currently active
       if (selectedScenario?.id === scenarioId) {
         setSelectedScenario(null);
         setSelectedCase(null);
       }
     } catch (err) {
       console.error("❌ Error deleting scenario", err);
-      // Extract specific error message from the backend response
       const errorMessage =
         err.response?.data?.message ||
         err.response?.data?.error ||
         "Failed to delete scenario.";
-      toast.error(errorMessage);
+      showStatusToast(errorMessage, "error");
     }
+  };
+
+  const handleDeleteScenario = (e, scenarioId, storyId) => {
+    e.stopPropagation();
+    setDeleteConfirm({
+      open: true,
+      title: "Delete Scenario",
+      message: "Are you sure you want to delete this test scenario?",
+      onConfirm: () => executeDeleteScenario(scenarioId, storyId),
+    });
   };
 
   // ---------------------------------------------------------
@@ -346,14 +341,23 @@ export default function TestDesign() {
   // ---------------------------------------------------------
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] text-gray-400">
-        <Loader2 className="animate-spin h-8 w-8 mb-4 text-blue-600" />
-        <p>Loading Test Design Environment...</p>
+      <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+        <LoadingSpinner text="Loading Test Design Environment..." size="lg" />
       </div>
     );
   }
 
   return (
+    <>
+    <ConfirmationModal
+      isOpen={deleteConfirm.open}
+      title={deleteConfirm.title}
+      message={deleteConfirm.message}
+      onConfirm={() => { deleteConfirm.onConfirm?.(); setDeleteConfirm({ open: false, title: "", message: "", onConfirm: null }); }}
+      onCancel={() => setDeleteConfirm({ open: false, title: "", message: "", onConfirm: null })}
+      confirmText="Delete"
+      variant="danger"
+    />
     <div className="flex h-[calc(100vh-80px)] bg-gray-50 overflow-hidden">
       {/* -------------------------------- */}
       {/* LEFT SIDEBAR — EXPLORER */}
@@ -601,7 +605,7 @@ export default function TestDesign() {
                 storyIdForCase,
               );
             } else {
-              toast.error("Error: Could not find case data to delete.");
+              showStatusToast("Error: Could not find case data to delete.", "error");
               console.error("Missing IDs for delete:", {
                 caseIdToDelete,
                 scenarioIdForCase,
@@ -662,5 +666,6 @@ export default function TestDesign() {
         />
       )}
     </div>
+    </>
   );
 }
