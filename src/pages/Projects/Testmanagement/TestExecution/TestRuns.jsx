@@ -55,6 +55,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
     try {
       const res = await axiosInstance.get(
         `/test-execution/test-runs/${run.id}/cases`,
+        `/test-execution/test-runs/${run.id}/cases`,
       );
       setTestCases(res.data || []);
     } catch (err) {
@@ -72,6 +73,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
+      
       );
       setEmployee(res.data || []);
     } catch (err) {
@@ -96,6 +98,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
+      
       );
       loadTestCases();
     } catch (err) {
@@ -434,4 +437,3 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
       )}
 </div>
   );
-}

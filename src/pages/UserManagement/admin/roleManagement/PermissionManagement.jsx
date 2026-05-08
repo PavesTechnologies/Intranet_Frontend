@@ -1,27 +1,29 @@
 import { useState, useMemo } from "react";
+import { ShieldCheck, Eye, X, KeyRound } from "lucide-react";
+
 import { getPermissionsByRole } from "../../../../services/roleManagementService";
 import { showStatusToast } from "../../../../components/toastfy/toast";
+
 import Button from "../../../../components/Button/Button";
 import SearchInput from "../../../../components/filter/Searchbar";
 import AppCard from "../../../../components/Cards/AppCard";
 import DynamicCardGrid from "../../../../components/Cards/DynamicCardGrid";
-import { ShieldCheck, Eye, X, KeyRound } from "lucide-react";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Layout configuration — change these to instantly reshape the entire UI
-// without touching render logic.
-// ─────────────────────────────────────────────────────────────────────────────
 const ROLE_GRID_CONFIG = {
-  layoutMode: "grid",      // "grid" | "list" | "masonry"
+  layoutMode: "grid",
+  columnMode: "auto",
   cardsPerRow: 3,
   cardsPerPage: 6,
-  minCardWidth: "245px",
+  minCardWidth: "240px",
   gapClassName: "gap-4",
   gridClassName: "items-stretch",
 };
 
 const PERMISSION_GRID_CONFIG = {
   layoutMode: "grid",
+  columnMode: "auto",
   cardsPerRow: 3,
   cardsPerPage: 6,
   minCardWidth: "230px",
@@ -29,88 +31,82 @@ const PERMISSION_GRID_CONFIG = {
   gridClassName: "items-stretch",
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Card renderers — swap these out to change card appearance globally
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Renders a single role card.
- * Receives: role, isSelected, onSelect
- */
 const RoleCard = ({ role, isSelected, onSelect }) => (
   <AppCard
-    icon={<ShieldCheck className="w-4 h-4" />}
+    icon={<ShieldCheck className="h-4 w-4" />}
     title={role.role_name}
     subtitle="View assigned permissions"
     selected={isSelected}
-    className="min-h-[145px] p-4 border-gray-200 hover:border-blue-200"
+    className="h-full min-h-[145px] border-gray-200 p-4 hover:border-[#0A0082]/40"
     actions={
       <Button
+        type="button"
         onClick={() => onSelect(role)}
-        className="px-3 py-2 text-sm bg-blue-900 text-white rounded-lg hover:bg-blue-950 transition-all flex items-center gap-2"
+        size="small"
+        variant="primary"
+        className="w-full sm:w-auto"
       >
-        <Eye className="w-4 h-4" />
+        <Eye className="h-4 w-4" />
         View
       </Button>
     }
   />
 );
 
-/**
- * Renders a single permission card.
- * Receives: permission
- */
 const PermissionCard = ({ permission }) => (
   <AppCard
-    icon={<KeyRound className="w-4 h-4" />}
+    icon={<KeyRound className="h-4 w-4" />}
     title={permission.code}
     subtitle={permission.description || "No description available."}
-    className="min-h-[120px] p-4 border-gray-200 hover:border-blue-200"
+    className="h-full min-h-[120px] border-gray-200 p-4 hover:border-[#0A0082]/40"
   />
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main component
-// ─────────────────────────────────────────────────────────────────────────────
-const PermissionManagement = ({ roles }) => {
+const PermissionManagement = ({ roles = [] }) => {
   const [selectedRole, setSelectedRole] = useState(null);
   const [rolePermissions, setRolePermissions] = useState([]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [permissionSearchTerm, setPermissionSearchTerm] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
-  const filteredRoles = useMemo(
-    () =>
-      roles.filter((role) =>
-        role.role_name?.toLowerCase().includes(searchTerm.toLowerCase()),
-      ),
-    [roles, searchTerm],
-  );
+  const filteredRoles = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
 
-  const filteredPermissions = useMemo(
-    () =>
-      rolePermissions.filter((p) => {
-        const search = permissionSearchTerm.toLowerCase();
-        return (
-          p.code?.toLowerCase().includes(search) ||
-          p.description?.toLowerCase().includes(search)
-        );
-      }),
-    [rolePermissions, permissionSearchTerm],
-  );
+    if (!term) return roles;
+
+    return roles.filter((role) =>
+      role.role_name?.toLowerCase().includes(term)
+    );
+  }, [roles, searchTerm]);
+
+  const filteredPermissions = useMemo(() => {
+    const term = permissionSearchTerm.trim().toLowerCase();
+
+    if (!term) return rolePermissions;
+
+    return rolePermissions.filter((permission) => {
+      return (
+        permission.code?.toLowerCase().includes(term) ||
+        permission.description?.toLowerCase().includes(term)
+      );
+    });
+  }, [rolePermissions, permissionSearchTerm]);
 
   const handleRoleSelect = async (role) => {
     setSelectedRole(role);
     setLoading(true);
     setShowModal(true);
     setPermissionSearchTerm("");
+
     try {
       const res = await getPermissionsByRole(role.role_uuid);
       setRolePermissions(res.data || []);
     } catch (err) {
       console.error("Error fetching permissions:", err);
-      showStatusToast("Failed to fetch permissions for this role", "error");
+      showStatusToast("Failed to fetch permissions for this role.", "error");
       setRolePermissions([]);
     } finally {
       setLoading(false);
@@ -125,45 +121,44 @@ const PermissionManagement = ({ roles }) => {
   };
 
   return (
-    <div className="min-h-screen bg-white -mx-6 -mt-6 p-5 sm:p-6">
-      {/* ── Page header ───────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-5">
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-5 h-5" />
+    <div className="w-full min-w-0">
+      <div className="mb-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+              <ShieldCheck className="h-5 w-5" />
             </div>
+
             <div className="min-w-0">
-              <h3 className="text-xl font-semibold text-gray-800">
-                Permission by Role
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">
+              <h3 className={Fonts.heading4}>Permission by Role</h3>
+              <p className={Fonts.paragraphMuted}>
                 View permissions assigned to each role.
               </p>
             </div>
           </div>
-          <div className="w-full sm:w-72">
+
+          <div className="w-full lg:w-80">
             <SearchInput
               placeholder="Search role..."
-              onSearch={(v) => setSearchTerm(v || "")}
+              onSearch={(value) => setSearchTerm(value || "")}
             />
           </div>
         </div>
       </div>
 
-      {/* ── Role grid ─────────────────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         {roles.length === 0 ? (
-          <div className="text-center text-gray-500 py-10">No roles found.</div>
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+            No roles found.
+          </div>
         ) : (
           <DynamicCardGrid
             data={filteredRoles}
             getKey={(role) => role.role_uuid}
             resetPageDependency={searchTerm}
             paginationWrapperClassName="mt-5 flex justify-center"
-            wrapperClassName="w-full"
+            wrapperClassName="w-full min-w-0"
             emptyMessage="No matching roles found."
-            // Spread the layout config — swap ROLE_GRID_CONFIG to change layout
             {...ROLE_GRID_CONFIG}
             renderCard={(role) => (
               <RoleCard
@@ -176,25 +171,22 @@ const PermissionManagement = ({ roles }) => {
         )}
       </div>
 
-      {/* ── Permission modal ───────────────────────────────────────────────── */}
       {showModal && selectedRole && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 px-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[88vh] overflow-hidden flex flex-col border border-gray-200">
-            {/* Modal header */}
-            <div className="p-5 border-b bg-white shrink-0">
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
-                    <KeyRound className="w-5 h-5" />
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-3 py-4 sm:px-6">
+          <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+            <div className="shrink-0 border-b bg-white p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    <KeyRound className="h-5 w-5" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Permissions for Role
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1 truncate">
+
+                  <div className="min-w-0">
+                    <h3 className={Fonts.heading4}>Permissions for Role</h3>
+                    <p className="mt-1 truncate text-sm text-gray-500">
                       Role:{" "}
                       <span
-                        className="font-medium text-blue-700"
+                        className="font-medium text-[#0A0082]"
                         title={selectedRole.role_name}
                       >
                         {selectedRole.role_name}
@@ -202,48 +194,44 @@ const PermissionManagement = ({ roles }) => {
                     </p>
                   </div>
                 </div>
+
                 <button
+                  type="button"
                   onClick={closeModal}
-                  className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 shrink-0"
+                  className="shrink-0 rounded-lg p-2 text-gray-500 transition hover:bg-gray-100"
+                  aria-label="Close modal"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="h-5 w-5" />
                 </button>
               </div>
+
               {!loading && rolePermissions.length > 0 && (
                 <div className="mt-4">
                   <SearchInput
                     placeholder="Search permission code or description..."
-                    onSearch={(v) => setPermissionSearchTerm(v || "")}
+                    onSearch={(value) => setPermissionSearchTerm(value || "")}
                   />
                 </div>
               )}
             </div>
 
-            {/* Modal body */}
-            <div className="p-5 overflow-y-auto flex-1 bg-white">
+            <div className="flex-1 overflow-y-auto bg-white p-4 sm:p-5">
               {loading ? (
-                // Skeleton state — DynamicCardGrid handles this natively
-                <DynamicCardGrid
-                  data={[]}
-                  loading
-                  skeletonCount={6}
-                  {...PERMISSION_GRID_CONFIG}
-                  renderCard={() => null}
-                  getKey={(_, i) => i}
-                />
+                <div className="rounded-xl border border-gray-200 bg-white py-16">
+                  <LoadingSpinner text="Loading permissions..." />
+                </div>
               ) : rolePermissions.length === 0 ? (
-                <div className="text-center text-gray-500 py-10 border border-gray-200 rounded-xl bg-white">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
                   No permissions assigned to this role.
                 </div>
               ) : (
                 <DynamicCardGrid
                   data={filteredPermissions}
-                  getKey={(p, i) => p.code || i}
+                  getKey={(permission, index) => permission.code || index}
                   resetPageDependency={permissionSearchTerm}
                   paginationWrapperClassName="mt-5 flex justify-center"
-                  wrapperClassName="w-full"
+                  wrapperClassName="w-full min-w-0"
                   emptyMessage="No permissions matched your search."
-                  // Swap PERMISSION_GRID_CONFIG to change layout
                   {...PERMISSION_GRID_CONFIG}
                   renderCard={(permission) => (
                     <PermissionCard permission={permission} />
@@ -252,14 +240,18 @@ const PermissionManagement = ({ roles }) => {
               )}
             </div>
 
-            {/* Modal footer */}
-            <div className="p-4 border-t bg-white shrink-0 flex justify-end">
-              <Button
-                onClick={closeModal}
-                className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-              >
-                Close
-              </Button>
+            <div className="shrink-0 border-t bg-white p-4">
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={closeModal}
+                  variant="outline"
+                  size="medium"
+                  className="w-full sm:w-auto"
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           </div>
         </div>

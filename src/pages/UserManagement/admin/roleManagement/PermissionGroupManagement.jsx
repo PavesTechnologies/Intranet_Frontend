@@ -1,16 +1,5 @@
 import { useState, useMemo } from "react";
 import {
-  getPermissionGroupsByRole,
-  getAvailablePermissionGroupsForRole,
-  addPermissionGroupsToRole,
-  removePermissionGroupsFromRole,
-} from "../../../../services/roleManagementService";
-import Button from "../../../../components/Button/Button";
-import SearchInput from "../../../../components/filter/Searchbar";
-import AppCard from "../../../../components/Cards/AppCard";
-import DynamicCardGrid from "../../../../components/Cards/DynamicCardGrid";
-import { showStatusToast } from "../../../../components/toastfy/toast";
-import {
   ShieldCheck,
   Layers,
   Plus,
@@ -20,20 +9,34 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Layout config — developers change these to reshape layouts globally
-// ─────────────────────────────────────────────────────────────────────────────
+import {
+  getPermissionGroupsByRole,
+  getAvailablePermissionGroupsForRole,
+  addPermissionGroupsToRole,
+  removePermissionGroupsFromRole,
+} from "../../../../services/roleManagementService";
+
+import Button from "../../../../components/Button/Button";
+import SearchInput from "../../../../components/filter/Searchbar";
+import AppCard from "../../../../components/Cards/AppCard";
+import DynamicCardGrid from "../../../../components/Cards/DynamicCardGrid";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import { Fonts } from "../../../../components/Fonts/Fonts";
+
 const ROLE_GRID_CONFIG = {
   layoutMode: "grid",
+  columnMode: "auto",
   cardsPerRow: 3,
   cardsPerPage: 6,
-  minCardWidth: "245px",
+  minCardWidth: "240px",
   gapClassName: "gap-4",
   gridClassName: "items-stretch",
 };
 
 const GROUP_GRID_CONFIG = {
   layoutMode: "grid",
+  columnMode: "auto",
   cardsPerRow: 3,
   cardsPerPage: 6,
   minCardWidth: "230px",
@@ -42,87 +45,66 @@ const GROUP_GRID_CONFIG = {
   showPagination: true,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Action tab config — add/remove tabs here without touching JSX
-// ─────────────────────────────────────────────────────────────────────────────
 const ACTION_TABS = [
-  {
-    key: "view",
-    label: "View",
-    icon: Eye,
-    activeClass: "bg-pink-900 text-white",
-    inactiveClass: "bg-white border text-gray-700 hover:bg-gray-100",
-  },
-  {
-    key: "add",
-    label: "Add",
-    icon: Plus,
-    activeClass: "bg-blue-900 text-white",
-    inactiveClass: "bg-white border text-gray-700 hover:bg-gray-100",
-  },
-  {
-    key: "delete",
-    label: "Delete",
-    icon: Trash2,
-    activeClass: "bg-red-600 text-white",
-    inactiveClass: "bg-white border text-gray-700 hover:bg-gray-100",
-  },
+  { key: "view", label: "View", icon: Eye, variant: "secondary" },
+  { key: "add", label: "Add", icon: Plus, variant: "primary" },
+  { key: "delete", label: "Delete", icon: Trash2, variant: "danger" },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-components — swap these independently to change card appearance
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Role card shown on the main listing page */
 const RoleCard = ({ role, onManage }) => (
   <AppCard
-    icon={<ShieldCheck className="w-4 h-4" />}
+    icon={<ShieldCheck className="h-4 w-4" />}
     title={role.role_name}
     subtitle="Manage assigned permission groups"
-    className="min-h-[145px] p-4 border-gray-200 hover:border-blue-200"
+    className="h-full min-h-[145px] border-gray-200 p-4 hover:border-[#0A0082]/40"
     actions={
       <Button
+        type="button"
         onClick={() => onManage(role)}
-        className="px-3 py-2 text-sm bg-blue-900 text-white rounded-lg hover:bg-blue-950 transition-all flex items-center gap-2"
+        variant="primary"
+        size="small"
+        className="w-full sm:w-auto"
       >
-        <Eye className="w-4 h-4" />
+        <Eye className="h-4 w-4" />
         Manage
       </Button>
     }
   />
 );
 
-/** Permission group card shown inside the modal */
 const GroupCard = ({ group, isSelected, activeAction, onSelect }) => {
   const selectedClass = isSelected
     ? activeAction === "delete"
       ? "border-red-300 bg-red-50"
       : "border-blue-300 bg-blue-50"
-    : "border-gray-200 hover:border-blue-200";
-
-  const selectBtnClass = isSelected
-    ? "bg-green-600 text-white"
-    : activeAction === "delete"
-    ? "bg-red-600 text-white hover:bg-red-700"
-    : "bg-blue-600 text-white hover:bg-blue-700";
+    : "border-gray-200 hover:border-[#0A0082]/40";
 
   return (
     <AppCard
-      icon={<Layers className="w-4 h-4" />}
+      icon={<Layers className="h-4 w-4" />}
       title={group.group_name}
       subtitle={`Module: ${group.module || "General"}`}
-      className={`min-h-[120px] p-4 transition-all ${selectedClass}`}
+      className={`h-full min-h-[120px] p-4 transition-all ${selectedClass}`}
       renderActions={
         activeAction !== "view"
           ? () => (
               <div className="mt-4 flex justify-end">
-                <button
+                <Button
+                  type="button"
+                  size="small"
+                  variant={
+                    isSelected
+                      ? "success"
+                      : activeAction === "delete"
+                      ? "danger"
+                      : "primary"
+                  }
                   onClick={() => onSelect(group)}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1 ${selectBtnClass}`}
+                  className="w-full sm:w-auto"
                 >
-                  {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                  {isSelected && <CheckCircle2 className="h-3 w-3" />}
                   {isSelected ? "Selected" : "Select"}
-                </button>
+                </Button>
               </div>
             )
           : undefined
@@ -131,46 +113,48 @@ const GroupCard = ({ group, isSelected, activeAction, onSelect }) => {
   );
 };
 
-/** Group header rendered above each module section in the grid */
 const ModuleGroupHeader = ({ groupKey, items }) => (
-  <div className="border rounded-xl bg-gray-50 overflow-hidden mb-1">
-    <div className="px-4 py-3 bg-white border-b flex items-center justify-between">
+  <div className="mb-1 overflow-hidden rounded-xl border bg-gray-50">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-white px-4 py-3">
       <div className="flex items-center gap-2">
-        <Layers className="w-4 h-4 text-blue-700" />
+        <Layers className="h-4 w-4 text-blue-700" />
         <h4 className="font-semibold text-gray-800">{groupKey}</h4>
       </div>
-      <span className="text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">
+
+      <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
         {items.length} group{items.length !== 1 ? "s" : ""}
       </span>
     </div>
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main component
-// ─────────────────────────────────────────────────────────────────────────────
-const PermissionGroupManagement = ({ roles }) => {
+const PermissionGroupManagement = ({ roles = [] }) => {
   const [selectedRole, setSelectedRole] = useState(null);
   const [activeAction, setActiveAction] = useState("view");
+
   const [availablePermissionGroups, setAvailablePermissionGroups] = useState([]);
   const [permissionGroupsForRole, setPermissionGroupsForRole] = useState([]);
+
   const [roleSearchTerm, setRoleSearchTerm] = useState("");
   const [groupSearchTerm, setGroupSearchTerm] = useState("");
   const [selectedModule, setSelectedModule] = useState("All");
+
   const [selectedGroupNames, setSelectedGroupNames] = useState([]);
   const [selectedGroupUUIDs, setSelectedGroupUUIDs] = useState([]);
+
   const [showModal, setShowModal] = useState(false);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
 
-  // ── Derived data ────────────────────────────────────────────────────────
-  const filteredRoles = useMemo(
-    () =>
-      roles.filter((role) =>
-        role.role_name?.toLowerCase().includes(roleSearchTerm.toLowerCase()),
-      ),
-    [roles, roleSearchTerm],
-  );
+  const filteredRoles = useMemo(() => {
+    const term = roleSearchTerm.trim().toLowerCase();
+
+    if (!term) return roles;
+
+    return roles.filter((role) =>
+      role.role_name?.toLowerCase().includes(term)
+    );
+  }, [roles, roleSearchTerm]);
 
   const normalizeGroup = (group) => ({
     ...group,
@@ -186,24 +170,22 @@ const PermissionGroupManagement = ({ roles }) => {
     activeAction === "add" ? availablePermissionGroups : permissionGroupsForRole;
 
   const modules = useMemo(() => {
-    const unique = new Set(groupsToDisplay.map((g) => g.module));
+    const unique = new Set(groupsToDisplay.map((group) => group.module));
     return ["All", ...Array.from(unique)];
   }, [groupsToDisplay]);
 
-  const filteredGroups = useMemo(
-    () =>
-      groupsToDisplay.filter((group) => {
-        const matchesSearch = group.group_name
-          ?.toLowerCase()
-          .includes(groupSearchTerm.toLowerCase());
-        const matchesModule =
-          selectedModule === "All" || group.module === selectedModule;
-        return matchesSearch && matchesModule;
-      }),
-    [groupsToDisplay, groupSearchTerm, selectedModule],
-  );
+  const filteredGroups = useMemo(() => {
+    const term = groupSearchTerm.trim().toLowerCase();
 
-  // ── Helpers ─────────────────────────────────────────────────────────────
+    return groupsToDisplay.filter((group) => {
+      const matchesSearch = group.group_name?.toLowerCase().includes(term);
+      const matchesModule =
+        selectedModule === "All" || group.module === selectedModule;
+
+      return matchesSearch && matchesModule;
+    });
+  }, [groupsToDisplay, groupSearchTerm, selectedModule]);
+
   const resetSelection = () => {
     setSelectedGroupNames([]);
     setSelectedGroupUUIDs([]);
@@ -213,6 +195,7 @@ const PermissionGroupManagement = ({ roles }) => {
 
   const fetchGroups = async (role, action) => {
     setLoadingGroups(true);
+
     try {
       if (action === "add") {
         const res = await getAvailablePermissionGroupsForRole(role.role_uuid);
@@ -223,7 +206,7 @@ const PermissionGroupManagement = ({ roles }) => {
       }
     } catch (err) {
       console.error("Failed to fetch permission groups:", err);
-      showStatusToast("Failed to fetch permission groups", "error");
+      showStatusToast("Failed to fetch permission groups.", "error");
       setAvailablePermissionGroups([]);
       setPermissionGroupsForRole([]);
     } finally {
@@ -231,7 +214,6 @@ const PermissionGroupManagement = ({ roles }) => {
     }
   };
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
   const loadGroups = async (role, action = "view") => {
     setSelectedRole(role);
     setActiveAction(action);
@@ -242,6 +224,7 @@ const PermissionGroupManagement = ({ roles }) => {
 
   const handleActionChange = async (action) => {
     if (!selectedRole) return;
+
     setActiveAction(action);
     resetSelection();
     await fetchGroups(selectedRole, action);
@@ -249,9 +232,12 @@ const PermissionGroupManagement = ({ roles }) => {
 
   const handleSelectGroup = (group) => {
     const uuidStr = group.group_uuid?.toString();
+
     if (!uuidStr) return;
+
     if (selectedGroupUUIDs.includes(uuidStr)) {
       const index = selectedGroupUUIDs.indexOf(uuidStr);
+
       setSelectedGroupUUIDs((prev) => prev.filter((id) => id !== uuidStr));
       setSelectedGroupNames((prev) => prev.filter((_, i) => i !== index));
     } else {
@@ -262,6 +248,7 @@ const PermissionGroupManagement = ({ roles }) => {
 
   const handleRemoveGroup = (name) => {
     const index = selectedGroupNames.indexOf(name);
+
     if (index !== -1) {
       setSelectedGroupNames((prev) => prev.filter((n) => n !== name));
       setSelectedGroupUUIDs((prev) => prev.filter((_, i) => i !== index));
@@ -270,25 +257,34 @@ const PermissionGroupManagement = ({ roles }) => {
 
   const handleSubmit = async () => {
     if (!selectedGroupUUIDs.length) {
-      showStatusToast("Select permission group(s)", "error");
+      showStatusToast("Select permission group(s).", "error");
       return;
     }
+
     setSubmitLoading(true);
+
     try {
       if (activeAction === "add") {
-        await addPermissionGroupsToRole(selectedRole.role_uuid, selectedGroupUUIDs);
-        showStatusToast("Groups added successfully", "success");
+        await addPermissionGroupsToRole(
+          selectedRole.role_uuid,
+          selectedGroupUUIDs
+        );
+        showStatusToast("Groups added successfully.", "success");
       } else {
-        await removePermissionGroupsFromRole(selectedRole.role_uuid, selectedGroupUUIDs);
-        showStatusToast("Groups removed successfully", "success");
+        await removePermissionGroupsFromRole(
+          selectedRole.role_uuid,
+          selectedGroupUUIDs
+        );
+        showStatusToast("Groups removed successfully.", "success");
       }
+
       setShowModal(false);
       resetSelection();
     } catch (err) {
       console.error("Permission group action failed:", err);
       showStatusToast(
-        activeAction === "add" ? "Failed to add groups" : "Failed to remove groups",
-        "error",
+        activeAction === "add" ? "Failed to add groups." : "Failed to remove groups.",
+        "error"
       );
     } finally {
       setSubmitLoading(false);
@@ -301,39 +297,27 @@ const PermissionGroupManagement = ({ roles }) => {
     resetSelection();
   };
 
-  // ── Submit button label / style ──────────────────────────────────────────
-  const submitLabel = submitLoading
-    ? activeAction === "add" ? "Adding..." : "Removing..."
-    : activeAction === "add" ? "Add Groups" : "Remove Groups";
+  const submitLabel =
+    activeAction === "add" ? "Add Groups" : "Remove Groups";
 
-  const submitClass =
-    selectedGroupUUIDs.length && !submitLoading
-      ? activeAction === "add"
-        ? "bg-blue-900 hover:bg-blue-950"
-        : "bg-red-600 hover:bg-red-700"
-      : "bg-gray-400 cursor-not-allowed";
-
-  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-white -mx-6 -mt-6 p-5 sm:p-6">
-
-      {/* ── Page header ─────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-5">
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-5 h-5" />
+    <div className="w-full min-w-0">
+      <div className="mb-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+              <ShieldCheck className="h-5 w-5" />
             </div>
+
             <div className="min-w-0">
-              <h3 className="text-xl font-semibold text-gray-800">
-                Permission Groups by Role
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">
+              <h3 className={Fonts.heading4}>Permission Groups by Role</h3>
+              <p className={Fonts.paragraphMuted}>
                 Manage permission groups module-wise for each role.
               </p>
             </div>
           </div>
-          <div className="w-full sm:w-72">
+
+          <div className="w-full lg:w-80">
             <SearchInput
               placeholder="Search role..."
               onSearch={(value) => setRoleSearchTerm(value || "")}
@@ -342,17 +326,18 @@ const PermissionGroupManagement = ({ roles }) => {
         </div>
       </div>
 
-      {/* ── Role grid ───────────────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         {roles.length === 0 ? (
-          <div className="text-center text-gray-500 py-10">No roles found.</div>
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+            No roles found.
+          </div>
         ) : (
           <DynamicCardGrid
             data={filteredRoles}
             getKey={(role) => role.role_uuid}
             resetPageDependency={roleSearchTerm}
             paginationWrapperClassName="mt-5 flex justify-center"
-            wrapperClassName="w-full"
+            wrapperClassName="w-full min-w-0"
             emptyMessage="No matching roles found."
             {...ROLE_GRID_CONFIG}
             renderCard={(role) => (
@@ -362,67 +347,69 @@ const PermissionGroupManagement = ({ roles }) => {
         )}
       </div>
 
-      {/* ── Modal ───────────────────────────────────────────────────────── */}
       {showModal && selectedRole && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 px-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[88vh] overflow-hidden flex flex-col border border-gray-200">
-
-            {/* Modal header */}
-            <div className="p-5 border-b bg-white shrink-0">
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
-                    <Layers className="w-5 h-5" />
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-3 py-4 sm:px-6">
+          <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+            <div className="shrink-0 border-b bg-white p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    <Layers className="h-5 w-5" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Manage Permission Groups
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1 truncate">
+
+                  <div className="min-w-0">
+                    <h3 className={Fonts.heading4}>Manage Permission Groups</h3>
+                    <p className="mt-1 truncate text-sm text-gray-500">
                       Role:{" "}
-                      <span className="font-medium text-blue-700" title={selectedRole.role_name}>
+                      <span
+                        className="font-medium text-[#0A0082]"
+                        title={selectedRole.role_name}
+                      >
                         {selectedRole.role_name}
                       </span>
                     </p>
                   </div>
                 </div>
+
                 <button
+                  type="button"
                   onClick={closeModal}
-                  className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 shrink-0"
+                  className="shrink-0 rounded-lg p-2 text-gray-500 transition hover:bg-gray-100"
+                  aria-label="Close modal"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="h-5 w-5" />
                 </button>
               </div>
 
-              {/* Action tabs */}
-              <div className="flex flex-wrap gap-2 mt-4">
-                {ACTION_TABS.map(({ key, label, icon: Icon, activeClass, inactiveClass }) => (
-                  <button
+              <div className="mt-4 flex flex-wrap gap-2">
+                {ACTION_TABS.map(({ key, label, icon: Icon, variant }) => (
+                  <Button
                     key={key}
+                    type="button"
+                    size="small"
+                    variant={activeAction === key ? variant : "outline"}
                     onClick={() => handleActionChange(key)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${
-                      activeAction === key ? activeClass : inactiveClass
-                    }`}
+                    className="flex-1 sm:flex-none"
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="h-4 w-4" />
                     {label}
-                  </button>
+                  </Button>
                 ))}
               </div>
 
-              {/* Filters — shown only when not loading */}
               {!loadingGroups && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
                   <div className="lg:col-span-2">
                     <SearchInput
                       placeholder="Search permission group..."
                       onSearch={(value) => setGroupSearchTerm(value || "")}
                     />
                   </div>
+
                   <select
                     value={selectedModule}
                     onChange={(e) => setSelectedModule(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
                   >
                     {modules.map((module) => (
                       <option key={module} value={module}>
@@ -434,29 +421,23 @@ const PermissionGroupManagement = ({ roles }) => {
               )}
             </div>
 
-            {/* Modal body */}
-            <div className="p-5 overflow-y-auto flex-1 bg-white">
+            <div className="flex-1 overflow-y-auto bg-white p-4 sm:p-5">
               {loadingGroups ? (
-                <DynamicCardGrid
-                  data={[]}
-                  loading
-                  skeletonCount={GROUP_GRID_CONFIG.cardsPerPage}
-                  {...GROUP_GRID_CONFIG}
-                  renderCard={() => null}
-                  getKey={(_, i) => i}
-                />
+                <div className="rounded-xl border border-gray-200 bg-white py-16">
+                  <LoadingSpinner text="Loading permission groups..." />
+                </div>
               ) : filteredGroups.length === 0 ? (
-                <div className="text-center text-gray-500 py-10 border border-gray-200 rounded-xl bg-white">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
                   No permission groups found.
                 </div>
               ) : (
                 <>
                   <DynamicCardGrid
                     data={filteredGroups}
-                    getKey={(g, i) => g.group_uuid || i}
-                    resetPageDependency={`${groupSearchTerm}|${selectedModule}`}
+                    getKey={(group, index) => group.group_uuid || index}
+                    resetPageDependency={`${groupSearchTerm}|${selectedModule}|${activeAction}`}
                     paginationWrapperClassName="mt-5 flex justify-center"
-                    wrapperClassName="w-full"
+                    wrapperClassName="w-full min-w-0"
                     emptyMessage="No permission groups matched your search."
                     groupBy={(group) => group.module || "General"}
                     renderGroupHeader={(groupKey, items) => (
@@ -466,6 +447,7 @@ const PermissionGroupManagement = ({ roles }) => {
                     renderCard={(group) => {
                       const uuidStr = group.group_uuid?.toString();
                       const isSelected = selectedGroupUUIDs.includes(uuidStr);
+
                       return (
                         <GroupCard
                           group={group}
@@ -477,27 +459,29 @@ const PermissionGroupManagement = ({ roles }) => {
                     }}
                   />
 
-                  {/* Selection summary — add / delete only */}
                   {activeAction !== "view" && (
                     <div className="mt-5 border-t pt-5">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Selected groups
-                      </label>
+                      <label className={Fonts.label}>Selected groups</label>
+
                       {selectedGroupNames.length === 0 ? (
-                        <p className="text-sm text-gray-500">No groups selected yet.</p>
+                        <p className="mt-2 text-sm text-gray-500">
+                          No groups selected yet.
+                        </p>
                       ) : (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="mt-2 flex flex-wrap gap-2">
                           {selectedGroupNames.map((name) => (
                             <span
                               key={name}
-                              className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
+                              className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${
                                 activeAction === "delete"
                                   ? "bg-red-100 text-red-800"
                                   : "bg-blue-100 text-blue-800"
                               }`}
                             >
-                              {name}
+                              <span className="truncate">{name}</span>
+
                               <button
+                                type="button"
                                 onClick={() => handleRemoveGroup(name)}
                                 className="font-bold hover:text-red-600"
                               >
@@ -513,32 +497,45 @@ const PermissionGroupManagement = ({ roles }) => {
               )}
             </div>
 
-            {/* Modal footer */}
-            <div className="p-4 border-t bg-white shrink-0 flex justify-end gap-3">
-              {activeAction !== "view" ? (
-                <>
+            <div className="shrink-0 border-t bg-white p-4">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                {activeAction !== "view" ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={closeModal}
+                      disabled={submitLoading}
+                      className="w-full sm:w-auto"
+                    >
+                      Cancel
+                    </Button>
+
+                    <Button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={!selectedGroupUUIDs.length || submitLoading}
+                      loading={submitLoading}
+                      loadingText={
+                        activeAction === "add" ? "Adding..." : "Removing..."
+                      }
+                      variant={activeAction === "add" ? "primary" : "danger"}
+                      className="w-full sm:w-auto"
+                    >
+                      {submitLabel}
+                    </Button>
+                  </>
+                ) : (
                   <Button
+                    type="button"
                     onClick={closeModal}
-                    className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                    variant="outline"
+                    className="w-full sm:w-auto"
                   >
-                    Cancel
+                    Close
                   </Button>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={!selectedGroupUUIDs.length || submitLoading}
-                    className={`px-4 py-2 text-sm text-white rounded-lg font-medium transition-all ${submitClass}`}
-                  >
-                    {submitLabel}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  onClick={closeModal}
-                  className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                >
-                  Close
-                </Button>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
