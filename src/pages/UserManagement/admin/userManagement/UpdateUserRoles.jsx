@@ -29,7 +29,9 @@ export default function UpdateUserRole() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [sortDirection, setSortDirection] = useState(SORT_DIRECTIONS.ASC);
+  const [sortDirection, setSortDirection] = useState(
+    SORT_DIRECTIONS.ASC
+  );
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser_uuId, setSelectedUser_uuId] = useState(null);
@@ -86,13 +88,21 @@ export default function UpdateUserRole() {
 
       showStatusToast(msg, "error");
 
-      if (err.response?.status === 401 || err.response?.status === 403) {
+      if (
+        err.response?.status === 401 ||
+        err.response?.status === 403
+      ) {
         navigate("/dashboard");
       }
     } finally {
       setLoading(false);
     }
-  }, [axiosInstance, currentPage, searchTerm, navigate]);
+  }, [
+    axiosInstance,
+    currentPage,
+    searchTerm,
+    navigate,
+  ]);
 
   useEffect(() => {
     fetchUsers();
@@ -108,7 +118,9 @@ export default function UpdateUserRole() {
   }, []);
 
   const handleNextPage = useCallback(() => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+    setCurrentPage((prev) =>
+      Math.min(prev + 1, totalPages)
+    );
   }, [totalPages]);
 
   const toggleSort = () => {
@@ -126,27 +138,48 @@ export default function UpdateUserRole() {
       className="cursor-pointer select-none"
       onClick={toggleSort}
     >
-      Name {sortDirection === SORT_DIRECTIONS.ASC ? "▲" : "▼"}
+      Name{" "}
+      {sortDirection === SORT_DIRECTIONS.ASC
+        ? "▲"
+        : "▼"}
     </span>,
     "Email",
     "Assigned Roles",
     "Actions",
   ];
 
-  const columns = ["serial_no", "name", "mail", "roles", "actions"];
+  const columns = [
+    "serial_no",
+    "name",
+    "mail",
+    "roles",
+    "actions",
+  ];
 
   const tableRows = users.map((user, index) => ({
-    serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
+    serial_no: (
+      (currentPage - 1) * ITEMS_PER_PAGE +
+      index +
+      1
+    ).toString(),
 
     name: user.name || "N/A",
 
-    mail: user.mail || <span className="italic text-gray-400">N/A</span>,
+    mail: user.mail || (
+      <span className="italic text-gray-400">
+        N/A
+      </span>
+    ),
 
     roles:
       user.roles?.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {user.roles.map((role, idx) => (
-            <StatusBadge key={idx} label={role} size="sm" />
+            <StatusBadge
+              key={idx}
+              label={role}
+              size="sm"
+            />
           ))}
         </div>
       ) : (
@@ -170,7 +203,10 @@ export default function UpdateUserRole() {
     ),
   }));
 
-  const handleRolesSaved = (userUuid, updatedRoleNames) => {
+  const handleRolesSaved = (
+    userUuid,
+    updatedRoleNames
+  ) => {
     setUsers((prev) =>
       prev.map((u) =>
         u.user_uuid === userUuid
@@ -258,7 +294,10 @@ export default function UpdateUserRole() {
           }}
           axiosInstance={axiosInstance}
           onSaved={(updatedRoleNames) =>
-            handleRolesSaved(selectedUser_uuId, updatedRoleNames)
+            handleRolesSaved(
+              selectedUser_uuId,
+              updatedRoleNames
+            )
           }
         />
       )}
@@ -304,14 +343,21 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
 
         let assignedIds = [];
 
-        if (assignedRes.data?.roles && Array.isArray(assignedRes.data.roles)) {
-          const roleNameToId = rolesRes.data.reduce((acc, r) => {
-            acc[r.role_name] = r.role_uuid;
-            return acc;
-          }, {});
+        if (
+          assignedRes.data?.roles &&
+          Array.isArray(assignedRes.data.roles)
+        ) {
+          const roleNameToId =
+            rolesRes.data.reduce((acc, r) => {
+              acc[r.role_name] = r.role_uuid;
+              return acc;
+            }, {});
 
           assignedIds = assignedRes.data.roles
-            .map((roleName) => roleNameToId[roleName])
+            .map(
+              (roleName) =>
+                roleNameToId[roleName]
+            )
             .filter(Boolean);
         }
 
@@ -356,7 +402,9 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
       );
 
       const updatedRoleNames = roles
-        .filter((r) => selectedRoleIds.includes(r.role_uuid))
+        .filter((r) =>
+          selectedRoleIds.includes(r.role_uuid)
+        )
         .map((r) => r.role_name);
 
       showStatusToast(
@@ -378,11 +426,17 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
   };
 
   const filteredRoles = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+    const term = searchTerm
+      .trim()
+      .toLowerCase();
 
     if (!term) return roles;
 
-    return roles.filter((r) => r.role_name.toLowerCase().includes(term));
+    return roles.filter((r) =>
+      r.role_name
+        .toLowerCase()
+        .includes(term)
+    );
   }, [roles, searchTerm]);
 
   return (

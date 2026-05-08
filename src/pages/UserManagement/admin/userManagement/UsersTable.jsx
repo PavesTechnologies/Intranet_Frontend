@@ -218,6 +218,7 @@ export default function UsersTable() {
             variant="link"
             size="icon"
             title="Edit"
+            aria-label="Edit user"
             className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
             onClick={() => handleEditClick(user.user_uuid)}
           >
@@ -230,6 +231,7 @@ export default function UsersTable() {
               variant="link"
               size="icon"
               title="Deactivate"
+              aria-label="Deactivate user"
               className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-800"
               onClick={() => handleToggleClick(user.user_uuid, true)}
             >
@@ -241,6 +243,7 @@ export default function UsersTable() {
               variant="link"
               size="icon"
               title="Activate"
+              aria-label="Activate user"
               className="h-8 w-8 p-0 text-green-600 hover:bg-green-50 hover:text-green-800"
               onClick={() => handleToggleClick(user.user_uuid, false)}
             >
