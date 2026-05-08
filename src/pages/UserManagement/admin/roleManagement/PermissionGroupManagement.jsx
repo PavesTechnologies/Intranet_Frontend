@@ -37,7 +37,7 @@ const ROLE_GRID_CONFIG = {
 
 const GROUP_GRID_CONFIG = {
   layoutMode: "grid",
-  columnMode: "auto",
+  columnMode: "fixed",
   cardsPerRow: 3,
   cardsPerPage: 6,
   minCardWidth: "180px",

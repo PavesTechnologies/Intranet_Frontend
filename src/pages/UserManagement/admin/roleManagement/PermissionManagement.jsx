@@ -24,9 +24,9 @@ const ROLE_GRID_CONFIG = {
 
 const PERMISSION_GRID_CONFIG = {
   layoutMode: "grid",
-  columnMode: "auto",
-  cardsPerRow: 4,
-  cardsPerPage: 8,
+  columnMode: "fixed",
+  cardsPerRow: 3,
+  cardsPerPage: 6,
   minCardWidth: "180px",
   gapClassName: "gap-3",
   gridClassName: "items-stretch",
