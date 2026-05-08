@@ -313,7 +313,7 @@ export function FilterPanel({
           onChange={(value) => onFiltersChange({ ...filters, project: value })}
         />
 
-        <SearchableDropdown
+        {/* <SearchableDropdown
           label="Employment Type"
           value={filters.employmentType}
           options={EMPLOYMENT_TYPES}
@@ -321,7 +321,7 @@ export function FilterPanel({
           onChange={(value) =>
             onFiltersChange({ ...filters, employmentType: value })
           }
-        />
+        /> */}
 
         <div className="grid grid-cols-2 gap-2">
           <div>

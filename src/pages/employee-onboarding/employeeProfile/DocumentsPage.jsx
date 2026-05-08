@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import {
   FileText,
   GraduationCap,
@@ -1697,31 +1698,14 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                           <label className="block text-sm font-medium text-gray-700 mb-1.5">
                             Document Type
                           </label>
-                          <select
+                          <FilterListbox
+                            options={[{value:"",label:"Select type"}, ...identityTypes.map((idType) => ({value: idType.identity_type_uuid, label: idType.identity_type_name}))]}
                             value={uploadFormData.identity_type_uuid || ""}
-                            onChange={(e) => {
-                              const selected = identityTypes.find(
-                                (t) => t.identity_type_uuid === e.target.value,
-                              );
-                              setUploadFormData((d) => ({
-                                ...d,
-                                identity_type_uuid: e.target.value,
-                                identity_type:
-                                  selected?.identity_type_name || "",
-                              }));
+                            onChange={(val) => {
+                              const selected = identityTypes.find(t => t.identity_type_uuid === val);
+                              setUploadFormData(d => ({ ...d, identity_type_uuid: val, identity_type: selected?.identity_type_name || "" }));
                             }}
-                            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 bg-white"
-                          >
-                            <option value="">Select type</option>
-                            {identityTypes.map((idType) => (
-                              <option
-                                key={idType.identity_type_uuid}
-                                value={idType.identity_type_uuid}
-                              >
-                                {idType.identity_type_name}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
                         <UploadField
                           label="Document Number"

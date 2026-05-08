@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import {
@@ -555,49 +556,42 @@ const RoleOffDashboard = () => {
                 
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Target Project</label>
-                  <select 
-                    name="project" 
-                    value={filters.project} 
-                    onChange={handleFilterChange} 
-                    className="w-full text-[11px] font-semibold border-slate-200 rounded-lg h-9 bg-slate-50/50 focus:ring-indigo-600 shadow-sm transition-all"
-                  >
-                    <option value="">All Projects</option>
-                    {projectsList.map((proj) => (
-                      <option key={proj.pmsProjectId || proj.id} value={proj.pmsProjectId || proj.id}>{proj.projectName || proj.name}</option>
-                    ))}
-                  </select>
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "All Projects" },
+                      ...projectsList.map((proj) => ({ value: proj.pmsProjectId || proj.id, label: proj.projectName || proj.name })),
+                    ]}
+                    value={filters.project}
+                    onChange={(val) => handleFilterChange({ target: { name: "project", value: val } })}
+                  />
                 </div>
                 
                 <div className="space-y-1.5 pt-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Client Account</label>
-                  <select 
-                    name="client" 
-                    value={filters.client} 
-                    onChange={handleFilterChange} 
-                    className="w-full text-[11px] font-semibold border-slate-200 rounded-lg h-9 bg-slate-50/50 focus:ring-indigo-600 shadow-sm transition-all"
-                  >
-                    <option value="">All Clients</option>
-                    {clientsList.map((c) => (
-                      <option key={c.clientId || c.id} value={c.clientId || c.id}>{c.clientName || c.name}</option>
-                    ))}
-                  </select>
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "All Clients" },
+                      ...clientsList.map((c) => ({ value: c.clientId || c.id, label: c.clientName || c.name })),
+                    ]}
+                    value={filters.client}
+                    onChange={(val) => handleFilterChange({ target: { name: "client", value: val } })}
+                  />
                 </div>
                 
                 <div className="col-span-2 space-y-1.5 pt-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Primary Role-Off Reason</label>
-                  <select 
-                    name="reason" 
-                    value={filters.reason} 
-                    onChange={handleFilterChange} 
-                    className="w-full text-[11px] font-semibold border-slate-200 rounded-lg h-10 bg-slate-50/50 focus:ring-indigo-600 shadow-sm transition-all"
-                  >
-                    <option value="">All Reasons</option>
-                    <option value="PROJECT_END">Project End</option>
-                    <option value="PERFORMANCE">Performance Issues</option>
-                    <option value="CLIENT_REQUEST">Specific Client Request</option>
-                    <option value="ATTRITION">Attrition / Resignation</option>
-                    <option value="INTERNAL_TRANSFER">Internal Movement</option>
-                  </select>
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "All Reasons" },
+                      { value: "PROJECT_END", label: "Project End" },
+                      { value: "PERFORMANCE", label: "Performance Issues" },
+                      { value: "CLIENT_REQUEST", label: "Specific Client Request" },
+                      { value: "ATTRITION", label: "Attrition / Resignation" },
+                      { value: "INTERNAL_TRANSFER", label: "Internal Movement" },
+                    ]}
+                    value={filters.reason}
+                    onChange={(val) => handleFilterChange({ target: { name: "reason", value: val } })}
+                  />
                 </div>
               </div>
             </div>

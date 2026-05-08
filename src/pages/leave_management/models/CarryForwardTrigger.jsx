@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import ConfirmationModal from "./ConfirmationModal";
 import axios from "axios";
 import { toast } from "react-toastify";
-
+import Button from "../../../components/Button/Button";
 const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
   const [year, setYear] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -72,16 +72,20 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
         />
 
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 bg-gray-300 rounded">
+          <Button 
+          variant="secondary"
+          onClick={onClose}
+          size="medium">
             Close
-          </button>
+          </Button>
 
-          <button
+          <Button
             onClick={handleConfirmClick}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            variant="primary"
+            size="medium"
           >
             Confirm
-          </button>
+          </Button>
         </div>
 
         <ConfirmationModal

@@ -6,6 +6,7 @@ const SIZE_CLASSES = {
   large: "text-base px-8 py-3",
   medium: "text-sm px-5 py-2.5",
   small: "text-xs px-3 py-1.5",
+   icon: "h-8 w-8 p-0 text-sm",
 };
 
 const VARIANT_CLASSES = {

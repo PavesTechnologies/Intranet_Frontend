@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, Fragment } from "react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { jwtDecode } from "jwt-decode";
 
 import { useNavigate, useParams } from "react-router-dom";
@@ -749,63 +750,34 @@ const AssetDetail = () => {
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
                     Project
                   </label>
-                  <select
-                    name="projectId"
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select Project" },
+                      ...clientProjects.map((p) => ({ value: p.pmsProjectId, label: p.projectName }))
+                    ]}
                     value={formData.projectId || ""}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData((prev) => ({
                         ...prev,
-                        projectId: e.target.value,
-                        projectName:
-                          clientProjects.find(
-                            (p) => p.pmsProjectId == e.target.value,
-                          )?.projectName || "",
+                        projectId: val,
+                        projectName: clientProjects.find((p) => p.pmsProjectId == val)?.projectName || "",
                       }))
                     }
-                    required
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">Select Project</option>
-                    {clientProjects.map((p) => (
-                      <option key={p.pmsProjectId} value={p.pmsProjectId}>
-                        {p.projectName}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
                     Resource Name
                   </label>
-                  <select
-                    name="resourceName"
+                  <FilterListbox
+                    options={[
+                      { value: "", label: !formData.projectId ? "Select Resource" : projectResourcesLoading ? "Loading resources..." : availableProjectResources.length === 0 ? "No resources allocated to this project" : "Select Resource" },
+                      ...availableProjectResources.map((res) => ({ value: res.resourceName, label: `${res.resourceName} - ${res.resourceRole}` }))
+                    ]}
                     value={formData.resourceName || ""}
-                    onChange={handleFormChange}
-                    required
-                    disabled={!formData.projectId || projectResourcesLoading || availableProjectResources.length === 0}
-                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all ${projectResourcesLoading
-                      ? "cursor-wait opacity-60"
-                      : !formData.projectId || availableProjectResources.length === 0
-                        ? "cursor-not-allowed opacity-60"
-                        : "appearance-none cursor-pointer"
-                      }`}
-                  >
-                    <option value="">
-                      {!formData.projectId
-                        ? "Select Resource"
-                        : projectResourcesLoading
-                          ? "Loading resources..."
-                          : availableProjectResources.length === 0
-                            ? "No resources allocated to this project"
-                            : "Select Resource"}
-                    </option>
-                    {availableProjectResources.map((res) => (
-                      <option key={res.resourceId} value={res.resourceName}>
-                        {res.resourceName} - {res.resourceRole}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => handleFormChange({ target: { name: "resourceName", value: val } })}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -813,33 +785,15 @@ const AssetDetail = () => {
                     Serial Number
                   </label>
 
-                  <select
-                    name="serialNumber"
+                  <FilterListbox
+                    options={[
+                      { value: "", label: serialLoading ? "Loading serials..." : "Select Serial Number" },
+                      ...(editingAssignment && formData.serialNumber ? [{ value: formData.serialNumber, label: `${formData.serialNumber} (Current)` }] : []),
+                      ...availableSerials.map((s) => ({ value: s.serialNumber, label: s.serialNumber }))
+                    ]}
                     value={formData.serialNumber}
-                    onChange={handleFormChange}
-                    required
-                    disabled={serialLoading}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">
-                      {serialLoading
-                        ? "Loading serials..."
-                        : "Select Serial Number"}
-                    </option>
-
-                    {/* Keep current serial visible in edit mode */}
-                    {editingAssignment && formData.serialNumber && (
-                      <option value={formData.serialNumber}>
-                        {formData.serialNumber} (Current)
-                      </option>
-                    )}
-
-                    {availableSerials.map((s) => (
-                      <option key={s.serialNumber} value={s.serialNumber}>
-                        {s.serialNumber}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => handleFormChange({ target: { name: "serialNumber", value: val } })}
+                  />
                 </div>
                 <Input
                   label="Assigned By"
@@ -882,25 +836,16 @@ const AssetDetail = () => {
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
                     Work Type
                   </label>
-                  <select
-                    id="locationType"
-                    name="locationType"
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        locationType: e.target.value,
-                      }))
-                    }
-                    required
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="" disabled selected>
-                      Select work mode
-                    </option>
-                    <option value="HYBRID">Hybrid</option>
-                    <option value="ON_SITE">On Site</option>
-                    <option value="CLIENT_LOCATION">Client Location</option>
-                  </select>
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select work mode" },
+                      { value: "HYBRID", label: "Hybrid" },
+                      { value: "ON_SITE", label: "On Site" },
+                      { value: "CLIENT_LOCATION", label: "Client Location" },
+                    ]}
+                    value={formData.locationType || ""}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, locationType: val }))}
+                  />
                 </div>
               </div>
               <div>

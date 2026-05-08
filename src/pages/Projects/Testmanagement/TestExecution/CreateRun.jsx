@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
 
@@ -103,24 +104,11 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
           {/* Status */}
           <div>
             <label className="block text-sm font-medium mb-1">Status *</label>
-            <select
-              name="status"
+            <FilterListbox
+              options={[{value:"",label:"Select Status"},{value:"CREATED",label:"CREATED"},{value:"IN_PROGRESS",label:"IN_PROGRESS"},{value:"COMPLETED",label:"COMPLETED"},{value:"CANCELLED",label:"CANCELLED"}]}
               value={form.status}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-lg"
-              required
-            >
-              <option value="">Select Status</option>
-              {/* <option value="NOT_STARTED">NOT_STARTED</option>
-              <option value="IN_PROGRESS">IN_PROGRESS</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="BLOCKED">BLOCKED</option>
-              <option value="FAILED">FAILED</option> */}
-              <option value="CREATED">CREATED</option>
-              <option value="IN_PROGRESS">IN_PROGRESS</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="CANCELLED">CANCELLED</option>
-            </select>
+              onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+            />
           </div>
 
           {/* Description (full width) */}

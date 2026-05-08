@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 export default function EmployeeCredentialsPage() {
   const roles = ["EMPLOYEE", "REPORTING_MANAGER", "HR", "ADMIN"];
@@ -115,17 +116,11 @@ export default function EmployeeCredentialsPage() {
             }
           />
 
-          <select
+          <FilterListbox
+            options={[{value:"",label:"Select Department *"}, ...Object.keys(deptMap).map((d) => ({value: d, label: d}))]}
             value={form.department}
-            onChange={(e) =>
-              setForm({ ...form, department: e.target.value })
-            }
-          >
-            <option value="">Select Department *</option>
-            {Object.keys(deptMap).map((d) => (
-              <option key={d}>{d}</option>
-            ))}
-          </select>
+            onChange={(val) => setForm({ ...form, department: val })}
+          />
 
           <input
             placeholder="Designation"
@@ -135,16 +130,11 @@ export default function EmployeeCredentialsPage() {
             }
           />
 
-          <select
+          <FilterListbox
+            options={roles.map((r) => ({value: r, label: r}))}
             value={form.role}
-            onChange={(e) =>
-              setForm({ ...form, role: e.target.value })
-            }
-          >
-            {roles.map((r) => (
-              <option key={r}>{r}</option>
-            ))}
-          </select>
+            onChange={(val) => setForm({ ...form, role: val })}
+          />
         </div>
 
         <button style={styles.primary} onClick={handleGenerate}>

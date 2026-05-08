@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import FilterListbox from "../../components/filter/FilterListbox";
 import "./ReportDashboard.css";
 import {
   FileDown,
@@ -437,26 +438,16 @@ export default function ReportDashboard() {
             </p>
             {isFilterOpen && (
               <div className="report-filters">
-                <select
+                <FilterListbox
+                  options={filteredMonths.map((m) => ({ value: m.value, label: m.name }))}
                   value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                >
-                  {filteredMonths.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-                <select
+                  onChange={setSelectedMonth}
+                />
+                <FilterListbox
+                  options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
                   value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                >
-                  {yearOptions.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedYear}
+                />
                 <button className="apply-btn" onClick={handleFilterApply}>
                   Apply
                 </button>
@@ -541,26 +532,16 @@ export default function ReportDashboard() {
           </p>
           {isFilterOpen && (
             <div className="report-filters">
-              <select
+              <FilterListbox
+                options={filteredMonths.map((m) => ({ value: m.value, label: m.name }))}
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              >
-                {filteredMonths.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={setSelectedMonth}
+              />
+              <FilterListbox
+                options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-              >
-                {yearOptions.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedYear}
+              />
               <button className="apply-btn" onClick={handleFilterApply}>
                 Apply
               </button>
@@ -661,20 +642,13 @@ export default function ReportDashboard() {
           </h3>
           <p className="month pt-1 flex justify-end">
             Records Per Page:
-            <select
-              name="userRange"
-              id="userRangeDropdown"
-              value={employeeBreakdownPerPage}
-              className="pr-6 py-0 border-none ml-2 mb-2 text-sm"
-              onChange={itemsPerPageChangeEmployeeBreakdown}
-            >
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-            </select>
+            <div className="ml-2 w-24">
+              <FilterListbox
+                options={["5","6","7","8","9","10"].map((n) => ({ value: n, label: n }))}
+                value={String(employeeBreakdownPerPage)}
+                onChange={(val) => itemsPerPageChangeEmployeeBreakdown({ target: { value: val } })}
+              />
+            </div>
           </p>
         </div>
         <table>
@@ -731,20 +705,13 @@ export default function ReportDashboard() {
           </h3>
           <p className="month pt-1 flex justify-end">
             Records Per Page:
-            <select
-              name="userRange"
-              id="userRangeDropdown"
-              value={productivityPerPage}
-              className="pr-6 py-0 border-none ml-2 mb-2 text-sm"
-              onChange={itemsPerPageChangeProductivity}
-            >
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-            </select>
+            <div className="ml-2 w-24">
+              <FilterListbox
+                options={["5","6","7","8","9","10"].map((n) => ({ value: n, label: n }))}
+                value={String(productivityPerPage)}
+                onChange={(val) => itemsPerPageChangeProductivity({ target: { value: val } })}
+              />
+            </div>
           </p>
         </div>
         <table>
@@ -797,20 +764,13 @@ export default function ReportDashboard() {
           </h3>
           <p className="month pt-1 flex justify-end">
             Records Per Page:
-            <select
-              name="userRange"
-              id="userRangeDropdown"
-              value={leaveHoursPerPage}
-              className="pr-6 py-0 border-none ml-2 mb-2 text-sm"
-              onChange={itemsPerPageChangeLeaveHours}
-            >
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-            </select>
+            <div className="ml-2 w-24">
+              <FilterListbox
+                options={["5","6","7","8","9","10"].map((n) => ({ value: n, label: n }))}
+                value={String(leaveHoursPerPage)}
+                onChange={(val) => itemsPerPageChangeLeaveHours({ target: { value: val } })}
+              />
+            </div>
           </p>
         </div>
         <table>
@@ -859,20 +819,13 @@ export default function ReportDashboard() {
           </h3>
           <p className="month pt-1 flex justify-end">
             Records Per Page:
-            <select
-              name="userRange"
-              id="userRangeDropdown"
-              value={projectBreakdownPerPage}
-              className="pr-6 py-0 border-none ml-2 mb-2 text-sm"
-              onChange={itemsPerPageChangeProjectBreakdown}
-            >
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-            </select>
+            <div className="ml-2 w-24">
+              <FilterListbox
+                options={["5","6","7","8","9","10"].map((n) => ({ value: n, label: n }))}
+                value={String(projectBreakdownPerPage)}
+                onChange={(val) => itemsPerPageChangeProjectBreakdown({ target: { value: val } })}
+              />
+            </div>
           </p>
         </div>
         <div className="projects-grid">

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 /* -------------------
   Delete Status Modal
@@ -61,24 +62,17 @@ export const DeleteStatusModal = ({
           </div>
         </div>
 
-        <div>
-          <div className="text-xs text-gray-500">
-            Move existing work items to
+          <div>
+            <div className="text-xs text-gray-500">
+              Move existing work items to
+            </div>
+            <FilterListbox
+              options={[{value:"",label:"-- Select destination status --"},...otherStatuses.map(s=>({value:s.id,label:s.name??s.statusName}))]}
+              value={selectedNewStatus}
+              onChange={setSelectedNewStatus}
+            />
           </div>
-          <select
-            value={selectedNewStatus}
-            onChange={(e) => setSelectedNewStatus(e.target.value)}
-            className="w-full mt-2 border rounded px-3 py-2"
-          >
-            <option value="">-- Select destination status --</option>
-            {otherStatuses.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name ?? s.statusName}
-              </option>
-            ))}
-          </select>
         </div>
-      </div>
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" size="small" onClick={onClose}>

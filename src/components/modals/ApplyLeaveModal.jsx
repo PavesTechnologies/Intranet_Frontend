@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Modal from '../Modal';
+import FilterListbox from '../filter/FilterListbox';
 
 
 
@@ -68,22 +69,19 @@ const ApplyLeaveModal = ({ isOpen, onClose, onSubmit }) => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Leave Type *
           </label>
-          <select
-            name="leaveType"
+          <FilterListbox
+            options={[
+              { value: "", label: "Select Leave Type" },
+              { value: "Annual Leave", label: "Annual Leave" },
+              { value: "Sick Leave", label: "Sick Leave" },
+              { value: "Personal Leave", label: "Personal Leave" },
+              { value: "Maternity Leave", label: "Maternity Leave" },
+              { value: "Paternity Leave", label: "Paternity Leave" },
+              { value: "Emergency Leave", label: "Emergency Leave" },
+            ]}
             value={formData.leaveType}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#263383] focus:border-transparent ${
-              errors.leaveType ? 'border-red-300' : 'border-gray-300'
-            }`}
-          >
-            <option value="">Select Leave Type</option>
-            <option value="Annual Leave">Annual Leave</option>
-            <option value="Sick Leave">Sick Leave</option>
-            <option value="Personal Leave">Personal Leave</option>
-            <option value="Maternity Leave">Maternity Leave</option>
-            <option value="Paternity Leave">Paternity Leave</option>
-            <option value="Emergency Leave">Emergency Leave</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "leaveType", value: val } })}
+          />
           {errors.leaveType && <p className="text-red-500 text-xs mt-1">{errors.leaveType}</p>}
         </div>
 

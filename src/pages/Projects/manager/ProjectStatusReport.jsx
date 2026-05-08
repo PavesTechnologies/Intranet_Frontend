@@ -1,5 +1,6 @@
 // ProjectStatusReport.jsx
 import React, { useMemo, useRef, useState } from 'react';
+import FilterListbox from '../../../components/filter/FilterListbox';
 import Button from '../../../components/Button/Button';
 import StatusBadge from '../../../components/status/statusbadge';
 import {
@@ -146,31 +147,23 @@ export default function ProjectStatusReport({ projectData }) {
           <div className="flex gap-4 h-auto flex-wrap items-center">
             <div className="w-72">
               <label className="block text-xs text-gray-600">Assignee</label>
-              <select
-                value={filterAssignee}
-                onChange={e => setFilterAssignee(e.target.value)}
-                className="mt-1 h-auto block w-full border rounded p-2"
-              >
-                {assignees.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <FilterListbox
+                  options={assignees.map(a => ({ value: a.id, label: a.name }))}
+                  value={filterAssignee}
+                  onChange={setFilterAssignee}
+                />
+              </div>
             </div>
             <div className="w-56">
               <label className="block text-xs text-gray-600">Status</label>
-              <select
-                value={filterStatus}
-                onChange={e => setFilterStatus(e.target.value)}
-                className="mt-1 block w-full border rounded p-2"
-              >
-                {statuses.map(s => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <FilterListbox
+                  options={statuses.map(s => ({ value: s, label: s }))}
+                  value={filterStatus}
+                  onChange={setFilterStatus}
+                />
+              </div>
             </div>
             <div>
               <label className="block text-xs text-gray-600">From</label>

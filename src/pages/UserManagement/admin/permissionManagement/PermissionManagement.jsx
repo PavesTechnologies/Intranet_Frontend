@@ -4,6 +4,7 @@ import { Pencil, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "react-toastify";
 
 import Button from "../../../../components/Button/Button";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import Pagination from "../../../../components/Pagination/pagination";
 import FormInput from "../../../../components/forms/FormInput";
 import Modal from "../../../../components/Modal/modal";
@@ -40,7 +41,6 @@ export default function PermissionManagement() {
   const [selectedPermissionUuids, setSelectedPermissionUuids] = useState([]);
 
   const itemsPerPage = 5;
-
   const token = localStorage.getItem("token");
 
   const axiosInstance = axios.create({
@@ -177,6 +177,13 @@ export default function PermissionManagement() {
     setSelectedGroup("");
   };
 
+  const resetEditForm = () => {
+    setEditingPermission(null);
+    setEditCode("");
+    setEditDescription("");
+    setEditGroup("");
+  };
+
   const handleCreate = async () => {
     if (!validatePermissionCode(newPermission)) return;
     if (!validateDescription(description)) return;
@@ -212,11 +219,9 @@ export default function PermissionManagement() {
 
   const handleEdit = (permission) => {
     setEditingPermission(permission);
-
     setEditCode(permission.permission_code);
     setEditDescription(permission.description || "");
     setEditGroup(permission.group_uuid || "");
-
     setShowModal(true);
   };
 
@@ -247,10 +252,7 @@ export default function PermissionManagement() {
       showSingleToast("Permission updated successfully!", "success");
 
       setShowModal(false);
-      setEditingPermission(null);
-      setEditCode("");
-      setEditDescription("");
-      setEditGroup("");
+      resetEditForm();
 
       await fetchPermissions();
     } catch (err) {
@@ -382,8 +384,8 @@ export default function PermissionManagement() {
       } else {
         showSingleToast(
           detail ||
-            err?.response?.data?.message ||
-            "Failed to delete permissions",
+          err?.response?.data?.message ||
+          "Failed to delete permissions",
           "error"
         );
       }
@@ -442,42 +444,52 @@ export default function PermissionManagement() {
         subtitle="Create a new permission and assign it to a group."
         className="!w-full !max-w-2xl"
       >
-        <div className="space-y-4">
-          <FormInput
-            label="Permission Code"
-            name="permission_code"
-            value={newPermission}
-            onChange={handlePermissionChange}
-            placeholder="Example: READ_USER"
+        <FormInput
+          label="Permission Code"
+          name="permission_code"
+          value={newPermission}
+          onChange={handlePermissionChange}
+          placeholder="Example: READ_USER"
+        />
+
+        <FormInput
+          type="text"
+          label="Description"
+          placeholder="Enter description"
+          value={description}
+          onChange={handleDescriptionChange}
+        />
+
+        <div className="space-y-1">
+          <label className={Fonts.label}>Permission Group</label>
+
+          <FilterListbox
+            options={[
+              { value: "", label: "Default Group" },
+              ...groups.map((g) => ({ value: g.group_uuid, label: g.group_name })),
+            ]}
+            value={selectedGroup}
+            onChange={setSelectedGroup}
           />
 
-          <FormInput
-            type="text"
-            label="Description"
-            placeholder="Enter description"
-            value={description}
-            onChange={handleDescriptionChange}
-          />
-
-          <div className="space-y-1">
-            <label className={Fonts.label}>Permission Group</label>
-
-            <select
-              value={selectedGroup}
-              onChange={(e) => setSelectedGroup(String(e.target.value))}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
+          <div className="flex gap-3 mt-3">
+            <Button
+              onClick={handleCreate}
+              variant="primary"
+              size="medium"
+              disabled={creatingPermission}
+              className="flex items-center gap-2"
             >
-              <option value="">Default Group</option>
+              {creatingPermission ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Add Permission"
+              )}
+            </Button>
 
-              {groups.map((g) => (
-                <option key={g.group_uuid} value={g.group_uuid}>
-                  {g.group_name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <Button
               onClick={() => {
                 setAddPermissionModal(false);
@@ -555,13 +567,15 @@ export default function PermissionManagement() {
               deletion.
             </span>
 
-            <button
+            <Button
               type="button"
+              variant="link"
+              size="small"
               onClick={clearSelectedPermissions}
-              className="text-left underline sm:text-right"
+              className="text-left text-red-700 underline sm:text-right"
             >
               Clear selection
-            </button>
+            </Button>
           </div>
         )}
 
@@ -623,15 +637,17 @@ export default function PermissionManagement() {
                   </div>
 
                   <div className="flex justify-end sm:justify-start">
-                    <button
-                      onClick={() => handleEdit(perm)}
-                      className="rounded-lg p-2 text-[#0A0082] transition hover:bg-[#0A0082]/10"
-                      title="Edit"
+                    <Button
                       type="button"
+                      size="icon"
+                      variant="icon"
+                      title="Edit"
                       aria-label={`Edit ${perm.permission_code}`}
+                      className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+                      onClick={() => handleEdit(perm)}
                     >
-                      <Pencil className="h-4 w-4" />
-                    </button>
+                      <Pencil size={17} />
+                    </Button>
                   </div>
                 </li>
               ))}
@@ -646,9 +662,7 @@ export default function PermissionManagement() {
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   onNext={() =>
-                    setCurrentPage((prev) =>
-                      Math.min(prev + 1, totalPages)
-                    )
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                   }
                 />
               </div>
@@ -659,7 +673,10 @@ export default function PermissionManagement() {
 
       <Modal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={() => {
+          setShowModal(false);
+          resetEditForm();
+        }}
         title="Edit Permission"
         subtitle="Update permission details and group mapping."
         className="!w-full !max-w-2xl"
@@ -679,29 +696,28 @@ export default function PermissionManagement() {
             placeholder="Enter description"
             value={editDescription}
             onChange={handleEditDescriptionChange}
+            className="w-full p-2 border rounded mb-3"
           />
 
-          <div className="space-y-1">
-            <label className={Fonts.label}>Permission Group</label>
-
-            <select
-              value={editGroup}
-              onChange={(e) => setEditGroup(String(e.target.value))}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
-            >
-              <option value="">Keep current / Default Group</option>
-
-              {groups.map((g) => (
-                <option key={g.group_uuid} value={g.group_uuid}>
-                  {g.group_name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={editGroup}
+            onChange={(e) => setEditGroup(String(e.target.value))}
+            className="w-full p-2 border rounded mb-3"
+          >
+            <option value="">Keep current / Default Group</option>
+            {groups.map((g) => (
+              <option key={g.group_uuid} value={g.group_uuid}>
+                {g.group_name}
+              </option>
+            ))}
+          </select>
 
           <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <Button
-              onClick={() => setShowModal(false)}
+              onClick={() => {
+                setShowModal(false);
+                resetEditForm();
+              }}
               variant="secondary"
               size="medium"
               disabled={updating}

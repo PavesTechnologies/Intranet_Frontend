@@ -1,6 +1,7 @@
 // src/pages/Projects/manager/Sprint/CreateSprintModal.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
@@ -259,16 +260,11 @@ const CreateSprintModal = ({
               <label className="block text-gray-700 mb-1 font-medium">
                 Duration
               </label>
-              <select
+              <FilterListbox
+                options={[{value:"1W",label:"1 Week"},{value:"2W",label:"2 Weeks"},{value:"3W",label:"3 Weeks"},{value:"CUSTOM",label:"Custom"}]}
                 value={duration}
-                onChange={handleDurationChange}
-                className="border rounded-lg w-full p-2"
-              >
-                <option value="1W">1 Week</option>
-                <option value="2W">2 Weeks</option>
-                <option value="3W">3 Weeks</option>
-                <option value="CUSTOM">Custom</option>
-              </select>
+                onChange={(val) => handleDurationChange({ target: { value: val } })}
+              />
             </div>
           )}
 

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Button from "../../../../components/Button/Button";
 import axios from "axios";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Modal from "../../../../components/Modal/modal";
 
@@ -79,21 +80,12 @@ const SprintPendingModal = ({
         {/* Options */}
         <div className="space-y-3 pt-2">
           {/* Move to next sprint */}
-          <div className="flex items-center gap-3">
-            <select
-              className="border px-4 py-2 rounded-lg flex-1"
+          <div className="flex items-center">
+            <FilterListbox
+              options={[{value:"",label:"Select Next Sprint"},...sprints.filter(sp=>sp.status==="PLANNING").map(sp=>({value:sp.id,label:sp.name}))]}
               value={selectedSprint}
-              onChange={(e) => setSelectedSprint(e.target.value)}
-            >
-              <option value="">Select Next Sprint</option>
-              {sprints
-                .filter((sp) => sp.status === "PLANNING")
-                .map((sp) => (
-                  <option key={sp.id} value={sp.id}>
-                    {sp.name}
-                  </option>
-                ))}
-            </select>
+              onChange={setSelectedSprint}
+            />
             <Button
               variant="success"
               disabled={!selectedSprint}

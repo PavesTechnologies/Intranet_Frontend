@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../../../../../contexts/AuthContext";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 
 
@@ -148,21 +149,11 @@ export default function CountryEducationMapping() {
           <label className="block text-sm font-medium mb-1">
             Select Country
           </label>
-          <select
-            className="border rounded px-3 py-2 w-80"
+          <FilterListbox
+            options={[{value:"",label:"-- Choose Country --"}, ...countries.map((c) => ({value: c.country_uuid, label: c.country_name}))]}
             value={selectedCountry}
-            onChange={(e) => {
-              setSelectedCountry(e.target.value);
-              loadMappings(e.target.value);
-            }}
-          >
-            <option value="">-- Choose Country --</option>
-            {countries.map((c) => (
-              <option key={c.country_uuid} value={c.country_uuid}>
-                {c.country_name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => { setSelectedCountry(val); loadMappings(val); }}
+          />
         </div>
 
         {/* Existing Mappings */}
@@ -224,37 +215,20 @@ export default function CountryEducationMapping() {
             <div className="flex items-end gap-4">
               <div>
                 <label className="block text-sm mb-1">Education Level</label>
-                <select
-                  className="border rounded px-3 py-2"
+                <FilterListbox
+                  options={[{value:"",label:"Select Level"}, ...levels.map((l) => ({value: l.education_uuid, label: l.education_name}))]}
                   value={selectedLevel}
-                  onChange={(e) => setSelectedLevel(e.target.value)}
-                >
-                  <option value="">Select Level</option>
-                  {levels.map((l) => (
-                    <option key={l.education_uuid} value={l.education_uuid}>
-                      {l.education_name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedLevel}
+                />
               </div>
 
               <div>
                 <label className="block text-sm mb-1">Document</label>
-                <select
-                  className="border rounded px-3 py-2"
+                <FilterListbox
+                  options={[{value:"",label:"Select Document"}, ...documents.map((d) => ({value: d.education_document_uuid, label: d.document_name}))]}
                   value={selectedDocument}
-                  onChange={(e) => setSelectedDocument(e.target.value)}
-                >
-                  <option value="">Select Document</option>
-                  {documents.map((d) => (
-                    <option
-                      key={d.education_document_uuid}
-                      value={d.education_document_uuid}
-                    >
-                      {d.document_name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedDocument}
+                />
               </div>
 
               <label className="flex items-center gap-2 mb-1">

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import AddCountryIdentityMappingModal from "./AddCountryIdentityMappingModal";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 export default function CountryIdentityMapping() {
   const [countries, setCountries] = useState([]);
@@ -230,18 +231,11 @@ export default function CountryIdentityMapping() {
       </p>
 
       {/* Country Selector */}
-      <select
+      <FilterListbox
+        options={[{value:"",label:"Select Country"}, ...countries.map((c) => ({value: c.country_uuid, label: c.country_name}))]}
         value={selectedCountry}
-        onChange={(e) => setSelectedCountry(e.target.value)}
-        className="border rounded-lg px-3 py-2 mb-6 w-80"
-      >
-        <option value="">Select Country</option>
-        {countries.map((c) => (
-          <option key={c.country_uuid} value={c.country_uuid}>
-            {c.country_name}
-          </option>
-        ))}
-      </select>
+        onChange={setSelectedCountry}
+      />
       {showForm && (
         <AddCountryIdentityMappingModal
           countryUuid={selectedCountry}
