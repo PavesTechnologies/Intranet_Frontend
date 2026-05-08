@@ -3,6 +3,8 @@ import axios from "axios";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
+import FormDatePicker from "../../../../components/forms/FormDatePicker";
+
 
 export const CreateTaskModal = ({
   open,
@@ -13,12 +15,18 @@ export const CreateTaskModal = ({
 }) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     if (open) {
       setTitle("");
       setDescription("");
+      setStartDate("");
+      setDueDate("");
     }
   }, [open]);
 
@@ -80,9 +88,9 @@ export const CreateTaskModal = ({
             placeholder="Enter description"
           />
         </label>
-        <FormDatePicker label="Start Date" name="startDate" value={formData.startDate || ""} onChange={onChange} min={today} />
+        <FormDatePicker label="Start Date" name="startDate" value={startDate} onChange={setStartDate} min={today} />
 
-        <FormDatePicker label="Due Date" name="dueDate" value={formData.dueDate || ""} onChange={onChange} min={today} />
+        <FormDatePicker label="Due Date" name="dueDate" value={dueDate} onChange={setDueDate} min={today} />
 
         <div className="flex justify-end gap-2 mt-4">
           <Button type="button" variant="outline" size="small" onClick={onClose}>

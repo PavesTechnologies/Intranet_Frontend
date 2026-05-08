@@ -437,3 +437,4 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
       )}
 </div>
   );
+}
