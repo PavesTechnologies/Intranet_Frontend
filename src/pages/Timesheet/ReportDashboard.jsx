@@ -65,6 +65,8 @@ export default function ReportDashboard() {
   const [mailLoading, setMailLoading] = useState(false);
   const membersPerPage = 8;
   const [leaveError, setLeaveError] = useState(false);
+  const [serverError, setServerError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   const handleProjectPageChange = (projectId, newPage) => {
     setProjectPages((prev) => ({
@@ -106,6 +108,8 @@ export default function ReportDashboard() {
       setProductivityPage(1);
       setLeavePage(1);
       setProjectBreakdownPage(1);
+      setLeaveError(false);
+      setServerError(false);
       try {
         const res = await axios.get(
           `${TS_BASE_URL}/api/report/monthly_finance`,
@@ -130,13 +134,16 @@ export default function ReportDashboard() {
         if (err.response?.status === 400) {
           setLeaveError(true);
           setData(null);
+        } else if (err.response?.status === 500) {
+          setServerError(true);
+          setData(null);
         }
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [TS_BASE_URL, appliedMonth, appliedYear]);
+  }, [TS_BASE_URL, appliedMonth, appliedYear, retryKey]);
 
   const sendMailPDF = async () => {
     setMailLoading(true);
@@ -457,6 +464,57 @@ export default function ReportDashboard() {
         </div>
         <div className="text-center font-semibold" style={{ marginTop: "2rem" }}>
           Pending Leaves for {monthOptions.find((m) => m.value === appliedMonth)?.name} {appliedYear} needs to be reviewed.
+        </div>
+      </div>
+    );
+
+  if (serverError && !data)
+    return (
+      <div className="report-container">
+        <div className="report-header">
+          <div>
+            <h1>Monthly Finance Timesheet Report</h1>
+            <p className="subtitle pt-1">
+              Team Productivity & Utilization Metrics
+            </p>
+            <p className="month pt-1">
+              Report Month:
+              <button
+                className="filter-toggle-btn"
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+              >
+                <span>
+                  {monthOptions.find((m) => m.value === selectedMonth)?.name}
+                  ,{selectedYear}
+                </span>
+              </button>
+            </p>
+            {isFilterOpen && (
+              <div className="report-filters">
+                <FilterListbox
+                  options={filteredMonths.map((m) => ({ value: m.value, label: m.name }))}
+                  value={selectedMonth}
+                  onChange={setSelectedMonth}
+                />
+                <FilterListbox
+                  options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
+                  value={selectedYear}
+                  onChange={setSelectedYear}
+                />
+                <button className="apply-btn" onClick={handleFilterApply}>
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="text-center" style={{ marginTop: "2rem" }}>
+          <p className="font-semibold" style={{ marginBottom: "0.75rem" }}>
+            Internal server error occurred. Please try again.
+          </p>
+          <Button variant="secondary" size="medium" onClick={() => setRetryKey((k) => k + 1)}>
+            Try Again
+          </Button>
         </div>
       </div>
     );
