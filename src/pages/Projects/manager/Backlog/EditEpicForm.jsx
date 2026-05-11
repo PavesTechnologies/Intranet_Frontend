@@ -150,23 +150,14 @@ const EditEpicForm = ({
 
   // ===================== BUILD PAYLOAD =====================
   const buildUpdatedPayload = () => {
-    if (!originalData) return formData; // Returns all if creating a new one
-    const payload = {};
-    const dateKeys = ["startDate", "dueDate"];
-
-    Object.keys(formData).forEach((key) => {
-      if (String(formData[key]) !== String(originalData[key])) {
-        if (key === "statusId") {
-          payload[key] = formData[key] !== "" ? Number(formData[key]) : null;
-        } else if (dateKeys.includes(key)) {
-          payload[key] = formData[key] ? `${formData[key]}T00:00:00` : null;
-        } else {
-          payload[key] = formData[key];
-        }
-      }
-    });
-
-    return payload;
+    return {
+      name: formData.name,
+      description: formData.description,
+      statusId: formData.statusId !== "" ? Number(formData.statusId) : null,
+      priority: formData.priority,
+      startDate: formData.startDate ? `${formData.startDate}T00:00:00` : null,
+      dueDate: formData.dueDate ? `${formData.dueDate}T00:00:00` : null,
+    };
   };
 
   // ===================== SUBMIT =====================
@@ -214,28 +205,30 @@ const EditEpicForm = ({
 
   return (
     <Wrapper mode={mode} onClose={onClose}>
-      {/* HEADER */}
-      <div className="flex justify-between items-center p-6 border-b shrink-0">
-        <h2 className="text-xl font-semibold text-gray-800">
-          {epicId ? "Edit Epic" : "Create Epic"}
-        </h2>
-        <button
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-800 transition-colors"
-        >
-          <X size={20} />
-        </button>
-      </div>
+      <form onSubmit={handleSubmit} className="flex flex-col min-h-full">
+        {/* HEADER */}
+        <div className="flex justify-between items-center p-6 border-b shrink-0">
+          <h2 className="text-xl font-semibold text-gray-800">
+            {epicId ? "Edit Epic" : "Create Epic"}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
 
-      {/* BODY */}
-      <div className="p-6 overflow-y-auto flex-1 space-y-6">
-        <FormInput
-          label="Project"
-          name="projectName"
-          value={projectName}
-          readOnly
-          disabled
-        />
+        {/* BODY */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          <FormInput
+            label="Project"
+            name="projectName"
+            value={projectName}
+            readOnly
+            disabled
+          />
 
         <FormInput
           label="Epic Name *"
@@ -265,7 +258,7 @@ const EditEpicForm = ({
               { label: "Critical", value: "CRITICAL" },
             ]}
           />
-          <FormSelect
+          {/* <FormSelect
             label="Status *"
             name="statusId"
             value={formData.statusId}
@@ -274,7 +267,7 @@ const EditEpicForm = ({
               { label: "Select Status", value: "" },
               ...statuses.map((s) => ({ label: s.name, value: String(s.id) })),
             ]}
-          />
+          /> */}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -299,11 +292,12 @@ const EditEpicForm = ({
         )}
       </div>
 
-      {/* FOOTER */}
-      <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3 shrink-0">
-        <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving..." : epicId ? "Save Changes" : "Create Epic"}</Button>
-      </div>
+        {/* FOOTER */}
+        <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3 shrink-0">
+          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving..." : epicId ? "Save Changes" : "Create Epic"}</Button>
+        </div>
+      </form>
     </Wrapper>
   );
 };

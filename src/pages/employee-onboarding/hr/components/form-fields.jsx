@@ -89,11 +89,18 @@ export function SearchableSelect({
   const [query, setQuery] = useState("");
 
   const filtered = options.filter((opt) =>
-    opt.label.toLowerCase().includes(query.toLowerCase())
+    `${opt.label || ""} ${opt.name || ""}`
+      .toLowerCase()
+      .includes(query.toLowerCase())
   );
 
   const selectedLabel =
-    options.find((o) => o.value === value)?.label || "";
+    options.find(
+      (o) =>
+        String(o.value || "") === String(value || "") ||
+        String(o.label || "") === String(value || "") ||
+        String(o.name || "") === String(value || ""),
+    )?.label || "";
 
   return (
     <div className="relative">
