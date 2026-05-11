@@ -39,7 +39,8 @@ const AdminPannel = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const permissions = user?.permissions || [];
-  const canCreateClient = permissions.includes("CREATE_CLIENT");
+  const roles = user?.roles || [];
+  const canCreateClient = roles.includes("Admin");
 
   const [clientDetails, setClientDetails] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -264,10 +265,10 @@ const AdminPannel = () => {
                 {exportProgress}%
               </span>
             ) : ( */}
-              <>
-                <Download className="w-4 h-4 mr-1.5" />
-                Export Data
-              </>
+            <>
+              <Download className="w-4 h-4 mr-1.5" />
+              Export Data
+            </>
             {/* )} */}
           </Button>
         </div>
@@ -297,8 +298,10 @@ const AdminPannel = () => {
           </h2>
           {canCreateClient && (
             <Button
+              variant="primary"
+              size="medium"
               onClick={() => setOpenCreateClient(true)}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg flex items-center hover:bg-indigo-700 transition-all active:scale-[0.98] shadow-sm"
+            // className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg flex items-center hover:bg-indigo-700 transition-all active:scale-[0.98] shadow-sm"
             >
               <Plus className="w-4 h-4 mr-1" /> Create New Client
             </Button>
