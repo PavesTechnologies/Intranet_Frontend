@@ -49,9 +49,12 @@ export default function TestManagement() {
   };
 
   return (
-    <div className="w-full">
+    <div
+      className="flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden"
+      style={{ height: "calc(100vh - 64px)" }}
+    >
       <TopTabs selectedTab={selectedTab} projectId={projectId} />
-      <div>{renderTabContent()}</div>
+      <div className="flex-1 min-h-0 overflow-hidden">{renderTabContent()}</div>
     </div>
   );
 }
