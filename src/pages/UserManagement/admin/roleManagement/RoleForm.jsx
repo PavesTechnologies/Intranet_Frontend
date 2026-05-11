@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Pencil, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import axios from "axios";
 
 import Button from "../../../../components/Button/Button";
@@ -9,6 +9,7 @@ import Modal from "../../../../components/Modal/modal";
 import SearchInput from "../../../../components/filter/Searchbar";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import StatusBadge from "../../../../components/status/statusbadge";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 
@@ -26,6 +27,7 @@ export default function RoleForm({
 
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [newRoleName, setNewRoleName] = useState("");
   const [editRole, setEditRole] = useState(null);
@@ -253,7 +255,8 @@ export default function RoleForm({
 
   const handleBulkDeleteRoles = async () => {
     if (selectedRoleUuids.length === 0) {
-      return showToast("Please select at least one role.", "warning");
+      showToast("Please select at least one role.", "warning");
+      return false;
     }
 
     setBulkDeletingRoles(true);
@@ -283,6 +286,8 @@ export default function RoleForm({
       await fetchRoles({ afterDelete: true });
 
       if (refreshRoles) refreshRoles();
+
+      return true;
     } catch (err) {
       console.error("Error bulk deleting roles", err);
 
@@ -296,6 +301,8 @@ export default function RoleForm({
           "error",
         );
       }
+
+      return false;
     } finally {
       setBulkDeletingRoles(false);
     }
@@ -389,9 +396,7 @@ export default function RoleForm({
               <Button
                 variant="danger"
                 size="medium"
-                onClick={handleBulkDeleteRoles}
-                loading={bulkDeletingRoles}
-                loadingText="Deleting..."
+                onClick={() => setShowDeleteConfirm(true)}
                 disabled={bulkDeletingRoles}
                 className="w-full justify-center sm:w-auto"
               >
@@ -488,23 +493,6 @@ export default function RoleForm({
                       </div>
                     </div>
 
-                    {/* <Button
-                      type="button"
-                      variant="outline"
-                      size="small"
-                      onClick={() => {
-                        setEditRole({
-                          ...role,
-                          original_name: role.role_name,
-                        });
-                        setEditModalOpen(true);
-                      }}
-                      className="w-full sm:w-auto"
-                    >
-                      <Pencil size={15} />
-                      Edit
-                    </Button> */}
-                    {/* Small icon button using shared Button component */}
                     <Button
                       type="button"
                       variant="link"
@@ -593,6 +581,28 @@ export default function RoleForm({
           </div>
         </div>
       </Modal>
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        title="Delete Selected Roles"
+        message={`Are you sure you want to delete ${selectedRoleUuids.length} selected role(s)? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={bulkDeletingRoles}
+        onCancel={() => {
+          if (!bulkDeletingRoles) {
+            setShowDeleteConfirm(false);
+          }
+        }}
+        onConfirm={async () => {
+          const success = await handleBulkDeleteRoles();
+
+          if (success) {
+            setShowDeleteConfirm(false);
+          }
+        }}
+      />
     </div>
   );
 }
