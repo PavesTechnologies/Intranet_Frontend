@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useDrag } from "react-dnd";
-import { MoreHorizontal, Plus, CheckSquare } from "lucide-react";
+import { 
+  MoreHorizontalIcon, 
+  AddIcon, 
+  ApprovedIcon 
+} from "../../../../components/icons";
 
 const TaskCard = ({
   task,
@@ -60,7 +64,7 @@ const TaskCard = ({
     >
       {/* TASK label */}
       <div className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold shrink-0">
-        <CheckSquare size={12} />
+        <ApprovedIcon size={12} />
         TASK
       </div>
 
@@ -84,7 +88,7 @@ const TaskCard = ({
           }}
           className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 shrink-0"
         >
-          <Plus size={13} /> Story
+          <AddIcon size={13} /> Story
         </button>
       )}
 
@@ -101,7 +105,7 @@ const TaskCard = ({
           }}
           className="p-1 text-gray-500 hover:text-gray-800"
         >
-          <MoreHorizontal size={16} />
+          <MoreHorizontalIcon size={16} />
         </button>
 
         {showMenu && (
