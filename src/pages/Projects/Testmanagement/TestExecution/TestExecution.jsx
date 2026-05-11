@@ -42,7 +42,7 @@ export default function TestExecution() {
 const executeDeleteCycle = async (cycleId) => {
     try {
       // Make sure this URL matches your backend endpoint for deleting a cycle
-      await axiosInstance.delete(`/test-execution/test-cycles/${cycleId}`);
+      await axiosInstance.delete(`api/test-execution/test-cycles/${cycleId}`);
       
       showStatusToast("Cycle deleted successfully!", "success");
       loadCycles(); // Refresh the list so the deleted cycle disappears
@@ -81,7 +81,7 @@ const executeDeleteCycle = async (cycleId) => {
     setLoadingCycles(true);
     try {
       const res = await axiosInstance.get(
-        `/test-execution/test-cycles/projects/${projectId}`
+        `api/test-execution/test-cycles/projects/${projectId}`
       );
       setCycles(res.data || []);
       if (!selectedCycleId && res.data?.length) {

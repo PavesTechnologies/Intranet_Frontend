@@ -20,7 +20,7 @@ export default function RunListForCycle({
     setLoading(true);
     try {
       const res = await axiosInstance.get(
-        `/test-execution/test-runs/cycles/${cycleId}`
+        `api/test-execution/test-runs/cycles/${cycleId}`
       );
       setRuns(res.data || []);
     } catch (err) {
@@ -38,7 +38,7 @@ export default function RunListForCycle({
 
   const executeDeleteRun = async () => {
     try {
-      await axiosInstance.delete(`/test-execution/test-runs/${runIdToDelete}`);
+      await axiosInstance.delete(`api/test-execution/test-runs/${runIdToDelete}`);
       showStatusToast("Test run deleted successfully", "success");
       loadRuns();
     } catch (err) {

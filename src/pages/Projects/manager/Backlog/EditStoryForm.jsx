@@ -172,7 +172,7 @@ const EditStoryForm = ({
       projectId: Number(projectId),
       epicId: formData.epicId,
       sprintId: formData.sprintId,
-      statusId: formData.statusId,
+       statusId: formData.statusId,
       priority: formData.priority,
 
       startDate: formData.startDate
@@ -251,26 +251,28 @@ const EditStoryForm = ({
   // ===================== UI =====================
   return (
     <Wrapper mode={mode} onClose={onClose}>
-      {/* HEADER */}
-      <div className="flex justify-between items-center p-6 border-b shrink-0">
-        <h2 className="text-xl font-semibold text-gray-800">Edit User Story</h2>
-        <button
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-800 transition-colors"
-        >
-          <X size={20} />
-        </button>
-      </div>
+      <form onSubmit={handleSubmit} className="flex flex-col min-h-full">
+        {/* HEADER */}
+        <div className="flex justify-between items-center p-6 border-b shrink-0">
+          <h2 className="text-xl font-semibold text-gray-800">Edit User Story</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
 
-      {/* BODY */}
-      <div className="p-6 overflow-y-auto flex-1 space-y-6">
-        <FormInput
-          label="Title *"
-          name="title"
-          value={formData.title}
-          onChange={handleChange}
-          required
-        />
+        {/* BODY */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          <FormInput
+            label="Title *"
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
+            required
+          />
 
         <FormTextArea
           label="Description"
@@ -304,7 +306,7 @@ const EditStoryForm = ({
             ]}
           />
 
-          <FormSelect
+          {/* <FormSelect
             label="Status *"
             name="statusId"
             value={formData.statusId || ""}
@@ -313,7 +315,7 @@ const EditStoryForm = ({
               { label: "Select Status", value: "" },
               ...statuses.map((s) => ({ label: s.name, value: s.id })),
             ]}
-          />
+          /> */}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -383,12 +385,13 @@ const EditStoryForm = ({
         </div>
       </div>
 
-      {/* FOOTER */}
-      <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3 shrink-0">
-        <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
+        {/* FOOTER */}
+        <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3 shrink-0">
+          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
 
-        <Button variant="primary" type="submit" disabled={loading}>Update Story</Button>
-      </div>
+          <Button variant="primary" type="submit" disabled={loading}>Update Story</Button>
+        </div>
+      </form>
     </Wrapper>
   );
 };
