@@ -245,7 +245,7 @@ export default function HrOnboardingDashboard() {
 
           return {
             value: payloadValue,
-            label: `${displayName} (${payloadValue})`,
+            label: displayName,
             name: displayName,
           };
         })

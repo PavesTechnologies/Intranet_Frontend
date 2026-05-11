@@ -18,7 +18,12 @@ import {
   ChevronRight,
   ChevronLeft,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Bookmark,
+  Loader2,
+  LayoutGrid,
+  Rows,
+  User
 } from "lucide-react";
 
 export {
@@ -41,5 +46,10 @@ export {
   ChevronRight as ChevronRightIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronDown as ChevronDownIcon,
-  ChevronUp as ChevronUpIcon
+  ChevronUp as ChevronUpIcon,
+  Bookmark as BookmarkIcon,
+  Loader2 as SpinnerIcon,
+  LayoutGrid as LayoutGridIcon,
+  Rows as RowsIcon,
+  User as UserIcon
 };
