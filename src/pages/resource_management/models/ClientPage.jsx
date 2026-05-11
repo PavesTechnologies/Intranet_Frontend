@@ -111,6 +111,9 @@ const ProjectSLA = ({ data, loading }) => {
               <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
                 Warning Threshold
               </th>
+              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
+                Status
+              </th>
             </tr>
           </thead>
 
@@ -147,6 +150,15 @@ const ProjectSLA = ({ data, loading }) => {
                     )}`}
                   >
                     {sla.warningThresholdDays} days
+                  </span>
+                </td>
+
+                {/* STATUS */}
+                <td className="px-6 py-4">
+                  <span
+                    className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
+                  >
+                    {sla.activeFlag ? "Active" : "Inactive"}
                   </span>
                 </td>
               </tr>

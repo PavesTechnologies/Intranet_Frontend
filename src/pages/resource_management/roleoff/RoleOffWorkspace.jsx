@@ -32,6 +32,7 @@ import {
   getResources,
   getRoleOffsApprovedToday,
   getRoleOffProjectKPI,
+  getFulfilledRoleOffsForDM,
   pmCancelRoleOff,
   rmApprove,
   rmReject,
@@ -42,7 +43,9 @@ const mapStatus = (item) => {
   const rawRoleOffStatus = item?.roleOffStatus;
   const normalizedRoleOffStatus = String(rawRoleOffStatus ?? "").trim().toUpperCase();
 
-  if (normalizedRoleOffStatus === "PENDING") return "Pending Approval";
+  if (normalizedRoleOffStatus === "PENDING" || normalizedRoleOffStatus === "PENDING_APPROVAL") {
+    return "Pending Approval";
+  }
   if (normalizedRoleOffStatus === "APPROVED") return "Approved";
   if (normalizedRoleOffStatus === "REJECTED") return "Rejected";
   if (normalizedRoleOffStatus === "FULFILLED") return "Fulfilled";
@@ -91,6 +94,7 @@ const deriveImpact = (allocation) => {
 
   return "Low";
 };
+
 
 const formatDisplayDate = (dateIso) => {
   if (!dateIso) return "-";
@@ -162,6 +166,8 @@ const toBoolean = (value) => {
   if (typeof value === "number") return value !== 0;
   return Boolean(value);
 };
+
+
 
 const hasIdentifierValue = (value) => {
   if (value === undefined || value === null) return false;
@@ -394,7 +400,7 @@ const mapPendingRoleOffToRequest = (item) => {
         .join(", ") || "-",
     impact: normalizeImpact(item.impact),
     impactSummary: `Allocation on ${item.projectName || "the current project"} is at ${Number(item.allocationPercentage || 0)}% with ${normalizeImpact(item.impact).toLowerCase()} impact.`,
-    status: mapStatus(item),
+    status: mapStatus({ ...item, roleOffStatus: item.roleOffStatus || item.status }),
     allocationPercent: Number(item.allocationPercentage || 0),
     effectiveDate: formatDisplayDate(effectiveDateIso),
     effectiveDateIso,
@@ -423,6 +429,7 @@ const titleMap = {
     subtitle: "Delivery Manager approval queue for pending role-off decisions and high impact review handling.",
   },
 };
+
 
 const buildKpis = (mode, allocations, roleOffRequests, selectedRows, approvedTodayCount = null) => {
   const activeAllocations = allocations.filter((item) => item.status === "Active");
@@ -656,13 +663,14 @@ const PM_QUEUE_TABS = [
 
 const DM_QUEUE_TABS = [
   { id: "queue", label: "Approval Queue" },
-  { id: "fulfilled", label: "Fulfilled Roleoff" },
 ];
 
 const extractArrayPayload = (payload) => {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.data?.data)) return payload.data.data;
+  if (Array.isArray(payload?.data?.roleOffEvents)) {
+    return payload.data.roleOffEvents;
+  }
   return [];
 };
 
@@ -931,6 +939,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     }
   }, [mode, projectId]);
 
+
   useEffect(() => {
     let active = true;
     loadPendingRoleOffRequests(() => active);
@@ -939,6 +948,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       active = false;
     };
   }, [loadPendingRoleOffRequests]);
+
 
   const refreshPendingQueue = useCallback(async () => {
     await loadPendingRoleOffRequests();
@@ -1003,7 +1013,6 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
   const dmTabCounts = useMemo(() => ({
     queue: scopedRoleOffRequests.filter((item) => isDlActionableStatus(item.status)).length,
-    fulfilled: scopedRoleOffRequests.filter((item) => item.status === "Fulfilled").length,
   }), [scopedRoleOffRequests]);
 
   const visibleRows = useMemo(() => {
@@ -1032,13 +1041,9 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         })
         : mode === "rm"
           ? scopedRoleOffRequests
-          : scopedRoleOffRequests.filter((item) => {
-            if (dmActiveTab === "fulfilled") {
-              return item.status === "Fulfilled";
-            }
-
-            return isDlActionableStatus(item.status);
-          });
+          : scopedRoleOffRequests.filter((item) =>
+            isDlActionableStatus(item.status)
+          );
 
     return baseRows.filter((row) => {
       const searchTarget = [row.resource, row.project, row.role, row.client].join(" ").toLowerCase();
@@ -1201,6 +1206,21 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     }
 
     if (mode === "pm" && (action === "roleoff" || action === "edit" || action === "view")) {
+      // Prevent opening a create panel if a role-off is already in progress
+      if (
+        pmActiveTab === "active" &&
+        action !== "view" &&
+        row.roleOffStatus &&
+        row.roleOffStatus !== "Not Requested" &&
+        row.roleOffStatus !== "Rejected"
+      ) {
+        toast.warning(
+          `A role-off request is already in progress for ${row.resource} (Status: ${row.roleOffStatus}). ` +
+          `Please check the "Roleoff Process" tab.`
+        );
+        setPmActiveTab("process");
+        return;
+      }
       openSidePanel(row, getPmActionType(row, pmActiveTab));
       return;
     }
@@ -1269,9 +1289,22 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     }
   };
 
-
   const handleRowClick = (row) => {
     if (mode === "pm") {
+      // Prevent opening a create panel if a role-off is already in progress
+      if (
+        pmActiveTab === "active" &&
+        row.roleOffStatus &&
+        row.roleOffStatus !== "Not Requested" &&
+        row.roleOffStatus !== "Rejected"
+      ) {
+        toast.warning(
+          `A role-off request is already in progress for ${row.resource} (Status: ${row.roleOffStatus}). ` +
+          `Please check the "Roleoff Process" tab.`
+        );
+        setPmActiveTab("process");
+        return;
+      }
       openSidePanel(row, getPmActionType(row, pmActiveTab));
       return;
     }
@@ -1292,10 +1325,24 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       const isBulkCreate = panelState.actionType === "bulk-create";
 
       if (isBulkCreate) {
+        const eligibleRecords = records.filter(
+          (item) => !item.roleOffStatus || item.roleOffStatus === "Not Requested" || item.roleOffStatus === "Rejected"
+        );
+
+        if (eligibleRecords.length === 0) {
+          toast.warning("All selected allocations already have role-off requests");
+          setPanelState({ open: false, actionType: "create", record: null });
+          return { success: true };
+        }
+
+        if (eligibleRecords.length < records.length) {
+          toast.info(`${records.length - eligibleRecords.length} allocation(s) skipped as they already have role-off requests`);
+        }
+
         const bulkPayload = {
           projectId,
-          allocationIds: records.map((item) => item.id),
-          resourceIds: records.map((item) => item.resourceId),
+          allocationIds: eligibleRecords.map((item) => item.id),
+          resourceIds: eligibleRecords.map((item) => item.resourceId),
           effectiveRoleOffDate: formState.effectiveDate,
           roleOffReason: formState.reason,
           roleOffType: "PLANNED",
@@ -1308,7 +1355,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           return response;
         }
 
-        records.forEach((record) => {
+        eligibleRecords.forEach((record) => {
           cacheRoleOffDetails(
             [record?.roleOffId, record?.allocationId, record?.id],
             {
@@ -1330,13 +1377,24 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         setSelectedRows([]);
         setPanelState({ open: false, actionType: "create", record: null });
         toast.success(
-          getApiMessage(response, `${records.length} planned role-off request(s) created`),
+          getApiMessage(response, `${eligibleRecords.length} planned role-off request(s) created`),
         );
         return { success: true };
       }
 
       let lastResponse = null;
       for (const currentAllocation of records) {
+        const currentStatus = currentAllocation.roleOffStatus;
+        if (
+          panelState.actionType === "create" &&
+          currentStatus &&
+          currentStatus !== "Not Requested" &&
+          currentStatus !== "Rejected"
+        ) {
+          toast.warning(`Role-off request already exists for ${currentAllocation.resource}`);
+          continue;
+        }
+
         const isBulkStyleUpdate =
           panelState.actionType === "update" && Boolean(currentAllocation?.isBulkCreated);
         const payload = {
@@ -1408,7 +1466,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
       setSelectedRows([]);
       setPanelState({ open: false, actionType: "create", record: null });
-      loadPmResources();
+      await loadPmResources();
       return { success: true };
     } catch (err) {
       console.error(err);
