@@ -446,9 +446,9 @@ const RMSProjectList = () => {
       {/* PAGINATION */}
       {totalPages > 1 && (
         <div className="mt-6 flex flex-col items-center gap-2">
-          <p className="text-xs font-medium text-gray-500">
+          {/* <p className="text-xs font-medium text-gray-500">
             Showing {pageStart}-{pageEnd} of {totalElements} projects
-          </p>
+          </p> */}
           <Pagination
             currentPage={page + 1}
             totalPages={totalPages}

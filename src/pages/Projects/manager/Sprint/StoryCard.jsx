@@ -85,7 +85,7 @@ const StoryCard = ({
             setShowMenu((prev) => !prev);
             setShowEpicList(false);
           }}
-          className="p-1 text-gray-400 hover:text-gray-800 rounded opacity-0 group-hover:opacity-100"
+          className="p-1 text-gray-400 hover:text-gray-800 rounded"
         >
           <MoreHorizontal size={16} />
         </button>

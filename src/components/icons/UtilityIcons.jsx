@@ -15,7 +15,9 @@ import {
   MoreVertical,
   Power,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Calendar,
+  Target
 } from "lucide-react";
 
 export {
@@ -35,5 +37,7 @@ export {
   MoreVertical as VerticalMenuIcon,
   Power as PowerIcon,
   ToggleLeft as ToggleOffIcon,
-  ToggleRight as ToggleOnIcon
+  ToggleRight as ToggleOnIcon,
+  Calendar as CalendarIcon,
+  Target as TargetIcon
 };
