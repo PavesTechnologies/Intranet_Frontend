@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import StatusBadge from "../../../components/status/statusbadge";
@@ -48,6 +49,17 @@ const EMP_STYLES = `
   .emp-page   { font-family: "DM Sans", sans-serif; }
   .emp-name   { font-family: "Fraunces", serif; }
 `;
+
+const CURRENCY_OPTIONS = [
+  { label: "INR (₹)", value: "INR", symbol: "₹" },
+  { label: "USD ($)", value: "USD", symbol: "$" },
+  { label: "EUR (€)", value: "EUR", symbol: "€" },
+  { label: "GBP (£)", value: "GBP", symbol: "£" },
+  { label: "AED (د.إ)", value: "AED", symbol: "د.إ" },
+];
+
+const getCurrencySymbol = (code) =>
+  CURRENCY_OPTIONS.find((currency) => currency.value === code)?.symbol || "₹";
 
 (function injectEmpStyles() {
   if (typeof document === "undefined") return;
@@ -104,7 +116,7 @@ export default function ViewEmpDetails() {
     contact_number: "",
     designation: "",
     employee_type: "",
-    // currency: "",
+    currency: "INR",
     total_ctc: "",
     compensation_components: [],
     cc_emails: "",
@@ -130,6 +142,7 @@ export default function ViewEmpDetails() {
       setEmployee(offerData);
       setEditData({
         ...offerData,
+        currency: offerData.currency || "INR",
         cc_emails:
         offerData?.cc_emails?.join(", ") ||
         "",
@@ -265,6 +278,7 @@ export default function ViewEmpDetails() {
   contact_number: editData.contact_number,
   designation: editData.designation,
   employee_type: editData.employee_type,
+  currency: editData.currency || "INR",
 
   total_ctc: Number(editData.total_ctc || 0),
 
@@ -425,6 +439,7 @@ export default function ViewEmpDetails() {
                 onClick={() => {
                   setEditData({
                     ...employee,
+                    currency: employee.currency || "INR",
                    cc_emails:
                   employee?.cc_emails?.join(", ") ||
                   employee?.cc_mails?.join(", ") ||
@@ -484,7 +499,9 @@ export default function ViewEmpDetails() {
                 {
                   icon: <Wallet size={16} />,
                   label: "Annual CTC",
-                  value: employee.total_ctc ? `₹ ${Number(employee.total_ctc).toLocaleString("en-IN")}` : "—",
+                  value: employee.total_ctc
+                    ? `${getCurrencySymbol(employee.currency)} ${Number(employee.total_ctc).toLocaleString("en-IN")}`
+                    : "—",
                   delay: 240,
                 },
                 { icon: <UserCheck size={16} />, label: "Employee Type", value: employee.employee_type, delay: 300 },
@@ -596,7 +613,7 @@ export default function ViewEmpDetails() {
                   .filter((key) =>
                     [
                       "first_name","middle_name","last_name","mail","country_code",
-                      "contact_number","designation","employee_type","total_ctc","cc_emails",
+                      "contact_number","designation","employee_type","currency","total_ctc","cc_emails",
                     ].includes(key)
                   )
                   .map((key) => (
@@ -605,16 +622,28 @@ export default function ViewEmpDetails() {
                         {toTitleCase(key.replace(/_/g, " "))}
                       </span>
                       {key === "employee_type" ? (
-                        <select
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "Select Employee Type" },
+                            { value: "Full-Time", label: "Full-Time" },
+                            { value: "Part-Time", label: "Part-Time" },
+                            { value: "Intern", label: "Intern" },
+                            { value: "Contract", label: "Contract" },
+                          ]}
                           value={editData[key] || ""}
+                          onChange={(val) => setEditData({ ...editData, [key]: val })}
+                        />
+                      ) : key === "currency" ? (
+                        <select
+                          value={editData[key] || "INR"}
                           onChange={(e) => setEditData({ ...editData, [key]: e.target.value })}
                           className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 ring-0 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
                         >
-                          <option value="">Select Employee Type</option>
-                          <option value="Full-Time">Full-Time</option>
-                          <option value="Part-Time">Part-Time</option>
-                          <option value="Intern">Intern</option>
-                          <option value="Contract">Contract</option>
+                          {CURRENCY_OPTIONS.map((currency) => (
+                            <option key={currency.value} value={currency.value}>
+                              {currency.label}
+                            </option>
+                          ))}
                         </select>
                       ) : (
                         <input
@@ -671,16 +700,11 @@ export default function ViewEmpDetails() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
                 Approver
               </label>
-              <select
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
+              <FilterListbox
+                options={[{value:"",label:"Select Approver"}, ...adminUsers.map((a) => ({value: String(a.user_id), label: a.name}))]}
                 value={selectedAdmin}
-                onChange={(e) => setSelectedAdmin(e.target.value)}
-              >
-                <option value="">Select Approver</option>
-                {adminUsers.map((a) => (
-                  <option key={a.user_id} value={a.user_id}>{a.name}</option>
-                ))}
-              </select>
+                onChange={setSelectedAdmin}
+              />
             </div>
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
               <button

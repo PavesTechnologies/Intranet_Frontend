@@ -1,9 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
 import ReportingManagerApprovalTable from "./ReportingManagerApprovalTable";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { useMemo } from "react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import Button from "../../../components/Button/Button";
+import { ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const ReportingManagerApprovalPage = () => {
+  const navigate = useNavigate();
   const [groupedTimesheets, setGroupedTimesheets] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,8 +28,7 @@ const ReportingManagerApprovalPage = () => {
   const fetchGroupedTimesheets = async () => {
     try {
       const response = await fetch(
-        `${
-          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheets/internal/summary/reportingManager`,
         {
           headers: {
@@ -33,13 +37,27 @@ const ReportingManagerApprovalPage = () => {
         },
       );
 
-      if (!response.ok) throw new Error("Failed to fetch timesheets");
+      // Read body once — Spring error responses carry `message`, success carries the data.
+      const payload = await response.json().catch(() => null);
 
-      const data = await response.json();
-      setGroupedTimesheets(data);
-      setLoading(false);
+      if (!response.ok) {
+        const message =
+          payload?.message ||
+          payload?.error ||
+          `Failed to fetch timesheets (${response.status})`;
+        showStatusToast(message, "error");
+        setGroupedTimesheets([]);
+        return;
+      }
+
+      setGroupedTimesheets(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error("Error fetching timesheets:", error);
+      showStatusToast(
+        error?.message || "Failed to fetch timesheets",
+        "error",
+      );
+    } finally {
       setLoading(false);
     }
   };
@@ -143,15 +161,20 @@ const ReportingManagerApprovalPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
+        >
+          <ArrowLeft size={18} />
+        </button>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Reporting Manager Approvals
         </h1>
       </div>
 
       {/* ✅ Filter Header */}
-      <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm flex flex-wrap items-center gap-3 mb-6">
-        {/* Search */}
+      {/* <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm flex flex-wrap items-center gap-3 mb-6">
         <input
           type="text"
           placeholder="Search by user,description,location..."
@@ -160,7 +183,6 @@ const ReportingManagerApprovalPage = () => {
           className="flex-1 min-w-[220px] px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 placeholder-gray-400"
         />
 
-        {/* Date */}
         <input
           type="date"
           value={selectedDate}
@@ -168,41 +190,90 @@ const ReportingManagerApprovalPage = () => {
           className="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
         />
 
-        {/* Status Dropdown */}
-        <select
+        <FilterListbox
+          options={[
+            { value: "All", label: "All" },
+            { value: "Submitted", label: "Submitted" },
+            { value: "Approved", label: "Approved" },
+            { value: "Rejected", label: "Rejected" },
+          ]}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
-        >
-          <option>All</option>
-          <option>Submitted</option>
-          <option>Approved</option>
-          <option>Rejected</option>
-        </select>
+          onChange={setStatusFilter}
+        />
 
-        {/* User Dropdown */}
-        <select
+        <FilterListbox
+          options={[
+            { value: "All Users", label: "All Users" },
+            ...[...new Set(groupedTimesheets.map((item) => item.userName?.trim()))].filter(Boolean).map((user) => ({ value: user, label: user })),
+          ]}
           value={userFilter}
-          onChange={(e) => setUserFilter(e.target.value)}
-          className="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
-        >
-          <option value="All Users">All Users</option>
-          {[...new Set(groupedTimesheets.map((item) => item.userName?.trim()))]
-            .filter(Boolean)
-            .map((user) => (
-              <option key={user} value={user}>
-                {user}
-              </option>
-            ))}
-        </select>
+          onChange={setUserFilter}
+        />
 
-        {/* Reset Button */}
-        <button
+        <Button
+          variant="destructive"
+          size="medium"
           onClick={handleResetFilters}
-          className="bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-full transition-colors"
+        // className="bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-full transition-colors"
         >
           Reset
-        </button>
+        </Button>
+      </div> */}
+      <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm flex flex-row items-center gap-3 mb-6">
+        {/* Search - flex-1 allows it to grow, min-w prevents it from getting too small */}
+        <input
+          type="text"
+          placeholder="Search by user, description, location..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1 min-w-[250px] px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 placeholder-gray-400"
+        />
+
+        {/* Date - shrink-0 keeps it at its natural size */}
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="shrink-0 px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+        />
+
+        {/* Status Dropdown - Wider container */}
+        <div className="shrink-0 min-w-[120px]">
+          <FilterListbox
+            options={[
+              { value: "All", label: "All Statuses" },
+              { value: "Submitted", label: "Submitted" },
+              { value: "Approved", label: "Approved" },
+              { value: "Rejected", label: "Rejected" },
+            ]}
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
+        </div>
+
+        {/* User Dropdown - Even wider for names */}
+        <div className="shrink-0 min-w-[150px]">
+          <FilterListbox
+            options={[
+              { value: "All Users", label: "All Users" },
+              ...[...new Set(groupedTimesheets.map((item) => item.userName?.trim()))]
+                .filter(Boolean)
+                .map((user) => ({ value: user, label: user })),
+            ]}
+            value={userFilter}
+            onChange={setUserFilter}
+          />
+        </div>
+
+        {/* Reset Button */}
+        <Button
+          variant="destructive"
+          size="medium"
+          onClick={handleResetFilters}
+          className="shrink-0 whitespace-nowrap"
+        >
+          Reset
+        </Button>
       </div>
 
       {/* ✅ Timesheet Table */}

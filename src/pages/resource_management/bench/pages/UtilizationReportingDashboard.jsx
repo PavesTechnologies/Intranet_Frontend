@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart
@@ -182,41 +183,31 @@ const UtilizationReportingDashboard = () => {
             <div className="flex flex-col gap-1">
               <label className="text-[9px] font-black text-slate-400 capitalize tracking-widest pl-1">Report Type</label>
               <div className="relative">
-                <select
+                <FilterListbox
+                  options={[
+                    { value: "SUMMARY", label: "SUMMARY" },
+                    { value: "RESOURCE", label: "RESOURCE" },
+                    { value: "PROJECT", label: "PROJECT" },
+                    { value: "CLIENT", label: "CLIENT" },
+                    { value: "ROLE", label: "ROLE" },
+                  ]}
                   value={reportParams.reportType}
-                  onChange={(e) => {
-                    const type = e.target.value;
-                    setReportParams({ ...reportParams, reportType: type });
-                    if (type === 'SUMMARY') {
-                      setActiveTab('ANOMALIES');
-                    } else {
-                      setActiveTab(type);
-                    }
+                  onChange={(val) => {
+                    setReportParams({ ...reportParams, reportType: val });
+                    if (val === 'SUMMARY') { setActiveTab('ANOMALIES'); } else { setActiveTab(val); }
                   }}
-                  className="h-9 min-w-[130px] pl-3 pr-8 rounded-lg border border-slate-100 text-[11px] font-bold text-slate-700 bg-slate-50 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all appearance-none cursor-pointer tracking-tight"
-                >
-                  <option value="SUMMARY">SUMMARY</option>
-                  <option value="RESOURCE">RESOURCE</option>
-                  <option value="PROJECT">PROJECT</option>
-                  <option value="CLIENT">CLIENT</option>
-                  <option value="ROLE">ROLE</option>
-                </select>
-                <ChevronRight size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" />
+                />
               </div>
             </div>
 
             <div className="flex flex-col gap-1">
               <label className="text-[9px] font-black text-slate-400 capitalize tracking-widest pl-1">Grouping</label>
               <div className="relative">
-                <select
+                <FilterListbox
+                  options={[{ value: "WEEKLY", label: "WEEKLY" }, { value: "MONTHLY", label: "MONTHLY" }]}
                   value={reportParams.groupBy}
-                  onChange={(e) => setReportParams({ ...reportParams, groupBy: e.target.value })}
-                  className="h-9 min-w-[100px] pl-3 pr-8 rounded-lg border border-slate-100 text-[11px] font-bold text-slate-700 bg-slate-50 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all appearance-none cursor-pointer tracking-tight"
-                >
-                  <option value="WEEKLY">WEEKLY</option>
-                  <option value="MONTHLY">MONTHLY</option>
-                </select>
-                <ChevronRight size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" />
+                  onChange={(val) => setReportParams({ ...reportParams, groupBy: val })}
+                />
               </div>
             </div>
           </div>

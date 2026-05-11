@@ -1,5 +1,6 @@
 import { Trash2, Pencil, Check, X } from "lucide-react";
 import { useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import axios from "axios";
 
 /* =========================
@@ -106,18 +107,11 @@ function MitigationRow({ mitigation, members, onUpdated, onDelete }) {
             className="border rounded-lg p-2 w-full text-sm"
           />
 
-          <select
+          <FilterListbox
+            options={[{value:"",label:"Select owner"},...members.map(m=>({value:m.id,label:m.name}))]}
             value={form.ownerId || ""}
-            onChange={(e) => setForm({ ...form, ownerId: e.target.value })}
-            className="border rounded-lg p-2 text-sm bg-white"
-          >
-            <option value="">Select owner</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setForm({...form, ownerId: val})}
+          />
 
           <div className="flex gap-3 pt-2">
             <button

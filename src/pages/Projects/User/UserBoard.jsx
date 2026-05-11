@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
@@ -122,7 +123,7 @@ const Board = ({ projectId, projectName }) => {
     }
   };
 
-  if (loading) return <div className="p-6">Loading board...</div>;
+  if (loading) return <LoadingSpinner size="md" text="Loading board..." />;
 
   // Group tasks by backend statusId
   const groupedTasks = {};

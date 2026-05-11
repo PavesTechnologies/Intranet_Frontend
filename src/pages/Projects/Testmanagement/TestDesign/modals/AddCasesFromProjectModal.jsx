@@ -2,8 +2,9 @@ import React, { useEffect, useState, useMemo } from "react";
 import axiosInstance from "../../api/axiosInstance";
 import { ChevronDown, ChevronRight, Folder, FileText } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../../components/toastfy/toast";
 import LoadingSpinner from "../../../../../components/LoadingSpinner";
+import Button from "../../../../../components/Button/Button";
 export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
   const { projectId, runId } = useParams();
   const [stories, setStories] = useState([]);
@@ -32,7 +33,7 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
       setStories(formatted);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load test data");
+      showStatusToast("Failed to load test data", "error");
     } finally {
       setIsLoading(false);
     }
@@ -139,10 +140,10 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
         { testCaseIds: selectedCases },
       );
 
-      toast.success("Test cases added successfully");
+      showStatusToast("Test cases added successfully", "success");
       navigate(-1);
     } catch (err) {
-      toast.error("Failed to add test cases");
+      showStatusToast("Failed to add test cases", "error");
     }
   };
 
@@ -288,24 +289,17 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
 
       {/* FOOTER */}
       <div className="flex justify-end gap-3 p-4 border-t bg-gray-50">
-        <button
-          className="px-6 py-2 border rounded-lg"
-          onClick={() => navigate(-1)}
-        >
+        <Button variant="secondary" onClick={() => navigate(-1)}>
           Cancel
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant="primary"
           disabled={selectedCases.length === 0}
           onClick={handleAddCasesSubmit}
-          className={`px-6 py-2 text-white rounded-lg ${
-            selectedCases.length > 0
-              ? "bg-indigo-600 hover:bg-indigo-700"
-              : "bg-indigo-400 cursor-not-allowed"
-          }`}
         >
           Add {selectedCases.length} Case(s)
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import ManagerApprovalTable from "./ManagerApprovalTable";
 import Button from "../../../components/Button/Button";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import ManagerDashboard from "../ManagerDashboard";
 import TimesheetHeader from "../TimesheetHeader";
 import { getManagerDashboardData } from "../api";
@@ -180,8 +181,7 @@ const ManagerApprovalPage = () => {
       )}
 
       {/* ✅ Filter Header */}
-      <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm flex flex-wrap items-center gap-3 mb-6">
-        {/* Search */}
+      {/* <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm flex flex-wrap items-center gap-3 mb-6">
         <input
           type="text"
           placeholder="Search by user,description,location..."
@@ -190,7 +190,6 @@ const ManagerApprovalPage = () => {
           className="flex-1 min-w-[220px] px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 placeholder-gray-400"
         />
 
-        {/* Date */}
         <input
           type="date"
           value={selectedDate}
@@ -198,41 +197,94 @@ const ManagerApprovalPage = () => {
           className="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
         />
 
-        {/* Status Dropdown */}
-        <select
+        <FilterListbox
+          options={[
+            { value: "All", label: "All" },
+            { value: "Submitted", label: "Submitted" },
+            { value: "Approved", label: "Approved" },
+            { value: "Rejected", label: "Rejected" },
+          ]}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
-        >
-          <option>All</option>
-          <option>Submitted</option>
-          <option>Approved</option>
-          <option>Rejected</option>
-        </select>
+          onChange={setStatusFilter}
+        />
 
-        {/* User Dropdown */}
-        <select
+        <FilterListbox
+          options={[
+            { value: "All Users", label: "All Users" },
+            ...[...new Set(groupedTimesheets.map((item) => item.userName?.trim()))].filter(Boolean).map((user) => ({ value: user, label: user })),
+          ]}
           value={userFilter}
-          onChange={(e) => setUserFilter(e.target.value)}
-          className="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
-        >
-          <option value="All Users">All Users</option>
-          {[...new Set(groupedTimesheets.map((item) => item.userName?.trim()))]
-            .filter(Boolean)
-            .map((user) => (
-              <option key={user} value={user}>
-                {user}
-              </option>
-            ))}
-        </select>
+          onChange={setUserFilter}
+        />
 
-        {/* Reset Button */}
-        <button
+        <Button
+          variant="destructive"
+          size="medium"
           onClick={handleResetFilters}
-          className="bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-full transition-colors"
+        // className="bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-full transition-colors"
         >
           Reset
-        </button>
+        </Button>
+      </div> */}
+      <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm flex flex-row flex-nowrap items-center gap-3 mb-6">
+        {/* Search - Flexible but with a healthy minimum */}
+        <input
+          type="text"
+          placeholder="Search by user, description, location..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1 min-w-[280px] px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 placeholder-gray-400"
+        />
+
+        {/* Date - Fixed width to prevent squishing */}
+        <div className="shrink-0">
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+          />
+        </div>
+
+        {/* Status Dropdown - Wider for clarity */}
+        <div className="shrink-0 min-w-[120px]">
+          <FilterListbox
+            options={[
+              { value: "All", label: "All Statuses" },
+              { value: "Submitted", label: "Submitted" },
+              { value: "Approved", label: "Approved" },
+              { value: "Rejected", label: "Rejected" },
+            ]}
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
+        </div>
+
+        {/* User Dropdown - Even wider for long names */}
+        <div className="shrink-0 min-w-[150px]">
+          <FilterListbox
+            options={[
+              { value: "All Users", label: "All Users" },
+              ...[...new Set(groupedTimesheets.map((item) => item.userName?.trim()))]
+                .filter(Boolean)
+                .map((user) => ({ value: user, label: user })),
+            ]}
+            value={userFilter}
+            onChange={setUserFilter}
+          />
+        </div>
+
+        {/* Reset Button */}
+        <div className="shrink-0">
+          <Button
+            variant="destructive"
+            size="medium"
+            onClick={handleResetFilters}
+            className="whitespace-nowrap"
+          >
+            Reset
+          </Button>
+        </div>
       </div>
 
       {/* ✅ Timesheet Table */}

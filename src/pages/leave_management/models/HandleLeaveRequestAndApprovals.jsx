@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { forwardRef, useImperativeHandle } from "react";
 import { Check, X, Search, Pencil, XCircle } from "lucide-react";
 import axios from "axios";
@@ -10,6 +10,8 @@ import LeaveSection from "./LeaveSection";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
+import Button from "../../../components/Button/Button";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
@@ -34,6 +36,79 @@ const formatted = new Date().toISOString().slice(0, 7);
 //   }
 //   return count;
 // }
+const STATUS_OPTIONS = [
+  { value: "All", label: "All" },
+  { value: "PENDING", label: "Pending" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "REJECTED", label: "Rejected" },
+  { value: "CANCELLED", label: "Cancelled" },
+];
+
+const MONTHS = [
+  { value: "", label: "All Months" },
+  { value: 1, label: "January" },
+  { value: 2, label: "February" },
+  { value: 3, label: "March" },
+  { value: 4, label: "April" },
+  { value: 5, label: "May" },
+  { value: 6, label: "June" },
+  { value: 7, label: "July" },
+  { value: 8, label: "August" },
+  { value: 9, label: "September" },
+  { value: 10, label: "October" },
+  { value: 11, label: "November" },
+  { value: 12, label: "December" },
+];
+
+// function FilterListbox({ options, value, onChange }) {
+//   const selected = options.find((o) => o.value === value) ?? options[0];
+//   return (
+//     <Listbox value={selected} onChange={(opt) => onChange(opt.value)}>
+//       <div className="relative w-full lg:min-w-[150px]">
+//         <Listbox.Button className="w-full cursor-default rounded-lg border border-gray-300 bg-white py-2.5 pl-4 pr-10 text-left text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+//           <span className="block truncate">{selected?.label}</span>
+//           <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+//             <ChevronUpDownIcon className="h-4 w-4 text-gray-400" />
+//           </span>
+//         </Listbox.Button>
+//         <Transition
+//           as={Fragment}
+//           leave="transition ease-in duration-100"
+//           leaveFrom="opacity-100"
+//           leaveTo="opacity-0"
+//         >
+//           <Listbox.Options className="absolute z-40 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white py-1 shadow-2xl ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm">
+//             {options.map((option, idx) => (
+//               <Listbox.Option
+//                 key={idx}
+//                 value={option}
+//                 className={({ active }) =>
+//                   `relative cursor-default select-none py-2 pl-4 pr-9 ${
+//                     active ? "bg-indigo-50 text-indigo-900" : "text-gray-900"
+//                   }`
+//                 }
+//               >
+//                 {({ selected }) => (
+//                   <>
+//                     <span className={`block truncate ${selected ? "font-semibold" : "font-normal"}`}>
+//                       {option.label}
+//                     </span>
+//                     {selected && (
+//                       <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-indigo-600">
+//                         <CheckIcon className="h-4 w-4" />
+//                       </span>
+//                     )}
+//                   </>
+//                 )}
+//               </Listbox.Option>
+//             ))}
+//           </Listbox.Options>
+//         </Transition>
+//       </div>
+//     </Listbox>
+//   );
+// }
+
 const MANAGER_WS_EVENTS = ["LEAVE_APPLIED", "LEAVE_CANCELLED", "LEAVE_UPDATED"];
 
 const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
@@ -54,6 +129,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
   const itemsPerPage = 8;
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 4 }, (_, i) => currentYear - i); // current + 3 past years
+  const yearOptions = [{ value: "", label: "All Years" }, ...years.map((y) => ({ value: y, label: String(y) }))];
   const isMountedRef = useRef(false);
 
   // const { user } = useAuth();
@@ -481,93 +557,30 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
           </div>
 
           {/* --- STATUS DROPDOWN --- */}
-          {/* This is the new, styled dropdown structure */}
-          <div className="relative w-full lg:w-auto">
-            <select
+          <div className="w-full lg:w-auto lg:min-w-[150px]">
+            <FilterListbox
+              options={STATUS_OPTIONS}
               value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              // MODIFICATION: Added 'appearance-none' to hide the default arrow and 'pr-10' for spacing
-              className="w-full lg:min-w-[150px] appearance-none bg-white pl-4 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-            >
-              <option>All</option>
-              <option>PENDING</option>
-              <option>APPROVED</option>
-              <option>REJECTED</option>
-              <option>CANCELLED</option>
-            </select>
-            {/* MODIFICATION: Added this div for the custom chevron icon */}
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-              <svg
-                className="fill-current h-4 w-4"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-              >
-                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-              </svg>
-            </div>
+              onChange={setSelectedStatus}
+            />
           </div>
 
           {/* --- YEAR DROPDOWN --- */}
-          <div className="relative w-full lg:w-auto">
-            <select
+          <div className="w-full lg:w-auto lg:min-w-[150px]">
+            <FilterListbox
+              options={yearOptions}
               value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="w-full lg:min-w-[150px] appearance-none bg-white pl-4 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-            >
-              <option value="">All Years</option>
-              {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-              <svg
-                className="fill-current h-4 w-4"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-              >
-                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-              </svg>
-            </div>
+              onChange={setSelectedYear}
+            />
           </div>
 
           {/* --- MONTH DROPDOWN --- */}
-          <div className="relative w-full lg:w-auto">
-            <select
+          <div className="w-full lg:w-auto lg:min-w-[150px]">
+            <FilterListbox
+              options={MONTHS}
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="w-full lg:min-w-[150px] appearance-none bg-white pl-4 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-            >
-              <option value="">All Months</option>
-              {[
-                { value: 1, label: "January" },
-                { value: 2, label: "February" },
-                { value: 3, label: "March" },
-                { value: 4, label: "April" },
-                { value: 5, label: "May" },
-                { value: 6, label: "June" },
-                { value: 7, label: "July" },
-                { value: 8, label: "August" },
-                { value: 9, label: "September" },
-                { value: 10, label: "October" },
-                { value: 11, label: "November" },
-                { value: 12, label: "December" },
-              ].map((month) => (
-                <option key={month.value} value={month.value}>
-                  {month.label}
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-              <svg
-                className="fill-current h-4 w-4"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-              >
-                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-              </svg>
-            </div>
+              onChange={setSelectedMonth}
+            />
           </div>
         </div>
       </div>
@@ -1051,12 +1064,13 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                 <h2 className="text-lg font-semibold">
                   Analysis for - {leaveBalanceModal.employeeName}
                 </h2>
-                <button
+                <Button
                   onClick={() => setLeaveBalaceModel(null)}
-                  className="text-gray-600 hover:text-black text-xl"
+                  variant="ghost"
+                  size="medium"
                 >
                   &times;
-                </button>
+                </Button>
               </div>
               <LeaveSection
                 employeeId={leaveBalanceModal.employeeId}
@@ -1108,19 +1122,27 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                 )}
 
                 <div className="flex gap-3 w-full">
-                  <button
-                    className="flex-1 px-4 py-2 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
+                  <Button
+                    variant="ghost"
+                    size="medium"
+                    className="flex-1"
                     onClick={() => setConfirmation(null)}
                     disabled={loading}
                   >
                     Cancel
-                  </button>
-                  <button
-                    className={`flex-1 px-4 py-2 rounded text-white font-medium transition ${
+                  </Button>
+                  <Button
+                    variant={
+                      confirmation.action === "approve" ? "primary" : "danger"
+                    }
+                    size="medium"
+                    className="flex-1"
+                    loading={loading}
+                    loadingText={
                       confirmation.action === "approve"
-                        ? "bg-green-600 hover:bg-green-700"
-                        : "bg-red-600 hover:bg-red-700"
-                    } ${loading ? "opacity-50 pointer-events-none" : ""}`}
+                        ? "Approving..."
+                        : "Rejecting..."
+                    }
                     onClick={() =>
                       handleDecision({
                         action: confirmation.action,
@@ -1129,10 +1151,9 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                         year: confirmation.year,
                       })
                     }
-                    disabled={loading}
                   >
                     Yes
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

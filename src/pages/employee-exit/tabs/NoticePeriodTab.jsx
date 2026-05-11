@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import FilterListbox from '../../../components/filter/FilterListbox';
 import { 
   Calendar,
   Clock,
@@ -327,16 +328,15 @@ export default function NoticePeriodTab({ exit_uuid, employee_uuid }) {
               <div className="md:col-span-1">
                 <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
                 {isEditing ? (
-                  <select
-                    name="kt_status"
+                  <FilterListbox
+                    options={[
+                      { value: "Not Started", label: "Not Started" },
+                      { value: "In Progress", label: "In Progress" },
+                      { value: "Completed", label: "Completed" },
+                    ]}
                     value={formData.kt_status}
-                    onChange={handleInputChange}
-                    className="w-full border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="Not Started">Not Started</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                  </select>
+                    onChange={(val) => handleInputChange({ target: { name: "kt_status", value: val } })}
+                  />
                 ) : (
                   <div className="font-medium text-gray-900 bg-gray-50 px-3 py-2.5 rounded-xl">
                     {noticeData.kt_status}

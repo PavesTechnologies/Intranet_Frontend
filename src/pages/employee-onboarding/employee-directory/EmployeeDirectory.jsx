@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-
+import FilterListbox from "../../../components/filter/FilterListbox";
 import EmployeeCard from "../components/EmployeeCard";
 import { Search, Loader2 } from "lucide-react";
 import axios from "axios";
@@ -130,17 +130,11 @@ const EmployeeDirectory = () => {
 
         {/* Department Filter Dropdown */}
         <div className="min-w-[150px]">
-          <select
+          <FilterListbox
+            options={departments.map((dept) => ({value: dept, label: dept === "All" ? "All Departments" : dept}))}
             value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-gray-700 font-medium cursor-pointer shadow-sm hover:border-gray-400 transition"
-          >
-            {departments.map((dept) => (
-              <option key={dept} value={dept}>
-                {dept === "All" ? "All Departments" : dept}
-              </option>
-            ))}
-          </select>
+            onChange={setDepartment}
+          />
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, Fragment, useMemo } from "react";
 import axios, { all } from "axios";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import {
   X,
   Lock,
@@ -16,6 +17,7 @@ import { useRecordLock } from "../hooks/useRecordLock";
 import { useAuth } from "../../../contexts/AuthContext";
 import DateRangePicker from "./DateRangePicker";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const GENDER_BASED_IDS = ["L-ML", "L-PL"];
@@ -648,20 +650,15 @@ export default function EditLeaveModal({
                       <label className="text-xs font-medium text-gray-500">
                         Start — {formatDateForDisplay(startDate)}
                       </label>
-                      <select
+                      <FilterListbox
+                        options={[
+                          { value: "fullday", label: "Full Day" },
+                          { value: "first", label: "First Half" },
+                          { value: "second", label: "Second Half" },
+                        ]}
                         value={halfDayConfig.start}
-                        onChange={(e) =>
-                          setHalfDayConfig((p) => ({
-                            ...p,
-                            start: e.target.value,
-                          }))
-                        }
-                        className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
-                      >
-                        <option value="fullday">Full Day</option>
-                        <option value="first">First Half</option>
-                        <option value="second">Second Half</option>
-                      </select>
+                        onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                      />
                     </div>
                     {isMultiDay && (
                       <>
@@ -670,20 +667,15 @@ export default function EditLeaveModal({
                           <label className="text-xs font-medium text-gray-500">
                             End — {formatDateForDisplay(endDate)}
                           </label>
-                          <select
+                          <FilterListbox
+                            options={[
+                              { value: "fullday", label: "Full Day" },
+                              { value: "first", label: "First Half" },
+                              { value: "second", label: "Second Half" },
+                            ]}
                             value={halfDayConfig.end}
-                            onChange={(e) =>
-                              setHalfDayConfig((p) => ({
-                                ...p,
-                                end: e.target.value,
-                              }))
-                            }
-                            className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
-                          >
-                            <option value="fullday">Full Day</option>
-                            <option value="first">First Half</option>
-                            <option value="second">Second Half</option>
-                          </select>
+                            onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                          />
                         </div>
                       </>
                     )}
@@ -735,18 +727,20 @@ export default function EditLeaveModal({
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-            <button
+            <Button
               type="button"
               onClick={handleClose}
               disabled={submitting || isLockedByOther}
-              className="px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+              variant="ghost"
+              size="medium"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={submitting || isLockedByOther || hasBalanceError}
-              className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              variant="primary"
+              size="medium"
             >
               {submitting ? (
                 <>
@@ -756,7 +750,7 @@ export default function EditLeaveModal({
               ) : (
                 "Update Request"
               )}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

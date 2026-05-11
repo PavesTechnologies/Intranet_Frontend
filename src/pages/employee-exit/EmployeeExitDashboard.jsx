@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import FilterListbox from '../../components/filter/FilterListbox';
 import { 
   Users, 
   Search, 
@@ -101,19 +102,18 @@ export default function EmployeeExitDashboard() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <select 
-                className="pl-10 pr-8 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white font-medium text-gray-700"
+            <div className="w-48">
+              <FilterListbox
+                options={[
+                  { value: "All", label: "All Statuses" },
+                  { value: "Approvals", label: "Approvals" },
+                  { value: "Clearance", label: "Clearance" },
+                  { value: "Settlement", label: "Settlement" },
+                  { value: "Completed", label: "Completed" },
+                ]}
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="All">All Statuses</option>
-                <option value="Approvals">Approvals</option>
-                <option value="Clearance">Clearance</option>
-                <option value="Settlement">Settlement</option>
-                <option value="Completed">Completed</option>
-              </select>
+                onChange={setStatusFilter}
+              />
             </div>
           </div>
         </div>

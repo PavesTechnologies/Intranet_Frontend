@@ -1,13 +1,14 @@
 import React from "react";
-import { 
-  Plus, 
-  ListTodo, 
-  ClipboardList, 
-  ListChecks, 
+import {
+  Plus,
+  ListTodo,
+  ClipboardList,
+  ListChecks,
   ArrowRight,
   Edit,      // ⭐ ADDED IMPORT
   Trash2     // ⭐ ADDED IMPORT
 } from "lucide-react";
+import Button from "../../../../../components/Button/Button";
 
 export default function ScenarioPanel({
   selectedScenario,
@@ -67,12 +68,9 @@ export default function ScenarioPanel({
             </p>
           </div>
 
-          <button
-            onClick={() => onAddCase(selectedScenario)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-          >
+          <Button variant="primary" size="small" onClick={() => onAddCase(selectedScenario)}>
             <Plus size={16} /> Add Test Case
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -90,12 +88,9 @@ export default function ScenarioPanel({
           {!selectedScenario.cases || selectedScenario.cases.length === 0 ? (
             <div className="text-center p-6 border border-dashed border-gray-200 rounded-xl bg-gray-50">
               <p className="text-sm text-gray-500 mb-3">No test cases created yet.</p>
-              <button
-                onClick={() => onAddCase(selectedScenario)}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-              >
+              <Button variant="link" size="small" onClick={() => onAddCase(selectedScenario)}>
                 + Create the first case
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="space-y-2">
@@ -189,12 +184,9 @@ export default function ScenarioPanel({
                   <p className="text-sm text-gray-500">Execution Steps</p>
                 </div>
                 
-                <button
-                  onClick={() => onAddSteps(selectedCase)}
-                  className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-md flex items-center gap-2 transition-colors shadow-sm"
-                >
+                <Button variant="secondary" size="small" onClick={() => onAddSteps(selectedCase)}>
                   <Plus size={14} /> Add Step
-                </button>
+                </Button>
               </div>
 
               {/* Steps List */}
@@ -202,12 +194,9 @@ export default function ScenarioPanel({
                 {!selectedCase.steps || selectedCase.steps.length === 0 ? (
                   <div className="text-center p-10 border border-dashed border-gray-200 rounded-xl bg-white">
                     <p className="text-sm text-gray-500 mb-3">No execution steps added yet.</p>
-                    <button
-                      onClick={() => onAddSteps(selectedCase)}
-                      className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                    >
+                    <Button variant="link" size="small" onClick={() => onAddSteps(selectedCase)}>
                       + Add the first step
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   selectedCase.steps.map((step, index) => (

@@ -294,14 +294,14 @@ const Dashboard = () => {
       color: "bg-[#d23369]",
       stats: "5 events today",
     },
-    {
-      title: "Calendar",
-      description: "View events, meetings, and deadlines",
-      icon: Calendar,
-      href: "/calendar",
-      color: "bg-[#d23369]",
-      stats: "5 events today",
-    },
+    // {
+    //   title: "Calendar",
+    //   description: "View events, meetings, and deadlines",
+    //   icon: Calendar,
+    //   href: "/calendar",
+    //   color: "bg-[#d23369]",
+    //   stats: "5 events today",
+    // },
     // {
     //   title: "Employee Exit",
     //   description: "Manage employee exit processes",

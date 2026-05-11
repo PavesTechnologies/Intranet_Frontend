@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { X } from "lucide-react";
+import Button from "../../../../components/Button/Button";
 
 const CreateSprint = ({ onClose }) => {
   const [formData, setFormData] = useState({
@@ -163,45 +165,31 @@ const CreateSprint = ({ onClose }) => {
 
         <div>
           <label className="block font-medium text-gray-700 mb-1">Status</label>
-          <select
-            name="status"
+          <FilterListbox
+            options={[{value:"PLANNING",label:"Planning"},{value:"ACTIVE",label:"Active"},{value:"COMPLETED",label:"Completed"}]}
             value={formData.status}
-            onChange={handleChange}
-            className="w-full border border-gray-300 p-2 rounded-md"
-          >
-            <option value="PLANNING">Planning</option>
-            <option value="ACTIVE">Active</option>
-            <option value="COMPLETED">Completed</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+          />
         </div>
 
         <div>
           <label className="block font-medium text-gray-700 mb-1">
             Project
           </label>
-          <select
-            name="projectId"
+          <FilterListbox
+            options={[
+              { value: "", label: "-- Select a Project --" },
+              ...projects.map((project) => ({ value: project.id, label: project.name })),
+            ]}
             value={formData.projectId}
-            onChange={handleChange}
-            required
-            className="w-full border border-gray-300 p-2 rounded-md"
-          >
-            <option value="">-- Select a Project --</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleChange({ target: { name: "projectId", value: val } })}
+          />
         </div>
 
         <div className="text-center">
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition"
-          >
+          <Button variant="primary" type="submit">
             Create Sprint
-          </button>
+          </Button>
         </div>
       </form>
     </div>

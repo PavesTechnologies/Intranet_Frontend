@@ -7,6 +7,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -691,15 +692,15 @@ const RoleOffSidePanel = ({
                   <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
                     Role-Off Type
                   </label>
-                  <select
+                  <FilterListbox
+                    options={[
+                      { value: "Planned", label: "Planned" },
+                      { value: "Emergency", label: "Emergency" },
+                    ]}
                     value={isBulkPmFlow ? "Planned" : form.type}
-                    onChange={(event) => updateField("type", event.target.value)}
+                    onChange={(val) => updateField("type", val)}
                     disabled={isReadOnlyPm || isSubmitting || isBulkPmFlow}
-                    className="mt-2 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-                  >
-                    <option value="Planned">Planned</option>
-                    <option value="Emergency">Emergency</option>
-                  </select>
+                  />
                 </div>
 
                 <div>
@@ -730,23 +731,15 @@ const RoleOffSidePanel = ({
                   <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
                     Reason
                   </label>
-                  <select
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select reason" },
+                      ...reasons.map((r) => ({ value: getReasonOptionValue(r), label: getReasonOptionLabel(r) })),
+                    ]}
                     value={form.reason}
-                    onChange={(event) => updateField("reason", event.target.value)}
+                    onChange={(val) => updateField("reason", val)}
                     disabled={isReadOnlyPm || isSubmitting}
-                    className={cn(getFieldClassName(fieldErrors.reason), "h-10 px-3")}
-                  >
-                    <option value="">Select reason</option>
-                    {reasons.map((r, idx) => {
-                      const value = getReasonOptionValue(r);
-                      const label = getReasonOptionLabel(r);
-                      return (
-                        <option key={idx} value={value}>
-                          {label}
-                        </option>
-                      );
-                    })}
-                  </select>
+                  />
                   {fieldErrors.reason ? (
                     <p className="mt-1 text-xs text-rose-600">{fieldErrors.reason}</p>
                   ) : null}
@@ -756,21 +749,21 @@ const RoleOffSidePanel = ({
                   <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
                     Resource Performance
                   </label>
-                  <select
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select performance" },
+                      { value: "HIGH_PERFORMER", label: "High Performer" },
+                      { value: "AVERAGE_PERFORMER", label: "Average Performer" },
+                      { value: "LOW_PERFORMER", label: "Low Performer" },
+                      { value: "EXCEPTIONAL", label: "Exceptional" },
+                      { value: "NEEDS_IMPROVEMENT", label: "Needs Improvement" },
+                      { value: "CONSISTENT", label: "Consistent" },
+                      { value: "NEW_RESOURCE", label: "New Resource" },
+                    ]}
                     value={form.resourcePerformance}
-                    onChange={(event) => updateField("resourcePerformance", event.target.value)}
+                    onChange={(val) => updateField("resourcePerformance", val)}
                     disabled={isReadOnlyPm || isSubmitting}
-                    className={cn(getFieldClassName(fieldErrors.resourcePerformance), "h-10 px-3")}
-                  >
-                    <option value="">Select performance</option>
-                    <option value="HIGH_PERFORMER">High Performer</option>
-                    <option value="AVERAGE_PERFORMER">Average Performer</option>
-                    <option value="LOW_PERFORMER">Low Performer</option>
-                    <option value="EXCEPTIONAL">Exceptional</option>
-                    <option value="NEEDS_IMPROVEMENT">Needs Improvement</option>
-                    <option value="CONSISTENT">Consistent</option>
-                    <option value="NEW_RESOURCE">New Resource</option>
-                  </select>
+                  />
                   {fieldErrors.resourcePerformance ? (
                     <p className="mt-1 text-xs text-rose-600">{fieldErrors.resourcePerformance}</p>
                   ) : null}

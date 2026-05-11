@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 
 /**
  * TestCaseResultComponent
@@ -54,7 +54,7 @@ export default function TestCaseResultComponent({
       setData(res.data);
     } catch (err) {
       console.error("Error fetching case results", err);
-      toast.error("Failed to load results");
+      showStatusToast("Failed to load results", "error");
     } finally {
       setLoading(false);
     }
