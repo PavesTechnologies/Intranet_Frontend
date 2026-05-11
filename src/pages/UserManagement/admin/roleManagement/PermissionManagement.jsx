@@ -83,7 +83,7 @@ const PermissionManagement = ({ roles = [] }) => {
     if (!term) return roles;
 
     return roles.filter((role) =>
-      role.role_name?.toLowerCase().includes(term)
+      role.role_name?.toLowerCase().includes(term),
     );
   }, [roles, searchTerm]);
 
@@ -192,13 +192,14 @@ const PermissionManagement = ({ roles = [] }) => {
         bodyClassName="p-0 overflow-hidden"
         scrollable={false}
         closeOnBackdrop={!loading}
+        footerClassName="px-4 py-2 sm:px-4 sm:py-2"
         footer={
           <div className="flex justify-end">
             <Button
               type="button"
               onClick={closeModal}
               variant="outline"
-              size="medium"
+              size="small"
               className="w-full sm:w-auto"
             >
               Close
@@ -206,7 +207,7 @@ const PermissionManagement = ({ roles = [] }) => {
           </div>
         }
       >
-        <div className="flex max-h-[calc(86vh-150px)] flex-col overflow-hidden">
+        <div className="flex max-h-[calc(86vh-130px)] flex-col overflow-hidden">
           {!loading && rolePermissions.length > 0 && (
             <div className="shrink-0 border-b border-gray-100 bg-white p-4">
               <SearchInput
