@@ -248,23 +248,24 @@ const EditTaskForm = ({
   // UI
   return (
     <Wrapper mode={mode} onClose={onClose}>
-      {/* HEADER */}
-      <div className="flex justify-between items-center p-6 border-b">
-        <h2 className="text-xl font-semibold">Edit Task</h2>
-        <button onClick={onClose}>
-          <X className="text-gray-600 hover:text-gray-900" />
-        </button>
-      </div>
+      <form onSubmit={handleSubmit} className="flex flex-col min-h-full">
+        {/* HEADER */}
+        <div className="flex justify-between items-center p-6 border-b">
+          <h2 className="text-xl font-semibold">Edit Task</h2>
+          <button type="button" onClick={onClose}>
+            <X className="text-gray-600 hover:text-gray-900" />
+          </button>
+        </div>
 
-      {/* BODY (scrollable) */}
-      <div className="p-6 overflow-y-auto flex-1 space-y-6">
-        <FormInput
-          label="Title *"
-          name="title"
-          value={formData.title}
-          onChange={handleChange}
-          required
-        />
+        {/* BODY (scrollable) */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          <FormInput
+            label="Title *"
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
+            required
+          />
 
         <FormTextArea
           label="Description"
@@ -392,12 +393,13 @@ const EditTaskForm = ({
         />
       </div>
 
-      {/* STICKY FOOTER */}
-      <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3">
-        <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
+        {/* STICKY FOOTER */}
+        <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3">
+          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
 
-        <Button variant="primary" type="submit">Save Changes</Button>
-      </div>
+          <Button variant="primary" type="submit">Save Changes</Button>
+        </div>
+      </form>
     </Wrapper>
   );
 };

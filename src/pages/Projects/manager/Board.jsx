@@ -1008,23 +1008,29 @@ const Board = ({ projectId, sprintId, projectName }) => {
                                   snapshot.isDraggingOver ? "bg-indigo-50" : ""
                                 }`}
                               >
-                                {taskItems.map((task, tIdx) => (
-                                  <Draggable
-                                    key={`task-${task.id}`}
-                                    draggableId={`task-${task.id}`}
-                                    index={tIdx}
-                                    type="ITEM"
-                                  >
-                                    {(taskProvided, taskSnapshot) => (
-                                      <TaskCard
-                                        task={task}
-                                        taskProvided={taskProvided}
-                                        taskSnapshot={taskSnapshot}
-                                        openTaskPanel={openTaskPanel}
-                                      />
-                                    )}
-                                  </Draggable>
-                                ))}
+                                {taskItems.length === 0 && activeSprintId && safeTasks.length === 0 ? (
+                                  <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-gray-500 italic">
+                                    No tasks available
+                                  </div>
+                                ) : (
+                                  taskItems.map((task, tIdx) => (
+                                    <Draggable
+                                      key={`task-${task.id}`}
+                                      draggableId={`task-${task.id}`}
+                                      index={tIdx}
+                                      type="ITEM"
+                                    >
+                                      {(taskProvided, taskSnapshot) => (
+                                        <TaskCard
+                                          task={task}
+                                          taskProvided={taskProvided}
+                                          taskSnapshot={taskSnapshot}
+                                          openTaskPanel={openTaskPanel}
+                                        />
+                                      )}
+                                    </Draggable>
+                                  ))
+                                )}
                                 {dropProvided.placeholder}
                               </div>
                             )}
