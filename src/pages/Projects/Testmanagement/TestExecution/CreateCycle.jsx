@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axiosInstance from "../api/axiosInstance";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
 
@@ -164,38 +165,21 @@ export default function CreateTestCycleForm({
         {/* Cycle Type */}
         <div>
           <label className="block text-sm font-medium mb-1">Cycle Type *</label>
-          <select
-            name="cycleType"
+          <FilterListbox
+            options={[{value:"",label:"Select Type"},{value:"REGRESSION",label:"REGRESSION"},{value:"SMOKE",label:"SMOKE"},{value:"UAT",label:"UAT"},{value:"SIT",label:"SIT"},{value:"PERFORMANCE",label:"PERFORMANCE"},{value:"OTHER",label:"OTHER"}]}
             value={form.cycleType}
-            onChange={handleChange}
-            className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            required
-          >
-            <option value="">Select Type</option>
-            <option value="REGRESSION">REGRESSION</option>
-            <option value="SMOKE">SMOKE</option>
-            <option value="UAT">UAT</option>
-            <option value="SIT">SIT</option>
-            <option value="PERFORMANCE">PERFORMANCE</option>
-            <option value="OTHER">OTHER</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "cycleType", value: val } })}
+          />
         </div>
 
         {/* Status */}
         <div>
           <label className="block text-sm font-medium mb-1">Status</label>
-          <select
-            name="status"
+          <FilterListbox
+            options={[{value:"",label:"Select Status"},{value:"PLANNED",label:"PLANNED"},{value:"IN_PROGRESS",label:"IN_PROGRESS"},{value:"COMPLETED",label:"COMPLETED"},{value:"CANCELLED",label:"CANCELLED"}]}
             value={form.status}
-            onChange={handleChange}
-            className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">Select Status</option>
-            <option value="PLANNED">PLANNED</option>
-            <option value="IN_PROGRESS">IN_PROGRESS</option>
-            <option value="COMPLETED">COMPLETED</option>
-            <option value="CANCELLED">CANCELLED</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+          />
         </div>
 
         {/* Sprint */}
@@ -206,19 +190,11 @@ export default function CreateTestCycleForm({
           {loadingSprints ? (
             <p className="text-gray-400 text-sm">Loading sprints...</p>
           ) : (
-            <select
-              name="sprintId"
+            <FilterListbox
+              options={[{value:"",label:"No Sprint"},...sprints.map(sprint=>({value:sprint.id,label:sprint.name}))]}
               value={form.sprintId ?? ""}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-              <option value="">No Sprint</option>
-              {sprints.map((sprint) => (
-                <option key={sprint.id} value={sprint.id}>
-                  {sprint.name}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => handleChange({ target: { name: "sprintId", value: val } })}
+            />
           )}
         </div>
 

@@ -7,17 +7,33 @@ import Button from "../../../components/Button/Button";
 import Pagination from "../../../components/Pagination/pagination";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
-import { MoreVertical } from "lucide-react";
+import {
+  VerticalMenuIcon,
+  SuccessIcon,
+  WarningIcon,
+  ErrorIcon,
+  CalendarIcon,
+  TargetIcon,
+  EditIcon,
+  DeleteIcon,
+} from "../../../components/icons";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import SearchInput from "../../../components/filter/Searchbar";
 import StatusBadge from "../../../components/status/statusbadge";
+import AppCard from "../../../components/Cards/AppCard";
+import {
+  EmployeeIcon,
+  LeaveIcon,
+  AddIcon,
+} from "../../../components/icons";
 
 // -------------------- 3 DOTS MENU --------------------
 const ProjectMenu = ({ project, onEdit, onDelete }) => {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="absolute top-3 right-3">
+    <div className="relative">
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -25,19 +41,20 @@ const ProjectMenu = ({ project, onEdit, onDelete }) => {
         }}
         className="p-1 rounded-full hover:bg-gray-100"
       >
-        <MoreVertical className="h-5 w-5 text-gray-600" />
+        <VerticalMenuIcon className="h-5 w-5 text-gray-600" />
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+        <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onEdit(project.project);
               setOpen(false);
             }}
-            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >
+            <EditIcon size={16} className="text-blue-600" />
             Edit
           </button>
 
@@ -47,8 +64,9 @@ const ProjectMenu = ({ project, onEdit, onDelete }) => {
               onDelete(project.project.id);
               setOpen(false);
             }}
-            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+            className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-gray-50 transition-colors"
           >
+            <DeleteIcon size={16} />
             Delete
           </button>
         </div>
@@ -81,11 +99,49 @@ const ProjectDashboard = () => {
     ? "MANAGER"
     : user?.roles?.includes("Admin")
       ? "ADMIN"
-      : "EMPLOYEE";
+      : user?.roles?.includes("General")
+        ? "GENERAL"
+        : "EMPLOYEE";
 
   const canManageProjects = userRole === "MANAGER" || userRole === "ADMIN";
-  const canmywork= userRole === "EMPLOYEE";
+  const canmywork = userRole === "EMPLOYEE" || userRole === "GENERAL";
+  const canSeeFinancials = userRole === "MANAGER" || userRole === "ADMIN";
 
+  // ------------------- HELPERS -------------------
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "TBD";
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const getStatusStyles = (status) => {
+    switch (status) {
+      case "ACTIVE":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "APPROVED":
+        return "bg-indigo-50 text-indigo-700 border-indigo-200";
+      case "ARCHIVED":
+        return "bg-slate-50 text-slate-700 border-slate-200";
+      case "PLANNING":
+        return "bg-blue-50 text-blue-700 border-blue-200";
+      case "COMPLETED":
+        return "bg-gray-50 text-gray-700 border-gray-200";
+      default:
+        return "bg-gray-50 text-gray-700 border-gray-200";
+    }
+  };
+
+  const formatCurrency = (amount, currency) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency || "USD",
+      maximumFractionDigits: 0,
+    }).format(amount || 0);
+  };
 
   // ------------------- FETCH PROJECTS -------------------
   const fetchProjects = async (status) => {
@@ -183,37 +239,44 @@ const ProjectDashboard = () => {
               onClick={() => navigate("/my-work")}
               variant="secondary"
               size="medium"
+              className="flex items-center gap-2"
             >
-                My Work
-              </Button>
+              <EmployeeIcon size={16} />
+              My Work
+            </Button>
           )}
           {canManageProjects && (
             <>
-
-                <Button
+              <Button
                 onClick={() => navigate("/my-work")}
                 variant="secondary"
                 size="medium"
+                className="flex items-center gap-2"
               >
+                <EmployeeIcon size={16} />
                 My Work
               </Button>
               <Button
                 onClick={() => navigate(`/block-leave-dates/${user?.user_id}`)}
                 variant="secondary"
                 size="medium"
+                className="flex items-center gap-2"
               >
+                <LeaveIcon size={16} />
                 Manage Leave Blocks
               </Button>
 
               <Button
                 variant="primary"
                 size="medium"
+                className="flex items-center gap-2 bg-[#0a0a4a] hover:bg-[#1a1a5a]"
                 onClick={() => {
                   setEditingProjectId(null);
                   setIsCreateModalOpen(true);
                 }}
               >
-                + Create Project
+                <AddIcon size={18} />
+                Create Project
               </Button>
             </>
           )}
@@ -222,39 +285,49 @@ const ProjectDashboard = () => {
 
       {/* PROJECT SECTION */}
       <div className="bg-gray-50 rounded-2xl p-6">
-        <h2 className="text-2xl font-semibold mb-4">All Projects</h2>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900 shrink-0">All Projects</h2>
+            <p className="text-sm text-gray-500 mt-1">Track and manage all your active and upcoming project portfolio.</p>
+          </div>
 
-        {/* SEARCH + FILTER */}
-        <div className="flex justify-between items-center mb-6">
-          <SearchInput
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by name or key"
-            className="w-64"
-          />
+          <div className="flex flex-col sm:flex-row items-center gap-4 flex-1 justify-end">
+            <div className="w-full sm:w-64">
+              <SearchInput
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by name or key"
+                className="w-full"
+              />
+            </div>
 
-          <div className="flex items-center gap-3">
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="border w-40 h-10 px-3 py-2 rounded-xl"
-            >
-              <option value="All">All</option>
-              <option value="ACTIVE">Active</option>
-              <option value="PLANNING">Planning</option>
-              <option value="ARCHIVED">Archived</option>
-              <option value="COMPLETED">Completed</option>
-            </select>
+            <div className="flex items-center gap-3">
+              <div className="w-40">
+                <FilterListbox
+                  options={[
+                    { value: "All", label: "All Status" },
+                    { value: "ACTIVE", label: "Active" },
+                    { value: "PLANNING", label: "Planning" },
+                    { value: "ARCHIVED", label: "Archived" },
+                    { value: "COMPLETED", label: "Completed" },
+                  ]}
+                  value={filterStatus}
+                  onChange={setFilterStatus}
+                />
+              </div>
 
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="border w-40 h-10 px-3 py-2 rounded-xl"
-            >
-              <option value="ALL">All</option>
-              <option value="OWNER">Managed by me</option>
-              <option value="MEMBER">I am a member</option>
-            </select>
+              <div className="w-40">
+                <FilterListbox
+                  options={[
+                    { value: "ALL", label: "All" },
+                    { value: "OWNER", label: "Managed by me" },
+                    { value: "MEMBER", label: "I am a member" },
+                  ]}
+                  value={roleFilter}
+                  onChange={setRoleFilter}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -269,39 +342,87 @@ const ProjectDashboard = () => {
               const p = item.project;
 
               return (
-                <div
+                <AppCard
                   key={p.id}
                   onClick={() => navigate(`/projects/${p.id}`)}
-                  className="relative bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow p-5 border border-gray-100 flex flex-col justify-between"
+                  className="group hover:border-blue-300 !p-0"
                 >
-                  {item.canEdit && item.canDelete ? (
-                    <ProjectMenu
-                      project={item}
-                      onEdit={startEdit}
-                      onDelete={handleDelete}
-                    />
-                  ) : (
-                    <div className="absolute top-3 right-3 opacity-40 cursor-not-allowed">
-                      <MoreVertical className="h-5 w-5 text-gray-400" />
+                  <div className="p-4 flex-1 min-w-0 flex flex-col relative">
+                    {/* TOP BADGES & MENU */}
+                    <div className="flex justify-between items-start mb-3 gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase rounded-full border ${getStatusStyles(p.status)}`}>
+                          {p.status?.replace(/_/g, " ") || "UNKNOWN"}
+                        </span>
+                        {p.riskLevel && (
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase rounded-full border ${p.riskLevel === "HIGH"
+                                ? "bg-red-50 text-red-700 border-red-200"
+                                : p.riskLevel === "MEDIUM"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : "bg-teal-50 text-teal-700 border-teal-200"
+                              }`}
+                          >
+                            {p.riskLevel} Risk
+                          </span>
+                        )}
+                      </div>
+
+                      {item.canEdit && item.canDelete ? (
+                        <div className="shrink-0 -mr-2 -mt-1">
+                          <ProjectMenu
+                            project={item}
+                            onEdit={startEdit}
+                            onDelete={handleDelete}
+                          />
+                        </div>
+                      ) : (
+                        <div className="shrink-0 -mr-2 -mt-1 opacity-40 cursor-not-allowed">
+                          <button className="p-1">
+                            <VerticalMenuIcon className="h-5 w-5 text-gray-400" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* TITLE & KEY */}
+                    <h3 className="font-bold text-gray-900 text-lg group-hover:text-blue-700 line-clamp-2 leading-tight mb-0.5 break-words">
+                      {p.name}
+                    </h3>
+                    <p className="text-xs text-gray-500 truncate mb-4">
+                      {p.projectKey}
+                    </p>
+
+                    {/* MIDDLE INFO */}
+                    <div className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-3 text-[11px] text-gray-600">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <TargetIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <span className="capitalize truncate">
+                          {p.currentStage?.toLowerCase()?.replace(/_/g, " ") || "Initiation"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <CalendarIcon className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                        <span className="truncate">
+                          {formatDate(p.startDate)} - {formatDate(p.endDate)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FOOTER - RBAC: Only Managers/Admins see Staffing & Budget */}
+                  {canSeeFinancials && (
+                    <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center gap-2 text-xs">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <SuccessIcon className="h-4 w-4 text-emerald-600" />
+                        <span className="text-emerald-700">Staffing</span>
+                      </div>
+                      <div className="font-bold text-gray-900">
+                        {formatCurrency(p.projectBudget, p.projectBudgetCurrency)}
+                      </div>
                     </div>
                   )}
-
-                  <h3 className="text-xl font-semibold text-indigo-700 mb-1">
-                    {p.name}
-                  </h3>
-
-                  <p className="text-sm text-gray-500 mb-3">
-                    Key: {p.projectKey}
-                  </p>
-
-                  <p className="text-gray-700 text-sm line-clamp-3">
-                    {p.description || "No description available."}
-                  </p>
-
-                  <div className="mt-4 flex justify-between items-center">
-                    <StatusBadge label={p.status} size="sm" />
-                  </div>
-                </div>
+                </AppCard>
               );
             })}
           </div>

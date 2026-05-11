@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
   const token = localStorage.getItem("token");
@@ -130,16 +131,11 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
 
       <div>
         <label className="block font-medium">Status</label>
-        <select
-          name="status"
-          className="w-full border p-2 rounded"
+        <FilterListbox
+          options={[{value:"PLANNING",label:"Planning"},{value:"ACTIVE",label:"Active"},{value:"COMPLETED",label:"Completed"}]}
           value={formData.status}
-          onChange={handleChange}
-        >
-          <option value="PLANNING">Planning</option>
-          <option value="ACTIVE">Active</option>
-          <option value="COMPLETED">Completed</option>
-        </select>
+          onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+        />
       </div>
 
       <div className="flex justify-end gap-3">

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 export default function TaskSubCard({ task, anchorRef, onClose, onSave }) {
   const panelRef = useRef();
@@ -114,11 +115,11 @@ export default function TaskSubCard({ task, anchorRef, onClose, onSave }) {
             {!editMode ? (
               <div>{task.priority}</div>
             ) : (
-              <select name="priority" value={form.priority} onChange={handleChange} style={inputStyle}>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
+              <FilterListbox
+                options={[{value:"high",label:"High"},{value:"medium",label:"Medium"},{value:"low",label:"Low"}]}
+                value={form.priority}
+                onChange={(val) => handleChange({ target: { name: "priority", value: val } })}
+              />
             )}
           </div>
           <div>
@@ -129,16 +130,11 @@ export default function TaskSubCard({ task, anchorRef, onClose, onSave }) {
                 {task.status}
               </div>
             ) : (
-              <select
-                name="status"
+              <FilterListbox
+                options={[{value:"todo",label:"To Do"},{value:"progress",label:"In Progress"},{value:"completed",label:"Completed"}]}
                 value={form.status}
-                onChange={handleChange}
-                style={inputStyle}
-              >
-                <option value="todo">To Do</option>
-                <option value="progress">In Progress</option>
-                <option value="completed">Completed</option>
-              </select>
+                onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+              />
             )}
           </div>
 

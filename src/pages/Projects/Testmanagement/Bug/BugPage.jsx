@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   createBug,
   updateBugStatus,
@@ -263,19 +264,11 @@ const BugPage = () => {
 
                   {/* Status Dropdown */}
                   <td className="px-4 py-2 text-center">
-                    <select
-                      className="border px-2 py-1 rounded"
+                    <FilterListbox
+                      options={[{value:"NEW",label:"New"},{value:"IN_PROGRESS",label:"In Progress"},{value:"READY_FOR_RETEST",label:"Ready For Retest"},{value:"REOPENED",label:"Reopened"},{value:"CLOSED",label:"Closed"}]}
                       value={bug.status}
-                      onChange={(e) =>
-                        handleStatusChange(bug.id, e.target.value)
-                      }
-                    >
-                      <option value="NEW">New</option>
-                      <option value="IN_PROGRESS">In Progress</option>
-                      <option value="READY_FOR_RETEST">Ready For Retest</option>
-                      <option value="REOPENED">Reopened</option>
-                      <option value="CLOSED">Closed</option>
-                    </select>
+                      onChange={(val) => handleStatusChange(bug.id, val)}
+                    />
                   </td>
 
                   <td className="px-4 py-2 text-center">
@@ -351,39 +344,26 @@ const BugPage = () => {
             </div>
           ))}
 
-          {/* Severity */}
-          <div>
-            <label className="block text-sm font-medium">Severity</label>
-            <select
-              className="w-full border rounded px-3 py-2 mt-1"
-              value={form.severity}
-              onChange={(e) =>
-                setForm({ ...form, severity: e.target.value })
-              }
-            >
-              <option>LOW</option>
-              <option>MEDIUM</option>
-              <option>HIGH</option>
-              <option>CRITICAL</option>
-            </select>
-          </div>
+              {/* Severity */}
+              <div>
+                <label className="block text-sm font-medium">Severity</label>
+                <FilterListbox
+                  options={[{value:"LOW",label:"LOW"},{value:"MEDIUM",label:"MEDIUM"},{value:"HIGH",label:"HIGH"},{value:"CRITICAL",label:"CRITICAL"}]}
+                  value={form.severity}
+                  onChange={(val) => setForm({ ...form, severity: val })}
+                />
+              </div>
 
-          {/* Priority */}
-          <div>
-            <label className="block text-sm font-medium">Priority</label>
-            <select
-              className="w-full border rounded px-3 py-2 mt-1"
-              value={form.priority}
-              onChange={(e) =>
-                setForm({ ...form, priority: e.target.value })
-              }
-            >
-              <option>NORMAL</option>
-              <option>HIGH</option>
-              <option>URGENT</option>
-            </select>
-          </div>
-        </div>
+              {/* Priority */}
+              <div>
+                <label className="block text-sm font-medium">Priority</label>
+                <FilterListbox
+                  options={[{value:"NORMAL",label:"NORMAL"},{value:"HIGH",label:"HIGH"},{value:"URGENT",label:"URGENT"}]}
+                  value={form.priority}
+                  onChange={(val) => setForm({ ...form, priority: val })}
+                />
+              </div>
+            </div>
 
         {/* Button Row */}
         <div className="flex justify-end mt-6 space-x-3">

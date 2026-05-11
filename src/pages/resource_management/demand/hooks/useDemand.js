@@ -26,7 +26,8 @@ const ROLE_PRIORITY = [
 
 const DEMAND_ROLE_LABELS = {
     "Resource_Manager": "Resource Manager",
-    "Delivery_Manager": "Delivery Manager"
+    "Delivery_Manager": "Delivery Manager",
+    "Project_Manager": "Project Manager"
 };
 
 export const DEMAND_STATUSES = [
@@ -53,14 +54,34 @@ export const DELIVERY_MODELS = [
 
 const normalizeRoleKey = (role = "") => {
     if (!role) return "";
-    return role.replace(/^ROLE[-_]/i, "") // Strip ROLE- or ROLE_ prefix
-        .trim();
+    return role
+        .replace(/^ROLE[-_\s]/i, "") // Strip ROLE-, ROLE_ or ROLE prefix
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "");
 };
+
+const ROLE_CANONICAL_BY_KEY = ROLE_PRIORITY.reduce((acc, role) => {
+    acc[normalizeRoleKey(role)] = role;
+    return acc;
+}, {});
+
+const toCanonicalDemandRole = (role = "") => ROLE_CANONICAL_BY_KEY[normalizeRoleKey(role)] || role;
+
+const getDemandCommitment = (demand = {}) =>
+    String(
+        demand.demandCommitment ||
+        demand.commitment ||
+        demand.demand_commitment ||
+        ""
+    ).toUpperCase();
+
+const isSoftDemand = (demand) => getDemandCommitment(demand) === "SOFT";
 
 const getDemandRoleOptions = (roles = []) => {
     if (!Array.isArray(roles) || roles.length === 0) return [];
     const normalized = roles.map(normalizeRoleKey);
-    const options = ROLE_PRIORITY.filter((role) => normalized.includes(role))
+    const options = ROLE_PRIORITY.filter((role) => normalized.includes(normalizeRoleKey(role)))
         .filter((role) => DEMAND_ROLE_LABELS[role])
         .map((role) => ({ value: role, label: DEMAND_ROLE_LABELS[role] }));
     return options;
@@ -69,7 +90,8 @@ const getDemandRoleOptions = (roles = []) => {
 const pickPrimaryDemandRole = (roles = []) => {
     if (!Array.isArray(roles) || roles.length === 0) return null;
     const normalized = roles.map(normalizeRoleKey);
-    return ROLE_PRIORITY.find((role) => normalized.includes(role)) || roles[0];
+    const matchedRole = ROLE_PRIORITY.find((role) => normalized.includes(normalizeRoleKey(role)));
+    return matchedRole || toCanonicalDemandRole(roles[0]);
 };
 
 export function useDemand(projectId = null) {
@@ -141,7 +163,7 @@ export function useDemand(projectId = null) {
         } else if (activeTab === 'active') {
             list = list.filter(d => ['APPROVED', 'OPEN', 'ACTIVE', 'REQUESTED', 'IN_PROGRESS', 'IN PROGRESS'].includes((d.demandStatus || d.lifecycleState)?.toUpperCase()));
         } else if (activeTab === 'soft') {
-            list = list.filter(d => ['SOFT', 'REQUESTED', 'DRAFT', 'PROPOSED'].includes((d.demandStatus || d.lifecycleState)?.toUpperCase()));
+            list = list.filter(isSoftDemand);
         } else if (activeTab === 'rejected') {
             list = list.filter(d => (d.demandStatus || d.lifecycleState)?.toUpperCase() === 'REJECTED');
         }
@@ -197,6 +219,14 @@ export function useDemand(projectId = null) {
             client: d.clientName || d.client,
             role: d.demandName || d.role,
             priority: d.demandPriority || d.priority,
+            demandCommitment: d.demandCommitment || d.commitment || d.demand_commitment,
+            demandType: d.demandType || d.type || d.demand_type || d.type_of_demand,
+            type: d.type || d.demandType || d.demand_type || d.type_of_demand,
+            deliveryRole: d.deliveryRoleId || d.roleId || d.delivery_role_id || d.deliveryRole,
+            deliveryRoleId: d.deliveryRoleId || d.deliveryRole || d.roleId || d.delivery_role_id,
+            deliveryRoleName: d.deliveryRoleName || d.deliveryRole,
+            resourcesRequired: d.resourcesRequired || d.resourceRequired || d.resource_required,
+            resourceRequired: d.resourceRequired || d.resourcesRequired || d.resource_required,
             slaDueAt: d.slaDueAt,
             slaDays: d.remainingDays !== undefined ? d.remainingDays : d.slaDays,
             demandSlaId: d.demandSlaId || d.slaId,

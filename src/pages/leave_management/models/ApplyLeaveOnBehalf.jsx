@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import axios from "axios";
 import Select from "react-select";
 import debounce from "lodash.debounce";
@@ -10,22 +10,18 @@ import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 import { LeaveTypeDropdown } from "./RequestLeaveModal";
 import { useAuth } from "../../../contexts/AuthContext";
 import { countWeekdaysBetween } from "./RequestLeaveModal";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
-export default function ApplyLeaveOnBehalf({
-  isOpen,
-  onClose,
-  onSuccess,
-  year,
-}) {
+export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year }) {
   const { user } = useAuth();
   const userId = user?.user_id;
 
   // --- State ---
-  const [employeeId, setEmployeeId] = useState("");
+  const [selectedEmployee, setSelectedEmployee] = useState(null); // store full {value, label} object
   const [employeeOptions, setEmployeeOptions] = useState([]);
-  const [search, setSearch] = useState("");
+  const hasFetchedInitial = useRef(false); // prevent re-fetching on every open
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -33,99 +29,87 @@ export default function ApplyLeaveOnBehalf({
   const [reason, setReason] = useState("");
   const [driveLink, setDriveLink] = useState("");
   const [showCustomHalfDay, setShowCustomHalfDay] = useState(false);
+  const [halfDayConfig, setHalfDayConfig] = useState({ start: "none", end: "none" });
 
-  const [halfDayConfig, setHalfDayConfig] = useState({
-    start: "none",
-    end: "none",
-  });
-
-  const [balances, setBalances] = useState({
-    regular: [],
-    genderBasedLeaveBalances: [],
-  });
+  const [balances, setBalances] = useState({ regular: [], genderBasedLeaveBalances: [] });
   const [holidays, setHolidays] = useState([]);
   const [loadingBalances, setLoadingBalances] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // --- Logic ---
+  const employeeId = selectedEmployee?.value ?? "";
 
+  // --- Reset ---
+  const resetForm = useCallback(() => {
+    setSelectedEmployee(null);
+    setStartDate("");
+    setEndDate("");
+    setLeaveTypeId("");
+    setReason("");
+    setDriveLink("");
+    setShowCustomHalfDay(false);
+    setHalfDayConfig({ start: "none", end: "none" });
+    setBalances({ regular: [], genderBasedLeaveBalances: [] });
+  }, []);
+
+  // --- Logic ---
   const weekdays = useMemo(() => {
-    return countWeekdaysBetween(
-      startDate,
-      endDate,
-      halfDayConfig,
-      holidays,
-      leaveTypeId,
-    );
+    return countWeekdaysBetween(startDate, endDate, halfDayConfig, holidays, leaveTypeId);
   }, [startDate, endDate, halfDayConfig, holidays, leaveTypeId]);
 
-  const allBalances = useMemo(() => {
-    return balances?.regular ?? [];
-  }, [balances]);
-
+  const allBalances = useMemo(() => balances?.regular ?? [], [balances]);
   const leaveTypeOptions = useLeaveDropdownOptions(allBalances);
-  const selectedLeave = leaveTypeOptions.find(
-    (l) => l.leaveTypeId === leaveTypeId,
-  );
+  const selectedLeave = leaveTypeOptions.find((l) => l.leaveTypeId === leaveTypeId);
 
-  // Logic for Drive Link visibility
   const shouldShowDriveLink = useCallback(() => {
     if (!selectedLeave) return false;
     if (selectedLeave.requiresDocumentation) return true;
-    // Specifically for Sick Leave (L-SL) over 3 days
     if (leaveTypeId === "L-SL" && weekdays > 3) return true;
     return false;
   }, [selectedLeave, leaveTypeId, weekdays]);
 
-  // --- Handlers ---
-
-  const handleStartDateChange = (date) => {
-    if (!date) return;
-    const dateString = format(date, "yyyy-MM-dd");
-    setStartDate(dateString);
-    if (!endDate || new Date(endDate) < new Date(dateString)) {
-      setEndDate(dateString);
+  // --- Fetch employees (only once on first open) ---
+  const fetchEmployees = useCallback(async (searchText) => {
+    try {
+      const res = await axios.get(`${BASE_URL}/api/employee/search/${userId}`, {
+        params: { search: searchText, page: 0 },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const formatted = res.data.data.map((emp) => ({
+        value: String(emp.employeeId),
+        label: emp.name,
+      }));
+      setEmployeeOptions(formatted);
+    } catch (err) {
+      toast.error("Failed to load employees");
     }
-  };
+  }, [userId]);
 
-  const handleEndDateChange = (date) => {
-    if (!date) return;
-    setEndDate(format(date, "yyyy-MM-dd"));
-  };
-
-  const fetchEmployees = useCallback(
-    async (searchText) => {
-      try {
-        const res = await axios.get(
-          `${BASE_URL}/api/employee/search/${userId}`,
-          {
-            params: { search: searchText, page: 0 },
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          },
-        );
-        const formatted = res.data.data.map((emp) => ({
-          value: emp.employeeId,
-          label: emp.name,
-        }));
-        setEmployeeOptions(formatted);
-      } catch (err) {
-        toast.error("Failed to load employees");
-      }
-    },
-    [userId],
-  );
-
-  const debouncedSearch = useMemo(
-    () => debounce((input) => fetchEmployees(input), 400),
-    [fetchEmployees],
-  );
-
+  // Fetch initial list only once per mount
   useEffect(() => {
-    if (isOpen) fetchEmployees("");
+    if (isOpen && !hasFetchedInitial.current) {
+      fetchEmployees("");
+      hasFetchedInitial.current = true;
+    }
+    // Reset flag when modal is closed so next open re-fetches if needed
+    if (!isOpen) {
+      hasFetchedInitial.current = false;
+    }
   }, [isOpen, fetchEmployees]);
 
+  // Only search/filter on user typing — don't re-run when selecting
+  const debouncedSearch = useMemo(
+    () => debounce((inputValue) => {
+      // Don't search if input is empty (already have initial list)
+      if (inputValue.trim()) {
+        fetchEmployees(inputValue);
+      } else {
+        fetchEmployees(""); // restore full list when cleared
+      }
+    }, 400),
+    [fetchEmployees]
+  );
+
+  // Fetch balances when employee changes
   useEffect(() => {
     if (!employeeId) return;
     setLoadingBalances(true);
@@ -145,10 +129,29 @@ export default function ApplyLeaveOnBehalf({
     }
   }, [leaveTypeId, selectedLeave]);
 
+  // --- Handlers ---
+  const handleStartDateChange = (date) => {
+    if (!date) return;
+    const dateString = format(date, "yyyy-MM-dd");
+    setStartDate(dateString);
+    if (!endDate || new Date(endDate) < new Date(dateString)) {
+      setEndDate(dateString);
+    }
+  };
+
+  const handleEndDateChange = (date) => {
+    if (!date) return;
+    setEndDate(format(date, "yyyy-MM-dd"));
+  };
+
+  const handleClose = useCallback(() => {
+    resetForm();
+    onClose();
+  }, [resetForm, onClose]);
+
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
 
-    // Basic validation for Drive Link
     if (shouldShowDriveLink() && !driveLink.trim()) {
       toast.warn("Please provide a drive link for documentation");
       return;
@@ -167,17 +170,14 @@ export default function ApplyLeaveOnBehalf({
           driveLink: shouldShowDriveLink() ? driveLink : null,
           daysRequested: weekdays,
           appliedBy: userId,
-          // Half day logic
           startSession: halfDayConfig.start,
           endSession: startDate === endDate ? "none" : halfDayConfig.end,
         },
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       toast.success("Leave applied successfully");
       onSuccess?.();
-      onClose();
+      handleClose();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to apply leave");
     } finally {
@@ -190,24 +190,18 @@ export default function ApplyLeaveOnBehalf({
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden border flex flex-col max-h-[90vh]">
+
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b bg-gray-50 flex-shrink-0">
-          <h2 className="text-lg font-bold text-gray-800">
-            Apply Leave on Behalf
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-200 rounded-full transition-colors"
-          >
+          <h2 className="text-lg font-bold text-gray-800">Apply Leave on Behalf</h2>
+          <button onClick={handleClose} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
             <X size={20} />
           </button>
         </div>
 
         {/* Scrollable Form */}
-        <form
-          className="p-6 space-y-5 overflow-y-auto custom-scrollbar pb-10"
-          onSubmit={handleSubmit}
-        >
+        <form className="p-6 space-y-5 overflow-y-auto custom-scrollbar pb-10" onSubmit={handleSubmit}>
+
           {/* Employee Selection */}
           <div>
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
@@ -215,14 +209,17 @@ export default function ApplyLeaveOnBehalf({
             </label>
             <Select
               className="mt-1 text-sm"
-              value={
-                employeeOptions.find((o) => o.value === employeeId) || null
-              }
+              value={selectedEmployee}           // ← store whole object, no find() needed
               onChange={(opt) => {
-                setEmployeeId(opt?.value);
-                setLeaveTypeId(""); // Reset leave type when employee changes
+                setSelectedEmployee(opt ?? null); // ← save full {value, label}
+                setLeaveTypeId("");
               }}
-              onInputChange={debouncedSearch}
+              onInputChange={(inputValue, { action }) => {
+                // Only search on actual typing, not on menu-close or value-select
+                if (action === "input-change") {
+                  debouncedSearch(inputValue);
+                }
+              }}
               options={employeeOptions}
               placeholder="Search employee..."
               isClearable
@@ -252,13 +249,10 @@ export default function ApplyLeaveOnBehalf({
             />
             <div className="col-span-2 flex items-center justify-between pt-2 border-t border-gray-200">
               <span className="flex items-center gap-1 text-xs font-bold text-indigo-600">
-                <Calculator size={14} /> {weekdays}{" "}
-                {weekdays === 1 ? "Day" : "Days"}
+                <Calculator size={14} /> {weekdays} {weekdays === 1 ? "Day" : "Days"}
               </span>
               <span className="text-[10px] text-gray-400 font-medium">
-                {leaveTypeId === "L-ML"
-                  ? "Includes All Days"
-                  : "Excludes Weekends"}
+                {leaveTypeId === "L-ML" ? "Includes All Days" : "Excludes Weekends"}
               </span>
             </div>
           </div>
@@ -274,9 +268,7 @@ export default function ApplyLeaveOnBehalf({
                     setHalfDayConfig({ start: "none", end: "none" });
                   }}
                   className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
-                    !showCustomHalfDay
-                      ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
+                    !showCustomHalfDay ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
                   Full Days
@@ -288,9 +280,7 @@ export default function ApplyLeaveOnBehalf({
                     setHalfDayConfig({ start: "fullday", end: "fullday" });
                   }}
                   className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
-                    showCustomHalfDay
-                      ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
+                    showCustomHalfDay ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
                   Custom (Half-Day)
@@ -300,43 +290,29 @@ export default function ApplyLeaveOnBehalf({
               {showCustomHalfDay && (
                 <div className="flex items-start gap-3 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
                   <div className="flex-1 space-y-1">
-                    <label className="text-[10px] font-bold text-indigo-600 uppercase">
-                      Start Day
-                    </label>
-                    <select
+                    <label className="text-[10px] font-bold text-indigo-600 uppercase">Start Day</label>
+                    <FilterListbox
+                      options={[
+                        { value: "fullday", label: "Full Day" },
+                        { value: "first", label: "First Half" },
+                        { value: "second", label: "Second Half" },
+                      ]}
                       value={halfDayConfig.start}
-                      onChange={(e) =>
-                        setHalfDayConfig((p) => ({
-                          ...p,
-                          start: e.target.value,
-                        }))
-                      }
-                      className="w-full p-2 bg-white border border-indigo-200 rounded-md text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="fullday">Full Day</option>
-                      <option value="first">First Half</option>
-                      <option value="second">Second Half</option>
-                    </select>
+                      onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                    />
                   </div>
                   {startDate !== endDate && (
                     <div className="flex-1 space-y-1">
-                      <label className="text-[10px] font-bold text-indigo-600 uppercase">
-                        End Day
-                      </label>
-                      <select
+                      <label className="text-[10px] font-bold text-indigo-600 uppercase">End Day</label>
+                      <FilterListbox
+                        options={[
+                          { value: "fullday", label: "Full Day" },
+                          { value: "first", label: "First Half" },
+                          { value: "second", label: "Second Half" },
+                        ]}
                         value={halfDayConfig.end}
-                        onChange={(e) =>
-                          setHalfDayConfig((p) => ({
-                            ...p,
-                            end: e.target.value,
-                          }))
-                        }
-                        className="w-full p-2 bg-white border border-indigo-200 rounded-md text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="fullday">Full Day</option>
-                        <option value="first">First Half</option>
-                        <option value="second">Second Half</option>
-                      </select>
+                        onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                      />
                     </div>
                   )}
                 </div>
@@ -364,13 +340,12 @@ export default function ApplyLeaveOnBehalf({
             )}
             {selectedLeave && (
               <p className="mt-2 text-[11px] text-emerald-600 font-bold flex items-center gap-1 px-1">
-                <Info size={12} /> Available Balance:{" "}
-                {selectedLeave.availableDays} Days
+                <Info size={12} /> Available Balance: {selectedLeave.availableDays} Days
               </p>
             )}
           </div>
 
-          {/* Drive Link (Documentation) */}
+          {/* Drive Link */}
           {shouldShowDriveLink() && (
             <div className="space-y-1 animate-in zoom-in-95 duration-200">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex justify-between">
@@ -417,21 +392,21 @@ export default function ApplyLeaveOnBehalf({
         <div className="flex justify-end gap-3 p-4 border-t border-gray-100 bg-white flex-shrink-0">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700"
           >
             Cancel
           </button>
-          <button
+          <Button
             type="button"
             onClick={handleSubmit}
-            disabled={
-              submitting || !employeeId || !leaveTypeId || weekdays <= 0
-            }
-            className="px-6 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold disabled:opacity-50 hover:bg-indigo-700 transition-all shadow-md active:scale-95 flex items-center gap-2"
+            disabled={submitting || !employeeId || !leaveTypeId || weekdays <= 0}
+            variant="primary"
+            loading={submitting}
+            loadingText="Applying..."
           >
-            {submitting ? "Applying..." : "Confirm & Apply"}
-          </button>
+            Confirm & Apply
+          </Button>
         </div>
       </div>
     </div>

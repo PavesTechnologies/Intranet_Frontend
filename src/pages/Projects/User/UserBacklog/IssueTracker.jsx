@@ -1,12 +1,13 @@
 // ✅ UserIssueTracker.jsx (Final View-Only Version)
 import React, { useEffect, useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import Button from "../../../../components/Button/Button";
-import { FiEye } from "react-icons/fi";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import SearchInput from "../../../../components/filter/Searchbar";
+import { EditIcon, DeleteIcon, ViewIcon } from "../../../../components/icons";
 
 const UserIssueTracker = () => {
   const { projectId: paramProjectId } = useParams();
@@ -20,12 +21,14 @@ const UserIssueTracker = () => {
   const [projects, setProjects] = useState([]);
 
   // ===== Filters =====
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("");
-  const [filterPriority, setFilterPriority] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterUser, setFilterUser] = useState("");
-  const [filterBillable, setFilterBillable] = useState("");
+  const [filters, setFilters] = useState({
+    search: "",
+    type: "ALL",
+    priority: "ALL",
+    status: "ALL",
+    user: "ALL",
+    billable: "ALL",
+  });
 
   const token = localStorage.getItem("token");
   const headers = {
@@ -129,38 +132,52 @@ const UserIssueTracker = () => {
   // ===== FILTER HANDLER =====
   useEffect(() => {
     let filtered = [...issues];
-    if (searchTerm)
+
+    // Search
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
       filtered = filtered.filter((i) =>
-        i.title?.toLowerCase().includes(searchTerm.toLowerCase()),
+        i.title?.toLowerCase().includes(q) ||
+        i.reporterName?.toLowerCase().includes(q) ||
+        i.assigneeName?.toLowerCase().includes(q)
       );
-    if (filterType) filtered = filtered.filter((i) => i.type === filterType);
-    if (filterPriority)
-      filtered = filtered.filter((i) => i.priority === filterPriority);
-    if (filterStatus)
-      filtered = filtered.filter((i) => i.status === filterStatus);
-    if (filterUser)
+    }
+
+    // Type
+    if (filters.type !== "ALL") {
+      filtered = filtered.filter((i) => i.type === filters.type);
+    }
+
+    // Priority
+    if (filters.priority !== "ALL") {
+      filtered = filtered.filter((i) => i.priority === filters.priority);
+    }
+
+    // Status
+    if (filters.status !== "ALL") {
+      filtered = filtered.filter((i) => i.status === filters.status);
+    }
+
+    // User
+    if (filters.user !== "ALL") {
       filtered = filtered.filter(
         (i) =>
-          i.reporterName?.toLowerCase() === filterUser.toLowerCase() ||
-          i.assigneeName?.toLowerCase() === filterUser.toLowerCase(),
+          i.reporterName?.toLowerCase() === filters.user.toLowerCase() ||
+          i.assigneeName?.toLowerCase() === filters.user.toLowerCase(),
       );
-    if (filterBillable)
+    }
+
+    // Billable
+    if (filters.billable !== "ALL") {
       filtered = filtered.filter((i) =>
-        filterBillable === "Yes"
+        filters.billable === "Yes"
           ? i.billable === true || i.billable === "Yes"
           : i.billable === false || i.billable === "No",
       );
+    }
 
     setFilteredIssues(filtered);
-  }, [
-    searchTerm,
-    filterType,
-    filterPriority,
-    filterStatus,
-    filterUser,
-    filterBillable,
-    issues,
-  ]);
+  }, [filters, issues]);
 
   const currentProject = projects.find((p) => p.id === Number(projectId));
   const projectName = currentProject ? currentProject.name : projectId;
@@ -207,98 +224,104 @@ const UserIssueTracker = () => {
         <SummaryCard title="High Priority" count={highPriority} />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-5 rounded-lg shadow-md flex flex-wrap gap-3 items-center border border-gray-100">
-        <SearchInput
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search by title..."
-          className="w-64"
+      {/* HORIZONTAL FILTER BAR */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[280px]">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </span>
+          <input
+            type="text"
+            placeholder="Search by title, reporter or assignee..."
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm"
+            value={filters.search}
+            onChange={(e) =>
+              setFilters((f) => ({ ...f, search: e.target.value }))
+            }
+          />
+        </div>
+
+        <InlineFilter
+          label="Type"
+          value={filters.type}
+          options={[
+            { label: "All", value: "ALL" },
+            { label: "Epic", value: "Epic" },
+            { label: "Story", value: "Story" },
+            { label: "Task", value: "Task" },
+            { label: "Bug", value: "Bug" },
+          ]}
+          onChange={(v) => setFilters((f) => ({ ...f, type: v }))}
         />
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-        >
-          <option value="">All Types</option>
-          <option value="Epic">Epic</option>
-          <option value="Story">Story</option>
-          <option value="Task">Task</option>
-          <option value="Bug">Bug</option>
-        </select>
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
-          value={filterPriority}
-          onChange={(e) => setFilterPriority(e.target.value)}
-        >
-          <option value="">All Priorities</option>
-          <option value="LOW">Low</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="HIGH">High</option>
-          <option value="CRITICAL">Critical</option>
-        </select>
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-        >
-          <option value="">All Status</option>
-          <option value="BACKLOG">Backlog</option>
-          <option value="TODO">Todo</option>
-          <option value="IN_PROGRESS">In Progress</option>
-          <option value="REVIEW">Review</option>
-          <option value="RESOLVED">Resolved</option>
-          <option value="DONE">Done</option>
-          <option value="CLOSED">Closed</option>
-          <option value="BLOCKED">Blocked</option>
-        </select>
 
-        {/* User Filter */}
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
-          value={filterUser}
-          onChange={(e) => setFilterUser(e.target.value)}
-        >
-          <option value="">All Users</option>
-          {userNames.map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </select>
+        <InlineFilter
+          label="Priority"
+          value={filters.priority}
+          options={[
+            { label: "All", value: "ALL" },
+            { label: "Low", value: "LOW" },
+            { label: "Medium", value: "MEDIUM" },
+            { label: "High", value: "HIGH" },
+            { label: "Critical", value: "CRITICAL" },
+          ]}
+          onChange={(v) => setFilters((f) => ({ ...f, priority: v }))}
+        />
 
-        {/* Billable Filter */}
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500"
-          value={filterBillable}
-          onChange={(e) => setFilterBillable(e.target.value)}
-        >
-          <option value="">All Billable</option>
-          <option value="Yes">Yes</option>
-          <option value="No">No</option>
-        </select>
+        <InlineFilter
+          label="Status"
+          value={filters.status}
+          options={[
+            { label: "All", value: "ALL" },
+            { label: "Backlog", value: "BACKLOG" },
+            { label: "Todo", value: "TODO" },
+            { label: "In Progress", value: "IN_PROGRESS" },
+            { label: "Review", value: "REVIEW" },
+            { label: "Resolved", value: "RESOLVED" },
+            { label: "Done", value: "DONE" },
+            { label: "Closed", value: "CLOSED" },
+            { label: "Blocked", value: "BLOCKED" },
+          ]}
+          onChange={(v) => setFilters((f) => ({ ...f, status: v }))}
+        />
 
-        {(filterType ||
-          filterPriority ||
-          filterStatus ||
-          searchTerm ||
-          filterUser ||
-          filterBillable) && (
-          <Button
-            size="small"
-            variant="secondary"
-            onClick={() => {
-              setSearchTerm("");
-              setFilterType("");
-              setFilterPriority("");
-              setFilterStatus("");
-              setFilterUser("");
-              setFilterBillable("");
-            }}
-          >
-            Clear Filters
-          </Button>
-        )}
+        <InlineFilter
+          label="User"
+          value={filters.user}
+          options={[
+            { label: "All Users", value: "ALL" },
+            ...userNames.map((u) => ({ label: u, value: u })),
+          ]}
+          onChange={(v) => setFilters((f) => ({ ...f, user: v }))}
+        />
+
+        <InlineFilter
+          label="Billable"
+          value={filters.billable}
+          options={[
+            { label: "All", value: "ALL" },
+            { label: "Yes", value: "Yes" },
+            { label: "No", value: "No" },
+          ]}
+          onChange={(v) => setFilters((f) => ({ ...f, billable: v }))}
+        />
+
+        <button
+          onClick={() =>
+            setFilters({
+              search: "",
+              type: "ALL",
+              priority: "ALL",
+              status: "ALL",
+              user: "ALL",
+              billable: "ALL",
+            })
+          }
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+          Reset
+        </button>
       </div>
 
       {/* Table */}
@@ -392,18 +415,34 @@ const UserIssueTracker = () => {
                           ? "No Due Date"
                           : "-"}
                     </td>
-                    <td className="border px-4 py-2 text-center">
-                      <ActionIcon
-                        label="View"
-                        onClick={() =>
-                          navigate(
-                            `/projects/${projectId}/issues/${issue.type.toLowerCase()}/${issue.id}/view`,
-                            { state: { issue } },
-                          )
-                        }
-                      >
-                        <FiEye size={18} className="text-blue-600" />
-                      </ActionIcon>
+                    <td className="border px-4 py-2">
+                      <div className="flex justify-center gap-3">
+                        <button
+                          onClick={() =>
+                            navigate(
+                              `/projects/${projectId}/issues/${issue.type.toLowerCase()}/${issue.id}/view`,
+                              { state: { issue } },
+                            )
+                          }
+                          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                        >
+                          <ViewIcon size={18} className="text-blue-600" />
+                        </button>
+
+                        <button
+                          onClick={() => console.log("Edit issue", issue.id)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                        >
+                          <EditIcon size={18} className="text-indigo-600" />
+                        </button>
+
+                        <button
+                          onClick={() => console.log("Delete issue", issue.id)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                        >
+                          <DeleteIcon size={18} className="text-red-600" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -466,15 +505,65 @@ const BadgeStatus = ({ status }) => {
   );
 };
 
-const ActionIcon = ({ label, onClick, children }) => (
-  <div className="relative group inline-block">
-    <button onClick={onClick} className="hover:scale-110 transition">
-      {children}
-    </button>
-    <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-black text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 whitespace-nowrap">
-      {label}
-    </span>
-  </div>
-);
+
+// --- Inline Filter Component ---
+const InlineFilter = ({ label, value, options, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const displayLabel = options.find((o) => o.value === value)?.label || "All";
+
+  return (
+    <div className="relative w-fit" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-gray-300 transition-all shadow-sm"
+      >
+        <span className="text-gray-400 font-normal">{label}</span>
+        <span className="text-gray-900">{displayLabel}</span>
+        <svg
+          className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 mt-2 min-w-full w-max max-w-[280px] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1.5 overflow-hidden">
+          {options.map((opt) => {
+            const isSelected = value === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                  isSelected
+                    ? "bg-indigo-50 text-indigo-700 font-semibold"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default UserIssueTracker;

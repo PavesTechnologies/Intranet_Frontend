@@ -218,8 +218,7 @@ export default function WorkItemCard({ item, onStatusChange, onMarkDone, onClick
 
       {/* Quick actions — visible on hover and always for touch */}
       {!readOnly && (
-        <div className="flex items-center gap-1.5 flex-shrink-0
-          opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+        <div className="flex items-center gap-1.5 flex-shrink-0 transition-opacity duration-150">
           <StatusDropdown item={item} onStatusChange={onStatusChange} />
 
           <button

@@ -62,7 +62,7 @@ const ProjectSLA = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No SLA configuration found for this project.
       </div>
     );
@@ -111,6 +111,9 @@ const ProjectSLA = ({ data, loading }) => {
               <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
                 Warning Threshold
               </th>
+              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
+                Status
+              </th>
             </tr>
           </thead>
 
@@ -149,6 +152,15 @@ const ProjectSLA = ({ data, loading }) => {
                     {sla.warningThresholdDays} days
                   </span>
                 </td>
+
+                {/* STATUS */}
+                <td className="px-6 py-4">
+                  <span
+                    className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
+                  >
+                    {sla.activeFlag ? "Active" : "Inactive"}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -165,7 +177,7 @@ const ProjectCompliance = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No compliance requirements configured for this project.
       </div>
     );
@@ -272,8 +284,8 @@ const ProjectAssets = ({ assets, loading }) => {
 
   if (!assets || assets.length === 0) {
     return (
-      <div className="text-center p-6 border-2 border-dashed rounded-lg text-gray-400">
-        No assets assigned
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
+        No assets assigned for this project.
       </div>
     );
   }
@@ -351,7 +363,7 @@ const ProjectEscalation = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No escalation contacts configured for this project.
       </div>
     );
