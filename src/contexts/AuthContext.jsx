@@ -1,3 +1,4 @@
+// src/contexts/AuthContext.jsx
 import React, {
   createContext,
   useContext,
@@ -25,7 +26,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isfirsttlogin, setIsfirsttlogin] = useState(false);
-  const isLoggingOut = useRef(false); // ✅ Prevent multiple logout triggers
+  const isLoggingOut = useRef(false);
 
   const loadUser = (token) => {
     try {
@@ -38,145 +39,121 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = (token, isfirsttlogin = false) => {
-    if (isfirsttlogin) {
+  // ✅ stores access token + refresh token
+  // refreshToken passed from LoginPage after login API response
+  const login = (token, isFirstLogin = false, refreshToken = null) => {
+    if (isFirstLogin) {
       localStorage.setItem("lastPath", "/change-password");
       setIsfirsttlogin(true);
       localStorage.setItem("isfirsttlogin", true);
     } else {
       localStorage.setItem("lastPath", "/dashboard");
     }
+
+    // store access token — axiosInstance reads this key
     localStorage.setItem("token", token);
+
+    // store refresh token — axiosInstance reads this key on 401
+    if (refreshToken) {
+      localStorage.setItem("refresh_token", refreshToken);
+    }
+
     loadUser(token);
   };
 
   const logout = (expired = false) => {
-    // ✅ Prevent multiple logout calls
     if (isLoggingOut.current) return;
     isLoggingOut.current = true;
 
-    const token = localStorage.getItem("token");
+    const token        = localStorage.getItem("token");
+    const refreshToken = localStorage.getItem("refresh_token");
 
+    // blacklist both tokens on backend
     if (token) {
       axios
         .post(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
+          { refresh_token: refreshToken },
+          { headers: { Authorization: `Bearer ${token}` } },
         )
-        .then((response) => {
-          console.log("Logout response:", response.data);
-        })
-        .catch((error) => {
-          console.error(
-            "Logout failed:",
-            error.response?.data || error.message,
-          );
-        });
+        .then((res) => console.log("Logout:", res.data))
+        .catch((err) => console.error("Logout failed:", err.response?.data || err.message));
     }
 
-    // Clear localStorage
+    // clear all auth keys
     localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
+    localStorage.removeItem("lastPath");
+
     if (localStorage.getItem("isfirsttlogin")) {
       localStorage.removeItem("isfirsttlogin");
       setIsfirsttlogin(false);
     }
 
-    // Update state
     setUser(null);
     setIsAuthenticated(false);
 
-    // Redirect to login
     if (expired) {
       navigate("/", { replace: true });
     }
 
-    // Reset logout flag after short delay (for future sessions)
     setTimeout(() => {
       isLoggingOut.current = false;
     }, 2000);
   };
 
-  // ✅ Check and auto logout when token expires
+  // ✅ single useEffect on mount — restore session from localStorage
+  // also sets expiry timer (interceptor handles actual refresh)
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
     try {
       const decoded = jwtDecode(token);
+
+      // validate token can be decoded before loading user
       loadUser(token);
 
       if (decoded.exp) {
-        const currentTime = Date.now() / 1000;
-        const timeLeft = decoded.exp - currentTime;
+        const timeLeft = decoded.exp - Date.now() / 1000;
 
         if (timeLeft <= 0) {
+          // already expired — interceptor will try refresh on next API call
+          // if no refresh token, will reject and user stays on page
+          // optionally show toast
           showStatusToast("Session expired. Please login again.");
-          setTimeout(() => {
-            logout(true);
-          }, 1000);
+          setTimeout(() => logout(true), 1000);
         } else {
+          // show toast when access token expires (interceptor handles refresh silently)
           const timer = setTimeout(() => {
-            showStatusToast("Session expired. Please login again.");
-            logout(true);
+            showStatusToast("Session refreshing...");
           }, timeLeft * 1000);
           return () => clearTimeout(timer);
         }
       }
-    } catch (err) {
-      if (err.response?.status === 401) {
-        showStatusToast("Token tampered", "error");
-        logout();
-      } else {
-        showStatusToast("Invalid token detected. Please login again.");
-        logout(true);
-      }
-    }
-  }, [navigate]);
-
-  // ✅ Detect token tampering or invalid format on page load
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      jwtDecode(token);
-      loadUser(token);
     } catch {
-      showStatusToast(
-        "Invalid or tampered token detected. Please login again.",
-      );
+      showStatusToast("Invalid token detected. Please login again.");
       logout(true);
     }
-  }, []);
-const getUserRoles = () => {
-  if (!user) return [];
+  }, []); // ✅ empty deps — runs once on mount only
 
-  const roles = user.roles || user.role || [];
+  const getUserRoles = () => {
+    if (!user) return [];
+    const roles = user.roles || user.role || [];
+    if (!roles) return [];
+    if (Array.isArray(roles)) return roles.map((r) => r.toUpperCase());
+    return roles.split(",").map((r) => r.trim().toUpperCase());
+  };
 
-  if (!roles) return [];
-
-  if (Array.isArray(roles)) {
-    return roles.map((r) => r.toUpperCase());
-  }
-
-  return roles.split(",").map((r) => r.trim().toUpperCase());
-};
-
-const hasRole = (allowedRoles) => {
-  const userRoles = getUserRoles();
-  return allowedRoles.some((role) => userRoles.includes(role.toUpperCase()));
-};
-
+  const hasRole = (allowedRoles) => {
+    const userRoles = getUserRoles();
+    return allowedRoles.some((role) => userRoles.includes(role.toUpperCase()));
+  };
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, login, logout, isfirsttlogin,  hasRole }}
+      value={{ user, isAuthenticated, login, logout, isfirsttlogin, hasRole }}
     >
       {children}
     </AuthContext.Provider>
