@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { AddIcon } from "../../../../components/icons";
 import axios from "axios";
 import Button from "../../../../components/Button/Button";
 
@@ -153,7 +153,7 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
         <h1 className="text-3xl font-bold"></h1>
 
         <Button variant="primary" size="medium" onClick={() => setShowCreateRisk(true)}>
-          <Plus className="w-4 h-4" /> New Risk
+          <AddIcon className="w-4 h-4" /> New Risk
         </Button>
 
         <CreateRiskModal
