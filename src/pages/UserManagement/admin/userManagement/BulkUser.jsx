@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { UploadCloud, FileSpreadsheet } from "lucide-react";
@@ -11,6 +11,24 @@ import { Fonts } from "../../../../components/Fonts/Fonts";
 const BulkUserUpload = ({ onClose, onSuccess }) => {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  const axiosInstance = useMemo(() => {
+    const instance = axios.create({
+      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
+    });
+
+    instance.interceptors.request.use((config) => {
+      const latestToken = localStorage.getItem("token");
+
+      if (latestToken) {
+        config.headers.Authorization = `Bearer ${latestToken}`;
+      }
+
+      return config;
+    });
+
+    return instance;
+  }, []);
 
   const handleFileChange = (e) => {
     setFile(e.target.files?.[0] || null);
@@ -34,13 +52,12 @@ const BulkUserUpload = ({ onClose, onSuccess }) => {
 
       toastId = toast.loading("Uploading file and reading data...");
 
-      const response = await axios.post(
-        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/multiple-users`,
+      const response = await axiosInstance.post(
+        "/admin/users/multiple-users",
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         }
       );
@@ -71,14 +88,21 @@ const BulkUserUpload = ({ onClose, onSuccess }) => {
     } catch (error) {
       console.error(error);
 
-      toast.update(toastId, {
-        render: `Upload failed: ${
-          error.response?.data?.detail || error.message
-        }`,
-        type: "error",
-        isLoading: false,
-        autoClose: 5000,
-      });
+      if (toastId) {
+        toast.update(toastId, {
+          render: `Upload failed: ${
+            error.response?.data?.detail || error.message
+          }`,
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
+      } else {
+        showStatusToast(
+          error.response?.data?.detail || "Upload failed.",
+          "error"
+        );
+      }
     } finally {
       setIsUploading(false);
     }
