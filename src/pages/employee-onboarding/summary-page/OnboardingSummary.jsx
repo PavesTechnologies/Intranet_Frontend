@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import { showStatusToast } from "../../../components/toastfy/toast.jsx";
 import {
   Users,
@@ -139,11 +140,8 @@ export default function OnboardingSummary() {
 
   if (loading && !summaryData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-          <p className="text-slate-500 font-medium">Loading summary data...</p>
-        </div>
+      <div className="min-h-screen bg-slate-50">
+        <LoadingSpinner text="Loading summary data..." />
       </div>
     );
   }

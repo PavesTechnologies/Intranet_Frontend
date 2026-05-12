@@ -16,6 +16,7 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { utilizationService } from '../../services/utilizationService';
 import { fetchResources } from '../../services/resource';
 import ResourceVisualizationDrawer from '../components/ResourceVisualizationDrawer';
+import { KPICard } from '../../../../components/kpi/KPI';
 
 // --- INTEGRATED DATA MODELS ---
 
@@ -660,22 +661,13 @@ const UtilizationPerformanceDashboard = () => {
             {(liveData ? dynamicKPIs : KPI_STATS).map((stat, idx) => {
                const originalStat = KPI_STATS.find(s => s.label === stat.label) || KPI_STATS[idx % KPI_STATS.length];
                return (
-                  <div key={stat.label} className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-indigo-100 hover:shadow-md group">
-                     <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border shadow-sm ${originalStat.bg} ${originalStat.color} group-hover:scale-105 transition-transform duration-300`}>
-                        {React.cloneElement(originalStat.icon, { size: 20, strokeWidth: 2.5 })}
-                     </div>
-                     <div className="min-w-0 flex-1">
-                        <p className="mb-1 text-[10px] font-black capitalize tracking-widest text-slate-400">{stat.label}</p>
-                        <div className="flex items-center gap-2">
-                           <p className="text-2xl font-black tracking-tight text-slate-900">{stat.value}</p>
-                           {stat.trend && (
-                              <div className={`flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded capitalize tracking-tighter ${stat.label === 'Active Breaches' || stat.trend === 'down' || stat.trend === 'Declining' ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>
-                                 {stat.trend}
-                              </div>
-                           )}
-                        </div>
-                     </div>
-                  </div>
+                  <KPICard
+                     key={stat.label}
+                     label={stat.label}
+                     value={stat.value}
+                     icon={React.cloneElement(originalStat.icon, { size: 20, strokeWidth: 2.5 })}
+                     color={`${originalStat.bg} ${originalStat.color}`}
+                  />
                );
             })}
          </div>

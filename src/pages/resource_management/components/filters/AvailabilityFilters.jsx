@@ -66,8 +66,8 @@ function SearchableDropdown({ label, value, options, onChange, placeholder }) {
     };
   }, [isOpen]);
 
-  const filteredOptions = (options || []).filter((opt) =>
-    (opt || "").toLowerCase().includes((search || "").toLowerCase())
+  const filteredOptions = options.filter((opt) =>
+    opt != null && opt.toLowerCase().includes((search || "").toLowerCase())
   );
 
   const handleSelect = (option) => {

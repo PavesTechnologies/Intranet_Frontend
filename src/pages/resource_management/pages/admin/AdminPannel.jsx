@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Download,
 } from "lucide-react";
+import { KPICard } from "../../../../components/kpi/KPI";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -276,18 +277,13 @@ const AdminPannel = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {KPI_DATA.map((kpi, index) => (
-          <div
+          <KPICard
             key={index}
-            className="bg-white p-6 rounded-xl shadow-sm border flex items-center justify-between"
-          >
-            <div>
-              <p className="text-sm text-gray-500">{kpi.label}</p>
-              <h3 className="text-2xl font-bold text-gray-900">{kpi.value}</h3>
-            </div>
-            <div className={`p-3 rounded-full ${kpi.bg}`}>
-              <kpi.icon className={`w-6 h-6 ${kpi.color}`} />
-            </div>
-          </div>
+            label={kpi.label}
+            value={kpi.value}
+            icon={<kpi.icon className={`w-5 h-5 ${kpi.color}`} />}
+            color={`${kpi.bg} ${kpi.color}`}
+          />
         ))}
       </div>
 

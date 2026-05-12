@@ -435,17 +435,13 @@ const handleSprintStatus = async (sprintId, action) => {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
-  {/* Use the global ToastContainer mounted in App.jsx */}
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          {/* <h1 className="text-2xl font-semibold text-indigo-900">
-            Backlog & Sprint Planning {projectName}
-          </h1> */}
+      <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
 
-          <div className="flex gap-3 align-middle">
+        {/* ── Enterprise Header ── */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200 flex-shrink-0">
+          <div className="flex gap-2">
             <Button
-              size="medium"
+              size="small"
               variant="outline"
               className="flex items-center gap-2"
               onClick={() =>
@@ -454,10 +450,11 @@ const handleSprintStatus = async (sprintId, action) => {
                 })
               }
             >
-              <List size={18} /> Issue Tracker
+              <List size={16} /> Issue Tracker
             </Button>
 
             <Button
+              size="small"
               className={`flex items-center gap-2 ${
                 !permissions?.canEdit ? "opacity-50 cursor-not-allowed" : ""
               }`}
@@ -468,20 +465,24 @@ const handleSprintStatus = async (sprintId, action) => {
                 }
               }}
             >
-              <Plus size={18} /> Create Sprint
+              <Plus size={16} /> Create Sprint
             </Button>
 
             <Button
+              size="small"
               variant="outline"
               className="flex items-center gap-2"
               onClick={() => setShowIssueForm(true)}
             >
-              <Plus size={18} /> Create Issue
+              <Plus size={16} /> Create Issue
             </Button>
           </div>
         </div>
+
+        {/* ── Scrollable Content ── */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         {/* Sprints */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {activeAndPlanningSprints.map((sprint) => {
             const sprintStories = stories.filter(
               (s) => s.sprintId === sprint.id || s.sprint?.id === sprint.id,
@@ -551,16 +552,16 @@ const handleSprintStatus = async (sprintId, action) => {
             <div className="mt-10">
               <button
                 onClick={() => setShowCompletedSprints(!showCompletedSprints)}
-                className="flex items-center gap-2 w-full text-left pb-2 border-b border-gray-200 group focus:outline-none"
+                className="flex items-center gap-2 w-full text-left pb-2 border-b border-slate-200 group focus:outline-none"
               >
-                <div className="p-1 rounded-md bg-gray-100 group-hover:bg-indigo-100 text-gray-500 group-hover:text-indigo-600 transition-colors">
+                <div className="p-1 rounded-md bg-slate-100 group-hover:bg-indigo-100 text-slate-500 group-hover:text-indigo-600 transition-colors">
                   {showCompletedSprints ? (
                     <ChevronDown size={18} />
                   ) : (
                     <ChevronRight size={18} />
                   )}
                 </div>
-                <h2 className="text-lg font-bold text-gray-600 group-hover:text-gray-900 transition-colors">
+                <h2 className="text-sm font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">
                   Completed Sprints ({completedSprints.length})
                 </h2>
               </button>
@@ -613,10 +614,8 @@ const handleSprintStatus = async (sprintId, action) => {
           )}
         </div>
         {/* Backlog */}
-        {/* Backlog */}
-        {/* Backlog */}
         <BacklogDropWrapper>
-          <h2 className="text-lg font-semibold text-indigo-900 mb-4 pb-2 border-b">
+          <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-slate-200">
             Product Backlog
           </h2>
 
@@ -637,7 +636,7 @@ const handleSprintStatus = async (sprintId, action) => {
                     {childTasks.length > 0 ? (
                       <button
                         onClick={() => toggleStoryExpand(story.id)}
-                        className="p-1 rounded-md bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-700 transition-colors shadow-sm"
+                        className="p-1 rounded-md bg-slate-100 hover:bg-indigo-100 text-slate-600 hover:text-indigo-700 transition-colors shadow-sm"
                         title={isExpanded ? "Collapse tasks" : "Expand tasks"}
                       >
                         {isExpanded ? (
@@ -697,8 +696,8 @@ const handleSprintStatus = async (sprintId, action) => {
               if (orphanTasks.length === 0) return null;
 
               return (
-                <div className="mt-8 pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
+                <div className="mt-6 pt-4 border-t border-slate-200">
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
                     Independent Tasks
                   </h3>
                   <div className="flex flex-col gap-2">
@@ -723,7 +722,8 @@ const handleSprintStatus = async (sprintId, action) => {
             })()}
           </div>
         </BacklogDropWrapper>
-      </div>
+        </div>{/* end scrollable content */}
+      </div>{/* end h-full flex-col */}
 
       {/* Modals */}
       {showIssueForm && (

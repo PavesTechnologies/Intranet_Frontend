@@ -86,11 +86,17 @@ export default function EmployeeOnboardingPage() {
 
   const [exportLoading, setExportLoading] = useState(false);
 
-  const [exportedEmails, setExportedEmails] = useState([]);
   const fileInputRef = useRef(null);
   const [uploadLoading, setUploadLoading] = useState(false);
-  const [failedRecords, setFailedRecords] = useState([]);
+  
+ const failedCount = useMemo(() => {
 
+  return excelPreview.filter(
+    (emp) =>
+      emp.export_status === "FAILED"
+  ).length;
+
+}, [excelPreview]);
   
 
   /* ============================
@@ -317,150 +323,254 @@ export default function EmployeeOnboardingPage() {
     });
   }, [employees, searchTerm, statusFilter, departmentFilter]);
 
-  const handleExportPreview = async () => {
+const handleExportPreview = async () => {
+
+  try {
+
     setExportLoading(true);
 
-    try {
-      // const excelData = filteredEmployees.map(emp => ({
-      //   "Employee ID": emp.employee_id,
-      //   "Name": `${emp.first_name} ${emp.last_name}`,
-      //   "Email": emp.work_email,
-      //   "Contact": emp.contact_number,
-      //   "Department": departmentMap[emp.department_uuid],
-      //   "Designation": designationMap[emp.designation_uuid],
-      //   "Joining Date": emp.joining_date,
-      //   "Status": emp.employment_status
-      // }));
-
-      const newEmployees = filteredEmployees.filter(
-        (emp) => !exportedEmails.includes(emp.work_email?.toLowerCase()),
-      );
-
-      if (newEmployees.length === 0) {
-        showStatusToast("No new employees to export", "info");
-        setExportLoading(false);
-        return;
-      }
-
-      const excelData = newEmployees.map((emp) => ({
-        user_uuid: emp.user_uuid,
-        employee_id: emp.employee_id,
-        first_name: emp.first_name,
-        last_name: emp.last_name,
-        mail: emp.work_email,
-        contact: emp.contact_number,
-        Department: departmentMap[emp.department_uuid],
-        Designation: designationMap[emp.designation_uuid],
-        Status: emp.employment_status,
-        
-      }));
-      setExcelPreview(excelData);
-      setShowPreview(true);
-    } catch (error) {
-      console.error("Excel preview error", error);
-    } finally {
-      setExportLoading(false);
-    }
-  };
-
-  // const downloadExcel = () => {
-  //   const worksheet = XLSX.utils.json_to_sheet(excelPreview);
-
-  //   const workbook = XLSX.utils.book_new();
-
-  //   XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
-
-  //   // Auto column width
-  //   const cols = Object.keys(excelPreview[0]).map(() => ({ wch: 25 }));
-  //   worksheet["!cols"] = cols;
-
-  //   XLSX.writeFile(workbook, "Employee_Report.xlsx");
-
-  //   const newEmails = excelPreview.map((emp) => emp.Email.toLowerCase());
-  //   setExportedEmails((prev) => [...new Set([...prev, ...newEmails])]);
-
-  //   setShowPreview(false);
-  // };
-const downloadExcel = async () => {
-  try {
     const token = localStorage.getItem("token");
 
-    // Create worksheet
-    const worksheet = XLSX.utils.json_to_sheet(excelPreview);
-
-    // Create workbook
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
-
-    // Auto column width
-    const cols = Object.keys(excelPreview[0]).map(() => ({ wch: 25 }));
-    worksheet["!cols"] = cols;
-
-    // Convert workbook to buffer
-    const excelBuffer = XLSX.write(workbook, {
-      bookType: "xlsx",
-      type: "array",
-    });
-
-    // Create Blob
-    const blob = new Blob(
-      [excelBuffer],
+    const response = await fetch(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/export-preview`,
       {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        method: "GET",
+
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       }
     );
 
-    // Create File
+    const result = await response.json();
+
+    if (response.ok) {
+
+      const previewData =
+        result.data || [];
+
+      if (previewData.length === 0) {
+
+        showStatusToast(
+          "No employees available for export",
+          "info"
+        );
+
+        return;
+      }
+
+      const formattedData =
+        previewData.map((emp) => ({
+
+          user_uuid: emp.employee_uuid,
+
+          employee_id: emp.employee_id,
+
+          first_name: emp.first_name,
+
+          last_name: emp.last_name,
+
+          mail: emp.mail,
+
+          contact: emp.contact,
+
+          Department:
+            departmentMap[
+              emp.department_uuid
+            ] || "—",
+
+          Designation:
+            designationMap[
+              emp.designation_uuid
+            ] || "—",
+
+          Status:
+            emp.employment_status,
+
+          export_status:
+            emp.export_status,
+
+          export_error:
+            emp.export_error
+        }));
+
+      setExcelPreview(
+        formattedData
+      );
+
+      setShowPreview(true);
+
+    }
+
+  } catch (error) {
+
+    console.error(error);
+
+    showStatusToast(
+      "Failed to fetch export preview",
+      "error"
+    );
+
+  } finally {
+
+    setExportLoading(false);
+  }
+};
+
+const downloadExcel = async () => {
+console.log(
+  "calling ums api"
+);
+  try {
+
+    const token =
+      localStorage.getItem("token");
+
+    // =========================
+    // REMOVE BACKEND META FIELDS
+    // =========================
+
+    const exportData = excelPreview.map(
+      ({
+        export_status,
+        export_error,
+        ...rest
+      }) => rest
+    );
+
+    // =========================
+    // CREATE EXCEL
+    // =========================
+
+    const worksheet =
+      XLSX.utils.json_to_sheet(
+        exportData
+      );
+
+    const workbook =
+      XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "Employees"
+    );
+
+    const excelBuffer =
+      XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+console.log(
+  "calling ums api"
+);
+    const blob = new Blob(
+      [excelBuffer],
+      {
+        type:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }
+    );
+
     const file = new File(
       [blob],
       "Employee_Report.xlsx",
       {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       }
     );
 
-    // FormData
+    // =========================
+    // CREATE FORM DATA
+    // =========================
+
     const formData = new FormData();
+
     formData.append("file", file);
 
-    // API call
+    // =========================
+    // SEND TO UMS
+    // =========================
+
     const response = await fetch(
+
       `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/multiple-users`,
+
       {
         method: "POST",
+
         headers: {
           Authorization: `Bearer ${token}`,
         },
+
         body: formData,
       }
     );
 
     const data = await response.json();
 
+    // =========================
+    // UPDATE EXPORT STATUS
+    // =========================
+
+    await fetch(
+
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/update-export-status`,
+
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+
+          Authorization:
+            `Bearer ${token}`,
+        },
+
+        body: JSON.stringify(data),
+      }
+    );
+
+    // =========================
+    // SUCCESS UI
+    // =========================
+
     if (response.ok) {
-      showStatusToast("Excel sent successfully", "success");
 
-      const newEmails = excelPreview.map((emp) =>
-        emp.Email.toLowerCase()
+      showStatusToast(
+
+        data.message ||
+        "Employees exported successfully",
+
+        "success"
       );
-
-      setExportedEmails((prev) => [
-        ...new Set([...prev, ...newEmails]),
-      ]);
 
       setShowPreview(false);
 
+      // Refresh latest employees
+      fetchEmployees();
+
+      // Refresh preview queue
+      setExcelPreview([]);
+
     } else {
+
       showStatusToast(
-        data.message || "Failed to send excel",
+        "Export failed",
         "error"
       );
     }
 
   } catch (error) {
-    console.error("Send excel error:", error);
 
-    showStatusToast("Failed to send excel", "error");
+    console.error(error);
+
+    showStatusToast(
+      "Failed to send excel",
+      "error"
+    );
   }
 };
   /* ============================
@@ -588,32 +698,37 @@ const downloadExcel = async () => {
           "Export Excel"
         )}
       </button>
-      {failedRecords.length > 0 && (
-  <div className="mt-4 border rounded-lg p-4 bg-red-50">
-    <h3 className="font-semibold text-red-600 mb-2">
-      Failed Records
-    </h3>
+      {failedCount > 0 && (
 
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b">
-          <th className="text-left p-2">Row</th>
-          <th className="text-left p-2">Reason</th>
-        </tr>
-      </thead>
+  <button
+    onClick={handleExportPreview}
+    className="
+      px-4 py-2
+      bg-red-600
+      hover:bg-red-700
+      text-white
+      rounded-lg
+      shadow-sm
+      flex items-center gap-2
+    "
+  >
 
-      <tbody>
-        {failedRecords.map((item, index) => (
-          <tr key={index} className="border-b">
-            <td className="p-2">{item.row}</td>
-            <td className="p-2">{formatError(item.reason)}</td>
-          </tr>
-        ))}
-      </tbody>
+    Retry Failed
 
-    </table>
+    <span
+      className="
+        bg-white
+        text-red-600
+        px-2 py-0.5
+        rounded-full
+        text-xs
+        font-semibold
+      "
+    >
+      {failedCount}
+    </span>
 
-  </div>
+  </button>
 )}
 
       </div>

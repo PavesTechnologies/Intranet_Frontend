@@ -28,6 +28,7 @@ import {
 } from "@/components/icons";
 
 import { useAuth } from "../../../contexts/AuthContext";
+import { KPICard } from "../../../components/kpi/KPI";
 
 import ClientSection from "./ClientSection";
 import AddConfigurationModal from "../models/client_configuration/AddConfigurationModal";
@@ -905,68 +906,17 @@ const ClientPage = () => {
       {/* Client KPI's */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 mb-10">
         {kpiData.map((kpi, idx) => (
-          <div
+          <KPICard
             key={idx}
-            className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between"
-          >
-            <div>
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                {kpi.label}
-              </p>
-              <h3 className="text-xl font-bold text-gray-900 mt-1">
-                {kpi.value}
-              </h3>
-            </div>
-            <div className={`p-2 rounded-lg ${kpi.bg}`}>
-              <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
-            </div>
-          </div>
+            label={kpi.label}
+            value={kpi.value}
+            icon={<kpi.icon className={`w-5 h-5 ${kpi.color}`} />}
+            color={`${kpi.bg} ${kpi.color}`}
+          />
         ))}
       </div>
 
-      {(canConfigAgreements || canManageAssets) && (
-        <div className="flex flex-wrap items-center justify-end gap-3 mt-5">
-          {/* ✅ COMPANY ESCALATION BUTTON */}
-          {canConfigAgreements && (
-            <Button
-              variant="secondary"
-              onClick={() => setOpenCompanyEscalation(true)}
-              className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
-            >
-              Company Escalation
-            </Button>
-          )}
-          {canConfigAgreements &&
-            (clientDetails.compliance ||
-              clientDetails.SLA ||
-              clientDetails.escalationContact) && (
-              <Button
-                variant="primary"
-                onClick={() => setOpenConfigModal(true)}
-                className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
-              >
-                + Add Configuration
-              </Button>
-            )}
 
-          {canManageAssets && (
-            <Button
-              variant="secondary"
-              onClick={() => navigate(`/manage-assets/${clientId}`)}
-              disabled={clientDetails.status !== "ACTIVE"}
-              title={clientDetails.status !== "ACTIVE" ? "Manage Assets is available only for ACTIVE clients" : ""}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all
-                ${clientDetails.status === "ACTIVE"
-                  ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-100 shadow-none opacity-80"
-                }`}
-            >
-              <PackageIcon size={16} />
-              Manage Assets
-            </Button>
-          )}
-        </div>
-      )}
 
       {(clientDetails.compliance ||
         clientDetails.SLA ||
@@ -977,6 +927,45 @@ const ClientPage = () => {
               slaRefetchKey={slaRefetchKey}
               complianceRefetchKey={complianceRefetchKey}
               escalationRefetchKey={escalationRefetchKey}
+              actions={
+                (canConfigAgreements || canManageAssets) && (
+                  <>
+                    {canConfigAgreements && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => setOpenCompanyEscalation(true)}
+                        className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
+                      >
+                        Company Escalation
+                      </Button>
+                    )}
+                    {canConfigAgreements &&
+                      (clientDetails.compliance ||
+                        clientDetails.SLA ||
+                        clientDetails.escalationContact) && (
+                        <Button
+                          variant="primary"
+                          onClick={() => setOpenConfigModal(true)}
+                          className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
+                        >
+                          + Add Configuration
+                        </Button>
+                      )}
+
+                    {canManageAssets && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => navigate(`/manage-assets/${clientId}?name=${encodeURIComponent(clientDetails.client_name)}`)}
+                        disabled={clientDetails.status !== "ACTIVE"}
+                        title={clientDetails.status !== "ACTIVE" ? "Manage Assets is available only for ACTIVE clients" : ""}
+                      >
+                        <PackageIcon size={16} />
+                        Manage Assets
+                      </Button>
+                    )}
+                  </>
+                )
+              }
             />
           </div>
         )}

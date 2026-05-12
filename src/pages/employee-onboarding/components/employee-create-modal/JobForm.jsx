@@ -19,6 +19,8 @@ export default function JobForm({
     "Resigned",
     "Terminated",
     "Absconded",
+    "Exited",
+    "On-Notice",
   ];
 
   const filteredDesignations = designations.filter(
