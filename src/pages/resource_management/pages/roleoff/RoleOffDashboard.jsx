@@ -6,7 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Legend, Sector
 } from 'recharts';
-import { Download, AlertTriangle, Zap, TrendingUp, Activity, Search, ArrowLeft, Filter, X } from 'lucide-react';
+import { DownloadIcon, WarningIcon, ZapIcon, TrendingUpIcon, ActivityIcon, SearchIcon, PrevIcon, FilterIcon, CloseIcon } from "@/components/icons";
 import { toast } from 'react-toastify';
 import { getFilteredRoleOffs, exportRoleOffsCsv } from "../../services/roleOffService";
 import { searchClients } from "../../services/clientservice";
@@ -374,7 +374,7 @@ const RoleOffDashboard = () => {
             className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm shrink-0"
             title="Back to Role-Off Operations"
           >
-            <ArrowLeft size={18} />
+            <PrevIcon size={18} />
           </button>
           <div className="flex-1">
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Role-Off Reporting Dashboard</h1>
@@ -387,7 +387,7 @@ const RoleOffDashboard = () => {
             disabled={isExporting}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-[12px] font-bold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-70"
           >
-            <Download className="h-3.5 w-3.5" />
+            <DownloadIcon className="h-3.5 w-3.5" />
             {isExporting ? 'Exporting...' : 'EXPORT ANALYTICS'}
           </button>
         </div>
@@ -398,7 +398,7 @@ const RoleOffDashboard = () => {
         {/* Total Role-Offs */}
         <div className="flex min-w-[200px] flex-1 items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all hover:border-slate-200">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 shadow-sm text-blue-700">
-            <Activity className="h-5 w-5" />
+            <ActivityIcon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
             <p className="mb-0.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">Total</p>
@@ -413,7 +413,7 @@ const RoleOffDashboard = () => {
               ? 'border-rose-100 bg-rose-50 text-rose-700' 
               : 'border-slate-100 bg-slate-50 text-slate-400'
           }`}>
-            <AlertTriangle className="h-5 w-5" />
+            <WarningIcon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
             <p className="mb-0.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">Risk Alerts</p>
@@ -426,7 +426,7 @@ const RoleOffDashboard = () => {
         {/* Projects Affected */}
         <div className="flex min-w-[200px] flex-1 items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all hover:border-slate-200">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-100 bg-amber-50 shadow-sm text-amber-700">
-            <Zap className="h-5 w-5" />
+            <ZapIcon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
             <p className="mb-0.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">Projects</p>
@@ -441,7 +441,7 @@ const RoleOffDashboard = () => {
               ? 'border-rose-100 bg-rose-50 text-rose-700' 
               : 'border-emerald-100 bg-emerald-50 text-emerald-700'
           }`}>
-            <TrendingUp className="h-5 w-5" />
+            <TrendingUpIcon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
             <p className="mb-0.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">Risk Score</p>
@@ -494,7 +494,7 @@ const RoleOffDashboard = () => {
                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <Filter className={`h-3.5 w-3.5 ${showFilters ? 'fill-current' : ''}`} />
+            <FilterIcon className={`h-3.5 w-3.5 ${showFilters ? 'fill-current' : ''}`} />
             <span className="text-[11px] font-bold uppercase tracking-wider">Filters</span>
             {activeFilterCount > 0 && (
               <span className={`ml-1 px-1.5 rounded-sm text-[10px] font-bold ${showFilters ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
@@ -522,11 +522,11 @@ const RoleOffDashboard = () => {
             {/* Popup Header */}
             <div className="shrink-0 px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Filter className="h-3.5 w-3.5 text-indigo-500" />
+                <FilterIcon className="h-3.5 w-3.5 text-indigo-500" />
                 <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest leading-none mt-0.5">Report Analysis Filters</h3>
               </div>
               <button onClick={() => setShowFilters(false)} className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors">
-                <X className="h-4 w-4" />
+                <CloseIcon className="h-4 w-4" />
               </button>
             </div>
             
@@ -636,7 +636,7 @@ const RoleOffDashboard = () => {
               <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-all" />
               <div className="flex items-center justify-between w-full mb-2">
                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Role-Off Reasons</h3>
-                <Activity size={12} className="text-indigo-400" />
+                <ActivityIcon size={12} className="text-indigo-400" />
               </div>
               
               <div className="h-44 w-full">
@@ -768,7 +768,7 @@ const RoleOffDashboard = () => {
           {data.riskAlerts && data.riskAlerts.length > 0 && (
             <div className="rounded-xl bg-red-50/50 border border-red-100 p-4 shadow-sm">
               <h3 className="text-[10px] font-bold text-red-800 flex items-center gap-2 mb-4 uppercase tracking-wider opacity-80">
-                <AlertTriangle className="h-3 w-3" /> Systemic Risk Alerts Detected
+                <WarningIcon className="h-3 w-3" /> Systemic Risk Alerts Detected
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {data.riskAlerts.map((alert, idx) => (

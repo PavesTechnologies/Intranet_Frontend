@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X } from "lucide-react";
+import { CloseIcon } from "@/components/icons";
 import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 const CreateSLAModal = ({ open, onClose }) => {
@@ -45,7 +45,7 @@ const CreateSLAModal = ({ open, onClose }) => {
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 

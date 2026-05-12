@@ -19,5 +19,6 @@ export {
   XSquare as RejectedIcon,
   Info as InfoIcon,
   HelpCircle as HelpIcon,
-  AlertCircle as AlertIcon
+  AlertCircle as AlertIcon,
+  CheckCircle2 as CheckCircleIcon
 };
