@@ -41,6 +41,30 @@ export default function IssuesPanel({
 
   const PAGE_SIZE = 3;
 
+  const axiosInstance = useMemo(() => {
+    const instance = axios.create({
+      baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    instance.interceptors.request.use(
+      (config) => {
+        const latestToken = localStorage.getItem("token");
+
+        if (latestToken) {
+          config.headers.Authorization = `Bearer ${latestToken}`;
+        }
+
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    return instance;
+  }, []);
+
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(issuesTotal / PAGE_SIZE));
   }, [issuesTotal]);
@@ -72,9 +96,6 @@ export default function IssuesPanel({
       setIsLoadingIssues(true);
 
       try {
-        const token = localStorage.getItem("token");
-        const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
-
         const params = {
           page: Math.max(0, issuePage - 1),
           size: PAGE_SIZE,
@@ -88,17 +109,18 @@ export default function IssuesPanel({
           params.search = debouncedSearch.toLowerCase();
         }
 
-        const res = await axios.get(
-          `${BASE_URL}/api/projects/${projectId}/risks/issues`,
+        const res = await axiosInstance.get(
+          `/api/projects/${projectId}/risks/issues`,
           {
-            headers: { Authorization: `Bearer ${token}` },
             params,
           }
         );
 
         if (cancelled) return;
 
-        const content = Array.isArray(res.data?.content) ? res.data.content : [];
+        const content = Array.isArray(res.data?.content)
+          ? res.data.content
+          : [];
 
         const uniqueIssues = Array.from(
           new Map(
@@ -127,7 +149,13 @@ export default function IssuesPanel({
     return () => {
       cancelled = true;
     };
-  }, [projectId, activeIssueType, issuePage, debouncedSearch]);
+  }, [
+    projectId,
+    activeIssueType,
+    issuePage,
+    debouncedSearch,
+    axiosInstance,
+  ]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full min-h-0">
@@ -176,8 +204,11 @@ export default function IssuesPanel({
         ) : issuesPageItems.length === 0 ? (
           <div className="p-6 text-center text-slate-500">
             <AlertIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+
             <p className="text-sm">
-              {debouncedSearch ? "No matching issues found" : "No issues found"}
+              {debouncedSearch
+                ? "No matching issues found"
+                : "No issues found"}
             </p>
           </div>
         ) : (

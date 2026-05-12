@@ -47,13 +47,29 @@ export default function RiskDetailModal({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
 
-  const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
-  const token = localStorage.getItem("token");
+  const axiosInstance = React.useMemo(() => {
+    const instance = axios.create({
+      baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
 
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+    instance.interceptors.request.use(
+      (config) => {
+        const latestToken = localStorage.getItem("token");
+
+        if (latestToken) {
+          config.headers.Authorization = `Bearer ${latestToken}`;
+        }
+
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    return instance;
+  }, []);
 
   useEffect(() => {
     if (!risk?.id) return;
@@ -65,53 +81,37 @@ export default function RiskDetailModal({
       setError(null);
 
       try {
-        const riskReq = axios.get(`${BASE_URL}/api/risks/${risk.id}`, {
-          headers,
-        });
+        const riskReq = axiosInstance.get(`/api/risks/${risk.id}`);
 
-        const riskLinkId = axios.get(`${BASE_URL}/api/risk-links/risk/${risk.id}`, {
-          headers,
-        });
+        const riskLinkId = axiosInstance.get(`/api/risk-links/risk/${risk.id}`);
 
-        const mitigationReq = axios
-          .get(`${BASE_URL}/api/mitigation-plans/risk/${risk.id}`, {
-            headers,
-          })
+        const mitigationReq = axiosInstance
+          .get(`/api/mitigation-plans/risk/${risk.id}`)
           .catch(() => ({ data: [] }));
 
-        const membersReq = axios.get(
-          `${BASE_URL}/api/projects/${projectId}/members`,
-          { headers },
+        const membersReq = axiosInstance.get(
+          `/api/projects/${projectId}/members`
         );
 
         const riskRes = (await riskReq).data;
 
         const riskLinkRes = (await riskLinkId).data;
-        // {console.log("Risk link data:", riskLinkRes)}; // Debug log
         riskRes.riskLinkId = riskLinkRes[0]?.id || null;
 
         const categoryReq = riskRes.categoryId
-          ? axios.get(`${BASE_URL}/api/risk/category/${riskRes.categoryId}`, {
-              headers,
-            })
+          ? axiosInstance.get(`/api/risk/category/${riskRes.categoryId}`)
           : Promise.resolve({ data: null });
 
         const ownerReq = riskRes.ownerId
-          ? axios.get(`${BASE_URL}/api/users/${riskRes.ownerId}`, {
-              headers,
-            })
+          ? axiosInstance.get(`/api/users/${riskRes.ownerId}`)
           : Promise.resolve({ data: null });
 
         const reporterReq = riskRes.reporterId
-          ? axios.get(`${BASE_URL}/api/users/${riskRes.reporterId}`, {
-              headers,
-            })
+          ? axiosInstance.get(`/api/users/${riskRes.reporterId}`)
           : Promise.resolve({ data: null });
 
         const statusReq = riskRes.statusId
-          ? axios.get(`${BASE_URL}/api/risk-statuses/${riskRes.statusId}`, {
-              headers,
-            })
+          ? axiosInstance.get(`/api/risk-statuses/${riskRes.statusId}`)
           : Promise.resolve({ data: null });
 
         const [
@@ -153,13 +153,12 @@ export default function RiskDetailModal({
     return () => {
       mounted = false;
     };
-  }, [risk?.id, projectId, BASE_URL, token]);
+  }, [risk?.id, projectId, axiosInstance]);
 
   async function startEditStatus() {
     try {
-      const res = await axios.get(
-        `${BASE_URL}/api/projects/${projectId}/risk-statuses`,
-        { headers },
+      const res = await axiosInstance.get(
+        `/api/projects/${projectId}/risk-statuses`
       );
 
       setStatuses(res.data || []);
@@ -172,11 +171,9 @@ export default function RiskDetailModal({
 
   async function saveStatus() {
     try {
-      await axios.patch(
-        `${BASE_URL}/api/risks/${risk.id}/status`,
-        { statusId: selectedStatusId },
-        { headers },
-      );
+      await axiosInstance.patch(`/api/risks/${risk.id}/status`, {
+        statusId: selectedStatusId,
+      });
 
       const updated = statuses.find((s) => s.id === selectedStatusId);
       setStatus(updated || null);
@@ -194,9 +191,7 @@ export default function RiskDetailModal({
     try {
       setDeleting(true);
 
-      await axios.delete(`${BASE_URL}/api/risks/${risk.id}`, {
-        headers,
-      });
+      await axiosInstance.delete(`/api/risks/${risk.id}`);
 
       showStatusToast("Risk deleted successfully", "success");
       onUpdated?.();
@@ -287,6 +282,7 @@ export default function RiskDetailModal({
             >
               <DeleteIcon className="w-3.5 h-3.5" /> Delete Risk
             </Button>
+
             <div className="flex gap-2">
               <Button
                 variant="primary"
@@ -295,6 +291,7 @@ export default function RiskDetailModal({
               >
                 <EditIcon className="w-3.5 h-3.5" /> Edit
               </Button>
+
               <Button variant="secondary" size="small" onClick={onClose}>
                 Close
               </Button>
@@ -302,7 +299,6 @@ export default function RiskDetailModal({
           </div>
         }
       >
-        {/* Edit risk modal — nested, manages its own open state */}
         <CreateRiskModal
           isOpen={showEdit}
           onClose={() => setShowEdit(false)}
@@ -315,7 +311,6 @@ export default function RiskDetailModal({
           onEdit={true}
         />
 
-        {/* Priority badge */}
         {riskDetail?.priority && (
           <div className="mb-3">
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 uppercase tracking-wide">
@@ -334,11 +329,12 @@ export default function RiskDetailModal({
 
         {riskDetail && (
           <div className="space-y-4">
-            {/* Score metrics */}
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
               <Metric label="Probability" value={riskDetail.probability} />
               <Metric label="Impact" value={riskDetail.impact} />
-              <div className={`border rounded-xl p-3 sm:p-4 text-center ${scoreColor}`}>
+              <div
+                className={`border rounded-xl p-3 sm:p-4 text-center ${scoreColor}`}
+              >
                 <div className="text-[10px] uppercase tracking-wide font-semibold opacity-70">
                   Risk Score
                 </div>
@@ -348,7 +344,6 @@ export default function RiskDetailModal({
               </div>
             </div>
 
-            {/* Info cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               <InfoCard
                 label="Category"
@@ -368,20 +363,23 @@ export default function RiskDetailModal({
               <InfoCard label="Triggers" value={riskDetail.triggers || "—"} />
             </div>
 
-            {/* Status row */}
             <div className="border border-slate-200 rounded-xl p-3 sm:p-4">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
                   <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-1.5">
                     Status
                   </p>
+
                   {!editingStatus ? (
                     <span className="px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
                       {status?.name || "—"}
                     </span>
                   ) : (
                     <FilterListbox
-                      options={statuses.map((s) => ({ value: s.id, label: s.name }))}
+                      options={statuses.map((s) => ({
+                        value: s.id,
+                        label: s.name,
+                      }))}
                       value={selectedStatusId || ""}
                       onChange={setSelectedStatusId}
                     />
@@ -401,6 +399,7 @@ export default function RiskDetailModal({
                     >
                       Cancel
                     </Button>
+
                     <Button variant="primary" size="small" onClick={saveStatus}>
                       <CheckIcon className="w-3 h-3" /> Save
                     </Button>
@@ -409,7 +408,6 @@ export default function RiskDetailModal({
               </div>
             </div>
 
-            {/* Description */}
             {riskDetail.description && (
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4">
                 <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-2">
@@ -421,7 +419,6 @@ export default function RiskDetailModal({
               </div>
             )}
 
-            {/* Mitigation plans */}
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <h4 className="font-semibold text-sm flex items-center gap-2 text-slate-800">
@@ -433,7 +430,12 @@ export default function RiskDetailModal({
                     </span>
                   )}
                 </h4>
-                <Button variant="ghost" size="small" onClick={() => setShowAdd(true)}>
+
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={() => setShowAdd(true)}
+                >
                   <AddIcon className="w-3.5 h-3.5" /> Add
                 </Button>
               </div>
@@ -455,7 +457,6 @@ export default function RiskDetailModal({
         )}
       </Modal>
 
-      {/* Add Mitigation — global Modal wrapper; AddMitigationForm renders its own header/footer */}
       <Modal
         isOpen={showAdd}
         onClose={() => setShowAdd(false)}
@@ -489,8 +490,6 @@ export default function RiskDetailModal({
   );
 }
 
-/* ── Local sub-components (display-only, no business logic) ── */
-
 function Metric({ label, value }) {
   return (
     <div className="border border-slate-200 rounded-xl p-3 sm:p-4 text-center bg-white">
@@ -512,6 +511,7 @@ function InfoCard({ label, value, icon }) {
           {icon}
         </div>
       )}
+
       <div className="min-w-0">
         <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
           {label}
