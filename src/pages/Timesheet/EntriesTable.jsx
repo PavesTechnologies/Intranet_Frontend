@@ -69,6 +69,8 @@ const EntriesTable = ({
   selectedEntryIds,
   setSelectedEntryIds,
   selectionMode,
+  pendingEntries,
+  setPendingEntries,
 }) => {
   const [editIndex, setEditIndex] = useState(null);
   const [editData, setEditData] = useState({});
@@ -76,7 +78,6 @@ const EntriesTable = ({
     workType: "Office",
     isBillable: false,
   });
-  const [pendingEntries, setPendingEntries] = useState([]);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [entryIdToDelete, setEntryIdToDelete] = useState(null); // ✅ Converts a backend UTC datetime string (e.g. "2025-11-10T04:30:00Z")
@@ -396,23 +397,49 @@ const EntriesTable = ({
     }
   }; // Add-entry: validate and push to pendingEntries
 
-  const handleAddEntry = () => {
+  const handleAddEntry = async () => {
     if (!isValid(addData, false)) return;
+
+    const baseEntry = {
+      ...addData,
+      projectId: parseInt(addData.projectId),
+      taskId: parseInt(addData.taskId),
+      fromTime: addData.fromTime,
+      toTime: addData.toTime,
+      billable: !!addData.isBillable,
+      workLocation: addData.workType,
+    };
+
+    // Existing timesheet → POST immediately; no pending buffer.
+    if (timesheetId) {
+      try {
+        await addEntryToTimesheet(timesheetId, workDate, [
+          {
+            ...baseEntry,
+            fromTime: new Date(
+              `${workDate}T${baseEntry.fromTime}:00`,
+            ).toISOString(),
+            toTime: new Date(
+              `${workDate}T${baseEntry.toTime}:00`,
+            ).toISOString(),
+          },
+        ]);
+        setAddingNewEntry(false);
+        setAddData({ workType: "Office", isBillable: "Yes" });
+        if (refreshData) await refreshData();
+      } catch (err) {
+        // addEntryToTimesheet already raises a toast; keep the row open so the user can retry.
+      }
+      return;
+    }
+
+    // New (uncreated) timesheet → keep batching locally.
     setPendingEntries((prev) => [
       ...prev,
-      (() => {
-        const newEntry = {
-          ...addData,
-          timesheetEntryId: `pending-${Date.now()}`,
-          projectId: parseInt(addData.projectId),
-          taskId: parseInt(addData.taskId),
-          fromTime: addData.fromTime,
-          toTime: addData.toTime,
-          billable: !!addData.isBillable,
-          workLocation: addData.workType,
-        };
-        return newEntry;
-      })(),
+      {
+        ...baseEntry,
+        timesheetEntryId: `pending-${Date.now()}`,
+      },
     ]);
     setAddingNewEntry(false);
     setAddData({ workType: "Office", isBillable: "Yes" });
@@ -452,13 +479,17 @@ const EntriesTable = ({
                 type="checkbox"
                 title="Select All"
                 checked={
-                  entries.length > 0 &&
-                  selectedEntryIds.length === entries.length
+                  [...entries, ...pendingEntries].length > 0 &&
+                  selectedEntryIds.length ===
+                    [...entries, ...pendingEntries].length
                 }
                 onChange={(e) => {
                   if (e.target.checked) {
                     setSelectedEntryIds(
-                      entries.map((entry) => entry.timesheetEntryId),
+                      [...entries, ...pendingEntries].map(
+                        (entry, idx) =>
+                          entry.timesheetEntryId || `new-${idx}`,
+                      ),
                     );
                   } else {
                     setSelectedEntryIds([]);
