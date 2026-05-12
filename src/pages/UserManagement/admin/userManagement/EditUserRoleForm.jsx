@@ -12,7 +12,7 @@ import { Fonts } from "../../../../components/Fonts/Fonts";
 
 const ROLES_PER_PAGE = 6;
 
-function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
+export default function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
   const [user, setUser] = useState(null);
   const [roles, setRoles] = useState([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState([]);
