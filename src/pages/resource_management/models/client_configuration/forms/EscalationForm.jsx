@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 const EscalationForm = ({ formData, setFormData }) => {
   const { getEnumValues } = useEnums();
@@ -53,19 +54,14 @@ const EscalationForm = ({ formData, setFormData }) => {
           <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
             Contact Role *
           </label>
-          <select
-            name="contactRole"
+          <FilterListbox
+            options={[
+              { value: "", label: "Select Role" },
+              ...CONTACT_ROLES.map((role) => ({ value: role, label: role.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) })),
+            ]}
             value={formData.contactRole || ""}
-            onChange={handleChange}
-            className="w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
-          >
-            <option value="">Select Role</option>
-            {CONTACT_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {role.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleChange({ target: { name: "contactRole", value: val } })}
+          />
         </div>
 
         {/* Escalation Level */}
@@ -73,19 +69,14 @@ const EscalationForm = ({ formData, setFormData }) => {
           <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
             Escalation Level *
           </label>
-          <select
-            name="escalationLevel"
+          <FilterListbox
+            options={[
+              { value: "", label: "Select Level" },
+              ...ESCALATION_LEVELS.map((level) => ({ value: level, label: level.replace(/_/g, " ") })),
+            ]}
             value={formData.escalationLevel || ""}
-            onChange={handleChange}
-            className="w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
-          >
-            <option value="">Select Level</option>
-            {ESCALATION_LEVELS.map((level) => (
-              <option key={level} value={level}>
-                {level.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleChange({ target: { name: "escalationLevel", value: val } })}
+          />
         </div>
       </div>
 

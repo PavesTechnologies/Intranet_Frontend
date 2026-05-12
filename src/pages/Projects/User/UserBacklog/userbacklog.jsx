@@ -10,6 +10,7 @@ import SprintColumn from "../UserSprint/SprintColumn";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import Button from "../../../../components/Button/Button";
+import Modal from "../../../../components/Modal/modal";
 
 const Backlog = ({ projectId, projectName }) => {
   const [showIssueForm, setShowIssueForm] = useState(false);
@@ -134,17 +135,9 @@ const Backlog = ({ projectId, projectName }) => {
         {/* ✅ Modal: Create Issue */}
 
         {/* ✅ Modal: Create Sprint */}
-        {showSprintForm && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex justify-center items-center">
-            <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6 overflow-y-auto max-h-[90vh]">
-              <button
-                onClick={handleCloseForms}
-                className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
-              ></button>
-              <CreateSprint onClose={handleCloseForms} projectId={projectId} />
-            </div>
-          </div>
-        )}
+        <Modal isOpen={showSprintForm} onClose={handleCloseForms} title="Create Sprint">
+          <CreateSprint onClose={handleCloseForms} projectId={projectId} />
+        </Modal>
 
         {/* ✅ Unassigned (Backlog) Stories Section */}
         <div className="bg-white border p-4 rounded-lg shadow-sm min-h-[120px]">

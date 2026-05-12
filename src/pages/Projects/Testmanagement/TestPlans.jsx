@@ -14,7 +14,9 @@ import axios from "axios";
 import CreateTestPlan from "./TestPlans/pages/CreateTestPlan";
 import EditTestPlan from "./TestPlans/pages/EditTestPlan";
 import { useParams } from "react-router-dom";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../components/toastfy/toast";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import Button from "../../../components/Button/Button";
 
 export default function TestPlans() {
   const { projectId } = useParams();
@@ -135,21 +137,8 @@ export default function TestPlans() {
           <h3 className="font-semibold text-gray-900 mb-2">Confirm Delete</h3>
           <p className="text-sm text-gray-600">{message}</p>
           <div className="flex justify-end gap-3 mt-4">
-            <button
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
-              onClick={() => closeToast()}
-            >
-              Cancel
-            </button>
-            <button
-              className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
-              onClick={() => {
-                closeToast();
-                onConfirm();
-              }}
-            >
-              Delete
-            </button>
+            <Button variant="secondary" size="small" onClick={() => closeToast()}>Cancel</Button>
+            <Button variant="danger" size="small" onClick={() => { closeToast(); onConfirm(); }}>Delete</Button>
           </div>
         </div>
       ),
@@ -182,9 +171,9 @@ export default function TestPlans() {
           } else if (updated.length === 0) {
             setSelectedPlan(null);
           }
-          toast.success("Test Plan deleted successfully!");
+          showStatusToast("Test Plan deleted successfully!", "success");
         } catch (error) {
-          toast.error("Failed to delete the test plan");
+          showStatusToast("Failed to delete the test plan", "error");
         }
       },
     );
@@ -220,12 +209,9 @@ export default function TestPlans() {
             Manage and organize your testing strategies and scenarios.
           </p>
         </div>
-        <button
-          className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg gap-2 transition-all shadow-sm"
-          onClick={() => setOpenCreateModal(true)}
-        >
+        <Button variant="primary" onClick={() => setOpenCreateModal(true)}>
           <Plus size={18} /> New Test Plan
-        </button>
+        </Button>
       </div>
 
       {/* MAIN TWO-COLUMN LAYOUT */}
@@ -344,10 +330,7 @@ export default function TestPlans() {
                 </div>
 
                 {loadingScenarios ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-4"></div>
-                    <p className="text-sm">Loading scenarios...</p>
-                  </div>
+                  <LoadingSpinner size="md" text="Loading scenarios..." />
                 ) : scenarios.length === 0 ? (
                   <div className="text-center py-12 border border-slate-100 rounded-xl bg-slate-50">
                     <AlertCircle className="mx-auto h-10 w-10 text-slate-300 mb-3" />

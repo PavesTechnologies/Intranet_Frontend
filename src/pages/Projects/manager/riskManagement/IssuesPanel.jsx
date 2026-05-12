@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Search, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import axios from "axios";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import Pagination from "../../../../components/Pagination/pagination";
+import SearchInput from "../../../../components/filter/Searchbar";
 
 // UI label → Backend enum
 const ISSUE_TYPE_MAP = {
@@ -27,13 +30,12 @@ const getStatusColor = (status) => {
 export default function IssuesPanel({
   projectId,
   activeIssueType,
-  issueSearch,
-  setIssueSearch,
   issuePage,
   setIssuePage,
   onSelectIssue,
   selectedIssue,
 }) {
+  const [issueSearch, setIssueSearch] = useState("");
   const [issuesPageItems, setIssuesPageItems] = useState([]);
   const [issuesTotal, setIssuesTotal] = useState(0);
   const [isLoadingIssues, setIsLoadingIssues] = useState(false);
@@ -119,19 +121,14 @@ export default function IssuesPanel({
         <h2 className="font-semibold text-slate-900 mb-3">
           {activeIssueType} Issues
         </h2>
-        <div className="relative">
-          <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder={`Search ${activeIssueType}...`}
-            value={issueSearch}
-            onChange={(e) => {
-              setIssueSearch(e.target.value);
-              setIssuePage(1);
-            }}
-            className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
+        <SearchInput
+          value={issueSearch}
+          onSearch={(val) => {
+            setIssueSearch(val);
+            setIssuePage(1);
+          }}
+          placeholder={`Search ${activeIssueType}...`}
+        />
       </div>
 
       {/* Selected Issue */}
@@ -162,10 +159,7 @@ export default function IssuesPanel({
       {/* Issues List */}
       <div className="flex-1 overflow-y-auto">
         {isLoadingIssues ? (
-          <div className="p-6 text-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600 mx-auto" />
-            <p className="text-sm text-slate-500 mt-2">Loading issues…</p>
-          </div>
+          <LoadingSpinner size="md" text="Loading issues…" />
         ) : issuesPageItems.length === 0 ? (
           <div className="p-6 text-center text-slate-500">
             <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -220,26 +214,13 @@ export default function IssuesPanel({
       </div>
 
       {/* Pagination */}
-      <div className="p-4 border-t bg-slate-50 flex justify-between items-center">
-        <span className="text-xs text-slate-600">
-          Page <b>{issuePage}</b> of <b>{totalPages}</b>
-        </span>
-        <div className="flex gap-2">
-          <button
-            disabled={issuePage === 1}
-            onClick={() => setIssuePage((p) => p - 1)}
-            className="p-1 hover:bg-slate-200 disabled:opacity-50 rounded"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            disabled={issuePage === totalPages}
-            onClick={() => setIssuePage((p) => p + 1)}
-            className="p-1 hover:bg-slate-200 disabled:opacity-50 rounded"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+      <div className="border-t border-slate-200">
+        <Pagination
+          currentPage={issuePage}
+          totalPages={totalPages}
+          onPrevious={() => setIssuePage((p) => p - 1)}
+          onNext={() => setIssuePage((p) => p + 1)}
+        />
       </div>
     </div>
   );

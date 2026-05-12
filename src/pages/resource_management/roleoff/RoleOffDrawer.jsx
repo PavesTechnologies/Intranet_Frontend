@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarDays, ClipboardList, RefreshCcw, X } from "lucide-react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -178,17 +179,15 @@ const RoleOffDrawer = ({
               <label className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                 Role-Off Type
               </label>
-              <select
+              <FilterListbox
+                options={[
+                  { value: "Planned", label: "Planned" },
+                  { value: "Emergency", label: "Emergency" },
+                ]}
                 value={formState.type}
+                onChange={(val) => setFormState((prev) => ({ ...prev, type: val }))}
                 disabled={mode !== "create"}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, type: event.target.value }))
-                }
-                className="mt-2 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm outline-none transition-colors focus:border-blue-500"
-              >
-                <option value="Planned">Planned</option>
-                <option value="Emergency">Emergency</option>
-              </select>
+              />
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
@@ -218,23 +217,21 @@ const RoleOffDrawer = ({
               <label className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                 Resource Performance
               </label>
-              <select
+              <FilterListbox
+                options={[
+                  { value: "", label: "Select performance" },
+                  { value: "HIGH_PERFORMER", label: "High Performer" },
+                  { value: "AVERAGE_PERFORMER", label: "Average Performer" },
+                  { value: "LOW_PERFORMER", label: "Low Performer" },
+                  { value: "EXCEPTIONAL", label: "Exceptional" },
+                  { value: "NEEDS_IMPROVEMENT", label: "Needs Improvement" },
+                  { value: "CONSISTENT", label: "Consistent" },
+                  { value: "NEW_RESOURCE", label: "New Resource" },
+                ]}
                 value={formState.resourcePerformance}
+                onChange={(val) => setFormState((prev) => ({ ...prev, resourcePerformance: val }))}
                 disabled={mode !== "create"}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, resourcePerformance: event.target.value }))
-                }
-                className="mt-2 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm outline-none transition-colors focus:border-blue-500"
-              >
-                <option value="">Select performance</option>
-                <option value="HIGH_PERFORMER">High Performer</option>
-                <option value="AVERAGE_PERFORMER">Average Performer</option>
-                <option value="LOW_PERFORMER">Low Performer</option>
-                <option value="EXCEPTIONAL">Exceptional</option>
-                <option value="NEEDS_IMPROVEMENT">Needs Improvement</option>
-                <option value="CONSISTENT">Consistent</option>
-                <option value="NEW_RESOURCE">New Resource</option>
-              </select>
+              />
               {errors.resourcePerformance ? (
                 <p className="mt-1 text-xs text-rose-600">{errors.resourcePerformance}</p>
               ) : null}
@@ -245,24 +242,15 @@ const RoleOffDrawer = ({
             <label className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
               Reason
             </label>
-            <select
+            <FilterListbox
+              options={[
+                { value: "", label: "Select reason" },
+                ...REASONS.map((reason) => ({ value: reason, label: reason })),
+              ]}
               value={formState.reason}
+              onChange={(val) => setFormState((prev) => ({ ...prev, reason: val }))}
               disabled={mode !== "create"}
-              onChange={(event) =>
-                setFormState((prev) => ({ ...prev, reason: event.target.value }))
-              }
-              className={cn(
-                "mt-2 h-10 w-full rounded-md border bg-white px-3 text-sm outline-none transition-colors focus:border-blue-500",
-                errors.reason ? "border-rose-300" : "border-gray-300",
-              )}
-            >
-              <option value="">Select reason</option>
-              {REASONS.map((reason) => (
-                <option key={reason} value={reason}>
-                  {reason}
-                </option>
-              ))}
-            </select>
+            />
             {errors.reason ? <p className="mt-1 text-xs text-rose-600">{errors.reason}</p> : null}
           </section>
 

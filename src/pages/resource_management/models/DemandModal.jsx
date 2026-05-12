@@ -245,6 +245,83 @@ const toDateInputValue = (date) => {
   }
 };
 
+const toNumberOrNull = (value) => {
+  const numberValue = Number(value);
+  return Number.isNaN(numberValue) ? null : numberValue;
+};
+
+const toLongOrNull = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const numberValue = Number(value);
+  return Number.isNaN(numberValue) ? null : numberValue;
+};
+
+const getRoleId = (role = {}) =>
+  role.dev_role_id ||
+  role.deliveryRoleId ||
+  role.roleId ||
+  role.role_id ||
+  role.id ||
+  "";
+
+const getRoleName = (role = {}) =>
+  role.role ||
+  role.name ||
+  role.roleName ||
+  role.deliveryRole ||
+  "";
+
+const resolveRoleId = (value, roles = []) => {
+  if (!value) return "";
+  const valueText = String(value).trim();
+  const valueKey = valueText.toLowerCase();
+
+  const matchedById = roles.find((role) => String(getRoleId(role)).trim() === valueText);
+  if (matchedById) return getRoleId(matchedById);
+
+  const matchedByName = roles.find((role) => String(getRoleName(role)).trim().toLowerCase() === valueKey);
+  return matchedByName ? getRoleId(matchedByName) : value;
+};
+
+const buildUpdateDemandPayload = (form, id) => {
+  const allocationPercentage = toNumberOrNull(form.allocationPercentage);
+  const resourcesRequired = parseInt(form.resourcesRequired, 10);
+  const minExp = toNumberOrNull(form.minExp);
+
+  return {
+    demandId: id,
+    demandType: form.demandType,
+    demandName: form.demandName,
+    minExp,
+    outgoingResourceId: toLongOrNull(form.outgoingResourceId),
+    deliveryRole: form.deliveryRole,
+    demandJustification: form.demandJustification,
+    demandStartDate: form.demandStartDate || null,
+    demandEndDate: form.demandEndDate || null,
+    allocationPercentage,
+    deliveryModel: form.deliveryModel,
+    demandPriority: form.demandPriority,
+    demandStatus: form.demandStatus,
+    demandCommitment: form.demandCommitment,
+    requiresAdditionalApproval: Boolean(form.requiresAdditionalApproval),
+    resourcesRequired,
+    modifiedBy: form.modifiedBy || null,
+  };
+};
+
+const buildCreateDemandPayload = (form, id) => {
+  const payload = {
+    ...buildUpdateDemandPayload(form, id),
+    projectId: form.projectId,
+  };
+
+  if (!id) {
+    delete payload.demandId;
+  }
+
+  return payload;
+};
+
 /* -------------------- Modal -------------------- */
 
 const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDetails, mode = "create", userRole = "" }) => {
@@ -389,13 +466,9 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
           allocation = allocation * 100; // Convert decimal to percentage
         }
 
-        // Search for deliveryRole ID by name if missing
-        let roleIdFromData = getVal(['deliveryRole', 'dev_role_id', 'roleId', 'role_id', 'RoleID', 'delivery_role_id', 'delivery_role_uuid']);
-        if (!roleIdFromData && (initialData.role || initialData.demandName)) {
-          const rName = initialData.role || initialData.demandName;
-          const found = roles.find(r => r.role === rName || r.name === rName);
-          if (found) roleIdFromData = found.dev_role_id || found.id;
-        }
+        const roleIdFromData = getVal(['deliveryRoleId', 'dev_role_id', 'roleId', 'role_id', 'RoleID', 'delivery_role_id', 'delivery_role_uuid']);
+        const roleNameFromData = getVal(['deliveryRoleName', 'deliveryRole', 'roleName', 'role_name']);
+        const resolvedRoleId = resolveRoleId(roleIdFromData || roleNameFromData, roles);
 
         const mappedData = {
           ...emptyForm,
@@ -406,13 +479,14 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
           demandStartDate: sDate || toDateInputValue(getVal(['demandStartDate', 'startDate', 'start_date', 'demand_start_date', 'slaCreatedAt'])),
           demandEndDate: eDate || toDateInputValue(getVal(['demandEndDate', 'endDate', 'end_date', 'demand_end_date', 'slaDueAt'])),
           allocationPercentage: isNaN(allocation) ? "" : Math.round(allocation),
-          deliveryRole: roleIdFromData,
+          deliveryRole: resolvedRoleId,
+          deliveryRoleName: roleNameFromData,
           demandStatus: String(getVal(['demandStatus', 'lifecycleState', 'status', 'LifecycleState', 'demand_status'], "DRAFT")).toUpperCase().trim(),
           demandType: String(getVal(['demandType', 'type', 'type_of_demand', 'DemandType', 'demand_type'], "NET_NEW")).toUpperCase().replace(/ /g, "_"),
           demandPriority: String(getVal(['demandPriority', 'priority', 'Priority', 'demand_priority'], "MEDIUM")).toUpperCase().trim(),
           demandCommitment: String(getVal(['demandCommitment', 'commitment', 'Commitment', 'demand_commitment'], "CONFIRMED")).toUpperCase().trim(),
-          resourcesRequired: parseInt(getVal(['resourcesRequired', 'resourceRequired'], 1)),
-          minExp: getVal(['minExp', 'experience', 'min_experience', 'MinExperience', 'experience_required', 'min_experience']),
+          resourcesRequired: parseInt(getVal(['resourcesRequired', 'resourceRequired', 'resource_required', 'requiredResources'], 1)),
+          minExp: getVal(['minExp', 'experience', 'minimumExperience', 'min_experience', 'MinExperience', 'experience_required', 'min_experience']),
           deliveryModel: String(getVal(['deliveryModel', 'model', 'DeliveryModel', 'delivery_model'], "OFFSHORE")).toUpperCase().trim(),
           demandJustification: getVal(['demandJustification', 'justification', 'Justification', 'demand_justification', 'reason', 'demandJustification']),
           requiresAdditionalApproval: !!getVal(['requiresAdditionalApproval', 'additionalApproval', 'RequiresAdditionalApproval', 'additional_approval'], false),
@@ -443,6 +517,20 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
       setForm(p => ({ ...p, outgoingResourceId: "" }));
     }
   }, [form.demandType]);
+
+  useEffect(() => {
+    if (!open || mode !== "edit" || roles.length === 0 || !initialData) return;
+
+    const sourceRole = form.deliveryRole || initialData.deliveryRoleId || initialData.roleId || initialData.deliveryRole;
+    const resolvedRoleId = resolveRoleId(sourceRole, roles);
+
+    if (resolvedRoleId && resolvedRoleId !== form.deliveryRole) {
+      setForm((prev) => ({
+        ...prev,
+        deliveryRole: resolvedRoleId,
+      }));
+    }
+  }, [open, mode, form.deliveryRole, roles, initialData]);
 
   const update = (k, v) => {
     setForm((p) => ({ ...p, [k]: v }));
@@ -532,6 +620,10 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
     try {
       if (mode === "edit") {
         const id = form.demandId || form.id || initialData?.demandId || initialData?.id;
+        const normalizedForm = {
+          ...form,
+          deliveryRole: resolveRoleId(form.deliveryRole, roles),
+        };
 
         if (normalizedRole === "DELIVERYMANAGER") {
           const dmPayload = {
@@ -543,7 +635,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
           };
           const res = await handleDMDecision(dmPayload);
           toast.success(res?.message || "Decision submitted successfully");
-          if (onSuccess) onSuccess();
+          if (onSuccess) await onSuccess(res, dmPayload);
           onClose();
           return;
         }
@@ -558,37 +650,28 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
           };
           const res = await handleRMDecision(rmPayload);
           toast.success(res?.message || "Decision submitted successfully");
-          if (onSuccess) onSuccess();
+          if (onSuccess) await onSuccess(res, rmPayload);
           onClose();
           return;
         }
 
-        // Default path for RM and others
-        // Append time components to satisfy java.time.LocalDateTime requirement
-        const submissionData = {
-          ...form,
-          id,
-          demandId: id,
-          demandStartDate: form.demandStartDate ? (form.demandStartDate.includes('T') ? form.demandStartDate : `${form.demandStartDate}T00:00:00`) : null,
-          demandEndDate: form.demandEndDate ? (form.demandEndDate.includes('T') ? form.demandEndDate : `${form.demandEndDate}T23:59:59`) : null,
-        };
+        const submissionData = buildUpdateDemandPayload(normalizedForm, id);
         const res = await updateDemandStatus(submissionData);
         toast.success(res.message || "Demand updated successfully");
-        if (onSuccess) onSuccess();
+        if (onSuccess) await onSuccess(res, submissionData);
         onClose();
         return;
       }
 
-      // Append time components to satisfy java.time.LocalDateTime requirement
-      const submissionData = {
+      const normalizedForm = {
         ...form,
-        demandStartDate: form.demandStartDate ? `${form.demandStartDate}T00:00:00` : null,
-        demandEndDate: form.demandEndDate ? `${form.demandEndDate}T23:59:59` : null,
+        deliveryRole: resolveRoleId(form.deliveryRole, roles),
       };
+      const submissionData = buildCreateDemandPayload(normalizedForm, form.demandId || form.id || undefined);
 
       const res = await createDemand(submissionData);
       toast.success(res.message || "Demand saved successfully");
-      if (onSuccess) onSuccess();
+      if (onSuccess) await onSuccess(res, submissionData);
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to save demand");
@@ -713,7 +796,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       label="Delivery Role"
                       value={form.deliveryRole}
                       onChange={(v) => update("deliveryRole", v)}
-                      options={roles.map((r) => ({ label: r.role, value: r.dev_role_id }))}
+                      options={roles.map((r) => ({ label: getRoleName(r), value: getRoleId(r) }))}
                       error={errors.deliveryRole}
                       placeholder="Search and Select Role"
                       required

@@ -38,8 +38,8 @@ const statusColor = {
 const AdminPannel = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const permissions = user?.permissions || [];
   const roles = user?.roles || [];
+  const permissions = user?.permissions || [];
   const canCreateClient = roles.includes("Admin");
 
   const [clientDetails, setClientDetails] = useState([]);
@@ -269,6 +269,10 @@ const AdminPannel = () => {
               <Download className="w-4 h-4 mr-1.5" />
               Export Data
             </>
+            <>
+              <Download className="w-4 h-4 mr-1.5" />
+              Export Data
+            </>
             {/* )} */}
           </Button>
         </div>
@@ -293,14 +297,17 @@ const AdminPannel = () => {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold text-gray-900">
             Clients Information
           </h2>
           {canCreateClient && (
             <Button
               variant="primary"
               size="medium"
+              variant="primary"
+              size="medium"
               onClick={() => setOpenCreateClient(true)}
+            // className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg flex items-center hover:bg-indigo-700 transition-all active:scale-[0.98] shadow-sm"
             // className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg flex items-center hover:bg-indigo-700 transition-all active:scale-[0.98] shadow-sm"
             >
               <Plus className="w-4 h-4 mr-1" /> Create New Client

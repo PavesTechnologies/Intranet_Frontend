@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Pencil, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import axios from "axios";
 
 import Button from "../../../../components/Button/Button";
@@ -9,6 +9,7 @@ import Modal from "../../../../components/Modal/modal";
 import SearchInput from "../../../../components/filter/Searchbar";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import StatusBadge from "../../../../components/status/statusbadge";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 
@@ -26,6 +27,7 @@ export default function RoleForm({
 
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [newRoleName, setNewRoleName] = useState("");
   const [editRole, setEditRole] = useState(null);
@@ -58,7 +60,7 @@ export default function RoleForm({
   useEffect(() => {
     const filtered = searchTerm
       ? localRoles.filter((role) =>
-          role.role_name?.toLowerCase().includes(searchTerm.toLowerCase())
+          role.role_name?.toLowerCase().includes(searchTerm.toLowerCase()),
         )
       : localRoles;
 
@@ -69,14 +71,14 @@ export default function RoleForm({
 
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredRoles.length / ITEMS_PER_PAGE)
+    Math.ceil(filteredRoles.length / ITEMS_PER_PAGE),
   );
 
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedRoles = filteredRoles.slice(
     (safeCurrentPage - 1) * ITEMS_PER_PAGE,
-    safeCurrentPage * ITEMS_PER_PAGE
+    safeCurrentPage * ITEMS_PER_PAGE,
   );
 
   useEffect(() => {
@@ -111,13 +113,13 @@ export default function RoleForm({
       if (afterDelete) {
         const filteredAfterDelete = searchTerm
           ? latestRoles.filter((role) =>
-              role.role_name?.toLowerCase().includes(searchTerm.toLowerCase())
+              role.role_name?.toLowerCase().includes(searchTerm.toLowerCase()),
             )
           : latestRoles;
 
         const newTotalPages = Math.max(
           1,
-          Math.ceil(filteredAfterDelete.length / ITEMS_PER_PAGE)
+          Math.ceil(filteredAfterDelete.length / ITEMS_PER_PAGE),
         );
 
         setCurrentPage((prev) => Math.min(prev, newTotalPages));
@@ -141,7 +143,7 @@ export default function RoleForm({
     if (!regex.test(roleName.trim())) {
       showToast(
         "Role name can only contain letters, spaces, hyphens, and underscores",
-        "error"
+        "error",
       );
       return false;
     }
@@ -186,7 +188,7 @@ export default function RoleForm({
     if (MANDATORY_ROLES.includes(editRole.original_name)) {
       showToast(
         `Role '${editRole.original_name}' is mandatory and cannot be renamed`,
-        "error"
+        "error",
       );
       setEditModalOpen(false);
       return;
@@ -197,7 +199,7 @@ export default function RoleForm({
     try {
       const res = await axiosInstance.put(
         `/admin/roles/uuid/${editRole.role_uuid}`,
-        { role_name: editRole.role_name.trim() }
+        { role_name: editRole.role_name.trim() },
       );
 
       if (res.status === 200) {
@@ -225,7 +227,7 @@ export default function RoleForm({
     setSelectedRoleUuids((prev) =>
       prev.includes(roleUuid)
         ? prev.filter((id) => id !== roleUuid)
-        : [...prev, roleUuid]
+        : [...prev, roleUuid],
     );
   };
 
@@ -233,12 +235,12 @@ export default function RoleForm({
     const currentPageUuids = paginatedRoles.map((role) => role.role_uuid);
 
     const allSelected = currentPageUuids.every((id) =>
-      selectedRoleUuids.includes(id)
+      selectedRoleUuids.includes(id),
     );
 
     if (allSelected) {
       setSelectedRoleUuids((prev) =>
-        prev.filter((id) => !currentPageUuids.includes(id))
+        prev.filter((id) => !currentPageUuids.includes(id)),
       );
     } else {
       setSelectedRoleUuids((prev) => [
@@ -253,7 +255,8 @@ export default function RoleForm({
 
   const handleBulkDeleteRoles = async () => {
     if (selectedRoleUuids.length === 0) {
-      return showToast("Please select at least one role.", "warning");
+      showToast("Please select at least one role.", "warning");
+      return false;
     }
 
     setBulkDeletingRoles(true);
@@ -273,7 +276,7 @@ export default function RoleForm({
       } else if (deletedCount > 0 && failedRoles.length > 0) {
         showToast(
           `${deletedCount} role(s) deleted. ${failedRoles.length} failed.`,
-          "warning"
+          "warning",
         );
       } else {
         showToast("No roles were deleted.", "error");
@@ -283,6 +286,8 @@ export default function RoleForm({
       await fetchRoles({ afterDelete: true });
 
       if (refreshRoles) refreshRoles();
+
+      return true;
     } catch (err) {
       console.error("Error bulk deleting roles", err);
 
@@ -293,9 +298,11 @@ export default function RoleForm({
       } else {
         showToast(
           detail || err?.response?.data?.message || "Failed to delete roles",
-          "error"
+          "error",
         );
       }
+
+      return false;
     } finally {
       setBulkDeletingRoles(false);
     }
@@ -307,9 +314,7 @@ export default function RoleForm({
 
   const isCurrentPageFullySelected =
     paginatedRoles.length > 0 &&
-    paginatedRoles.every((role) =>
-      selectedRoleUuids.includes(role.role_uuid)
-    );
+    paginatedRoles.every((role) => selectedRoleUuids.includes(role.role_uuid));
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -391,9 +396,7 @@ export default function RoleForm({
               <Button
                 variant="danger"
                 size="medium"
-                onClick={handleBulkDeleteRoles}
-                loading={bulkDeletingRoles}
-                loadingText="Deleting..."
+                onClick={() => setShowDeleteConfirm(true)}
                 disabled={bulkDeletingRoles}
                 className="w-full justify-center sm:w-auto"
               >
@@ -415,7 +418,9 @@ export default function RoleForm({
 
         {selectedRoleUuids.length > 0 && (
           <div className="mb-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
-            <span>{selectedRoleUuids.length} role(s) selected for deletion.</span>
+            <span>
+              {selectedRoleUuids.length} role(s) selected for deletion.
+            </span>
 
             <button
               type="button"
@@ -490,8 +495,8 @@ export default function RoleForm({
 
                     <Button
                       type="button"
-                      variant="outline"
-                      size="small"
+                      variant="link"
+                      size="icon"
                       onClick={() => {
                         setEditRole({
                           ...role,
@@ -499,10 +504,10 @@ export default function RoleForm({
                         });
                         setEditModalOpen(true);
                       }}
-                      className="w-full sm:w-auto"
+                      title="Edit"
+                      className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
                     >
-                      <Pencil size={15} />
-                      Edit
+                      <Pencil size={17} />
                     </Button>
                   </li>
                 );
@@ -576,6 +581,28 @@ export default function RoleForm({
           </div>
         </div>
       </Modal>
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        title="Delete Selected Roles"
+        message={`Are you sure you want to delete ${selectedRoleUuids.length} selected role(s)? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={bulkDeletingRoles}
+        onCancel={() => {
+          if (!bulkDeletingRoles) {
+            setShowDeleteConfirm(false);
+          }
+        }}
+        onConfirm={async () => {
+          const success = await handleBulkDeleteRoles();
+
+          if (success) {
+            setShowDeleteConfirm(false);
+          }
+        }}
+      />
     </div>
   );
 }
