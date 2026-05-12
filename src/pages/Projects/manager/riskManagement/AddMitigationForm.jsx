@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import axios from "axios";
@@ -14,8 +14,29 @@ export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
   const [showNotes, setShowNotes] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
-  const token = localStorage.getItem("token");
+  const axiosInstance = useMemo(() => {
+    const instance = axios.create({
+      baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    instance.interceptors.request.use(
+      (config) => {
+        const latestToken = localStorage.getItem("token");
+
+        if (latestToken) {
+          config.headers.Authorization = `Bearer ${latestToken}`;
+        }
+
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    return instance;
+  }, []);
 
   async function submit(e) {
     e.preventDefault();
@@ -24,16 +45,12 @@ export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
     try {
       setSubmitting(true);
 
-      const res = await axios.post(
-        `${BASE_URL}/api/mitigation-plans`,
-        {
-          riskId,
-          ...form,
-          used: false,
-          effective: false,
-        },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const res = await axiosInstance.post("/api/mitigation-plans", {
+        riskId,
+        ...form,
+        used: false,
+        effective: false,
+      });
 
       onAdd(res.data);
       resetAndClose();
@@ -58,7 +75,6 @@ export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
       onSubmit={submit}
       className="border border-slate-200 rounded-xl p-4 space-y-4 bg-slate-50 relative"
     >
-      {/* Header */}
       <div className="flex justify-between items-center">
         <h5 className="text-sm font-semibold text-slate-700">
           Add Mitigation Plan
@@ -72,7 +88,6 @@ export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
         </button>
       </div>
 
-      {/* Mitigation */}
       <div>
         <label className="text-xs font-semibold text-slate-600">
           Mitigation Plan <span className="text-red-500">*</span>
@@ -87,7 +102,6 @@ export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
         />
       </div>
 
-      {/* Contingency */}
       <div>
         <label className="text-xs font-semibold text-slate-600">
           Contingency Plan
@@ -101,17 +115,26 @@ export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
         />
       </div>
 
-      {/* Owner */}
       <div>
         <label className="text-xs font-semibold text-slate-600">Owner</label>
         <FilterListbox
-          options={[{value:"",label:"Unassigned"},...members.map(m=>({value:m.id,label:m.name}))]}
+          options={[
+            { value: "", label: "Unassigned" },
+            ...members.map((m) => ({
+              value: m.id,
+              label: m.name,
+            })),
+          ]}
           value={form.ownerId}
-          onChange={(val) => setForm({...form, ownerId: val})}
+          onChange={(val) =>
+            setForm({
+              ...form,
+              ownerId: val,
+            })
+          }
         />
       </div>
 
-      {/* Notes toggle */}
       <button
         type="button"
         onClick={() => setShowNotes((v) => !v)}
@@ -131,7 +154,6 @@ export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
         />
       )}
 
-      {/* Actions */}
       <div className="flex justify-end gap-3 pt-2 border-t border-slate-200">
         <button
           type="button"
@@ -144,9 +166,9 @@ export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
         <button
           type="submit"
           disabled={submitting}
-          className={`px-4 py-1.5 rounded-lg text-sm text-white
-            ${submitting ? "bg-indigo-300" : "bg-indigo-600 hover:bg-indigo-700"}
-          `}
+          className={`px-4 py-1.5 rounded-lg text-sm text-white ${
+            submitting ? "bg-indigo-300" : "bg-indigo-600 hover:bg-indigo-700"
+          }`}
         >
           {submitting ? "Adding..." : "Add Mitigation"}
         </button>

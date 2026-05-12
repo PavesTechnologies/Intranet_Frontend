@@ -214,7 +214,7 @@ const CreateRiskModal = ({
 
     setLoadingMeta(true);
 
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
     Promise.all([
       axios.get(`${BASE_URL}/api/projects/${projectId}/members-with-owner`, {
@@ -346,7 +346,7 @@ const CreateRiskModal = ({
 
     axios
       .get(`${BASE_URL}/api/projects/${projectId}/${apiType}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       .then((res) => {
         const list = res.data || [];
@@ -475,11 +475,11 @@ const CreateRiskModal = ({
 
     if (isEditMode) {
       await axios.put(`${BASE_URL}/api/risks/${riskId}`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
     } else {
       const res = await axios.post(`${BASE_URL}/api/risks`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
       riskId = res.data.id;
@@ -497,12 +497,12 @@ const CreateRiskModal = ({
           `${BASE_URL}/api/risk-links/${risk.riskLinkId}`,
           linkPayload,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }
         );
       } else {
         await axios.post(`${BASE_URL}/api/risk-links`, linkPayload, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
       }
     }
