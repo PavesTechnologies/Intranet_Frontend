@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import StatusBadge from "../../components/status/statusbadge";
 import EntriesTable from "./EntriesTable";
-import { CheckCircle, XCircle, Clock, MoreVertical } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  MoreVertical,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import Tooltip from "../../components/status/Tooltip";
 import { showStatusToast } from "../../components/toastfy/toast";
 import { submitWeeklyTimesheet } from "./api";
@@ -164,7 +171,11 @@ const TimesheetGroup = ({
     { approverName: "Dummy Approver1", status: "Pending" },
     { approverName: "Dummy Approver2", status: "Approved" },
   ],
+  isCollapsed,
+  onToggleCollapse,
 }) => {
+  const collapsible = typeof onToggleCollapse === "function";
+  const showBody = !collapsible || !isCollapsed;
   const isWeeklyFormat = weekGroup && weekGroup.timesheets;
   const weekData = isWeeklyFormat ? weekGroup : null;
   const dailyData = !isWeeklyFormat
@@ -581,12 +592,23 @@ const TimesheetGroup = ({
     >
             {/* Week Header */}     {" "}
       {isWeeklyFormat && (
-        <div className={`${getWeekHeaderBgColor()} border-b px-4 py-3 mb-2`}>
+        <div
+          className={`${getWeekHeaderBgColor()} border-b px-4 py-3 ${showBody ? "mb-2" : ""} ${collapsible ? "cursor-pointer hover:brightness-95 transition" : ""}`}
+          onClick={collapsible ? () => onToggleCollapse() : undefined}
+          role={collapsible ? "button" : undefined}
+          aria-expanded={collapsible ? !isCollapsed : undefined}
+        >
                    {" "}
           <div className="flex justify-between items-center">
                        {" "}
             <div className="flex items-center gap-3">
                            {" "}
+              {collapsible &&
+                (isCollapsed ? (
+                  <ChevronDown size={20} className="text-gray-600 shrink-0" />
+                ) : (
+                  <ChevronUp size={20} className="text-gray-600 shrink-0" />
+                ))}
               <div
                 className={`${getWeekBadgeColor()} text-white px-3 py-1 rounded-full text-sm font-bold`}
               >
@@ -657,6 +679,8 @@ const TimesheetGroup = ({
         </div>
       )}
            {" "}
+      {showBody && (
+        <>
       <div
         className={
           !isWeeklyFormat
@@ -1153,6 +1177,8 @@ const TimesheetGroup = ({
         />
       )}
            {" "}
+        </>
+      )}
       <ConfirmDialog
         open={isConfirmOpen}
         title="Confirm Delete"
