@@ -1,5 +1,5 @@
 import React from "react";
-import { Eye, ArrowRightCircle, Pencil, ShieldAlert, XCircle } from "lucide-react";
+import { ViewIcon, NextCircleIcon, EditIcon, SecurityAlertIcon, ErrorIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -94,7 +94,7 @@ const RoleOffTable = ({
       return {
         key: "roleoff",
         label: "Role-Off",
-        icon: ArrowRightCircle,
+        icon: NextCircleIcon,
       };
     }
 
@@ -106,7 +106,7 @@ const RoleOffTable = ({
       return {
         key: "view",
         label: "View",
-        icon: Eye,
+        icon: ViewIcon,
       };
     }
 
@@ -114,14 +114,14 @@ const RoleOffTable = ({
       return {
         key: "edit",
         label: "Edit",
-        icon: Pencil,
+        icon: EditIcon,
       };
     }
 
     return {
       key: "roleoff",
       label: "Role-Off",
-      icon: ArrowRightCircle,
+      icon: NextCircleIcon,
     };
   };
 
@@ -222,7 +222,7 @@ const RoleOffTable = ({
                     <td className="px-4 py-4">
                       <div className="flex items-start gap-3">
                         {isHigh ? (
-                          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+                          <SecurityAlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
                         ) : null}
                         <div>
                           <p className="font-semibold text-[#081534]">{row.resource}</p>
@@ -270,7 +270,7 @@ const RoleOffTable = ({
                                 className="h-8 border-rose-300 bg-white px-3 text-xs text-rose-700 hover:bg-rose-50 hover:text-rose-800"
                                 onClick={() => onAction("cancel", row)}
                               >
-                                <XCircle className="mr-1 h-3.5 w-3.5" />
+                                <ErrorIcon className="mr-1 h-3.5 w-3.5" />
                                 Cancel
                               </Button>
                             ) : null}
@@ -283,7 +283,7 @@ const RoleOffTable = ({
                             className="h-8 border-gray-300 bg-white px-3 text-xs"
                             onClick={() => onAction("view", row)}
                           >
-                            <Eye className="mr-1 h-3.5 w-3.5" />
+                            <ViewIcon className="mr-1 h-3.5 w-3.5" />
                             View
                           </Button>
                         ) : null}
@@ -294,7 +294,7 @@ const RoleOffTable = ({
                             className="h-8 border-gray-300 bg-white px-3 text-xs"
                             onClick={() => onAction("view", row)}
                           >
-                            <Eye className="mr-1 h-3.5 w-3.5" />
+                            <ViewIcon className="mr-1 h-3.5 w-3.5" />
                             View
                           </Button>
                         ) : null}

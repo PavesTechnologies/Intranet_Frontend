@@ -8,7 +8,7 @@ import {
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
-import { Pencil, Trash2 } from "lucide-react";
+import { EditIcon, DeleteIcon } from "@/components/icons";
 import Modal from "../../../components/Modal/modal";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -211,7 +211,7 @@ const CompanyEscalation = () => {
                           }}
                           className="text-blue-600 hover:text-blue-800"
                         >
-                          <Pencil size={14} />
+                          <EditIcon size={14} />
                         </button>
 
                         <button
@@ -221,7 +221,7 @@ const CompanyEscalation = () => {
                           }}
                           className="text-red-600 hover:text-red-800"
                         >
-                          <Trash2 size={14} />
+                          <DeleteIcon size={14} />
                         </button>
                       </div>
                     ) : (

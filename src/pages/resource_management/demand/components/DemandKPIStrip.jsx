@@ -1,9 +1,5 @@
 import React from 'react';
-import {
-    Users, Briefcase, Activity, Clock,
-    AlertTriangle, CheckCircle2, ShieldAlert,
-    Shield, Zap, Target, Layers
-} from "lucide-react";
+import { LayersIcon, ActivityIcon, SuccessIcon, ShieldIcon, PendingIcon, ZapIcon, WarningIcon, SecurityAlertIcon, TargetIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -53,14 +49,14 @@ const KPICard = ({ label, value, icon: Icon, colorClass, active, onClick, suffix
 
 const DemandKPIStrip = ({ data, isLoading }) => {
     const kpiConfig = {
-        "Total": { icon: Layers, color: "bg-slate-100 text-slate-600" },
-        "Active": { icon: Activity, color: "bg-indigo-100 text-indigo-600" },
-        "Fulfilled": { icon: CheckCircle2, color: "bg-emerald-100 text-emerald-600" },
-        "Approved": { icon: Shield, color: "bg-blue-100 text-blue-600" },
-        "Pending": { icon: Clock, color: "bg-amber-100 text-amber-600" },
-        "Soft": { icon: Zap, color: "bg-slate-100 text-slate-600" },
-        "SLA At Risk": { icon: AlertTriangle, color: "bg-rose-100 text-orange-600" },
-        "SLA Breached": { icon: ShieldAlert, color: "bg-rose-100 text-rose-600" }
+        "Total": { icon: LayersIcon, color: "bg-slate-100 text-slate-600" },
+        "Active": { icon: ActivityIcon, color: "bg-indigo-100 text-indigo-600" },
+        "Fulfilled": { icon: SuccessIcon, color: "bg-emerald-100 text-emerald-600" },
+        "Approved": { icon: ShieldIcon, color: "bg-blue-100 text-blue-600" },
+        "Pending": { icon: PendingIcon, color: "bg-amber-100 text-amber-600" },
+        "Soft": { icon: ZapIcon, color: "bg-slate-100 text-slate-600" },
+        "SLA At Risk": { icon: WarningIcon, color: "bg-rose-100 text-orange-600" },
+        "SLA Breached": { icon: SecurityAlertIcon, color: "bg-rose-100 text-rose-600" }
     };
 
     if (isLoading || !data || data.length === 0) {
@@ -86,7 +82,7 @@ const DemandKPIStrip = ({ data, isLoading }) => {
             )}
         >
             {data.map((item, idx) => {
-                const config = kpiConfig[item.label] || { icon: Target, color: "bg-slate-100 text-slate-400" };
+                const config = kpiConfig[item.label] || { icon: TargetIcon, color: "bg-slate-100 text-slate-400" };
                 return (
                     <KPICard
                         key={idx}

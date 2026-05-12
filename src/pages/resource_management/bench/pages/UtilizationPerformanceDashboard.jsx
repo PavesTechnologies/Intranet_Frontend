@@ -9,16 +9,7 @@ import {
    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
    BarChart, Bar, Cell, PieChart, Pie, Sector, Legend, LineChart, Line, ComposedChart
 } from 'recharts';
-import {
-   ArrowLeft, TrendingUp, BarChart3, Users, Zap, Target, Activity,
-   Download, Filter, Search, Award, Monitor, PieChart as PieIcon,
-   ChevronRight, Briefcase, FileText, ShieldCheck, AlertTriangle,
-   ArrowUpRight, ArrowDownRight, History, Bell, CheckCircle2,
-   Share2, RefreshCcw, Info, Fingerprint, Lock, ShieldAlert,
-   Scale, LayoutGrid, PieChart as PieChartIcon,
-   TrendingUp as TrendingUpIcon, MoveUpRight, Circle, CalendarRange,
-   ZapOff, Database, Clock, X, User, BarChart2, BrainCircuit
-} from 'lucide-react';
+import { PrevIcon, TrendingUpIcon, BarChartIcon, EmployeeIcon, ZapIcon, TargetIcon, ActivityIcon, DownloadIcon, FilterIcon, SearchIcon, AwardIcon, DesktopIcon, AnalyticsIcon, ChevronRightIcon, ProjectsIcon, DocumentIcon, SuccessIcon, WarningIcon, TrendUpIcon, TrendDownIcon, HistoryIcon, NotificationIcon, CheckCircleIcon, ShareIcon, RefreshIcon, InfoIcon, IntelligenceIcon, LockIcon, SecurityAlertIcon, ScaleIcon, LayoutGridIcon, UpRightIcon, CircleIcon, DateRangeIcon, PowerOffIcon, DatabaseIcon, PendingIcon, CloseIcon, UserIcon, BrainCircuitIcon, PieChartIcon } from "@/components/icons";
 import { getBillNonBillable, getResourceProjects } from '../../services/utilizationService';
 import Pagination from '../../../../components/Pagination/pagination';
 import LoadingSpinner from "../../../../components/LoadingSpinner";
@@ -29,10 +20,10 @@ import ResourceVisualizationDrawer from '../components/ResourceVisualizationDraw
 // --- INTEGRATED DATA MODELS ---
 
 const KPI_STATS = [
-   { label: 'Total Resources', value: '0', trend: 'Active Pool', icon: <Users />, color: 'text-rose-600', bg: 'bg-rose-50' },
+   { label: 'Total Resources', value: '0', trend: 'Active Pool', icon: <EmployeeIcon />, color: 'text-rose-600', bg: 'bg-rose-50' },
    { label: 'Utilization', value: '0.0%', trend: 'Live', icon: <TrendingUpIcon />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-   { label: 'Billable Ratio', value: '0.0%', trend: '', icon: <Award />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-   { label: 'Confidence Score', value: '100%', trend: 'Verified', icon: <Fingerprint />, color: 'text-blue-600', bg: 'bg-blue-50' },
+   { label: 'Billable Ratio', value: '0.0%', trend: '', icon: <AwardIcon />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+   { label: 'Confidence Score', value: '100%', trend: 'Verified', icon: <IntelligenceIcon />, color: 'text-blue-600', bg: 'bg-blue-50' },
 ];
 
 const BILLING_PIE_DATA = [
@@ -608,7 +599,7 @@ const UtilizationPerformanceDashboard = () => {
             label: 'Total Resources',
             value: totalRes,
             trend: 'Active Pool',
-            icon: <Users />,
+            icon: <EmployeeIcon />,
             color: 'text-rose-600', bg: 'bg-rose-50'
          },
          {
@@ -622,14 +613,14 @@ const UtilizationPerformanceDashboard = () => {
             label: 'Billable Ratio',
             value: `${parseFloat(billableRatio).toFixed(2)}%`,
             trend: billableTrend === 'down' ? 'Declining' : billableTrend === 'up' ? 'Improving' : billableTrend,
-            icon: <Award />,
+            icon: <AwardIcon />,
             color: 'text-emerald-600', bg: 'bg-emerald-50'
          },
          {
             label: 'Confidence Score',
             value: `${parseFloat(confScore).toFixed(0)}%`,
             trend: confTrend === 'down' ? 'Declining' : confTrend === 'up' ? 'Improving' : confTrend,
-            icon: <Fingerprint />,
+            icon: <IntelligenceIcon />,
             color: 'text-blue-600', bg: 'bg-blue-50'
          },
       ];
@@ -647,7 +638,7 @@ const UtilizationPerformanceDashboard = () => {
                <div>
                   <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-none capitalize">Utilization Intelligence Hub</h1>
                   <p className="mt-2 text-xs sm:text-sm font-medium text-slate-500 flex items-center gap-2">
-                     <Activity size={14} className="text-indigo-500" /> Real-time resource performance & portfolio health
+                     <ActivityIcon size={14} className="text-indigo-500" /> Real-time resource performance & portfolio health
                   </p>
                </div>
             </div>
@@ -658,7 +649,7 @@ const UtilizationPerformanceDashboard = () => {
                   onClick={() => navigate('/resource-management/bench/utilization-reporting')}
                   className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[11px] font-black text-slate-700 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm h-[42px] capitalize tracking-wider"
                >
-                  <BarChart3 className="h-4 w-4 text-indigo-600" />
+                  <BarChartIcon className="h-4 w-4 text-indigo-600" />
                   Reports & Dashboard
                </button>
             </div>
@@ -692,9 +683,9 @@ const UtilizationPerformanceDashboard = () => {
          <div className="mb-6 border-b border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-end gap-10 overflow-x-auto no-scrollbar">
                {[
-                  { id: 'portfolio', label: 'Portfolio Analytics', icon: <PieIcon size={14} /> },
-                  { id: 'projects', label: 'Projects', icon: <Monitor size={14} /> },
-                  { id: 'resource', label: 'Resource Capability', icon: <BrainCircuit size={14} /> },
+                  { id: 'portfolio', label: 'Portfolio Analytics', icon: <AnalyticsIcon size={14} /> },
+                  { id: 'projects', label: 'Projects', icon: <DesktopIcon size={14} /> },
+                  { id: 'resource', label: 'Resource Capability', icon: <BrainCircuitIcon size={14} /> },
                   // { id: 'governance', label: 'Governance & Readiness', icon: <ShieldAlert size={14} /> }
                ].map((tab) => {
                   const isActive = activeTab === tab.id;
@@ -717,7 +708,7 @@ const UtilizationPerformanceDashboard = () => {
 
                {/* Unified Calendar / Date Range Picker */}
                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm h-[38px] mb-2 hover:border-indigo-500 transition-all focus-within:ring-1 focus-within:ring-indigo-500 group">
-                  <CalendarRange size={14} className="text-indigo-600 shrink-0 group-hover:scale-110 transition-transform" />
+                  <DateRangeIcon size={14} className="text-indigo-600 shrink-0 group-hover:scale-110 transition-transform" />
                   <div className="flex items-center gap-1">
                      <input
                         type="date"
@@ -792,11 +783,11 @@ const UtilizationPerformanceDashboard = () => {
                         </div>
                         <div className="mt-8 flex flex-wrap items-center justify-center gap-6 border-t border-slate-50 pt-6">
                            <div className="flex items-center gap-2.5">
-                              <History size={14} className="text-indigo-500" />
+                              <HistoryIcon size={14} className="text-indigo-500" />
                               <span className="text-[10px] font-black text-slate-600 capitalize tracking-widest">Trend Preservation Active</span>
                            </div>
                            <div className="flex items-center gap-2.5 border-l border-slate-200 pl-6">
-                              <Scale size={14} className="text-slate-400" />
+                              <ScaleIcon size={14} className="text-slate-400" />
                               <span className="text-[10px] font-black text-slate-400 capitalize tracking-widest italic opacity-70">Comparison: Planned vs Realized</span>
                            </div>
                         </div>
@@ -996,7 +987,7 @@ const UtilizationPerformanceDashboard = () => {
                      </div>
                      <div className="flex items-center gap-4 w-full sm:w-auto">
                         <div className="relative w-full sm:w-auto">
-                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                           <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
                            <input
                               type="text"
                               placeholder="Search Resource..."
@@ -1056,7 +1047,7 @@ const UtilizationPerformanceDashboard = () => {
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                        <div className="flex flex-col items-center gap-0.5">
-                                          <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black capitalize"><Zap size={14} /> Stable</div>
+                                          <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black capitalize"><ZapIcon size={14} /> Stable</div>
                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-right">
@@ -1111,7 +1102,7 @@ const PerformanceTooltip = ({ active, payload, label }) => {
          <div className="bg-[#081534]/95 backdrop-blur-md border border-slate-700/50 rounded-2xl shadow-2xl p-5 flex flex-col gap-3 min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-slate-700/50 pb-2 mb-1">
                <p className="text-[10px] font-black text-slate-400 capitalize tracking-[0.2em]">{label || 'Period'}</p>
-               <Circle size={8} className="text-indigo-400 fill-indigo-400 animate-pulse" />
+               <CircleIcon size={8} className="text-indigo-400 fill-indigo-400 animate-pulse" />
             </div>
             <div className="space-y-3">
                {payload.map((p, idx) => (

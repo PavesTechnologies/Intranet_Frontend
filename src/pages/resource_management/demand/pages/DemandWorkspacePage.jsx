@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import {
-    Search, Filter, Activity, AlertTriangle, Zap, ShieldAlert, XCircle, CheckCircle2, Loader2
-} from "lucide-react";
+import { SearchIcon, FilterIcon, ActivityIcon, WarningIcon, ZapIcon, SecurityAlertIcon, ErrorIcon, SuccessIcon, SpinnerIcon, CloseIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import DemandKPIStrip from '../components/DemandKPIStrip';
 import DemandList from '../components/DemandList';
@@ -63,7 +61,7 @@ const DecisionModal = ({
             ? "Confirm that staffing is complete and close this demand."
         : "Confirm the demand and move it to the next step.";
     const buttonLabel = isReject ? "Submit Rejection" : isFulfill ? "Mark Fulfilled" : "Confirm Approval";
-    const Icon = isReject ? XCircle : CheckCircle2;
+    const Icon = isReject ? ErrorIcon : SuccessIcon;
 
     return createPortal(
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-[2px]">
@@ -88,7 +86,7 @@ const DecisionModal = ({
                             disabled={loading}
                             className="rounded-full border border-slate-200 p-2 text-slate-400 transition hover:border-slate-300 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            <XCircle className="h-4 w-4" />
+                            <CloseIcon className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
@@ -159,7 +157,7 @@ const DecisionModal = ({
                         disabled={loading}
                         className={cn("inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60", primaryButtonClass)}
                     >
-                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+                        {loading ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
                         {buttonLabel}
                     </button>
                 </div>
@@ -179,7 +177,7 @@ const DeleteDemandModal = ({ demand, loading, onClose, onSubmit }) => {
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <div className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-rose-600">
-                                <XCircle className="h-3.5 w-3.5" />
+                                <ErrorIcon className="h-3.5 w-3.5" />
                                 Delete
                             </div>
                             <h3 className="mt-3 text-lg font-bold text-slate-900">
@@ -195,7 +193,7 @@ const DeleteDemandModal = ({ demand, loading, onClose, onSubmit }) => {
                             disabled={loading}
                             className="rounded-full border border-slate-200 p-2 text-slate-400 transition hover:border-slate-300 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            <XCircle className="h-4 w-4" />
+                            <CloseIcon className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
@@ -227,7 +225,7 @@ const DeleteDemandModal = ({ demand, loading, onClose, onSubmit }) => {
                         disabled={loading}
                         className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-rose-200 transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                        {loading ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
                         Delete Demand
                     </button>
                 </div>
@@ -594,14 +592,14 @@ const DemandWorkspacePage = () => {
 
                                 <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60">
                                     {[
-                                        { id: 'breached', label: 'Breached', icon: ShieldAlert, color: 'text-rose-600' },
-                                        { id: 'at_risk', label: 'At Risk', icon: AlertTriangle, color: 'text-orange-600' },
-                                        { id: 'active', label: 'Approved', icon: Activity, color: 'text-indigo-600' },
-                                        { id: 'soft', label: 'Soft', icon: Zap, color: 'text-slate-600' },
+                                        { id: 'breached', label: 'Breached', icon: SecurityAlertIcon, color: 'text-rose-600' },
+                                        { id: 'at_risk', label: 'At Risk', icon: WarningIcon, color: 'text-orange-600' },
+                                        { id: 'active', label: 'Approved', icon: ActivityIcon, color: 'text-indigo-600' },
+                                        { id: 'soft', label: 'Soft', icon: ZapIcon, color: 'text-slate-600' },
                                         ...(isRMView
-                                            ? [{ id: 'fulfilled', label: 'Fulfilled', icon: CheckCircle2, color: 'text-emerald-600' }]
+                                            ? [{ id: 'fulfilled', label: 'Fulfilled', icon: SuccessIcon, color: 'text-emerald-600' }]
                                             : []),
-                                        { id: 'rejected', label: 'Rejected', icon: XCircle, color: 'text-rose-600' }
+                                        { id: 'rejected', label: 'Rejected', icon: ErrorIcon, color: 'text-rose-600' }
                                     ].map(tab => (
                                         <button
                                             key={tab.id}
@@ -622,7 +620,7 @@ const DemandWorkspacePage = () => {
 
                             <div className="flex items-center gap-2">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                                     <input
                                         type="text"
                                         placeholder="Search pipeline..."
@@ -639,7 +637,7 @@ const DemandWorkspacePage = () => {
                                         !filterCollapsed ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-100" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                                     )}
                                 >
-                                    <Filter className="h-3.5 w-3.5" />
+                                    <FilterIcon className="h-3.5 w-3.5" />
                                     {filters.client !== 'ALL' ? filters.client : 'Filters'}
                                     {activeFilterCount > 0 && (
                                         <span className="ml-1 px-1 bg-indigo-100 text-indigo-600 rounded-sm text-[9px]">
@@ -684,7 +682,7 @@ const DemandWorkspacePage = () => {
                                 ) : filteredDemands.length === 0 ? (
                                     <div className="py-24 text-center">
                                         <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
-                                            <Search className="h-8 w-8 text-slate-200" />
+                                            <SearchIcon className="h-8 w-8 text-slate-200" />
                                         </div>
                                         <h3 className="text-sm font-bold text-slate-900">No matches found</h3>
                                         <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or search terms</p>
