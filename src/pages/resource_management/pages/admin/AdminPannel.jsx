@@ -282,14 +282,14 @@ const AdminPannel = () => {
         {KPI_DATA.map((kpi, index) => (
           <div
             key={index}
-            className="bg-white p-6 rounded-xl shadow-sm border flex items-center justify-between"
+            className="bg-white p-6 rounded-xl shadow-sm border flex items-center gap-4"
           >
-            <div>
+            <div className={`p-3 rounded-full shrink-0 ${kpi.bg}`}>
+              <kpi.icon className={`w-6 h-6 ${kpi.color}`} />
+            </div>
+            <div className="min-w-0">
               <p className="text-sm text-gray-500">{kpi.label}</p>
               <h3 className="text-2xl font-bold text-gray-900">{kpi.value}</h3>
-            </div>
-            <div className={`p-3 rounded-full ${kpi.bg}`}>
-              <kpi.icon className={`w-6 h-6 ${kpi.color}`} />
             </div>
           </div>
         ))}
@@ -302,8 +302,6 @@ const AdminPannel = () => {
           </h2>
           {canCreateClient && (
             <Button
-              variant="primary"
-              size="medium"
               variant="primary"
               size="medium"
               onClick={() => setOpenCreateClient(true)}

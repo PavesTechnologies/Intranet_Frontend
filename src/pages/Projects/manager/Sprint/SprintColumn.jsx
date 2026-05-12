@@ -1,6 +1,6 @@
 // src/pages/Projects/manager/Sprint/SprintColumn.jsx
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useDrop } from "react-dnd";
 import { 
   ChevronRightIcon, 
@@ -41,6 +41,17 @@ const SprintColumn = ({
   
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   const toggleStoryExpand = (storyId) => {
     setExpandedStories((prev) =>
       prev.includes(storyId) ? prev.filter((id) => id !== storyId) : [...prev, storyId]
@@ -166,7 +177,7 @@ const SprintColumn = ({
 
           {/* Menu - ONLY SHOW IF MANAGER AND (HAS EDIT OR HAS DELETE) */}
           {permissions.canEdit && (onEditSprint || onDeleteSprint) && (
-            <div className="relative">
+            <div ref={menuRef} className="relative">
               <button
                 onClick={(e) => {
                   e.stopPropagation();

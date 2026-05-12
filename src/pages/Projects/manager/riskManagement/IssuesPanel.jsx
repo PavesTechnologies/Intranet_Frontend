@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertIcon } from "../../../../components/icons";
 import axios from "axios";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -115,7 +115,7 @@ export default function IssuesPanel({
   }, [projectId, activeIssueType, issuePage, issueSearch]);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="p-5 border-b bg-gradient-to-r from-indigo-50 to-blue-50">
         <h2 className="font-semibold text-slate-900 mb-3">
@@ -162,7 +162,7 @@ export default function IssuesPanel({
           <LoadingSpinner size="md" text="Loading issues…" />
         ) : issuesPageItems.length === 0 ? (
           <div className="p-6 text-center text-slate-500">
-            <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <AlertIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No issues found</p>
           </div>
         ) : (
