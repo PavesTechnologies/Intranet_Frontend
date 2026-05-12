@@ -127,7 +127,7 @@ export const AuthProvider = ({ children }) => {
         } else {
           // show toast when access token expires (interceptor handles refresh silently)
           const timer = setTimeout(() => {
-            showStatusToast("Session refreshing...");
+            // showStatusToast("Session refreshing...");
           }, timeLeft * 1000);
           return () => clearTimeout(timer);
         }
