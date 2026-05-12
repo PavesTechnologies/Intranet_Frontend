@@ -5,6 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import StatusBadge from "../../../components/status/statusbadge";
 import {
   ArrowLeft,
@@ -200,11 +201,8 @@ export default function AdminOfferView() {
   /* ── Loading / Not found ── */
   if (loading)
     return (
-      <div className="emp-page min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin" />
-          <p className="text-slate-500 text-sm">Loading offer details…</p>
-        </div>
+      <div className="emp-page min-h-screen bg-slate-50">
+        <LoadingSpinner text="Loading offer details..." />
       </div>
     );
 
