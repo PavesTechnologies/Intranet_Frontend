@@ -1,20 +1,20 @@
 import React, { useEffect, useState } from "react";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
-  AlertCircle,
-  Plus,
-  X,
-  User,
-  Tag,
-  Pencil,
-  Check,
-  ShieldAlert,
-  Trash2,
-} from "lucide-react";
+  AlertIcon,
+  AddIcon,
+  UserIcon,
+  BookmarkIcon,
+  EditIcon,
+  CheckIcon,
+  ShieldIcon,
+  DeleteIcon,
+  CloseIcon,
+} from "../../../../components/icons";
 import axios from "axios";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
-
+import Modal from "../../../../components/Modal/modal";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import AddMitigationForm from "./AddMitigationForm";
@@ -69,6 +69,10 @@ export default function RiskDetailModal({
           headers,
         });
 
+        const riskLinkId = axios.get(`${BASE_URL}/api/risk-links/risk/${risk.id}`, {
+          headers,
+        });
+
         const mitigationReq = axios
           .get(`${BASE_URL}/api/mitigation-plans/risk/${risk.id}`, {
             headers,
@@ -81,6 +85,10 @@ export default function RiskDetailModal({
         );
 
         const riskRes = (await riskReq).data;
+
+        const riskLinkRes = (await riskLinkId).data;
+        // {console.log("Risk link data:", riskLinkRes)}; // Debug log
+        riskRes.riskLinkId = riskLinkRes[0]?.id || null;
 
         const categoryReq = riskRes.categoryId
           ? axios.get(`${BASE_URL}/api/risk/category/${riskRes.categoryId}`, {
@@ -218,29 +226,24 @@ export default function RiskDetailModal({
     setMitigations((p) => p.filter((m) => m.id !== id));
   }
 
-  if (!risk) return null;
-
   const editRiskData = riskDetail
     ? {
         ...riskDetail,
-
         linkedType:
           riskDetail.linkedType ||
-          risk.linkedType ||
+          risk?.linkedType ||
           selectedIssue?.linkedType ||
           null,
-
         linkedId:
           riskDetail.linkedId ||
-          risk.linkedId ||
+          risk?.linkedId ||
           selectedIssue?.linkedId ||
           null,
-
         linkedName:
           riskDetail.linkedName ||
           riskDetail.linkedTitle ||
-          risk.linkedName ||
-          risk.linkedTitle ||
+          risk?.linkedName ||
+          risk?.linkedTitle ||
           selectedIssue?.title ||
           selectedIssue?.name ||
           null,
@@ -259,84 +262,47 @@ export default function RiskDetailModal({
           : "text-emerald-600 bg-emerald-50 border-emerald-200";
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center sm:justify-center">
-
-      <div
-        className="
-          bg-white w-full
-          sm:max-w-3xl sm:mx-4
-          rounded-t-2xl sm:rounded-2xl
-          shadow-2xl flex flex-col
-          max-h-[92dvh] sm:max-h-[88vh]
-          overflow-hidden
-        "
+    <>
+      <Modal
+        isOpen={!!risk}
+        onClose={onClose}
+        title={`Risk #${risk?.id ?? ""}`}
+        subtitle={riskDetail?.title || (loading ? "Loading…" : "")}
+        titleIcon={<ShieldIcon className="w-4 h-4 text-white" />}
+        closeIcon={<CloseIcon className="w-4 h-4 text-white" />}
+        size="3xl"
+        maxHeight="max-h-[88vh]"
+        headerClassName="!bg-indigo-600 !border-indigo-500"
+        titleClassName="!text-white"
+        subtitleClassName="!text-indigo-200"
+        footer={
+          <div className="flex justify-between items-center w-full">
+            <Button
+              variant="danger"
+              size="small"
+              onClick={handleDeleteRisk}
+              disabled={deleting}
+              loading={deleting}
+              loadingText="Deleting..."
+            >
+              <DeleteIcon className="w-3.5 h-3.5" /> Delete Risk
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="primary"
+                size="small"
+                onClick={() => setShowEdit(true)}
+              >
+                <EditIcon className="w-3.5 h-3.5" /> Edit
+              </Button>
+              <Button variant="secondary" size="small" onClick={onClose}>
+                Close
+              </Button>
+            </div>
+          </div>
+        }
       >
-        <div className="bg-indigo-600 text-white px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-start sm:items-center flex-shrink-0">
-          <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
-              <ShieldAlert className="w-4 h-4" />
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="font-bold text-sm sm:text-base">
-                  Risk #{risk.id}
-                </h2>
-
-                {riskDetail?.priority && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/20 uppercase tracking-wide">
-                    {riskDetail.priority}
-                  </span>
-                )}
-              </div>
-
-              <p className="text-xs text-white/70 truncate max-w-[200px] sm:max-w-sm mt-0.5">
-                {riskDetail?.title || "Loading…"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-            {/* <button
-              onClick={handleDeleteRisk}
-              disabled={deleting}
-              className="hidden sm:flex items-center gap-1 text-xs text-white/90 hover:text-white bg-red-500/25 hover:bg-red-500/40 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-60"
-            >
-              <Trash2 size={12} />
-              {deleting ? "Deleting..." : "Delete"}
-            </button> */}
-
-            <button
-              onClick={handleDeleteRisk}
-              disabled={deleting}
-              className="sm:hidden w-7 h-7 flex items-center justify-center rounded-lg bg-red-500/25 hover:bg-red-500/40 disabled:opacity-60"
-            >
-              <Trash2 size={13} />
-            </button>
-
-            <button
-              onClick={() => setShowEdit(true)}
-              className="hidden sm:flex items-center gap-1 text-xs text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg transition-colors"
-            >
-              <Pencil size={12} /> Edit
-            </button>
-
-            <button
-              onClick={() => setShowEdit(true)}
-              className="sm:hidden w-7 h-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20"
-            >
-              <Pencil size={13} />
-            </button>
-
-            <button
-              onClick={onClose}
-              className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
-            >
-              <X size={15} />
-            </button>
-          </div>
-        </div>
-
+        {/* Edit risk modal — nested, manages its own open state */}
         <CreateRiskModal
           isOpen={showEdit}
           onClose={() => setShowEdit(false)}
@@ -346,196 +312,184 @@ export default function RiskDetailModal({
             setShowEdit(false);
             onUpdated?.();
           }}
+          onEdit={true}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          {loading && <LoadingSpinner size="md" text="Loading…" />}
+        {/* Priority badge */}
+        {riskDetail?.priority && (
+          <div className="mb-3">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 uppercase tracking-wide">
+              {riskDetail.priority}
+            </span>
+          </div>
+        )}
 
-          {error && (
-            <div className="mx-4 sm:mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
-              {error}
-            </div>
-          )}
+        {loading && <LoadingSpinner size="md" text="Loading…" />}
 
-          {riskDetail && (
-            <div className="px-4 sm:px-6 py-4 space-y-4">
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                <Metric label="Probability" value={riskDetail.probability} />
-                <Metric label="Impact" value={riskDetail.impact} />
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 mb-4">
+            {error}
+          </div>
+        )}
 
-                <div
-                  className={`border rounded-xl p-3 sm:p-4 text-center ${scoreColor}`}
-                >
-                  <div className="text-[10px] uppercase tracking-wide font-semibold opacity-70">
-                    Risk Score
-                  </div>
-                  <div className="text-xl sm:text-2xl font-black mt-0.5">
-                    {riskDetail.riskScore ?? "—"}
-                  </div>
+        {riskDetail && (
+          <div className="space-y-4">
+            {/* Score metrics */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              <Metric label="Probability" value={riskDetail.probability} />
+              <Metric label="Impact" value={riskDetail.impact} />
+              <div className={`border rounded-xl p-3 sm:p-4 text-center ${scoreColor}`}>
+                <div className="text-[10px] uppercase tracking-wide font-semibold opacity-70">
+                  Risk Score
+                </div>
+                <div className="text-xl sm:text-2xl font-black mt-0.5">
+                  {riskDetail.riskScore ?? "—"}
                 </div>
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                <InfoCard
-                  label="Category"
-                  value={category?.name}
-                  icon={<Tag size={13} className="text-slate-400" />}
-                />
+            {/* Info cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+              <InfoCard
+                label="Category"
+                value={category?.name}
+                icon={<BookmarkIcon className="w-3 h-3 text-slate-400" />}
+              />
+              <InfoCard
+                label="Owner"
+                value={owner?.name}
+                icon={<UserIcon className="w-3 h-3 text-slate-400" />}
+              />
+              <InfoCard
+                label="Reporter"
+                value={reporter?.name}
+                icon={<UserIcon className="w-3 h-3 text-slate-400" />}
+              />
+              <InfoCard label="Triggers" value={riskDetail.triggers || "—"} />
+            </div>
 
-                <InfoCard
-                  label="Owner"
-                  value={owner?.name}
-                  icon={<User size={13} className="text-slate-400" />}
-                />
-
-                <InfoCard
-                  label="Reporter"
-                  value={reporter?.name}
-                  icon={<User size={13} className="text-slate-400" />}
-                />
-
-                <InfoCard label="Triggers" value={riskDetail.triggers || "—"} />
-              </div>
-
-              <div className="border border-slate-200 rounded-xl p-3 sm:p-4">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-1.5">
-                      Status
-                    </p>
-
-                    {!editingStatus ? (
-                      <span className="px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
-                        {status?.name || "—"}
-                      </span>
-                    ) : (
-                      <FilterListbox
-                        options={statuses.map(s=>({value:s.id,label:s.name}))}
-                        value={selectedStatusId || ""}
-                        onChange={setSelectedStatusId}
-                      />
-                    )}
-                  </div>
-
+            {/* Status row */}
+            <div className="border border-slate-200 rounded-xl p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-1.5">
+                    Status
+                  </p>
                   {!editingStatus ? (
-                    <button
-                      onClick={startEditStatus}
-                      className="flex items-center gap-1 text-indigo-600 text-xs font-medium hover:text-indigo-700 transition-colors"
-                    >
-                      <Pencil size={12} /> Edit
-                    </button>
+                    <span className="px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                      {status?.name || "—"}
+                    </span>
                   ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setEditingStatus(false)}
-                        className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg border border-slate-200 transition-colors"
-                      >
-                        Cancel
-                      </button>
-
-                      <button
-                        onClick={saveStatus}
-                        className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-colors"
-                      >
-                        <Check size={12} /> Save
-                      </button>
-                    </div>
+                    <FilterListbox
+                      options={statuses.map((s) => ({ value: s.id, label: s.name }))}
+                      value={selectedStatusId || ""}
+                      onChange={setSelectedStatusId}
+                    />
                   )}
                 </div>
-              </div>
 
-              {riskDetail.description && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4">
-                  <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-2">
-                    Description
-                  </p>
-                  <p className="text-sm text-slate-700 leading-relaxed">
-                    {riskDetail.description}
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-semibold text-sm flex items-center gap-2 text-slate-800">
-                    <AlertCircle size={15} className="text-indigo-500" />
-                    Mitigation Plans
-
-                    {mitigations.length > 0 && (
-                      <span className="text-[10px] bg-indigo-100 text-indigo-600 font-bold px-1.5 py-0.5 rounded-full">
-                        {mitigations.length}
-                      </span>
-                    )}
-                  </h4>
-
-                  <button
-                    onClick={() => setShowAdd(true)}
-                    className="flex items-center gap-1 text-indigo-600 text-xs font-semibold hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition-colors"
-                  >
-                    <Plus size={13} /> Add
-                  </button>
-                </div>
-
-                {mitigations.length === 0 && !loading ? (
-                  <div className="text-center py-6 text-slate-400 text-sm border border-dashed border-slate-200 rounded-xl">
-                    No mitigation plans yet
-                  </div>
+                {!editingStatus ? (
+                  <Button variant="ghost" size="small" onClick={startEditStatus}>
+                    <EditIcon className="w-3 h-3" /> Edit
+                  </Button>
                 ) : (
-                  <MitigationList
-                    mitigations={mitigations}
-                    members={members}
-                    onUpdated={handleUpdated}
-                    onDelete={handleDeleted}
-                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="small"
+                      onClick={() => setEditingStatus(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button variant="primary" size="small" onClick={saveStatus}>
+                      <CheckIcon className="w-3 h-3" /> Save
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>
-          )}
-        </div>
 
-        <div className="border-t border-slate-100 bg-slate-50/60 px-4 sm:px-6 py-3 flex justify-between items-center flex-shrink-0">
-          <Button
-            variant="danger"
-            size="medium"
-            onClick={handleDeleteRisk}
-            disabled={deleting}
-            loading={deleting}
-            loadingText="Deleting..."
-          >
-            <Trash2 size={14} /> Delete Risk
-          </Button>
-          <Button variant="outline" size="medium" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      </div>
+            {/* Description */}
+            {riskDetail.description && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4">
+                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-2">
+                  Description
+                </p>
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  {riskDetail.description}
+                </p>
+              </div>
+            )}
 
-      {showAdd && (
-        <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center sm:justify-center">
-          <div className="bg-white w-full sm:max-w-md sm:mx-4 rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden max-h-[85dvh]">
-            <AddMitigationForm
-              riskId={risk.id}
-              members={members}
-              onAdd={handleCreated}
-              onClose={() => setShowAdd(false)}
-            />
+            {/* Mitigation plans */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <h4 className="font-semibold text-sm flex items-center gap-2 text-slate-800">
+                  <AlertIcon className="w-4 h-4 text-indigo-500" />
+                  Mitigation Plans
+                  {mitigations.length > 0 && (
+                    <span className="text-[10px] bg-indigo-100 text-indigo-600 font-bold px-1.5 py-0.5 rounded-full">
+                      {mitigations.length}
+                    </span>
+                  )}
+                </h4>
+                <Button variant="ghost" size="small" onClick={() => setShowAdd(true)}>
+                  <AddIcon className="w-3.5 h-3.5" /> Add
+                </Button>
+              </div>
+
+              {mitigations.length === 0 && !loading ? (
+                <div className="text-center py-6 text-slate-400 text-sm border border-dashed border-slate-200 rounded-xl">
+                  No mitigation plans yet
+                </div>
+              ) : (
+                <MitigationList
+                  mitigations={mitigations}
+                  members={members}
+                  onUpdated={handleUpdated}
+                  onDelete={handleDeleted}
+                />
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
+
+      {/* Add Mitigation — global Modal wrapper; AddMitigationForm renders its own header/footer */}
+      <Modal
+        isOpen={showAdd}
+        onClose={() => setShowAdd(false)}
+        showHeader={false}
+        size="md"
+        zIndex="z-[10000]"
+        bodyClassName="p-0"
+      >
+        <AddMitigationForm
+          riskId={risk?.id}
+          members={members}
+          onAdd={handleCreated}
+          onClose={() => setShowAdd(false)}
+        />
+      </Modal>
 
       <ConfirmationModal
         isOpen={deleteConfirmOpen}
         title="Delete Risk"
         message="Are you sure you want to delete this risk? This action cannot be undone."
-        onConfirm={() => { setDeleteConfirmOpen(false); executeDeleteRisk(); }}
+        onConfirm={() => {
+          setDeleteConfirmOpen(false);
+          executeDeleteRisk();
+        }}
         onCancel={() => setDeleteConfirmOpen(false)}
         confirmText="Delete"
         variant="danger"
         isLoading={deleting}
       />
-    </div>
+    </>
   );
 }
+
+/* ── Local sub-components (display-only, no business logic) ── */
 
 function Metric({ label, value }) {
   return (
@@ -558,7 +512,6 @@ function InfoCard({ label, value, icon }) {
           {icon}
         </div>
       )}
-
       <div className="min-w-0">
         <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
           {label}
