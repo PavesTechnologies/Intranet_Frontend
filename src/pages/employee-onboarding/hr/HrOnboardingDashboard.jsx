@@ -80,6 +80,31 @@ export default function HrOnboardingDashboard() {
     joining_comments: "",
   });
 
+  const getManagerDisplayName = (manager) =>
+    `${manager.first_name || ""} ${manager.last_name || ""}`.trim();
+
+  const getManagerPayloadValue = (manager) =>
+    String(manager.employee_id || "").trim();
+
+  const resolveReportingManager = (value) => {
+    const normalizedValue = String(value || "").trim();
+    if (!normalizedValue) return "";
+
+    const manager = managerOptions.find((option) => {
+      const optionValue = String(option.value || "").trim();
+      const optionLabel = String(option.label || "").trim();
+      const optionName = String(option.name || "").trim();
+
+      return (
+        optionValue === normalizedValue ||
+        optionLabel === normalizedValue ||
+        optionName === normalizedValue
+      );
+    });
+
+    return manager?.value || normalizedValue;
+  };
+
   const handleKpiClick = (status) => {
     setStatusFilter(status);
     setCurrentPage(1);
@@ -211,11 +236,20 @@ export default function HrOnboardingDashboard() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      console.log("CORE EMPLOYEE RESPONSE:", res.data);
-      const managers = (res.data || []).map((u) => ({
-        value: `${u.first_name || ""} ${u.last_name || ""}`.trim(),
-        label: `${u.first_name || ""} ${u.last_name || ""}`.trim(),
-      }));
+      const managers = (res.data || [])
+        .map((u) => {
+          const displayName = getManagerDisplayName(u);
+          const payloadValue = getManagerPayloadValue(u);
+
+          if (!displayName || !payloadValue) return null;
+
+          return {
+            value: payloadValue,
+            label: displayName,
+            name: displayName,
+          };
+        })
+        .filter(Boolean);
 
       setManagerOptions(managers);
     } catch (err) {
@@ -309,7 +343,7 @@ export default function HrOnboardingDashboard() {
       location: "",
       department: "",
       reporting_manager: "",
-      joining_comments: "",
+      custom_message: "",
     });
   };
 
@@ -348,9 +382,17 @@ export default function HrOnboardingDashboard() {
       return;
     }
 
+    const normalizedReportingManager =
+      resolveReportingManager(reporting_manager);
+
     const payload = {
       user_emails_list: emails,
       ...joinForm,
+      reporting_manager: normalizedReportingManager,
+    };
+    const joiningDetails = {
+      ...joinForm,
+      reporting_manager: normalizedReportingManager,
     };
 
     try {
@@ -368,7 +410,7 @@ export default function HrOnboardingDashboard() {
           selectedIds.includes(emp.user_uuid)
             ? {
               ...emp,
-              ...joinForm,
+              ...joiningDetails,
               status:
                 getNormalizedStatus(emp.status) === "VERIFIED"
                   ? "JOINING"
@@ -381,7 +423,7 @@ export default function HrOnboardingDashboard() {
       selectedEmployees.forEach((employee) =>
         persistJoiningStatus({
           ...employee,
-          ...joinForm,
+          ...joiningDetails,
           status: "JOINING",
         }),
       );
@@ -425,10 +467,13 @@ export default function HrOnboardingDashboard() {
       return;
     }
 
+    const normalizedReportingManager =
+      resolveReportingManager(reporting_manager);
+
     const payload = {
       user_uuid: editingEmployee.user_uuid,
       new_joining_date: joining_date,
-      reporting_manager,
+      reporting_manager: normalizedReportingManager,
       reporting_time,
       location,
       department,
@@ -454,7 +499,7 @@ export default function HrOnboardingDashboard() {
         reporting_time,
         location,
         department,
-        reporting_manager,
+        reporting_manager: normalizedReportingManager,
         joining_comments,
       });
 
@@ -468,7 +513,7 @@ export default function HrOnboardingDashboard() {
               reporting_time,
               location,
               department,
-              reporting_manager,
+              reporting_manager: normalizedReportingManager,
               joining_comments,
             }
             : emp,

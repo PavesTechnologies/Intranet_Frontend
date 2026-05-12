@@ -3,7 +3,7 @@ import axios from "axios";
 
 // Detect / load backend base URL
 const BASE_URL =
-  window.__APP_CONFIG__.API_BASE_URL || "http://localhost:8080/api";
+  window.__APP_CONFIG__.PMS_BASE_URL || "http://localhost:8080/api";
 
 // Create instance
 const axiosInstance = axios.create({
