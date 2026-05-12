@@ -6,7 +6,7 @@ import ClientEscalationContact from "./ClientEscalationContact";
 import ClientEscalationSection from "./ClientEscalationSection";
 // import ClientAssets from "./ClientAssets";
 
-export default function ClientSection({ clientDetails, slaRefetchKey, complianceRefetchKey, escalationRefetchKey }) {
+export default function ClientSection({ clientDetails, slaRefetchKey, complianceRefetchKey, escalationRefetchKey, actions }) {
   // const [activeTab, setActiveTab] = useState("escalation");
   const TAB_CONFIG = [
     { key: "sla", label: "SLA", enabled: (d) => d?.SLA },
@@ -66,6 +66,9 @@ export default function ClientSection({ clientDetails, slaRefetchKey, compliance
               )}
             </button>
           ))}
+        </div>
+        <div className="flex items-center gap-3 mb-1.5">
+          {actions}
         </div>
       </div>
 

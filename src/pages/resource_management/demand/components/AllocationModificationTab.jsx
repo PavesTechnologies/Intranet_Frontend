@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { WarningIcon, SuccessIcon } from "@/components/icons";
 import { toast } from "react-toastify";
-import { Button } from "@/components/ui/button";
+import Button from "../../../../components/Button/Button";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import { fetchResourcesByDemandId } from "../../services/resource";
 import allocationModificationApi from "../services/allocationModificationApi";
 import CreateModificationModal from "./CreateModificationModal";
@@ -70,43 +71,6 @@ const normalizeModification = (item, demand, fallbackProjectName) => {
     overrideBy: getValue([item], ["overrideBy"], ""),
     overrideAt: getValue([item], ["overrideAt"], ""),
   };
-};
-
-const ActionPromptModal = ({
-  isOpen,
-  title,
-  message,
-  confirmText,
-  confirmClassName,
-  isSubmitting,
-  onConfirm,
-  onCancel,
-}) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-5">
-          <h2 className="text-base font-black tracking-tight text-slate-900">{title}</h2>
-          <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">{message}</p>
-        </div>
-        <div className="flex gap-3 bg-slate-50/50 px-6 py-5">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            className="h-10 flex-1 rounded-xl border-slate-200 text-[10px] font-bold tracking-widest text-slate-500 hover:bg-white"
-          >
-            Keep Request
-          </Button>
-          <Button type="button" onClick={onConfirm} disabled={isSubmitting} className={confirmClassName}>
-            {isSubmitting ? "Processing..." : confirmText}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
 };
 
 const AllocationModificationTab = ({ demandId, demand, user }) => {
@@ -288,7 +252,7 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-              <CheckCircle2 className="h-4 w-4" />
+              <SuccessIcon className="h-4 w-4" />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Requests</p>
@@ -300,7 +264,7 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <AlertTriangle className="h-4 w-4" />
+              <WarningIcon className="h-4 w-4" />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pending Requests</p>
@@ -341,15 +305,15 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         modification={rejectTarget}
       />
 
-      <ActionPromptModal
+      <ConfirmationModal
         isOpen={!!cancelTarget}
         title="Cancel Modification Request"
         message={`This will cancel the modification request for ${cancelTarget?.resourceName || "the selected resource"}.`}
         confirmText="Cancel Modification"
-        confirmClassName="h-10 flex-[2] rounded-xl bg-slate-900 text-[10px] font-black tracking-widest text-white shadow-xl shadow-slate-900/10 hover:bg-slate-800"
-        isSubmitting={processingAction === `cancel-${cancelTarget?.id}`}
         onConfirm={handleCancel}
         onCancel={() => setCancelTarget(null)}
+        isLoading={processingAction === `cancel-${cancelTarget?.id}`}
+        variant="danger"
       />
     </div>
   );

@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-    ArrowLeft, Calendar, UserPlus, ShieldAlert, ShieldCheck,
-    Globe, Database, Briefcase, MapPin,
-    Target, Clock, ChevronRight, Activity,
-    LayoutDashboard, CheckCircle2, MoreVertical,
-    FileText, Zap, Shield, AlertTriangle,
-    Mail, ExternalLink, PenTool, XCircle, Info,
-    UserCheck, FileSearch, History, Star, Settings2, Download,
-    TrendingUp, Award, Layers, Hash, Building2, GitCompare, Code2, Percent, Plus,
-    Users, Search
-} from "lucide-react";
+    PrevIcon, CalendarIcon, HireIcon, SecurityAlertIcon, AuthSuccessIcon,
+    GlobalIcon, DatabaseIcon, ProjectsIcon, MapPinIcon,
+    TargetIcon, PendingIcon, ChevronRightIcon, ActivityIcon,
+    DashboardIcon, SuccessIcon, MoreVerticalIcon,
+    DocumentIcon, ZapIcon, ShieldIcon, WarningIcon,
+    EmailIcon, LinkIcon, PenToolIcon, ErrorIcon, InfoIcon,
+    AuthorizedIcon, FileSearchIcon, HistoryIcon, StarIcon, ConfigIcon, DownloadIcon,
+    TrendingUpIcon, SkillIcon, LayersIcon, HashIcon, BuildingIcon, GitCompareIcon, CodeIcon, PercentIcon,
+    TeamIcon, SearchIcon, AddIcon, AwardIcon
+} from "@/components/icons";
 import { cn } from "@/lib/utils";
 import SkillGapTab from '../../components/resource-intelligence/SkillGapTab';
 import AllocationModal from '../components/AllocationModal';
@@ -112,22 +112,22 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Column 1: Demand Specification */}
-                <DetailCard title="Demand Specification" icon={FileText}>
+                <DetailCard title="Demand Specification" icon={DocumentIcon}>
                     <div className="space-y-0.5">
                         <InfoRow label="Internal ID" value={demand.demandId?.slice(0, 8)} colorClass="font-mono text-indigo-600" />
                         <InfoRow label="Demand Type" value={demand.demandType} />
                         <InfoRow label="Priority" value={<PriorityBadge priority={demand.demandPriority} />} />
                         <InfoRow label="Resources Needed" value={demand.resourceRequired || "1"} />
                         <InfoRow label="Experience Min" value={`${demand.minExp || 0} Years`} />
-                        <InfoRow label="Start Date" value={demand.demandStartDate} icon={Calendar} />
-                        <InfoRow label="End Date" value={demand.demandEndDate} icon={Calendar} />
+                        <InfoRow label="Start Date" value={demand.demandStartDate} icon={CalendarIcon} />
+                        <InfoRow label="End Date" value={demand.demandEndDate} icon={CalendarIcon} />
                     </div>
                 </DetailCard>
 
                 {/* Column 2: Project Intelligence */}
-                <DetailCard title="Project Intelligence" icon={Briefcase}>
+                <DetailCard title="Project Intelligence" icon={ProjectsIcon}>
                     <div className="space-y-0.5">
-                        <InfoRow label="Project Name" value={project.projectName} icon={Briefcase} />
+                        <InfoRow label="Project Name" value={project.projectName} icon={ProjectsIcon} />
                         <InfoRow label="Risk Profile" value={
                             <div className={cn(
                                 "px-2 py-0.5 rounded text-[9px] font-black border",
@@ -138,21 +138,21 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
                         } />
                         <InfoRow label="Status" value={project.status || "ACTIVE"} colorClass="text-emerald-600 uppercase" />
                         <InfoRow label="Lifecycle" value={project.lifecycle} />
-                        <InfoRow label="Location" value={project.location} icon={MapPin} />
-                        <InfoRow label="Delivery" value={project.deliveryModel || demand.deliveryModel} icon={Globe} />
+                        <InfoRow label="Location" value={project.location} icon={MapPinIcon} />
+                        <InfoRow label="Delivery" value={project.deliveryModel || demand.deliveryModel} icon={GlobalIcon} />
                     </div>
                 </DetailCard>
 
                 {/* Column 3: Partner & Compliance */}
                 <div className="space-y-6">
-                    <DetailCard title="Partner Profile" icon={Building2}>
+                    <DetailCard title="Partner Profile" icon={BuildingIcon}>
                         <div className="space-y-0.5">
-                            <InfoRow label="Client" value={clientInfo?.clientName || passedClientName} icon={UserCheck} />
+                            <InfoRow label="Client" value={clientInfo?.clientName || passedClientName} icon={SuccessIcon} />
                             <InfoRow label="Priority Score" value={demand.priorityScore || "N/A"} colorClass="text-indigo-600 font-black" />
                         </div>
                     </DetailCard>
 
-                    <DetailCard title="SLA Compliance" icon={Activity}>
+                    <DetailCard title="SLA Compliance" icon={ActivityIcon}>
                         {!slaId ? (
                             <div className="text-center py-2">
                                 <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">No Active SLA</p>
@@ -163,7 +163,7 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
                                     <span className={cn("text-lg font-black tracking-tighter", remainingDays < 0 ? "text-rose-600" : "text-slate-900")}>
                                         {remainingDays} Days Left
                                     </span>
-                                    <Clock className="h-4 w-4 text-indigo-500" />
+                                    <PendingIcon className="h-4 w-4 text-indigo-500" />
                                 </div>
                                 <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
                                     <div className="h-full bg-indigo-600 rounded-full transition-all duration-1000" style={{ width: `${progress}%` }} />
@@ -175,7 +175,7 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
             </div>
 
             {/* Strategic Justification (Full Width) */}
-            <DetailCard title="Strategic Justification" icon={Target}>
+            <DetailCard title="Strategic Justification" icon={TargetIcon}>
                 <p className="text-[11px] font-medium text-slate-600 leading-relaxed italic bg-slate-50/50 p-4 rounded-xl border border-slate-100">
                     {demand.demandJustification || "No justification provided for this demand."}
                 </p>
@@ -183,7 +183,7 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
 
             {/* Rejection Details if any */}
             {(rejectionInfo?.rejectionReason || rejectionInfo?.dmRejectionReason || rejectionInfo?.rmRejectionReason) && (
-                <DetailCard title="Rejection Analysis" icon={XCircle} className="border-rose-100 shadow-rose-500/5">
+                <DetailCard title="Rejection Analysis" icon={ErrorIcon} className="border-rose-100 shadow-rose-500/5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {rejectionInfo.dmRejectionReason && (
                             <div className="p-3 bg-rose-50/50 rounded-lg border border-rose-100">
@@ -263,11 +263,11 @@ const RoleInfoTab = ({ demand, skillsRequirements }) => {
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             {/* Role Header */}
             <div className="bg-slate-900 rounded-2xl p-6 text-white border border-slate-800 shadow-xl overflow-hidden relative">
-                <div className="absolute right-0 top-0 p-8 opacity-5 scale-150"><Target className="h-32 w-32" /></div>
+                <div className="absolute right-0 top-0 p-8 opacity-5 scale-150"><TargetIcon className="h-32 w-32" /></div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative">
                     <div className="flex items-center gap-5">
                         <div className="h-12 w-12 sm:h-14 sm:w-14 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shrink-0">
-                            <Code2 className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                            <CodeIcon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                         </div>
                         <div>
                             <h2 className="text-xl sm:text-2xl font-black tracking-tight">{skillsRequirements?.deliveryRoleDetails?.roleName || "N/A"}</h2>
@@ -286,7 +286,7 @@ const RoleInfoTab = ({ demand, skillsRequirements }) => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Skills Table */}
                 <div className="lg:col-span-2">
-                    <DetailCard title="Technical Blueprint & Skills Matrix" icon={Award}>
+                    <DetailCard title="Technical Blueprint & Skills Matrix" icon={AwardIcon}>
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>
@@ -353,13 +353,13 @@ const RoleInfoTab = ({ demand, skillsRequirements }) => {
 
                 {/* Certificates */}
                 <div className="lg:col-span-1">
-                    <DetailCard title="Required Certifications" icon={Award}>
+                    <DetailCard title="Required Certifications" icon={AwardIcon}>
                         <div className="space-y-4">
                             {certificates.length > 0 ? certificates.map((cert, idx) => (
                                 <div key={idx} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:shadow-sm transition-shadow">
                                     <div className="flex items-start gap-3">
                                         <div className="h-8 w-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center shrink-0">
-                                            <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                                            <AuthSuccessIcon className="h-4 w-4 text-emerald-500" />
                                         </div>
                                         <div>
                                             <p className="text-xs font-black text-slate-900 tracking-tight">{cert.certificateName}</p>
@@ -369,7 +369,7 @@ const RoleInfoTab = ({ demand, skillsRequirements }) => {
                                 </div>
                             )) : (
                                 <div className="py-10 text-center flex flex-col items-center gap-3 opacity-40">
-                                    <Award className="h-10 w-10 text-slate-300" />
+                                    <AwardIcon className="h-10 w-10 text-slate-300" />
                                     <p className="text-[10px] font-black uppercase tracking-widest">No certifications required</p>
                                 </div>
                             )}
@@ -433,17 +433,17 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
         complete: {
             circle: "bg-emerald-50 border-emerald-500 text-emerald-600 shadow-emerald-500/10",
             text: "text-slate-900",
-            icon: <CheckCircle2 className="h-5 w-5" />,
+            icon: <SuccessIcon className="h-5 w-5" />,
         },
         pending: {
             circle: "bg-amber-50 border-amber-500 text-amber-600 animate-pulse shadow-amber-500/10",
             text: "text-amber-600",
-            icon: <History className="h-5 w-5" />,
+            icon: <HistoryIcon className="h-5 w-5" />,
         },
         rejected: {
             circle: "bg-rose-50 border-rose-500 text-rose-600 shadow-rose-500/10",
             text: "text-rose-600",
-            icon: <XCircle className="h-5 w-5" />,
+            icon: <ErrorIcon className="h-5 w-5" />,
         },
         future: {
             circle: "bg-white border-slate-200 text-slate-300",
@@ -456,7 +456,7 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
             {/* ── STEPPER CARD ─────────────────────────────────────────────── */}
-            <DetailCard title="Sequential Governance Pipeline" icon={ShieldCheck}>
+            <DetailCard title="Sequential Governance Pipeline" icon={ShieldIcon}>
                 <div className="py-6 sm:py-12 px-2 sm:px-6">
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between relative gap-8 md:gap-0">
 
@@ -534,7 +534,7 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
                 <div className="bg-rose-50 border border-rose-200 rounded-2xl shadow-sm overflow-hidden">
                     <div className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3 text-rose-700">
-                            <XCircle className="h-5 w-5 shrink-0" />
+                            <ErrorIcon className="h-5 w-5 shrink-0" />
                             <span className="text-[10px] sm:text-[11px] font-bold tracking-wider">
                                 This demand was <strong>rejected by the Delivery Manager</strong>. Please review the requirements and resubmit.
                             </span>
@@ -547,7 +547,7 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
                     {dmRejection && (
                         <div className="mx-4 sm:mx-5 mb-4 sm:mb-5 p-4 bg-white border border-rose-200 rounded-xl">
                             <p className="text-[9px] font-black text-rose-400 uppercase tracking-[0.15em] mb-2 flex items-center gap-1.5">
-                                <AlertTriangle className="h-3 w-3" />
+                                <WarningIcon className="h-3 w-3" />
                                 DM Rejection Reason
                             </p>
                             <p className="text-sm font-bold text-rose-700 leading-relaxed">
@@ -563,7 +563,7 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
                 <div className="bg-rose-50 border border-rose-200 rounded-2xl shadow-sm overflow-hidden">
                     <div className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3 text-rose-700">
-                            <XCircle className="h-5 w-5 shrink-0" />
+                            <ErrorIcon className="h-5 w-5 shrink-0" />
                             <span className="text-[10px] sm:text-[11px] font-bold tracking-wider">
                                 This demand was <strong>rejected by the Resource Manager</strong>. Please review the requirements and resubmit.
                             </span>
@@ -576,7 +576,7 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
                     {rmRejection && (
                         <div className="mx-4 sm:mx-5 mb-4 sm:mb-5 p-4 bg-white border border-rose-200 rounded-xl">
                             <p className="text-[9px] font-black text-rose-400 uppercase tracking-[0.15em] mb-2 flex items-center gap-1.5">
-                                <AlertTriangle className="h-3 w-3" />
+                                <WarningIcon className="h-3 w-3" />
                                 RM Rejection Reason
                             </p>
                             <p className="text-sm font-bold text-rose-700 leading-relaxed">
@@ -591,7 +591,7 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
             {rmPending && (
                 <div className="p-4 sm:p-6 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
                     <div className="flex items-center gap-4 text-amber-700">
-                        <Info className="h-5 w-5 shrink-0" />
+                        <InfoIcon className="h-5 w-5 shrink-0" />
                         <span className="text-[10px] sm:text-[11px] font-bold tracking-wider">
                             Delivery Manager has approved this demand. Awaiting <strong>Resource Manager approval</strong> to proceed to final confirmation.
                         </span>
@@ -606,7 +606,7 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
             {dmPending && (
                 <div className="p-4 sm:p-6 bg-blue-50 border border-blue-100 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
                     <div className="flex items-center gap-4 text-blue-700">
-                        <Info className="h-5 w-5 shrink-0" />
+                        <InfoIcon className="h-5 w-5 shrink-0" />
                         <span className="text-[10px] sm:text-[11px] font-bold tracking-wider">
                             This demand has been created and is awaiting <strong>Delivery Manager approval</strong>.
                         </span>
@@ -621,7 +621,7 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
             {finalDone && (
                 <div className="p-4 sm:p-6 bg-emerald-50 border border-emerald-100 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
                     <div className="flex items-center gap-4 text-emerald-700">
-                        <CheckCircle2 className="h-5 w-5 shrink-0" />
+                        <SuccessIcon className="h-5 w-5 shrink-0" />
                         <span className="text-[10px] sm:text-[11px] font-bold tracking-wider">
                             All approvals complete. This demand has been <strong>fulfilled</strong> and a resource has been successfully allocated.
                         </span>
@@ -673,7 +673,7 @@ const AllocationResultsTab = ({ results }) => {
                 <div className="grid grid-cols-2 gap-6 mb-8">
                     <div className="bg-white border border-slate-200 rounded-xl p-6 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
                         <div className="h-10 w-10 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600">
-                            <CheckCircle2 className="h-5 w-5" />
+                            <SuccessIcon className="h-5 w-5" />
                         </div>
                         <div>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Success</p>
@@ -682,7 +682,7 @@ const AllocationResultsTab = ({ results }) => {
                     </div>
                     <div className="bg-white border border-slate-200 rounded-xl p-6 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
                         <div className="h-10 w-10 bg-rose-50 rounded-lg flex items-center justify-center text-rose-600">
-                            <XCircle className="h-5 w-5" />
+                            <ErrorIcon className="h-5 w-5" />
                         </div>
                         <div>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Failed</p>
@@ -740,7 +740,7 @@ const AllocationResultsTab = ({ results }) => {
                         ))}
                         {items.length === 0 && (
                             <div className="p-12 text-center opacity-40">
-                                <Database className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                                <DatabaseIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
                                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">No records found</p>
                             </div>
                         )}
@@ -753,7 +753,7 @@ const AllocationResultsTab = ({ results }) => {
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-2 duration-300">
                             <div>
                                 <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-3">
-                                    <UserPlus className={cn("h-5 w-5", activeSubTab === 'Successful' ? "text-indigo-600" : "text-rose-600")} />
+                                    <HireIcon className={cn("h-5 w-5", activeSubTab === 'Successful' ? "text-indigo-600" : "text-rose-600")} />
                                     {selectedItem.resourceName || `Resource ${selectedItem.resourceId}`}
                                 </h3>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
@@ -798,10 +798,10 @@ const AllocationResultsTab = ({ results }) => {
                                         </div>
                                         <div className="space-y-3 p-6 bg-rose-50/50 border border-rose-100 rounded-2xl relative overflow-hidden group">
                                             <div className="absolute right-0 top-0 p-4 opacity-[0.03] scale-150 rotate-12">
-                                                <AlertTriangle className="h-24 w-24 text-rose-900" />
+                                                <WarningIcon className="h-24 w-24 text-rose-900" />
                                             </div>
                                             <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
-                                                <Zap className="h-3 w-3" /> Failure Reason
+                                                <ZapIcon className="h-3 w-3" /> Failure Reason
                                             </label>
                                             <p className="text-sm font-bold text-rose-700 leading-relaxed">
                                                 {selectedItem.reason}
@@ -813,7 +813,7 @@ const AllocationResultsTab = ({ results }) => {
                         </div>
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4 opacity-50">
-                            <FileSearch className="h-10 w-10 text-slate-200" />
+                            <FileSearchIcon className="h-10 w-10 text-slate-200" />
                             <p className="text-[10px] font-black uppercase tracking-[0.2em]">Select a record to view details</p>
                         </div>
                     )}
@@ -834,7 +834,7 @@ const SLAInsightsTab = ({ sla }) => {
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <DetailCard title="SLA Compliance Vision" icon={Clock}>
+            <DetailCard title="SLA Compliance Vision" icon={PendingIcon}>
                 <div className="p-4">
                     <div className="relative mb-6 py-6">
                         {/* Timeline Track */}
@@ -954,7 +954,7 @@ const DemandResourcesTable = ({ demandId }) => {
     if (error) {
         return (
             <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl flex items-center gap-3">
-                <AlertTriangle className="h-5 w-5" />
+                <WarningIcon className="h-5 w-5" />
                 <p className="text-xs font-bold">{error}</p>
             </div>
         );
@@ -964,12 +964,12 @@ const DemandResourcesTable = ({ demandId }) => {
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h3 className="text-sm font-black flex items-center gap-2 text-slate-900 tracking-tight">
-                    <UserPlus className="h-4 w-4 text-indigo-500" />
+                    <HireIcon className="h-4 w-4 text-indigo-500" />
                     Allocated Resources ({allocations.length})
                 </h3>
 
                 <div className="relative w-full md:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input
                         type="text"
                         placeholder="Search resources..."
@@ -983,7 +983,7 @@ const DemandResourcesTable = ({ demandId }) => {
             {allocations.length === 0 ? (
                 <div className="bg-white p-16 rounded-3xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-center shadow-sm">
                     <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                        <Users className="text-slate-200 h-10 w-10" />
+                        <TeamIcon className="text-slate-200 h-10 w-10" />
                     </div>
                     <h4 className="text-lg font-black text-slate-900 tracking-tight">No Resources Allocated</h4>
                     <p className="text-sm text-slate-400 max-w-[320px] mt-2 font-medium leading-relaxed">
@@ -1037,9 +1037,9 @@ const DemandResourcesTable = ({ demandId }) => {
                                         <td className="p-5 text-center">
                                             <div className="flex flex-col items-center">
                                                 <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100">
-                                                    <Calendar className="h-3 w-3 text-indigo-400" />
+                                                    <CalendarIcon className="h-3 w-3 text-indigo-400" />
                                                     <span className="text-[10px] text-slate-700 font-black">{item.allocationStartDate}</span>
-                                                    <ChevronRight className="h-2.5 w-2.5 text-slate-300" />
+                                                    <ChevronRightIcon className="h-2.5 w-2.5 text-slate-300" />
                                                     <span className="text-[10px] text-slate-700 font-black">{item.allocationEndDate}</span>
                                                 </div>
                                             </div>
@@ -1054,7 +1054,7 @@ const DemandResourcesTable = ({ demandId }) => {
                                         </td>
                                         <td className="p-5 text-center">
                                             <div className="inline-flex items-center gap-2 text-[10px] text-slate-500 font-black bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-                                                <UserCheck className="h-3.5 w-3.5 text-indigo-500" />
+                                                <SuccessIcon className="h-3.5 w-3.5 text-indigo-500" />
                                                 <span>{item.createdBy || "System"}</span>
                                             </div>
                                         </td>
@@ -1177,7 +1177,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
             <div className="bg-white p-12 border border-slate-200 rounded-3xl shadow-2xl max-w-lg text-center">
                 <div className="h-20 w-20 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-8 border border-rose-100">
-                    <ShieldAlert className="h-10 w-10 text-rose-600" />
+                    <SecurityAlertIcon className="h-10 w-10 text-rose-600" />
                 </div>
                 <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">Record Not Found</h2>
                 <p className="text-sm text-slate-500 mb-10 font-medium leading-relaxed">The requested demand record is currently offline or could not be reached. Please try again.</p>
@@ -1205,12 +1205,12 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
         );
 
     const TABS = [
-        { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-        { id: 'resource', label: 'Resources', icon: Users },
-        { id: 'roleInfo', label: 'Delivery Role Info', icon: Code2 },
-        ...(isRM ? [{ id: 'skillGap', label: 'Skill Gap Analysis', icon: GitCompare }] : []),
-        { id: 'approvalFlow', label: 'Approval Flow', icon: ShieldCheck },
-        ...(!isSoft && slaId ? [{ id: 'slaInsights', label: 'SLA Insights', icon: Clock }] : []),
+        { id: 'overview', label: 'Overview', icon: DashboardIcon },
+        { id: 'resource', label: 'Resources', icon: TeamIcon },
+        { id: 'roleInfo', label: 'Delivery Role Info', icon: CodeIcon },
+        ...(isRM ? [{ id: 'skillGap', label: 'Skill Gap Analysis', icon: GitCompareIcon }] : []),
+        { id: 'approvalFlow', label: 'Approval Flow', icon: ShieldIcon },
+        ...(!isSoft && slaId ? [{ id: 'slaInsights', label: 'SLA Insights', icon: PendingIcon }] : []),
         ...(isRM && allocationResults ? [{ id: 'allocationResults', label: 'Allocation Results', icon: Activity }] : [])
     ];
 
@@ -1230,7 +1230,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                 onClick={propOnBack || (() => navigate('/resource-management/demand'))}
                                 className="h-9 w-9 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
                             >
-                                <ArrowLeft className="h-4 w-4" />
+                                <PrevIcon className="h-4 w-4" />
                             </Button>
 
                             <div className="space-y-0.5">
@@ -1263,7 +1263,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                     onClick={() => setIsAllocationModalOpen(true)}
                                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black tracking-widest rounded-lg shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2"
                                 >
-                                    <Plus className="h-3.5 w-3.5" />
+                                    <AddIcon className="h-3.5 w-3.5" />
                                     <span className="uppercase">Allocate</span>
                                 </button>
                             )}

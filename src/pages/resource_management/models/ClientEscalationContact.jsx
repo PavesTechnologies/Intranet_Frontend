@@ -7,7 +7,7 @@ import {
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontalIcon, EditIcon, DeleteIcon } from "@/components/icons";
 import Modal from "../../../components/Modal/modal";
 import EscalationForm from "./client_configuration/forms/EscalationForm";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
@@ -213,7 +213,7 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
                           }}
                           className="px-2 text-blue-600 hover:text-blue-800 transition"
                         >
-                          <Pencil size={14} />
+                          <EditIcon size={14} />
                         </button>
 
                         <button
@@ -223,7 +223,7 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
                           }}
                           className="p-1 text-red-600 hover:text-red-800 transition"
                         >
-                          <Trash2 size={14} />
+                          <DeleteIcon size={14} />
                         </button>
                       </div>
                     ) : (

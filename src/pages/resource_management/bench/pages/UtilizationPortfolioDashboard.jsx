@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-   Briefcase, Target, TrendingUp, DollarSign, Users, BarChart3, 
-   PieChart, LayoutGrid, Download, ExternalLink, ChevronRight,
-   CheckCircle2, AlertTriangle, Monitor
-} from 'lucide-react';
+import { ProjectsIcon, TargetIcon, TrendingUpIcon, BillingIcon, EmployeeIcon, BarChartIcon, PieChartIcon, LayoutGridIcon, DownloadIcon, ExportIcon, ChevronRightIcon, SuccessIcon, WarningIcon, DesktopIcon } from "@/components/icons";
 import { 
    ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
    Tooltip as RechartsTooltip, Cell, Legend
@@ -48,10 +44,10 @@ const UtilizationPortfolioDashboard = () => {
                </div>
                <div className="flex items-center gap-3">
                   <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-2xl text-[11px] font-black text-slate-600 capitalize tracking-widest hover:bg-slate-50 transition-all shadow-sm">
-                     <Download size={16} /> Portfolio Report
+                     <DownloadIcon size={16} /> Portfolio Report
                   </button>
                   <button className="flex items-center gap-2 px-5 py-2.5 bg-[#081534] text-white rounded-2xl text-[11px] font-black capitalize tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
-                     <LayoutGrid size={16} /> Grid View
+                     <LayoutGridIcon size={16} /> Grid View
                   </button>
                </div>
             </div>
@@ -59,10 +55,10 @@ const UtilizationPortfolioDashboard = () => {
             {/* PORTFOLIO KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
                {[
-                  { label: 'Avg Project Yield', value: '84.2%', icon: <TrendingUp />, color: 'text-emerald-600', bg: 'bg-emerald-50', note: 'Higher than last Q' },
-                  { label: 'Allocation Efficiency', value: '91.5%', icon: <Users />, color: 'text-indigo-600', bg: 'bg-indigo-50', note: 'Optimal boundary' },
-                  { label: 'Resource Density', value: '8.4', icon: <Monitor />, color: 'text-blue-600', bg: 'bg-blue-50', note: 'Avg per project' },
-                  { label: 'Revenue/Hour', value: '$142', icon: <DollarSign />, color: 'text-amber-600', bg: 'bg-amber-50', note: 'Blended rate' },
+                  { label: 'Avg Project Yield', value: '84.2%', icon: <TrendingUpIcon />, color: 'text-emerald-600', bg: 'bg-emerald-50', note: 'Higher than last Q' },
+                  { label: 'Allocation Efficiency', value: '91.5%', icon: <EmployeeIcon />, color: 'text-indigo-600', bg: 'bg-indigo-50', note: 'Optimal boundary' },
+                  { label: 'Resource Density', value: '8.4', icon: <DesktopIcon />, color: 'text-blue-600', bg: 'bg-blue-50', note: 'Avg per project' },
+                  { label: 'Revenue/Hour', value: '$142', icon: <BillingIcon />, color: 'text-amber-600', bg: 'bg-amber-50', note: 'Blended rate' },
                ].map((kpi) => (
                   <div key={kpi.label} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4 group hover:shadow-xl transition-all duration-500">
                      <div className="flex items-center justify-between">
@@ -88,7 +84,7 @@ const UtilizationPortfolioDashboard = () => {
                         <span className="text-[10px] font-bold text-slate-400 italic">Workload intensity distribution</span>
                      </div>
                      <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner">
-                        <BarChart3 size={20} />
+                        <BarChartIcon size={20} />
                      </div>
                   </div>
                   <div className="flex-1 h-[500px] w-full relative">
@@ -124,7 +120,7 @@ const UtilizationPortfolioDashboard = () => {
                   <div className="px-8 py-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
                      <div className="flex items-center gap-4">
                         <div className="h-10 w-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center border border-indigo-100 shadow-sm">
-                           <Briefcase size={22} strokeWidth={2.5} />
+                           <ProjectsIcon size={22} strokeWidth={2.5} />
                         </div>
                         <div>
                            <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-widest">Project Performance Ledger</h4>
@@ -170,13 +166,13 @@ const UtilizationPortfolioDashboard = () => {
                                  </td>
                                  <td className="px-8 py-6 text-center">
                                     <div className={`inline-flex items-center gap-1 text-[11px] font-black capitalize ${proj.utilizationPercentage > 90 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                       {proj.utilizationPercentage > 90 ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
+                                       {proj.utilizationPercentage > 90 ? <WarningIcon size={12} /> : <SuccessIcon size={12} />}
                                        {proj.utilizationPercentage > 90 ? 'High Burn' : 'Healthy'}
                                     </div>
                                  </td>
                                  <td className="px-8 py-6 text-right">
                                     <button className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all flex items-center justify-center ml-auto border border-slate-100">
-                                       <ExternalLink size={18} />
+                                       <ExportIcon size={18} />
                                     </button>
                                  </td>
                               </tr>

@@ -83,7 +83,7 @@ function SearchableDropdown({ label, value, options, onChange, placeholder }) {
       </label>
       <div className="relative" ref={inputRef}>
         <Input
-          value={search}
+          value={search || ""}
           onChange={(e) => {
             setSearch(e.target.value);
             setIsOpen(true);
