@@ -10,6 +10,7 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 import { MoreVertical, X, ChevronDown, ChevronUp } from "lucide-react";
 import Modal from "../../../components/Modal/modal";
 import InternalActivities from "./InternalActivities";
+import HourSettingsModal from "./HourSettingsModal";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 
 const AdminApprovalTable = ({
@@ -39,6 +40,7 @@ const AdminApprovalTable = ({
   const [userLevelLoading, setUserLevelLoading] = useState(null); // for Approve/Reject All Weeks
   const [weekLevelLoading, setWeekLevelLoading] = useState({}); // for per-week Approve/Reject
   const [isOpen, setIsOpen] = useState(false);
+  const [isHourSettingsOpen, setIsHourSettingsOpen] = useState(false);
 
   // ✅ Per-user expand/collapse state — collapsed by default
   const [expandedUsers, setExpandedUsers] = useState({});
@@ -837,6 +839,13 @@ const AdminApprovalTable = ({
             <Button
               variant="primary"
               size="medium"
+              onClick={() => setIsHourSettingsOpen(true)}
+            >
+              Hour Settings
+            </Button>
+            <Button
+              variant="primary"
+              size="medium"
               onClick={() => setIsOpen(true)}
             >
               Internal Activities
@@ -1311,6 +1320,11 @@ const AdminApprovalTable = ({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         children={<InternalActivities />}
+      />
+
+      <HourSettingsModal
+        isOpen={isHourSettingsOpen}
+        onClose={() => setIsHourSettingsOpen(false)}
       />
     </div>
   );
