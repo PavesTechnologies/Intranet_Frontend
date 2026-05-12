@@ -1,6 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useDrag } from "react-dnd";
-import { MoreHorizontal, Plus, Bookmark } from "lucide-react";
+import { 
+  MoreHorizontalIcon, 
+  AddIcon, 
+  BookmarkIcon,
+  ChevronDownIcon,
+  ChevronRightIcon
+} from "../../../../components/icons";
 
 const StoryCard = ({
   story,
@@ -20,6 +26,18 @@ const StoryCard = ({
 
   const [showMenu, setShowMenu] = useState(false);
   const [showEpicList, setShowEpicList] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+        setShowEpicList(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleSelectSprint = (sprintId) => {
     onAddToSprint?.(story.id, sprintId);
@@ -45,7 +63,7 @@ const StoryCard = ({
     >
       {/* STORY label */}
       <div className="flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[10px] font-bold shrink-0">
-        <Bookmark size={12} strokeWidth={3} />
+        <BookmarkIcon size={12} strokeWidth={3} />
         STORY
       </div>
      
@@ -71,12 +89,13 @@ const StoryCard = ({
           }}
           className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 shrink-0"
         >
-          <Plus size={13} /> Epic
+          <AddIcon size={13} /> Epic
         </button>
       )}
 
       {/* Menu */}
       <div
+        ref={menuRef}
         className="relative shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
@@ -87,7 +106,7 @@ const StoryCard = ({
           }}
           className="p-1 text-gray-400 hover:text-gray-800 rounded"
         >
-          <MoreHorizontal size={16} />
+          <MoreHorizontalIcon size={16} />
         </button>
 
         {showMenu && (

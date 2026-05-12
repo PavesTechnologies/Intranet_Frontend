@@ -55,9 +55,9 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
   const loadTestCases = async () => {
     try {
       const res = await axiosInstance.get(
-        `/test-execution/test-runs/${run.id}/cases`,
-        `/test-execution/test-runs/${run.id}/cases`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/runs/${run.id}/cases`,
       );
+      console.log("🔍 Test cases loaded:", res.data);
       setTestCases(res.data || []);
     } catch (err) {
       console.error("Error loading test cases:", err);
@@ -116,7 +116,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
     }
     try {
       setSaving(true);
-      await axiosInstance.put(`/test-execution/test-runs/${run.id}`, {
+      await axiosInstance.put(`api/test-execution/test-runs/${run.id}`, {
         name: editForm.name,
         status: editForm.status,
         description: editForm.description || null,
@@ -413,7 +413,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
       {runTestCaseId != null && (
         <RunTestCaseComponent
           runId={run.id}
-          testCaseId={runTestCaseId}
+          runCaseId={runTestCaseId}
           onClose={() => {
             setRunTestCaseId(null);
             loadTestCases();
