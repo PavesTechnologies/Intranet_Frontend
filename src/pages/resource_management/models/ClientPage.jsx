@@ -907,18 +907,18 @@ const ClientPage = () => {
         {kpiData.map((kpi, idx) => (
           <div
             key={idx}
-            className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between"
+            className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4"
           >
-            <div>
+            <div className={`p-2 rounded-lg shrink-0 ${kpi.bg}`}>
+              <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
+            </div>
+            <div className="min-w-0">
               <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
                 {kpi.label}
               </p>
               <h3 className="text-xl font-bold text-gray-900 mt-1">
                 {kpi.value}
               </h3>
-            </div>
-            <div className={`p-2 rounded-lg ${kpi.bg}`}>
-              <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
             </div>
           </div>
         ))}
