@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { getSkills, getCertificates } from "../../../services/clientservice";
 import { toast } from "react-toastify";
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 const ComplianceForm = ({ formData, setFormData }) => {
   const { getEnumValues } = useEnums();
@@ -37,6 +38,12 @@ const ComplianceForm = ({ formData, setFormData }) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (formData.mandatoryFlag === undefined) {
+      setFormData((prev) => ({ ...prev, mandatoryFlag: false }));
+    }
+  }, []);
 
   useEffect(() => {
     if (formData.requirementType === "SKILL") {
@@ -87,19 +94,14 @@ const ComplianceForm = ({ formData, setFormData }) => {
           <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
             Requirement Type *
           </label>
-          <select
-            name="requirementType"
+          <FilterListbox
+            options={[
+              { value: "", label: "Select Type" },
+              ...REQUIREMENT_TYPES.map((type) => ({ value: type, label: type.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) })),
+            ]}
             value={formData.requirementType || ""}
-            onChange={handleChange}
-            className="w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
-          >
-            <option value="">Select Type</option>
-            {REQUIREMENT_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleChange({ target: { name: "requirementType", value: val } })}
+          />
         </div>
 
         {formData.requirementType === "SKILL" ? (
@@ -107,40 +109,30 @@ const ComplianceForm = ({ formData, setFormData }) => {
             <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Skills *
             </label>
-            <select
-              name="skill"
+            <FilterListbox
+              options={[
+                { value: "", label: "Select a skill" },
+                ...skills.map((skill) => ({ value: skill.id, label: skill.name })),
+              ]}
               value={formData.skill?.id || ""}
-              onChange={handleChange}
-              className={`w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none ${loading ? 'opacity-50 cursor-wait' : ''}`}
+              onChange={(val) => handleChange({ target: { name: "skill", value: val } })}
               disabled={loading}
-            >
-              <option value="">Select a skill</option>
-              {skills.map((skill) => (
-                <option key={skill.id} value={skill.id}>
-                  {skill.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         ) : formData.requirementType === "CERTIFICATION" ? (
           <div className="sm:col-span-1">
             <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Certificate *
             </label>
-            <select
-              name="certificate"
+            <FilterListbox
+              options={[
+                { value: "", label: "Select a certificate" },
+                ...certificates.map((cert) => ({ value: cert.certificateId, label: cert.providerName })),
+              ]}
               value={formData.certificate?.certificateId || ""}
-              onChange={handleChange}
-              className={`w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none ${loading ? 'opacity-50 cursor-wait' : ''}`}
+              onChange={(val) => handleChange({ target: { name: "certificate", value: val } })}
               disabled={loading}
-            >
-              <option value="">Select a certificate</option>
-              {certificates.map((cert) => (
-                <option key={cert.certificateId} value={cert.certificateId}>
-                  {cert.providerName}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         ) : null}
 

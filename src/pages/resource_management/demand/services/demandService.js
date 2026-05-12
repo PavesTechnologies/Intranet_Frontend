@@ -13,10 +13,10 @@ const getAuthHeader = () => {
 };
 
 // const ROLE_ALIAS_MAP = {
-//     "RESOURCE-MANAGER": "RESOURCE_MANAGER",
+//     "Resource_Manager": "RESOURCE_MANAGER",
 //     "RESOURCE MANAGER": "RESOURCE_MANAGER",
 //     "RESOURCE_MANAGER": "RESOURCE_MANAGER",
-//     "DELIVERY-MANAGER": "DELIVERY_MANAGER",
+//     "Delivery_Manager": "DELIVERY_MANAGER",
 //     "DELIVERY MANAGER": "DELIVERY_MANAGER",
 //     "DELIVERY_MANAGER": "DELIVERY_MANAGER"
 // };
@@ -37,7 +37,7 @@ const normalizeRoleKey = (role) => {
 
   return role
     .toUpperCase()
-    .replace(/-/g, "_") // RESOURCE-MANAGER → RESOURCE_MANAGER
+    .replace(/-/g, "_") // Resource_Manager → RESOURCE_MANAGER
     .trim();
 };
 
@@ -278,6 +278,23 @@ export const demandService = {
       return response.data;
     } catch (error) {
       console.error("Error in handleRMDecision:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Deletes a demand by Project Manager
+   * @param {string|number} demandId
+   */
+  deleteDemandByPM: async (demandId) => {
+    try {
+      const response = await axios.delete(
+        `${BASE_URL}/api/demand/delete/pm/${demandId}`,
+        getAuthHeader(),
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error in deleteDemandByPM for ID ${demandId}:`, error);
       throw error;
     }
   },

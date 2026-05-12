@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Button from "../../../../components/Button/Button";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { toast } from "react-toastify";
  
 const CompanyEscalationContactModal = ({
@@ -70,17 +71,17 @@ const CompanyEscalationContactModal = ({
       />
  
       {/* Role */}
-      <select
-        className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      <FilterListbox
+        options={[
+          { value: "", label: "Select Role" },
+          { value: "PROJECT_MANAGER", label: "Project Manager" },
+          { value: "DELIVERY_MANAGER", label: "Delivery Manager" },
+          { value: "BU_HEAD", label: "BU Head" },
+          { value: "RESOURCE_MANAGER", label: "Resource Manager" },
+        ]}
         value={formData.contactRole}
-        onChange={(e) => handleChange("contactRole", e.target.value)}
-      >
-        <option value="">Select Role</option>
-        <option value="PROJECT_MANAGER">Project Manager</option>
-        <option value="DELIVERY_MANAGER">Delivery Manager</option>
-        <option value="BU_HEAD">BU Head</option>
-        <option value="RESOURCE_MANAGER">Resource Manager</option>
-      </select>
+        onChange={(val) => handleChange("contactRole", val)}
+      />
  
       {/* Email */}
       <input
@@ -100,15 +101,15 @@ const CompanyEscalationContactModal = ({
       />
  
       {/* Escalation Level */}
-      <select
-        className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      <FilterListbox
+        options={[
+          { value: "Level-1", label: "Level 1" },
+          { value: "Level-2", label: "Level 2" },
+          { value: "Level-3", label: "Level 3" },
+        ]}
         value={formData.escalationLevel}
-        onChange={(e) => handleChange("escalationLevel", e.target.value)}
-      >
-        <option value="Level-1">Level 1</option>
-        <option value="Level-2">Level 2</option>
-        <option value="Level-3">Level 3</option>
-      </select>
+        onChange={(val) => handleChange("escalationLevel", val)}
+      />
  
       {/* Active Flag */}
       <label className="flex items-center gap-2 text-sm">

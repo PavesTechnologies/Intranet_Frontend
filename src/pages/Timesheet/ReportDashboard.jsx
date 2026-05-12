@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import FilterListbox from "../../components/filter/FilterListbox";
 import "./ReportDashboard.css";
 import {
   FileDown,
@@ -35,6 +36,9 @@ const monthOptions = [
 ];
 
 const currentYear = new Date().getFullYear();
+const currentMonth = new Date().getMonth() + 1; // 1-indexed (Jan=1, May=5)
+const defaultMonth = currentMonth > 1 ? currentMonth - 1 : 12;
+const defaultYear = currentMonth > 1 ? currentYear : currentYear - 1;
 const yearOptions = [currentYear, currentYear - 1];
 
 export default function ReportDashboard() {
@@ -51,16 +55,18 @@ export default function ReportDashboard() {
   const [projectBreakdownPerPage, setProjectBreakdownPerPage] = useState(8);
   const [leaveHoursPerPage, setLeaveHoursPerPage] = useState(8);
   const TS_BASE_URL = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [appliedMonth, setAppliedMonth] = useState(new Date().getMonth());
-  const [appliedYear, setAppliedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
+  const [selectedYear, setSelectedYear] = useState(defaultYear);
+  const [appliedMonth, setAppliedMonth] = useState(defaultMonth);
+  const [appliedYear, setAppliedYear] = useState(defaultYear);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [projectPages, setProjectPages] = useState({});
   const [mailLoading, setMailLoading] = useState(false);
   const membersPerPage = 8;
   const [leaveError, setLeaveError] = useState(false);
+  const [serverError, setServerError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   const handleProjectPageChange = (projectId, newPage) => {
     setProjectPages((prev) => ({
@@ -71,7 +77,7 @@ export default function ReportDashboard() {
 
   const filteredMonths =
     selectedYear === currentYear
-      ? monthOptions.filter((m) => m.value <= appliedMonth)
+      ? monthOptions.filter((m) => m.value < currentMonth)
       : monthOptions;
 
   const itemsPerPageChangeEmployeeBreakdown = (event) => {
@@ -102,6 +108,8 @@ export default function ReportDashboard() {
       setProductivityPage(1);
       setLeavePage(1);
       setProjectBreakdownPage(1);
+      setLeaveError(false);
+      setServerError(false);
       try {
         const res = await axios.get(
           `${TS_BASE_URL}/api/report/monthly_finance`,
@@ -125,13 +133,17 @@ export default function ReportDashboard() {
         toast.error(err.response?.data || "Failed to fetch data");
         if (err.response?.status === 400) {
           setLeaveError(true);
+          setData(null);
+        } else if (err.response?.status === 500) {
+          setServerError(true);
+          setData(null);
         }
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [TS_BASE_URL, appliedMonth, appliedYear]);
+  }, [TS_BASE_URL, appliedMonth, appliedYear, retryKey]);
 
   const sendMailPDF = async () => {
     setMailLoading(true);
@@ -412,8 +424,98 @@ export default function ReportDashboard() {
 
   if (leaveError && !data)
     return (
-      <div className="report-container text-center font-semibold">
-        Pending Leaves needs to be reviewed.
+      <div className="report-container">
+        <div className="report-header">
+          <div>
+            <h1>Monthly Finance Timesheet Report</h1>
+            <p className="subtitle pt-1">
+              Team Productivity & Utilization Metrics
+            </p>
+            <p className="month pt-1">
+              Report Month:
+              <button
+                className="filter-toggle-btn"
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+              >
+                <span>
+                  {monthOptions.find((m) => m.value === selectedMonth)?.name}
+                  ,{selectedYear}
+                </span>
+              </button>
+            </p>
+            {isFilterOpen && (
+              <div className="report-filters">
+                <FilterListbox
+                  options={filteredMonths.map((m) => ({ value: m.value, label: m.name }))}
+                  value={selectedMonth}
+                  onChange={setSelectedMonth}
+                />
+                <FilterListbox
+                  options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
+                  value={selectedYear}
+                  onChange={setSelectedYear}
+                />
+                <button className="apply-btn" onClick={handleFilterApply}>
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="text-center font-semibold" style={{ marginTop: "2rem" }}>
+          Pending Leaves for {monthOptions.find((m) => m.value === appliedMonth)?.name} {appliedYear} needs to be reviewed.
+        </div>
+      </div>
+    );
+
+  if (serverError && !data)
+    return (
+      <div className="report-container">
+        <div className="report-header">
+          <div>
+            <h1>Monthly Finance Timesheet Report</h1>
+            <p className="subtitle pt-1">
+              Team Productivity & Utilization Metrics
+            </p>
+            <p className="month pt-1">
+              Report Month:
+              <button
+                className="filter-toggle-btn"
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+              >
+                <span>
+                  {monthOptions.find((m) => m.value === selectedMonth)?.name}
+                  ,{selectedYear}
+                </span>
+              </button>
+            </p>
+            {isFilterOpen && (
+              <div className="report-filters">
+                <FilterListbox
+                  options={filteredMonths.map((m) => ({ value: m.value, label: m.name }))}
+                  value={selectedMonth}
+                  onChange={setSelectedMonth}
+                />
+                <FilterListbox
+                  options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
+                  value={selectedYear}
+                  onChange={setSelectedYear}
+                />
+                <button className="apply-btn" onClick={handleFilterApply}>
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="text-center" style={{ marginTop: "2rem" }}>
+          <p className="font-semibold" style={{ marginBottom: "0.75rem" }}>
+            Internal server error occurred. Please try again.
+          </p>
+          <Button variant="secondary" size="medium" onClick={() => setRetryKey((k) => k + 1)}>
+            Try Again
+          </Button>
+        </div>
       </div>
     );
 
@@ -488,26 +590,16 @@ export default function ReportDashboard() {
           </p>
           {isFilterOpen && (
             <div className="report-filters">
-              <select
+              <FilterListbox
+                options={filteredMonths.map((m) => ({ value: m.value, label: m.name }))}
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              >
-                {filteredMonths.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={setSelectedMonth}
+              />
+              <FilterListbox
+                options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-              >
-                {yearOptions.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedYear}
+              />
               <button className="apply-btn" onClick={handleFilterApply}>
                 Apply
               </button>
@@ -608,20 +700,13 @@ export default function ReportDashboard() {
           </h3>
           <p className="month pt-1 flex justify-end">
             Records Per Page:
-            <select
-              name="userRange"
-              id="userRangeDropdown"
-              value={employeeBreakdownPerPage}
-              className="pr-6 py-0 border-none ml-2 mb-2 text-sm"
-              onChange={itemsPerPageChangeEmployeeBreakdown}
-            >
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-            </select>
+            <div className="ml-2 w-24">
+              <FilterListbox
+                options={["5","6","7","8","9","10"].map((n) => ({ value: n, label: n }))}
+                value={String(employeeBreakdownPerPage)}
+                onChange={(val) => itemsPerPageChangeEmployeeBreakdown({ target: { value: val } })}
+              />
+            </div>
           </p>
         </div>
         <table>
@@ -678,20 +763,13 @@ export default function ReportDashboard() {
           </h3>
           <p className="month pt-1 flex justify-end">
             Records Per Page:
-            <select
-              name="userRange"
-              id="userRangeDropdown"
-              value={productivityPerPage}
-              className="pr-6 py-0 border-none ml-2 mb-2 text-sm"
-              onChange={itemsPerPageChangeProductivity}
-            >
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-            </select>
+            <div className="ml-2 w-24">
+              <FilterListbox
+                options={["5","6","7","8","9","10"].map((n) => ({ value: n, label: n }))}
+                value={String(productivityPerPage)}
+                onChange={(val) => itemsPerPageChangeProductivity({ target: { value: val } })}
+              />
+            </div>
           </p>
         </div>
         <table>
@@ -744,20 +822,13 @@ export default function ReportDashboard() {
           </h3>
           <p className="month pt-1 flex justify-end">
             Records Per Page:
-            <select
-              name="userRange"
-              id="userRangeDropdown"
-              value={leaveHoursPerPage}
-              className="pr-6 py-0 border-none ml-2 mb-2 text-sm"
-              onChange={itemsPerPageChangeLeaveHours}
-            >
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-            </select>
+            <div className="ml-2 w-24">
+              <FilterListbox
+                options={["5","6","7","8","9","10"].map((n) => ({ value: n, label: n }))}
+                value={String(leaveHoursPerPage)}
+                onChange={(val) => itemsPerPageChangeLeaveHours({ target: { value: val } })}
+              />
+            </div>
           </p>
         </div>
         <table>
@@ -806,20 +877,13 @@ export default function ReportDashboard() {
           </h3>
           <p className="month pt-1 flex justify-end">
             Records Per Page:
-            <select
-              name="userRange"
-              id="userRangeDropdown"
-              value={projectBreakdownPerPage}
-              className="pr-6 py-0 border-none ml-2 mb-2 text-sm"
-              onChange={itemsPerPageChangeProjectBreakdown}
-            >
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-            </select>
+            <div className="ml-2 w-24">
+              <FilterListbox
+                options={["5","6","7","8","9","10"].map((n) => ({ value: n, label: n }))}
+                value={String(projectBreakdownPerPage)}
+                onChange={(val) => itemsPerPageChangeProjectBreakdown({ target: { value: val } })}
+              />
+            </div>
           </p>
         </div>
         <div className="projects-grid">

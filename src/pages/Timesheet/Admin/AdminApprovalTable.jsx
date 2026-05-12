@@ -6,9 +6,11 @@ import { reviewTimesheet, handleBulkReviewAdmin } from "../api";
 import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
-import { MoreVertical, X } from "lucide-react";
+import FilterListbox from "../../../components/filter/FilterListbox";
+import { MoreVertical, X, ChevronDown, ChevronUp } from "lucide-react";
 import Modal from "../../../components/Modal/modal";
 import InternalActivities from "./InternalActivities";
+import HourSettingsModal from "./HourSettingsModal";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 
 const AdminApprovalTable = ({
@@ -38,6 +40,12 @@ const AdminApprovalTable = ({
   const [userLevelLoading, setUserLevelLoading] = useState(null); // for Approve/Reject All Weeks
   const [weekLevelLoading, setWeekLevelLoading] = useState({}); // for per-week Approve/Reject
   const [isOpen, setIsOpen] = useState(false);
+  const [isHourSettingsOpen, setIsHourSettingsOpen] = useState(false);
+
+  // ✅ Per-user expand/collapse state — collapsed by default
+  const [expandedUsers, setExpandedUsers] = useState({});
+  const toggleUser = (userId) =>
+    setExpandedUsers((prev) => ({ ...prev, [userId]: !prev[userId] }));
 
   // -----------------------------
   // Fetch project info
@@ -79,8 +87,7 @@ const AdminApprovalTable = ({
     setHolidayLoading(true);
     try {
       const res = await fetch(
-        `${
-          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/all`,
         {
           headers: {
@@ -205,8 +212,7 @@ const AdminApprovalTable = ({
       }));
 
       const res = await fetch(
-        `${
-          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/timesheets/review/internal/bulk`,
         {
           method: "POST",
@@ -221,8 +227,7 @@ const AdminApprovalTable = ({
       if (!res.ok) throw new Error("Bulk review failed");
 
       showStatusToast(
-        `All submitted weeks ${status.toLowerCase()} successfully for ${
-          user.userName
+        `All submitted weeks ${status.toLowerCase()} successfully for ${user.userName
         }`,
         "success",
       );
@@ -654,8 +659,7 @@ const AdminApprovalTable = ({
     try {
       for (const id of selectedUsers) {
         const res = await fetch(
-          `${
-            window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holiday-exclude-users/${id}`,
           {
             method: "DELETE",
@@ -693,8 +697,7 @@ const AdminApprovalTable = ({
 
     try {
       const res = await fetch(
-        `${
-          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/create`,
         {
           method: "POST",
@@ -737,8 +740,7 @@ const AdminApprovalTable = ({
       // Run both API calls in parallel and wait for both to finish
       const [usersRes, holidaysRes] = await Promise.all([
         fetch(
-          `${
-            window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holiday-exclude-users/allusers`,
           {
             headers: {
@@ -747,8 +749,7 @@ const AdminApprovalTable = ({
           },
         ),
         fetch(
-          `${
-            window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holidays/currentMonth`,
           {
             headers: {
@@ -789,8 +790,7 @@ const AdminApprovalTable = ({
 
     try {
       const res = await fetch(
-        `${
-          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/${selectedUpdateRecord.id}`,
         {
           method: "PUT",
@@ -830,15 +830,22 @@ const AdminApprovalTable = ({
       ) : (
         <>
           <div className="flex justify-end gap-3 mb-4">
-            <Button variant="primary" size="small" onClick={exportCSV}>
+            <Button variant="primary" size="medium" onClick={exportCSV}>
               Export CSV
             </Button>
-            <Button variant="primary" size="small" onClick={exportPDF}>
+            <Button variant="secondary" size="medium" onClick={exportPDF}>
               Export PDF
             </Button>
             <Button
-              variant="secondary"
-              size="small"
+              variant="primary"
+              size="medium"
+              onClick={() => setIsHourSettingsOpen(true)}
+            >
+              Hour Settings
+            </Button>
+            <Button
+              variant="primary"
+              size="medium"
               onClick={() => setIsOpen(true)}
             >
               Internal Activities
@@ -857,80 +864,114 @@ const AdminApprovalTable = ({
               No Approvals
             </div>
           ) : (
-            enrichedGroupedData.map((user) => (
-              <div
-                key={user.userId}
-                className="bg-white rounded-xl shadow-md border p-4"
-              >
-                {/* ✅ One-line layout for username and action buttons */}
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-xl font-bold text-gray-800">
-                    {user.userName} (ID: {user.userId})
-                  </h2>
+            enrichedGroupedData.map((user) => {
+              const isExpanded = !!expandedUsers[user.userId];
+              const totalWeeks = user.weeklySummary?.length || 0;
+              const pendingWeeks =
+                user.weeklySummary?.filter((w) => {
+                  const s = w.weeklyStatus?.toUpperCase();
+                  return s === "SUBMITTED" || s === "PARTIALLY APPROVED";
+                }).length || 0;
 
-                  <div className="flex gap-3">
-                    {userLevelLoading === user.userId ? (
-                      <LoadingSpinner text="Processing..." />
-                    ) : (
-                      <>
-                        <Button
-                          variant="success"
-                          size="small"
-                          disabled={
-                            userLevelLoading !== null || disableButton(user)
-                          }
-                          className={`disabled:opacity-50 disabled:cursor-not-allowed`}
-                          onClick={async () => {
-                            setUserLevelLoading(user.userId);
-                            try {
-                              await handleSelectAllWeeks(user, "APPROVED");
-                            } finally {
-                              setUserLevelLoading(null);
+              return (
+                <div
+                  key={user.userId}
+                  className="bg-white rounded-xl shadow-md border p-4"
+                >
+                  {/* ✅ Collapsible user header */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => toggleUser(user.userId)}
+                      className="flex items-center gap-3 text-left flex-1 min-w-0 py-1 hover:bg-gray-50 rounded-md px-2 -mx-2 transition-colors"
+                      aria-expanded={isExpanded}
+                    >
+                      {isExpanded ? (
+                        <ChevronUp size={20} className="text-gray-500 shrink-0" />
+                      ) : (
+                        <ChevronDown size={20} className="text-gray-500 shrink-0" />
+                      )}
+                      <h2 className="text-xl font-bold text-gray-800 truncate">
+                        {user.userName} (ID: {user.userId})
+                      </h2>
+                      <span className="text-sm text-gray-500 shrink-0">
+                        • {totalWeeks} {totalWeeks === 1 ? "week" : "weeks"}
+                      </span>
+                      {pendingWeeks > 0 && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300 shrink-0">
+                          {pendingWeeks} pending
+                        </span>
+                      )}
+                    </button>
+
+                    <div className="flex gap-3 shrink-0">
+                      {userLevelLoading === user.userId ? (
+                        <LoadingSpinner text="Processing..." />
+                      ) : (
+                        <>
+                          <Button
+                            variant="success"
+                            size="small"
+                            disabled={
+                              userLevelLoading !== null || disableButton(user)
                             }
-                          }}
-                        >
-                          Approve All Weeks
-                        </Button>
+                            className={`disabled:opacity-50 disabled:cursor-not-allowed`}
+                            onClick={async () => {
+                              setUserLevelLoading(user.userId);
+                              try {
+                                await handleSelectAllWeeks(user, "APPROVED");
+                              } finally {
+                                setUserLevelLoading(null);
+                              }
+                            }}
+                          >
+                            Approve All Weeks
+                          </Button>
 
-                        <Button
-                          variant="danger"
-                          size="small"
-                          disabled={
-                            userLevelLoading !== null || disableButton(user)
-                          }
-                          className={`disabled:opacity-50 disabled:cursor-not-allowed`}
-                          onClick={handleCancelModal}
-                        >
-                          Reject All Weeks
-                        </Button>
-                      </>
-                    )}
+                          <Button
+                            variant="danger"
+                            size="small"
+                            disabled={
+                              userLevelLoading !== null || disableButton(user)
+                            }
+                            className={`disabled:opacity-50 disabled:cursor-not-allowed`}
+                            onClick={handleCancelModal}
+                          >
+                            Reject All Weeks
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <CancellationModal
-                  title="Reject All Weeks"
-                  subtitle="Are you sure you want to Reject All Weeks Timesheets?"
-                  isOpen={rejectAllCancellationModal}
-                  onCancel={handleCancelModal}
-                  onConfirm={async (reason) => {
-                    setUserLevelLoading(user.userId);
-                    setActionLoading(true);
-                    try {
-                      await handleSelectAllWeeks(user, "REJECTED", reason);
-                    } finally {
-                      setUserLevelLoading(null);
-                      setActionLoading(false);
-                      handleCancelModal();
-                    }
-                  }}
-                  isLoading={actionLoading}
-                  confirmText="Confirm"
-                />
+                  <CancellationModal
+                    title="Reject All Weeks"
+                    subtitle="Are you sure you want to Reject All Weeks Timesheets?"
+                    isOpen={rejectAllCancellationModal}
+                    onCancel={handleCancelModal}
+                    onConfirm={async (reason) => {
+                      setUserLevelLoading(user.userId);
+                      setActionLoading(true);
+                      try {
+                        await handleSelectAllWeeks(user, "REJECTED", reason);
+                      } finally {
+                        setUserLevelLoading(null);
+                        setActionLoading(false);
+                        handleCancelModal();
+                      }
+                    }}
+                    isLoading={actionLoading}
+                    confirmText="Confirm"
+                  />
 
-                <hr className="my-3 border-gray-200" />
-                {renderUserWeeks(user)}
-              </div>
-            ))
+                  {isExpanded && (
+                    <>
+                      <hr className="my-3 border-gray-200" />
+                      {renderUserWeeks(user)}
+                    </>
+                  )}
+                </div>
+              );
+            })
           )}
         </>
       )}
@@ -986,13 +1027,11 @@ const AdminApprovalTable = ({
                     <div
                       key={item.id}
                       onClick={() => handleSelectUser(item)}
-                      className={`border rounded-lg p-4 transition-all ${
-                        isRemoveMode ? "cursor-pointer" : "cursor-default"
-                      } ${
-                        isRemoveMode && selectedUsers.includes(item.id)
+                      className={`border rounded-lg p-4 transition-all ${isRemoveMode ? "cursor-pointer" : "cursor-default"
+                        } ${isRemoveMode && selectedUsers.includes(item.id)
                           ? "bg-red-100 border-red-400"
                           : "bg-gray-50 hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       <h3 className="font-semibold text-gray-800 text-lg">
                         {item.userName} (User ID: {item.userId})
@@ -1102,36 +1141,28 @@ const AdminApprovalTable = ({
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Select Employee
                         </label>
-                        <select
-                          className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "-- Select Employee --" },
+                            ...managerUsers.map((u) => ({ value: u.id, label: `${u.id} - ${u.fullName}` })),
+                          ]}
                           value={selectedAddUser}
-                          onChange={(e) => setSelectedAddUser(e.target.value)}
-                        >
-                          <option value="">-- Select Employee --</option>
-                          {managerUsers.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.id} - {u.fullName}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setSelectedAddUser}
+                        />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Select Holiday
                         </label>
-                        <select
-                          className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "-- Select Holiday --" },
+                            ...monthlyHolidays.map((h) => ({ value: h.holidayDate, label: `${h.holidayDate} - ${h.holidayName}` })),
+                          ]}
                           value={selectedHoliday}
-                          onChange={(e) => setSelectedHoliday(e.target.value)}
-                        >
-                          <option value="">-- Select Holiday --</option>
-                          {monthlyHolidays.map((h) => (
-                            <option key={h.holidayId} value={h.holidayDate}>
-                              {h.holidayDate} - {h.holidayName}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setSelectedHoliday}
+                        />
                       </div>
 
                       <div>
@@ -1206,18 +1237,14 @@ const AdminApprovalTable = ({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Select Holiday
                     </label>
-                    <select
-                      className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-400"
+                    <FilterListbox
+                      options={[
+                        { value: "", label: "-- Select Holiday --" },
+                        ...monthlyHolidays.map((h) => ({ value: h.holidayDate, label: `${h.holidayDate} - ${h.holidayDescription}` })),
+                      ]}
                       value={updateHoliday}
-                      onChange={(e) => setUpdateHoliday(e.target.value)}
-                    >
-                      <option value="">-- Select Holiday --</option>
-                      {monthlyHolidays.map((h) => (
-                        <option key={h.holidayId} value={h.holidayDate}>
-                          {h.holidayDate} - {h.holidayDescription}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setUpdateHoliday}
+                    />
                   </div>
 
                   {/* 🆕 Editable Reason */}
@@ -1293,6 +1320,11 @@ const AdminApprovalTable = ({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         children={<InternalActivities />}
+      />
+
+      <HourSettingsModal
+        isOpen={isHourSettingsOpen}
+        onClose={() => setIsHourSettingsOpen(false)}
       />
     </div>
   );

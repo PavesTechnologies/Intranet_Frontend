@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Select from "react-select";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   X,
   ChevronRight,
@@ -13,7 +14,11 @@ import {
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
 const ISSUE_TYPES = ["Epic", "Story", "Task"];
-const SCORE_OPTIONS = [1, 2, 3, 4, 5].map((v) => ({ value: v, label: `${v}` }));
+
+const SCORE_OPTIONS = [1, 2, 3, 4, 5].map((v) => ({
+  value: v,
+  label: `${v}`,
+}));
 
 const selectStyles = (hasError) => ({
   control: (base, state) => ({
@@ -47,9 +52,11 @@ const ScorePicker = ({ value, onChange, label, required, error }) => (
       {label}
       {required && <span className="text-red-400 ml-0.5">*</span>}
     </label>
+
     <div className="flex gap-1.5 sm:gap-2">
       {[1, 2, 3, 4, 5].map((n) => {
         const selected = value?.value === n;
+
         const colors = [
           "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100",
           "bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100",
@@ -57,6 +64,7 @@ const ScorePicker = ({ value, onChange, label, required, error }) => (
           "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100",
           "bg-red-50 border-red-200 text-red-700 hover:bg-red-100",
         ];
+
         const selectedColors = [
           "bg-emerald-500 border-emerald-500 text-white",
           "bg-sky-500 border-sky-500 text-white",
@@ -64,6 +72,7 @@ const ScorePicker = ({ value, onChange, label, required, error }) => (
           "bg-orange-500 border-orange-500 text-white",
           "bg-red-500 border-red-500 text-white",
         ];
+
         return (
           <button
             key={n}
@@ -77,10 +86,12 @@ const ScorePicker = ({ value, onChange, label, required, error }) => (
         );
       })}
     </div>
+
     <div className="flex justify-between text-[10px] text-slate-400 mt-1 px-1">
       <span>Low</span>
       <span>Critical</span>
     </div>
+
     {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
   </div>
 );
@@ -92,7 +103,9 @@ const Field = ({ label, required, error, children }) => (
       {label}
       {required && <span className="text-red-400 ml-0.5">*</span>}
     </label>
+
     {children}
+
     {error && <p className="text-xs text-red-500">{error}</p>}
   </div>
 );
@@ -134,8 +147,18 @@ const STEPS = [
     icon: AlertTriangle,
     desc: "Status, category & scoring",
   },
-  { id: 2, label: "People", icon: Check, desc: "Owner & reporter" },
-  { id: 3, label: "Link", icon: Link, desc: "Optional issue link" },
+  {
+    id: 2,
+    label: "People",
+    icon: Check,
+    desc: "Owner & reporter",
+  },
+  {
+    id: 3,
+    label: "Link",
+    icon: Link,
+    desc: "Optional issue link",
+  },
 ];
 
 /* ════════════════════════════════════════════
@@ -148,8 +171,10 @@ const CreateRiskModal = ({
   onSuccess,
   onCreate,
   risk = null,
+  onEdit = false,
 }) => {
   const isEditMode = Boolean(risk?.id);
+  // {console.log("Risk data in modal:", risk)}; // Debug log
   const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
   const token = localStorage.getItem("token");
 
@@ -181,15 +206,26 @@ const CreateRiskModal = ({
     setErrors((e) => ({ ...e, [field]: undefined }));
   };
 
-  /* Pre-fetch master data as soon as projectId is known — NOT waiting for modal open */
+  /* =========================
+     Fetch master data
+  ========================= */
   useEffect(() => {
     if (!projectId) return;
+
     setLoadingMeta(true);
+
     const headers = { Authorization: `Bearer ${token}` };
+
     Promise.all([
-      axios.get(`${BASE_URL}/api/projects/${projectId}/members-with-owner`, { headers }),
-      axios.get(`${BASE_URL}/api/projects/${projectId}/risk-statuses`, { headers }),
-      axios.get(`${BASE_URL}/api/risk/category`, { headers }),
+      axios.get(`${BASE_URL}/api/projects/${projectId}/members-with-owner`, {
+        headers,
+      }),
+      axios.get(`${BASE_URL}/api/projects/${projectId}/risk-statuses`, {
+        headers,
+      }),
+      axios.get(`${BASE_URL}/api/risk/category`, {
+        headers,
+      }),
     ])
       .then(([m, s, c]) => {
         setMembers(m.data || []);
@@ -198,169 +234,324 @@ const CreateRiskModal = ({
       })
       .catch(console.error)
       .finally(() => setLoadingMeta(false));
-  }, [projectId]);
+  }, [projectId, BASE_URL, token]);
 
-  /* Reset step + errors each time modal opens */
+  /* =========================
+     Reset modal state on open
+  ========================= */
   useEffect(() => {
     if (!isOpen) return;
+
     setStep(0);
     setErrors({});
-  }, [isOpen]);
 
-  /* prefill edit */
+    if (!isEditMode) {
+      setForm({
+        title: "",
+        description: "",
+        triggers: "",
+        probability: null,
+        impact: null,
+        statusId: "",
+        owner: null,
+        reporter: null,
+        category: null,
+        linkedType: null,
+        linkedIssue: null,
+      });
+      setIssues([]);
+    }
+  }, [isOpen, isEditMode]);
+
+  /* =========================
+     Prefill edit data
+  ========================= */
   useEffect(() => {
     if (!risk || !members.length || !categories.length) return;
+
+    const ownerMember = members.find((m) => m.id === risk.ownerId);
+    const reporterMember = members.find((m) => m.id === risk.reporterId);
+    const categoryObj = categories.find((c) => c.id === risk.categoryId);
+
+    const linkedTypeValue = risk.linkedType
+      ? {
+          value: risk.linkedType,
+          label: risk.linkedType,
+        }
+      : null;
+
+    const linkedIssueValue = risk.linkedId
+      ? {
+          value: risk.linkedId,
+          label:
+            risk.linkedName ||
+            risk.linkedTitle ||
+            risk.issueName ||
+            risk.issueTitle ||
+            risk.titleOfLinkedIssue ||
+            `${risk.linkedType || "Issue"} #${risk.linkedId}`,
+        }
+      : null;
+
     setForm({
       title: risk.title ?? "",
       description: risk.description ?? "",
       triggers: risk.triggers ?? "",
       statusId: risk.statusId ?? "",
+
       probability:
         SCORE_OPTIONS.find((p) => p.value === risk.probability) || null,
+
       impact: SCORE_OPTIONS.find((i) => i.value === risk.impact) || null,
-      owner: members.find((m) => m.id === risk.ownerId)
+
+      owner: ownerMember
         ? {
             value: risk.ownerId,
-            label: members.find((m) => m.id === risk.ownerId).name,
+            label: ownerMember.name,
           }
         : null,
-      reporter: members.find((m) => m.id === risk.reporterId)
+
+      reporter: reporterMember
         ? {
             value: risk.reporterId,
-            label: members.find((m) => m.id === risk.reporterId).name,
+            label: reporterMember.name,
           }
         : null,
-      category: categories.find((c) => c.id === risk.categoryId)
+
+      category: categoryObj
         ? {
             value: risk.categoryId,
-            label: categories.find((c) => c.id === risk.categoryId).name,
+            label: categoryObj.name,
           }
         : null,
-      linkedType: null,
-      linkedIssue: null,
+
+      linkedType: linkedTypeValue,
+      linkedIssue: linkedIssueValue,
     });
   }, [risk, members, categories]);
 
-  /* load issues */
+  /* =========================
+     Load issues based on linked type
+  ========================= */
   useEffect(() => {
-    if (!form.linkedType || !projectId) return;
+    if (!form.linkedType || !projectId) {
+      setIssues([]);
+      return;
+    }
+
     const apiType =
       form.linkedType.value === "Story"
         ? "stories"
         : `${form.linkedType.value.toLowerCase()}s`;
+
     axios
       .get(`${BASE_URL}/api/projects/${projectId}/${apiType}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((res) => setIssues(res.data || []))
+      .then((res) => {
+        const list = res.data || [];
+        setIssues(list);
+
+        /*
+          In edit mode, we initially prefill linkedIssue with temporary label.
+          Once issue list is loaded, replace it with real title/name from API.
+        */
+        if (isEditMode && form.linkedIssue?.value) {
+          const matched = list.find((i) => i.id === form.linkedIssue.value);
+
+          if (matched) {
+            setForm((prev) => ({
+              ...prev,
+              linkedIssue: {
+                value: matched.id,
+                label:
+                  matched.title ||
+                  matched.name ||
+                  `${form.linkedType.value} #${matched.id}`,
+              },
+            }));
+          }
+        }
+      })
       .catch(console.error);
-  }, [form.linkedType, projectId]);
+  }, [form.linkedType, projectId, BASE_URL, token, isEditMode]);
 
   if (!isOpen) return null;
 
-  /* validate per step */
+  /* =========================
+     Validation
+  ========================= */
   const validateStep = (s) => {
     const e = {};
-    if (s === 0 && !form.title.trim()) e.title = "Title is required";
-    if (s === 1 && !form.statusId) e.statusId = "Status is required";
-    if (s === 1 && !form.category) e.category = "Category is required";
-    if (s === 1 && !form.probability) e.probability = "Probability is required";
-    if (s === 1 && !form.impact) e.impact = "Impact is required";
-    if (s === 2 && !form.owner) e.owner = "Owner is required";
-    if (s === 2 && !form.reporter) e.reporter = "Reporter is required";
-    if (s === 3 && !form.linkedType) e.linkedType = "Link type is required";
-    if (s === 3 && !form.linkedIssue) e.linkedIssue = "Linked item is required";
+
+    if (s === 0 && !form.title.trim()) {
+      e.title = "Title is required";
+    }
+
+    if (s === 1 && !form.statusId) {
+      e.statusId = "Status is required";
+    }
+
+    if (s === 1 && !form.category) {
+      e.category = "Category is required";
+    }
+
+    if (s === 1 && !form.probability) {
+      e.probability = "Probability is required";
+    }
+
+    if (s === 1 && !form.impact) {
+      e.impact = "Impact is required";
+    }
+
+    if (s === 2 && !form.owner) {
+      e.owner = "Owner is required";
+    }
+
+    if (s === 2 && !form.reporter) {
+      e.reporter = "Reporter is required";
+    }
+
+    if (s === 3 && !form.linkedType) {
+      e.linkedType = "Link type is required";
+    }
+
+    if (s === 3 && !form.linkedIssue) {
+      e.linkedIssue = "Linked item is required";
+    }
+
     return e;
   };
 
   const goNext = () => {
     const e = validateStep(step);
+
     if (Object.keys(e).length) {
       setErrors(e);
       return;
     }
+
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
-  const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
-  const handleSubmit = async () => {
-    // validate all required steps
-    const allErrors = {
-      ...validateStep(0),
-      ...validateStep(1),
-      ...validateStep(2),
-      ...validateStep(3),
-    };
-    if (Object.keys(allErrors).length) {
-      showStatusToast("Please fill all required fields", "error");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const payload = {
-        projectId,
-        title: form.title,
-        description: form.description,
-        probability: form.probability?.value,
-        impact: form.impact?.value,
-        triggers: form.triggers,
-        statusId: form.statusId,
-        ownerId: form.owner.value,
-        reporterId: form.reporter.value,
-        categoryId: form.category.value,
-      };
-      let riskId = risk?.id;
-      if (isEditMode) {
-        await axios.put(`${BASE_URL}/api/risks/${riskId}`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } else {
-        const res = await axios.post(`${BASE_URL}/api/risks`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        riskId = res.data.id;
-      }
-      if (form.linkedType && form.linkedIssue) {
-        await axios.post(
-          `${BASE_URL}/api/risk-links`,
-          {
-            riskId,
-            linkedType: form.linkedType.value,
-            linkedId: form.linkedIssue.value,
-          },
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
-      }
-      showStatusToast(
-        isEditMode ? "Risk updated successfully" : "Risk created successfully",
-        "success",
-      );
-      onSuccess?.();
-      onCreate?.();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      showStatusToast("Operation failed", "error");
-    } finally {
-      setSubmitting(false);
-    }
+  const goBack = () => {
+    setStep((s) => Math.max(s - 1, 0));
   };
 
-  const memberOptions = members.map((m) => ({ value: m.id, label: m.name }));
+  /* =========================
+     Submit
+  ========================= */
+ const handleSubmit = async () => {
+  const allErrors = {
+    ...validateStep(0),
+    ...validateStep(1),
+    ...validateStep(2),
+    ...validateStep(3),
+  };
+
+  if (Object.keys(allErrors).length) {
+    setErrors(allErrors);
+    showStatusToast("Please fill all required fields", "error");
+    return;
+  }
+
+  setSubmitting(true);
+
+  try {
+    const payload = {
+      projectId,
+      title: form.title,
+      description: form.description,
+      probability: form.probability?.value,
+      impact: form.impact?.value,
+      triggers: form.triggers,
+      statusId: form.statusId,
+      ownerId: form.owner.value,
+      reporterId: form.reporter.value,
+      categoryId: form.category.value,
+    };
+
+    let riskId = risk?.id;
+
+    if (isEditMode) {
+      await axios.put(`${BASE_URL}/api/risks/${riskId}`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } else {
+      const res = await axios.post(`${BASE_URL}/api/risks`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      riskId = res.data.id;
+    }
+
+    if (form.linkedType && form.linkedIssue) {
+      const linkPayload = {
+        riskId,
+        linkedType: form.linkedType.value,
+        linkedId: form.linkedIssue.value,
+      };
+
+      if (isEditMode && risk?.riskLinkId) {
+        await axios.patch(
+          `${BASE_URL}/api/risk-links/${risk.riskLinkId}`,
+          linkPayload,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      } else {
+        await axios.post(`${BASE_URL}/api/risk-links`, linkPayload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    }
+
+    showStatusToast(
+      isEditMode ? "Risk updated successfully" : "Risk created successfully",
+      "success"
+    );
+
+    onSuccess?.();
+    onCreate?.();
+    onClose();
+  } catch (err) {
+    console.error(err);
+    showStatusToast("Operation failed", "error");
+  } finally {
+    setSubmitting(false);
+  }
+};
+
+  /* =========================
+     Options
+  ========================= */
+  const memberOptions = members.map((m) => ({
+    value: m.id,
+    label: m.name,
+  }));
+
   const categoryOptions = categories.map((c) => ({
     value: c.id,
     label: c.name,
   }));
+
   const issueOptions = issues.map((i) => ({
     value: i.id,
-    label: i.title || i.name,
+    label: i.title || i.name || `${form.linkedType?.value || "Issue"} #${i.id}`,
   }));
 
-  /* ── Risk score matrix display ── */
+  /* =========================
+     Risk score display
+  ========================= */
   const riskScore = (form.probability?.value ?? 0) * (form.impact?.value ?? 0);
+
   const riskLevel =
     riskScore >= 20
-      ? { label: "Critical", cls: "bg-red-100 text-red-700 border-red-200" }
+      ? {
+          label: "Critical",
+          cls: "bg-red-100 text-red-700 border-red-200",
+        }
       : riskScore >= 12
         ? {
             label: "High",
@@ -378,7 +569,9 @@ const CreateRiskModal = ({
               }
             : null;
 
-  /* ── Step content panels ── */
+  /* =========================
+     Step panels
+  ========================= */
   const panels = [
     /* Step 0 — Details */
     <div key={0} className="space-y-4">
@@ -390,6 +583,7 @@ const CreateRiskModal = ({
           onChange={(e) => set("title", e.target.value)}
         />
       </Field>
+
       <Field label="Description">
         <Textarea
           placeholder="What could go wrong? Provide context…"
@@ -398,6 +592,7 @@ const CreateRiskModal = ({
           onChange={(e) => set("description", e.target.value)}
         />
       </Field>
+
       <Field label="Triggers">
         <Textarea
           placeholder="Early warning signs to watch for…"
@@ -417,11 +612,13 @@ const CreateRiskModal = ({
               <div className="h-3 w-16 bg-slate-200 rounded mb-2" />
               <div className="h-10 bg-slate-100 rounded-lg" />
             </div>
+
             <div>
               <div className="h-3 w-16 bg-slate-200 rounded mb-2" />
               <div className="h-10 bg-slate-100 rounded-lg" />
             </div>
           </div>
+
           <div>
             <div className="h-3 w-24 bg-slate-200 rounded mb-2" />
             <div className="flex gap-1.5 sm:gap-2">
@@ -430,6 +627,7 @@ const CreateRiskModal = ({
               ))}
             </div>
           </div>
+
           <div>
             <div className="h-3 w-16 bg-slate-200 rounded mb-2" />
             <div className="flex gap-1.5 sm:gap-2">
@@ -443,21 +641,13 @@ const CreateRiskModal = ({
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Field label="Status" required error={errors.statusId}>
-              <select
+              <FilterListbox
+                options={[{value:"",label:"Select status…"},...statuses.map(s=>({value:s.id,label:s.name}))]}
                 value={form.statusId}
-                onChange={(e) => set("statusId", e.target.value)}
-                className={`w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800
-                  focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all
-                  ${errors.statusId ? "border-red-400 bg-red-50" : "border-slate-200"}`}
-              >
-                <option value="">Select status…</option>
-                {statuses.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => set("statusId", val)}
+              />
             </Field>
+
             <Field label="Category" required error={errors.category}>
               <Select
                 styles={selectStyles(!!errors.category)}
@@ -469,6 +659,7 @@ const CreateRiskModal = ({
               />
             </Field>
           </div>
+
           <ScorePicker
             label="Probability"
             required
@@ -476,6 +667,7 @@ const CreateRiskModal = ({
             value={form.probability}
             onChange={(v) => set("probability", v)}
           />
+
           <ScorePicker
             label="Impact"
             required
@@ -483,6 +675,7 @@ const CreateRiskModal = ({
             value={form.impact}
             onChange={(v) => set("impact", v)}
           />
+
           {riskLevel && (
             <div
               className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-semibold ${riskLevel.cls}`}
@@ -503,6 +696,7 @@ const CreateRiskModal = ({
           mitigation; the reporter tracks and escalates it.
         </p>
       </div>
+
       <Field label="Risk Owner" required error={errors.owner}>
         <Select
           styles={selectStyles(!!errors.owner)}
@@ -513,6 +707,7 @@ const CreateRiskModal = ({
           placeholder="Who owns this risk?"
         />
       </Field>
+
       <Field label="Reporter" required error={errors.reporter}>
         <Select
           styles={selectStyles(!!errors.reporter)}
@@ -533,9 +728,10 @@ const CreateRiskModal = ({
           work items. This is required.
         </p>
       </div>
+
       <Field label="Link Type" required error={errors.linkedType}>
         <Select
-          styles={selectStyles(false)}
+          styles={selectStyles(!!errors.linkedType)}
           options={ISSUE_TYPES.map((t) => ({ value: t, label: t }))}
           value={form.linkedType}
           onChange={(v) => {
@@ -546,9 +742,10 @@ const CreateRiskModal = ({
           placeholder="Epic / Story / Task…"
         />
       </Field>
+
       <Field label="Linked Item" required error={errors.linkedIssue}>
         <Select
-          styles={selectStyles(false)}
+          styles={selectStyles(!!errors.linkedIssue)}
           options={issueOptions}
           value={form.linkedIssue}
           onChange={(v) => set("linkedIssue", v)}
@@ -567,14 +764,16 @@ const CreateRiskModal = ({
         className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
         style={{ maxHeight: "100dvh", height: "auto" }}
       >
-        {/* ── Top bar ── */}
+        {/* Top bar */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-slate-100">
           <div>
             <h2 className="text-base font-bold text-slate-800">
               {isEditMode ? "Edit Risk" : "Create Risk"}
             </h2>
+
             <p className="text-xs text-slate-400 mt-0.5">{STEPS[step].desc}</p>
           </div>
+
           <button
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
@@ -583,12 +782,13 @@ const CreateRiskModal = ({
           </button>
         </div>
 
-        {/* ── Step indicator ── */}
+        {/* Step indicator */}
         <div className="flex px-4 sm:px-6 pt-3 sm:pt-4 pb-2 gap-1.5 sm:gap-2 items-center">
           {STEPS.map((s, i) => {
             const done = i < step;
             const active = i === step;
             const Icon = s.icon;
+
             return (
               <button
                 key={s.id}
@@ -610,11 +810,12 @@ const CreateRiskModal = ({
                 ) : (
                   <Icon size={10} strokeWidth={2.5} />
                 )}
+
                 <span className="hidden xs:inline sm:inline">{s.label}</span>
               </button>
             );
           })}
-          {/* progress line */}
+
           <div className="flex-1 flex items-center">
             <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
               <div
@@ -625,12 +826,12 @@ const CreateRiskModal = ({
           </div>
         </div>
 
-        {/* ── Panel body ── */}
+        {/* Panel body */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4">
           {panels[step]}
         </div>
 
-        {/* ── Footer nav ── */}
+        {/* Footer nav */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-100 bg-slate-50/60">
           <button
             type="button"
@@ -686,6 +887,7 @@ const CreateRiskModal = ({
                       stroke="currentColor"
                       strokeWidth="4"
                     />
+
                     <path
                       className="opacity-75"
                       fill="currentColor"

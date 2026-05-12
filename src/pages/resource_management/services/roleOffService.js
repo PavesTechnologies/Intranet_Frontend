@@ -2,6 +2,10 @@ import axios from "axios";
 
 const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
+const getAuthHeaders = () => ({
+  Authorization: `Bearer ${localStorage.getItem("token")}`,
+});
+
 export const getResources = async (projectId) => {
   try {
     const response = await axios.get(
@@ -34,9 +38,21 @@ export const getRoleOffProjectKPI = async (projectId) => {
   }
 };
 
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${localStorage.getItem("token")}`,
-});
+export const getRoleOffsApprovedToday = async (projectId) => {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/role-off/approved-today`, {
+      params: projectId ? { projectId } : {},
+      headers: getAuthHeaders(),
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// const getAuthHeaders = () => ({
+//   Authorization: `Bearer ${localStorage.getItem("token")}`,
+// });
 
 // ✅ CREATE ROLE-OFF (PM)
 export const createRoleOff = async (payload) => {
@@ -259,11 +275,27 @@ export const getPendingRoleOffs = async () => {
 export const getPendingRoleOffsForDM = async () => {
   try {
     const response = await axios.get(
-      `${BASE_URL}/api/role-off/get-role-off-dm`,
+      `${BASE_URL}/api/role-off/pending-dm-action`,
       {
         headers: getAuthHeaders(),
       },
     );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getFulfilledRoleOffsForDM = async (projectId) => {
+  try {
+    const response = await axios.get(
+      `${BASE_URL}/api/role-off/fulfilled-dm-action`,
+      {
+        params: projectId ? { projectId } : {},
+        headers: getAuthHeaders(),
+      },
+    );
+
     return response.data;
   } catch (error) {
     throw error;

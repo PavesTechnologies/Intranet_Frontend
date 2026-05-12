@@ -6,9 +6,9 @@ import StoryCard from "./StoryCard";
 import CreateSprintModal from "./CreateSprintModal";
 import SprintColumn from "./SprintColumn";
 import Button from "../../../../components/Button/Button";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import SprintPendingModal from "./SprintPendingModal";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 const SprintBoard = ({ projectId, projectName }) => {
   const [stories, setStories] = useState([]);
@@ -50,7 +50,7 @@ const SprintBoard = ({ projectId, projectName }) => {
         "❌ Failed to load stories:",
         err.response?.data || err.message,
       );
-      toast.error("Failed to load stories. Check console for details.");
+      showStatusToast("Failed to load stories. Check console for details.", "error");
       setStories([]);
     }
   };
@@ -78,7 +78,7 @@ const SprintBoard = ({ projectId, projectName }) => {
         "❌ Failed to load sprints:",
         err.response?.data || err.message,
       );
-      toast.error("Failed to load sprints. Check console for details.");
+      showStatusToast("Failed to load sprints. Check console for details.", "error");
       setSprints([]);
     }
   };
@@ -93,14 +93,14 @@ const SprintBoard = ({ projectId, projectName }) => {
         { sprintId },
         { headers },
       );
-      toast.success("Story assigned to sprint successfully!");
+      showStatusToast("Story assigned to sprint successfully!", "success");
       await fetchStories();
     } catch (err) {
       console.error(
         "Error assigning story to sprint:",
         err.response?.data || err.message,
       );
-      toast.error("Failed to assign story to sprint.");
+      showStatusToast("Failed to assign story to sprint.", "error");
     }
   };
 
@@ -108,91 +108,79 @@ const SprintBoard = ({ projectId, projectName }) => {
    * Change Sprint Status
    ============================== */
   const handleStatusChange = async (sprintId, action) => {
-    try {
-      const response = await axios.put(
-        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
-        {},
-        { headers },
-      );
+      try {
+          const response = await axios.put(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
+              {},
+              { headers },
+          );
+          showStatusToast(`Sprint ${action} successful`, "success");
+          fetchStories();
+          fetchSprints();
 
-      // success UI
-      toast.success(`Sprint ${action} successful`);
-      fetchStories();
-      fetchSprints();
-    } catch (error) {
-      const errorData = error.response?.data || {};
+      } catch (error) {
+          const errorData = error.response?.data || {};
 
-      console.log("❌ Error Response:", {
-        code: errorData.code,
-        message: errorData.message,
-        data: errorData.data,
-        fullError: error,
-      });
-
-      // Handle structured error response (preferred)
-      if (
-        action === "complete" &&
-        errorData.code === "SPRINT_COMPLETION_VALIDATION_ERROR"
-      ) {
-        const { pendingTasks = [], pendingStories = [] } = errorData.data || {};
-
-        console.log("✅ Modal triggered with:", {
-          pendingTasks,
-          pendingStories,
-        });
-
-        setPendingData({
-          sprintId,
-          tasks: Array.isArray(pendingTasks) ? pendingTasks : [],
-          stories: Array.isArray(pendingStories) ? pendingStories : [],
-        });
-        setShowPendingModal(true);
-        return;
-      }
-
-      // Fallback: handle old API response format with string parsing
-      if (
-        action === "complete" &&
-        errorData.message?.includes("Cannot complete sprint")
-      ) {
-        try {
-          const raw = errorData.message;
-          let tasks = raw.match(/Tasks not done: \[(.*?)\]/);
-          let stories = raw.match(/Stories not done: \[(.*?)\]/);
-
-          tasks = tasks
-            ? tasks[1]
-                .split(",")
-                .map((t) => t.trim())
-                .filter(Boolean)
-            : [];
-          stories = stories
-            ? stories[1]
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean)
-            : [];
-
-          if (tasks.length > 0 || stories.length > 0) {
-            setPendingData({
-              sprintId,
-              tasks,
-              stories,
-            });
-            setShowPendingModal(true);
-            return;
+          // Check 1 — completion validation (structured)
+          if (action === "complete" && errorData.code === "SPRINT_COMPLETION_VALIDATION_ERROR") {
+              const { pendingTasks = [], pendingStories = [] } = errorData.data || {};
+              setPendingData({
+                  sprintId,
+                  tasks: Array.isArray(pendingTasks) ? pendingTasks : [],
+                  stories: Array.isArray(pendingStories) ? pendingStories : [],
+              });
+              setShowPendingModal(true);
+              return;
           }
-        } catch (parseErr) {
-          console.error("Failed to parse pending items:", parseErr);
-        }
+
+          // Check 2 — completion validation (old string format)
+          if (action === "complete" && errorData.message?.includes("Cannot complete sprint")) {
+              try {
+                  const raw = errorData.message;
+                  let tasks = raw.match(/Tasks not done: \[(.*?)\]/);
+                  let stories = raw.match(/Stories not done: \[(.*?)\]/);
+                  tasks = tasks ? tasks[1].split(",").map((t) => t.trim()).filter(Boolean) : [];
+                  stories = stories ? stories[1].split(",").map((s) => s.trim()).filter(Boolean) : [];
+                  if (tasks.length > 0 || stories.length > 0) {
+                      setPendingData({ sprintId, tasks, stories });
+                      setShowPendingModal(true);
+                      return;
+                  }
+              } catch (parseErr) {
+                  console.error("Failed to parse pending items:", parseErr);
+              }
+          }
+
+          // Check 3 — another active sprint
+          if (errorData.message?.toLowerCase().includes("another active sprint")) {
+              showStatusToast(
+                  "Cannot start sprint: Another active sprint already exists in this project.",
+                  "warn"
+              );
+              fetchSprints();
+              return;
+          }
+
+          // ✅ Check 4 — empty sprint
+          if (
+              errorData.message?.toLowerCase().includes("empty sprint") ||
+              errorData.message?.toLowerCase().includes("at least one task or story")
+          ) {
+              showStatusToast(errorData.message, "warn");
+              return;
+          }
+
+          // ✅ Check 5 — epic not assigned
+          if (errorData.message?.toLowerCase().includes("epic")) {
+              showStatusToast(errorData.message, "warn");
+              return;
+          }
+
+          // Fallback — no containerId
+          const errorMsg = errorData.message || error.message || "Operation failed";
+          showStatusToast(errorMsg, "error");
       }
-
-      // Generic error message
-      const errorMsg = errorData.message || error.message || "Operation failed";
-      toast.error(errorMsg);
-    }
   };
-
   /** ==============================
    * Lifecycle
    ============================== */
@@ -212,7 +200,6 @@ const SprintBoard = ({ projectId, projectName }) => {
    ============================== */
   return (
     <DndProvider backend={HTML5Backend}>
-      <ToastContainer />
       <div className="p-6 space-y-6">
         {/* ===== Page Header ===== */}
         <div className="flex justify-between items-center">
@@ -230,23 +217,22 @@ const SprintBoard = ({ projectId, projectName }) => {
         {/* ===== Filter Dropdown ===== */}
         <div className="flex items-center gap-3">
           <label
-            htmlFor="sprintFilter"
             className="text-base font-medium text-gray-700"
           >
             Filter Sprints:
           </label>
-          <select
-            id="sprintFilter"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="border border-gray-300 rounded-lg px-4 py-3 text-base w-48 
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="ALL">ALL</option>
-            <option value="PLANNING">PLANNING</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="COMPLETED">COMPLETED</option>
-          </select>
+          <div className="w-48">
+            <FilterListbox
+              options={[
+                { value: "ALL", label: "ALL" },
+                { value: "PLANNING", label: "PLANNING" },
+                { value: "ACTIVE", label: "ACTIVE" },
+                { value: "COMPLETED", label: "COMPLETED" },
+              ]}
+              value={filter}
+              onChange={setFilter}
+            />
+          </div>
 
           {/* ✅ Debug Reload Button */}
           {/* <Button

@@ -59,6 +59,7 @@ export const persistJoiningStatus = (offer) => {
 
   current[offer.user_uuid] = {
     user_uuid: offer.user_uuid,
+    status: offer.status || "",
     joining_date: offer.joining_date || "",
     reporting_time: offer.reporting_time || "",
     location: offer.location || "",
@@ -90,6 +91,7 @@ export const getOfferWithJoiningStatus = (offer = {}) => {
 
   return {
     ...offer,
+    status: storedJoiningStatus.status || offer.status, 
     joining_date: offer?.joining_date || storedJoiningStatus.joining_date,
     reporting_time:
       offer?.reporting_time || storedJoiningStatus.reporting_time,

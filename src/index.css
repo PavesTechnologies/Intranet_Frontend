@@ -128,6 +128,61 @@
   color: white !important;
 }
 
+.timesheet-datepicker .react-datepicker__month {
+  margin: 0.4rem 0.25rem 0.25rem;
+}
+
+.timesheet-datepicker .react-datepicker__day-names,
+.timesheet-datepicker .react-datepicker__week {
+  display: grid;
+  grid-template-columns: repeat(7, 2.15rem);
+  justify-content: center;
+  column-gap: 0.35rem;
+}
+
+.timesheet-datepicker .react-datepicker__week {
+  margin-top: 0.18rem;
+}
+
+.timesheet-datepicker .react-datepicker__day-name,
+.timesheet-datepicker .react-datepicker__day {
+  width: 2.15rem !important;
+  height: 2.15rem !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  line-height: 1 !important;
+  border-radius: 9999px !important;
+  vertical-align: middle;
+}
+
+.timesheet-datepicker .react-datepicker__day > div {
+  color: inherit;
+  position: relative;
+  z-index: 1;
+}
+
+.timesheet-datepicker .react-datepicker__day:hover {
+  border-radius: 9999px !important;
+}
+
+.timesheet-datepicker .react-datepicker__day--keyboard-selected {
+  border-radius: 9999px !important;
+}
+
+.timesheet-range-datepicker .react-datepicker__day--outside-month,
+.timesheet-range-datepicker .react-datepicker__day--disabled {
+  color: #c7cdd6 !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+.timesheet-range-datepicker .react-datepicker__day--outside-month:hover,
+.timesheet-range-datepicker .react-datepicker__day--disabled:hover {
+  background-color: transparent !important;
+}
+
 
 @keyframes fadeIn {
   from {

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { toast } from "react-toastify";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { statusUpdate } from "../services/projectService";
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 import Modal from "../../../components/Modal/modal";
@@ -64,22 +65,14 @@ const UpdateProjectStatusModal = ({ open, onClose, onSuccess, pmsProjectId }) =>
             Target Status <span className="text-red-500">*</span>
           </label>
           <div className="relative group">
-            <select
+            <FilterListbox
+              options={[
+                { value: "", label: "Select current readiness" },
+                ...STATUS_OPTIONS.map((val) => ({ value: val, label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) }))
+              ]}
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className={`w-full h-11 px-4 bg-white border rounded-xl text-sm font-medium transition-all outline-none appearance-none cursor-pointer focus:ring-4 focus:ring-indigo-500/10 ${errors.status ? "border-red-500 focus:border-red-500" : "border-gray-200 focus:border-indigo-500 group-hover:border-gray-300"
-                }`}
-            >
-              <option value="">Select current readiness</option>
-              {STATUS_OPTIONS.map((val) => (
-                <option key={val} value={val}>
-                  {val.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 group-hover:text-gray-600 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
-            </div>
+              onChange={setStatus}
+            />
           </div>
           {errors.status && (
             <p className="text-[10px] font-bold text-red-500 uppercase tracking-wide ml-1">{errors.status}</p>

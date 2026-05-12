@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
-import { X } from "lucide-react";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import FormInput from "../../../../components/forms/FormInput";
+import Modal from "../../../../components/Modal/modal";
+import Button from "../../../../components/Button/Button";
 import FormTextArea from "../../../../components/forms/FormTextArea";
 import FormSelect from "../../../../components/forms/FormSelect";
+import FormDatePicker from "../../../../components/forms/FormDatePicker";
 
 const CreateTaskForm = ({
   projectId,
@@ -13,11 +15,24 @@ const CreateTaskForm = ({
   defaultStatusId,
   defaultSprintId,
 }) => {
+  // 1. Define 'today' to resolve the ReferenceError
+  const today = new Date().toISOString().split("T")[0];
+
   const [formData, setFormData] = useState({
     projectId,
-    statusId: defaultStatusId || null,
-    sprintId: defaultSprintId || null,
+    title: "",
+    description: "",
+    statusId: defaultStatusId || "",
+    sprintId: defaultSprintId || "",
+    storyId: "",
+    priority: "MEDIUM",
+    reporterId: "",
+    assigneeId: "",
+    startDate: "",
+    dueDate: "",
+    isBillable: "false",
   });
+
   const [stories, setStories] = useState([]);
   const [users, setUsers] = useState([]);
   const [selectedStorySprint, setSelectedStorySprint] = useState(
@@ -28,14 +43,17 @@ const CreateTaskForm = ({
   const token = localStorage.getItem("token");
   const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
+  // Helper for date formatting
+  const toISODate = (date) => (date ? new Date(date).toISOString().split('T')[0] : null);
+
   useEffect(() => {
     if (!projectId) return;
     const load = async () => {
       try {
         const [storyRes, userRes] = await Promise.all([
           axios.get(
-            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
-            axiosConfig,
+            `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/sprint/${defaultSprintId}`,
+            axiosConfig
           ),
           axios.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
@@ -45,7 +63,7 @@ const CreateTaskForm = ({
         setStories(storyRes.data || []);
         setUsers(userRes.data || []);
       } catch (err) {
-        toast.error("Failed to load project details");
+        showStatusToast("Failed to load project details", "error");
         console.error(err);
       }
     };
@@ -67,8 +85,9 @@ const CreateTaskForm = ({
   const submit = async (e) => {
     e.preventDefault();
     if (!formData.title || !formData.statusId || !formData.reporterId)
-      return toast.error("Title, Status, and Reporter are required");
+      return showStatusToast("Title, Status, and Reporter are required", "error");
 
+    // 2. Fixed references: Changed 'd.startDate' to 'formData.startDate'
     const payload = {
       title: formData.title,
       description: formData.description || null,
@@ -78,6 +97,8 @@ const CreateTaskForm = ({
       reporterId: Number(formData.reporterId),
       assigneeId: Number(formData.assigneeId) || null,
       sprintId: Number(formData.sprintId) || selectedStorySprint || null,
+      startDate: toISODate(formData.startDate), 
+      dueDate: toISODate(formData.dueDate),
       billable: formData.isBillable === "true",
       projectId,
     };
@@ -89,13 +110,13 @@ const CreateTaskForm = ({
         payload,
         axiosConfig,
       );
-      toast.success("Task created successfully!");
+      showStatusToast("Task created successfully!", "success");
       setTimeout(() => {
         onCreated?.(res.data);
         onClose?.();
       }, 500);
     } catch (err) {
-      toast.error("Failed to create task");
+      showStatusToast("Failed to create task", "error");
       console.error(err);
     } finally {
       setLoading(false);
@@ -103,21 +124,7 @@ const CreateTaskForm = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
-      <div className="bg-white rounded-2xl shadow-lg p-6 w-[500px] max-w-full max-h-[90vh] overflow-y-auto relative">
-        <ToastContainer />
-
-        {/* Close Button */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
-        >
-          <X size={20} />
-        </button>
-
-        <h2 className="text-xl font-bold mb-4 text-center">Create Task</h2>
-
+    <Modal isOpen={true} onClose={onClose} title="Create Task">
         <form onSubmit={submit} className="space-y-4">
           <FormInput
             label="Title *"
@@ -167,6 +174,22 @@ const CreateTaskForm = ({
             options={users.map((u) => ({ label: u.name, value: u.id }))}
           />
 
+          <FormDatePicker
+            label="Start Date"
+            name="startDate"
+            value={formData.startDate || ""}
+            onChange={handleChange}
+            min={today}
+          />
+
+          <FormDatePicker
+            label="Due Date"
+            name="dueDate"
+            value={formData.dueDate || ""}
+            onChange={handleChange}
+            min={today}
+          />
+
           <FormSelect
             label="Billable"
             name="isBillable"
@@ -178,16 +201,11 @@ const CreateTaskForm = ({
             ]}
           />
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold"
-          >
+          <Button variant="primary" type="submit" disabled={loading} className="w-full">
             {loading ? "Creating..." : "Create Task"}
-          </button>
+          </Button>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

@@ -7,58 +7,37 @@ const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const GENDER_BASED_IDS = ["L-ML", "L-PL"];
 
-export function useLeaveDropdownOptions(balances) {
-  const [leaveTypes, setLeaveTypes] = useState([]);
-  const [hasFetched, setHasFetched] = useState(false);
-
-  useEffect(() => {
-    if (hasFetched) return;
-    const fetchLeaveTypes = async () => {
-      try {
-        const res = await axios.get(`${BASE_URL}/api/leave/types`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-        setLeaveTypes(res.data);
-        setHasFetched(true);
-      } catch (err) {
-        toast.error(
-          err?.response?.data?.message || "Failed to load leave type details.",
-        );
-      }
-    };
-    fetchLeaveTypes();
-  }, []);
-
+export function useLeaveDropdownOptions(balances = []) {
   return useMemo(() => {
-    console.log("useLeaveDropdownOptions", { balances, leaveTypes });
-    if (!balances || balances.length === 0 || leaveTypes.length === 0)
-      return [];
-
     return balances.map((balance) => {
-      const leaveTypeId = balance.leaveType.leaveTypeId;
-      const originalName = balance.leaveType.leaveName.replace(/^L-/, "");
-      const matchingType = leaveTypes.find(
-        (type) => type.name === balance.leaveType.leaveName,
-      );
-      const leaveName = matchingType ? matchingType.label : originalName;
+      // ✅ Handle BOTH formats (flat + nested)
+      const leaveTypeId =
+        balance.leaveTypeId || balance.leaveType?.leaveTypeId;
 
-      // ✅ Gender-based leaves use remainingDays, all others use remainingLeaves
-      const isGenderBased = GENDER_BASED_IDS.includes(leaveTypeId);
-      const remaining = isGenderBased
-        ? balance.remainingDays
-        : balance.remainingLeaves;
+      const leaveNameRaw =
+        balance.leaveName || balance.leaveType?.leaveName || "Unknown";
+
+      // ✅ Normalize remaining
+      const remaining =
+        balance.remaining ??
+        balance.remainingDays ??
+        balance.remainingLeaves ??
+        0;
+
+      // ✅ Clean label
+      const leaveName = leaveNameRaw
+        .replace(/_/g, " ")
+        .toLowerCase()
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+
+      // ✅ Infinite logic
+      const isInfinite =
+        leaveTypeId === "L-UP" ||
+        leaveNameRaw.toLowerCase().includes("unpaid");
 
       let availableText;
-      let isInfinite = false;
-
-      if (
-        leaveTypeId === "L-UP" ||
-        leaveName.toLowerCase().includes("unpaid")
-      ) {
-        availableText = "infinite balance";
-        isInfinite = true;
+      if (isInfinite) {
+        availableText = "Infinite balance";
       } else if (remaining > 0) {
         availableText = `${remaining} days available`;
       } else {
@@ -66,19 +45,21 @@ export function useLeaveDropdownOptions(balances) {
       }
 
       return {
-        balanceId: balance.balanceId,
         leaveTypeId,
         leaveName,
         availableText,
-        availableDays: isInfinite ? Infinity : remaining, // ✅
+        availableDays: isInfinite ? Infinity : remaining,
         isInfinite,
-        disabled: (!isInfinite && remaining <= 0) || balance.isBlocked, // ✅
-        allowHalfDay: !!balance.leaveType.allowHalfDay,
-        requiresDocumentation: !!balance.leaveType.requiresDocumentation,
-        weekendsAndHolidaysAllowed:
-          !!balance.leaveType?.weekendsAndHolidaysAllowed,
-        raw: balance,
+        disabled: (!isInfinite && remaining <= 0) || balance.isBlocked,
+        allowHalfDay:
+          balance.allowHalfDay ??
+          balance.leaveType?.allowHalfDay ??
+          false,
+        requiresDocumentation:
+          balance.requiresDocumentation ??
+          balance.leaveType?.requiresDocumentation ??
+          false,
       };
     });
-  }, [balances, leaveTypes]);
+  }, [balances]);
 }

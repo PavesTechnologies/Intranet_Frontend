@@ -4,6 +4,9 @@ import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { Pencil, Trash2, Settings, Users, CalendarDays, ClipboardCheck, History } from "lucide-react";
 import { toast } from "react-toastify";
+import Button from "../../components/Button/Button";
+
+
 
 // Modals
 import AddEmployeeModal from "./models/AddEmployeeModal";
@@ -122,12 +125,13 @@ const HRManageTools = ({ employeeId }) => {
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800">System Leave Types</h3>
-                <button
+                <Button
                   onClick={() => { setEditLeaveType(null); setIsAddLeaveTypeModalOpen(true); }}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-all"
+                  variant="primary"
+                  size="medium"
                 >
                   + Add Leave Type
-                </button>
+                </Button>
               </div>
 
               {isLoading ? (
@@ -241,35 +245,87 @@ const AdminCard = ({ title, desc, icon, onClick }) => (
 
 const LeaveTable = ({ title, data, onEdit, onDelete }) => {
   if (data.length === 0) return null;
+
   const headers = Object.keys(data[0]);
+
+  // ✅ Smart value renderer
+  const renderCellValue = (value) => {
+    if (value === null || value === undefined) return "-";
+
+    // 🔥 Boolean handling
+    if (typeof value === "boolean") {
+      return (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-semibold ${
+            value
+              ? "bg-green-100 text-green-700"
+              : "bg-red-100 text-red-600"
+          }`}
+        >
+          {value ? "True" : "False"}
+        </span>
+      );
+    }
+
+    return String(value);
+  };
 
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">{title}</h4>
+      <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">
+        {title}
+      </h4>
+
       <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm bg-white">
         <table className="w-full text-sm text-left">
           <thead className="bg-gray-50 text-gray-600 border-b">
             <tr>
               {headers.map((h, i) => (
-                <th key={h} className={`px-4 py-3 font-semibold capitalize ${i === 0 ? "sticky left-0 bg-gray-50 z-10" : ""}`}>
-                  {h.replace(/([A-Z])/g, ' $1')}
+                <th
+                  key={h}
+                  className={`px-4 py-3 font-semibold capitalize ${
+                    i === 0 ? "sticky left-0 bg-gray-50 z-10" : ""
+                  }`}
+                >
+                  {h.replace(/([A-Z])/g, " $1")}
                 </th>
               ))}
-              <th className="px-4 py-3 text-center sticky right-0 bg-gray-50 z-10 border-l">Actions</th>
+              <th className="px-4 py-3 text-center sticky right-0 bg-gray-50 z-10 border-l">
+                Actions
+              </th>
             </tr>
           </thead>
+
           <tbody className="divide-y divide-gray-100">
             {data.map((row, idx) => (
               <tr key={idx} className="hover:bg-gray-50 transition-colors">
                 {headers.map((key, i) => (
-                  <td key={key} className={`px-4 py-3 text-gray-600 whitespace-nowrap ${i === 0 ? "sticky left-0 bg-white group-hover:bg-gray-50 font-medium z-10" : ""}`}>
-                    {String(row[key])}
+                  <td
+                    key={key}
+                    className={`px-4 py-3 text-gray-600 whitespace-nowrap ${
+                      i === 0
+                        ? "sticky left-0 bg-white group-hover:bg-gray-50 font-medium z-10"
+                        : ""
+                    }`}
+                  >
+                    {renderCellValue(row[key])}
                   </td>
                 ))}
+
                 <td className="px-4 py-3 sticky right-0 bg-white z-10 border-l">
                   <div className="flex justify-center gap-3">
-                    <button onClick={() => onEdit(row)} className="text-indigo-600 hover:text-indigo-900"><Pencil size={16} /></button>
-                    <button onClick={() => onDelete(row.leaveTypeId)} className="text-red-500 hover:text-red-800"><Trash2 size={16} /></button>
+                    <button
+                      onClick={() => onEdit(row)}
+                      className="text-indigo-600 hover:text-indigo-900"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(row.leaveTypeId)}
+                      className="text-red-500 hover:text-red-800"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </td>
               </tr>

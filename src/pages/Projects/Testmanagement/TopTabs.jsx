@@ -5,19 +5,16 @@ import { FileText, PenTool, Play, Bug } from "lucide-react";
 
 export default function TopTabs({ selectedTab }) {
   const { projectId } = useParams();
-  console.log("Project ID in TopTabs:", projectId);
 
-  // ⭐ 1. Define the tabs that are actually visible
   const validTabs = [
     "test-management/test-plans",
     "test-management/test-design",
     "test-management/test-execution",
-    "test-management/test-bugs"
+    "test-management/test-bugs",
   ];
 
-  // ⭐ 2. If the parent passes an invalid tab (like "overview"), force it to "test-plans"
-  const activeTab = validTabs.includes(selectedTab) 
-    ? selectedTab 
+  const activeTab = validTabs.includes(selectedTab)
+    ? selectedTab
     : "test-management/test-plans";
 
   const tabs = [
@@ -42,29 +39,28 @@ export default function TopTabs({ selectedTab }) {
     {
       name: "Bugs",
       path: `/projects/${projectId}?tab=test-management/test-bugs`,
-      tab: "test-management/test-bugs", 
+      tab: "test-management/test-bugs",
       icon: <Bug size={16} />,
     },
   ];
 
   return (
-    <div className="w-full bg-white border border-gray-200 rounded-2xl shadow-sm">
-      <div className="flex gap-6 px-6 py-3">
+    <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-wrap">
         {tabs.map((tab) => (
           <NavLink
             key={tab.name}
             to={tab.path}
             end
-            className={`
-              flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all
-              ${
-                activeTab === tab.tab
-                  ? "bg-[#0A1128] text-white shadow-md"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-[#0A1128]"
-              }
-            `}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === tab.tab
+                ? "bg-indigo-900 text-white shadow-sm"
+                : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
           >
-            {tab.icon}
+            <span className={activeTab === tab.tab ? "text-white" : "text-slate-500"}>
+              {tab.icon}
+            </span>
             {tab.name}
           </NavLink>
         ))}

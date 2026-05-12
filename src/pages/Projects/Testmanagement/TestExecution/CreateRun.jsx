@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
-import { toast } from "react-toastify";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Button from "../../../../components/Button/Button";
 
-export default function CreateTestRunForm({ projectId, onSuccess, onClose }) {
-  const [cycles, setCycles] = useState([]);
-  const [loadingCycles, setLoadingCycles] = useState(true);
+export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuccess, onClose }) {
 
   const [form, setForm] = useState({
-    cycleId: "",
+    // cycleId: "",
     name: "",
     status: "",
     description: "",
@@ -16,27 +16,6 @@ export default function CreateTestRunForm({ projectId, onSuccess, onClose }) {
   });
 
   const [loadingSubmit, setLoadingSubmit] = useState(false);
-
-  // Load cycles from API
-  useEffect(() => {
-    const fetchCycles = async () => {
-      try {
-        const res = await axiosInstance.get(
-          `${
-            window.__APP_CONFIG__.PMS_BASE_URL
-          }/api/test-execution/test-cycles/projects/${projectId}`,
-        );
-        setCycles(res.data || []);
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load test cycles");
-      } finally {
-        setLoadingCycles(false);
-      }
-    };
-
-    fetchCycles();
-  }, [projectId]);
 
   const handleChange = (e) => {
     setForm({
@@ -48,20 +27,16 @@ export default function CreateTestRunForm({ projectId, onSuccess, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.cycleId || !form.name || !form.status) {
-      toast.error("Cycle, Name & Status are required");
+    if (!cycleId || !form.name || !form.status) {
+      showStatusToast("Cycle, Name & Status are required", "error");
       return;
     }
 
     const payload = {
-      cycleId: Number(form.cycleId),
+      cycleId: Number(cycleId),
       name: form.name,
       status: form.status,
       description: form.description || null,
-      createdBy: 1, // replace with logged-in user id
-      createdAt: new Date().toISOString(),
-      executedBy: form.executedBy || null,
-      executedAt: form.executedAt || null,
     };
 
     try {
@@ -71,11 +46,11 @@ export default function CreateTestRunForm({ projectId, onSuccess, onClose }) {
         payload,
       );
 
-      toast.success("Test Run Created Successfully");
+      showStatusToast("Test Run Created Successfully", "success");
       onSuccess && onSuccess();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to create test run");
+      showStatusToast("Failed to create test run", "error");
     } finally {
       setLoadingSubmit(false);
     }
@@ -96,13 +71,6 @@ export default function CreateTestRunForm({ projectId, onSuccess, onClose }) {
       </div>
 
       {/* If cycles are loading */}
-      {loadingCycles ? (
-        <p className="text-gray-500">Loading cycles...</p>
-      ) : cycles.length === 0 ? (
-        <p className="text-red-500">
-          No Test Cycles found for this project. Please create one first.
-        </p>
-      ) : (
         <form
           onSubmit={handleSubmit}
           className="grid grid-cols-1 md:grid-cols-2 gap-6"
@@ -110,22 +78,13 @@ export default function CreateTestRunForm({ projectId, onSuccess, onClose }) {
           {/* Select Cycle */}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-1">
-              Select Cycle *
+              Cycle
             </label>
-            <select
-              name="cycleId"
-              value={form.cycleId}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-lg"
-              required
-            >
-              <option value="">-- Select Test Cycle --</option>
-              {cycles.map((cycle) => (
-                <option key={cycle.id} value={cycle.id}>
-                  {cycle.name} ({cycle.cycleType})
-                </option>
-              ))}
-            </select>
+            <input
+              value={cycleName || "Loading cycle..."}
+              disabled
+              className="w-full p-2 border rounded-lg bg-gray-100"
+            />
           </div>
 
           {/* Run Name */}
@@ -145,20 +104,11 @@ export default function CreateTestRunForm({ projectId, onSuccess, onClose }) {
           {/* Status */}
           <div>
             <label className="block text-sm font-medium mb-1">Status *</label>
-            <select
-              name="status"
+            <FilterListbox
+              options={[{value:"",label:"Select Status"},{value:"CREATED",label:"CREATED"},{value:"IN_PROGRESS",label:"IN_PROGRESS"},{value:"COMPLETED",label:"COMPLETED"},{value:"CANCELLED",label:"CANCELLED"}]}
               value={form.status}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-lg"
-              required
-            >
-              <option value="">Select Status</option>
-              <option value="NOT_STARTED">NOT_STARTED</option>
-              <option value="IN_PROGRESS">IN_PROGRESS</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="BLOCKED">BLOCKED</option>
-              <option value="FAILED">FAILED</option>
-            </select>
+              onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+            />
           </div>
 
           {/* Description (full width) */}
@@ -207,16 +157,18 @@ export default function CreateTestRunForm({ projectId, onSuccess, onClose }) {
 
           {/* Submit Button full width */}
           <div className="md:col-span-2">
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              className="w-full"
               disabled={loadingSubmit}
-              className="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
+              loading={loadingSubmit}
+              loadingText="Creating..."
             >
-              {loadingSubmit ? "Creating..." : "Create Test Run"}
-            </button>
+              Create Test Run
+            </Button>
           </div>
         </form>
-      )}
     </div>
   );
 }

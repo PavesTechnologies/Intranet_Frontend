@@ -67,7 +67,7 @@ function SearchableDropdown({ label, value, options, onChange, placeholder }) {
   }, [isOpen]);
 
   const filteredOptions = options.filter((opt) =>
-    opt.toLowerCase().includes(search.toLowerCase())
+    opt != null && opt.toLowerCase().includes((search || "").toLowerCase())
   );
 
   const handleSelect = (option) => {
@@ -313,7 +313,7 @@ export function FilterPanel({
           onChange={(value) => onFiltersChange({ ...filters, project: value })}
         />
 
-        <SearchableDropdown
+        {/* <SearchableDropdown
           label="Employment Type"
           value={filters.employmentType}
           options={EMPLOYMENT_TYPES}
@@ -321,7 +321,7 @@ export function FilterPanel({
           onChange={(value) =>
             onFiltersChange({ ...filters, employmentType: value })
           }
-        />
+        /> */}
 
         <div className="grid grid-cols-2 gap-2">
           <div>

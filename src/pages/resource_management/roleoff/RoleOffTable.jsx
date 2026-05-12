@@ -36,6 +36,20 @@ const getPmExtraColumnConfig = (pmTab) => {
     };
   }
 
+  if (pmTab === "rejected") {
+    return {
+      header: "Rejection Reason",
+      renderCell: (row) => (
+        <span
+          className="block max-w-[220px] truncate font-medium text-rose-700"
+          title={row.rejectionReason || "-"}
+        >
+          {row.rejectionReason || "-"}
+        </span>
+      ),
+    };
+  }
+
   if (pmTab === "process") {
     return {
       header: "Role-Off Status",
@@ -63,7 +77,9 @@ const RoleOffTable = ({
   loading,
 }) => {
   const showPmCheckboxes = mode === "pm" && pmTab === "active";
-  const showSelectionCheckboxes = mode !== "pm" || pmTab === "active";
+  const showSelectionCheckboxes =
+    (mode === "pm" && pmTab === "active") ||
+    (mode !== "pm" && pmTab !== "fulfilled");
   const allSelected = rows.length > 0 && rows.every((row) => selectedRows.includes(row.id));
   const anySelected = rows.some((row) => selectedRows.includes(row.id));
   const pmExtraColumn = getPmExtraColumnConfig(pmTab);

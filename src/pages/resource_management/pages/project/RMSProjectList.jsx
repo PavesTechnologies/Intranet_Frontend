@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -33,6 +34,7 @@ const RMSProjectList = () => {
   const [page, setPage] = useState(0);
   const size = 6;
   const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filters, setFilters] = useState({
@@ -123,14 +125,18 @@ const RMSProjectList = () => {
         filters,
       });
 
-      setProjects(res.data.content || []);
-      setTotalPages(res.data.totalPages || 0);
+      const pageData = res?.data || {};
+
+      setProjects(pageData.content || []);
+      setTotalPages(pageData.totalPages || 0);
+      setTotalElements(pageData.totalElements || 0);
     } catch (err) {
       console.error("Failed to load projects", err);
       const message = err.response?.data?.message || "Failed to load projects";
       setErrorMsg(message);
       setProjects([]);
       setTotalPages(0);
+      setTotalElements(0);
 
       // Only show toast if it's a real error, not just "no projects found"
       if (err.response?.status !== 400 || !message.includes("No Projects Found")) {
@@ -140,6 +146,17 @@ const RMSProjectList = () => {
       setLoading(false);
     }
   };
+
+  const handlePreviousPage = () => {
+    setPage((currentPage) => Math.max(currentPage - 1, 0));
+  };
+
+  const handleNextPage = () => {
+    setPage((currentPage) => Math.min(currentPage + 1, totalPages - 1));
+  };
+
+  const pageStart = totalElements === 0 ? 0 : page * size + 1;
+  const pageEnd = Math.min((page + 1) * size, totalElements);
 
   // const appliedFiltersCount = Object.values(filters).filter(Boolean).length;
 
@@ -204,7 +221,7 @@ const RMSProjectList = () => {
 
       <ProjectKPIs stats={kpiStats} />
 
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row flex-wrap gap-4 items-center justify-between">
+      {/* <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row flex-wrap gap-4 items-center justify-between">
         <div className="relative w-full md:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
@@ -216,47 +233,85 @@ const RMSProjectList = () => {
           />
         </div>
 
-        <div className="flex flex-wrap gap-3 w-full md:w-auto">
-          <select
-            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-w-[160px] cursor-pointer text-gray-700 hover:border-gray-300 transition-colors"
+        <div className="flex gap-5 w-full md:w-auto">
+          <FilterListbox
+            options={[
+              { value: "", label: "All Readiness" },
+              ...READINESS_STATUSES.map(val => ({ value: val, label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase()) }))
+            ]}
             value={filters.readinessStatus}
-            onChange={(e) =>
-              handleFilterChange("readinessStatus", e.target.value)
-            }
-          >
-            <option value="">All Readiness</option>
-            {READINESS_STATUSES.map((val) => (
-              <option key={val} value={val}>
-                {val.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleFilterChange("readinessStatus", val)}
+          />
 
-          <select
-            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-w-[140px] cursor-pointer text-gray-700 hover:border-gray-300 transition-colors"
+          <FilterListbox
+            options={[
+              { value: "", label: "All Status" },
+              ...PROJECT_STATUSES.map(val => ({ value: val, label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase()) }))
+            ]}
             value={filters.projectStatus}
-            onChange={(e) => handleFilterChange("projectStatus", e.target.value)}
-          >
-            <option value="">All Status</option>
-            {PROJECT_STATUSES.map((val) => (
-              <option key={val} value={val}>
-                {val.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleFilterChange("projectStatus", val)}
+          />
 
-          <select
-            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-w-[140px] cursor-pointer text-gray-700 hover:border-gray-300 transition-colors"
+          <FilterListbox
+            options={[
+              { value: "", label: "All Risk" },
+              ...RISK_LEVELS.map(val => ({ value: val, label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase()) }))
+            ]}
             value={filters.riskLevel}
-            onChange={(e) => handleFilterChange("riskLevel", e.target.value)}
-          >
-            <option value="">All Risk</option>
-            {RISK_LEVELS.map((val) => (
-              <option key={val} value={val}>
-                {val.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleFilterChange("riskLevel", val)}
+          />
+        </div>
+      </div> */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-row items-center gap-4">
+        {/* Search Bar Container - using flex-1 to grow and fill available space */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search project / client..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* Filters Container - now set to flex-nowrap to prevent stacking */}
+        <div className="flex flex-row flex-nowrap gap-3 shrink-0">
+          <FilterListbox
+            options={[
+              { value: "", label: "All Readiness" },
+              ...READINESS_STATUSES.map(val => ({
+                value: val,
+                label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
+              }))
+            ]}
+            value={filters.readinessStatus}
+            onChange={(val) => handleFilterChange("readinessStatus", val)}
+          />
+
+          <FilterListbox
+            options={[
+              { value: "", label: "All Status" },
+              ...PROJECT_STATUSES.map(val => ({
+                value: val,
+                label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
+              }))
+            ]}
+            value={filters.projectStatus}
+            onChange={(val) => handleFilterChange("projectStatus", val)}
+          />
+
+          <FilterListbox
+            options={[
+              { value: "", label: "All Risk" },
+              ...RISK_LEVELS.map(val => ({
+                value: val,
+                label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
+              }))
+            ]}
+            value={filters.riskLevel}
+            onChange={(val) => handleFilterChange("riskLevel", val)}
+          />
         </div>
       </div>
 
@@ -390,12 +445,17 @@ const RMSProjectList = () => {
 
       {/* PAGINATION */}
       {totalPages > 1 && (
-        <Pagination
-          currentPage={page + 1}
-          totalPages={totalPages}
-          onPrevious={() => setPage((p) => Math.max(p - 1, 0))}
-          onNext={() => setPage((p) => Math.min(p + 1, totalPages - 1))}
-        />
+        <div className="mt-6 flex flex-col items-center gap-2">
+          {/* <p className="text-xs font-medium text-gray-500">
+            Showing {pageStart}-{pageEnd} of {totalElements} projects
+          </p> */}
+          <Pagination
+            currentPage={page + 1}
+            totalPages={totalPages}
+            onPrevious={handlePreviousPage}
+            onNext={handleNextPage}
+          />
+        </div>
       )}
 
       <UpdateProjectStatusModal

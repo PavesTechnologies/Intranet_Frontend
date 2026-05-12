@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "../../../contexts/AuthContext";
+import { KPICard } from "../../../components/kpi/KPI";
 
 import ClientSection from "./ClientSection";
 import AddConfigurationModal from "../models/client_configuration/AddConfigurationModal";
@@ -62,7 +63,7 @@ const ProjectSLA = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No SLA configuration found for this project.
       </div>
     );
@@ -111,6 +112,9 @@ const ProjectSLA = ({ data, loading }) => {
               <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
                 Warning Threshold
               </th>
+              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
+                Status
+              </th>
             </tr>
           </thead>
 
@@ -149,6 +153,15 @@ const ProjectSLA = ({ data, loading }) => {
                     {sla.warningThresholdDays} days
                   </span>
                 </td>
+
+                {/* STATUS */}
+                <td className="px-6 py-4">
+                  <span
+                    className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
+                  >
+                    {sla.activeFlag ? "Active" : "Inactive"}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -165,7 +178,7 @@ const ProjectCompliance = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No compliance requirements configured for this project.
       </div>
     );
@@ -272,8 +285,8 @@ const ProjectAssets = ({ assets, loading }) => {
 
   if (!assets || assets.length === 0) {
     return (
-      <div className="text-center p-6 border-2 border-dashed rounded-lg text-gray-400">
-        No assets assigned
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
+        No assets assigned for this project.
       </div>
     );
   }
@@ -351,7 +364,7 @@ const ProjectEscalation = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No escalation contacts configured for this project.
       </div>
     );
@@ -462,9 +475,10 @@ const ClientPage = () => {
   const { clientId } = useParams();
   const { user } = useAuth();
   const permissions = user?.permissions || [];
-  const canConfigAgreements = permissions.includes("ADD_CONFIGURATION");
-  const canManageAssets = permissions.includes("ASSETS_MANAGEMENT");
-  const canEditProfile = permissions.includes("EDIT_CLIENT_PROFILE");
+  const roles = user?.roles || [];
+  const canConfigAgreements = roles.includes("Admin");  // permissions.includes("ADD_CONFIGURATION");
+  const canManageAssets = roles.includes("Resource_Manager"); // permissions.includes("ASSETS_MANAGEMENT");
+  const canEditProfile = roles.includes("Admin");  // permissions.includes("EDIT_CLIENT_PROFILE");
   const navigate = useNavigate();
 
   // State declarations - ALL hooks inside component
@@ -892,22 +906,13 @@ const ClientPage = () => {
       {/* Client KPI's */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 mb-10">
         {kpiData.map((kpi, idx) => (
-          <div
+          <KPICard
             key={idx}
-            className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between"
-          >
-            <div>
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                {kpi.label}
-              </p>
-              <h3 className="text-xl font-bold text-gray-900 mt-1">
-                {kpi.value}
-              </h3>
-            </div>
-            <div className={`p-2 rounded-lg ${kpi.bg}`}>
-              <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
-            </div>
-          </div>
+            label={kpi.label}
+            value={kpi.value}
+            icon={<kpi.icon className={`w-5 h-5 ${kpi.color}`} />}
+            color={`${kpi.bg} ${kpi.color}`}
+          />
         ))}
       </div>
 
@@ -939,14 +944,13 @@ const ClientPage = () => {
           {canManageAssets && (
             <Button
               variant="secondary"
-              onClick={() => navigate(`/manage-assets/${clientId}`)}
+              onClick={() => navigate(`/manage-assets/${clientId}?name=${encodeURIComponent(clientDetails.client_name)}`)}
               disabled={clientDetails.status !== "ACTIVE"}
               title={clientDetails.status !== "ACTIVE" ? "Manage Assets is available only for ACTIVE clients" : ""}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all
-                ${clientDetails.status === "ACTIVE"
-                  ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-100 shadow-none opacity-80"
-                }`}
+            // className={`${clientDetails.status === "ACTIVE"
+            //     ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
+            //     : "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-100 shadow-none opacity-80"
+            // }`}
             >
               <Package size={16} />
               Manage Assets
@@ -1002,7 +1006,7 @@ const ClientPage = () => {
                         : "text-gray-900"
                         }`}
                     >
-                      {project.name}
+                      {project.projectName}
                     </h3>
                     {getProjectId(selectedProject) ===
                       getProjectId(project) && (
@@ -1062,7 +1066,7 @@ const ClientPage = () => {
               <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50 rounded-t-xl">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">
-                    {selectedProject.name}
+                    {selectedProject.projectName}
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
                     Managed by{" "}

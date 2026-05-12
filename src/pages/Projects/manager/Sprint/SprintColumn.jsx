@@ -1,12 +1,18 @@
 // src/pages/Projects/manager/Sprint/SprintColumn.jsx
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useDrop } from "react-dnd";
-import { ChevronRight, ChevronDown, MoreVertical } from "lucide-react";
+import { 
+  ChevronRightIcon, 
+  ChevronDownIcon, 
+  VerticalMenuIcon,
+  EditIcon,
+  DeleteIcon 
+} from "../../../../components/icons";
 import StoryCard from "./StoryCard";
 import TaskCard from "./TaskCard";
 import { jwtDecode } from "jwt-decode";
-import { toast } from "react-toastify"; // if needed for the modal
+import { showStatusToast } from "../../../../components/toastfy/toast";
 
 
 const SprintColumn = ({
@@ -35,6 +41,17 @@ const SprintColumn = ({
   
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   const toggleStoryExpand = (storyId) => {
     setExpandedStories((prev) =>
       prev.includes(storyId) ? prev.filter((id) => id !== storyId) : [...prev, storyId]
@@ -119,7 +136,7 @@ const SprintColumn = ({
       >
         {/* LEFT SECTION */}
         <div className="flex items-center gap-3">
-          {expanded ? <ChevronDown size={20} className="text-gray-500" /> : <ChevronRight size={20} className="text-gray-500" />}
+          {expanded ? <ChevronDownIcon size={20} className="text-gray-500" /> : <ChevronRightIcon size={20} className="text-gray-500" />}
 
           <h3 className="font-semibold text-gray-900 text-[16px]">
             {sprint.name || "Unnamed Sprint"}
@@ -160,7 +177,7 @@ const SprintColumn = ({
 
           {/* Menu - ONLY SHOW IF MANAGER AND (HAS EDIT OR HAS DELETE) */}
           {permissions.canEdit && (onEditSprint || onDeleteSprint) && (
-            <div className="relative">
+            <div ref={menuRef} className="relative">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -168,7 +185,7 @@ const SprintColumn = ({
                 }}
                 className="p-1 rounded-md text-gray-500 hover:bg-gray-200 transition-colors"
               >
-                <MoreVertical size={20} />
+                <VerticalMenuIcon size={20} />
               </button>
 
               {menuOpen && (
@@ -176,26 +193,28 @@ const SprintColumn = ({
                   
                   {onEditSprint && (
                     <button
-                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+                      className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         setMenuOpen(false);
                         onEditSprint(sprint);
                       }}
                     >
+                      <EditIcon size={16} className="text-blue-600" />
                       Edit Sprint
                     </button>
                   )}
 
                   {onDeleteSprint && (
                     <button
-                      className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         setMenuOpen(false);
                         onDeleteSprint(sprint.id);
                       }}
                     >
+                      <DeleteIcon size={16} />
                       Delete Sprint
                     </button>
                   )}
@@ -232,7 +251,7 @@ const SprintColumn = ({
                       className="p-1 rounded-md bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-700 transition-colors shadow-sm shrink-0"
                       title={isStoryExpanded ? "Collapse tasks" : "Expand tasks"}
                     >
-                      {isStoryExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                      {isStoryExpanded ? <ChevronDownIcon size={18} /> : <ChevronRightIcon size={18} />}
                     </button>
                   ) : (
                     <span className="w-[26px] shrink-0"></span> // Invisible spacer for alignment

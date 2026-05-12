@@ -17,6 +17,7 @@ import CompletedSection from "./components/CompletedSection";
 import ItemDetailPanel  from "./components/ItemDetailPanel";
 import { MyWorkPageSkeleton } from "./skeletons/MyWorkSkeletons";
 import { useNavigate } from "react-router-dom";
+import Button from "../../../components/Button/Button";
 export default function MyWorkPage() {
   const { user } = useAuth();
   const userId   = user?.id || user?.user_id;
@@ -76,13 +77,7 @@ export default function MyWorkPage() {
       <p className="text-sm text-slate-400 mb-4">
         Something went wrong fetching your items.
       </p>
-      <button
-        onClick={refetch}
-        className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium
-          rounded-lg hover:bg-indigo-700 transition-colors"
-      >
-        Retry
-      </button>
+      <Button variant="primary" onClick={refetch}>Retry</Button>
     </div>
   );
 
@@ -129,6 +124,7 @@ export default function MyWorkPage() {
 
         {/* ── Filter bar ────────────────────────────────────────────────────── */}
         <FilterBar projects={data?.projects} />
+      
 
         {/* ── Empty state (no work assigned at all) ─────────────────────────── */}
         {isEmpty ? (

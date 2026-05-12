@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { Users, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import Table from "../../../components/Table/table";
 import Pagination from "../../../components/Pagination/pagination";
@@ -762,36 +763,17 @@ console.log(
           className="w-full md:w-1/3 px-3 py-2 border rounded-lg"
         />
 
-        <select
+        <FilterListbox
+          options={[{value:"ALL",label:"All Status"},{value:"ACTIVE",label:"Active"},{value:"PROBATION",label:"Probation"},{value:"NOTICE PERIOD",label:"Notice Period"}]}
           value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-full md:w-48 px-3 py-2 border rounded-lg bg-white"
-        >
-          <option value="ALL">All Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="PROBATION">Probation</option>
-          <option value="NOTICE PERIOD">Notice Period</option>
-        </select>
+          onChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}
+        />
 
-        <select
+        <FilterListbox
+          options={[{value:"ALL",label:"All Departments"}, ...departments.map((dept) => ({value: dept.department_name, label: dept.department_name}))]}
           value={departmentFilter}
-          onChange={(e) => {
-            setDepartmentFilter(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-full md:w-48 px-3 py-2 border rounded-lg bg-white"
-        >
-          <option value="ALL">All Departments</option>
-
-          {departments.map((dept) => (
-            <option key={dept.department_uuid} value={dept.department_name}>
-              {dept.department_name}
-            </option>
-          ))}
-        </select>
+          onChange={(val) => { setDepartmentFilter(val); setCurrentPage(1); }}
+        />
       </div>
 
       {/* TABLE */}

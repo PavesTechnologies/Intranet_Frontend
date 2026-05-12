@@ -11,6 +11,7 @@ import { ChevronUpDownIcon, CheckIcon } from "@heroicons/react/20/solid";
 import { Plus } from "lucide-react";
 import LeaveUploadWizard from "./LeaveUploadWizard";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Button from "../../../components/Button/Button";
 
 export const YearDropdown = ({ value, onChange }) => {
   const currentYear = new Date().getFullYear();
@@ -374,10 +375,9 @@ const EmployeeLeaveBalances = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => navigate(-1)}
-          className="flex items-center text-blue-700 font-medium hover:text-blue-900 transition-colors whitespace-nowrap"
+          className="flex items-center border border-gray-500 rounded-md px-5 py-1  text-blue-700 font-medium hover:text-blue-900 transition-colors whitespace-nowrap"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
         </motion.button>
       </div>
 
@@ -421,7 +421,7 @@ const EmployeeLeaveBalances = () => {
           )}
         </div>
 
-        <div className="relative z-50">
+        <div className="relative z-60">
           <YearDropdown
             value={currentYear}
             onChange={(year) => {
@@ -431,13 +431,14 @@ const EmployeeLeaveBalances = () => {
           />
         </div>
 
-        <button
+        <Button
           onClick={() => setShowUploadWizard(true)}
-          className="flex items-center text-blue-700 font-medium hover:text-blue-900 transition-colors whitespace-nowrap"
+          variant="primary"
+          size="medium"
         >
           <Plus className="h-4 w-4 mr-1" />
           Add Leave Balance
-        </button>
+        </Button>
       </div>
 
       {/* Table */}
@@ -488,12 +489,14 @@ const EmployeeLeaveBalances = () => {
                       </td>
                     ))}
                     <td className="border px-4 py-2 text-center sticky right-0 bg-white z-10">
-                      <button
+                      <Button
                         onClick={() => handleEdit(emp)}
-                        className="text-blue-600 underline hover:text-blue-800"
+                        variant="ghost"
+                        size="small" 
+                        className="text-blue-600 hover:text-blue-800"
                       >
                         Edit
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}

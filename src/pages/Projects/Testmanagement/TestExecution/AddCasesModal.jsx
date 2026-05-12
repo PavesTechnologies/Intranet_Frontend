@@ -1,5 +1,6 @@
 // src/components/AddCasesModal.jsx
 import React, { useState, useEffect } from "react";
+import Button from "../../../../components/Button/Button";
 
 export default function AddCasesModal({ show, onClose, availableCases, onSubmit }) {
   const [selected, setSelected] = useState([]);
@@ -39,19 +40,13 @@ export default function AddCasesModal({ show, onClose, availableCases, onSubmit 
         </div>
 
         <div className="flex items-center gap-3 mt-4">
-          <button
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            onClick={() => onSubmit(selected)}
-          >
+          <Button variant="success" onClick={() => onSubmit(selected)}>
             Add Selected Cases
-          </button>
+          </Button>
 
-          <button
-            className="text-gray-600 px-4 py-2 rounded hover:text-gray-900"
-            onClick={onClose}
-          >
+          <Button variant="secondary" onClick={onClose}>
             Cancel
-          </button>
+          </Button>
         </div>
 
         <button

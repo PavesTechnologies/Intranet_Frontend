@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { showStatusToast } from "../../../../components/toastfy/toast";
+import Button from "../../../../components/Button/Button";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
   const token = localStorage.getItem("token");
@@ -37,7 +39,7 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
           projectId: sprint.projectId,
         });
       } catch (err) {
-        showStatusToast("Failed to load sprint details", "error", 3000);
+        showStatusToast("Sprint updated successfully!", "success");
       } finally {
         setLoading(false);
       }
@@ -66,16 +68,12 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      showStatusToast("Sprint updated successfully!", "success", 3000);
+      showStatusToast("Sprint updated successfully!", "success");
 
       onUpdated?.();
       onClose?.();
     } catch (err) {
-      showStatusToast(
-        err.response?.data?.message || "Failed to update sprint",
-        "error",
-        4000,
-      );
+      showStatusToast("Failed to load sprint details", "error");
     } finally {
       setLoading(false);
     }
@@ -133,33 +131,17 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
 
       <div>
         <label className="block font-medium">Status</label>
-        <select
-          name="status"
-          className="w-full border p-2 rounded"
+        <FilterListbox
+          options={[{value:"PLANNING",label:"Planning"},{value:"ACTIVE",label:"Active"},{value:"COMPLETED",label:"Completed"}]}
           value={formData.status}
-          onChange={handleChange}
-        >
-          <option value="PLANNING">Planning</option>
-          <option value="ACTIVE">Active</option>
-          <option value="COMPLETED">Completed</option>
-        </select>
+          onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+        />
       </div>
 
       <div className="flex justify-end gap-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 bg-gray-300 rounded"
-        >
-          Cancel
-        </button>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
 
-        <button
-          type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded"
-        >
-          Update Sprint
-        </button>
+        <Button variant="primary" type="submit">Update Sprint</Button>
       </div>
     </form>
   );

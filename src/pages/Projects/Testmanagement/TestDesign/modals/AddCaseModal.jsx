@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react"; // ⭐ 1. Added useEffect
 import axiosInstance from "../../api/axiosInstance";
-import { X } from "lucide-react";
-import toast from "react-hot-toast";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
+import { showStatusToast } from "../../../../../components/toastfy/toast";
+import Button from "../../../../../components/Button/Button";
+import Modal from "../../../../../components/Modal/modal";
 
 // ⭐ 2. Added caseToEdit prop
 export default function AddCaseModal({
@@ -55,9 +57,9 @@ export default function AddCaseModal({
   };
 
   const handleSave = async () => {
-    if (!title.trim()) return toast.error("Case title is required");
+    if (!title.trim()) return showStatusToast("Case title is required", "error");
     // Only strictly require scenarioId if we are creating a new case
-    if (!caseToEdit && !scenarioId) return toast.error("No scenario selected");
+    if (!caseToEdit && !scenarioId) return showStatusToast("No scenario selected", "error");
 
     setSaving(true);
 
@@ -82,23 +84,22 @@ export default function AddCaseModal({
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/${caseToEdit.id}`,
           payload,
         );
-        toast.success("Test Case updated successfully!");
+        showStatusToast("Test Case updated successfully!", "success");
       } else {
         await axiosInstance.post(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases`,
           payload,
         );
-        toast.success("Test Case created successfully!");
+        showStatusToast("Test Case created successfully!", "success");
       }
 
       if (onCreated) onCreated();
       onClose();
     } catch (err) {
       console.error("Action FAILED →", err);
-      toast.error(
-        caseToEdit
-          ? "Failed to update test case"
-          : "Failed to create test case",
+      showStatusToast(
+        caseToEdit ? "Failed to update test case" : "Failed to create test case",
+        "error",
       );
     } finally {
       setSaving(false);
@@ -106,16 +107,12 @@ export default function AddCaseModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white w-[650px] max-h-[80vh] overflow-auto p-5 rounded-xl shadow-lg">
-        <div className="flex justify-between mb-4">
-          {/* ⭐ 5. Dynamic Modal Title */}
-          <h2 className="text-lg font-semibold">
-            {caseToEdit ? "Edit Test Case" : "Add Test Case"}
-          </h2>
-          <X className="cursor-pointer" onClick={onClose} />
-        </div>
-
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={caseToEdit ? "Edit Test Case" : "Add Test Case"}
+      className="max-w-[650px]"
+    >
         <div className="space-y-4">
           <div>
             <label className="text-sm">Title</label>
@@ -141,30 +138,20 @@ export default function AddCaseModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm">Type</label>
-              <select
-                className="w-full border rounded px-3 py-2"
+              <FilterListbox
+                options={[{value:"FUNCTIONAL",label:"FUNCTIONAL"},{value:"REGRESSION",label:"REGRESSION"},{value:"SMOKE",label:"SMOKE"},{value:"SECURITY",label:"SECURITY"}]}
                 value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value="FUNCTIONAL">FUNCTIONAL</option>
-                <option value="REGRESSION">REGRESSION</option>
-                <option value="SMOKE">SMOKE</option>
-                <option value="SECURITY">SECURITY</option>
-              </select>
+                onChange={setType}
+              />
             </div>
 
             <div>
               <label className="text-sm">Priority</label>
-              <select
-                className="w-full border rounded px-3 py-2"
+              <FilterListbox
+                options={[{value:"LOW",label:"LOW"},{value:"MEDIUM",label:"MEDIUM"},{value:"HIGH",label:"HIGH"},{value:"CRITICAL",label:"CRITICAL"}]}
                 value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-              >
-                <option value="LOW">LOW</option>
-                <option value="MEDIUM">MEDIUM</option>
-                <option value="HIGH">HIGH</option>
-                <option value="CRITICAL">CRITICAL</option>
-              </select>
+                onChange={setPriority}
+              />
             </div>
           </div>
 
@@ -209,27 +196,12 @@ export default function AddCaseModal({
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-            <button
-              className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-            <button
-              className={`px-4 py-2 bg-blue-600 text-white rounded-lg transition-colors ${saving ? "opacity-70 cursor-not-allowed" : "hover:bg-blue-700"}`}
-              onClick={handleSave}
-              disabled={saving}
-            >
-              {/* ⭐ 6. Dynamic Save Button Text */}
-              {saving
-                ? "Saving..."
-                : caseToEdit
-                  ? "Update Case"
-                  : "Create Case"}
-            </button>
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button variant="primary" onClick={handleSave} disabled={saving} loading={saving} loadingText="Saving...">
+              {caseToEdit ? "Update Case" : "Create Case"}
+            </Button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -1,7 +1,5 @@
-// src/components/toastify/toast.jsx
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
 
 const STATUS_CONFIG = {
   success: {
@@ -10,14 +8,17 @@ const STATUS_CONFIG = {
   },
   info: {
     toastType: toast.info,
-    defaultMessage: "Action is in progress or on hold.",
+    defaultMessage: "Action is in progress.",
   },
   error: {
     toastType: toast.error,
-    defaultMessage: "Action failed or was rejected.",
+    defaultMessage: "Action failed.",
+  },
+  warning: {
+    toastType: toast.warning,
+    defaultMessage: "Please check the details.",
   },
 };
-
 
 export const showStatusToast = (message = "", messageType = "info") => {
   const config = STATUS_CONFIG[messageType];
@@ -25,6 +26,6 @@ export const showStatusToast = (message = "", messageType = "info") => {
   if (config) {
     config.toastType(message || config.defaultMessage);
   } else {
-    toast(message); // fallback to default toast if type is not recognized
+    toast(message || "Notification");
   }
 };

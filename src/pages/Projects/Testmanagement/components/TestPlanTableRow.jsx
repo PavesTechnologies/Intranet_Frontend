@@ -1,5 +1,6 @@
 import React from "react";
 import { Edit, Trash2 } from "lucide-react";
+import StatusBadge from "../../../../components/status/statusbadge";
 
 const TestPlanTableRow = ({ plan, onEdit, onDelete }) => {
   return (
@@ -7,15 +8,7 @@ const TestPlanTableRow = ({ plan, onEdit, onDelete }) => {
       <td className="px-4 py-2">{plan.name}</td>
       <td className="px-4 py-2">{plan.description}</td>
       <td className="px-4 py-2">
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-semibold ${
-            plan.status === "Active"
-              ? "bg-green-100 text-green-800"
-              : "bg-gray-100 text-gray-800"
-          }`}
-        >
-          {plan.status}
-        </span>
+        <StatusBadge label={plan.status} size="sm" />
       </td>
       <td className="px-4 py-2">{new Date(plan.createdAt).toLocaleDateString()}</td>
       <td className="px-4 py-2 flex gap-2">

@@ -102,22 +102,7 @@ const AdminPanel = ({ employeeId }) => {
   // Subscribe to WebSocket for real-time updates
   // In AdminPanel.js
   console.log("leavered", leaveApprovalRef.current);
-  // useEffect(() => {
-  //   const unsub = subscribe("data-updated", () => {
-  //     fetchRevokeRequests();
-  //     if (refreshCooldown.current) return; // ⛔ already refreshing
 
-  //     refreshCooldown.current = true;
-  //     console.log("WS EVENT → refreshing admin data");
-  //     leaveApprovalRef.current?.refreshData();
-
-  //     setTimeout(() => {
-  //       refreshCooldown.current = false;
-  //     }, 2000);
-  //   });
-
-  //   return unsub;
-  // }, [subscribe, fetchRevokeRequests]);
 
   useEffect(() => {
     const sub1 = subscribe("leave-updated", () => {
@@ -193,13 +178,13 @@ const AdminPanel = ({ employeeId }) => {
           <p className="text-gray-600">Handle leave requests and approvals</p>
         </div>
         <div>
-          <Button
+          {/* <Button
             onClick={() => navigate(`/block-leave-dates/${employeeId}`)}
             variant="secondary"
             size="medium"
           >
             Manage Leave Blocks
-          </Button>
+          </Button> */}
         </div>
       </div>
 
@@ -256,7 +241,7 @@ const AdminPanel = ({ employeeId }) => {
       </div> */}
 
       {/* Comp-Off Balance Requests Section */}
-      {permissions.includes("VIEW_PENDING_COMPOFF_REQUESTS") && (
+      {permissions.includes("VIEW_COMPOFF_BY_EMPLOYEE") && (
         <CompOffBalanceRequests managerId={employeeId} />
       )}
       {/* <CompOffBalanceRequests managerId={employeeId} /> */}

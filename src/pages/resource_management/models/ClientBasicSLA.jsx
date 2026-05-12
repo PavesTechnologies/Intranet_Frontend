@@ -16,7 +16,8 @@ import { useAuth } from "../../../contexts/AuthContext";
 const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
   const { user } = useAuth();
   const permissions = user?.permissions || [];
-  const canEditConfig = permissions.includes("EDIT_CLIENT_CONFIG");
+  const roles = user?.roles || [];
+  const canEditConfig = roles.includes("Admin"); // permissions.includes("EDIT_CLIENT_CONFIG");
   const [slaList, setSLAList] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -174,6 +175,9 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
                 Warning Threshold
               </th>
               <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                Status
+              </th>
+              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
                 Actions
               </th>
             </tr>
@@ -212,6 +216,15 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
                     )}`}
                   >
                     {sla.warningThresholdDays} days
+                  </span>
+                </td>
+
+                {/* STATUS */}
+                <td className="px-6 py-4">
+                  <span
+                    className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
+                  >
+                    {sla.activeFlag ? "Active" : "Inactive"}
                   </span>
                 </td>
 

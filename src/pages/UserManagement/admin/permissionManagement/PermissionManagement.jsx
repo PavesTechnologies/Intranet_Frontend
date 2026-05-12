@@ -1,39 +1,46 @@
-import Button from "../../../../components/Button/Button";
-import Pagination from "../../../../components/Pagination/pagination";
-import FormInput from "../../../../components/forms/FormInput";
-import { Pencil, Trash } from "lucide-react";
-import Modal from "../../../../components/Modal/modal";
-import SearchInput from "../../../../components/filter/Searchbar";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { Pencil, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "react-toastify";
+
+import Button from "../../../../components/Button/Button";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import Pagination from "../../../../components/Pagination/pagination";
+import FormInput from "../../../../components/forms/FormInput";
+import Modal from "../../../../components/Modal/modal";
+import SearchInput from "../../../../components/filter/Searchbar";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
 export default function PermissionManagement() {
   const [permissions, setPermissions] = useState([]);
-  const [filteredPermissions, setFilteredPermissions] = useState([]);
   const [groups, setGroups] = useState([]);
+
   const [newPermission, setNewPermission] = useState("");
   const [description, setNewDescription] = useState("");
   const [selectedGroup, setSelectedGroup] = useState("");
+
   const [editingPermission, setEditingPermission] = useState(null);
   const [editCode, setEditCode] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editGroup, setEditGroup] = useState("");
-  const [mode, setMode] = useState("basic");
+
   const [showModal, setShowModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
-  const [addpermission, setAddPermission] = useState(false);
   const [addPermissionModal, setAddPermissionModal] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
-  const [adding, setAdding] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [processing, setProcessing] = useState(false); // for generic cancel/ok actions if needed
 
+  const [adding, setAdding] = useState(false);
+  const [creatingPermission, setCreatingPermission] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [selectedPermissionUuids, setSelectedPermissionUuids] = useState([]);
+
+  const itemsPerPage = 5;
   const token = localStorage.getItem("token");
 
   const axiosInstance = axios.create({
@@ -41,33 +48,89 @@ export default function PermissionManagement() {
     headers: { Authorization: `Bearer ${token}` },
   });
 
+  const showSingleToast = (msg, type) => {
+    toast.dismiss();
+    showStatusToast(msg, type);
+  };
+
+  const filteredPermissions = permissions.filter((perm) =>
+    perm?.permission_code?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredPermissions.length / itemsPerPage)
+  );
+
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedPermissions = filteredPermissions.slice(
+    (safeCurrentPage - 1) * itemsPerPage,
+    safeCurrentPage * itemsPerPage
+  );
+
   useEffect(() => {
-    fetchPermissions();
-    fetchGroups();
+    initialize();
   }, []);
 
-  const fetchPermissions = async () => {
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedPermissionUuids([]);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const initialize = async () => {
+    setLoading(true);
+
+    try {
+      await Promise.all([fetchPermissions(), fetchGroups()]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchPermissions = async (options = {}) => {
+    const { afterDelete = false } = options;
+
     try {
       const res = await axiosInstance.get("/admin/permissions/");
-      setPermissions(res.data);
-      setFilteredPermissions(res.data);
+      const latestPermissions = res.data || [];
+
+      setPermissions(latestPermissions);
+
+      if (afterDelete) {
+        const filteredAfterDelete = latestPermissions.filter((perm) =>
+          perm?.permission_code
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase())
+        );
+
+        const newTotalPages = Math.max(
+          1,
+          Math.ceil(filteredAfterDelete.length / itemsPerPage)
+        );
+
+        setCurrentPage((prev) => Math.min(prev, newTotalPages));
+      }
     } catch (err) {
       console.error("Failed to fetch permissions", err);
+      showSingleToast("Failed to fetch permissions", "error");
     }
   };
 
   const fetchGroups = async () => {
     try {
       const res = await axiosInstance.get("/admin/groups");
-      setGroups(res.data);
+      setGroups(res.data || []);
     } catch (err) {
       console.error("Failed to fetch groups", err);
+      showSingleToast("Failed to fetch groups", "error");
     }
-  };
-
-  const showSingleToast = (msg, type) => {
-    toast.dismiss();
-    showStatusToast(msg, type);
   };
 
   const validatePermissionCode = (code) => {
@@ -75,21 +138,17 @@ export default function PermissionManagement() {
       showSingleToast("Enter the permission", "error");
       return false;
     }
-    if (!/[A-Z]/.test(code)) {
+
+    const permissionCodePattern = /^[A-Z]+(_[A-Z]+)*$/;
+
+    if (!permissionCodePattern.test(code.trim())) {
       showSingleToast(
-        "Permission code must contain at least one capital letter",
-        "error",
+        "Invalid format. Use uppercase letters and underscores only.",
+        "error"
       );
       return false;
     }
-    const validCharsRegex = /^[A-Za-z\s-_]+$/;
-    if (!validCharsRegex.test(code)) {
-      showSingleToast(
-        "Permission code can only contain letters, spaces, hyphens, and underscores",
-        "error",
-      );
-      return false;
-    }
+
     return true;
   };
 
@@ -98,108 +157,64 @@ export default function PermissionManagement() {
       showSingleToast("Description shouldn't be empty", "error");
       return false;
     }
+
     const textOnlyRegex = /^[A-Za-z0-9\s.,!?'"()_-]+$/;
+
     if (!textOnlyRegex.test(desc)) {
       showSingleToast(
         "Description should contain only valid text format",
-        "error",
+        "error"
       );
       return false;
     }
+
     return true;
+  };
+
+  const resetForm = () => {
+    setNewPermission("");
+    setNewDescription("");
+    setSelectedGroup("");
+  };
+
+  const resetEditForm = () => {
+    setEditingPermission(null);
+    setEditCode("");
+    setEditDescription("");
+    setEditGroup("");
   };
 
   const handleCreate = async () => {
     if (!validatePermissionCode(newPermission)) return;
     if (!validateDescription(description)) return;
 
+    setCreatingPermission(true);
+
     try {
-      const payload = {
-        permission_code: newPermission,
-        description,
-        group_uuid: selectedGroup,
-      };
-
-      const endpoint = "/admin/permissions/group";
-
-      await axiosInstance.post(endpoint, payload);
+      await axiosInstance.post("/admin/permissions/group", {
+        permission_code: newPermission.trim(),
+        description: description.trim(),
+        group_uuid: selectedGroup || null,
+      });
 
       showSingleToast("Permission created successfully!", "success");
+
       resetForm();
-      fetchPermissions();
+      setAddPermissionModal(false);
+
+      await fetchPermissions();
     } catch (err) {
       console.error("Error creating permission", err);
+
       const detail =
-        err.response?.data?.detail || "Failed to create permission";
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to create permission";
+
       showSingleToast(detail, "error");
-    }
-  };
-
-  const handleUpdate = async () => {
-    if (!validatePermissionCode(editCode)) return;
-    if (!validateDescription(editDescription)) return;
-
-    try {
-      await axiosInstance.put(
-        `/admin/permissions/${editingPermission.permission_uuid}`,
-        {
-          permission_code: editCode,
-          description: editDescription,
-        },
-      );
-
-      if (mode === "withGroup") {
-        await axiosInstance.put(
-          `/admin/permissions/${editingPermission.permission_uuid}/group`,
-          {
-            group_uuid: editGroup,
-          },
-        );
-      }
-
-      showSingleToast("Permission updated successfully!", "success");
-      setShowModal(false);
-      fetchPermissions();
-    } catch (err) {
-      console.error("Error updating permission", err);
-      const detail =
-        err.response?.data?.detail || "Failed to update permission";
-      showSingleToast(detail, "error");
-    }
-  };
-
-  const confirmDelete = async () => {
-    try {
-      await axiosInstance.delete(`/admin/permissions/${deleteId}`);
-      fetchPermissions();
-      showSingleToast("Permission deleted successfully!", "success");
-    } catch (err) {
-      console.error("Failed to delete permission", err);
-      showSingleToast("Failed to delete permission", "error");
     } finally {
-      setShowDeleteModal(false);
-      setDeleteId(null);
+      setCreatingPermission(false);
     }
-  };
-
-  const handlePermissionChange = (e) => {
-    const value = e.target.value;
-    if (/^[A-Za-z\s-_]*$/.test(value)) setNewPermission(value);
-  };
-
-  const handleDescriptionChange = (e) => {
-    const value = e.target.value;
-    if (/^[A-Za-z0-9\s.,!?'"()_-]*$/.test(value)) setNewDescription(value);
-  };
-
-  const handleEditPermissionChange = (e) => {
-    const value = e.target.value;
-    if (/^[A-Za-z\s-_]*$/.test(value)) setEditCode(value);
-  };
-
-  const handleEditDescriptionChange = (e) => {
-    const value = e.target.value;
-    if (/^[A-Za-z0-9\s.,!?'"()_-]*$/.test(value)) setEditDescription(value);
   };
 
   const handleEdit = (permission) => {
@@ -210,232 +225,519 @@ export default function PermissionManagement() {
     setShowModal(true);
   };
 
-  const handleDeleteClick = (id) => {
-    setDeleteId(id);
-    setShowDeleteModal(true);
-  };
+  const handleUpdate = async () => {
+    if (!validatePermissionCode(editCode)) return;
+    if (!validateDescription(editDescription)) return;
 
-  const resetForm = () => {
-    setNewPermission("");
-    setNewDescription("");
-    setSelectedGroup("");
-  };
+    setUpdating(true);
 
-  const handleAddPermission = () => {
-    setAddPermission(!addpermission);
-    setAddPermissionModal(!addPermissionModal);
-  };
-
-  useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredPermissions(permissions);
-    } else {
-      const filtered = permissions.filter((perm) =>
-        perm.permission_code.toLowerCase().includes(searchTerm.toLowerCase()),
+    try {
+      await axiosInstance.put(
+        `/admin/permissions/${editingPermission.permission_uuid}`,
+        {
+          permission_code: editCode.trim(),
+          description: editDescription.trim(),
+        }
       );
-      setFilteredPermissions(filtered);
-    }
-    setCurrentPage(1);
-  }, [searchTerm, permissions]);
 
-  const totalPages = Math.ceil(filteredPermissions.length / itemsPerPage);
-  const paginatedPermissions = filteredPermissions.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
-  );
+      if (editGroup) {
+        await axiosInstance.put(
+          `/admin/permissions/${editingPermission.permission_uuid}/group`,
+          {
+            group_uuid: editGroup,
+          }
+        );
+      }
+
+      showSingleToast("Permission updated successfully!", "success");
+
+      setShowModal(false);
+      resetEditForm();
+
+      await fetchPermissions();
+    } catch (err) {
+      console.error("Error updating permission", err);
+
+      const detail =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to update permission";
+
+      showSingleToast(detail, "error");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handlePermissionChange = (e) => {
+    const value = e.target.value.toUpperCase();
+
+    if (/^[A-Z_]*$/.test(value)) {
+      setNewPermission(value);
+    }
+  };
+
+  const handleDescriptionChange = (e) => {
+    const value = e.target.value;
+
+    if (/^[A-Za-z0-9\s.,!?'"()_-]*$/.test(value)) {
+      setNewDescription(value);
+    }
+  };
+
+  const handleEditPermissionChange = (e) => {
+    const value = e.target.value.toUpperCase();
+
+    if (/^[A-Z_]*$/.test(value)) {
+      setEditCode(value);
+    }
+  };
+
+  const handleEditDescriptionChange = (e) => {
+    const value = e.target.value;
+
+    if (/^[A-Za-z0-9\s.,!?'"()_-]*$/.test(value)) {
+      setEditDescription(value);
+    }
+  };
+
+  const handlePermissionCheckboxChange = (permissionUuid) => {
+    setSelectedPermissionUuids((prev) =>
+      prev.includes(permissionUuid)
+        ? prev.filter((id) => id !== permissionUuid)
+        : [...prev, permissionUuid]
+    );
+  };
+
+  const handleSelectAllCurrentPage = () => {
+    const currentPageUuids = paginatedPermissions.map(
+      (perm) => perm.permission_uuid
+    );
+
+    const allSelected = currentPageUuids.every((id) =>
+      selectedPermissionUuids.includes(id)
+    );
+
+    if (allSelected) {
+      setSelectedPermissionUuids((prev) =>
+        prev.filter((id) => !currentPageUuids.includes(id))
+      );
+    } else {
+      setSelectedPermissionUuids((prev) => [
+        ...new Set([...prev, ...currentPageUuids]),
+      ]);
+    }
+  };
+
+  const clearSelectedPermissions = () => {
+    setSelectedPermissionUuids([]);
+  };
+
+  const handleBulkDeletePermissions = async () => {
+    if (selectedPermissionUuids.length === 0) {
+      return showSingleToast(
+        "Please select at least one permission.",
+        "warning"
+      );
+    }
+
+    setBulkDeleting(true);
+
+    try {
+      const res = await axiosInstance.delete("/admin/permissions/bulk-delete", {
+        data: {
+          permission_uuids: selectedPermissionUuids,
+        },
+      });
+
+      const data = res?.data || {};
+      const deletedCount = data.deleted_count ?? selectedPermissionUuids.length;
+      const failedPermissions = data.failed_permissions || [];
+
+      if (deletedCount > 0 && failedPermissions.length === 0) {
+        showSingleToast(
+          `${deletedCount} permission(s) deleted successfully.`,
+          "success"
+        );
+      } else if (deletedCount > 0 && failedPermissions.length > 0) {
+        showSingleToast(
+          `${deletedCount} permission(s) deleted. ${failedPermissions.length} failed.`,
+          "warning"
+        );
+      } else {
+        showSingleToast("No permissions were deleted.", "error");
+      }
+
+      setSelectedPermissionUuids([]);
+
+      await fetchPermissions({ afterDelete: true });
+    } catch (err) {
+      console.error("Failed to delete permissions", err);
+
+      const detail = err?.response?.data?.detail;
+
+      if (typeof detail === "object") {
+        showSingleToast(
+          detail.message || "Failed to delete permissions",
+          "error"
+        );
+      } else {
+        showSingleToast(
+          detail ||
+          err?.response?.data?.message ||
+          "Failed to delete permissions",
+          "error"
+        );
+      }
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleAddPermission = async () => {
+    setAdding(true);
+
+    try {
+      setAddPermissionModal(true);
+    } finally {
+      setAdding(false);
+    }
+  };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-6 flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">Permission Management</h2>
-        <Button
-          onClick={async () => {
-            setAdding(true);
-            try {
-              await handleAddPermission(); // <-- your existing function
-            } finally {
-              setAdding(false);
-            }
-          }}
-          disabled={adding}
-          className={`px-6 py-2 text-white rounded transition-colors font-medium ${
-            adding
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-900 hover:bg-blue-950"
-          }`}
-        >
-          {adding ? "Adding..." : "Add Permission"}
-        </Button>
+    <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 lg:px-6">
+      <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0A0082]/10 text-[#0A0082]">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+
+            <div>
+              <h2 className={Fonts.heading3}>Permission Management</h2>
+
+              <p className={Fonts.paragraphMuted}>
+                Create, update, search, and bulk delete permissions.
+              </p>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleAddPermission}
+            disabled={adding}
+            variant="primary"
+            size="medium"
+            className="w-full sm:w-auto"
+          >
+            {adding ? "Opening..." : "Add Permission"}
+          </Button>
+        </div>
       </div>
 
-      {/* Add Permission Modal */}
-      <Modal isOpen={addPermissionModal} onClose={handleAddPermission}>
-        {addpermission && (
-          <div className="flex flex-col gap-[8px] bg-white p-4 rounded shadow mb-6">
-            <h3 className="text-lg font-semibold mb-3">Add New Permission</h3>
-            <FormInput
-              label="Permission Code"
-              name="permission_code"
-              value={newPermission}
-              onChange={handlePermissionChange}
-              placeholder="e.g., READ_USER (must contain capital letters)"
-              className="mb-3"
-            />
-            <FormInput
-              type="text"
-              label="Description"
-              padding="medium"
-              placeholder="Enter description (text only)"
-              value={description}
-              onChange={handleDescriptionChange}
-              className="w-full p-2 border rounded mb-3"
-            />
-            <select
-              value={selectedGroup}
-              onChange={(e) => setSelectedGroup(String(e.target.value))}
-              className="w-full p-2 border rounded mb-3"
-            >
-              <option value="">Select Group</option>
-              {groups.map((g) => (
-                <option key={g.group_uuid} value={g.group_uuid}>
-                  {g.group_name}
-                </option>
-              ))}
-            </select>
+      <Modal
+        isOpen={addPermissionModal}
+        onClose={() => {
+          setAddPermissionModal(false);
+          resetForm();
+        }}
+        title="Add New Permission"
+        subtitle="Create a new permission and assign it to a group."
+        className="!w-full !max-w-2xl"
+      >
+        <FormInput
+          label="Permission Code"
+          name="permission_code"
+          value={newPermission}
+          onChange={handlePermissionChange}
+          placeholder="Example: READ_USER"
+        />
+
+        <FormInput
+          type="text"
+          label="Description"
+          placeholder="Enter description"
+          value={description}
+          onChange={handleDescriptionChange}
+        />
+
+        <div className="space-y-1">
+          <label className={Fonts.label}>Permission Group</label>
+
+          <FilterListbox
+            options={[
+              { value: "", label: "Default Group" },
+              ...groups.map((g) => ({ value: g.group_uuid, label: g.group_name })),
+            ]}
+            value={selectedGroup}
+            onChange={setSelectedGroup}
+          />
+
+          <div className="flex gap-3 mt-3">
             <Button
               onClick={handleCreate}
               variant="primary"
               size="medium"
-              className="mt-3"
+              disabled={creatingPermission}
+              className="flex items-center gap-2"
+            >
+              {creatingPermission ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Add Permission"
+              )}
+            </Button>
+
+            <Button
+              onClick={() => {
+                setAddPermissionModal(false);
+                resetForm();
+              }}
+              variant="secondary"
+              size="medium"
+              disabled={creatingPermission}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              onClick={handleCreate}
+              variant="primary"
+              size="medium"
+              disabled={creatingPermission}
+              loading={creatingPermission}
+              loadingText="Creating..."
+              className="w-full sm:w-auto"
             >
               Add Permission
             </Button>
           </div>
-        )}
+        </div>
       </Modal>
 
-      {/* Permission List */}
-      <div className="bg-white p-4 rounded shadow">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <h3 className="text-lg font-semibold">Existing Permissions</h3>
-          <SearchInput
-            onSearch={(value) => setSearchTerm(value)}
-            delay={500}
-            placeholder="Search Permissions by code..."
-            className="max-w-md"
-          />
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className={Fonts.heading4}>Existing Permissions</h3>
+
+            <p className={Fonts.paragraphMuted}>
+              {filteredPermissions.length} permission(s) found
+            </p>
+          </div>
+
+          <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:items-center">
+            {selectedPermissionUuids.length > 0 && (
+              <Button
+                size="medium"
+                variant="danger"
+                onClick={handleBulkDeletePermissions}
+                type="button"
+                disabled={bulkDeleting}
+                className="w-full lg:w-auto"
+              >
+                {bulkDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>Delete Selected ({selectedPermissionUuids.length})</>
+                )}
+              </Button>
+            )}
+
+            <div className="w-full lg:w-96">
+              <SearchInput
+                onSearch={(value) => setSearchTerm(value)}
+                delay={500}
+                placeholder="Search permissions by code..."
+                className="w-full"
+              />
+            </div>
+          </div>
         </div>
 
-        <ul className="space-y-3">
-          {paginatedPermissions.map((perm) => (
-            <li
-              key={perm.permission_uuid}
-              className="flex justify-between items-start border-b pb-3"
+        {selectedPermissionUuids.length > 0 && (
+          <div className="mb-4 flex flex-col gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {selectedPermissionUuids.length} permission(s) selected for
+              deletion.
+            </span>
+
+            <Button
+              type="button"
+              variant="link"
+              size="small"
+              onClick={clearSelectedPermissions}
+              className="text-left text-red-700 underline sm:text-right"
             >
-              <div className="flex-1 min-w-0">
-                <span className="font-semibold break-words text-gray-800">
-                  {perm.permission_code}
-                </span>
-                <p className="text-sm text-gray-600 break-words whitespace-pre-wrap mt-1 leading-relaxed">
-                  {perm.description || "No description available."}
-                </p>
-              </div>
+              Clear selection
+            </Button>
+          </div>
+        )}
 
-              <div className="flex gap-3 ml-4 flex-shrink-0">
-                <button
-                  onClick={() => handleEdit(perm)}
-                  className="p-2 rounded hover:bg-blue-100 text-blue-900"
-                  title="Edit"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDeleteClick(perm.permission_uuid)}
-                  className="p-2 rounded hover:bg-red-100 text-red-600"
-                  title="Delete"
-                >
-                  <Trash className="w-4 h-4" />
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {loading ? (
+          <div className="py-14">
+            <LoadingSpinner text="Loading permissions..." />
+          </div>
+        ) : paginatedPermissions.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center text-gray-500">
+            {searchTerm
+              ? "No permissions found matching your search."
+              : "No permissions available. Create a new permission to get started."}
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={
+                  paginatedPermissions.length > 0 &&
+                  paginatedPermissions.every((perm) =>
+                    selectedPermissionUuids.includes(perm.permission_uuid)
+                  )
+                }
+                onChange={handleSelectAllCurrentPage}
+                className="h-4 w-4"
+              />
 
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          onNext={() =>
-            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-          }
-        />
+              <span>Select all on this page</span>
+            </div>
+
+            <ul className="space-y-3">
+              {paginatedPermissions.map((perm) => (
+                <li
+                  key={perm.permission_uuid}
+                  className="flex flex-col gap-4 rounded-xl border border-gray-200 p-4 transition hover:border-[#0A0082]/30 sm:flex-row sm:items-start sm:justify-between"
+                >
+                  <div className="flex min-w-0 flex-1 gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedPermissionUuids.includes(
+                        perm.permission_uuid
+                      )}
+                      onChange={() =>
+                        handlePermissionCheckboxChange(perm.permission_uuid)
+                      }
+                      className="mt-1 h-4 w-4 shrink-0"
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      <h4 className="break-words font-semibold text-gray-800">
+                        {perm.permission_code}
+                      </h4>
+
+                      <p className="mt-1 break-words whitespace-pre-wrap text-sm leading-relaxed text-gray-600">
+                        {perm.description || "No description available."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end sm:justify-start">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="icon"
+                      title="Edit"
+                      aria-label={`Edit ${perm.permission_code}`}
+                      className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+                      onClick={() => handleEdit(perm)}
+                    >
+                      <Pencil size={17} />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {filteredPermissions.length > itemsPerPage && (
+              <div className="mt-6">
+                <Pagination
+                  currentPage={safeCurrentPage}
+                  totalPages={totalPages}
+                  onPrevious={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  onNext={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
+                />
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Edit Modal */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
-        <h2 className="text-lg font-semibold mb-4">Edit Permission</h2>
-        <FormInput
-          label="Permission Code"
-          name="edit_permission_code"
-          value={editCode}
-          onChange={handleEditPermissionChange}
-          placeholder="e.g., READ_USER (must contain capital letters)"
-          className="mb-3"
-        />
-        <FormInput
-          type="text"
-          label="Description"
-          placeholder="Enter description (text only)"
-          value={editDescription}
-          onChange={handleEditDescriptionChange}
-          className="w-full p-2 border rounded mb-3"
-        />
-        <div className="flex gap-3 mt-4">
-          <Button
-            onClick={async () => {
-              setUpdating(true);
-              try {
-                await handleUpdate(); // <-- your existing function
-              } finally {
-                setUpdating(false);
-              }
-            }}
-            disabled={updating}
-            className={`px-6 py-2 text-white rounded transition-colors font-medium ${
-              updating
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-green-600 hover:bg-green-700"
-            }`}
-          >
-            {updating ? "Updating..." : "Update"}
-          </Button>
+      <Modal
+        isOpen={showModal}
+        onClose={() => {
+          setShowModal(false);
+          resetEditForm();
+        }}
+        title="Edit Permission"
+        subtitle="Update permission details and group mapping."
+        className="!w-full !max-w-2xl"
+      >
+        <div className="space-y-4">
+          <FormInput
+            label="Permission Code"
+            name="edit_permission_code"
+            value={editCode}
+            onChange={handleEditPermissionChange}
+            placeholder="Example: READ_USER"
+          />
 
-          <Button
-            onClick={() => setShowModal(false)}
-            variant="secondary"
-            size="medium"
-          >
-            Cancel
-          </Button>
-        </div>
-      </Modal>
+          <FormInput
+            type="text"
+            label="Description"
+            placeholder="Enter description"
+            value={editDescription}
+            onChange={handleEditDescriptionChange}
+            className="w-full p-2 border rounded mb-3"
+          />
 
-      {/* Delete Modal */}
-      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)}>
-        <h2 className="text-lg font-semibold mb-4">
-          Are you sure you want to delete this permission?
-        </h2>
-        <div className="flex gap-3 mt-4">
-          <Button onClick={confirmDelete} variant="danger" size="medium">
-            OK
-          </Button>
-          <Button
-            onClick={() => setShowDeleteModal(false)}
-            variant="secondary"
-            size="medium"
+          <select
+            value={editGroup}
+            onChange={(e) => setEditGroup(String(e.target.value))}
+            className="w-full p-2 border rounded mb-3"
           >
-            Cancel
-          </Button>
+            <option value="">Keep current / Default Group</option>
+            {groups.map((g) => (
+              <option key={g.group_uuid} value={g.group_uuid}>
+                {g.group_name}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+            <Button
+              onClick={() => {
+                setShowModal(false);
+                resetEditForm();
+              }}
+              variant="secondary"
+              size="medium"
+              disabled={updating}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              onClick={handleUpdate}
+              disabled={updating}
+              variant="success"
+              size="medium"
+              loading={updating}
+              loadingText="Updating..."
+              className="w-full sm:w-auto"
+            >
+              Update
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

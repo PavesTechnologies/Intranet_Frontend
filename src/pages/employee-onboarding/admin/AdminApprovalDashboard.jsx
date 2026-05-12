@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import {
   Users,
   CheckCircle,
@@ -9,7 +10,7 @@ import {
   Clock,
   Loader2,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import axios from "axios";
 import Pagination from "../../../components/Pagination/pagination";
 import {useAuth} from "../../../contexts/AuthContext";
@@ -38,7 +39,7 @@ const userRoles = useMemo(() => {
 // Match the casing used in ViewEmpDetails
 const isHR = userRoles.includes("HR");
 const isAdmin = userRoles.includes("Admin");
-const isManager = userRoles.includes("Manager");
+const isManager = userRoles.includes("Reporting_Manager");
 
 // Permission flag for this specific page
 const isAuthorizedManager = isManager || isAdmin;
@@ -184,20 +185,11 @@ if (!authLoading && !isAuthorizedManager) {
           className="w-full md:w-1/3 px-3 py-2 border rounded-lg"
         />
 
-        <select
+        <FilterListbox
+          options={[{value:"ALL",label:"All Status"},{value:"PENDING",label:"Pending"},{value:"APPROVED",label:"Approved"},{value:"REJECTED",label:"Rejected"},{value:"ON_HOLD",label:"On Hold"}]}
           value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-full md:w-1/4 px-3 py-2 border rounded-lg"
-        >
-          <option value="ALL">All Status</option>
-          <option value="PENDING">Pending</option>
-          <option value="APPROVED">Approved</option>
-          <option value="REJECTED">Rejected</option>
-          <option value="ON_HOLD">On Hold</option>
-        </select>
+          onChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}
+        />
       </div>
 
       {/* Table */}

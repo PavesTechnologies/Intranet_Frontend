@@ -1,11 +1,12 @@
 // src/pages/CycleRunsPage.jsx
 import { useParams, useNavigate } from "react-router-dom";
+import Button from "../../../../components/Button/Button";
 import RunListForCycle from "./RunListForCycle";
 import AddCasesModal from "./AddCasesModal";
 import CreateTestRunForm from "./CreateRun";
 import axiosInstance from "../api/axiosInstance";
-import { useState } from "react";
-import { toast } from "react-toastify";
+import { useState, useEffect } from "react";   // ✅ UPDATED
+import { showStatusToast } from "../../../../components/toastfy/toast";
 
 export default function CycleRunsPage() {
   const { projectId, cycleId } = useParams();
@@ -16,6 +17,25 @@ export default function CycleRunsPage() {
   const [selectedRunId, setSelectedRunId] = useState(null);
   const [availableCases, setAvailableCases] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // ✅ NEW STATE
+  const [cycleName, setCycleName] = useState("");
+
+  // ✅ NEW API CALL
+  useEffect(() => {
+    const fetchCycle = async () => {
+      try {
+        const res = await axiosInstance.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-cycles/${cycleId}`
+        );
+        setCycleName(res.data?.name || "");
+      } catch (err) {
+        console.error("Failed to fetch cycle", err);
+      }
+    };
+
+    if (cycleId) fetchCycle();
+  }, [cycleId]);
 
   const openAddCasesModal = async (runId) => {
     setSelectedRunId(runId);
@@ -28,7 +48,7 @@ export default function CycleRunsPage() {
       setShowAddCasesModal(true);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load test cases");
+      showStatusToast("Failed to load test cases", "error");
     }
   };
 
@@ -38,33 +58,29 @@ export default function CycleRunsPage() {
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-runs/${selectedRunId}/add-cases`,
         { testCaseIds: ids },
       );
-      toast.success("Test cases added!");
+      showStatusToast("Test cases added!", "success");
       setShowAddCasesModal(false);
       setRefreshKey((x) => x + 1);
     } catch {
-      toast.error("Failed to add test cases");
+      showStatusToast("Failed to add test cases", "error");
     }
   };
 
   return (
     <div className="p-6">
       {/* Back button */}
-      <button
-        className="mb-4 bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
-        onClick={() => navigate(-1)}
-      >
+      <Button variant="secondary" className="mb-4" onClick={() => navigate(-1)}>
         ← Back to Cycles
-      </button>
+      </Button>
 
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-xl font-bold">Test Runs for Cycle</h1>
+        <h1 className="text-xl font-bold">
+          Test Runs for Cycle {cycleName ? `- ${cycleName}` : ""}
+        </h1>
 
-        <button
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          onClick={() => setShowRunModal(true)}
-        >
+        <Button variant="primary" onClick={() => setShowRunModal(true)}>
           + Create Run
-        </button>
+        </Button>
       </div>
 
       <RunListForCycle
@@ -90,6 +106,7 @@ export default function CycleRunsPage() {
             <CreateTestRunForm
               projectId={projectId}
               cycleId={cycleId}
+              cycleName={cycleName}   // ✅ NEW PROP
               onSuccess={() => {
                 setShowRunModal(false);
                 setRefreshKey((x) => x + 1);

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { AlertTriangle, Eye, Edit2, Check, X } from "lucide-react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { CATEGORY_OPTIONS } from "../constants/benchConstants";
 import { getAgingTone } from "../models/benchModel";
 import { updateStatusResource } from "../services/benchService";
@@ -225,24 +226,11 @@ const BenchTable = ({
                     {editingRow?.id === row.id ? (
                       <div className="flex flex-col gap-2 min-w-[150px] py-1">
                         <div className="relative">
-                          <select
+                          <FilterListbox
+                            options={validStates.map((status) => ({ value: status, label: status.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') }))}
                             value={editStatus}
-                            onChange={(e) => setEditStatus(e.target.value)}
-                            disabled={isSaving}
-                            className="h-9 w-full rounded-lg border border-slate-300 bg-white pl-3 pr-8 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 appearance-none transition-all cursor-pointer"
-                          >
-                            <option value="" disabled>Select Status</option>
-                            {validStates.map((status) => (
-                              <option key={status} value={status}>
-                                {status.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
+                            onChange={setEditStatus}
+                          />
                         </div>
                         <input
                           type="text"
@@ -265,13 +253,13 @@ const BenchTable = ({
                   </td>
                   <td className="px-4 py-4 align-middle text-center">
                     <div className="flex flex-col items-center gap-1">
-                      <span className={`text-[13px] font-bold ${row.allocation < 50 ? 'text-rose-600' : 'text-slate-900'}`}>
-                        {row.allocation}%
+                      <span className={`text-[13px] font-bold ${row.availability < 50 ? 'text-rose-600' : 'text-slate-900'}`}>
+                        {row.availability}%
                       </span>
                       <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
                         <div
-                          className={`h-full ${row.allocation >= 75 ? 'bg-emerald-500' : row.allocation >= 25 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                          style={{ width: `${row.allocation}%` }}
+                          className={`h-full ${row.availability >= 75 ? 'bg-emerald-500' : row.availability >= 25 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                          style={{ width: `${row.availability}%` }}
                         />
                       </div>
                     </div>
@@ -338,22 +326,11 @@ const BenchTable = ({
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">New Target State</label>
                 <div className="relative">
-                  <select
+                  <FilterListbox
+                    options={[{value:"",label:"Select a substate"},...validStates.map((status) => ({ value: status, label: status.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') }))]}
                     value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                    disabled={isSaving}
-                    className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 outline-none transition-all hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60"
-                  >
-                    <option value="" disabled>Select a substate</option>
-                    {validStates.map((state) => (
-                      <option key={state} value={state} className="font-medium">
-                        {state.replace(/_/g, " ")}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                  </div>
+                    onChange={setEditStatus}
+                  />
                 </div>
               </div>
 

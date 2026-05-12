@@ -1,3 +1,5 @@
+import FilterListbox from "../../../../components/filter/FilterListbox";
+
 export default function FiltersBar({
   department,
   setDepartment,
@@ -8,30 +10,18 @@ export default function FiltersBar({
   return (
     <div style={{ display: "flex", gap: 12 }}>
       {/* Department */}
-      <select
+      <FilterListbox
+        options={[{value:"",label:"All Departments"},{value:"Engineering",label:"Engineering"},{value:"Human Resources",label:"Human Resources"}]}
         value={department}
-        onChange={(e) => setDepartment(e.target.value)}
-        style={selectStyle}
-      >
-        <option value="">All Departments</option>
-        <option>Engineering</option>
-        <option>Human Resources</option>
-      </select>
-
+        onChange={setDepartment}
+      />
 
       {/* Location */}
-      <select
-        value={location}
-        onChange={
-          (e) => setLocations([e.target.value])
-        }  
-        style={selectStyle}
-      >
-        <option value="">All Locations</option>
-        {locationOptions.map((loc) => (
-          <option key={loc}>{loc}</option>
-        ))}
-      </select>
+      <FilterListbox
+        options={[{value:"",label:"All Locations"}, ...locationOptions.map((loc) => ({value: loc, label: loc}))]}
+        value={locations[0] || ""}
+        onChange={(val) => setLocations([val])}
+      />
     </div>
   );
 }

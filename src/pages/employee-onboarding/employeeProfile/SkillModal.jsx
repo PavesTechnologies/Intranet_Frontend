@@ -227,34 +227,7 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
     subSkills: []
   });
 
-  // useEffect(() => {
-  // const fetchData = async () => {
-  //   try {
-  //     const [treeRes, profRes] = await Promise.all([
-  //       skillService.getSkillTree(),
-  //       skillService.getProficiencies(),
-  //     ]);
-
-
-
-  //     const profData = profRes?.data || profRes || [];
-  //     setProficiencies(
-  //       Array.isArray(profData) 
-  //         ? profData.map(p => ({
-  //             id: p.proficiencyId || p.id,
-  //             name: p.proficiencyName || p.name || p.levelName
-  //           }))
-  //         : []
-  //     );
-  //   } catch (err) {
-  //     console.error("Error fetching skill data:", err);
-  //     setError("Failed to load skill data.");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-  //   fetchData();
-  // }, []);
+ 
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -464,18 +437,11 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]">
-        <div className="bg-white ...">
-          <div className="relative">
-            <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
-            </div>
-          </div>
-          <p className="text-sm font-bold text-gray-700 tracking-wide">Loading Skill Data...</p>
-        </div>
-      </div>
-    );
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
+      <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+    </div>
+  );
+
   }
 
   return (

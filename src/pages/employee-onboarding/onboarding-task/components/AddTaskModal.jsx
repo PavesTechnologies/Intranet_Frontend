@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 /* ---------- HELPERS ---------- */
 const normalizeStatusValue = (status) => {
@@ -209,80 +210,47 @@ export default function AddTaskModal({
 
           <div>
             <label style={labelStyle}>Employee</label>
-            <select
-              name="user_uuid"
+            <FilterListbox
+              options={[{value:"",label:"Select"}, ...employees]}
               value={String(formData.user_uuid)}
-              onChange={handleChange}
-              style={inputStyle}
-            >
-              <option value="">Select</option>
-              {employees.map((e) => (
-                <option key={e.value} value={e.value}>
-                  {e.label}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => handleChange({ target: { name: "user_uuid", value: val } })}
+            />
           </div>
 
           <div>
             <label style={labelStyle}>Assigned To</label>
-            <select
-              name="assigned_to"
+            <FilterListbox
+              options={[{value:"",label:"Select"}, ...assignees]}
               value={String(formData.assigned_to)}
-              onChange={handleChange}
-              style={inputStyle}
-            >
-              <option value="">Select</option>
-              {assignees.map((a) => (
-                <option key={a.value} value={a.value}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => handleChange({ target: { name: "assigned_to", value: val } })}
+            />
           </div>
 
           <div>
             <label style={labelStyle}>Priority</label>
-            <select
-              name="priority"
+            <FilterListbox
+              options={[{value:"High",label:"High"},{value:"Medium",label:"Medium"},{value:"Low",label:"Low"}]}
               value={formData.priority}
-              onChange={handleChange}
-              style={inputStyle}
-            >
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
+              onChange={(val) => handleChange({ target: { name: "priority", value: val } })}
+            />
           </div>
 
           <div>
             <label style={labelStyle}>Status</label>
-            <select
-              name="status"
+            <FilterListbox
+              options={[{value:"todo",label:"To Do"},{value:"progress",label:"In Progress"},{value:"completed",label:"Completed"}]}
               value={formData.status}
-              onChange={handleChange}
-              style={inputStyle}
-            >
-              <option value="todo">To Do</option>
-              <option value="progress">In Progress</option>
-              <option value="completed">Completed</option>
-            </select>
+              onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+            />
           </div>
 
           <div>
             <label style={labelStyle}>Task Type</label>
-            <select
-              name="taskType"
+            <FilterListbox
+              options={[{value:"Onboarding",label:"Onboarding"},{value:"Exit",label:"Exit"},{value:"IT Provisioning",label:"IT Provisioning"},{value:"Finance Clearance",label:"Finance Clearance"},{value:"Admin",label:"Admin"}]}
               value={formData.taskType}
-              onChange={handleChange}
-              style={inputStyle}
-            >
-              <option value="Onboarding">Onboarding</option>
-              <option value="Exit">Exit</option>
-              <option value="IT Provisioning">IT Provisioning</option>
-              <option value="Finance Clearance">Finance Clearance</option>
-              <option value="Admin">Admin</option>
-            </select>
+              onChange={(val) => handleChange({ target: { name: "taskType", value: val } })}
+            />
           </div>
 
           <div>
