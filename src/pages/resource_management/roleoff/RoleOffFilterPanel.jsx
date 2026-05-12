@@ -56,10 +56,11 @@ const RoleOffFilterPanel = ({
               <FilterListbox
                 options={[
                   { value: "", label: "All Statuses" },
-                  { value: "Pending Approval", label: "Pending Approval" },
-                  { value: "Approved", label: "Approved" },
-                  { value: "Rejected", label: "Rejected" },
-                  { value: "Cancelled", label: "Cancelled" },
+                  { value: "PENDING", label: "PENDING" },
+                  { value: "APPROVED", label: "APPROVED" },
+                  { value: "REJECTED", label: "REJECTED" },
+                  { value: "FULFILLED", label: "FULFILLED" },
+                  { value: "CANCELLED", label: "CANCELLED" },
                 ]}
                 value={filters.status}
                 onChange={(val) => onChange("status", val)}

@@ -396,10 +396,10 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
         if (!kpiData) return [];
 
         const total = kpiData.total || projectDemands.length;
-        const active = kpiData.active || projectDemands.filter(d => ['ACTIVE', 'OPEN', 'APPROVED'].includes(d.lifecycleState?.toUpperCase())).length;
+        const active = kpiData.active || projectDemands.filter(d => ['REQUESTED', 'APPROVED'].includes(d.lifecycleState?.toUpperCase())).length;
         const fulfilled = kpiData.fulfilled || projectDemands.filter(d => d.lifecycleState?.toUpperCase() === 'FULFILLED').length;
         const soft = projectDemands.filter(isSoftDemand).length;
-        const pending = kpiData.pending || projectDemands.filter(d => d.lifecycleState?.toUpperCase() === 'PENDING').length;
+        const pending = kpiData.pending || projectDemands.filter(d => ['DRAFT', 'REQUESTED'].includes(d.lifecycleState?.toUpperCase())).length;
 
         if (total === 0 && kpiData) {
             return [
@@ -452,12 +452,12 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
             );
         }
 
-        list = list.filter(d => !['CANCELLED', 'CLOSED'].includes(d.lifecycleState?.toUpperCase()));
+        list = list.filter(d => !['CANCELLED', 'REJECTED'].includes(d.lifecycleState?.toUpperCase()));
 
         if (activeTab === 'fulfilled') {
             list = list.filter(d => d.lifecycleState?.toUpperCase() === 'FULFILLED');
         } else if (activeTab === 'active') {
-            list = list.filter(d => ['ACTIVE', 'APPROVED', 'OPEN'].includes(d.lifecycleState?.toUpperCase()));
+            list = list.filter(d => ['REQUESTED', 'APPROVED'].includes(d.lifecycleState?.toUpperCase()));
         } else if (activeTab === 'soft') {
             list = list.filter(isSoftDemand);
         }
