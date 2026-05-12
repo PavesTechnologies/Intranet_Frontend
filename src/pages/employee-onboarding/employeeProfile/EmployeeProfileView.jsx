@@ -137,17 +137,6 @@ const EPV3_STYLES = `
     opacity: 0; transition: opacity 0.2s ease; gap: 2px;
   }
 
-  /* ─── Tagline ─── */
-  .epv3-tagline {
-    color: #ff5d91;
-    font-family: "Dancing Script", cursive;
-    font-size: 24px;
-    font-weight: 700;
-    line-height: 1.2;
-    text-shadow: 0 4px 20px rgba(255,61,114,0.25);
-    position: relative;
-    z-index: 1;
-  }
 
   /* ─── Right info panel ─── */
   .epv3-hero-right {
@@ -230,28 +219,31 @@ const EPV3_STYLES = `
     filter: blur(18px);
     pointer-events: none;
   }
-  /* Small pink decorative bar — top right corner */
-  .epv3-pink-bar {
-  position: absolute;
-
-  top: 38px;
-  right: 48px;
-
-  width: 82px;
-  height: 10px;
-
-  border-radius: 999px;
-
-  background:
-    linear-gradient(
-      90deg,
-      #c084fc,
-      #ff4d8d
-    );
-
-  box-shadow:
-    0 2px 10px rgba(255,61,114,.4);
-}
+  /* Corner wave rings — top-right */
+  .epv3-cw1 {
+    position: absolute; top: -50px; right: -50px;
+    width: 150px; height: 150px; border-radius: 50%;
+    border: 2px solid rgba(255,120,165,0.38);
+    pointer-events: none;
+  }
+  .epv3-cw2 {
+    position: absolute; top: -72px; right: -72px;
+    width: 240px; height: 240px; border-radius: 50%;
+    border: 2px solid rgba(196,181,253,0.30);
+    pointer-events: none;
+  }
+  .epv3-cw3 {
+    position: absolute; top: -95px; right: -95px;
+    width: 340px; height: 340px; border-radius: 50%;
+    border: 1.5px solid rgba(255,150,185,0.20);
+    pointer-events: none;
+  }
+  .epv3-cw4 {
+    position: absolute; top: -118px; right: -118px;
+    width: 440px; height: 440px; border-radius: 50%;
+    border: 1px solid rgba(196,181,253,0.13);
+    pointer-events: none;
+  }
   .epv3-hero-content {
     position: relative;
     z-index: 1;
@@ -1066,24 +1058,20 @@ export default function EmployeeProfileView() {
               <input hidden ref={profileRef} type="file" accept="image/*"
                 onChange={e => handleProfileChange(e.target.files[0])} />
             </div>
-
-            {/* Tagline */}
-            <p className="epv3-tagline">Let's Innovate Together</p>
           </div>
 
           {/* ── RIGHT INFO PANEL ── */}
           <div className="epv3-hero-right">
-            {/* Wave background blobs */}
+            {/* Background blob */}
             <div className="epv3-wave-mid" />
-            {/* Pink decorative bar */}
-            <div className="epv3-pink-bar" />
+            {/* Corner waves — top-right */}
+            <div className="epv3-cw1" />
+            <div className="epv3-cw2" />
+            <div className="epv3-cw3" />
+            <div className="epv3-cw4" />
 
             <div className="epv3-hero-content">
               <div className="epv3-hero-main">
-                <span className="epv3-hero-kicker">
-                  <Sparkles size={12} />
-                  Employee Profile
-                </span>
 
                 <h2 className="epv3-display epv3-hero-name">
                   {mappedEmployee.name || "Employee Name"}
