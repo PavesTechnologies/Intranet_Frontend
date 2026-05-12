@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import {
@@ -15,18 +15,12 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
-/* ==========================================================
-   Inline FileUpload Component
-========================================================== */
 const FileUpload = React.forwardRef(
   ({ label, name, onChange, accept, ...props }, ref) => {
     return (
       <div className="flex flex-col gap-2">
         {label && (
-          <label
-            htmlFor={name}
-            className="text-sm font-medium text-gray-700"
-          >
+          <label htmlFor={name} className="text-sm font-medium text-gray-700">
             {label}
           </label>
         )}
@@ -48,9 +42,6 @@ const FileUpload = React.forwardRef(
 
 FileUpload.displayName = "FileUpload";
 
-/* ==========================================================
-   Main Component
-========================================================== */
 const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,45 +51,56 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
 
   const fileInputRef = useRef(null);
 
+  const axiosInstance = useMemo(() => {
+    const instance = axios.create({
+      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
+    });
+
+    instance.interceptors.request.use(
+      (config) => {
+        const latestToken = localStorage.getItem("token");
+
+        if (latestToken) {
+          config.headers.Authorization = `Bearer ${latestToken}`;
+        }
+
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    return instance;
+  }, []);
+
   const navItems = [
     {
       name: "Access Points",
       onClick: () => navigate("/user-management/access-points"),
-      isActive:
-        location.pathname === "/user-management/access-points",
+      isActive: location.pathname === "/user-management/access-points",
     },
     {
       name: "Add New",
-      onClick: () =>
-        navigate("/user-management/access-points/create"),
-      isActive:
-        location.pathname ===
-        "/user-management/access-points/create",
+      onClick: () => navigate("/user-management/access-points/create"),
+      isActive: location.pathname === "/user-management/access-points/create",
     },
     {
       name: "Permission Mapping",
       onClick: () =>
-        navigate(
-          "/user-management/access-points/admin/access-point-mapping"
-        ),
+        navigate("/user-management/access-points/admin/access-point-mapping"),
       isActive:
         location.pathname ===
         "/user-management/access-points/admin/access-point-mapping",
     },
     {
       name: "Access Point Create Bulk",
-      onClick: () =>
-        navigate("/user-management/access-points/create-bulk"),
+      onClick: () => navigate("/user-management/access-points/create-bulk"),
       isActive:
-        location.pathname ===
-        "/user-management/access-points/create-bulk",
+        location.pathname === "/user-management/access-points/create-bulk",
     },
     {
       name: "Access Permission Mapping Bulk",
       onClick: () =>
-        navigate(
-          "/user-management/access-point-map-permission-bulk"
-        ),
+        navigate("/user-management/access-point-map-permission-bulk"),
       isActive:
         location.pathname ===
         "/user-management/access-point-map-permission-bulk",
@@ -125,18 +127,12 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
     e.preventDefault();
 
     if (!file) {
-      showStatusToast(
-        "Please select a file before submitting.",
-        "error"
-      );
+      showStatusToast("Please select a file before submitting.", "error");
       return;
     }
 
     if (!file.name.endsWith(".xlsx")) {
-      showStatusToast(
-        "Only .xlsx Excel files are allowed.",
-        "error"
-      );
+      showStatusToast("Only .xlsx Excel files are allowed.", "error");
       return;
     }
 
@@ -146,15 +142,12 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
     try {
       setIsUploading(true);
 
-      const response = await axios.post(
-        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/access-points/bulk-access-points-create`,
+      const response = await axiosInstance.post(
+        "/admin/access-points/bulk-access-points-create",
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${localStorage.getItem(
-              "token"
-            )}`,
           },
         }
       );
@@ -167,10 +160,7 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
           "success"
         );
       } else {
-        showStatusToast(
-          `⚠️ ${successful} created, ${failed} failed.`,
-          "warning"
-        );
+        showStatusToast(`⚠️ ${successful} created, ${failed} failed.`, "warning");
       }
 
       setFile(null);
@@ -201,7 +191,6 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
 
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl">
-          {/* Header */}
           <div className="mb-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex items-start gap-3">
@@ -215,15 +204,13 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
                   </h2>
 
                   <p className={Fonts.paragraphMuted}>
-                    Upload Excel files to create access points in
-                    bulk.
+                    Upload Excel files to create access points in bulk.
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Upload Card */}
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
             {isUploading ? (
               <div className="py-14">
@@ -231,7 +218,6 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Upload Section */}
                 <div className="rounded-xl border border-dashed border-blue-300 bg-blue-50/40 p-5">
                   <div className="mb-4 flex items-center gap-2">
                     <FileSpreadsheet className="h-5 w-5 text-blue-700" />
@@ -253,14 +239,11 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
                     <div className="mt-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
                       <CheckCircle2 className="h-4 w-4 shrink-0" />
 
-                      <span className="truncate font-medium">
-                        {file.name}
-                      </span>
+                      <span className="truncate font-medium">{file.name}</span>
                     </div>
                   )}
                 </div>
 
-                {/* Instructions */}
                 <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                   <div className="mb-3 flex items-center gap-2">
                     <Info className="h-4 w-4 text-blue-700" />
@@ -272,15 +255,12 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
 
                   <ul className="space-y-2 pl-5 text-sm text-blue-700">
                     <li className="list-disc">
-                      Accepted format:{" "}
-                      <strong>.xlsx</strong>
+                      Accepted format: <strong>.xlsx</strong>
                     </li>
 
                     <li className="list-disc">
                       Required columns:{" "}
-                      <strong>
-                        endpoint_path, method, module
-                      </strong>
+                      <strong>endpoint_path, method, module</strong>
                     </li>
 
                     <li className="list-disc">
@@ -288,13 +268,11 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
                     </li>
 
                     <li className="list-disc">
-                      Ensure all endpoint details are valid before
-                      upload.
+                      Ensure all endpoint details are valid before upload.
                     </li>
                   </ul>
                 </div>
 
-                {/* Actions */}
                 <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end">
                   <Button
                     type="button"
