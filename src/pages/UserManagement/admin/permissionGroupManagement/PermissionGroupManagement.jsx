@@ -199,10 +199,29 @@ export default function PermissionGroupManagement() {
 
   const token = localStorage.getItem("token");
 
-  const axiosInstance = axios.create({
+  const axiosInstance = useMemo(() => {
+  const instance = axios.create({
     baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      "Content-Type": "application/json",
+    },
   });
+
+  instance.interceptors.request.use(
+    (config) => {
+      const latestToken = localStorage.getItem("token");
+
+      if (latestToken) {
+        config.headers.Authorization = `Bearer ${latestToken}`;
+      }
+
+      return config;
+    },
+    (error) => Promise.reject(error)
+  );
+
+  return instance;
+}, []);
 
   const showUniqueToast = (message, type) => {
     toast.dismiss();
