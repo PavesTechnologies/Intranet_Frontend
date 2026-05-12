@@ -62,6 +62,14 @@ const CURRENCY_OPTIONS = [
 const getCurrencySymbol = (code) =>
   CURRENCY_OPTIONS.find((currency) => currency.value === code)?.symbol || "₹";
 
+const getApiErrorDetail = (error) => {
+  const detail = error?.response?.data?.detail;
+  return typeof detail === "string" ? detail : "";
+};
+
+const isMissingGreenletError = (error) =>
+  getApiErrorDetail(error).includes("MissingGreenlet");
+
 (function injectEmpStyles() {
   if (typeof document === "undefined") return;
   if (document.getElementById("emp-details-styles")) return;
@@ -240,28 +248,57 @@ export default function ViewEmpDetails() {
   const handleApprovalSubmit = async () => {
     if (!selectedAdmin) { showStatusToast("Please select approver"); return; }
     const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+    const selectedApproverId = Number(selectedAdmin);
+    const currentApproverId =
+      approvalHistory?.[0]?.action_taker_id || approvalHistory?.[0]?.approver_id;
+
+    if (isPending && String(currentApproverId) === String(selectedApproverId)) {
+      showStatusToast("This approver is already assigned");
+      setOpenApprovalModal(false);
+      setSelectedAdmin("");
+      return;
+    }
+
     setSendingApproval(true);
     try {
       if (isNoRequest) {
         await axios.post(
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval-requests/request`,
-          [{ user_uuid, action_taker_id: Number(selectedAdmin) }],
-          { headers: { Authorization: `Bearer ${token}` } },
+          [{ user_uuid, action_taker_id: selectedApproverId }],
+          { headers },
         );
         showStatusToast("Approval request sent");
       } else if (isPending) {
-        await axios.put(
-          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/reassign`,
-          { user_uuid, new_approver_id: Number(selectedAdmin), comments: "Reassigned from UI" },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        try {
+          await axios.put(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/reassign`,
+            { user_uuid, new_approver_id: selectedApproverId, comments: "Reassigned from UI" },
+            { headers }
+          );
+        } catch (error) {
+          if (!isMissingGreenletError(error)) throw error;
+
+          await axios.delete(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval-requests/request/delete`,
+            {
+              headers: { ...headers, "Content-Type": "application/json" },
+              data: [{ user_uuid }],
+            }
+          );
+          await axios.post(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval-requests/request`,
+            [{ user_uuid, action_taker_id: selectedApproverId }],
+            { headers },
+          );
+        }
         showStatusToast("Approval reassigned");
       }
       setOpenApprovalModal(false);
       setSelectedAdmin("");
       fetchApprovalHistory();
-    } catch {
-      showStatusToast("Failed to process approval");
+    } catch (error) {
+      showStatusToast(getApiErrorDetail(error) || "Failed to process approval");
     } finally {
       setSendingApproval(false);
     }
