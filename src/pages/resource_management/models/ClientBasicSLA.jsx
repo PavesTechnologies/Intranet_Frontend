@@ -7,7 +7,7 @@ import {
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontalIcon, EditIcon, DeleteIcon } from "@/components/icons";
 import SLAForm from "./client_configuration/forms/SLAForm";
 import Modal from "../../../components/Modal/modal";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
@@ -175,6 +175,9 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
                 Warning Threshold
               </th>
               <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                Status
+              </th>
+              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
                 Actions
               </th>
             </tr>
@@ -216,6 +219,15 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
                   </span>
                 </td>
 
+                {/* STATUS */}
+                <td className="px-6 py-4">
+                  <span
+                    className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
+                  >
+                    {sla.activeFlag ? "Active" : "Inactive"}
+                  </span>
+                </td>
+
                 {/* ACTIONS */}
                 <td className="px-6 py-4">
                   {canEditConfig ? (
@@ -228,7 +240,7 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
                         }}
                         className="p-1 text-blue-600 hover:text-blue-800 transition"
                       >
-                        <Pencil size={16} />
+                        <EditIcon size={16} />
                       </button>
 
                       <button
@@ -239,7 +251,7 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
                         }}
                         className="p-1 text-red-600 hover:text-red-800 transition"
                       >
-                        <Trash2 size={16} />
+                        <DeleteIcon size={16} />
                       </button>
                     </div>
                   ) : (

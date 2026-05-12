@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Select from "react-select";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   X,
   ChevronRight,
@@ -170,9 +171,10 @@ const CreateRiskModal = ({
   onSuccess,
   onCreate,
   risk = null,
+  onEdit = false,
 }) => {
   const isEditMode = Boolean(risk?.id);
-
+  // {console.log("Risk data in modal:", risk)}; // Debug log
   const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
   const token = localStorage.getItem("token");
 
@@ -212,7 +214,7 @@ const CreateRiskModal = ({
 
     setLoadingMeta(true);
 
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
     Promise.all([
       axios.get(`${BASE_URL}/api/projects/${projectId}/members-with-owner`, {
@@ -344,7 +346,7 @@ const CreateRiskModal = ({
 
     axios
       .get(`${BASE_URL}/api/projects/${projectId}/${apiType}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       .then((res) => {
         const list = res.data || [];
@@ -439,82 +441,87 @@ const CreateRiskModal = ({
   /* =========================
      Submit
   ========================= */
-  const handleSubmit = async () => {
-    const allErrors = {
-      ...validateStep(0),
-      ...validateStep(1),
-      ...validateStep(2),
-      ...validateStep(3),
+ const handleSubmit = async () => {
+  const allErrors = {
+    ...validateStep(0),
+    ...validateStep(1),
+    ...validateStep(2),
+    ...validateStep(3),
+  };
+
+  if (Object.keys(allErrors).length) {
+    setErrors(allErrors);
+    showStatusToast("Please fill all required fields", "error");
+    return;
+  }
+
+  setSubmitting(true);
+
+  try {
+    const payload = {
+      projectId,
+      title: form.title,
+      description: form.description,
+      probability: form.probability?.value,
+      impact: form.impact?.value,
+      triggers: form.triggers,
+      statusId: form.statusId,
+      ownerId: form.owner.value,
+      reporterId: form.reporter.value,
+      categoryId: form.category.value,
     };
 
-    if (Object.keys(allErrors).length) {
-      setErrors(allErrors);
-      showStatusToast("Please fill all required fields", "error");
-      return;
+    let riskId = risk?.id;
+
+    if (isEditMode) {
+      await axios.put(`${BASE_URL}/api/risks/${riskId}`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+    } else {
+      const res = await axios.post(`${BASE_URL}/api/risks`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+
+      riskId = res.data.id;
     }
 
-    setSubmitting(true);
-
-    try {
-      const payload = {
-        projectId,
-        title: form.title,
-        description: form.description,
-        probability: form.probability?.value,
-        impact: form.impact?.value,
-        triggers: form.triggers,
-        statusId: form.statusId,
-        ownerId: form.owner.value,
-        reporterId: form.reporter.value,
-        categoryId: form.category.value,
+    if (form.linkedType && form.linkedIssue) {
+      const linkPayload = {
+        riskId,
+        linkedType: form.linkedType.value,
+        linkedId: form.linkedIssue.value,
       };
 
-      let riskId = risk?.id;
-
-      if (isEditMode) {
-        await axios.put(`${BASE_URL}/api/risks/${riskId}`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } else {
-        const res = await axios.post(`${BASE_URL}/api/risks`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        riskId = res.data.id;
-      }
-
-      /*
-        Using current endpoint only.
-        This is same endpoint you already had.
-        Backend should handle duplicate prevention if editing existing link.
-      */
-      if (form.linkedType && form.linkedIssue) {
-        await axios.post(
-          `${BASE_URL}/api/risk-links`,
+      if (isEditMode && risk?.riskLinkId) {
+        await axios.patch(
+          `${BASE_URL}/api/risk-links/${risk.riskLinkId}`,
+          linkPayload,
           {
-            riskId,
-            linkedType: form.linkedType.value,
-            linkedId: form.linkedIssue.value,
-          },
-          { headers: { Authorization: `Bearer ${token}` } },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          }
         );
+      } else {
+        await axios.post(`${BASE_URL}/api/risk-links`, linkPayload, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
       }
-
-      showStatusToast(
-        isEditMode ? "Risk updated successfully" : "Risk created successfully",
-        "success",
-      );
-
-      onSuccess?.();
-      onCreate?.();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      showStatusToast("Operation failed", "error");
-    } finally {
-      setSubmitting(false);
     }
-  };
+
+    showStatusToast(
+      isEditMode ? "Risk updated successfully" : "Risk created successfully",
+      "success"
+    );
+
+    onSuccess?.();
+    onCreate?.();
+    onClose();
+  } catch (err) {
+    console.error(err);
+    showStatusToast("Operation failed", "error");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   /* =========================
      Options
@@ -634,25 +641,11 @@ const CreateRiskModal = ({
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Field label="Status" required error={errors.statusId}>
-              <select
+              <FilterListbox
+                options={[{value:"",label:"Select status…"},...statuses.map(s=>({value:s.id,label:s.name}))]}
                 value={form.statusId}
-                onChange={(e) => set("statusId", e.target.value)}
-                className={`w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800
-                  focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all
-                  ${
-                    errors.statusId
-                      ? "border-red-400 bg-red-50"
-                      : "border-slate-200"
-                  }`}
-              >
-                <option value="">Select status…</option>
-
-                {statuses.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => set("statusId", val)}
+              />
             </Field>
 
             <Field label="Category" required error={errors.category}>

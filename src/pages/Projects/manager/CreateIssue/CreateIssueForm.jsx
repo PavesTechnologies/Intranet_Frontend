@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { X } from "lucide-react";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 
 import EpicFields from "./Fields/EpicFields";
 import StoryFields from "./Fields/StoryFields";
@@ -11,6 +10,7 @@ import BugFields from "./Fields/BugFields";
 
 import { normalizeId } from "./helpers/normalize";
 import { toISODate } from "./helpers/dataParser";
+import  Button  from "../../../../components/Button/Button";
 
 // import FormInput from "@/components/forms/FormInput";
 // import FormTextArea from "@/components/forms/FormTextArea";
@@ -88,7 +88,7 @@ const CreateIssueForm = ({
         setProjects(projectsRes.data?.content || projectsRes.data || []);
         setUsers(usersRes.data?.content || usersRes.data || []);
       } catch (e) {
-        toast.error("Failed loading initial project or user data");
+        showStatusToast("Failed loading initial project or user data", "error");
       }
     };
     init();
@@ -144,7 +144,7 @@ const CreateIssueForm = ({
         const responses = await Promise.all(requests);
         responses.forEach((res, idx) => setters[idx](res));
       } catch (e) {
-        toast.error("Failed loading project dependencies");
+        showStatusToast("Failed loading project dependencies", "error");
       } finally {
         setLoading(false);
       }
@@ -211,7 +211,7 @@ const CreateIssueForm = ({
     if (issueType === "Epic") {
       if (formData.startDate && formData.dueDate) {
         if (new Date(formData.dueDate) < new Date(formData.startDate)) {
-          toast.error("Due date cannot be earlier than start date");
+          showStatusToast("Due date cannot be earlier than start date", "error");
           return;
         }
       }
@@ -223,7 +223,7 @@ const CreateIssueForm = ({
     if (issueType === "Story") {
       if (formData.startDate && formData.dueDate) {
         if (new Date(formData.dueDate) < new Date(formData.startDate)) {
-          toast.error("Due date cannot be earlier than start date");
+          showStatusToast("Due date cannot be earlier than start date", "error");
           return;
         }
       }
@@ -236,7 +236,7 @@ const CreateIssueForm = ({
     if (issueType === "Task") {
       if (formData.startDate && formData.dueDate) {
         if (new Date(formData.dueDate) < new Date(formData.startDate)) {
-          toast.error("Due date cannot be earlier than start date");
+          showStatusToast("Due date cannot be earlier than start date", "error");
           return;
         }
       }
@@ -251,7 +251,7 @@ const CreateIssueForm = ({
     //   endpoint = "/api/bugs";
     // }
 
-    if (err) return toast.error(err);
+    if (err) return showStatusToast(err, "error");
 
     try {
       await axios.post(
@@ -259,7 +259,7 @@ const CreateIssueForm = ({
         payload,
         axiosConfig,
       );
-      toast.success(`${issueType} created successfully!`);
+      showStatusToast(`${issueType} created successfully!`, "success");
       setTimeout(() => {
         onCreated?.();
         onClose?.();
@@ -272,7 +272,7 @@ const CreateIssueForm = ({
       // Case 1: structured validation errors
       if (data?.errors) {
         Object.entries(data.errors).forEach(([field, message]) => {
-          toast.error(`${field}: ${message}`);
+          showStatusToast(`${field}: ${message}`, "error");
         });
         return;
       }
@@ -281,12 +281,12 @@ const CreateIssueForm = ({
       const msg = data?.message;
       if (msg && msg.includes("interpolatedMessage")) {
         const extracted = msg.match(/interpolatedMessage='([^']+)'/);
-        toast.error(extracted ? extracted[1] : "Validation error");
+        showStatusToast(extracted ? extracted[1] : "Validation error", "error");
         return;
       }
 
       // Case 3: normal backend error message
-      toast.error(msg || "Error creating issue");
+      showStatusToast(msg || "Error creating issue", "error");
     }
   };
 
@@ -356,7 +356,6 @@ const CreateIssueForm = ({
 
           {/* RIGHT FORM AREA */}
           <div className="flex-1 overflow-y-auto p-8 space-y-6">
-            <ToastContainer />
 
             {issueType === "Epic" && (
               <EpicFields
@@ -406,18 +405,12 @@ const CreateIssueForm = ({
 
         {/* ------- FOOTER ------- */}
         <div className="border-t px-6 py-3 flex justify-end gap-3 bg-gray-50">
-          <button
-            onClick={onClose}
-            className="px-5 py-2 rounded-md border text-gray-700 hover:bg-gray-100"
-          >
+          <Button variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="px-5 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-          >
+          </Button>
+          <Button variant="primary" onClick={handleSubmit}>
             Create {issueType}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

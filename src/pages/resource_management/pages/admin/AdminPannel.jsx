@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Download,
 } from "lucide-react";
+import { KPICard } from "../../../../components/kpi/KPI";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -38,8 +39,9 @@ const statusColor = {
 const AdminPannel = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const roles = user?.roles || [];
   const permissions = user?.permissions || [];
-  const canCreateClient = permissions.includes("CREATE_CLIENT");
+  const canCreateClient = roles.includes("Admin");
 
   const [clientDetails, setClientDetails] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -264,10 +266,10 @@ const AdminPannel = () => {
                 {exportProgress}%
               </span>
             ) : ( */}
-              <>
-                <Download className="w-4 h-4 mr-1.5" />
-                Export Data
-              </>
+            <>
+              <Download className="w-4 h-4 mr-1.5" />
+              Export Data
+            </>
             {/* )} */}
           </Button>
         </div>
@@ -275,30 +277,27 @@ const AdminPannel = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {KPI_DATA.map((kpi, index) => (
-          <div
+          <KPICard
             key={index}
-            className="bg-white p-6 rounded-xl shadow-sm border flex items-center justify-between"
-          >
-            <div>
-              <p className="text-sm text-gray-500">{kpi.label}</p>
-              <h3 className="text-2xl font-bold text-gray-900">{kpi.value}</h3>
-            </div>
-            <div className={`p-3 rounded-full ${kpi.bg}`}>
-              <kpi.icon className={`w-6 h-6 ${kpi.color}`} />
-            </div>
-          </div>
+            label={kpi.label}
+            value={kpi.value}
+            icon={<kpi.icon className={`w-5 h-5 ${kpi.color}`} />}
+            color={`${kpi.bg} ${kpi.color}`}
+          />
         ))}
       </div>
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold text-gray-900">
             Clients Information
           </h2>
           {canCreateClient && (
             <Button
+              variant="primary"
+              size="medium"
               onClick={() => setOpenCreateClient(true)}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg flex items-center hover:bg-indigo-700 transition-all active:scale-[0.98] shadow-sm"
+            // className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg flex items-center hover:bg-indigo-700 transition-all active:scale-[0.98] shadow-sm"
             >
               <Plus className="w-4 h-4 mr-1" /> Create New Client
             </Button>

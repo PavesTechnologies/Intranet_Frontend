@@ -20,9 +20,11 @@ const EmployeePanel = () => {
   }
   roles = roles.map((r) => r.toLowerCase().replace('hr-manager', 'hr-administrator'));
 
+  console.log("EmployeePanel Roles:", roles);
+
   const employeeId = employee.user?.user_id;
 
-  const isManager = roles.includes('manager') || (employee?.roles || '').toLowerCase() === 'super admin';
+  const isManager = roles.includes('reporting_manager') || (employee?.roles || '').toLowerCase() === 'super admin';
   const isHR = roles.includes('hr');
   const isHRAdministrator = roles.includes('hr-administrator');
   

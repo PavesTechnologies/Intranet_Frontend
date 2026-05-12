@@ -2,13 +2,14 @@
 
 import { createScenario } from "../testDesignApi";
 import { useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import Button from "../../../../components/Button/Button";
+import Modal from "../../../../components/Modal/modal";
 
 export default function ScenarioModal({ open, close }) {
   const [title, setTitle] = useState("");
   const [storyId, setStoryId] = useState("");
   const [priority, setPriority] = useState("MEDIUM");
-
-  if (!open) return null;
 
   const handleSubmit = async () => {
     await createScenario({
@@ -22,11 +23,7 @@ export default function ScenarioModal({ open, close }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg w-[400px]">
-
-        <h2 className="text-lg font-semibold mb-4">Add Scenario</h2>
-
+    <Modal isOpen={open} onClose={close} title="Add Scenario">
         <label className="text-sm">Title</label>
         <input 
           value={title}
@@ -42,23 +39,16 @@ export default function ScenarioModal({ open, close }) {
         />
 
         <label className="text-sm">Priority</label>
-        <select 
+        <FilterListbox
+          options={[{value:"HIGH",label:"High"},{value:"MEDIUM",label:"Medium"},{value:"LOW",label:"Low"}]}
           value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          className="border p-2 rounded w-full mb-4"
-        >
-          <option value="HIGH">High</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="LOW">Low</option>
-        </select>
+          onChange={setPriority}
+        />
 
         <div className="flex justify-end gap-2">
-          <button onClick={close} className="px-4 py-1 bg-gray-300 rounded">Cancel</button>
-          <button onClick={handleSubmit} className="px-4 py-1 bg-blue-600 text-white rounded">
-            Save
-          </button>
+          <Button variant="secondary" size="small" onClick={close}>Cancel</Button>
+          <Button variant="primary" size="small" onClick={handleSubmit}>Save</Button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

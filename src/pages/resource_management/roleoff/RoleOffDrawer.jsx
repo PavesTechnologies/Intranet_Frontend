@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarDays, ClipboardList, RefreshCcw, X } from "lucide-react";
+import { WarningIcon, CalendarIcon, ClipboardIcon, RefreshIcon, CloseIcon } from "@/components/icons";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -112,7 +113,7 @@ const RoleOffDrawer = ({
               onClick={onClose}
               className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
             >
-              <X className="h-4 w-4" />
+              <CloseIcon className="h-4 w-4" />
             </button>
           </div>
 
@@ -148,7 +149,7 @@ const RoleOffDrawer = ({
         <div className="space-y-6 px-6 py-6">
           <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center gap-2">
-              <ClipboardList className="h-4 w-4 text-gray-600" />
+              <ClipboardIcon className="h-4 w-4 text-gray-600" />
               <h3 className="text-sm font-semibold text-[#081534]">Context</h3>
             </div>
             <div className="grid gap-3 text-sm md:grid-cols-2">
@@ -178,24 +179,22 @@ const RoleOffDrawer = ({
               <label className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                 Role-Off Type
               </label>
-              <select
+              <FilterListbox
+                options={[
+                  { value: "Planned", label: "Planned" },
+                  { value: "Emergency", label: "Emergency" },
+                ]}
                 value={formState.type}
+                onChange={(val) => setFormState((prev) => ({ ...prev, type: val }))}
                 disabled={mode !== "create"}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, type: event.target.value }))
-                }
-                className="mt-2 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm outline-none transition-colors focus:border-blue-500"
-              >
-                <option value="Planned">Planned</option>
-                <option value="Emergency">Emergency</option>
-              </select>
+              />
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                 Effective Date
               </label>
               <div className="relative mt-2">
-                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <CalendarIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   type="date"
                   value={formState.effectiveDate}
@@ -218,23 +217,21 @@ const RoleOffDrawer = ({
               <label className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                 Resource Performance
               </label>
-              <select
+              <FilterListbox
+                options={[
+                  { value: "", label: "Select performance" },
+                  { value: "HIGH_PERFORMER", label: "High Performer" },
+                  { value: "AVERAGE_PERFORMER", label: "Average Performer" },
+                  { value: "LOW_PERFORMER", label: "Low Performer" },
+                  { value: "EXCEPTIONAL", label: "Exceptional" },
+                  { value: "NEEDS_IMPROVEMENT", label: "Needs Improvement" },
+                  { value: "CONSISTENT", label: "Consistent" },
+                  { value: "NEW_RESOURCE", label: "New Resource" },
+                ]}
                 value={formState.resourcePerformance}
+                onChange={(val) => setFormState((prev) => ({ ...prev, resourcePerformance: val }))}
                 disabled={mode !== "create"}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, resourcePerformance: event.target.value }))
-                }
-                className="mt-2 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm outline-none transition-colors focus:border-blue-500"
-              >
-                <option value="">Select performance</option>
-                <option value="HIGH_PERFORMER">High Performer</option>
-                <option value="AVERAGE_PERFORMER">Average Performer</option>
-                <option value="LOW_PERFORMER">Low Performer</option>
-                <option value="EXCEPTIONAL">Exceptional</option>
-                <option value="NEEDS_IMPROVEMENT">Needs Improvement</option>
-                <option value="CONSISTENT">Consistent</option>
-                <option value="NEW_RESOURCE">New Resource</option>
-              </select>
+              />
               {errors.resourcePerformance ? (
                 <p className="mt-1 text-xs text-rose-600">{errors.resourcePerformance}</p>
               ) : null}
@@ -245,24 +242,15 @@ const RoleOffDrawer = ({
             <label className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
               Reason
             </label>
-            <select
+            <FilterListbox
+              options={[
+                { value: "", label: "Select reason" },
+                ...REASONS.map((reason) => ({ value: reason, label: reason })),
+              ]}
               value={formState.reason}
+              onChange={(val) => setFormState((prev) => ({ ...prev, reason: val }))}
               disabled={mode !== "create"}
-              onChange={(event) =>
-                setFormState((prev) => ({ ...prev, reason: event.target.value }))
-              }
-              className={cn(
-                "mt-2 h-10 w-full rounded-md border bg-white px-3 text-sm outline-none transition-colors focus:border-blue-500",
-                errors.reason ? "border-rose-300" : "border-gray-300",
-              )}
-            >
-              <option value="">Select reason</option>
-              {REASONS.map((reason) => (
-                <option key={reason} value={reason}>
-                  {reason}
-                </option>
-              ))}
-            </select>
+            />
             {errors.reason ? <p className="mt-1 text-xs text-rose-600">{errors.reason}</p> : null}
           </section>
 
@@ -277,7 +265,7 @@ const RoleOffDrawer = ({
             {impact === "High" ? (
               <div className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3">
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 text-rose-700" />
+                  <WarningIcon className="mt-0.5 h-4 w-4 text-rose-700" />
                   <div className="text-sm text-rose-800">
                     This role-off impacts a critical delivery path and requires explicit acknowledgement.
                   </div>
@@ -357,7 +345,7 @@ const RoleOffDrawer = ({
                 onClick={() => onCancelRequest?.(request)}
                 className="h-10 border-rose-300 bg-white text-sm text-rose-700 hover:bg-rose-50 hover:text-rose-800"
               >
-                <RefreshCcw className="mr-2 h-4 w-4" />
+                <RefreshIcon className="mr-2 h-4 w-4" />
                 Cancel Request
               </Button>
             ) : (

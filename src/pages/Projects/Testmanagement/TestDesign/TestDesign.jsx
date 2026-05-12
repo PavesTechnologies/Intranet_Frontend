@@ -5,14 +5,15 @@ import {
   ChevronRight,
   Layers,
   BookOpen,
-  Loader2,
   AlertCircle,
   Edit,
   Trash2,
 } from "lucide-react";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
 import axiosInstance from "../api/axiosInstance";
 import { useParams } from "react-router-dom";
-import { toast } from "react-hot-toast";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import ScenarioPanel from "./panels/ScenarioPanel";
 import AddScenarioModal from "./modals/AddScenarioModal";
 import AddCaseModal from "./modals/AddCaseModal";
@@ -38,6 +39,7 @@ export default function TestDesign() {
   const [editingStory, setEditingStory] = useState(null);
   const [editingScenario, setEditingScenario] = useState(null); // <-- ADD THIS
   const [editingCase, setEditingCase] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, title: "", message: "", onConfirm: null });
 
   // const [loading, setLoading] = useState(true);
   // const [editingStory, setEditingStory] = useState(null);
@@ -61,22 +63,13 @@ export default function TestDesign() {
   // ---------------------------------------------------------
   // DELETE STORY
   // ---------------------------------------------------------
-  const handleDeleteStory = async (e, storyId) => {
-    e.stopPropagation(); // Prevent row expand/collapse
-
-    if (!window.confirm("Are you sure you want to delete this test story?")) {
-      return;
-    }
-
+  const executeDeleteStory = async (storyId) => {
     try {
       await axiosInstance.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-stories/project-test-data/${storyId}`,
       );
-      toast.success("Test story deleted successfully!");
-
-      // Remove it from the local state
+      showStatusToast("Test story deleted successfully!", "success");
       setTestStories((prev) => prev.filter((s) => s.id !== storyId));
-
       // Clear selections if the deleted story was active
       if (selectedStory?.id === storyId) {
         setSelectedStory(null);
@@ -85,41 +78,46 @@ export default function TestDesign() {
       }
     } catch (err) {
       console.error("❌ Error deleting story", err);
-      toast.error("Failed to delete test story.");
+      showStatusToast("Failed to delete test story.", "error");
     }
+  };
+
+  const handleDeleteStory = (e, storyId) => {
+    e.stopPropagation();
+    setDeleteConfirm({
+      open: true,
+      title: "Delete Test Story",
+      message: "Are you sure you want to delete this test story?",
+      onConfirm: () => executeDeleteStory(storyId),
+    });
   };
 
   // ---------------------------------------------------------
   // DELETE CASE
   // ---------------------------------------------------------
-  const handleDeleteCase = async (caseId, scenarioId, storyId) => {
-    console.log("🚨 handleDeleteCase triggered for ID:", caseId);
-
-    // Use the reliable browser popup just like Story and Scenario!
-    if (!window.confirm("Are you sure you want to delete this test case?")) {
-      return;
-    }
-
+  const executeDeleteCase = async (caseId, storyId) => {
     try {
-      // 1. Delete from backend
       await axiosInstance.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-cases/${caseId}`,
       );
-
-      // 2. Show standard success toast
-      toast.success("Test case deleted successfully!");
-
-      // 3. Refresh the story contents silently in the background
+      showStatusToast("Test case deleted successfully!", "success");
       await loadStoryContents(storyId);
-
-      // 4. Clear the right panel if the deleted case was currently selected
       if (selectedCase?.id === caseId) {
         setSelectedCase(null);
       }
     } catch (err) {
       console.error("❌ Error deleting case", err);
-      toast.error("Failed to delete test case.");
+      showStatusToast("Failed to delete test case.", "error");
     }
+  };
+
+  const handleDeleteCase = (caseId, scenarioId, storyId) => {
+    setDeleteConfirm({
+      open: true,
+      title: "Delete Test Case",
+      message: "Are you sure you want to delete this test case?",
+      onConfirm: () => executeDeleteCase(caseId, storyId),
+    });
   };
   // ---------------------------------------------------------
   // FETCH SCENARIOS by STORY ID
@@ -157,38 +155,35 @@ export default function TestDesign() {
   // ---------------------------------------------------------
   // DELETE SCENARIO
   // ---------------------------------------------------------
-  const handleDeleteScenario = async (e, scenarioId, storyId) => {
-    e.stopPropagation(); // Prevent row selection/collapse
-
-    if (
-      !window.confirm("Are you sure you want to delete this test scenario?")
-    ) {
-      return;
-    }
-
+  const executeDeleteScenario = async (scenarioId, storyId) => {
     try {
       await axiosInstance.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios/${scenarioId}`,
       );
-      toast.success("Scenario deleted successfully!");
-
-      // Silently refresh the story contents to remove it from the list
+      showStatusToast("Scenario deleted successfully!", "success");
       await loadStoryContents(storyId);
-
-      // Clear selections if the deleted scenario was currently active
       if (selectedScenario?.id === scenarioId) {
         setSelectedScenario(null);
         setSelectedCase(null);
       }
     } catch (err) {
       console.error("❌ Error deleting scenario", err);
-      // Extract specific error message from the backend response
       const errorMessage =
         err.response?.data?.message ||
         err.response?.data?.error ||
         "Failed to delete scenario.";
-      toast.error(errorMessage);
+      showStatusToast(errorMessage, "error");
     }
+  };
+
+  const handleDeleteScenario = (e, scenarioId, storyId) => {
+    e.stopPropagation();
+    setDeleteConfirm({
+      open: true,
+      title: "Delete Scenario",
+      message: "Are you sure you want to delete this test scenario?",
+      onConfirm: () => executeDeleteScenario(scenarioId, storyId),
+    });
   };
 
   // ---------------------------------------------------------
@@ -346,32 +341,38 @@ export default function TestDesign() {
   // ---------------------------------------------------------
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] text-gray-400">
-        <Loader2 className="animate-spin h-8 w-8 mb-4 text-blue-600" />
-        <p>Loading Test Design Environment...</p>
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner text="Loading Test Design Environment..." size="lg" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-[calc(100vh-80px)] bg-gray-50 overflow-hidden">
-      {/* -------------------------------- */}
+    <>
+    <ConfirmationModal
+      isOpen={deleteConfirm.open}
+      title={deleteConfirm.title}
+      message={deleteConfirm.message}
+      onConfirm={() => { deleteConfirm.onConfirm?.(); setDeleteConfirm({ open: false, title: "", message: "", onConfirm: null }); }}
+      onCancel={() => setDeleteConfirm({ open: false, title: "", message: "", onConfirm: null })}
+      confirmText="Delete"
+      variant="danger"
+    />
+    <div className="flex h-full min-h-0 bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden">
       {/* LEFT SIDEBAR — EXPLORER */}
-      {/* -------------------------------- */}
-      <aside className="w-80 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col shadow-sm z-10">
+      <aside className="w-80 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col shadow-sm z-10">
         {/* HEADER */}
-        {/* HEADER */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-blue-50">
           <div className="flex items-center gap-2">
-            <BookOpen size={18} className="text-blue-600" />
-            <h3 className="font-semibold text-gray-800 tracking-tight">
+            <BookOpen size={18} className="text-indigo-600" />
+            <h3 className="font-semibold text-slate-800 tracking-tight">
               Test Stories
             </h3>
           </div>
           <button
-            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
             onClick={() => {
-              setEditingStory(null); // <-- Ensure it opens as a NEW story
+              setEditingStory(null);
               setOpenStoryModal(true);
             }}
             title="Add Test Story"
@@ -383,7 +384,7 @@ export default function TestDesign() {
         {/* STORY LIST */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
           {testStories.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 text-gray-400 text-sm">
+            <div className="flex flex-col items-center justify-center h-32 text-slate-400 text-sm">
               <AlertCircle className="h-6 w-6 mb-2 opacity-50" />
               <span>No test stories found.</span>
             </div>
@@ -394,7 +395,7 @@ export default function TestDesign() {
               return (
                 <div key={story.id} className="select-none">
                   {/* Story Row */}
-                  <div className="group flex items-center justify-between px-2 py-2 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors text-gray-700">
+                  <div className="group flex items-center justify-between px-2 py-2 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors text-slate-700">
                     <div
                       className="flex items-center gap-2 flex-1 overflow-hidden"
                       onClick={() => {
@@ -404,25 +405,21 @@ export default function TestDesign() {
                     >
                       <ChevronRight
                         size={16}
-                        className={`text-gray-400 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}
+                        className={`text-slate-400 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}
                       />
                       <Folder
                         size={16}
-                        className={
-                          isExpanded ? "text-blue-500" : "text-gray-400"
-                        }
+                        className={isExpanded ? "text-indigo-500" : "text-slate-400"}
                       />
                       <span className="text-sm font-medium truncate">
                         {story.name}
                       </span>
                     </div>
 
-                    {/* Add Scenario Button (Visible on hover) */}
                     {/* Action Buttons (Visible on hover) */}
                     <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-                      {/* Edit Button */}
                       <button
-                        className="p-1 hover:bg-blue-100 hover:text-blue-600 rounded text-gray-500 transition-colors"
+                        className="p-1 hover:bg-indigo-100 hover:text-indigo-600 rounded text-slate-400 transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingStory(story);
@@ -432,24 +429,18 @@ export default function TestDesign() {
                       >
                         <Edit size={14} />
                       </button>
-
-                      {/* Delete Button */}
                       <button
-                        className="p-1 hover:bg-red-100 hover:text-red-600 rounded text-gray-500 transition-colors"
+                        className="p-1 hover:bg-red-100 hover:text-red-600 rounded text-slate-400 transition-colors"
                         onClick={(e) => handleDeleteStory(e, story.id)}
                         title="Delete Story"
                       >
                         <Trash2 size={14} />
                       </button>
-
-                      {/* Add Scenario Button */}
-                      {/* Add Scenario Button (Inside Story Row) */}
-                      {/* Add Scenario Button (Inside Story Row) */}
                       <button
-                        className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors"
+                        className="p-1 hover:bg-slate-200 rounded text-slate-400 transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setEditingScenario(null); // <-- ADD THIS to ensure it's a NEW scenario
+                          setEditingScenario(null);
                           setScenarioStory(story);
                           setOpenScenarioModal(true);
                         }}
@@ -462,23 +453,22 @@ export default function TestDesign() {
 
                   {/* Expandable Scenario List */}
                   {isExpanded && (
-                    <div className="ml-5 mt-1 border-l border-gray-200 pl-2 space-y-0.5 pb-2">
+                    <div className="ml-5 mt-1 border-l border-slate-200 pl-2 space-y-0.5 pb-2">
                       {story.scenarios.length === 0 ? (
-                        <div className="px-4 py-2 text-xs text-gray-400 italic">
+                        <div className="px-4 py-2 text-xs text-slate-400 italic">
                           No scenarios inside
                         </div>
                       ) : (
                         story.scenarios.map((scenario) => {
-                          const isSelected =
-                            selectedScenario?.id === scenario.id;
+                          const isSelected = selectedScenario?.id === scenario.id;
 
                           return (
                             <div
                               key={scenario.id}
                               className={`group flex items-center justify-between px-3 py-1.5 rounded-md cursor-pointer transition-colors ${
                                 isSelected
-                                  ? "bg-blue-50 text-blue-700 font-medium"
-                                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                  ? "bg-indigo-50 text-indigo-700 font-medium"
+                                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                               }`}
                               onClick={() => {
                                 setSelectedScenario(scenario);
@@ -488,53 +478,36 @@ export default function TestDesign() {
                               <div className="flex items-center gap-2 overflow-hidden">
                                 <Layers
                                   size={14}
-                                  className={
-                                    isSelected
-                                      ? "text-blue-500"
-                                      : "text-gray-400"
-                                  }
+                                  className={isSelected ? "text-indigo-500" : "text-slate-400"}
                                 />
                                 <span className="text-sm truncate">
                                   {scenario.title}
                                 </span>
                               </div>
 
-                              {/* Add Case Button (Visible on hover) */}
-                              {/* Action Buttons (Visible on hover) */}
                               {/* Action Buttons (Visible on hover) */}
                               <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity ml-2 shrink-0">
-                                {/* Edit Scenario */}
                                 <button
-                                  className="p-1 hover:bg-blue-200 hover:text-blue-800 rounded text-gray-500 transition-colors"
+                                  className="p-1 hover:bg-indigo-200 hover:text-indigo-800 rounded text-slate-400 transition-colors"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setEditingScenario(scenario); // <-- Sets the scenario data to prefill
-                                    setScenarioStory(story); // <-- Ensures the modal knows the parent story
-                                    setOpenScenarioModal(true); // <-- Opens the correct modal!
+                                    setEditingScenario(scenario);
+                                    setScenarioStory(story);
+                                    setOpenScenarioModal(true);
                                   }}
                                   title="Edit Scenario"
                                 >
                                   <Edit size={12} />
                                 </button>
-
-                                {/* Delete Scenario */}
                                 <button
-                                  className="p-1 hover:bg-red-200 hover:text-red-800 rounded text-gray-500 transition-colors"
-                                  onClick={(e) =>
-                                    handleDeleteScenario(
-                                      e,
-                                      scenario.id,
-                                      story.id,
-                                    )
-                                  }
+                                  className="p-1 hover:bg-red-200 hover:text-red-800 rounded text-slate-400 transition-colors"
+                                  onClick={(e) => handleDeleteScenario(e, scenario.id, story.id)}
                                   title="Delete Scenario"
                                 >
                                   <Trash2 size={12} />
                                 </button>
-
-                                {/* Add Case Button */}
                                 <button
-                                  className="p-1 hover:bg-green-200 hover:text-green-800 rounded text-gray-500 transition-colors"
+                                  className="p-1 hover:bg-emerald-200 hover:text-emerald-800 rounded text-slate-400 transition-colors"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setEditingCase(null);
@@ -559,11 +532,8 @@ export default function TestDesign() {
         </div>
       </aside>
 
-      {/* -------------------------------- */}
       {/* MAIN CONTENT PANEL */}
-      {/* -------------------------------- */}
-      {/* MAIN CONTENT PANEL */}
-      <main className="flex-1 overflow-auto bg-white border-l border-gray-100">
+      <main className="flex-1 overflow-auto bg-white border-l border-slate-100">
         <ScenarioPanel
           selectedTestStory={selectedStory}
           selectedScenario={selectedScenario}
@@ -601,7 +571,7 @@ export default function TestDesign() {
                 storyIdForCase,
               );
             } else {
-              toast.error("Error: Could not find case data to delete.");
+              showStatusToast("Error: Could not find case data to delete.", "error");
               console.error("Missing IDs for delete:", {
                 caseIdToDelete,
                 scenarioIdForCase,
@@ -662,5 +632,6 @@ export default function TestDesign() {
         />
       )}
     </div>
+    </>
   );
 }

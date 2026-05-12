@@ -5,6 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import StatusBadge from "../../../components/status/statusbadge";
 import {
   ArrowLeft,
@@ -199,11 +200,8 @@ export default function AdminOfferView() {
   /* ── Loading / Not found ── */
   if (loading)
     return (
-      <div className="emp-page min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin" />
-          <p className="text-slate-500 text-sm">Loading offer details…</p>
-        </div>
+      <div className="emp-page min-h-screen bg-slate-50">
+        <LoadingSpinner text="Loading offer details..." />
       </div>
     );
 
@@ -332,16 +330,22 @@ export default function AdminOfferView() {
                 { icon: <Mail size={16} />, label: "Email", value: offer.mail, delay: 60 },
                 { icon: <Phone size={16} />, label: "Contact", value: `+${offer.country_code} ${offer.contact_number}`, delay: 120 },
                 { icon: <Briefcase size={16} />, label: "Designation", value: offer.designation, delay: 180 },
-                { icon: <IndianRupee size={16} />, label: "CTC", value: `${offer.package} ${offer.currency}`, delay: 240 },
+                { icon: <IndianRupee size={16} />, label: "CTC", value: `${offer.total_ctc} ${offer.currency}`, delay: 240 },
                 { icon: <UserCheck size={16} />, label: "Employee Type", value: offer.employee_type, delay: 300 },
                 {
-                  icon: <Mail size={16} />,
-                  label: "CC Emails",
-                  value: offer?.cc_emails
-                    ? offer.cc_emails.split(",").map((e) => e.trim()).filter(Boolean).join(", ")
-                    : "—",
-                  delay: 360,
-                },
+  icon: <Mail size={16} />,
+  label: "CC Emails",
+  value: Array.isArray(offer?.cc_emails)
+    ? offer.cc_emails.join(", ")
+    : typeof offer?.cc_emails === "string"
+      ? offer.cc_emails
+          .split(",")
+          .map((e) => e.trim())
+          .filter(Boolean)
+          .join(", ")
+      : "—",
+  delay: 360,
+},
               ].map(({ icon, label, value, delay }) => (
                 <GhostCard key={label} icon={icon} label={label} value={value} delay={delay} />
               ))}

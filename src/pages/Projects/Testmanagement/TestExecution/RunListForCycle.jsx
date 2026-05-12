@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
 import TestRunAccordion from "./TestRuns";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 
 export default function RunListForCycle({
   projectId,
@@ -11,13 +12,15 @@ export default function RunListForCycle({
 }) {
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [deleteRunConfirmOpen, setDeleteRunConfirmOpen] = useState(false);
+  const [runIdToDelete, setRunIdToDelete] = useState(null);
 
   const loadRuns = async () => {
     if (!cycleId) return;
     setLoading(true);
     try {
       const res = await axiosInstance.get(
-        `/test-execution/test-runs/cycles/${cycleId}`
+        `api/test-execution/test-runs/cycles/${cycleId}`
       );
       setRuns(res.data || []);
     } catch (err) {
@@ -28,15 +31,22 @@ export default function RunListForCycle({
   };
 
   // ── Delete handler ────────────────────────────────────────────────────────
-  const handleDelete = async (runId) => {
-    if (!window.confirm("Are you sure you want to delete this test run?")) return;
+  const handleDelete = (runId) => {
+    setRunIdToDelete(runId);
+    setDeleteRunConfirmOpen(true);
+  };
+
+  const executeDeleteRun = async () => {
     try {
-      await axiosInstance.delete(`/test-execution/test-runs/${runId}`);
-      toast.success("Test run deleted successfully");
+      await axiosInstance.delete(`api/test-execution/test-runs/${runIdToDelete}`);
+      showStatusToast("Test run deleted successfully", "success");
       loadRuns();
     } catch (err) {
       console.error("Error deleting run:", err);
-      toast.error("Failed to delete test run");
+      showStatusToast("Failed to delete test run", "error");
+    } finally {
+      setDeleteRunConfirmOpen(false);
+      setRunIdToDelete(null);
     }
   };
 
@@ -47,6 +57,16 @@ export default function RunListForCycle({
   if (!cycleId) return null;
 
   return (
+    <>
+    <ConfirmationModal
+      isOpen={deleteRunConfirmOpen}
+      title="Delete Test Run"
+      message="Are you sure you want to delete this test run? This action cannot be undone."
+      onConfirm={executeDeleteRun}
+      onCancel={() => { setDeleteRunConfirmOpen(false); setRunIdToDelete(null); }}
+      confirmText="Delete"
+      variant="danger"
+    />
     <div className="space-y-4">
       <h3 className="text-lg font-semibold mb-2">Test Runs</h3>
 
@@ -66,5 +86,6 @@ export default function RunListForCycle({
         ))
       )}
     </div>
+    </>
   );
 }

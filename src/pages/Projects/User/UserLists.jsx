@@ -2,8 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import CommentBox from "./UserCommentBox";
 import ExpandableList from "../../../components/List/List";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../components/toastfy/toast";
 import { X } from "lucide-react";
 import { useAuth } from "../../../contexts/AuthContext";
 
@@ -71,7 +70,7 @@ const Lists = ({ projectId }) => {
       setNoEpicStories(noEpic);
     } catch (err) {
       console.error("Error loading project data:", err);
-      toast.error("Failed to load project data.", { position: "top-right" });
+      showStatusToast("Failed to load project data.", "error");
     } finally {
       setLoading(false);
     }
@@ -95,7 +94,6 @@ const Lists = ({ projectId }) => {
 
   return (
     <div className="p-6 space-y-6">
-      <ToastContainer />
 
       {/* Epics */}
       <h2 className="text-xl font-bold text-indigo-700">Epics</h2>

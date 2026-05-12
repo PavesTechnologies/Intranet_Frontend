@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Laptop,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import Pagination from "../../../components/Pagination/pagination";
+import { KPICard } from "../../../components/kpi/KPI";
 
 import {
   getAssetsByClient,
@@ -33,6 +34,8 @@ import "react-toastify/dist/ReactToastify.css";
 const AssetList = () => {
   const navigate = useNavigate();
   const { clientId } = useParams();
+  const [searchParams] = useSearchParams();
+  const clientName = searchParams.get("name");
 
   const [assets, setAssets] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -251,7 +254,7 @@ const AssetList = () => {
               </h1>
               <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                 <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs font-medium">
-                  {/* Client */} {assets[0]?.client?.client_name}
+                  {/* Client */} {clientName}
                 </span>
                 <span>•</span>
                 <span>Inventory & Dashboard</span>
@@ -266,38 +269,37 @@ const AssetList = () => {
               onClick={() => openModal()}
             >
               <Plus size={18} strokeWidth={2.5} />
-              <span>New Asset</span>
+              New Asset
             </Button>
           </div>
         </div>
 
         {/* KPI SECTION */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <Kpi
-            title="Total Assets"
+          <KPICard
+            label="Total Assets"
             value={kpi.totalAssets || 0}
-            icon={Box}
-            color="blue"
+            icon={<Box size={20} className="text-blue-600" />}
+            color="bg-blue-50 text-blue-600"
           />
-          <Kpi
-            title="Assigned Assets"
+          <KPICard
+            label="Assigned Assets"
             value={kpi.assignedAssets || 0}
-            icon={Users}
-            color="violet"
+            icon={<Users size={20} className="text-violet-600" />}
+            color="bg-violet-50 text-violet-600"
           />
-          <Kpi
-            title="Available Assets"
+          <KPICard
+            label="Available Assets"
             value={kpi.availableAssets || 0}
-            icon={Laptop}
-            color="emerald"
+            icon={<Laptop size={20} className="text-emerald-600" />}
+            color="bg-emerald-50 text-emerald-600"
           />
-          <Kpi
-            title="Utilization"
-            value={`${kpi.utilizationPercentage || 0}%`}
-            icon={Activity}
-            color="amber"
-            isPercentage
-            highlight={kpi.utilizationPercentage}
+          <KPICard
+            label="Utilization"
+            value={kpi.utilizationPercentage || 0}
+            suffix="%"
+            icon={<Activity size={20} className="text-amber-600" />}
+            color="bg-amber-50 text-amber-600"
           />
         </div>
 
@@ -469,6 +471,7 @@ const AssetList = () => {
                       type="number"
                       min="1"
                       defaultValue={editingAsset?.quantity}
+                      onWheel={(e) => e.target.blur()}
                       placeholder="e.g. 10"
                       error={validationErrors.quantity}
                       disabled={isQuantityLocked}
@@ -650,52 +653,6 @@ const AssetList = () => {
 };
 
 /* ---------------- UI HELPERS ---------------- */
-
-const Kpi = ({
-  title,
-  value,
-  icon: Icon,
-  color = "indigo",
-  isPercentage,
-  highlight,
-}) => {
-  const colorMap = {
-    indigo: "bg-indigo-50 text-indigo-600 border-indigo-100",
-    blue: "bg-blue-50 text-blue-600 border-blue-100",
-    emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-    amber: "bg-amber-50 text-amber-600 border-amber-100",
-    violet: "bg-violet-50 text-violet-600 border-violet-100",
-  };
-
-  const getHighlightColor = (val) => {
-    if (!isPercentage) return "text-gray-900";
-    if (val >= 80) return "text-emerald-600";
-    if (val >= 50) return "text-amber-600";
-    return "text-red-600";
-  };
-
-  return (
-    <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-300">
-      <div className="flex justify-between items-start">
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            {title}
-          </p>
-          <p
-            className={`text-2xl font-bold mt-2 ${isPercentage ? getHighlightColor(highlight) : "text-gray-900"}`}
-          >
-            {value}
-          </p>
-        </div>
-        <div
-          className={`p-3 rounded-xl border ${colorMap[color] || colorMap.indigo}`}
-        >
-          <Icon size={22} />
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const StatusBadge = ({ status }) => {
   const styles = {

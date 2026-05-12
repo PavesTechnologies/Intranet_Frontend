@@ -113,44 +113,83 @@ export default function HrProfileView() {
         });
 
         setProfile(res.data);
-        const status = res.data.offer?.offer_status;
-        setVerificationStatus(status);
+const status = res.data.offer?.offer_status;
+setVerificationStatus(status);
 
-        if (status === "Verified") {
-          setSectionStatus({
-            overview: true,
-            education: true,
-            experience: true,
-            "identity documents": true,
-          });
+// Initialize section status
+const newSectionStatus = {
+  overview: false,
+  education: false,
+  experience: false,
+  "identity documents": false,
+};
 
-          const allDocs = {};
+// Initialize document status
+const newDocStatus = {};
 
-          [
-            ...(res.data.education_documents || []),
-            ...(res.data.identity_documents || []),
-            ...(res.data.experience?.flatMap((e) => e.documents || []) || []),
-          ].forEach((d, i) => {
-            allDocs[getDocKey(d, i)] = true;
-          });
+// Education documents
+(res.data.education_documents || []).forEach((doc, i) => {
+  const key = getDocKey(doc, i);
+  const isVerified = doc.verification_status === "Verified";
+  newDocStatus[key] = isVerified;
 
-          setDocStatus(allDocs);
-          setActiveTab("overview");
-        } else {
-          // Submitted → reset UI
-          setSectionStatus({
-            overview: false,
-            education: false,
-            experience: false,
-            "identity documents": false,
-          });
+  if (isVerified) {
+    newSectionStatus.education = true;
+  }
+});
 
-          setDocStatus({});
-          setActiveTab("overview");
-        }
-        /* restore saved verification */
+// Identity documents
+(res.data.identity_documents || []).forEach((doc, i) => {
+  const key = getDocKey(doc, i);
+  const isVerified = doc.verification_status === "Verified";
+  newDocStatus[key] = isVerified;
 
-        setLoadedFromStorage(true);
+  if (isVerified) {
+    newSectionStatus["identity documents"] = true;
+  }
+});
+
+// Experience documents
+(res.data.experience || []).forEach((exp) => {
+  (exp.documents || []).forEach((doc, i) => {
+    const key = getDocKey(doc, i);
+    const isVerified = doc.verification_status === "Verified";
+    newDocStatus[key] = isVerified;
+
+    if (isVerified) {
+      newSectionStatus.experience = true;
+    }
+  });
+});
+
+// Overview section
+if (
+  res.data.personal_details?.verification_status === "Verified" ||
+  res.data.bank_details?.verification_status === "Verified" ||
+  res.data.pf_details?.verification_status === "Verified" ||
+  (res.data.addresses || []).some(
+    (a) => a.verification_status === "Verified"
+  )
+) {
+  newSectionStatus.overview = true;
+}
+
+// If profile is fully verified
+if (status === "Verified") {
+  Object.keys(newSectionStatus).forEach((key) => {
+    newSectionStatus[key] = true;
+  });
+
+  Object.keys(newDocStatus).forEach((key) => {
+    newDocStatus[key] = true;
+  });
+}
+
+// Set states
+setSectionStatus(newSectionStatus);
+setDocStatus(newDocStatus);
+setActiveTab("overview");
+setLoadedFromStorage(true);
       } catch {
         showStatusToast("Failed to load profile", "error");
       } finally {

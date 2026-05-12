@@ -6,9 +6,11 @@ import { reviewTimesheet, handleBulkReviewAdmin } from "../api";
 import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { MoreVertical, X, ChevronDown, ChevronUp } from "lucide-react";
 import Modal from "../../../components/Modal/modal";
 import InternalActivities from "./InternalActivities";
+import HourSettingsModal from "./HourSettingsModal";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 
 const AdminApprovalTable = ({
@@ -38,6 +40,7 @@ const AdminApprovalTable = ({
   const [userLevelLoading, setUserLevelLoading] = useState(null); // for Approve/Reject All Weeks
   const [weekLevelLoading, setWeekLevelLoading] = useState({}); // for per-week Approve/Reject
   const [isOpen, setIsOpen] = useState(false);
+  const [isHourSettingsOpen, setIsHourSettingsOpen] = useState(false);
 
   // ✅ Per-user expand/collapse state — collapsed by default
   const [expandedUsers, setExpandedUsers] = useState({});
@@ -84,8 +87,7 @@ const AdminApprovalTable = ({
     setHolidayLoading(true);
     try {
       const res = await fetch(
-        `${
-          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/all`,
         {
           headers: {
@@ -210,8 +212,7 @@ const AdminApprovalTable = ({
       }));
 
       const res = await fetch(
-        `${
-          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/timesheets/review/internal/bulk`,
         {
           method: "POST",
@@ -226,8 +227,7 @@ const AdminApprovalTable = ({
       if (!res.ok) throw new Error("Bulk review failed");
 
       showStatusToast(
-        `All submitted weeks ${status.toLowerCase()} successfully for ${
-          user.userName
+        `All submitted weeks ${status.toLowerCase()} successfully for ${user.userName
         }`,
         "success",
       );
@@ -659,8 +659,7 @@ const AdminApprovalTable = ({
     try {
       for (const id of selectedUsers) {
         const res = await fetch(
-          `${
-            window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holiday-exclude-users/${id}`,
           {
             method: "DELETE",
@@ -698,8 +697,7 @@ const AdminApprovalTable = ({
 
     try {
       const res = await fetch(
-        `${
-          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/create`,
         {
           method: "POST",
@@ -742,8 +740,7 @@ const AdminApprovalTable = ({
       // Run both API calls in parallel and wait for both to finish
       const [usersRes, holidaysRes] = await Promise.all([
         fetch(
-          `${
-            window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holiday-exclude-users/allusers`,
           {
             headers: {
@@ -752,8 +749,7 @@ const AdminApprovalTable = ({
           },
         ),
         fetch(
-          `${
-            window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holidays/currentMonth`,
           {
             headers: {
@@ -794,8 +790,7 @@ const AdminApprovalTable = ({
 
     try {
       const res = await fetch(
-        `${
-          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/${selectedUpdateRecord.id}`,
         {
           method: "PUT",
@@ -835,15 +830,22 @@ const AdminApprovalTable = ({
       ) : (
         <>
           <div className="flex justify-end gap-3 mb-4">
-            <Button variant="primary" size="small" onClick={exportCSV}>
+            <Button variant="primary" size="medium" onClick={exportCSV}>
               Export CSV
             </Button>
-            <Button variant="primary" size="small" onClick={exportPDF}>
+            <Button variant="secondary" size="medium" onClick={exportPDF}>
               Export PDF
             </Button>
             <Button
-              variant="secondary"
-              size="small"
+              variant="primary"
+              size="medium"
+              onClick={() => setIsHourSettingsOpen(true)}
+            >
+              Hour Settings
+            </Button>
+            <Button
+              variant="primary"
+              size="medium"
               onClick={() => setIsOpen(true)}
             >
               Internal Activities
@@ -1025,13 +1027,11 @@ const AdminApprovalTable = ({
                     <div
                       key={item.id}
                       onClick={() => handleSelectUser(item)}
-                      className={`border rounded-lg p-4 transition-all ${
-                        isRemoveMode ? "cursor-pointer" : "cursor-default"
-                      } ${
-                        isRemoveMode && selectedUsers.includes(item.id)
+                      className={`border rounded-lg p-4 transition-all ${isRemoveMode ? "cursor-pointer" : "cursor-default"
+                        } ${isRemoveMode && selectedUsers.includes(item.id)
                           ? "bg-red-100 border-red-400"
                           : "bg-gray-50 hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       <h3 className="font-semibold text-gray-800 text-lg">
                         {item.userName} (User ID: {item.userId})
@@ -1141,36 +1141,28 @@ const AdminApprovalTable = ({
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Select Employee
                         </label>
-                        <select
-                          className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "-- Select Employee --" },
+                            ...managerUsers.map((u) => ({ value: u.id, label: `${u.id} - ${u.fullName}` })),
+                          ]}
                           value={selectedAddUser}
-                          onChange={(e) => setSelectedAddUser(e.target.value)}
-                        >
-                          <option value="">-- Select Employee --</option>
-                          {managerUsers.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.id} - {u.fullName}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setSelectedAddUser}
+                        />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Select Holiday
                         </label>
-                        <select
-                          className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "-- Select Holiday --" },
+                            ...monthlyHolidays.map((h) => ({ value: h.holidayDate, label: `${h.holidayDate} - ${h.holidayName}` })),
+                          ]}
                           value={selectedHoliday}
-                          onChange={(e) => setSelectedHoliday(e.target.value)}
-                        >
-                          <option value="">-- Select Holiday --</option>
-                          {monthlyHolidays.map((h) => (
-                            <option key={h.holidayId} value={h.holidayDate}>
-                              {h.holidayDate} - {h.holidayName}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setSelectedHoliday}
+                        />
                       </div>
 
                       <div>
@@ -1245,18 +1237,14 @@ const AdminApprovalTable = ({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Select Holiday
                     </label>
-                    <select
-                      className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-400"
+                    <FilterListbox
+                      options={[
+                        { value: "", label: "-- Select Holiday --" },
+                        ...monthlyHolidays.map((h) => ({ value: h.holidayDate, label: `${h.holidayDate} - ${h.holidayDescription}` })),
+                      ]}
                       value={updateHoliday}
-                      onChange={(e) => setUpdateHoliday(e.target.value)}
-                    >
-                      <option value="">-- Select Holiday --</option>
-                      {monthlyHolidays.map((h) => (
-                        <option key={h.holidayId} value={h.holidayDate}>
-                          {h.holidayDate} - {h.holidayDescription}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setUpdateHoliday}
+                    />
                   </div>
 
                   {/* 🆕 Editable Reason */}
@@ -1332,6 +1320,11 @@ const AdminApprovalTable = ({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         children={<InternalActivities />}
+      />
+
+      <HourSettingsModal
+        isOpen={isHourSettingsOpen}
+        onClose={() => setIsHourSettingsOpen(false)}
       />
     </div>
   );

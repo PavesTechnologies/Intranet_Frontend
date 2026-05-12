@@ -35,3 +35,19 @@ export const handleRMDecision = async (rmDemandDecision) => {
     throw error;
   }
 };
+
+export const deleteDemandByPM = async (demandId) => {
+  try {
+    const response = await axios.delete(
+      `${BASE_URL}/api/demand/delete/pm/${demandId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};

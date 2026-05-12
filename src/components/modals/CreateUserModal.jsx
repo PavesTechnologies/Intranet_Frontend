@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Modal from '../Modal';
+import FilterListbox from '../filter/FilterListbox';
 
 
 const CreateUserModal = ({ isOpen, onClose, onSubmit }) => {
@@ -59,58 +60,53 @@ const CreateUserModal = ({ isOpen, onClose, onSubmit }) => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Role *
           </label>
-          <select
-            name="role"
+          <FilterListbox
+            options={[
+              { value: "", label: "Select Role" },
+              { value: "System Administrator", label: "System Administrator" },
+              { value: "Project Manager", label: "Project Manager" },
+              { value: "Developer", label: "Developer" },
+              { value: "HR Manager", label: "HR Manager" },
+              { value: "Designer", label: "Designer" },
+              { value: "Employee", label: "Employee" },
+            ]}
             value={formData.role}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#263383] focus:border-transparent"
-            required
-          >
-            <option value="">Select Role</option>
-            <option value="System Administrator">System Administrator</option>
-            <option value="Project Manager">Project Manager</option>
-            <option value="Developer">Developer</option>
-            <option value="HR Manager">HR Manager</option>
-            <option value="Designer">Designer</option>
-            <option value="Employee">Employee</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "role", value: val } })}
+          />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Department *
           </label>
-          <select
-            name="department"
+          <FilterListbox
+            options={[
+              { value: "", label: "Select Department" },
+              { value: "IT", label: "IT" },
+              { value: "Operations", label: "Operations" },
+              { value: "Engineering", label: "Engineering" },
+              { value: "Human Resources", label: "Human Resources" },
+              { value: "Design", label: "Design" },
+              { value: "Marketing", label: "Marketing" },
+              { value: "Sales", label: "Sales" },
+            ]}
             value={formData.department}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#263383] focus:border-transparent"
-            required
-          >
-            <option value="">Select Department</option>
-            <option value="IT">IT</option>
-            <option value="Operations">Operations</option>
-            <option value="Engineering">Engineering</option>
-            <option value="Human Resources">Human Resources</option>
-            <option value="Design">Design</option>
-            <option value="Marketing">Marketing</option>
-            <option value="Sales">Sales</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "department", value: val } })}
+          />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Status
           </label>
-          <select
-            name="status"
+          <FilterListbox
+            options={[
+              { value: "Active", label: "Active" },
+              { value: "Inactive", label: "Inactive" },
+            ]}
             value={formData.status}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#263383] focus:border-transparent"
-          >
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+          />
         </div>
 
         <div className="flex justify-end space-x-3 pt-4">
