@@ -69,6 +69,10 @@ export default function RiskDetailModal({
           headers,
         });
 
+        const riskLinkId = axios.get(`${BASE_URL}/api/risk-links/risk/${risk.id}`, {
+          headers,
+        });
+
         const mitigationReq = axios
           .get(`${BASE_URL}/api/mitigation-plans/risk/${risk.id}`, {
             headers,
@@ -81,6 +85,10 @@ export default function RiskDetailModal({
         );
 
         const riskRes = (await riskReq).data;
+
+        const riskLinkRes = (await riskLinkId).data;
+        // {console.log("Risk link data:", riskLinkRes)}; // Debug log
+        riskRes.riskLinkId = riskLinkRes[0]?.id || null;
 
         const categoryReq = riskRes.categoryId
           ? axios.get(`${BASE_URL}/api/risk/category/${riskRes.categoryId}`, {
@@ -304,6 +312,7 @@ export default function RiskDetailModal({
             setShowEdit(false);
             onUpdated?.();
           }}
+          onEdit={true}
         />
 
         {/* Priority badge */}
