@@ -677,21 +677,21 @@ const Kpi = ({
 
   return (
     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-300">
-      <div className="flex justify-between items-start">
-        <div>
+      <div className="flex items-center gap-4">
+        <div
+          className={`p-3 rounded-xl border shrink-0 ${colorMap[color] || colorMap.indigo}`}
+        >
+          <Icon size={22} />
+        </div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
             {title}
           </p>
           <p
-            className={`text-2xl font-bold mt-2 ${isPercentage ? getHighlightColor(highlight) : "text-gray-900"}`}
+            className={`text-2xl font-bold mt-1 ${isPercentage ? getHighlightColor(highlight) : "text-gray-900"}`}
           >
             {value}
           </p>
-        </div>
-        <div
-          className={`p-3 rounded-xl border ${colorMap[color] || colorMap.indigo}`}
-        >
-          <Icon size={22} />
         </div>
       </div>
     </div>

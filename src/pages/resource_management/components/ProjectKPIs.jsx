@@ -13,13 +13,13 @@ const ProjectKPIs = ({ stats }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       {cards.map((card, index) => (
-        <div key={index} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex items-center justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <p className="text-gray-500 text-xs font-medium uppercase truncate">{card.label}</p>
-            <h3 className="text-2xl font-bold text-[#081534] mt-1 truncate" title={String(card.value)}>{card.value}</h3>
-          </div>
+        <div key={index} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex items-center gap-4">
           <div className={`p-3 rounded-full shrink-0 ${card.bg}`}>
             <card.icon className={`h-6 w-6 ${card.color}`} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-gray-500 text-xs font-medium uppercase truncate">{card.label}</p>
+            <h3 className="text-2xl font-bold text-[#081534] mt-1 truncate" title={String(card.value)}>{card.value}</h3>
           </div>
         </div>
       ))}

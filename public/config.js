@@ -1,0 +1,14 @@
+// public/config.js
+window.__APP_CONFIG__ = {
+  TIMESHEET_API_ENDPOINT: "http://13.204.95.26:5000",
+//   TIMESHEET_API_ENDPOINT: "http://localhost:5000",
+//   USER_MANAGEMENT_URL: "http://127.0.0.1:8000",
+  USER_MANAGEMENT_URL: "http://13.204.95.26:8000",
+  BASE_URL: "http://13.204.95.26:9999",
+  //   PMS_BASE_URL: "http://localhost:8080",
+  PMS_BASE_URL: "http://13.204.95.26:8080",
+  MSOffice_USER_MANAGEMENT_URL: "http://127.0.0.1:8000",
+//   MSOffice_USER_MANAGEMENT_URL: "http://13.204.95.26:8000",
+  EMPLOYEE_ONBOARDING_URL: "http://13.204.95.26:8001",
+  RMS_BASE_URL: "http://13.204.95.26:8002",
+};
