@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from "react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import FilterListbox from "../../components/filter/FilterListbox";
+import Button from "../../components/Button/Button";
+import { showStatusToast } from "../../components/toastfy/toast";
 import {
   LineChart,
   Line,
@@ -19,9 +23,17 @@ import {
   fetchDashboardSummary,
   fetchDashboardLastMonth,
   fetchDashboardLast3Months,
+  fetchDashboardDateRange,
 } from "./api";
 import TimesheetHeader from "./TimesheetHeader";
 import LoadingSpinner from "../../components/LoadingSpinner";
+
+const toLocalISODate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const Card = ({ children, className = "" }) => (
   <div className={`bg-white rounded-2xl shadow ${className}`}>{children}</div>
@@ -39,10 +51,13 @@ const DashboardPage = () => {
   const [productivityTrend, setProductivityTrend] = useState([]);
   const [billableData, setBillableData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState(null);
+  const [customEndDate, setCustomEndDate] = useState(null);
   const monthOptions = [
     { label: "Current Month", value: "Current Month" },
     { label: "Last-Current Month", value: "Last Month" },
     { label: "Last 2-Cur Months", value: "Last 3 Months" },
+    { label: "Custom Range", value: "Custom Range" },
   ];
   const [selectedMonth, setSelectedMonth] = useState("current");
 
@@ -55,6 +70,8 @@ const DashboardPage = () => {
 
   // 🔹 Fetch data dynamically when month changes
   useEffect(() => {
+    if (selectedMonth === "Custom Range") return;
+
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -77,6 +94,29 @@ const DashboardPage = () => {
     };
     fetchData();
   }, [selectedMonth]);
+
+  const handleApplyCustomRange = async () => {
+    if (!customStartDate || !customEndDate) {
+      showStatusToast("Please select valid start and end dates", "error");
+      return;
+    }
+    if (customStartDate > customEndDate) {
+      showStatusToast("Start date must be before end date", "error");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const start = toLocalISODate(customStartDate);
+      const end = toLocalISODate(customEndDate);
+      const response = await fetchDashboardDateRange(start, end);
+      if (response) setDashboardSummary(response);
+    } catch (error) {
+      console.error("Error fetching dashboard summary:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 🔹 Prepare chart data after summary loads
   useEffect(() => {
@@ -134,8 +174,38 @@ const DashboardPage = () => {
       <TimesheetHeader />
 
       {/* 🔹 Dropdown for Month Selection */}
-      <div className="flex justify-end items-center mr-6">
-        <label className="mr-2 text-sm font-medium text-gray-700">
+      <div className="flex justify-end items-center gap-3 mr-6">
+        {selectedMonth === "Custom Range" && (
+          <>
+            <DatePicker
+              selected={customStartDate}
+              onChange={(d) => setCustomStartDate(d)}
+              dateFormat="yyyy-MM-dd"
+              className="border border-gray-300 rounded px-2 py-1 text-sm w-36"
+              maxDate={customEndDate || new Date()}
+              placeholderText="Start date"
+            />
+            <DatePicker
+              selected={customEndDate}
+              onChange={(d) => setCustomEndDate(d)}
+              dateFormat="yyyy-MM-dd"
+              className="border border-gray-300 rounded px-2 py-1 text-sm w-36"
+              minDate={customStartDate}
+              maxDate={new Date()}
+              placeholderText="End date"
+            />
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleApplyCustomRange}
+              disabled={!customStartDate || !customEndDate || loading}
+              loading={loading}
+            >
+              Apply
+            </Button>
+          </>
+        )}
+        <label className="text-sm font-medium text-gray-700">
           Select Range:
         </label>
         <div className="w-48">
