@@ -65,16 +65,19 @@ export const AuthProvider = ({ children }) => {
     if (isLoggingOut.current) return;
     isLoggingOut.current = true;
 
-    const token        = localStorage.getItem("token");
     const refreshToken = localStorage.getItem("refresh_token");
 
-    // blacklist both tokens on backend
-    if (token) {
+// blacklist both tokens on backend
+    if (localStorage.getItem("token")) {
       axios
         .post(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
           { refresh_token: refreshToken },
-          { headers: { Authorization: `Bearer ${token}` } },
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
         )
         .then((res) => console.log("Logout:", res.data))
         .catch((err) => console.error("Logout failed:", err.response?.data || err.message));

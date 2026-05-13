@@ -43,13 +43,12 @@ const Dashboard = () => {
 
   // ✅ Fetch total employees
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const fetchEmployeeCount = async () => {
       try {
         const res = await axios.get(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/count`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
         setEmployeeCount(res.data.user_count);
@@ -62,13 +61,12 @@ const Dashboard = () => {
 
   // ✅ Fetch active employees
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const fetchActiveEmployees = async () => {
       try {
         const res = await axios.get(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/active-count`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
         setActiveEmployeeCount(res.data.active_user_count);
@@ -81,14 +79,13 @@ const Dashboard = () => {
 
   // fetch projects count
   useEffect(() => {
-    const token = localStorage.getItem("token");
 
     const fetchProjectsCount = async () => {
       try {
         const res = await axios.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/count`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
 
@@ -105,14 +102,13 @@ const Dashboard = () => {
 
   // fetch tasks count
   useEffect(() => {
-    const token = localStorage.getItem("token");
 
     const fetchTasksCount = async () => {
       try {
         const res = await axios.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/status/done/count`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
 
@@ -130,14 +126,13 @@ const Dashboard = () => {
 
   //fetch average timesheet hours
   useEffect(() => {
-    const token = localStorage.getItem("token");
 
     const fetchAvgTimesheetHours = async () => {
       try {
         const res = await axios.get(
           `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/dashboard/total_hours`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
 
@@ -163,7 +158,7 @@ const Dashboard = () => {
         const res = await axios.get(
           `${window.__APP_CONFIG__.BASE_URL}/api/leave-requests/manager/pending-count/${managerId}`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
 
