@@ -21,7 +21,7 @@ import {useAuth} from "../../../contexts/AuthContext";
 ============================ */
 export default function AdminApprovalDashboard() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
+
 
  /* ---------- ROLE LOGIC ---------- */
 const { user, loading: authLoading } = useAuth();
@@ -70,7 +70,7 @@ const isAuthorizedManager = isManager || isAdmin;
       setLoading(true);
       try {
         const res = await axios.get(`${BASE_URL}/offer-approval/my-actions`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
         setData(res.data || []);
@@ -83,7 +83,7 @@ const isAuthorizedManager = isManager || isAdmin;
     };
 
     fetchApprovals();
-  }, [BASE_URL, token, isAuthorizedManager]);
+  }, [BASE_URL, isAuthorizedManager]);
   // Redirect if not authorized
 if (!authLoading && !isAuthorizedManager) {
   return <Navigate to="/unauthorized" replace />;

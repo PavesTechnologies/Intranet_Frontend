@@ -76,8 +76,6 @@ export default function OffersTable({
   loading = false,
 }) {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
-
   const [currentPage, setCurrentPage] = useState(1);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -111,7 +109,7 @@ export default function OffersTable({
         },
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
         },
