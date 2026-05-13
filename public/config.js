@@ -1,4 +1,3 @@
-// public/config.js
 window.__APP_CONFIG__ = {
   TIMESHEET_API_ENDPOINT: "http://13.204.95.26:5000",
 //   TIMESHEET_API_ENDPOINT: "http://localhost:5000",

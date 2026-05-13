@@ -179,7 +179,7 @@ export default function WorkforceAvailability() {
                 )}
               </div>
 
-              <div className="p-4 min-h-[600px] relative">
+              <div className="pt-1 px-2 pb-2 sm:pt-1.5 sm:px-3 sm:pb-3 min-h-[600px] relative">
                 {loading && (
                   <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-[1px] transition-all duration-300">
                     {/* <div className="flex flex-col items-center gap-2 p-6 rounded-xl bg-card shadow-xl border animate-in fade-in zoom-in duration-300"> */}
@@ -236,7 +236,7 @@ export default function WorkforceAvailability() {
                 </TabsContent>
 
                 <TabsContent value="table" className="mt-0 outline-none">
-                  <div className="flex flex-col gap-5">
+                  <div className="flex flex-col gap-2">
                     <ResourceTable
                       resources={filteredResources}
                       onResourceClick={handleResourceClick}

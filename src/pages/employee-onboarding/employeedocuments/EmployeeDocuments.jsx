@@ -204,8 +204,6 @@ export default function EmployeeDocumentsPage() {
       try {
         setLoading(true);
 
-        const token = localStorage.getItem("token");
-
         const [documentsResponse, offersResponse] = await Promise.all([
           fetch(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/employees/documents`,
@@ -213,7 +211,7 @@ export default function EmployeeDocumentsPage() {
               method: "GET",
               headers: {
                 accept: "application/json",
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
               },
             },
           ),
@@ -223,7 +221,7 @@ export default function EmployeeDocumentsPage() {
               method: "GET",
               headers: {
                 accept: "application/json",
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
               },
             },
           ),
@@ -307,7 +305,7 @@ export default function EmployeeDocumentsPage() {
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/view_documents?file_path=${filePath}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );

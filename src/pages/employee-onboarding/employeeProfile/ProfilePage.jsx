@@ -190,11 +190,10 @@ export default function ProfilePage({
     const fetchSocialLinks = async () => {
       try {
         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-        const token = localStorage.getItem("token");
         const res = await fetch(
           `${BASE_URL}/employee-details/social-links/${user_uuid}`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
         if (res.ok) {
@@ -746,7 +745,6 @@ const PrimaryModal = ({
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const personal = hrData?.personal_details || {};
       const core = hrData?.offer || {}; // Actually coreData is passed to ProfilePage
 
@@ -770,7 +768,7 @@ const PrimaryModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(personalPayload),
         },
@@ -801,7 +799,7 @@ const PrimaryModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(corePayload),
         },
@@ -919,7 +917,6 @@ const ContactModal = ({
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const personal = hrData?.personal_details || {};
       const offer = hrData?.offer || {};
 
@@ -949,7 +946,7 @@ const ContactModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(corePayload),
         },
@@ -975,7 +972,7 @@ const ContactModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(personalPayload),
         },
@@ -1099,7 +1096,6 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
 
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
 
       const updateAddress = async (addr, type) => {
         if (!addr.address_uuid) return;
@@ -1123,7 +1119,7 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
             body: JSON.stringify(payload),
           },
@@ -1389,7 +1385,6 @@ const RelationsModal = ({
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const personal = hrData?.personal_details || {};
 
       // Identify the emergency contact (e.g., the first one or a specific one)
@@ -1413,7 +1408,7 @@ const RelationsModal = ({
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify(payload),
       });
@@ -1686,12 +1681,11 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
     if (linkToDelete.social_link_uuid) {
       try {
         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-        const token = localStorage.getItem("token");
         const res = await fetch(
           `${BASE_URL}/employee-details/social-links/${linkToDelete.social_link_uuid}`,
           {
             method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
         if (!res.ok) throw new Error("Failed to delete link");
@@ -1719,10 +1713,9 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const headers = {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
       };
 
       const tasks = [];

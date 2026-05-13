@@ -9,14 +9,13 @@ export default function EducationDocumentManagement() {
   const [editData, setEditData] = useState(null);
 
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
 
   /* -------------------- FETCH (INITIAL LOAD ONLY) -------------------- */
   const fetchDocs = async () => {
     try {
       setLoading(true);
       const res = await axios.get(`${BASE}/education/education-document`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setDocs(res.data);
     } catch {
@@ -36,7 +35,7 @@ export default function EducationDocumentManagement() {
 
     try {
       await axios.delete(`${BASE}/education/education-document/${uuid}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
       setDocs((prev) => prev.filter((d) => d.education_document_uuid !== uuid));
@@ -167,7 +166,6 @@ function DocumentModal({ editData, onClose, onSuccess }) {
   const [saving, setSaving] = useState(false);
 
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
 
   const save = async () => {
     if (!name.trim()) {
@@ -190,7 +188,7 @@ function DocumentModal({ editData, onClose, onSuccess }) {
           `${BASE}/education/education-document/${editData.education_document_uuid}`,
           payload,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
             responseType: "text",
           },
         );
@@ -199,7 +197,7 @@ function DocumentModal({ editData, onClose, onSuccess }) {
           `${BASE}/education/create_education_document`,
           payload,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
             responseType: "text",
           },
         );

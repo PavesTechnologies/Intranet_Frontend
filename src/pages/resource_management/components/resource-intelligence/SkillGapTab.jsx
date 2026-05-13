@@ -12,6 +12,7 @@ import { fetchDemands, getSkillGapAnalysis } from "../../services/workforceServi
 import { fetchResources } from "../../services/resource";
 import { toast } from "react-toastify";
 import Pagination from "../../../../components/Pagination/pagination";
+import GenericTable from "../../../../components/Table/table";
 
 // ── Match Gauge Component ────────────────────────────────────────────────────
 function MatchGauge({ percentage, size = 48 }) {
@@ -240,58 +241,54 @@ export default function SkillGapTab({ resource, demand }) {
 
                         {analysis ? (
                             <>
-                                <div className="overflow-x-auto flex-1">
-                                    <table className="w-full font-sans">
-                                        <thead>
-                                            <tr className="bg-slate-50/30 border-b border-slate-100">
-                                                <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[180px]">Skill Layer</th>
-                                                <th className="px-5 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[80px]">Target</th>
-                                                <th className="px-5 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[80px]">Asset</th>
-                                                <th className="px-5 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[100px]">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {paginatedSkills.map((sc, i) => {
-                                                const isGap = sc.status?.toUpperCase() === 'GAP';
-                                                return (
-                                                    <tr key={i} className={cn("hover:bg-slate-50/50 transition-colors group", isGap && sc.mandatory && "bg-rose-50/20")}>
-                                                        <td className="px-5 py-3.5">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border",
-                                                                    isGap ? "bg-rose-50 border-rose-100 text-rose-500" : "bg-emerald-50 border-emerald-100 text-emerald-500")}>
-                                                                    <Target className="h-4 w-4" />
-                                                                </div>
-                                                                <div>
-                                                                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                                                        {sc.skill || sc.skillName}
-                                                                        {sc.mandatory && <span className="text-[8px] font-black text-white bg-rose-500 px-1 rounded uppercase tracking-tighter">Crit</span>}
-                                                                    </div>
-                                                                    <div className="text-[10px] font-bold text-indigo-500 mt-0.5">{sc.subSkillName || sc.subskillName || sc.subSkill || sc.sub_skill_name || sc.subskill || "Primary Focus"}</div>
-                                                                </div>
+                                <div className="overflow-x-auto flex-1 no-scrollbar">
+                                    <GenericTable
+                                        headers={["Skill Layer", "Target", "Asset", "Status"]}
+                                        columns={["skill_layer_info", "target_info", "asset_info", "status_info"]}
+                                        rows={paginatedSkills.map((sc, i) => {
+                                            const isGap = sc.status?.toUpperCase() === 'GAP';
+                                            return {
+                                                ...sc,
+                                                skill_layer_info: (
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border",
+                                                            isGap ? "bg-rose-50 border-rose-100 text-rose-500" : "bg-emerald-50 border-emerald-100 text-emerald-500")}>
+                                                            <Target className="h-4 w-4" />
+                                                        </div>
+                                                        <div className="text-left">
+                                                            <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                                                {sc.skill || sc.skillName}
+                                                                {sc.mandatory && <span className="text-[8px] font-black text-white bg-rose-500 px-1 rounded uppercase tracking-tighter">Crit</span>}
                                                             </div>
-                                                        </td>
-                                                        <td className="px-5 py-3.5 text-center">
-                                                            <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">{sc.requiredProficiency}</span>
-                                                        </td>
-                                                        <td className="px-5 py-3.5 text-center">
-                                                            <span className={cn("text-[10px] font-bold px-2 py-1 rounded border shadow-sm",
-                                                                isGap ? "bg-rose-50 text-rose-600 border-rose-100" : "bg-emerald-50 text-emerald-600 border-emerald-100")}>
-                                                                {sc.resourceProficiency || "Deficit"}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-5 py-3.5">
-                                                            <div className="flex justify-center">
-                                                                <div className={cn("inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full",
-                                                                    isGap ? "text-rose-600 bg-rose-50" : "text-emerald-600 bg-emerald-50")}>
-                                                                    {isGap ? <XCircle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />} {sc.status}
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
+                                                            <div className="text-[10px] font-bold text-indigo-500 mt-0.5">{sc.subSkillName || sc.subskillName || sc.subSkill || sc.sub_skill_name || sc.subskill || "Primary Focus"}</div>
+                                                        </div>
+                                                    </div>
+                                                ),
+                                                target_info: (
+                                                    <div className="text-center">
+                                                        <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">{sc.requiredProficiency}</span>
+                                                    </div>
+                                                ),
+                                                asset_info: (
+                                                    <div className="text-center">
+                                                        <span className={cn("text-[10px] font-bold px-2 py-1 rounded border shadow-sm",
+                                                            isGap ? "bg-rose-50 text-rose-600 border-rose-100" : "bg-emerald-50 text-emerald-600 border-emerald-100")}>
+                                                            {sc.resourceProficiency || "Deficit"}
+                                                        </span>
+                                                    </div>
+                                                ),
+                                                status_info: (
+                                                    <div className="text-center">
+                                                        <div className={cn("inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full",
+                                                            isGap ? "text-rose-600 bg-rose-50" : "text-emerald-600 bg-emerald-50")}>
+                                                            {isGap ? <XCircle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />} {sc.status}
+                                                        </div>
+                                                    </div>
+                                                ),
+                                                rowClass: isGap && sc.mandatory ? "bg-rose-50/20" : ""
+                                            };
+                                        })}
+                                    />
                                 </div>
                                 {totalPages > 1 && (
                                     <div className="p-4 border-t border-slate-100">

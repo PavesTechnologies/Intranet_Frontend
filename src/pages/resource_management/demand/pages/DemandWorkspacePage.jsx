@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { SearchIcon, FilterIcon, ActivityIcon, WarningIcon, ZapIcon, SecurityAlertIcon, ErrorIcon, SuccessIcon, SpinnerIcon, CloseIcon } from "@/components/icons";
+import {
+    SearchIcon, FilterIcon, ActivityIcon, WarningIcon, ZapIcon, SecurityAlertIcon,
+    ErrorIcon, SuccessIcon, SpinnerIcon, CloseIcon, ProjectsIcon, UserIcon,
+    CheckIcon, EditIcon, DeleteIcon, PendingIcon
+} from "@/components/icons";
+import GenericTable from '../../../../components/Table/table';
+import { PriorityBadge, StateBadge, SLABadge, DemandTypeBadge } from '../components/FormalBadges';
 import { cn } from "@/lib/utils";
 import DemandKPIStrip from '../components/DemandKPIStrip';
-import DemandList from '../components/DemandList';
 import DemandFilters from '../components/DemandFilters';
 import { useDemand } from '../hooks/useDemand';
 import DemandModal from '../../models/DemandModal';
@@ -24,6 +29,29 @@ const getActionErrorMessage = (error, fallback) =>
     error?.response?.data?.message ||
     error?.message ||
     fallback;
+
+const DM_PENDING_STATUSES = ['REQUESTED', 'DRAFT', 'SOFT', 'PROPOSED', 'PENDING', 'OPEN', 'IN_PROGRESS', 'IN PROGRESS'];
+
+const normalizeRole = (role = "") =>
+    String(role)
+        .toUpperCase()
+        .replace(/^ROLE[-_]/, "")
+        .replace(/[^A-Z0-9]/g, "");
+
+const getDemandCommitment = (demand = {}) =>
+    String(
+        demand.demandCommitment ||
+        demand.commitment ||
+        demand.demand_commitment ||
+        ""
+    ).toUpperCase();
+
+const getDemandType = (demand = {}) =>
+    demand.demandType ||
+    demand.type ||
+    demand.demand_type ||
+    demand.type_of_demand ||
+    "";
 
 const DecisionModal = ({
     type,
@@ -649,76 +677,195 @@ const DemandWorkspacePage = () => {
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto border-t border-slate-100">
-                        <div className="min-w-[1000px]">
-                            <div className="grid grid-cols-12 items-center gap-4 px-5 py-2.5 bg-slate-50 border-b border-slate-100">
-                                <div className="col-span-3 text-[10px] font-bold text-slate-400 tracking-wider uppercase">Demand Specifications & Context</div>
-                                <div className="col-span-1 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Score</div>
-                                <div className="col-span-1 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Priority</div>
-                                <div className="col-span-3 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">
-                                    {activeTab === 'rejected' ? 'Rejection Reason' : 'SLA Compliance'}
-                                </div>
-                                <div className="col-span-2 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Status</div>
-                                <div className="col-span-2 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Actions</div>
-                            </div>
+                    <div className="mt-4">
+                        <GenericTable
+                            headers={[
+                                "Demand Details",
+                                "Score",
+                                "Priority",
+                                activeTab === 'rejected' ? 'Rejection Reason' : 'SLA Compliance',
+                                "Status",
+                                "Actions"
+                            ]}
+                            columns={["demand_details", "score", "priority", "sla_compliance", "status", "actions"]}
+                            loading={isLoading}
+                            rows={filteredDemands.map((demand) => {
+                                const status = String(demand.lifecycleState || demand.demandStatus || '').toUpperCase();
+                                const demandCommitment = getDemandCommitment(demand);
+                                const normalizedViewerRole = normalizeRole(effectiveRole);
+                                const isDMView = normalizedViewerRole === "DELIVERYMANAGER";
+                                const isRMView = normalizedViewerRole === "RESOURCEMANAGER";
+                                const isPMView = normalizedViewerRole === "PROJECTMANAGER" || normalizedViewerRole === "MANAGER";
+                                const canQuickDecision = isDMView && DM_PENDING_STATUSES.includes(status);
+                                const canRMCloseDemand = isRMView && status === 'APPROVED';
+                                const canPMEditRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
+                                const canPMDeleteRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
+                                const isFulfilled = status === 'FULFILLED';
+                                const isRejected = status === 'REJECTED';
+                                const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditRequestedDemand);
+                                
+                                const isApproving = decisionState?.demandId === demand.id && decisionState?.action === "approve";
+                                const isRejecting = decisionState?.demandId === demand.id && decisionState?.action === "reject";
+                                const isFulfilling = decisionState?.demandId === demand.id && decisionState?.action === "fulfill";
 
-                            <div className="bg-white min-h-[400px]">
-                                {isLoading ? (
-                                    <div className="flex flex-col">
-                                        {[...Array(6)].map((_, i) => (
-                                            <div key={i} className="px-6 py-5 border-b border-slate-50 animate-pulse flex items-center justify-between">
-                                                <div className="flex items-center gap-4 w-1/3">
-                                                    <div className="h-10 w-10 bg-slate-50 rounded-lg" />
-                                                    <div className="space-y-2 flex-1">
-                                                        <div className="h-3 w-3/4 bg-slate-50 rounded" />
-                                                        <div className="h-2 w-1/2 bg-slate-50 rounded" />
-                                                    </div>
+                                return {
+                                    ...demand,
+                                    onRowClick: () => navigate(`/resource-management/demand/${demand.id}`, { 
+                                        state: { clientName: demand.clientName || demand.client } 
+                                    }),
+                                    rowClass: "group",
+                                    demand_details: (
+                                        <div className="flex flex-col gap-1 text-left px-2">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-[13px] font-bold text-slate-900 truncate tracking-tight group-hover:text-indigo-600 transition-colors">
+                                                    {demand.projectName}
+                                                </h3>
+                                                <div className="px-1.5 py-0.5 bg-slate-100 rounded text-[8px] font-black text-slate-500 tracking-tighter">
+                                                    ID: {demand.id?.split('-')[0]}
                                                 </div>
-                                                <div className="h-4 w-1/12 bg-slate-50 rounded" />
-                                                <div className="h-6 w-1/6 bg-slate-50 rounded-full" />
                                             </div>
-                                        ))}
-                                    </div>
-                                ) : filteredDemands.length === 0 ? (
-                                    <div className="py-24 text-center">
-                                        <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
-                                            <SearchIcon className="h-8 w-8 text-slate-200" />
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="flex items-center gap-1 min-w-0">
+                                                    <ProjectsIcon className="h-3 w-3 text-slate-400" />
+                                                    <span className="text-[11px] font-semibold text-slate-500 truncate">{demand.client}</span>
+                                                </div>
+                                                <div className="h-2.5 w-[1px] bg-slate-200" />
+                                                <div className="flex items-center gap-1 min-w-0">
+                                                    <UserIcon className="h-3 w-3 text-slate-400" />
+                                                    <span className="text-[11px] text-slate-400 truncate">{demand.role}</span>
+                                                </div>
+                                                <DemandTypeBadge type={getDemandType(demand)} />
+                                            </div>
                                         </div>
-                                        <h3 className="text-sm font-bold text-slate-900">No matches found</h3>
-                                        <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or search terms</p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <DemandList
-                                            demands={filteredDemands}
-                                            onViewDetail={(demand) => navigate(`/resource-management/demand/${demand.id}`, { state: { clientName: demand.clientName || demand.client } })}
-                                            onEdit={(demand) => {
-                                                setEditingDemand(demand);
-                                                setEditModalOpen(true);
-                                            }}
-                                            onDelete={openDeleteModal}
-                                            onApprove={openApproveModal}
-                                            onReject={openRejectModal}
-                                            onFulfill={openFulfillModal}
-                                            onRMReject={openRMRejectModal}
-                                            decisionState={decisionState}
-                                            activeTab={activeTab}
-                                            viewerRole={effectiveRole}
-                                        />
-                                        {totalPages > 1 && (
-                                            <div className="py-6 border-t border-slate-100">
-                                                <Pagination
-                                                    currentPage={page}
-                                                    totalPages={totalPages}
-                                                    onPrevious={() => setPage((p) => Math.max(1, p - 1))}
-                                                    onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    ),
+                                    score: (
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-base font-black text-slate-900 tracking-tighter leading-none">
+                                                {demand.priorityScore || 0}
+                                            </span>
+                                            <div className="text-[8px] font-bold text-slate-400 tracking-widest mt-0.5 uppercase">Score</div>
+                                        </div>
+                                    ),
+                                    priority: (
+                                        <div className="flex justify-center">
+                                            <PriorityBadge priority={demand.priority} />
+                                        </div>
+                                    ),
+                                    sla_compliance: (
+                                        <div className="flex justify-center w-full">
+                                            {activeTab === 'rejected' ? (
+                                                <div className="flex flex-col items-center gap-1 w-full px-2 overflow-hidden">
+                                                    {(demand.rmRejectionReason || demand.dmRejectionReason || demand.rejectionReason) ? (
+                                                        <span
+                                                            className="text-[10px] font-bold text-rose-600 truncate max-w-full italic"
+                                                            title={demand.rmRejectionReason || demand.dmRejectionReason || demand.rejectionReason}
+                                                        >
+                                                            "{demand.rmRejectionReason || demand.dmRejectionReason || demand.rejectionReason}"
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400 italic font-bold">No reason specified</span>
+                                                    )}
+                                                </div>
+                                            ) : (demand.demandSlaId || demand.slaId) ? (
+                                                <SLABadge
+                                                    days={demand.slaDays}
+                                                    isSoft={
+                                                        !demand.demandSlaId && (
+                                                            activeTab === 'soft' ||
+                                                            demandCommitment === 'SOFT' ||
+                                                            demand.lifecycleState?.toUpperCase() === 'SOFT'
+                                                        )
+                                                    }
                                                 />
-                                            </div>
-                                        )}
-                                    </>
-                                )}
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-0.5 px-2 py-0.5 rounded-lg border min-w-[80px] bg-slate-50 border-slate-100 text-slate-400">
+                                                    <div className="flex items-center gap-1">
+                                                        <PendingIcon className="h-2 w-2 opacity-40" />
+                                                        <span className="text-[8px] font-black tracking-widest uppercase">SLA</span>
+                                                    </div>
+                                                    <span className="text-[11px] font-black">No SLA</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ),
+                                    status: (
+                                        <div className="flex justify-center">
+                                            <StateBadge state={demand.lifecycleState} />
+                                        </div>
+                                    ),
+                                    actions: (
+                                        <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                            {canQuickDecision ? (
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => openApproveModal(demand)}
+                                                        disabled={isApproving || isRejecting}
+                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
+                                                    >
+                                                        {isApproving ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon className="h-4 w-4" />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => openRejectModal(demand)}
+                                                        disabled={isApproving || isRejecting}
+                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                                                    >
+                                                        {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
+                                                    </button>
+                                                </div>
+                                            ) : canRMCloseDemand ? (
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => openFulfillModal(demand)}
+                                                        disabled={isFulfilling || isRejecting}
+                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
+                                                    >
+                                                        {isFulfilling ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <SuccessIcon className="h-4 w-4" />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => openRMRejectModal(demand)}
+                                                        disabled={isFulfilling || isRejecting}
+                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                                                    >
+                                                        {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingDemand(demand);
+                                                            setEditModalOpen(true);
+                                                        }}
+                                                        disabled={isEditDisabled}
+                                                        className={cn("p-1.5 rounded-lg transition-colors", isEditDisabled ? "text-slate-300" : "text-blue-600 hover:bg-blue-50")}
+                                                    >
+                                                        <EditIcon className="h-4 w-4" />
+                                                    </button>
+                                                    {canPMDeleteRequestedDemand && (
+                                                        <button
+                                                            onClick={() => openDeleteModal(demand)}
+                                                            className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                                                        >
+                                                            <DeleteIcon className="h-4 w-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                };
+                            })}
+                        />
+                        {totalPages > 1 && (
+                            <div className="py-6 border-t border-slate-100">
+                                <Pagination
+                                    currentPage={page}
+                                    totalPages={totalPages}
+                                    onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+                                    onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                />
                             </div>
-                        </div>
+                        )}
                     </div>
                 </section>
             </main>

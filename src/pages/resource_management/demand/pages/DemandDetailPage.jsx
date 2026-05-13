@@ -25,6 +25,7 @@ import { PriorityBadge, StateBadge } from '../components/FormalBadges';
 import { Button } from "@/components/ui/button";
 import Pagination from '../../../../components/Pagination/pagination';
 import { fetchResourcesByDemandId } from '../../services/resource';
+import GenericTable from '../../../../components/Table/table';
 
 
 /**
@@ -291,56 +292,38 @@ const RoleInfoTab = ({ demand, skillsRequirements }) => {
                 {/* Skills Table */}
                 <div className="lg:col-span-2">
                     <DetailCard title="Technical Blueprint & Skills Matrix" icon={AwardIcon}>
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-slate-100">
-                                        <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Skill</th>
-                                        <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Sub Skill</th>
-                                        <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Proficiency</th>
-                                        <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Mandatory</th>
-                                        <th className="text-center py-4 px-4 text-[10px] font-black text-slate-400 tracking-widest">Source</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50 text-center">
-                                    {paginatedSkills.map((skill, i) => (
-                                        <tr key={i} className="group hover:bg-slate-50/50 transition-colors">
-                                            <td className="py-4 px-4">
-                                                <span className="text-xs font-black text-slate-900 tracking-tight">{skill.primary}</span>
-                                            </td>
-                                            <td className="py-4 px-4 text-xs font-bold text-slate-500 tracking-tight">{skill.sub}</td>
-                                            <td className="py-4 px-4">
-                                                <div className="flex flex-col items-center gap-1.5 w-32 mx-auto">
-                                                    <span className="text-[9px] font-black text-indigo-600 italic">{skill.proficiency}</span>
-                                                    <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-indigo-500" style={{ width: '60%' }} />
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-4">
-                                                <div className="flex justify-center">
-                                                    {skill.mandatory ? (
-                                                        <div className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" title="Mandatory" />
-                                                    ) : (
-                                                        <div className="h-2 w-2 rounded-full bg-slate-200" title="Optional" />
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-4">
-                                                <span className={cn(
-                                                    "px-2 py-0.5 rounded text-[9px] font-black border",
-                                                    skill.source === "Requirement" ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-600 border-slate-100"
-                                                )}>{skill.source}</span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {skills.length === 0 && (
-                                        <tr>
-                                            <td colSpan="5" className="py-10 text-center text-slate-400 text-xs font-bold">No skills specified</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                        <div className="overflow-x-auto no-scrollbar">
+                            <GenericTable
+                                headers={["Skill", "Sub Skill", "Proficiency", "Mandatory", "Source"]}
+                                columns={["primary_info", "sub", "proficiency_info", "mandatory_info", "source_info"]}
+                                rows={paginatedSkills.map((skill) => ({
+                                    ...skill,
+                                    primary_info: <span className="text-xs font-black text-slate-900 tracking-tight">{skill.primary}</span>,
+                                    proficiency_info: (
+                                        <div className="flex flex-col items-center gap-1.5 w-32 mx-auto">
+                                            <span className="text-[9px] font-black text-indigo-600 italic">{skill.proficiency}</span>
+                                            <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-indigo-500" style={{ width: '60%' }} />
+                                            </div>
+                                        </div>
+                                    ),
+                                    mandatory_info: (
+                                        <div className="flex justify-center">
+                                            {skill.mandatory ? (
+                                                <div className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" title="Mandatory" />
+                                            ) : (
+                                                <div className="h-2 w-2 rounded-full bg-slate-200" title="Optional" />
+                                            )}
+                                        </div>
+                                    ),
+                                    source_info: (
+                                        <span className={cn(
+                                            "px-2 py-0.5 rounded text-[9px] font-black border text-center block",
+                                            skill.source === "Requirement" ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-600 border-slate-100"
+                                        )}>{skill.source}</span>
+                                    )
+                                }))}
+                            />
                         </div>
                         {totalPages > 1 && (
                             <div className="mt-4 pt-4 border-t border-slate-100">
@@ -653,7 +636,7 @@ const SLAInsightsTab = ({ sla }) => {
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <DetailCard title="SLA Compliance Vision" icon={Clock}>
+            <DetailCard title="SLA Compliance Vision" icon={PendingIcon}>
                 <div className="p-4">
                     <div className="relative mb-6 py-6">
                         {/* Timeline Track */}
@@ -996,75 +979,69 @@ const DemandResourcesTable = ({ demandId }) => {
             ) : (
                 <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xl shadow-slate-200/50">
                     <div className="overflow-x-auto no-scrollbar">
-                        <table className="w-full text-xs text-left">
-                            <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                                <tr>
-                                    <th className="p-5">Resource</th>
-                                    <th className="p-5 text-center">Allocation</th>
-                                    <th className="p-5 text-center">Period</th>
-                                    <th className="p-5 text-center">Status</th>
-                                    <th className="p-5 text-center">Created By</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {paginatedAllocations.map((item) => (
-                                    <tr key={item.allocationId} className="hover:bg-slate-50/30 transition-colors group">
-                                        <td className="p-5">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-11 h-11 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs shrink-0 border border-indigo-100 uppercase shadow-sm group-hover:scale-105 transition-transform">
-                                                    {item.fullName.split(" ").map(n => n[0]).join("")}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="font-black text-slate-900 truncate tracking-tight">{item.fullName}</p>
-                                                    <p className="text-[10px] text-slate-400 font-bold truncate mt-0.5">{item.email}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-5 text-center">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <span className={`text-[11px] font-black ${item.allocationPercentage >= 80 ? "text-rose-600" :
-                                                    item.allocationPercentage >= 50 ? "text-indigo-600" : "text-emerald-600"
-                                                    }`}>
-                                                    {item.allocationPercentage}%
-                                                </span>
-                                                <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                                                    <div
-                                                        className={`h-full rounded-full transition-all duration-1000 ${item.allocationPercentage >= 80 ? "bg-rose-500" :
-                                                            item.allocationPercentage >= 50 ? "bg-indigo-500" : "bg-emerald-500"
-                                                            }`}
-                                                        style={{ width: `${item.allocationPercentage}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-5 text-center">
-                                            <div className="flex flex-col items-center">
-                                                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100">
-                                                    <CalendarIcon className="h-3 w-3 text-indigo-400" />
-                                                    <span className="text-[10px] text-slate-700 font-black">{item.allocationStartDate}</span>
-                                                    <ChevronRightIcon className="h-2.5 w-2.5 text-slate-300" />
-                                                    <span className="text-[10px] text-slate-700 font-black">{item.allocationEndDate}</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-5 text-center">
-                                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.15em] border ${item.allocationStatus === "ACTIVE"
-                                                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                                : "bg-amber-50 text-amber-600 border-amber-100"
-                                                }`}>
-                                                {item.allocationStatus}
-                                            </span>
-                                        </td>
-                                        <td className="p-5 text-center">
-                                            <div className="inline-flex items-center gap-2 text-[10px] text-slate-500 font-black bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-                                                <SuccessIcon className="h-3.5 w-3.5 text-indigo-500" />
-                                                <span>{item.createdBy || "System"}</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <GenericTable
+                            headers={["Resource", "Allocation", "Period", "Status", "Created By"]}
+                            columns={["resource_info", "allocation_info", "period_info", "status_info", "createdBy_info"]}
+                            rows={paginatedAllocations.map((item) => ({
+                                ...item,
+                                resource_info: (
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-11 h-11 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs shrink-0 border border-indigo-100 uppercase shadow-sm group-hover:scale-105 transition-transform">
+                                            {item.fullName.split(" ").map(n => n[0]).join("")}
+                                        </div>
+                                        <div className="min-w-0 text-left">
+                                            <p className="font-black text-slate-900 truncate tracking-tight">{item.fullName}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold truncate mt-0.5">{item.email}</p>
+                                        </div>
+                                    </div>
+                                ),
+                                allocation_info: (
+                                    <div className="flex flex-col items-center gap-2">
+                                        <span className={`text-[11px] font-black ${item.allocationPercentage >= 80 ? "text-rose-600" :
+                                            item.allocationPercentage >= 50 ? "text-indigo-600" : "text-emerald-600"
+                                            }`}>
+                                            {item.allocationPercentage}%
+                                        </span>
+                                        <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                                            <div
+                                                className={`h-full rounded-full transition-all duration-1000 ${item.allocationPercentage >= 80 ? "bg-rose-500" :
+                                                    item.allocationPercentage >= 50 ? "bg-indigo-500" : "bg-emerald-500"
+                                                    }`}
+                                                style={{ width: `${item.allocationPercentage}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                ),
+                                period_info: (
+                                    <div className="flex flex-col items-center">
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100">
+                                            <Calendar className="h-3 w-3 text-indigo-400" />
+                                            <span className="text-[10px] text-slate-700 font-black">{item.allocationStartDate}</span>
+                                            <ChevronRight className="h-2.5 w-2.5 text-slate-300" />
+                                            <span className="text-[10px] text-slate-700 font-black">{item.allocationEndDate}</span>
+                                        </div>
+                                    </div>
+                                ),
+                                status_info: (
+                                    <div className="text-center">
+                                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.15em] border ${item.allocationStatus === "ACTIVE"
+                                            ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                            : "bg-amber-50 text-amber-600 border-amber-100"
+                                            }`}>
+                                            {item.allocationStatus}
+                                        </span>
+                                    </div>
+                                ),
+                                createdBy_info: (
+                                    <div className="text-center">
+                                        <div className="inline-flex items-center gap-2 text-[10px] text-slate-500 font-black bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                                            <UserCheck className="h-3.5 w-3.5 text-indigo-500" />
+                                            <span>{item.createdBy || "System"}</span>
+                                        </div>
+                                    </div>
+                                )
+                            }))}
+                        />
                     </div>
 
                     {totalPages > 1 && (
@@ -1253,7 +1230,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
 
             {/* --- TOP HEADER (Slimmed Down) --- */}
             <header className="bg-white border-b border-slate-100 sticky top-0">
-                <div className="max-w-[1600px] mx-auto px-6 py-3">
+                <div className="max-w-[1600px] mx-auto px-3 py-1.5">
                     <div className="flex items-center justify-between">
 
                         {/* Header Left */}
@@ -1326,7 +1303,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
 
                 {/* Sub-Header Tabs */}
                 <div className="bg-white border-t border-slate-50">
-                    <div className="max-w-[1600px] mx-auto px-6">
+                    <div className="max-w-[1600px] mx-auto px-3">
                         <nav className="flex gap-8 -mb-[1px]">
                             {TABS.map((tab) => {
                                 const Icon = tab.icon;
@@ -1354,7 +1331,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
 
             {/* --- SINGLE COLUMN CONTENT AREA --- */}
             <main className="flex-1 overflow-y-auto bg-slate-50/50">
-                <div className="max-w-[1400px] mx-auto p-6 md:p-10 font-sans">
+                <div className="max-w-[1400px] mx-auto p-3 md:p-6 font-sans">
                     {activeTab === 'overview' && (
                         <OverviewTab
                             demand={demand}

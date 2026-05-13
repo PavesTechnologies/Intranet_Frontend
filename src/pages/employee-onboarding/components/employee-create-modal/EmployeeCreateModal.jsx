@@ -24,7 +24,7 @@ export default function EmployeeCreateModal({
   const [designations, setDesignations] = useState([]);
   const [managerOptions, setManagerOptions] = useState([]);
 
-  const token = localStorage.getItem("token");
+  
   const isEditMode = !!employeeUuid;
 
   const fetchDepartments = async () => {
@@ -35,7 +35,7 @@ export default function EmployeeCreateModal({
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -75,7 +75,7 @@ export default function EmployeeCreateModal({
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -124,7 +124,7 @@ export default function EmployeeCreateModal({
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
           {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           },
         );
@@ -161,7 +161,7 @@ export default function EmployeeCreateModal({
     };
 
     fetchEmployee();
-  }, [employeeUuid, token]);
+  }, [employeeUuid]);
 
   useEffect(() => {
     if (!userUuid || isEditMode) return;
@@ -303,7 +303,7 @@ export default function EmployeeCreateModal({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
         },
