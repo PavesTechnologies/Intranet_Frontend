@@ -253,6 +253,8 @@ const CompanyEscalation = () => {
           setOpenUpdateContact(false);
           setSelectedContact(null);
         }}
+        bodyClassName="p-5 overflow-y-auto max-h-[60vh]"
+        scrollable={true}
       >
         <CompanyEscalationContactModal
           initialData={selectedContact}

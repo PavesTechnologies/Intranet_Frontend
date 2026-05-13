@@ -297,21 +297,32 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
       {/* Update Compliance Modal */}
       <Modal
         title="Update Compliance"
-        subtitle="Update Compliance details."
+        subtitle="Update Compliance details for the client."
         isOpen={openUpdateCompliance}
         onClose={() => setOpenUpdateCompliance(false)}
+        bodyClassName="p-5 overflow-y-auto max-h-[60vh]"
+        scrollable={true}
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setOpenUpdateCompliance(false)}
+              className="px-6 py-2 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition-all active:scale-95 text-[12px] uppercase tracking-wider"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUpdateCompliance}
+              disabled={updateLoading}
+              className={`px-8 py-2 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-md ${
+                updateLoading ? "opacity-50 cursor-not-allowed" : "active:scale-95"
+              } text-[12px] uppercase tracking-wider`}
+            >
+              {updateLoading ? "Updating..." : "Update"}
+            </button>
+          </div>
+        }
       >
         <ComplianceForm formData={formData} setFormData={setFormData} />
-        <div className="flex justify-end mt-4">
-          <button
-            type="button"
-            onClick={handleUpdateCompliance}
-            disabled={updateLoading}
-            className={`px-4 py-2 rounded-xl bg-blue-700 text-white hover:bg-blue-800 ${updateLoading && "opacity-50 cursor-not-allowed"}`}
-          >
-            {updateLoading ? "Updating..." : "Update"}
-          </button>
-        </div>
       </Modal>
 
       {/* Delete Compliance Modal */}

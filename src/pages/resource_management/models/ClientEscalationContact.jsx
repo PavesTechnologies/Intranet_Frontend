@@ -252,17 +252,33 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
         subtitle="Update Escalation Contact details."
         isOpen={openUpdateContact}
         onClose={() => setOpenUpdateContact(false)}
+        bodyClassName="p-5 overflow-y-auto max-h-[60vh]"
+        scrollable={true}
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setOpenUpdateContact(false)}
+              className="px-6 py-2 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition-all active:scale-95 text-[12px] uppercase tracking-wider"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUpdateContact}
+              disabled={updateLoading}
+              className={`px-8 py-2 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-md ${
+                updateLoading ? "opacity-50 cursor-not-allowed" : "active:scale-95"
+              } text-[12px] uppercase tracking-wider`}
+            >
+              {updateLoading ? "Updating..." : "Update"}
+            </button>
+          </div>
+        }
       >
-        <EscalationForm formData={formData} setFormData={setFormData} />
-        <div className="flex justify-end mt-4">
-          <button
-            onClick={handleUpdateContact}
-            disabled={updateLoading}
-            className={`px-4 py-2 rounded-xl bg-blue-700 text-white hover:bg-blue-800 ${updateLoading && "opacity-50 cursor-not-allowed"}`}
-          >
-            {updateLoading ? "Updating..." : "Update"}
-          </button>
-        </div>
+        <EscalationForm
+          formData={formData}
+          setFormData={setFormData}
+          showButtons={false}
+        />
       </Modal>
 
       {/* Confirm Modal */}
