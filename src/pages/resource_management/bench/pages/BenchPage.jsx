@@ -8,6 +8,7 @@ import BenchDrawer from "../components/BenchDrawer";
 import AllocationModal from "../../demand/components/AllocationModal";
 import MoveToPoolModal from "../components/MoveToPoolModal";
 import { getBenchMatches } from "../services/benchService";
+import Pagination from "../../../../components/Pagination/pagination";
 import { createPortal } from "react-dom";
 import {
   BENCH_STORAGE_KEY,
@@ -71,6 +72,10 @@ const BenchPage = () => {
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  
   const updatePosition = () => {
     if (filterButtonRef.current) {
       const rect = filterButtonRef.current.getBoundingClientRect();
@@ -185,12 +190,20 @@ const BenchPage = () => {
         filters,
       }),
     );
+    setCurrentPage(1); // Reset pagination on search/filter/tab change
   }, [search, activeTab, filters]);
 
   const visibleRows = useMemo(
     () => filterResources(resources, search, filters, activeTab),
     [resources, search, filters, activeTab],
   );
+
+  // Pagination calculations
+  const totalPages = Math.ceil(visibleRows.length / itemsPerPage);
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return visibleRows.slice(start, start + itemsPerPage);
+  }, [visibleRows, currentPage, itemsPerPage]);
   const selectedResource = useMemo(
     () => resources.find((item) => item.id === selectedResourceId) || null,
     [resources, selectedResourceId],
@@ -441,7 +454,7 @@ const BenchPage = () => {
 
         <div className="p-4">
           <BenchTable
-            rows={visibleRows}
+            rows={paginatedRows}
             selectedRows={selectedRows}
             activeRowId={selectedResourceId}
             emptyState={emptyState}
@@ -454,6 +467,16 @@ const BenchPage = () => {
             loading={loading}
             activeTab={activeTab}
           />
+          {totalPages > 1 && (
+            <div className="mt-4">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              />
+            </div>
+          )}
         </div>
       </div>
 

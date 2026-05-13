@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Download,
 } from "lucide-react";
+import { KPICard } from "../../../../components/kpi/KPI";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -22,40 +23,40 @@ import { toast } from "react-toastify"; // Removed ToastContainer check
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import ExcelJS from "exceljs/dist/exceljs.min.js"; // Robust Vite Import
 import { saveAs } from "file-saver";
-
+ 
 const priorityColor = {
   HIGH: "text-red-600 bg-red-50",
   MEDIUM: "text-yellow-600 bg-yellow-50",
   LOW: "text-green-600 bg-green-50",
 };
-
+ 
 const statusColor = {
   ACTIVE: "text-xs text-green-600 font-semibold",
   INACTIVE: "text-xs text-red-600 font-semibold",
   PROSPECT: "text-xs text-blue-600 font-semibold",
 };
-
+ 
 const AdminPannel = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const roles = user?.roles || [];
   const permissions = user?.permissions || [];
   const canCreateClient = roles.includes("Admin");
-
+ 
   const [clientDetails, setClientDetails] = useState([]);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [openCreateClient, setOpenCreateClient] = useState(false);
   const [kpiData, setKpiData] = useState(null);
-
+ 
   const [pageInfo, setPageInfo] = useState({
     current: 0,
     size: 8,
     totalElements: 0,
     totalPages: 0,
   });
-
+ 
   const [filters, setFilters] = useState({
     search: "",
     region: "",
@@ -65,7 +66,7 @@ const AdminPannel = () => {
     startDate: "",
     endDate: "",
   });
-
+ 
   const fetchKPIs = async () => {
     try {
       const response = await getAdminKPI();
@@ -74,12 +75,12 @@ const AdminPannel = () => {
       console.error("KPI Error:", error);
     }
   };
-
+ 
   const handleFilterUpdate = (updates) => {
     setFilters((prev) => ({ ...prev, ...updates }));
     setPageInfo((prev) => ({ ...prev, current: 0 }));
   };
-
+ 
   const fetchClients = useCallback(async () => {
     setLoading(true);
     try {
@@ -105,7 +106,7 @@ const AdminPannel = () => {
       setLoading(false);
     }
   }, [filters, pageInfo.current, pageInfo.size]);
-
+ 
   useEffect(() => {
     fetchKPIs();
   }, []);
@@ -113,28 +114,28 @@ const AdminPannel = () => {
     const handler = setTimeout(() => fetchClients(), 400);
     return () => clearTimeout(handler);
   }, [fetchClients]);
-
+ 
   const handleExport = async () => {
     if (pageInfo.totalElements === 0) {
       toast.warning("Nothing to download: Current view is empty.");
       return;
     }
-
+ 
     const isFiltered = Object.values(filters).some((x) => x !== "");
     const startMsg = isFiltered
       ? `Explicitly downloading ${pageInfo.totalElements} filtered records...`
       : `Explicitly downloading full list of ${pageInfo.totalElements} clients...`;
-
+ 
     toast.info(startMsg, { icon: "📊" });
-
+ 
     setExporting(true);
     setExportProgress(0);
-
+ 
     try {
       let allRecords = [];
       let currentPage = 0;
       let totalPagesToFetch = 1;
-
+ 
       while (currentPage < totalPagesToFetch) {
         const response = await searchClients(filters, currentPage, 50);
         if (response.success && response.data) {
@@ -148,10 +149,10 @@ const AdminPannel = () => {
           throw new Error("Batch retrieval interrupted.");
         }
       }
-
+ 
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Inventory");
-
+ 
       worksheet.columns = [
         { header: "CLIENT NAME", key: "clientName", width: 30 },
         { header: "TYPE", key: "clientType", width: 15 },
@@ -160,7 +161,7 @@ const AdminPannel = () => {
         { header: "STATUS", key: "status", width: 15 },
         { header: "CREATED DATE", key: "createdAt", width: 20 },
       ];
-
+ 
       worksheet.getRow(1).eachCell((cell) => {
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
         cell.fill = {
@@ -170,7 +171,7 @@ const AdminPannel = () => {
         };
         cell.alignment = { vertical: "middle", horizontal: "center" };
       });
-
+ 
       const rows = allRecords.map((record) => ({
         ...record,
         clientType: record.clientType?.replace(/_/g, " "),
@@ -178,16 +179,16 @@ const AdminPannel = () => {
           ? new Date(record.createdAt).toLocaleDateString()
           : "N/A",
       }));
-
+ 
       worksheet.addRows(rows);
-
+ 
       const buffer = await workbook.xlsx.writeBuffer();
       const fileName = isFiltered ? "Filtered_Clients" : "Full_Inventory";
-
+ 
       const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-
+ 
       saveAs(
         blob,
         `${fileName}_${new Date().toISOString().split("T")[0]}.xlsx`,
@@ -201,7 +202,7 @@ const AdminPannel = () => {
       setExportProgress(0);
     }
   };
-
+ 
   const KPI_DATA = [
     {
       label: "Total Clients",
@@ -232,7 +233,7 @@ const AdminPannel = () => {
       bg: kpiData?.growthPositive ? "bg-emerald-100" : "bg-red-100",
     },
   ];
-
+ 
   return (
     <div className="p-6 space-y-8">
       <div className="flex justify-between items-start">
@@ -244,12 +245,12 @@ const AdminPannel = () => {
             Monitor clients, priorities, and engagement status
           </p>
         </div>
-
+ 
         <div className="flex items-center gap-3">
           <Button
             onClick={handleExport}
             // disabled={exporting}
-            // className={`px-4 py-2 text-sm font-medium rounded-lg flex items-center transition-all active:scale-[0.98] 
+            // className={`px-4 py-2 text-sm font-medium rounded-lg flex items-center transition-all active:scale-[0.98]
             //   ${exporting
             //     ? "bg-indigo-400 cursor-not-allowed text-white"
             //     : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
@@ -269,32 +270,23 @@ const AdminPannel = () => {
               <Download className="w-4 h-4 mr-1.5" />
               Export Data
             </>
-            <>
-              <Download className="w-4 h-4 mr-1.5" />
-              Export Data
-            </>
             {/* )} */}
           </Button>
         </div>
       </div>
-
+ 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {KPI_DATA.map((kpi, index) => (
-          <div
+          <KPICard
             key={index}
-            className="bg-white p-6 rounded-xl shadow-sm border flex items-center gap-4"
-          >
-            <div className={`p-3 rounded-full shrink-0 ${kpi.bg}`}>
-              <kpi.icon className={`w-6 h-6 ${kpi.color}`} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm text-gray-500">{kpi.label}</p>
-              <h3 className="text-2xl font-bold text-gray-900">{kpi.value}</h3>
-            </div>
-          </div>
+            label={kpi.label}
+            value={kpi.value}
+            icon={<kpi.icon className={`w-5 h-5 ${kpi.color}`} />}
+            color={`${kpi.bg} ${kpi.color}`}
+          />
         ))}
       </div>
-
+ 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">
@@ -306,19 +298,18 @@ const AdminPannel = () => {
               size="medium"
               onClick={() => setOpenCreateClient(true)}
             // className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg flex items-center hover:bg-indigo-700 transition-all active:scale-[0.98] shadow-sm"
-            // className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg flex items-center hover:bg-indigo-700 transition-all active:scale-[0.98] shadow-sm"
             >
               <Plus className="w-4 h-4 mr-1" /> Create New Client
             </Button>
           )}
         </div>
-
+ 
         <FilterBar
           filters={filters}
           onUpdate={handleFilterUpdate}
           totalResults={pageInfo.totalElements}
         />
-
+ 
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner text="loading..." />
@@ -370,7 +361,7 @@ const AdminPannel = () => {
                   </div>
                 ))}
               </div>
-
+ 
               <div className="flex items-center justify-center pt-4">
                 <Pagination
                   currentPage={pageInfo.current + 1}
@@ -391,7 +382,7 @@ const AdminPannel = () => {
           )
         )}
       </div>
-
+ 
       <Modal
         isOpen={openCreateClient}
         onClose={() => setOpenCreateClient(false)}
@@ -409,5 +400,6 @@ const AdminPannel = () => {
     </div>
   );
 };
-
+ 
 export default AdminPannel;
+ 

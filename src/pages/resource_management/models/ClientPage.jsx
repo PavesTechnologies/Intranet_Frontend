@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "../../../contexts/AuthContext";
+import { KPICard } from "../../../components/kpi/KPI";
 
 import ClientSection from "./ClientSection";
 import AddConfigurationModal from "../models/client_configuration/AddConfigurationModal";
@@ -45,6 +46,7 @@ import {
   createClientCompliance,
   createClientEscalation,
 } from "../services/clientservice";
+import GenericTable from "../../../components/Table/table";
 
 /* ---------------- SUB COMPONENTS ---------------- */
 
@@ -93,78 +95,38 @@ const ProjectSLA = ({ data, loading }) => {
         subtitle="Contractual obligations and metrics."
       />
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
-        <div className="px-6 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b min-w-max">
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="px-6 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b">
           <p className="text-sm font-semibold text-gray-700">SLA Definitions</p>
         </div>
 
-        <table className="w-full text-sm min-w-[600px]">
-          {/* TABLE HEADER */}
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
-                SLA Type
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
-                Duration
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
-                Warning Threshold
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
-                Status
-              </th>
-            </tr>
-          </thead>
-
-          {/* TABLE BODY */}
-          <tbody className="divide-y divide-gray-100">
-            {data.map((sla) => (
-              <tr
-                key={sla.projectSlaId}
-                className="hover:bg-gray-50 transition"
-              >
-                {/* SLA TYPE */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${getSlaTypeColor(
-                      sla.slaType,
-                    )}`}
-                  >
-                    {sla.slaType.replaceAll("_", " ")}
-                  </span>
-                </td>
-
-                {/* DURATION */}
-                <td className="px-6 py-4">
-                  <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
-                    {sla.slaDurationDays} days
-                  </span>
-                </td>
-
-                {/* WARNING */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${getWarningColor(
-                      sla.warningThresholdDays,
-                    )}`}
-                  >
-                    {sla.warningThresholdDays} days
-                  </span>
-                </td>
-
-                {/* STATUS */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
-                  >
-                    {sla.activeFlag ? "Active" : "Inactive"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <GenericTable
+          headers={["SLA Type", "Duration", "Warning Threshold", "Status"]}
+          columns={["slaType_info", "duration_info", "warning_info", "status_info"]}
+          rows={data.map((sla) => ({
+            ...sla,
+            slaType_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getSlaTypeColor(sla.slaType)}`}>
+                {sla.slaType.replaceAll("_", " ")}
+              </span>
+            ),
+            duration_info: (
+              <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                {sla.slaDurationDays} days
+              </span>
+            ),
+            warning_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getWarningColor(sla.warningThresholdDays)}`}>
+                {sla.warningThresholdDays} days
+              </span>
+            ),
+            status_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                {sla.activeFlag ? "Active" : "Inactive"}
+              </span>
+            )
+          }))}
+        />
       </div>
     </div>
   );
@@ -190,88 +152,29 @@ const ProjectCompliance = ({ data, loading }) => {
         subtitle="Required certifications and audit status."
       />
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
-        <table className="w-full text-sm text-left min-w-[800px]">
-          {/* HEADER */}
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Requirement
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Type
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Mandatory
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Source
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Status
-              </th>
-            </tr>
-          </thead>
-
-          {/* BODY */}
-          <tbody className="divide-y divide-gray-100">
-            {data.map((item) => (
-              <tr key={item.projectComplianceId} className="hover:bg-gray-50">
-                {/* REQUIREMENT */}
-                <td className="px-6 py-4 font-semibold text-gray-900">
-                  {item.requirementName}
-                </td>
-
-                {/* TYPE */}
-                <td className="px-6 py-4 text-gray-700">
-                  {item.requirementType}
-                </td>
-
-                {/* MANDATORY */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${item.mandatoryFlag
-                        ? "bg-red-100 text-red-700"
-                        : "bg-gray-100 text-gray-600"
-                      }
-                    `}
-                  >
-                    {item.mandatoryFlag ? "Mandatory" : "Optional"}
-                  </span>
-                </td>
-
-                {/* SOURCE */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${item.isInherited
-                        ? "bg-indigo-100 text-indigo-700"
-                        : "bg-purple-100 text-purple-700"
-                      }
-                    `}
-                  >
-                    {item.isInherited ? "Inherited" : "Project"}
-                  </span>
-                </td>
-
-                {/* STATUS */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${item.activeFlag
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
-                      }
-                    `}
-                  >
-                    {item.activeFlag ? "Active" : "Inactive"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+        <GenericTable
+          headers={["Requirement", "Type", "Mandatory", "Source", "Status"]}
+          columns={["requirementName", "requirementType", "mandatory_info", "source_info", "status_info"]}
+          rows={data.map((item) => ({
+            ...item,
+            mandatory_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${item.mandatoryFlag ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+                {item.mandatoryFlag ? "Mandatory" : "Optional"}
+              </span>
+            ),
+            source_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${item.isInherited ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"}`}>
+                {item.isInherited ? "Inherited" : "Project"}
+              </span>
+            ),
+            status_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${item.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                {item.activeFlag ? "Active" : "Inactive"}
+              </span>
+            )
+          }))}
+        />
       </div>
     </div>
   );
@@ -297,57 +200,22 @@ const ProjectAssets = ({ assets, loading }) => {
         subtitle="Hardware and licenses allocated to this project."
       />
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
-        <table className="w-full text-sm text-left min-w-[600px]">
-          {/* HEADER */}
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Asset Name
-              </th>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Serial / ID
-              </th>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Assigned User
-              </th>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-            </tr>
-          </thead>
-
-          {/* BODY */}
-          <tbody className="divide-y divide-gray-100">
-            {assets.map((asset, index) => (
-              <tr key={index} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4 font-medium text-gray-900">
-                  {asset.asset?.assetName || asset.assetName || "—"}
-                </td>
-
-                <td className="px-6 py-4 font-mono text-gray-600">
-                  {asset.serialNumber || asset.serial || "—"}
-                </td>
-
-                <td className="px-6 py-4 text-gray-700">
-                  {asset.assignedBy || asset.assignedTo || "—"}
-                </td>
-
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${(asset.asset?.status || asset.status) === "ACTIVE"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
-                      }`}
-                  >
-                    {asset.asset?.status || asset.status || "UNKNOWN"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <GenericTable
+          headers={["Asset Name", "Serial / ID", "Assigned User", "Status"]}
+          columns={["asset_info", "serial_info", "assigned_info", "status_info"]}
+          rows={assets.map((asset, index) => ({
+            ...asset,
+            asset_info: <span>{asset.asset?.assetName || asset.assetName || "—"}</span>,
+            serial_info: <span className="font-mono text-gray-600">{asset.serialNumber || asset.serial || "—"}</span>,
+            assigned_info: <span>{asset.assignedBy || asset.assignedTo || "—"}</span>,
+            status_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${(asset.asset?.status || asset.status) === "ACTIVE" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                {asset.asset?.status || asset.status || "UNKNOWN"}
+              </span>
+            )
+          }))}
+        />
       </div>
     </div>
   );
@@ -905,22 +773,13 @@ const ClientPage = () => {
       {/* Client KPI's */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 mb-10">
         {kpiData.map((kpi, idx) => (
-          <div
+          <KPICard
             key={idx}
-            className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4"
-          >
-            <div className={`p-2 rounded-lg shrink-0 ${kpi.bg}`}>
-              <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                {kpi.label}
-              </p>
-              <h3 className="text-xl font-bold text-gray-900 mt-1">
-                {kpi.value}
-              </h3>
-            </div>
-          </div>
+            label={kpi.label}
+            value={kpi.value}
+            icon={<kpi.icon className={`w-5 h-5 ${kpi.color}`} />}
+            color={`${kpi.bg} ${kpi.color}`}
+          />
         ))}
       </div>
 
@@ -952,14 +811,13 @@ const ClientPage = () => {
           {canManageAssets && (
             <Button
               variant="secondary"
-              onClick={() => navigate(`/manage-assets/${clientId}`)}
+              onClick={() => navigate(`/manage-assets/${clientId}?name=${encodeURIComponent(clientDetails.client_name)}`)}
               disabled={clientDetails.status !== "ACTIVE"}
               title={clientDetails.status !== "ACTIVE" ? "Manage Assets is available only for ACTIVE clients" : ""}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all
-                ${clientDetails.status === "ACTIVE"
-                  ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-100 shadow-none opacity-80"
-                }`}
+            // className={`${clientDetails.status === "ACTIVE"
+            //     ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
+            //     : "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-100 shadow-none opacity-80"
+            // }`}
             >
               <Package size={16} />
               Manage Assets

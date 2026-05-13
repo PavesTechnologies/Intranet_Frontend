@@ -12,6 +12,7 @@ import Modal from "../../../components/Modal/modal";
 import EscalationForm from "./client_configuration/forms/EscalationForm";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { useAuth } from "../../../contexts/AuthContext";
+import GenericTable from "../../../components/Table/table";
 
 const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
   const { user } = useAuth();
@@ -137,105 +138,48 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
     <div className="p-2">
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-max w-full text-sm text-center">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Contact Name
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Contact Role
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Email
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Phone
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Escalation Level
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-
-            {/* BODY */}
-            <tbody className="divide-y divide-gray-100">
-              {paginatedData.map((item) => (
-                <tr key={item.complianceId} className="hover:bg-gray-50">
-                  {/* Name */}
-                  <td className="px-6 py-4 font-semibold text-gray-900">
-                    {item.contactName}
-                  </td>
-
-                  {/* Role */}
-                  <td className="px-6 py-4 text-gray-700">
-                    {item.contactRole}
-                  </td>
-
-                  {/* Email */}
-                  <td className="px-6 py-4 text-gray-700">{item.email}</td>
-
-                  {/* Phone */}
-                  <td className="px-6 py-4 text-gray-700">{item.phone}</td>
-
-                  {/* Escalation Level */}
-                  <td className="px-6 py-4 text-gray-700">
-                    {item.escalationLevel}
-                  </td>
-
-                  {/* STATUS */}
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full ${
-                        item.activeFlag
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-600"
-                      }`}
+        <GenericTable
+          headers={["Contact Name", "Contact Role", "Email", "Phone", "Escalation Level", "Status", "Actions"]}
+          columns={["contactName", "contactRole", "email", "phone", "escalationLevel", "status_info", "actions"]}
+          rows={paginatedData.map((item) => ({
+            ...item,
+            status_info: (
+              <span className={`px-2 py-1 text-xs rounded-full ${item.activeFlag ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                {item.activeFlag ? "Active" : "Inactive"}
+              </span>
+            ),
+            actions: (
+              <div className="flex justify-center items-center gap-4">
+                {canEditConfig ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        handleSetFormData(item);
+                        setOpenUpdateContact(true);
+                      }}
+                      className="px-2 text-blue-600 hover:text-blue-800 transition"
                     >
-                      {item.activeFlag ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-
-                  {/* ACTIONS */}
-                  <td className="px-6 py-4">
-                    {canEditConfig ? (
-                      <div className="flex justify-center items-center gap-4">
-                        <button
-                          onClick={() => {
-                            handleSetFormData(item);
-                            setOpenUpdateContact(true);
-                          }}
-                          className="px-2 text-blue-600 hover:text-blue-800 transition"
-                        >
-                          <Pencil size={14} />
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setSelectedContactId(item.contactId);
-                            setOpenConfirmModal(true);
-                          }}
-                          className="p-1 text-red-600 hover:text-red-800 transition"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-gray-500 italic text-xs">
-                        Don't have permission to take actions
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedContactId(item.contactId);
+                        setOpenConfirmModal(true);
+                      }}
+                      className="p-1 text-red-600 hover:text-red-800 transition"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-gray-500 italic text-xs">
+                    Don't have permission to take actions
+                  </span>
+                )}
+              </div>
+            )
+          }))}
+        />
         </div>
       </div>
 

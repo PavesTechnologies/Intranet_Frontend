@@ -25,6 +25,8 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { utilizationService } from '../../services/utilizationService';
 import { fetchResources } from '../../services/resource';
 import ResourceVisualizationDrawer from '../components/ResourceVisualizationDrawer';
+import { KPICard } from '../../../../components/kpi/KPI';
+import GenericTable from "../../../../components/Table/table";
 
 // --- INTEGRATED DATA MODELS ---
 
@@ -669,22 +671,13 @@ const UtilizationPerformanceDashboard = () => {
             {(liveData ? dynamicKPIs : KPI_STATS).map((stat, idx) => {
                const originalStat = KPI_STATS.find(s => s.label === stat.label) || KPI_STATS[idx % KPI_STATS.length];
                return (
-                  <div key={stat.label} className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-indigo-100 hover:shadow-md group">
-                     <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border shadow-sm ${originalStat.bg} ${originalStat.color} group-hover:scale-105 transition-transform duration-300`}>
-                        {React.cloneElement(originalStat.icon, { size: 20, strokeWidth: 2.5 })}
-                     </div>
-                     <div className="min-w-0 flex-1">
-                        <p className="mb-1 text-[10px] font-black capitalize tracking-widest text-slate-400">{stat.label}</p>
-                        <div className="flex items-center gap-2">
-                           <p className="text-2xl font-black tracking-tight text-slate-900">{stat.value}</p>
-                           {stat.trend && (
-                              <div className={`flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded capitalize tracking-tighter ${stat.label === 'Active Breaches' || stat.trend === 'down' || stat.trend === 'Declining' ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>
-                                 {stat.trend}
-                              </div>
-                           )}
-                        </div>
-                     </div>
-                  </div>
+                  <KPICard
+                     key={stat.label}
+                     label={stat.label}
+                     value={stat.value}
+                     icon={React.cloneElement(originalStat.icon, { size: 20, strokeWidth: 2.5 })}
+                     color={`${originalStat.bg} ${originalStat.color}`}
+                  />
                );
             })}
          </div>
@@ -893,82 +886,65 @@ const UtilizationPerformanceDashboard = () => {
                         )}
 
                         <div className="overflow-x-auto no-scrollbar">
-                           <table className="w-full text-left">
-                              <thead>
-                                 <tr className="bg-slate-50/50 border-b border-slate-50">
-                                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500">Project / Engagement</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500 text-center">Billing Strip</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500 text-center">Hours (Act / Plan)</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500 text-right">Utilization %</th>
-                                 </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-50">
-                                 {visibleOperationalProjects.length === 0 && (
-                                    <tr>
-                                       <td colSpan="4" className="px-6 py-8 text-center text-[11px] font-semibold text-slate-500">
-                                          {projectCategoryTab === 'internal'
-                                             ? 'No internal projects were returned by the backend hours summary endpoint.'
-                                             : 'No active client projects were returned by the backend hours summary endpoint.'}
-                                       </td>
-                                    </tr>
-                                 )}
-                                 {paginatedOperationalProjects.map((project) => (
-                                    <tr
-                                       key={project.id}
-                                       className="hover:bg-slate-50/40 transition-colors group cursor-pointer"
-                                       onClick={() => navigate(`/resource-management/bench/utilization-performance/projects/${project.id}`)}
-                                    >
-                                       <td className="px-6 py-4">
-                                          <div className="flex flex-col">
-                                             <span className="text-[13px] font-bold text-slate-900 capitalize tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{project.name}</span>
-                                             <span className="text-[10px] font-medium text-slate-400 mt-1.5 capitalize tracking-widest italic">
-                                                {projectCategoryTab === 'internal' ? 'Internal Project' : project.client} | {project.id}
-                                             </span>
-                                             <span className="text-[9px] font-semibold text-slate-500 mt-2">
-                                                Pending: {formatMetric(project.pendingHours, 'h')}
-                                             </span>
-                                          </div>
-                                       </td>
-                                       <td className="px-6 py-4 text-center">
-                                          {project.resourceHours > 0 ? (
-                                             <>
-                                                <div className="flex items-center justify-center gap-0.5 max-w-[140px] mx-auto overflow-hidden rounded-full h-2 bg-slate-100 border border-slate-200">
-                                                   <div className="h-full bg-indigo-600" style={{ width: `${project.billable}%` }} />
-                                                   <div className="h-full bg-indigo-300" style={{ width: `${project.nonBillable}%` }} />
-                                                   <div className="h-full bg-slate-300" style={{ width: `${project.internal}%` }} />
-                                                </div>
-                                                <div className="flex justify-center gap-3 mt-1.5">
-                                                   <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-600" /><span className="text-[8px] font-black text-slate-400 capitalize">{formatMetric(project.billableHours, 'h')} B</span></div>
-                                                   <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-300" /><span className="text-[8px] font-black text-slate-400 capitalize">{formatMetric(project.nonBillableHours, 'h')} NB</span></div>
-                                                </div>
-                                             </>
-                                          ) : (
-                                             <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[8px] font-black capitalize tracking-widest text-slate-500">
-                                                No billed hours
-                                             </span>
-                                          )}
-                                       </td>
-                                       <td className="px-6 py-4 text-center">
-                                          <span className="text-[12px] font-bold text-slate-900">{formatMetric(project.actualHours)} / {formatMetric(project.plannedHours, 'h')}</span>
-                                          <div className="h-1 w-12 bg-slate-100 rounded-full mt-2 mx-auto overflow-hidden">
-                                             <div className="h-full bg-indigo-500" style={{ width: `${typeof project.util === 'number' ? project.util : 0}%` }} />
-                                          </div>
-                                       </td>
-                                       <td className="px-6 py-4 text-right">
-                                          <div className="flex flex-col items-end">
-                                             <span className={`text-[16px] font-black ${project.health === 'Critical' ? 'text-rose-600' : 'text-slate-900'}`}>{formatMetric(project.util, '%')}</span>
-                                             <span className={`inline-flex rounded-md border px-2 py-0.5 text-[8px] font-black capitalize tracking-widest mt-1 ${project.severity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-100' :
-                                                project.severity === 'Warning' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                                   'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                                }`}>
-                                                {project.health}
-                                             </span>
-                                          </div>
-                                       </td>
-                                    </tr>
-                                 ))}
-                              </tbody>
-                           </table>
+                           <GenericTable
+                              headers={["Project / Engagement", "Billing Strip", "Hours (Act / Plan)", "Utilization %"]}
+                              columns={["project_info", "billing_info", "hours_info", "utilization_info"]}
+                              rows={paginatedOperationalProjects.map((project) => ({
+                                 ...project,
+                                 project_info: (
+                                    <div className="flex flex-col text-left">
+                                       <span className="text-[13px] font-bold text-slate-900 capitalize tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{project.name}</span>
+                                       <span className="text-[10px] font-medium text-slate-400 mt-1.5 capitalize tracking-widest italic">
+                                          {projectCategoryTab === 'internal' ? 'Internal Project' : project.client} | {project.id}
+                                       </span>
+                                       <span className="text-[9px] font-semibold text-slate-500 mt-2">
+                                          Pending: {formatMetric(project.pendingHours, 'h')}
+                                       </span>
+                                    </div>
+                                 ),
+                                 billing_info: (
+                                    <div className="text-center">
+                                       {project.resourceHours > 0 ? (
+                                          <>
+                                             <div className="flex items-center justify-center gap-0.5 max-w-[140px] mx-auto overflow-hidden rounded-full h-2 bg-slate-100 border border-slate-200">
+                                                <div className="h-full bg-indigo-600" style={{ width: `${project.billable}%` }} />
+                                                <div className="h-full bg-indigo-300" style={{ width: `${project.nonBillable}%` }} />
+                                                <div className="h-full bg-slate-300" style={{ width: `${project.internal}%` }} />
+                                             </div>
+                                             <div className="flex justify-center gap-3 mt-1.5">
+                                                <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-600" /><span className="text-[8px] font-black text-slate-400 capitalize">{formatMetric(project.billableHours, 'h')} B</span></div>
+                                                <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-indigo-300" /><span className="text-[8px] font-black text-slate-400 capitalize">{formatMetric(project.nonBillableHours, 'h')} NB</span></div>
+                                             </div>
+                                          </>
+                                       ) : (
+                                          <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[8px] font-black capitalize tracking-widest text-slate-500">
+                                             No billed hours
+                                          </span>
+                                       )}
+                                    </div>
+                                 ),
+                                 hours_info: (
+                                    <div className="text-center">
+                                       <span className="text-[12px] font-bold text-slate-900">{formatMetric(project.actualHours)} / {formatMetric(project.plannedHours, 'h')}</span>
+                                       <div className="h-1 w-12 bg-slate-100 rounded-full mt-2 mx-auto overflow-hidden">
+                                          <div className="h-full bg-indigo-500" style={{ width: `${typeof project.util === 'number' ? project.util : 0}%` }} />
+                                       </div>
+                                    </div>
+                                 ),
+                                 utilization_info: (
+                                    <div className="flex flex-col items-end">
+                                       <span className={`text-[16px] font-black ${project.health === 'Critical' ? 'text-rose-600' : 'text-slate-900'}`}>{formatMetric(project.util, '%')}</span>
+                                       <span className={`inline-flex rounded-md border px-2 py-0.5 text-[8px] font-black capitalize tracking-widest mt-1 ${project.severity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                                          project.severity === 'Warning' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                             'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                          }`}>
+                                          {project.health}
+                                       </span>
+                                    </div>
+                                 ),
+                                 onClick: () => navigate(`/resource-management/bench/utilization-performance/projects/${project.id}`)
+                              }))}
+                           />
                         </div>
                         {visibleOperationalProjects.length > 0 && (
                            <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/40">
@@ -1005,80 +981,61 @@ const UtilizationPerformanceDashboard = () => {
                               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                            />
                         </div>
-
-                        {/* <div className="flex items-center gap-2 bg-slate-900 text-white rounded-lg px-3 py-1 text-[9px] font-black uppercase tracking-widest">
-                              <ShieldCheck size={12} className="text-emerald-400" /> Source Verified
-                           </div> */}
                      </div>
                   </div>
                   <div className="overflow-x-auto no-scrollbar">
-                     <table className="w-full text-left">
-                        <thead>
-                           <tr className="bg-slate-50/50 border-b border-slate-50">
-                              <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500">Resource Registry</th>
-                              <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500 text-center">Hourly Split (B / NB)</th>
-                              <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500 text-center">Trend Signal</th>
-                              <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-indigo-600 text-right">Overall Util %</th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                           {isResourceLoading ? (
-                              <tr>
-                                 <td colSpan="4" className="px-6 py-8 text-center">
-                                    <div className="flex flex-col items-center justify-center gap-2">
-                                       {/* <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div> */}
-                                       {/* <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Loading Resources...</span> */}
-                                       <LoadingSpinner text='Loading Resources...' />
+                     {isResourceLoading ? (
+                        <div className="px-6 py-20 flex justify-center items-center bg-white">
+                           <LoadingSpinner text="Loading Resources..." />
+                        </div>
+                     ) : filteredAndPaginatedResources.paginated.length === 0 ? (
+                        <div className="px-6 py-20 flex justify-center items-center bg-white text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                           No Resource Data Available
+                        </div>
+                     ) : (
+                        <GenericTable
+                           headers={["Resource Registry", "Hourly Split (B / NB)", "Trend Signal", "Overall Util %"]}
+                           columns={["resource_info", "hours_info", "trend_info", "utilization_info"]}
+                           rows={filteredAndPaginatedResources.paginated.map((res, idx) => ({
+                              ...res,
+                              resource_info: (
+                                 <div className="flex flex-col text-left">
+                                    <span className="text-[13px] font-bold text-slate-900 capitalize tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{res.userName}</span>
+                                    <span className="text-[10px] font-medium text-slate-400 mt-1.5 capitalize tracking-widest italic">Resource</span>
+                                 </div>
+                              ),
+                              hours_info: (
+                                 <div className="flex items-center justify-center gap-3">
+                                    <div className="flex flex-col items-center"><span className="text-[11px] font-black text-indigo-600">{res.billableHours}h</span><span className="text-[8px] font-bold text-slate-400 capitalize">Billable</span></div>
+                                    <div className="h-6 w-px bg-slate-100" />
+                                    <div className="flex flex-col items-center"><span className="text-[11px] font-black text-slate-600">{res.nonBillableHours}h</span><span className="text-[8px] font-bold text-slate-400 capitalize">Non-Bill</span></div>
+                                 </div>
+                              ),
+                              trend_info: (
+                                 <div className="flex flex-col items-center gap-0.5">
+                                    <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black capitalize"><Zap size={14} /> Stable</div>
+                                 </div>
+                              ),
+                              utilization_info: (
+                                 <div className="flex flex-col items-end">
+                                    <span className="text-[16px] font-black text-slate-900">{res.billablePercentage}%</span>
+                                    <div className="h-1 w-12 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                                       <div className="h-full bg-indigo-500" style={{ width: `${res.billablePercentage}%` }} />
                                     </div>
-                                 </td>
-                              </tr>
-                           ) : (filteredAndPaginatedResources.paginated.length === 0 ? (
-                              <tr>
-                                 <td colSpan="4" className="px-6 py-8 text-center">
-                                    <span className="text-[11px] font-bold text-slate-500 capitalize tracking-widest">No Resource Data Available</span>
-                                 </td>
-                              </tr>
-                           ) : (
-                              filteredAndPaginatedResources.paginated.map((res, idx) => (
-                                 <tr key={res.userId || idx} className="hover:bg-slate-50/40 transition-colors group cursor-pointer" onClick={() => handleRowClick(res)}>
-                                    <td className="px-6 py-4">
-                                       <div className="flex flex-col">
-                                          <span className="text-[13px] font-bold text-slate-900 capitalize tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{res.userName}</span>
-                                          <span className="text-[10px] font-medium text-slate-400 mt-1.5 capitalize tracking-widest italic">Resource</span>
-                                       </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                       <div className="flex items-center justify-center gap-3">
-                                          <div className="flex flex-col items-center"><span className="text-[11px] font-black text-indigo-600">{res.billableHours}h</span><span className="text-[8px] font-bold text-slate-400 capitalize">Billable</span></div>
-                                          <div className="h-6 w-px bg-slate-100" />
-                                          <div className="flex flex-col items-center"><span className="text-[11px] font-black text-slate-600">{res.nonBillableHours}h</span><span className="text-[8px] font-bold text-slate-400 capitalize">Non-Bill</span></div>
-                                       </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                       <div className="flex flex-col items-center gap-0.5">
-                                          <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black capitalize"><Zap size={14} /> Stable</div>
-                                       </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                       <div className="flex flex-col items-end">
-                                          <span className="text-[16px] font-black text-slate-900">{res.billablePercentage}%</span>
-                                          <div className="h-1 w-12 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
-                                             <div className="h-full bg-indigo-500" style={{ width: `${res.billablePercentage}%` }} />
-                                          </div>
-                                       </div>
-                                    </td>
-                                 </tr>
-                              ))))}
-                           </tbody>
-                        </table>
-                     </div>
-                     {!projectsLoading && totalProjectPages > 1 && (
+                                 </div>
+                              ),
+                              onClick: () => handleRowClick(res)
+                           }))}
+                        />
+                     )}
+                  </div>
+                      {filteredAndPaginatedResources.totalPages > 1 && (
                         <div className="border-t border-slate-100 py-6">
                            <Pagination
-                              currentPage={projectPage}
-                              totalPages={totalProjectPages}
-                              onPrevious={() => setProjectPage((prev) => Math.max(prev - 1, 1))}
-                              onNext={() => setProjectPage((prev) => Math.min(prev + 1, totalProjectPages))}
+                              currentPage={currentPage}
+                              totalPages={filteredAndPaginatedResources.totalPages}
+                              onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                              onNext={() => setCurrentPage((prev) => Math.min(prev + 1, filteredAndPaginatedResources.totalPages))}
                            />
                         </div>
                      )}

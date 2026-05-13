@@ -11,6 +11,7 @@ import {
 import utilizationService from '../../../../services/utilizationService';
 import UtilizationNavbar from '../components/UtilizationNavbar';
 import LoadingSpinner from '../../../../components/LoadingSpinner';
+import GenericTable from "../../../../components/Table/table";
 
 const UtilizationPortfolioDashboard = () => {
    const [loading, setLoading] = useState(true);
@@ -136,53 +137,49 @@ const UtilizationPortfolioDashboard = () => {
                      </span>
                   </div>
                   <div className="overflow-x-auto no-scrollbar flex-1">
-                     <table className="w-full text-left">
-                        <thead>
-                           <tr className="bg-slate-50/50 border-b border-slate-100">
-                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] w-[30%]">Project / Client</th>
-                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Project Yield</th>
-                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Efficiency</th>
-                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Cost vs Util</th>
-                              <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-right">Status</th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                           {projects.map((proj, idx) => (
-                              <tr key={idx} className="hover:bg-slate-50/50 transition-all group">
-                                 <td className="px-8 py-6">
-                                    <div className="flex flex-col gap-0.5">
-                                       <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight leading-tight">{proj.projectName}</span>
-                                       <span className="text-[11px] font-bold text-slate-400 capitalize tracking-widest opacity-70 italic">{proj.clientName}</span>
-                                    </div>
-                                 </td>
-                                 <td className="px-8 py-6 text-center">
-                                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-100">
-                                       <span className="text-[14px] font-black text-emerald-700">{proj.billableRatio}%</span>
-                                    </div>
-                                 </td>
-                                 <td className="px-8 py-6 text-center">
-                                    <div className="flex flex-col items-center gap-1.5">
-                                       <span className="text-[13px] font-black text-slate-700">92.4%</span>
-                                       <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                          <div className="h-full bg-indigo-500 w-[92%]" />
-                                       </div>
-                                    </div>
-                                 </td>
-                                 <td className="px-8 py-6 text-center">
-                                    <div className={`inline-flex items-center gap-1 text-[11px] font-black capitalize ${proj.utilizationPercentage > 90 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                       {proj.utilizationPercentage > 90 ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
-                                       {proj.utilizationPercentage > 90 ? 'High Burn' : 'Healthy'}
-                                    </div>
-                                 </td>
-                                 <td className="px-8 py-6 text-right">
-                                    <button className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all flex items-center justify-center ml-auto border border-slate-100">
-                                       <ExternalLink size={18} />
-                                    </button>
-                                 </td>
-                              </tr>
-                           ))}
-                        </tbody>
-                     </table>
+                     <GenericTable
+                        headers={["Project / Client", "Project Yield", "Efficiency", "Cost vs Util", "Status"]}
+                        columns={["project_info", "yield_info", "efficiency_info", "burn_info", "actions_info"]}
+                        rows={projects.map((proj, idx) => ({
+                           ...proj,
+                           project_info: (
+                              <div className="flex flex-col gap-0.5 text-left">
+                                 <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight leading-tight">{proj.projectName}</span>
+                                 <span className="text-[11px] font-bold text-slate-400 capitalize tracking-widest opacity-70 italic">{proj.clientName}</span>
+                              </div>
+                           ),
+                           yield_info: (
+                              <div className="text-center">
+                                 <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-100">
+                                    <span className="text-[14px] font-black text-emerald-700">{proj.billableRatio}%</span>
+                                 </div>
+                              </div>
+                           ),
+                           efficiency_info: (
+                              <div className="flex flex-col items-center gap-1.5">
+                                 <span className="text-[13px] font-black text-slate-700">92.4%</span>
+                                 <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-indigo-500 w-[92%]" />
+                                 </div>
+                              </div>
+                           ),
+                           burn_info: (
+                              <div className="text-center">
+                                 <div className={`inline-flex items-center gap-1 text-[11px] font-black capitalize ${proj.utilizationPercentage > 90 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                    {proj.utilizationPercentage > 90 ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
+                                    {proj.utilizationPercentage > 90 ? 'High Burn' : 'Healthy'}
+                                 </div>
+                              </div>
+                           ),
+                           actions_info: (
+                              <div className="flex justify-end">
+                                 <button className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all flex items-center justify-center border border-slate-100">
+                                    <ExternalLink size={18} />
+                                 </button>
+                              </div>
+                           )
+                        }))}
+                     />
                   </div>
                </div>
             </div>

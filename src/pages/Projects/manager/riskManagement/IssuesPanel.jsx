@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AlertIcon } from "../../../../components/icons";
 import axios from "axios";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
@@ -36,29 +36,43 @@ export default function IssuesPanel({
   selectedIssue,
 }) {
   const [issueSearch, setIssueSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [issuesPageItems, setIssuesPageItems] = useState([]);
   const [issuesTotal, setIssuesTotal] = useState(0);
   const [isLoadingIssues, setIsLoadingIssues] = useState(false);
 
-  const PAGE_SIZE = 10;
-  const totalPages = Math.max(1, Math.ceil(issuesTotal / PAGE_SIZE));
+  const PAGE_SIZE = 3;
 
-  const lastFetchKey = useRef("");
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(issuesTotal / PAGE_SIZE));
+  }, [issuesTotal]);
+
+  const goPrevious = () => {
+    setIssuePage((p) => Math.max(1, p - 1));
+  };
+
+  const goNext = () => {
+    setIssuePage((p) => Math.min(totalPages, p + 1));
+  };
+
+  // Debounce search so typing/search reset does not cause duplicate API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(issueSearch.trim());
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [issueSearch]);
+
+  // Reset page only when filter/search type changes
+  useEffect(() => {
+    setIssuePage(1);
+  }, [activeIssueType, debouncedSearch, setIssuePage]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function fetchIssues() {
-      const paramsKey = JSON.stringify({
-        projectId,
-        activeIssueType,
-        issuePage,
-        issueSearch,
-      });
-
-      if (lastFetchKey.current === paramsKey) return;
-      lastFetchKey.current = paramsKey;
-
       setIsLoadingIssues(true);
 
       try {
@@ -66,7 +80,7 @@ export default function IssuesPanel({
         const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 
         const params = {
-          page: issuePage - 1,
+          page: Math.max(0, issuePage - 1), // UI page 1 => backend page 0
           size: PAGE_SIZE,
         };
 
@@ -74,8 +88,8 @@ export default function IssuesPanel({
           params.issueType = ISSUE_TYPE_MAP[activeIssueType];
         }
 
-        if (issueSearch?.trim()) {
-          params.search = issueSearch.trim();
+        if (debouncedSearch) {
+          params.search = debouncedSearch;
         }
 
         const res = await axios.get(
@@ -83,36 +97,42 @@ export default function IssuesPanel({
           {
             headers: { Authorization: `Bearer ${token}` },
             params,
-          },
+          }
         );
 
         if (cancelled) return;
 
-        // ✅ Ensure only unique issues by linkedType + linkedId
+        const content = Array.isArray(res.data?.content) ? res.data.content : [];
+
+        // Ensure only unique issues by linkedType + linkedId
         const uniqueIssues = Array.from(
           new Map(
-            res.data.content.map((i) => [`${i.linkedType}-${i.linkedId}`, i]),
-          ).values(),
+            content.map((i) => [`${i.linkedType}-${i.linkedId}`, i])
+          ).values()
         );
 
         setIssuesPageItems(uniqueIssues);
-        setIssuesTotal(res.data.totalElements ?? uniqueIssues.length);
+        setIssuesTotal(res.data?.totalElements ?? uniqueIssues.length);
       } catch (e) {
         console.error("Failed to load issues", e);
+
         if (!cancelled) {
           setIssuesPageItems([]);
           setIssuesTotal(0);
         }
       } finally {
-        if (!cancelled) setIsLoadingIssues(false);
+        if (!cancelled) {
+          setIsLoadingIssues(false);
+        }
       }
     }
 
     fetchIssues();
+
     return () => {
       cancelled = true;
     };
-  }, [projectId, activeIssueType, issuePage, issueSearch]);
+  }, [projectId, activeIssueType, issuePage, debouncedSearch]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full min-h-0">
@@ -121,11 +141,11 @@ export default function IssuesPanel({
         <h2 className="font-semibold text-slate-900 mb-3">
           {activeIssueType} Issues
         </h2>
+
         <SearchInput
           value={issueSearch}
           onSearch={(val) => {
             setIssueSearch(val);
-            setIssuePage(1);
           }}
           placeholder={`Search ${activeIssueType}...`}
         />
@@ -139,13 +159,16 @@ export default function IssuesPanel({
               <div className="text-xs font-semibold text-indigo-600 mb-1">
                 SELECTED
               </div>
+
               <div className="font-semibold text-sm">
                 {selectedIssue.linkedType}-{selectedIssue.linkedId}
               </div>
+
               <div className="text-xs text-slate-600 line-clamp-1">
                 {selectedIssue.title}
               </div>
             </div>
+
             <button
               onClick={() => onSelectIssue(null)}
               className="text-slate-400 hover:text-slate-600"
@@ -187,17 +210,20 @@ export default function IssuesPanel({
                       <div className="font-semibold text-sm text-slate-900">
                         {issue.linkedType}-{issue.linkedId}
                       </div>
+
                       <p className="text-xs text-slate-600 line-clamp-2 mt-1">
                         {issue.title}
                       </p>
+
                       <div className="flex items-center gap-2 mt-2">
                         <span
                           className={`text-xs px-2 py-1 rounded ${getStatusColor(
-                            issue.issueStatus,
+                            issue.issueStatus
                           )}`}
                         >
-                          {issue.issueStatus}
+                          {issue.issueStatus || "No Status"}
                         </span>
+
                         {issue.riskCount > 0 && (
                           <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-semibold">
                             {issue.riskCount} risks
@@ -218,8 +244,8 @@ export default function IssuesPanel({
         <Pagination
           currentPage={issuePage}
           totalPages={totalPages}
-          onPrevious={() => setIssuePage((p) => p - 1)}
-          onNext={() => setIssuePage((p) => p + 1)}
+          onPrevious={goPrevious}
+          onNext={goNext}
         />
       </div>
     </div>

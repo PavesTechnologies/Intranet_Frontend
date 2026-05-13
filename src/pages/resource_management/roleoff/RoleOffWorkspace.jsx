@@ -18,6 +18,7 @@ import RoleOffFilterPanel from "./RoleOffFilterPanel";
 import RoleOffSidePanel from "./RoleOffSidePanel";
 import RoleOffSummaryCard from "./RoleOffSummaryCard";
 import CancelRoleOffModal from "./CancelRoleOffModal";
+import Pagination from "../../../components/Pagination/pagination";
 import {
   bulkDlFulfill,
   bulkDlReject,
@@ -823,6 +824,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     loading: false,
   });
 
+
   const loadPmResources = useCallback(async (isActiveRef = () => true) => {
     if (mode !== "pm") {
       setAllocations([]);
@@ -1060,10 +1062,20 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     [filters],
   );
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  const totalPages = Math.ceil(visibleRows.length / itemsPerPage);
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return visibleRows.slice(start, start + itemsPerPage);
+  }, [visibleRows, currentPage, itemsPerPage]);
+
   useEffect(() => {
     const visibleIds = new Set(visibleRows.map((item) => item.id));
     setSelectedRows((prev) => prev.filter((id) => visibleIds.has(id)));
-  }, [visibleRows]);
+    setCurrentPage(1); // Reset pagination on filter/tab change
+  }, [visibleRows, pmActiveTab, dmActiveTab]);
 
 
   const handleToggleRow = (id, checked) => {
@@ -1921,7 +1933,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                 mode={mode}
                 pmTab={mode === "dm" ? dmActiveTab : pmActiveTab}
                 loading={loading}
-                rows={visibleRows}
+                rows={paginatedRows}
                 hasActiveFilters={hasActiveFilters}
                 selectedRows={selectedRows}
                 activeRowId={panelState.record?.id}
@@ -1930,6 +1942,16 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                 onAction={handleTableAction}
                 onRowClick={handleRowClick}
               />
+              {totalPages > 1 && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { Briefcase, Calendar, Check, Search, Trash2, UserCheck, Users, X } from 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Pagination from "../../../../components/Pagination/pagination";
+import GenericTable from "../../../../components/Table/table";
 
 const STATUS_CONFIG = {
   REQUESTED: "bg-amber-50 text-amber-700 border-amber-100",
@@ -175,126 +176,125 @@ const ModificationTable = ({
       ) : (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full min-w-[1180px] text-left text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                <tr>
-                  <th className="p-5">Resource Name</th>
-                  <th className="p-5">Project</th>
-                  <th className="p-5 text-center">Current Allocation %</th>
-                  <th className="p-5 text-center">Requested Allocation %</th>
-                  <th className="p-5 text-center">Effective Date</th>
-                  <th className="p-5 text-center">Status</th>
-                  <th className="p-5 text-center">Requested By</th>
-                  <th className="p-5 text-center">Approved By</th>
-                  <th className="p-5 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {paginatedItems.map((item) => {
-                  const canApproveRequest = canApprove && item.status === "REQUESTED";
-                  const canCancelRequest = canCancel && item.status === "REQUESTED";
-                  const isApproving = processingAction === `approve-${item.id}`;
-                  const isRejecting = processingAction === `reject-${item.id}`;
-                  const isCancelling = processingAction === `cancel-${item.id}`;
+            <GenericTable
+              headers={[
+                "Resource Name",
+                "Project",
+                "Current Allocation %",
+                "Requested Allocation %",
+                "Effective Date",
+                "Status",
+                "Requested By",
+                "Approved By",
+                "Actions",
+              ]}
+              columns={[
+                "resource_info",
+                "project_info",
+                "currentAllocationPercentage",
+                "requestedAllocationPercentage",
+                "effective_date_info",
+                "status_info",
+                "requested_by_info",
+                "approvedBy",
+                "actions",
+              ]}
+              rows={paginatedItems.map((item) => {
+                const canApproveRequest = canApprove && item.status === "REQUESTED";
+                const canCancelRequest = canCancel && item.status === "REQUESTED";
+                const isApproving = processingAction === `approve-${item.id}`;
+                const isRejecting = processingAction === `reject-${item.id}`;
+                const isCancelling = processingAction === `cancel-${item.id}`;
 
-                  return (
-                    <tr key={item.id} className="group transition-colors hover:bg-slate-50/40">
-                      <td className="p-5">
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-700">
-                            {String(item.resourceName || "R")
-                              .split(" ")
-                              .filter(Boolean)
-                              .slice(0, 2)
-                              .map((name) => name[0])
-                              .join("") || "R"}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate font-black tracking-tight text-slate-900">
-                              {item.resourceName || "N/A"}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-5">
-                        <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
-                          <Briefcase className="h-3.5 w-3.5 text-slate-400" />
-                          <span>{item.projectName || "N/A"}</span>
-                        </div>
-                      </td>
-                      <td className="p-5 text-center">
-                        <span className="text-[11px] font-black text-slate-700">
-                          {formatPercent(item.currentAllocationPercentage)}
-                        </span>
-                      </td>
-                      <td className="p-5 text-center">
-                        <span className="text-[11px] font-black text-indigo-600">
-                          {formatPercent(item.requestedAllocationPercentage)}
-                        </span>
-                      </td>
-                      <td className="p-5 text-center">
-                        <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
-                          <Calendar className="h-3 w-3 text-slate-400" />
-                          <span>{formatDate(item.effectiveDate)}</span>
-                        </div>
-                      </td>
-                      <td className="p-5 text-center">
-                        <ModificationStatusBadge status={item.status} />
-                      </td>
-                      <td className="p-5 text-center">
-                        <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
-                          <UserCheck className="h-3.5 w-3.5 text-slate-400" />
-                          <span>{item.requestedBy || "N/A"}</span>
-                        </div>
-                      </td>
-                      <td className="p-5 text-center">
-                        <span className="text-[10px] font-black text-slate-500">
-                          {item.approvedBy || "N/A"}
-                        </span>
-                      </td>
-                      <td className="p-5">
-                        <div className="flex items-center justify-center gap-2">
-                          {canApproveRequest && (
-                            <>
-                              <ActionIconButton
-                                label="Approve modification"
-                                icon={Check}
-                                onClick={() => onApprove(item)}
-                                disabled={isApproving || isRejecting}
-                                className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                              />
-                              <ActionIconButton
-                                label="Reject modification"
-                                icon={X}
-                                onClick={() => onReject(item)}
-                                disabled={isApproving || isRejecting}
-                                className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                              />
-                            </>
-                          )}
+                return {
+                  ...item,
+                  resource_info: (
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-700">
+                        {String(item.resourceName || "R")
+                          .split(" ")
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((name) => name[0])
+                          .join("") || "R"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate font-black tracking-tight text-slate-900">
+                          {item.resourceName || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                  ),
+                  project_info: (
+                    <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+                      <Briefcase className="h-3.5 w-3.5 text-slate-400" />
+                      <span>{item.projectName || "N/A"}</span>
+                    </div>
+                  ),
+                  currentAllocationPercentage: (
+                    <span className="text-[11px] font-black text-slate-700">
+                      {formatPercent(item.currentAllocationPercentage)}
+                    </span>
+                  ),
+                  requestedAllocationPercentage: (
+                    <span className="text-[11px] font-black text-indigo-600">
+                      {formatPercent(item.requestedAllocationPercentage)}
+                    </span>
+                  ),
+                  effective_date_info: (
+                    <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+                      <Calendar className="h-3 w-3 text-slate-400" />
+                      <span>{formatDate(item.effectiveDate)}</span>
+                    </div>
+                  ),
+                  status_info: <ModificationStatusBadge status={item.status} />,
+                  requested_by_info: (
+                    <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+                      <UserCheck className="h-3.5 w-3.5 text-slate-400" />
+                      <span>{item.requestedBy || "N/A"}</span>
+                    </div>
+                  ),
+                  actions: (
+                    <div className="flex items-center justify-center gap-2">
+                      {canApproveRequest && (
+                        <>
+                          <ActionIconButton
+                            label="Approve modification"
+                            icon={Check}
+                            onClick={() => onApprove(item)}
+                            disabled={isApproving || isRejecting}
+                            className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          />
+                          <ActionIconButton
+                            label="Reject modification"
+                            icon={X}
+                            onClick={() => onReject(item)}
+                            disabled={isApproving || isRejecting}
+                            className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                          />
+                        </>
+                      )}
 
-                          {canCancelRequest && (
-                            <ActionIconButton
-                              label="Cancel modification"
-                              icon={Trash2}
-                              onClick={() => onCancel(item)}
-                              disabled={isCancelling}
-                              className="border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                            />
-                          )}
+                      {canCancelRequest && (
+                        <ActionIconButton
+                          label="Cancel modification"
+                          icon={Trash2}
+                          onClick={() => onCancel(item)}
+                          disabled={isCancelling}
+                          className="border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                        />
+                      )}
 
-                          {!canApproveRequest && !canCancelRequest && (
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">
-                              No Action
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      {!canApproveRequest && !canCancelRequest && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">
+                          No Action
+                        </span>
+                      )}
+                    </div>
+                  ),
+                };
+              })}
+            />
           </div>
 
           {filteredItems.length > itemsPerPage && (
