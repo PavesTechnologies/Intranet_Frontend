@@ -18,13 +18,11 @@ export default function HeadcountDemographicsPage() {
   }, []);
 
   const fetchDepartments = async () => {
-    const token = localStorage.getItem("token");
-
     const res = await fetch(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`, // ✅ ADD THIS  
         },
       },
     );
@@ -34,36 +32,7 @@ export default function HeadcountDemographicsPage() {
     setDepartments(data.map((d) => d.department_name));
   };
 
-  //  const loadAnalytics = async () => {
-  //   const data = await fetchDashboardAnalytics();
 
-  //   console.log("API DATA:", data); // 👈 DEBUG
-
-  //   if (data) {
-  //     const demographicsData = data.demographics || data; // 🔥 KEY FIX
-
-  //     const genderWithColor = (demographicsData.gender || []).map(item => ({
-  //       ...item,
-  //       color: item.label === "Female" ? "#b57bb5" : "#5b8def"
-  //     }));
-
-  //     const nationalityWithColor = (demographicsData.nationality || []).map(item => ({
-  //       ...item,
-  //       color: item.label === "India" ? "#5b8def" : "#d97b7b"
-  //     }));
-
-  //     setAnalytics({
-  //       demographics: {
-  //         ...demographicsData,
-  //         gender: genderWithColor,
-  //         nationality: nationalityWithColor
-  //       },
-  //       workerDept: data.workerDept || [],
-  //       genderDept: data.genderDept || [],
-  //       employmentDept: data.employmentDept || []
-  //     });
-  //   }
-  // };
   const loadAnalytics = async () => {
     const data = await fetchDashboardAnalytics();
 
