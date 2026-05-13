@@ -14,6 +14,7 @@ import StatusBadge from "../../../../components/status/statusbadge";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 
 const ITEMS_PER_PAGE = 10;
+const ROLE_ITEMS_PER_PAGE = 6;
 
 const SORT_DIRECTIONS = {
   ASC: "asc",
@@ -23,45 +24,47 @@ const SORT_DIRECTIONS = {
 export default function UpdateUserRole() {
   const [users, setUsers] = useState([]);
   const [totalUsers, setTotalUsers] = useState(0);
-
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [sortDirection, setSortDirection] = useState(
-    SORT_DIRECTIONS.ASC
-  );
+  const [sortDirection, setSortDirection] = useState(SORT_DIRECTIONS.ASC);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser_uuId, setSelectedUser_uuId] = useState(null);
 
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
 
-  const totalPages = Math.ceil(totalUsers / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(totalUsers / ITEMS_PER_PAGE));
 
   const axiosInstance = useMemo(() => {
-    const headers = {
-      "Content-Type": "application/json",
-    };
-
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    return axios.create({
+    const instance = axios.create({
       baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-      headers,
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
-  }, [token]);
+
+    instance.interceptors.request.use((config) => {
+      const latestToken = localStorage.getItem("token");
+
+      if (latestToken) {
+        config.headers.Authorization = `Bearer ${latestToken}`;
+      }
+
+      return config;
+    });
+
+    return instance;
+  }, []);
 
   useEffect(() => {
-    if (!token) {
+    if (!localStorage.getItem("token")) {
       showStatusToast("Session expired. Please login again.", "warning");
       navigate("/");
     }
-  }, [token, navigate]);
+  }, [navigate]);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -88,29 +91,27 @@ export default function UpdateUserRole() {
 
       showStatusToast(msg, "error");
 
-      if (
-        err.response?.status === 401 ||
-        err.response?.status === 403
-      ) {
+      if (err.response?.status === 401 || err.response?.status === 403) {
         navigate("/dashboard");
       }
     } finally {
       setLoading(false);
     }
-  }, [
-    axiosInstance,
-    currentPage,
-    searchTerm,
-    navigate,
-  ]);
+  }, [axiosInstance, currentPage, searchTerm, navigate]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
   const handleSearch = useCallback((value) => {
-    setSearchTerm(value || "");
-    setCurrentPage(1);
+    const nextSearch = value || "";
+
+    setSearchTerm((prev) => {
+      if (prev === nextSearch) return prev;
+
+      setCurrentPage(1);
+      return nextSearch;
+    });
   }, []);
 
   const handlePreviousPage = useCallback(() => {
@@ -118,9 +119,7 @@ export default function UpdateUserRole() {
   }, []);
 
   const handleNextPage = useCallback(() => {
-    setCurrentPage((prev) =>
-      Math.min(prev + 1, totalPages)
-    );
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
   }, [totalPages]);
 
   const toggleSort = () => {
@@ -138,48 +137,27 @@ export default function UpdateUserRole() {
       className="cursor-pointer select-none"
       onClick={toggleSort}
     >
-      Name{" "}
-      {sortDirection === SORT_DIRECTIONS.ASC
-        ? "▲"
-        : "▼"}
+      Name {sortDirection === SORT_DIRECTIONS.ASC ? "▲" : "▼"}
     </span>,
     "Email",
     "Assigned Roles",
     "Actions",
   ];
 
-  const columns = [
-    "serial_no",
-    "name",
-    "mail",
-    "roles",
-    "actions",
-  ];
+  const columns = ["serial_no", "name", "mail", "roles", "actions"];
 
   const tableRows = users.map((user, index) => ({
-    serial_no: (
-      (currentPage - 1) * ITEMS_PER_PAGE +
-      index +
-      1
-    ).toString(),
+    serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
 
     name: user.name || "N/A",
 
-    mail: user.mail || (
-      <span className="italic text-gray-400">
-        N/A
-      </span>
-    ),
+    mail: user.mail || <span className="italic text-gray-400">N/A</span>,
 
     roles:
       user.roles?.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {user.roles.map((role, idx) => (
-            <StatusBadge
-              key={idx}
-              label={role}
-              size="sm"
-            />
+            <StatusBadge key={idx} label={role} size="sm" />
           ))}
         </div>
       ) : (
@@ -203,18 +181,15 @@ export default function UpdateUserRole() {
     ),
   }));
 
-  const handleRolesSaved = (
-    userUuid,
-    updatedRoleNames
-  ) => {
+  const handleRolesSaved = (userUuid, updatedRoleNames) => {
     setUsers((prev) =>
-      prev.map((u) =>
-        u.user_uuid === userUuid
+      prev.map((user) =>
+        user.user_uuid === userUuid
           ? {
-              ...u,
+              ...user,
               roles: updatedRoleNames,
             }
-          : u
+          : user
       )
     );
   };
@@ -294,10 +269,7 @@ export default function UpdateUserRole() {
           }}
           axiosInstance={axiosInstance}
           onSaved={(updatedRoleNames) =>
-            handleRolesSaved(
-              selectedUser_uuId,
-              updatedRoleNames
-            )
+            handleRolesSaved(selectedUser_uuId, updatedRoleNames)
           }
         />
       )}
@@ -309,17 +281,12 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
   const [user, setUser] = useState(null);
   const [roles, setRoles] = useState([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState("");
-
-  const token = localStorage.getItem("token");
-
-  const authHeader = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
+  const [rolePage, setRolePage] = useState(1);
 
   useEffect(() => {
     if (!user_uuId) return;
@@ -331,33 +298,28 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
 
       try {
         const [userRes, rolesRes, assignedRes] = await Promise.all([
-          axiosInstance.get(`/admin/users/uuid/${user_uuId}`, authHeader),
-          axiosInstance.get(`/admin/roles`, authHeader),
-          axiosInstance.get(`/admin/users/uuid/${user_uuId}/roles`, authHeader),
+          axiosInstance.get(`/admin/users/uuid/${user_uuId}`),
+          axiosInstance.get(`/admin/roles`),
+          axiosInstance.get(`/admin/users/uuid/${user_uuId}/roles`),
         ]);
 
         if (!mounted) return;
 
+        const allRoles = Array.isArray(rolesRes.data) ? rolesRes.data : [];
+
         setUser(userRes.data);
-        setRoles(Array.isArray(rolesRes.data) ? rolesRes.data : []);
+        setRoles(allRoles);
 
         let assignedIds = [];
 
-        if (
-          assignedRes.data?.roles &&
-          Array.isArray(assignedRes.data.roles)
-        ) {
-          const roleNameToId =
-            rolesRes.data.reduce((acc, r) => {
-              acc[r.role_name] = r.role_uuid;
-              return acc;
-            }, {});
+        if (assignedRes.data?.roles && Array.isArray(assignedRes.data.roles)) {
+          const roleNameToId = allRoles.reduce((acc, role) => {
+            acc[role.role_name] = role.role_uuid;
+            return acc;
+          }, {});
 
           assignedIds = assignedRes.data.roles
-            .map(
-              (roleName) =>
-                roleNameToId[roleName]
-            )
+            .map((roleName) => roleNameToId[roleName])
             .filter(Boolean);
         }
 
@@ -379,6 +341,55 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
     };
   }, [user_uuId, axiosInstance]);
 
+  const handleRoleSearch = useCallback((value) => {
+    const nextSearch = value || "";
+
+    setSearchTerm((prev) => {
+      if (prev === nextSearch) return prev;
+
+      setRolePage(1);
+      return nextSearch;
+    });
+  }, []);
+
+  const filteredRoles = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+
+    if (!term) return roles;
+
+    return roles.filter((role) =>
+      role.role_name?.toLowerCase().includes(term)
+    );
+  }, [roles, searchTerm]);
+
+  const totalRolePages = Math.max(
+    1,
+    Math.ceil(filteredRoles.length / ROLE_ITEMS_PER_PAGE)
+  );
+
+  const safeRolePage = Math.min(rolePage, totalRolePages);
+
+  const paginatedRoles = useMemo(() => {
+    return filteredRoles.slice(
+      (safeRolePage - 1) * ROLE_ITEMS_PER_PAGE,
+      safeRolePage * ROLE_ITEMS_PER_PAGE
+    );
+  }, [filteredRoles, safeRolePage]);
+
+  useEffect(() => {
+    if (rolePage > totalRolePages) {
+      setRolePage(totalRolePages);
+    }
+  }, [rolePage, totalRolePages]);
+
+  const handlePreviousRolePage = useCallback(() => {
+    setRolePage((prev) => Math.max(prev - 1, 1));
+  }, []);
+
+  const handleNextRolePage = useCallback(() => {
+    setRolePage((prev) => Math.min(prev + 1, totalRolePages));
+  }, [totalRolePages]);
+
   const toggleRole = (roleId) => {
     setSelectedRoleIds((prev) =>
       prev.includes(roleId)
@@ -397,15 +408,12 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
         `/admin/users/uuid/${user_uuId}/role`,
         {
           role_ids: selectedRoleIds,
-        },
-        authHeader
+        }
       );
 
       const updatedRoleNames = roles
-        .filter((r) =>
-          selectedRoleIds.includes(r.role_uuid)
-        )
-        .map((r) => r.role_name);
+        .filter((role) => selectedRoleIds.includes(role.role_uuid))
+        .map((role) => role.role_name);
 
       showStatusToast(
         response?.data?.message || "Roles updated successfully!",
@@ -419,25 +427,17 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
       onClose();
     } catch (err) {
       console.error("Failed to update roles", err);
-      showStatusToast("Update failed.", "error");
+
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Update failed.";
+
+      showStatusToast(msg, "error");
     } finally {
       setSaving(false);
     }
   };
-
-  const filteredRoles = useMemo(() => {
-    const term = searchTerm
-      .trim()
-      .toLowerCase();
-
-    if (!term) return roles;
-
-    return roles.filter((r) =>
-      r.role_name
-        .toLowerCase()
-        .includes(term)
-    );
-  }, [roles, searchTerm]);
 
   return (
     <Modal
@@ -497,15 +497,22 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
             <div className="mt-4">
               <SearchInput
                 placeholder="Search roles..."
-                onSearch={(val) => setSearchTerm(val || "")}
+                onSearch={handleRoleSearch}
               />
             </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-xs text-gray-500">
+                Showing {paginatedRoles.length} of {filteredRoles.length} role
+                {filteredRoles.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {filteredRoles.length > 0 ? (
-                filteredRoles.map((role) => (
+              {paginatedRoles.length > 0 ? (
+                paginatedRoles.map((role) => (
                   <label
                     key={role.role_uuid}
                     className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition ${
@@ -532,6 +539,17 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
                 </div>
               )}
             </div>
+
+            {filteredRoles.length > ROLE_ITEMS_PER_PAGE && (
+              <div className="mt-4 flex justify-center border-t border-gray-100 pt-4">
+                <Pagination
+                  currentPage={safeRolePage}
+                  totalPages={totalRolePages}
+                  onPrevious={handlePreviousRolePage}
+                  onNext={handleNextRolePage}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

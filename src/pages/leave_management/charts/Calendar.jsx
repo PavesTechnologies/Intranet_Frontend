@@ -184,7 +184,6 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-const token = localStorage.getItem("token");
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const months = [
@@ -227,7 +226,9 @@ export default function Calendar() {
       try {
         const res = await axios.get(
           `${window.__APP_CONFIG__.BASE_URL}/api/holidays/all`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          {
+            headers: { Authorization: `Bearer ${ localStorage.getItem("token")}` },
+          },
         );
         setHolidays(res.data);
       } catch (err) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Filter, X, Search, ChevronDown, Check, X as XIcon } from "lucide-react";
+import { FilterIcon, CloseIcon, SearchIcon, ChevronDownIcon, CheckIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 const MultiSelectDropdown = ({ options, value, onChange, placeholder, formatEnum = (s) => s }) => {
@@ -62,18 +62,18 @@ const MultiSelectDropdown = ({ options, value, onChange, placeholder, formatEnum
                         valueArray.map(v => (
                             <span key={v} className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0 mt-0.5 mb-0.5 border border-indigo-100">
                                 {formatEnum(v)}
-                                <XIcon className="h-3 w-3 hover:bg-indigo-200 hover:text-indigo-900 rounded-full cursor-pointer transition-colors" onClick={(e) => removeTag(e, v)} />
+                                <CloseIcon className="h-3 w-3 hover:bg-indigo-200 hover:text-indigo-900 rounded-full cursor-pointer transition-colors" onClick={(e) => removeTag(e, v)} />
                             </span>
                         ))
                     )}
                 </div>
-                <ChevronDown className={cn("h-4 w-4 text-slate-400 shrink-0 ml-1 transition-transform duration-200", isOpen ? "rotate-180" : "")} />
+                <ChevronDownIcon className={cn("h-4 w-4 text-slate-400 shrink-0 ml-1 transition-transform duration-200", isOpen ? "rotate-180" : "")} />
             </div>
 
             {isOpen && (
                 <div className="absolute z-[120] mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2">
                     <div className="p-2 border-b bg-slate-50 flex items-center shrink-0">
-                        <Search className="h-3.5 w-3.5 text-slate-400 mr-2 shrink-0" />
+                        <SearchIcon className="h-3.5 w-3.5 text-slate-400 mr-2 shrink-0" />
                         <input
                             type="text"
                             className="w-full bg-transparent text-[11px] font-semibold text-slate-700 outline-none placeholder:text-slate-400"
@@ -109,7 +109,7 @@ const MultiSelectDropdown = ({ options, value, onChange, placeholder, formatEnum
                                             {formatEnum(opt)}
                                         </span>
                                         <div className={cn("h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 transition-colors", isSelected ? "bg-indigo-600 border-indigo-600" : "bg-white border-slate-300")}>
-                                            {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
+                                            {isSelected && <CheckIcon className="h-2.5 w-2.5 text-white" />}
                                         </div>
                                     </div>
                                 )
@@ -221,14 +221,14 @@ const DemandFilters = ({
                 {/* Header */}
                 <div className="flex justify-between items-center px-4 py-3 bg-slate-50 border-b">
                     <span className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                        <Filter className="h-3.5 w-3.5 text-indigo-500" />
+                        <FilterIcon className="h-3.5 w-3.5 text-indigo-500" />
                         Demand Workspace Filters
                     </span>
                     <button
                         onClick={onToggleCollapse}
                         className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 p-1 rounded transition-colors"
                     >
-                        <X className="w-4 h-4" />
+                        <CloseIcon className="w-4 h-4" />
                     </button>
                 </div>
 
@@ -346,7 +346,7 @@ const DemandFilters = ({
         <div className="w-64 shrink-0 rounded-lg border bg-card flex flex-col shadow-sm h-full font-sans">
             <div className="flex items-center justify-between p-4 border-b bg-slate-50/50">
                 <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-slate-500" />
+                    <FilterIcon className="h-4 w-4 text-slate-500" />
                     <h3 className="text-xs font-bold text-slate-700">
                         Filters
                     </h3>

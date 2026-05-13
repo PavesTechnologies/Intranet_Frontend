@@ -5,7 +5,6 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
 import SearchInput from "../../../../components/filter/Searchbar";
 
-// UI label → Backend enum
 const ISSUE_TYPE_MAP = {
   Epics: "Epic",
   Stories: "Story",
@@ -13,7 +12,6 @@ const ISSUE_TYPE_MAP = {
   Bugs: "Bug",
 };
 
-// Status color helper
 const getStatusColor = (status) => {
   switch (status) {
     case "To Do":
@@ -43,6 +41,30 @@ export default function IssuesPanel({
 
   const PAGE_SIZE = 3;
 
+  const axiosInstance = useMemo(() => {
+    const instance = axios.create({
+      baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    instance.interceptors.request.use(
+      (config) => {
+        const latestToken = localStorage.getItem("token");
+
+        if (latestToken) {
+          config.headers.Authorization = `Bearer ${latestToken}`;
+        }
+
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    return instance;
+  }, []);
+
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(issuesTotal / PAGE_SIZE));
   }, [issuesTotal]);
@@ -55,7 +77,6 @@ export default function IssuesPanel({
     setIssuePage((p) => Math.min(totalPages, p + 1));
   };
 
-  // Debounce search so typing/search reset does not cause duplicate API calls
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(issueSearch.trim());
@@ -64,7 +85,6 @@ export default function IssuesPanel({
     return () => clearTimeout(timer);
   }, [issueSearch]);
 
-  // Reset page only when filter/search type changes
   useEffect(() => {
     setIssuePage(1);
   }, [activeIssueType, debouncedSearch, setIssuePage]);
@@ -76,11 +96,8 @@ export default function IssuesPanel({
       setIsLoadingIssues(true);
 
       try {
-        const token = localStorage.getItem("token");
-        const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
-
         const params = {
-          page: Math.max(0, issuePage - 1), // UI page 1 => backend page 0
+          page: Math.max(0, issuePage - 1),
           size: PAGE_SIZE,
         };
 
@@ -89,22 +106,22 @@ export default function IssuesPanel({
         }
 
         if (debouncedSearch) {
-          params.search = debouncedSearch;
+          params.search = debouncedSearch.toLowerCase();
         }
 
-        const res = await axios.get(
-          `${BASE_URL}/api/projects/${projectId}/risks/issues`,
+        const res = await axiosInstance.get(
+          `/api/projects/${projectId}/risks/issues`,
           {
-            headers: { Authorization: `Bearer ${token}` },
             params,
           }
         );
 
         if (cancelled) return;
 
-        const content = Array.isArray(res.data?.content) ? res.data.content : [];
+        const content = Array.isArray(res.data?.content)
+          ? res.data.content
+          : [];
 
-        // Ensure only unique issues by linkedType + linkedId
         const uniqueIssues = Array.from(
           new Map(
             content.map((i) => [`${i.linkedType}-${i.linkedId}`, i])
@@ -112,7 +129,7 @@ export default function IssuesPanel({
         );
 
         setIssuesPageItems(uniqueIssues);
-        setIssuesTotal(res.data?.totalElements ?? uniqueIssues.length);
+        setIssuesTotal(res.data?.totalElements ?? 0);
       } catch (e) {
         console.error("Failed to load issues", e);
 
@@ -132,11 +149,16 @@ export default function IssuesPanel({
     return () => {
       cancelled = true;
     };
-  }, [projectId, activeIssueType, issuePage, debouncedSearch]);
+  }, [
+    projectId,
+    activeIssueType,
+    issuePage,
+    debouncedSearch,
+    axiosInstance,
+  ]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full min-h-0">
-      {/* Header */}
       <div className="p-5 border-b bg-gradient-to-r from-indigo-50 to-blue-50">
         <h2 className="font-semibold text-slate-900 mb-3">
           {activeIssueType} Issues
@@ -144,18 +166,15 @@ export default function IssuesPanel({
 
         <SearchInput
           value={issueSearch}
-          onSearch={(val) => {
-            setIssueSearch(val);
-          }}
+          onSearch={(val) => setIssueSearch(val)}
           placeholder={`Search ${activeIssueType}...`}
         />
       </div>
 
-      {/* Selected Issue */}
       {selectedIssue && (
         <div className="p-4 bg-indigo-50 border-b-2 border-indigo-200 sticky top-0 z-10">
-          <div className="flex justify-between">
-            <div>
+          <div className="flex justify-between gap-2">
+            <div className="min-w-0">
               <div className="text-xs font-semibold text-indigo-600 mb-1">
                 SELECTED
               </div>
@@ -171,7 +190,7 @@ export default function IssuesPanel({
 
             <button
               onClick={() => onSelectIssue(null)}
-              className="text-slate-400 hover:text-slate-600"
+              className="text-slate-400 hover:text-slate-600 flex-shrink-0"
             >
               ✕
             </button>
@@ -179,14 +198,18 @@ export default function IssuesPanel({
         </div>
       )}
 
-      {/* Issues List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {isLoadingIssues ? (
           <LoadingSpinner size="md" text="Loading issues…" />
         ) : issuesPageItems.length === 0 ? (
           <div className="p-6 text-center text-slate-500">
             <AlertIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No issues found</p>
+
+            <p className="text-sm">
+              {debouncedSearch
+                ? "No matching issues found"
+                : "No issues found"}
+            </p>
           </div>
         ) : (
           <div className="p-3 space-y-2">
@@ -208,14 +231,14 @@ export default function IssuesPanel({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="font-semibold text-sm text-slate-900">
-                        {issue.linkedType}-{issue.linkedId}
+                        {issue.linkedType}
                       </div>
 
                       <p className="text-xs text-slate-600 line-clamp-2 mt-1">
-                        {issue.title}
+                        Title - {issue.title}
                       </p>
 
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
                         <span
                           className={`text-xs px-2 py-1 rounded ${getStatusColor(
                             issue.issueStatus
@@ -239,15 +262,16 @@ export default function IssuesPanel({
         )}
       </div>
 
-      {/* Pagination */}
-      <div className="border-t border-slate-200">
-        <Pagination
-          currentPage={issuePage}
-          totalPages={totalPages}
-          onPrevious={goPrevious}
-          onNext={goNext}
-        />
-      </div>
+      {totalPages > 1 && (
+        <div className="border-t border-slate-200">
+          <Pagination
+            currentPage={issuePage}
+            totalPages={totalPages}
+            onPrevious={goPrevious}
+            onNext={goNext}
+          />
+        </div>
+      )}
     </div>
   );
 }

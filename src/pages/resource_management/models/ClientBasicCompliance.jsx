@@ -7,7 +7,7 @@ import {
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
-import { Pencil, Trash2 } from "lucide-react";
+import { EditIcon, DeleteIcon } from "@/components/icons";
 import Modal from "../../../components/Modal/modal";
 import ComplianceForm from "./client_configuration/forms/ComplianceForm";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
@@ -245,7 +245,6 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
                     </span>
                   </td>
 
-                  {/* ACTIONS */}
                   <td className="px-6 py-4">
                     {canEditConfig ? (
                       <div className="flex justify-center items-center gap-4">
@@ -258,7 +257,7 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
                           }}
                           className="px-2 text-blue-600 hover:text-blue-800 transition"
                         >
-                          <Pencil size={14} />
+                          <EditIcon size={14} />
                         </button>
 
                         <button
@@ -270,7 +269,7 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
                           }}
                           className="p-1 text-red-600 hover:text-red-800 transition"
                         >
-                          <Trash2 size={14} />
+                          <DeleteIcon size={14} />
                         </button>
                       </div>
                     ) : (

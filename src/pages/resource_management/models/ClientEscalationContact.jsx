@@ -7,7 +7,7 @@ import {
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontalIcon, EditIcon, DeleteIcon } from "@/components/icons";
 import Modal from "../../../components/Modal/modal";
 import EscalationForm from "./client_configuration/forms/EscalationForm";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
@@ -158,9 +158,11 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
                 <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
                   Status
                 </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Actions
-                </th>
+                {canEditConfig && (
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
 
@@ -203,8 +205,8 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
                   </td>
 
                   {/* ACTIONS */}
-                  <td className="px-6 py-4">
-                    {canEditConfig ? (
+                  {canEditConfig && (
+                    <td className="px-6 py-4">
                       <div className="flex justify-center items-center gap-4">
                         <button
                           onClick={() => {
@@ -213,7 +215,7 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
                           }}
                           className="px-2 text-blue-600 hover:text-blue-800 transition"
                         >
-                          <Pencil size={14} />
+                          <EditIcon size={14} />
                         </button>
 
                         <button
@@ -223,15 +225,11 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
                           }}
                           className="p-1 text-red-600 hover:text-red-800 transition"
                         >
-                          <Trash2 size={14} />
+                          <DeleteIcon size={14} />
                         </button>
                       </div>
-                    ) : (
-                      <span className="text-gray-500 italic text-xs">
-                        Don't have permission to take actions
-                      </span>
-                    )}
-                  </td>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

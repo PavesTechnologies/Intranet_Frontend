@@ -25,5 +25,7 @@ export {
   Award as SkillIcon,
   Contact as ContactInfoIcon,
   Fingerprint as AttendanceIcon,
-  HeartPulse as HealthIcon
+  HeartPulse as HealthIcon,
+  UserMinus as UserMinusIcon,
+  Users as UsersIcon
 };
