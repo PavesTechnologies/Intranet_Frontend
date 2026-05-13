@@ -27,22 +27,34 @@ import { skillService } from "../../../services/skillService";
 const EPV3_STYLES = `
   @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&family=Dancing+Script:wght@700&display=swap");
 
-  .epv3         { font-family: "Inter", system-ui, sans-serif; background: #f4f6fc; min-height: 100vh; }
+.epv3 {
+  font-family: "Inter", system-ui, sans-serif;
+  background: #f4f6fc;
+  min-height: 100vh;
+
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
   .epv3-display { font-family: "Poppins", system-ui, sans-serif; }
 
-  /* ─── Hero wrapper ─── */
   .epv3-hero-wrap {
-    position: relative;
-    overflow: hidden;
-    border-radius: 32px;
-    background: #ffffff;
-    min-height: 115px;
-    display: flex;
-    box-shadow:
-      0 20px 60px rgba(15,23,42,0.08),
-      0 4px 20px rgba(15,23,42,0.04);
-  }
+  position: relative;
+  overflow: hidden;
 
+  border-radius: 0;
+
+  background: #ffffff;
+
+  min-height: 115px;
+
+  display: flex;
+
+  width: 100%;
+
+  box-shadow:
+    0 6px 20px rgba(15,23,42,0.05);
+}
   /* ─── Left dark panel — diagonal slant divider ─── */
   .epv3-hero-left {
     position: relative;
@@ -1026,7 +1038,7 @@ export default function EmployeeProfileView() {
       {/* ╔══════════════════════════════════════════════════════════╗
           ║  HERO  —  split left-dark / right-info                  ║
           ╚══════════════════════════════════════════════════════════╝ */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-4">
+      <div className="w-full px-0 pt-0 pb-4">
         <div className="epv3-hero-wrap epv3-anim">
 
           {/* ── LEFT DARK PANEL ── */}
@@ -1110,7 +1122,7 @@ export default function EmployeeProfileView() {
       {/* ╔══════════════════════════════════════════════════════════╗
           ║  TABS + CONTENT                                          ║
           ╚══════════════════════════════════════════════════════════╝ */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-14">
+      <div className="w-full px-4 pb-14">
 
         {/* Tab navigation */}
         <div className="epv3-anim mb-5 overflow-x-auto epv3-noscroll" style={{ animationDelay: "80ms" }}>

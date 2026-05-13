@@ -434,7 +434,7 @@ const Sidebar = ({ isCollapsed }) => {
           )}
 
           {/* 4. Employee Onboarding (Non-General, Non-DM) */}
-          {!isGeneral && (
+          { (
             <li
               ref={eoRef}
               className="relative"
