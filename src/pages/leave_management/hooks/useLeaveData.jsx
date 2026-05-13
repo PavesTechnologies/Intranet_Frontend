@@ -19,18 +19,12 @@ const useLeaveData = (employeeId, refreshKey, year) => {
   const fetchLeaveData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        toast.error("Authentication token not found.");
-        return;
-      }
 
       const response = await axios.get(
         `${BASE_URL}/api/leave-requests/employee/${employeeId}/${year}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );

@@ -5,9 +5,37 @@ const TooltipProvider = ({ children }) => <>{children}</>
 
 const Tooltip = ({ children }) => <div className="relative group inline-block">{children}</div>
 
-const TooltipTrigger = React.forwardRef(({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("", className)} {...props} />
-))
+function setRef(ref, value) {
+    if (typeof ref === "function") {
+        ref(value)
+        return
+    }
+
+    if (ref) {
+        ref.current = value
+    }
+}
+
+const TooltipTrigger = React.forwardRef(({ className, asChild = false, children, ...props }, ref) => {
+    if (asChild && React.isValidElement(children)) {
+        const childClassName = children.props.className
+
+        return React.cloneElement(children, {
+            ...props,
+            className: cn(childClassName, className),
+            ref: (node) => {
+                setRef(ref, node)
+                setRef(children.ref, node)
+            },
+        })
+    }
+
+    return (
+        <div ref={ref} className={cn("", className)} {...props}>
+            {children}
+        </div>
+    )
+})
 TooltipTrigger.displayName = "TooltipTrigger"
 
 const TooltipContent = React.forwardRef(({ className, side = "top", sideOffset = 4, ...props }, ref) => {

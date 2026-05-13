@@ -14,7 +14,7 @@ const EmployeeDirectory = () => {
   const [departmentsList, setDepartmentsList] = useState([]);
   const [designationsList, setDesignationsList] = useState([]);
 
-  const token = localStorage.getItem("token");
+
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   useEffect(() => {
@@ -25,13 +25,13 @@ const EmployeeDirectory = () => {
         // Fetch employees, departments, and designations in parallel
         const [empRes, deptRes, desigRes] = await Promise.all([
           axios.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }),
           axios.get(`${BASE_URL}/masters/departments/`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }),
           axios.get(`${BASE_URL}/masters/designations/`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }),
         ]);
 
@@ -84,7 +84,7 @@ const EmployeeDirectory = () => {
     };
 
     fetchData();
-  }, [BASE_URL, token]);
+  }, [BASE_URL]);
 
   // Departments for the filter chips
   const departments = ["All", ...departmentsList.map((d) => d.department_name)];

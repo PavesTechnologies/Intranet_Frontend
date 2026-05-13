@@ -8,6 +8,7 @@ import CreatableSelect from "react-select/creatable";
 import { toast } from "react-toastify";
 import { User, Briefcase, FileText, Plus, Trash2 } from "lucide-react";
 
+
 export default function CreateOffer() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
@@ -119,7 +120,7 @@ export default function CreateOffer() {
     const loadCountries = async () => {
       const res = await axios.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/country`,
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
 
       setCountries(
@@ -135,7 +136,7 @@ export default function CreateOffer() {
     const loadCC = async () => {
       const res = await axios.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/admin-users`,
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
 
       setCcOptions(
@@ -206,7 +207,7 @@ export default function CreateOffer() {
       const res = await axios.post(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/create`,
         payload,
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
 
       toast.update(toastId, {

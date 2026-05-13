@@ -19,7 +19,6 @@ export default function HrProfileView() {
   const { user_uuid } = useParams();
   const navigate = useNavigate();
 
-  const token = localStorage.getItem("token");
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const tabs = ["overview", "education", "experience", "identity documents"];
@@ -76,7 +75,7 @@ export default function HrProfileView() {
         },
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -109,7 +108,7 @@ export default function HrProfileView() {
     (async () => {
       try {
         const res = await axios.get(`${BASE_URL}/hr/hr/${user_uuid}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
         setProfile(res.data);
@@ -207,7 +206,7 @@ setLoadedFromStorage(true);
     try {
       const res = await axios.get(`${BASE_URL}/hr/view_documents`, {
         params: { file_path: encodeURIComponent(url) },
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
       const fileUrl = res.data.replace(/^"+|"+$/g, "");
@@ -312,7 +311,7 @@ setLoadedFromStorage(true);
       await axios.post(
         `${BASE_URL}/hr/verify-profile`,
         { user_uuid, status: "Verified" },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
 
       setVerificationStatus("Verified");

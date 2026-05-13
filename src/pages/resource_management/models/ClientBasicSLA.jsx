@@ -12,6 +12,7 @@ import SLAForm from "./client_configuration/forms/SLAForm";
 import Modal from "../../../components/Modal/modal";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { useAuth } from "../../../contexts/AuthContext";
+import GenericTable from "../../../components/Table/table";
 
 const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
   const { user } = useAuth();
@@ -156,113 +157,72 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
   );
 
   return (
-    <div className="p-4">
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[600px]">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
-                  SLA Type
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
-                  Duration
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
-                  Warning Threshold
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
-                  Actions
-                </th>
-              </tr>
-            </thead>
+    <div className="p-2">
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        {/* <div className="px-6 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b">
+          <p className="text-sm font-semibold text-gray-700">SLA Definitions</p>
+        </div> */}
 
-          {/* TABLE BODY */}
-          <tbody className="divide-y divide-gray-100">
-            {paginatedData.map((sla) => (
-              <tr
-                key={sla.slaId}
-                className="hover:bg-gray-50 transition text-center"
-              >
-                {/* SLA TYPE */}
-                <td className="px-6 py-3">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${getSlaTypeColor(
-                      sla.slaType,
-                    )}`}
-                  >
-                    {sla.slaType.replaceAll("_", " ")}
+        <GenericTable
+          headers={["SLA Type", "Duration", "Warning Threshold", "Status", "Actions"]}
+          columns={["type_info", "duration_info", "warning_info", "status_info", "actions"]}
+          rows={paginatedData.map((sla) => ({
+            ...sla,
+            type_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getSlaTypeColor(sla.slaType)}`}>
+                {sla.slaType.replaceAll("_", " ")}
+              </span>
+            ),
+            duration_info: (
+              <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                {sla.slaDurationDays} days
+              </span>
+            ),
+            warning_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getWarningColor(sla.warningThresholdDays)}`}>
+                {sla.warningThresholdDays} days
+              </span>
+            ),
+            status_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                {sla.activeFlag ? "Active" : "Inactive"}
+              </span>
+            ),
+            actions: (
+              <div className="flex justify-center items-center gap-4">
+                {canEditConfig ? (
+                  <>
+                    <button
+                      title="Edit SLA"
+                      onClick={() => {
+                        handleSetFormData(sla);
+                        setOpenUpdateSLA(true);
+                      }}
+                      className="p-1 text-blue-600 hover:text-blue-800 transition"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      title="Delete SLA"
+                      onClick={() => {
+                        setSelectedSLAId(sla.slaId);
+                        setOpenConfirmModal(true);
+                      }}
+                      className="p-1 text-red-600 hover:text-red-800 transition"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-gray-500 italic text-xs">
+                    Don't have permission to take actions
                   </span>
-                </td>
-
-                {/* DURATION */}
-                <td className="px-6 py-4">
-                  <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
-                    {sla.slaDurationDays} days
-                  </span>
-                </td>
-
-                {/* WARNING */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${getWarningColor(
-                      sla.warningThresholdDays,
-                    )}`}
-                  >
-                    {sla.warningThresholdDays} days
-                  </span>
-                </td>
-
-                {/* STATUS */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
-                  >
-                    {sla.activeFlag ? "Active" : "Inactive"}
-                  </span>
-                </td>
-
-                {/* ACTIONS */}
-                <td className="px-6 py-4">
-                  {canEditConfig ? (
-                    <div className="flex justify-center items-center gap-4">
-                      <button
-                        title="Edit SLA"
-                        onClick={() => {
-                          handleSetFormData(sla);
-                          setOpenUpdateSLA(true);
-                        }}
-                        className="p-1 text-blue-600 hover:text-blue-800 transition"
-                      >
-                        <EditIcon size={16} />
-                      </button>
-
-                      <button
-                        title="Delete SLA"
-                        onClick={() => {
-                          setSelectedSLAId(sla.slaId);
-                          setOpenConfirmModal(true);
-                        }}
-                        className="p-1 text-red-600 hover:text-red-800 transition"
-                      >
-                        <DeleteIcon size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-gray-500 italic text-xs">
-                      Don't have permission to take actions
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                )}
+              </div>
+            )
+          }))}
+        />
       </div>
-    </div>
 
       {totalPages > 1 && (
         <Pagination

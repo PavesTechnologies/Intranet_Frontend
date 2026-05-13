@@ -141,11 +141,11 @@ export default function ViewEmpDetails() {
 
   /* ── FETCH EMPLOYEE ── */
   const fetchEmployee = async () => {
-    const token = localStorage.getItem("token");
+  
     try {
       const res = await axios.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/offer/${user_uuid}`,
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
       const offerData = getOfferWithJoiningStatus(res.data);
       setEmployee(offerData);
@@ -164,19 +164,19 @@ export default function ViewEmpDetails() {
   };
 
   const fetchAdminUsers = async () => {
-    const token = localStorage.getItem("token");
+  
     const res = await axios.get(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/admin-users`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
     );
     setAdminUsers(res.data || []);
   };
 
   const fetchApprovalHistory = async () => {
-    const token = localStorage.getItem("token");
+   
     const res = await axios.get(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/status/${user_uuid}`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
     );
     const data = Array.isArray(res.data) ? res.data : [res.data];
     const mapped = data.map((item) => ({
@@ -202,11 +202,11 @@ export default function ViewEmpDetails() {
 
   /* ── PREVIEW ── */
   const handlePreviewOffer = async () => {
-    const token = localStorage.getItem("token");
+   
     try {
       const res = await axios.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${user_uuid}/generate-preview`,
-        { headers: { Authorization: `Bearer ${token}` }, responseType: "blob" }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }, responseType: "blob" }
       );
       const file = new Blob([res.data], { type: "application/pdf" });
       window.open(URL.createObjectURL(file), "_blank");
@@ -218,13 +218,13 @@ export default function ViewEmpDetails() {
   /* ── SEND OFFER ── */
   const handleSendOffer = async () => {
     setLoadingSendOffer(true);
-    const token = localStorage.getItem("token");
+  
     try {
       setSending(true);
       await axios.post(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/bulk-send`,
         { user_uuid_list: [user_uuid] },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
       showStatusToast("Offer sent successfully");
       fetchEmployee();
@@ -247,8 +247,8 @@ export default function ViewEmpDetails() {
 
   const handleApprovalSubmit = async () => {
     if (!selectedAdmin) { showStatusToast("Please select approver"); return; }
-    const token = localStorage.getItem("token");
-    const headers = { Authorization: `Bearer ${token}` };
+    
+    const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
     const selectedApproverId = Number(selectedAdmin);
     const currentApproverId =
       approvalHistory?.[0]?.action_taker_id || approvalHistory?.[0]?.approver_id;
@@ -306,7 +306,7 @@ export default function ViewEmpDetails() {
 
   /* ── UPDATE ── */
   const handleUpdateOffer = async () => {
-    const token = localStorage.getItem("token");
+
     const payload = {
   first_name: editData.first_name,
   middle_name: editData.middle_name,
@@ -336,7 +336,7 @@ export default function ViewEmpDetails() {
       await axios.put(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${user_uuid}`,
         payload,
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
       showStatusToast("Offer updated successfully");
       setIsEditing(false);
@@ -350,12 +350,12 @@ export default function ViewEmpDetails() {
 
   /* ── DELETE ── */
   const handleDeleteOffer = async () => {
-    const token = localStorage.getItem("token");
+    
     try {
       setDeletingOffer(true);
       await axios.delete(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/delete/${user_uuid}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       showStatusToast("Offer deleted successfully");
       setDeleteOfferModal(false);
