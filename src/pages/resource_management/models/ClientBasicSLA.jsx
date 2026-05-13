@@ -157,31 +157,28 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
 
   return (
     <div className="p-4">
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        {/* <div className="px-6 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b">
-          <p className="text-sm font-semibold text-gray-700">SLA Definitions</p>
-        </div> */}
-
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
-                SLA Type
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
-                Duration
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
-                Warning Threshold
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
-                Status
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
-                Actions
-              </th>
-            </tr>
-          </thead>
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                  SLA Type
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                  Duration
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                  Warning Threshold
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                  Actions
+                </th>
+              </tr>
+            </thead>
 
           {/* TABLE BODY */}
           <tbody className="divide-y divide-gray-100">
@@ -233,7 +230,7 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
                   {canEditConfig ? (
                     <div className="flex justify-center items-center gap-4">
                       <button
-                      title="Edit SLA"
+                        title="Edit SLA"
                         onClick={() => {
                           handleSetFormData(sla);
                           setOpenUpdateSLA(true);
@@ -244,7 +241,7 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
                       </button>
 
                       <button
-                      title="Delete SLA"
+                        title="Delete SLA"
                         onClick={() => {
                           setSelectedSLAId(sla.slaId);
                           setOpenConfirmModal(true);
@@ -265,6 +262,7 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
           </tbody>
         </table>
       </div>
+    </div>
 
       {totalPages > 1 && (
         <Pagination

@@ -168,14 +168,16 @@ const CompanyEscalation = () => {
                   "Level",
                   "Status",
                   "Actions",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase"
-                  >
-                    {h}
-                  </th>
-                ))}
+                ]
+                  .filter((h) => (h === "Actions" ? canEditConfig : true))
+                  .map((h) => (
+                    <th
+                      key={h}
+                      className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase"
+                    >
+                      {h}
+                    </th>
+                  ))}
               </tr>
             </thead>
 
@@ -201,8 +203,8 @@ const CompanyEscalation = () => {
                     </span>
                   </td>
 
-                  <td className="px-6 py-4">
-                    {canEditConfig ? (
+                  {canEditConfig && (
+                    <td className="px-6 py-4">
                       <div className="flex justify-center gap-4">
                         <button
                           onClick={() => {
@@ -224,12 +226,8 @@ const CompanyEscalation = () => {
                           <DeleteIcon size={14} />
                         </button>
                       </div>
-                    ) : (
-                      <span className="text-gray-400 italic text-xs">
-                        No permission
-                      </span>
-                    )}
-                  </td>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -282,3 +280,4 @@ const CompanyEscalation = () => {
 };
 
 export default CompanyEscalation;
+
