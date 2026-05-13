@@ -107,7 +107,7 @@ export default function EmployeeOnboardingPage() {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem("token");
+
 
       const response = await fetch(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
@@ -115,7 +115,7 @@ export default function EmployeeOnboardingPage() {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -136,15 +136,14 @@ export default function EmployeeOnboardingPage() {
 
   const fetchDepartments = async () => {
     try {
-      const token = localStorage.getItem("token");
-
+    
       const response = await fetch(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
         {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -159,7 +158,7 @@ export default function EmployeeOnboardingPage() {
 
   const fetchDesignations = async () => {
     try {
-      const token = localStorage.getItem("token");
+
 
       const res = await fetch(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/`,
@@ -167,7 +166,7 @@ export default function EmployeeOnboardingPage() {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -187,7 +186,7 @@ export default function EmployeeOnboardingPage() {
 
       if (!file) return;
 
-      const token = localStorage.getItem("token");
+    
 
       const formData = new FormData();
       formData.append("file", file);
@@ -199,7 +198,7 @@ export default function EmployeeOnboardingPage() {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${localStorage.getItem("token")}`
           },
           body: formData
         }
@@ -329,15 +328,14 @@ const handleExportPreview = async () => {
 
     setExportLoading(true);
 
-    const token = localStorage.getItem("token");
-
+ 
     const response = await fetch(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/export-preview`,
       {
         method: "GET",
 
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       }
     );
@@ -423,8 +421,7 @@ console.log(
 );
   try {
 
-    const token =
-      localStorage.getItem("token");
+ 
 
     // =========================
     // REMOVE BACKEND META FIELDS
@@ -501,7 +498,7 @@ console.log(
         method: "POST",
 
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
 
         body: formData,
@@ -526,7 +523,7 @@ console.log(
             "application/json",
 
           Authorization:
-            `Bearer ${token}`,
+            `Bearer ${localStorage.getItem("token")}`,
         },
 
         body: JSON.stringify(data),

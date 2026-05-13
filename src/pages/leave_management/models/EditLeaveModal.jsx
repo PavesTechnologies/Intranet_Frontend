@@ -422,6 +422,13 @@ export default function EditLeaveModal({
     onClose();
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e) => { if (e.key === "Escape") handleClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleUpdate = async (e) => {
     e.preventDefault();
     setError("");

@@ -17,14 +17,12 @@ export default function AdminApprovalView() {
     currentPage * PAGE_SIZE,
   );
   useEffect(() => {
-    const token = localStorage.getItem("token");
-
     const fetchApprovals = async () => {
       try {
         const res = await axios.get(
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/pending`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
         setRequests(res.data || []);

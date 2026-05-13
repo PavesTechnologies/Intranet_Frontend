@@ -51,12 +51,11 @@ export default function EmployeeOnboardingDashboard() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
 
     const fetchOffers = async () => {
       const detailedOffers = await fetchOfferDetailsList(
         window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL,
-        token,
+        localStorage.getItem("token"),
       );
 
       setOffers(detailedOffers);
@@ -66,7 +65,7 @@ export default function EmployeeOnboardingDashboard() {
       const res = await axios.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          headers: { Authorization: `Bearer ${ localStorage.getItem("token")}` },
         },
       );
 
