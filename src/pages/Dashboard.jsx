@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AppCard from "../components/Cards/AppCard";
 import DynamicCardGrid from "../components/Cards/DynamicCardGrid";
@@ -6,83 +6,14 @@ import UpcomingHolidays from "../pages/leave_management/charts/UpcomingHolidays"
 import BirthdayAnniversaryPanel from "../components/Cards/BirthdayAnniversaryPanel";
 import RequestLeaveModal from "../pages/leave_management/models/RequestLeaveModal";
 import { KPICard } from "../components/kpi/KPI";
+import { timesheet, pmsSummary, leaveBalance } from "../services/dashboard";
+import { useAuth } from "../contexts/AuthContext";
+import { CalendarPlus, Clock } from "lucide-react";
+import Button from "../components/Button/Button";
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
-const STATS = [
-  {
-    id: "projects",
-    label: "Active Projects",
-    value: "8",
-    sub: "3 on track",
-    accentBar: "bg-blue-400",
-    iconBg: "bg-blue-50",
-    iconColor: "text-blue-600",
-    badgeColor: "bg-blue-50 text-blue-700",
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-        <rect x="3" y="3" width="7" height="7" rx="1.5" />
-        <rect x="14" y="3" width="7" height="7" rx="1.5" />
-        <rect x="3" y="14" width="7" height="7" rx="1.5" />
-        <rect x="14" y="14" width="7" height="7" rx="1.5" />
-      </svg>
-    ),
-  },
-  {
-    id: "hours",
-    label: "Hours This Week",
-    value: "26",
-    valueSuffix: "/ 40 hrs",
-    sub: "Timesheet pending",
-    accentBar: "bg-amber-500",
-    iconBg: "bg-amber-50",
-    iconColor: "text-amber-700",
-    badgeColor: "bg-amber-50 text-amber-700",
-    progress: 65,
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="9" />
-        <polyline points="12 7 12 12 15.5 14" />
-      </svg>
-    ),
-  },
-  {
-    id: "leave",
-    label: "Leave Balance",
-    value: "12",
-    valueSuffix: "days left",
-    sub: "1 pending approval",
-    accentBar: "bg-teal-500",
-    iconBg: "bg-teal-50",
-    iconColor: "text-teal-700",
-    badgeColor: "bg-amber-50 text-amber-700",
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-        <rect x="3" y="4" width="18" height="18" rx="2" />
-        <line x1="16" y1="2" x2="16" y2="6" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="3" y1="10" x2="21" y2="10" />
-      </svg>
-    ),
-  },
-  {
-    id: "tasks",
-    label: "My Tasks",
-    value: "5",
-    valueSuffix: "open",
-    sub: "2 due today",
-    accentBar: "bg-orange-500",
-    iconBg: "bg-orange-50",
-    iconColor: "text-orange-700",
-    badgeColor: "bg-orange-50 text-orange-700",
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-        <polyline points="9 11 12 14 22 4" />
-        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-      </svg>
-    ),
-  },
-];
+
 
 const MODULES = [
   {
@@ -190,23 +121,40 @@ const ACTIVITY = [
 // ── Sub-components ───────────────────────────────────────────────────────────
 
 function DonutChart({ label, used, remaining, color }) {
-  const total = used + remaining;
-  const pct = total > 0 ? (used / total) * 100 : 0;
+  const u = parseFloat(used) || 0;
+  const r = parseFloat(remaining) || 0;
+  const total = u + r;
+  // Chart shows remaining balance (reduced from total)
+  const pct = total > 0 ? (r / total) * 100 : 0;
   const size = 80;
   const stroke = 8;
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
+  const radius = (size - stroke) / 2;
+  const circ = 2 * Math.PI * radius;
   const offset = circ - (pct / 100) * circ;
+
+  const formatValue = (val) => {
+    return Math.round(val * 100) / 100;
+  };
 
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
+          {/* Background circle represents the total capacity */}
           <circle
             cx={size / 2}
             cy={size / 2}
-            r={r}
+            r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+            className="opacity-10"
+          />
+          {/* Foreground circle represents the remaining balance */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
             fill="none"
             stroke={color}
             strokeWidth={stroke}
@@ -217,8 +165,8 @@ function DonutChart({ label, used, remaining, color }) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-sm font-bold text-gray-800 leading-none">{used}</span>
-          <span className="text-[10px] text-gray-400 mt-0.5">/ {total}</span>
+          <span className="text-sm font-bold text-gray-800 leading-none">{formatValue(r)}</span>
+          <span className="text-[10px] text-gray-400 mt-0.5">/ {formatValue(total)}</span>
         </div>
       </div>
       <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-tight text-center">{label}</span>
@@ -259,28 +207,129 @@ function ActivityFeed() {
 export default function Dashboard() {
   const [activeModule, setActiveModule] = useState(null);
   const [isRequestLeaveModalOpen, setIsRequestLeaveModalOpen] = useState(false);
+  const [totalHours, setTotalHours] = useState("0.00");
+  const [pmsData, setPmsData] = useState(null);
+  const [leaveBalanceData, setLeaveBalanceData] = useState(null);
   const navigate = useNavigate();
   const year = new Date().getFullYear();
+  const { user } = useAuth();
+  const userId = user.user_id;
+  const fetchTimesheetData = async () => {
+    try {
+      const res = await timesheet();
+      if (res.success && res.data) {
+        setTotalHours(res.data.totalHours);
+      }
+    } catch (err) {
+      console.error("Failed to fetch timesheet data", err);
+    }
+  };
+
+  const fetchPMSData = async () => {
+    try {
+      const res = await pmsSummary(userId);
+      setPmsData(res);
+    } catch (err) {
+      console.error("Failed to fetch PMS data", err);
+    }
+  };
+
+  const fetchLeaveBalanceData = async () => {
+    try {
+      const res = await leaveBalance(userId, year);
+      setLeaveBalanceData(res.data);
+    } catch (err) {
+      console.error("Failed to fetch leave balance data", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTimesheetData();
+    fetchPMSData();
+    fetchLeaveBalanceData();
+  }, [userId]);
+
+  const STATS = [
+    {
+      id: "projects",
+      label: "Active Projects",
+      value: pmsData?.activeProjectCount || 0,
+      accentBar: "bg-blue-400",
+      iconBg: "bg-blue-50",
+      iconColor: "text-blue-600",
+      badgeColor: "bg-blue-50 text-blue-700",
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </svg>
+      ),
+    },
+    {
+      id: "hours",
+      label: "Hours This Month",
+      value: totalHours,
+      // valueSuffix: "/ 40 hrs",
+      sub: "Timesheet this month",
+      accentBar: "bg-amber-500",
+      iconBg: "bg-amber-50",
+      iconColor: "text-amber-700",
+      badgeColor: "bg-amber-50 text-amber-700",
+      // progress: 65,
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <polyline points="12 7 12 12 15.5 14" />
+        </svg>
+      ),
+    },
+    {
+      id: "leave",
+      label: "Leave Balance",
+      value: leaveBalanceData
+        ? Math.round(leaveBalanceData.reduce((acc, curr) => acc + (curr.remainingBalance || 0), 0) * 100) / 100
+        : "0",
+      // valueSuffix: " days left",
+      sub: "Available balance",
+      accentBar: "bg-teal-500",
+      iconBg: "bg-teal-50",
+      iconColor: "text-teal-700",
+      badgeColor: "bg-amber-50 text-amber-700",
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      ),
+    },
+    {
+      id: "tasks",
+      label: "My Tasks",
+      value: pmsData?.totalTasksCount || 0,
+      // valueSuffix: "open",
+      // sub: "2 due today",
+      accentBar: "bg-orange-500",
+      iconBg: "bg-orange-50",
+      iconColor: "text-orange-700",
+      badgeColor: "bg-orange-50 text-orange-700",
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+          <polyline points="9 11 12 14 22 4" />
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+        </svg>
+      ),
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
 
       {/* Main content */}
       <main className="p-8 max-w-6xl">
-
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-3 mb-8">
-          {STATS.map((s) => (
-            <KPICard
-              key={s.id}
-              label={s.label}
-              value={s.value}
-              suffix={s.valueSuffix}
-              icon={s.icon}
-              color={`${s.iconBg} ${s.iconColor}`}
-            />
-          ))}
-        </div>
 
         {/* Modules */}
         <div className="grid grid-cols-8 gap-3">
@@ -315,62 +364,112 @@ export default function Dashboard() {
             />
           </div> */}
           <div className="col-span-4">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3">Holidays & Leave</p>
-            <div className="mt-2">
-              <UpcomingHolidays year={year} />
+            {/* <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3">Holidays & Leave</p> */}
+            <div className="grid grid-cols-2 gap-3">
+              {STATS.map((s) => (
+                <KPICard
+                  key={s.id}
+                  label={s.label}
+                  value={s.value}
+                  suffix={s.valueSuffix}
+                  icon={s.icon}
+                  color={`${s.iconBg} ${s.iconColor}`}
+                />
+              ))}
             </div>
-            <div className="mt-3">
+
+            <AppCard
+              className="mt-4"
+              density="comfortable"
+              renderHeader={() => (
+                // <h2 className="text-sm font-semibold text-gray-800">Quick Actions</h2>
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-4 rounded-full bg-indigo-800" />
+                  <span className="text-sm font-semibold text-gray-800">Quick Actions</span>
+                </div>
+              )}
+            >
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="primary"
+                  size="medium"
+                  onClick={() => setIsRequestLeaveModalOpen(true)}
+                >
+                  Apply Leave
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="medium"
+                  onClick={() => navigate("/timesheets")}
+                >
+                  Enter Timesheets
+                </Button>
+
+                <Button
+                  variant="success"
+                  size="medium"
+                  onClick={() => navigate("/my-work")}
+                >
+                  Manage Tasks
+                </Button>
+              </div>
+            </AppCard>
+            <div className="mt-6">
               <AppCard
                 density="comfortable"
                 renderHeader={() => (
-                  <h2 className="text-sm font-semibold text-gray-800">Leave Balance Overview</h2>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-4 rounded-full bg-pink-500" />
+                      <span className="text-sm font-semibold text-gray-800">Leave Balance Overview</span>
+                    </div>
+                    <button onClick={() => navigate("/leave-management")}
+                      className="text-xs text-blue-600 hover:text-blue-800">View Details</button>
+                  </div>
                 )}
               >
                 <div className="flex justify-around items-center py-4">
-                  <DonutChart label="Earned Leave" used={5} remaining={15} color="#10b981" />
-                  <DonutChart label="Sick Leave" used={2} remaining={8} color="#f43f5e" />
-                  <DonutChart label="Comp Off" used={1} remaining={4} color="#3b82f6" />
+                  {(() => {
+                    const getLeave = (name) => leaveBalanceData?.find(l => l.leaveName === name) || { totalBalance: 0, remainingBalance: 0 };
+                    const earned = getLeave("Earned Leave");
+                    const sick = getLeave("Sick Leave");
+                    const comp = getLeave("Compensatory Leave");
+
+                    return (
+                      <>
+                        <DonutChart
+                          label="Earned Leave"
+                          used={earned.totalBalance - earned.remainingBalance}
+                          remaining={earned.remainingBalance}
+                          color="#10b981"
+                        />
+                        <DonutChart
+                          label="Sick Leave"
+                          used={sick.totalBalance - sick.remainingBalance}
+                          remaining={sick.remainingBalance}
+                          color="#f43f5e"
+                        />
+                        <DonutChart
+                          label="Comp Off"
+                          used={comp.totalBalance - comp.remainingBalance}
+                          remaining={comp.remainingBalance}
+                          color="#3b82f6"
+                        />
+                      </>
+                    );
+                  })()}
                 </div>
               </AppCard>
             </div>
           </div>
           <div className="col-span-4">
             {/* <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3">Quick Updates</p> */}
-            <div className="mt-2">
-              <BirthdayAnniversaryPanel />
+            <div>
+              <UpcomingHolidays year={year} />
             </div>
-
-            <div className="mt-6">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3">Quick Actions</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setIsRequestLeaveModalOpen(true)}
-                  className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col items-center justify-center gap-2 group text-left"
-                >
-                  <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-100 transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                      <rect x="3" y="4" width="18" height="18" rx="2" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-700">Apply Leave</span>
-                </button>
-
-                <button
-                  onClick={() => navigate("/timesheets")}
-                  className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col items-center justify-center gap-2 group text-left"
-                >
-                  <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 group-hover:bg-amber-100 transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                      <circle cx="12" cy="12" r="9" />
-                      <polyline points="12 7 12 12 15.5 14" />
-                    </svg>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-700">Apply Timesheet</span>
-                </button>
-              </div>
+            <div className="mt-4">
+              <BirthdayAnniversaryPanel />
             </div>
           </div>
         </div>

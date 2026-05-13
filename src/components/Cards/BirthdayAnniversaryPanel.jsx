@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { celebrations } from "../../services/dashboard";
+import LoadingSpinner from "../LoadingSpinner";
 
 const WHEN_COLORS = {
   Today: "bg-emerald-50 text-emerald-600",
@@ -75,9 +76,9 @@ function CelebrationItem({ item, isActive }) {
         <span className={`text-[10px] font-bold ${isActive ? 'text-gray-800' : 'text-gray-500'}`}>
           {item.date}
         </span>
-        <span className={`text-[9px] font-medium opacity-50 uppercase tracking-tighter`}>
+        {/* <span className={`text-[9px] font-medium opacity-50 uppercase tracking-tighter`}>
           {item.when === "Today" ? "Today" : item.when}
-        </span>
+        </span> */}
       </div>
     </div>
   );
@@ -242,8 +243,8 @@ export default function BirthdayAnniversaryPanel() {
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${isActive
-                        ? `${tab.activeClass} shadow-sm`
-                        : "text-gray-400 hover:text-gray-600"
+                      ? `${tab.activeClass} shadow-sm`
+                      : "text-gray-400 hover:text-gray-600"
                       }`}
                   >
                     {tab.icon}
@@ -260,20 +261,19 @@ export default function BirthdayAnniversaryPanel() {
 
           {loading ? (
             <div className="px-4 pb-10 flex flex-col items-center justify-center gap-3">
-              <div className="w-8 h-8 border-2 border-gray-100 border-t-blue-500 rounded-full animate-spin" />
-              <span className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Loading celebrations...</span>
+              <LoadingSpinner text="Loading Celebrations..." />
             </div>
           ) : (
             <div className="px-4 pb-5">
               <div className="grid grid-cols-2 gap-6">
                 {/* Today Section */}
                 <div className={`relative p-5 rounded-2xl transition-all duration-500 group/today ${activeTab === "birthdays"
-                    ? "bg-gradient-to-br from-rose-50/80 via-orange-50/50 to-white border border-rose-100/50 shadow-sm shadow-rose-100/20"
-                    : activeTab === "anniversaries"
-                      ? "bg-gradient-to-br from-violet-50/80 via-purple-50/50 to-white border border-violet-100/50 shadow-sm shadow-violet-100/20"
-                      : "bg-gradient-to-br from-blue-50/80 via-emerald-50/50 to-white border border-blue-100/50 shadow-sm shadow-blue-100/20"
+                  ? "bg-gradient-to-br from-rose-50/80 via-orange-50/50 to-white border border-rose-100/50 shadow-sm shadow-rose-100/20"
+                  : activeTab === "anniversaries"
+                    ? "bg-gradient-to-br from-violet-50/80 via-purple-50/50 to-white border border-violet-100/50 shadow-sm shadow-violet-100/20"
+                    : "bg-gradient-to-br from-blue-50/80 via-emerald-50/50 to-white border border-blue-100/50 shadow-sm shadow-blue-100/20"
                   }`}>
-                  
+
                   {todayItems.length > 0 && (
                     <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
                       <div className="absolute -bottom-6 -left-6 w-56 h-56 opacity-[0.08] transform -rotate-12 transition-all duration-1000 ease-out group-hover/today:translate-x-8 group-hover/today:-translate-y-8 group-hover/today:rotate-0 group-hover/today:scale-125 z-0 flex items-center justify-center">
