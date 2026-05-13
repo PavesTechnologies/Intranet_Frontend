@@ -10,7 +10,6 @@ export default function CountryManagement() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
-  const token = localStorage.getItem("token");
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   /* -------------------- FETCH COUNTRIES -------------------- */
@@ -18,7 +17,7 @@ export default function CountryManagement() {
     try {
       setLoading(true);
       const res = await axios.get(`${BASE_URL}/masters/country`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setCountries(res.data);
     } catch (error) {
@@ -48,7 +47,7 @@ export default function CountryManagement() {
         null,
         {
           params: { is_active: country.is_active ? "false" : "true" },
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           validateStatus: (status) => status >= 200 && status < 300,
         },
       );
@@ -172,7 +171,6 @@ export default function CountryManagement() {
             setCountries((prev) => [newCountry, ...prev])
           }
           BASE_URL={BASE_URL}
-          token={token}
         />
       )}
     </div>

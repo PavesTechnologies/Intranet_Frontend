@@ -8,7 +8,6 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const token = localStorage.getItem("token");
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   useEffect(() => {
@@ -43,7 +42,7 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
           payload,
           {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
               "Content-Type": "application/json",
             },
           },
@@ -53,7 +52,7 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
       } else {
         const res = await axios.post(`${BASE_URL}/identity`, payload, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
         });

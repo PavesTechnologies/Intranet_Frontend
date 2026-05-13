@@ -55,7 +55,10 @@ export default function EmployeeOnboardingDashboard() {
     const fetchOffers = async () => {
       const detailedOffers = await fetchOfferDetailsList(
         window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL,
+<<<<<<< HEAD
+=======
         localStorage.getItem("token"),
+>>>>>>> 5470a5fc9c06765623f46a2034d598da662a1a38
       );
 
       setOffers(detailedOffers);

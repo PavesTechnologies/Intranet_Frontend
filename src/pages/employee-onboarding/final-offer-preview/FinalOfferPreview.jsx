@@ -10,13 +10,12 @@ export default function FinalOfferPreview() {
 
   useEffect(() => {
     const fetchPreview = async () => {
-      const token = localStorage.getItem("token");
 
       const res = await axios.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${offerId}/final-preview`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           responseType: "blob",
         },

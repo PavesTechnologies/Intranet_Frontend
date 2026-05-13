@@ -37,7 +37,6 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 
 export default function HrOnboardingDashboard() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const [data, setData] = useState([]);
@@ -113,7 +112,7 @@ export default function HrOnboardingDashboard() {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const offers = await fetchOfferDetailsList(BASE_URL, token);
+      const offers = await fetchOfferDetailsList(BASE_URL, localStorage.getItem("token"));
       setData(offers);
     } catch (err) {
       console.error(err);
@@ -128,7 +127,7 @@ export default function HrOnboardingDashboard() {
         `${BASE_URL}/permanent-employee/core-employee-details/`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -174,7 +173,7 @@ export default function HrOnboardingDashboard() {
         `${BASE_URL}/hr/offerletters/${employee.user_uuid}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -233,7 +232,7 @@ export default function HrOnboardingDashboard() {
 
     try {
       const res = await axios.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
       const managers = (res.data || [])
@@ -275,7 +274,7 @@ export default function HrOnboardingDashboard() {
       const res = await axios.get(
         `${BASE_URL}/hr/offerletters/${userUuid}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
       );
 
@@ -400,7 +399,7 @@ export default function HrOnboardingDashboard() {
 
       await axios.post(`${BASE_URL}/hr/offerletters/bulk-join`, payload, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
         },
       });
@@ -485,7 +484,7 @@ export default function HrOnboardingDashboard() {
 
       const res = await axios.put(`${BASE_URL}/hr/offerletters/reassign-joining`, payload, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
         },
       });

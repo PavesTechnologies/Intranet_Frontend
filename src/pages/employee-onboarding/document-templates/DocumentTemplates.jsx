@@ -109,7 +109,6 @@ export default function DocumentTemplates() {
   const iframeRef = useRef(null);
 
   const [bulkLoading, setBulkLoading] = useState(false);
-  const token = localStorage.getItem("token");
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const downloadBulkTemplate = async () => {
@@ -119,7 +118,7 @@ export default function DocumentTemplates() {
         `${BASE_URL}/permanent-employee/core-employee-details/bulk-template/`,
         {
           responseType: "blob",
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
         }
       );
       const url = window.URL.createObjectURL(new Blob([response.data]));

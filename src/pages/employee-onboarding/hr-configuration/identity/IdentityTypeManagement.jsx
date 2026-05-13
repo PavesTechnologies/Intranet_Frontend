@@ -12,8 +12,6 @@ export default function IdentityTypeManagement() {
   const [editData, setEditData] = useState(null);
 
   const [deleteBlocked, setDeleteBlocked] = useState(null);
-
-  const token = localStorage.getItem("token");
   const navigate = useNavigate();
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
@@ -22,7 +20,7 @@ export default function IdentityTypeManagement() {
     try {
       setLoading(true);
       const res = await axios.get(`${BASE_URL}/identity`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setIdentities(res.data);
     } catch {
@@ -54,7 +52,7 @@ export default function IdentityTypeManagement() {
 
     try {
       await axios.delete(`${BASE_URL}/identity/${uuid}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
       toast.success("Identity type deleted");
