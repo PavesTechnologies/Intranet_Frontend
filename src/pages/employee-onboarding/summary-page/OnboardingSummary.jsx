@@ -67,14 +67,13 @@ export default function OnboardingSummary() {
   const [loading, setLoading] = useState(true);
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
 
-  const token = localStorage.getItem("token");
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const fetchSummaryData = async () => {
     try {
       setLoading(true);
       const res = await axios.get(`${BASE_URL}/dashboard/onboarding-summary`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setSummaryData(res.data);
     } catch {

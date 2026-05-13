@@ -51,12 +51,10 @@ export default function EmployeeOnboardingDashboard() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
 
     const fetchOffers = async () => {
       const detailedOffers = await fetchOfferDetailsList(
         window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL,
-        token,
       );
 
       setOffers(detailedOffers);
