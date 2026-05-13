@@ -20,7 +20,6 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const token = localStorage.getItem("token");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -46,7 +45,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
 
     try {
       await axios.post(`${BASE_URL}/api/employee/register`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setSuccess("Employee added successfully!");
       setLoading(false);

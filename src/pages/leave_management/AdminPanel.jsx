@@ -19,7 +19,7 @@ const AdminPanel = ({ employeeId }) => {
   // const [adminLeaveRequests, setAdminLeaveRequests] = useState([]);
   const [resultMsg, setResultMsg] = useState(null);
   const [revokeRequests, setRevokeRequests] = useState([]);
-  const token = localStorage.getItem("token");
+  
   const { user } = useAuth();
   const permissions = user?.permissions || [];
   const navigate = useNavigate();
@@ -50,7 +50,7 @@ const AdminPanel = ({ employeeId }) => {
         },
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       )
@@ -102,7 +102,6 @@ const AdminPanel = ({ employeeId }) => {
   // Subscribe to WebSocket for real-time updates
   // In AdminPanel.js
   console.log("leavered", leaveApprovalRef.current);
-
 
   useEffect(() => {
     const sub1 = subscribe("leave-updated", () => {
@@ -254,10 +253,12 @@ const AdminPanel = ({ employeeId }) => {
       )}
 
       {/* Search and Filter Section */}
-      <HandleLeaveRequestAndApprovals
-        employeeId={employeeId}
-        ref={leaveApprovalRef}
-      />
+      {permissions.includes("VIEW_LEAVE_REQUEST_BY_EMPLOYEE") &&
+        <HandleLeaveRequestAndApprovals
+          employeeId={employeeId}
+          ref={leaveApprovalRef}
+        />
+      }
 
       {/* Modals */}
       {/* <AddEmployeeModal
