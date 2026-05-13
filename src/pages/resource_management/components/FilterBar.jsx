@@ -280,7 +280,7 @@ const FilterBar = ({ filters, onUpdate }) => {
   }, [open]);
 
   return (
-    <div className="flex items-center gap-2 p-2 bg-white border-b font-sans">
+    <div className="flex items-center gap-2 font-sans">
       {/* Search Input */}
       <div className="relative w-80 group">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-indigo-600 transition-colors" />

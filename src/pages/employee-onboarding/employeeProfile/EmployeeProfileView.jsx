@@ -719,10 +719,9 @@ export default function EmployeeProfileView() {
     try {
       const targetId = empId || employee?.employee_id;
       if (!targetId) return;
-      const token = localStorage.getItem("token");
       const RMSURL = window.__APP_CONFIG__.RMS_BASE_URL;
       const res = await fetch(`${RMSURL}/api/resource-certificates/resource/${targetId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const result = await res.json();
       setRawCertifications(result.data || []);
@@ -769,9 +768,8 @@ export default function EmployeeProfileView() {
 
   const fetchAboutData = async () => {
     try {
-      const token = localStorage.getItem("token");
       const res = await fetch(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       if (res.ok) {
         const responseData = await res.json();
@@ -802,7 +800,6 @@ export default function EmployeeProfileView() {
     const updatedAbout = { ...about, [key]: newContent };
     setSavingAbout(true);
     try {
-      const token = localStorage.getItem("token");
       const method = aboutUuid ? "PUT" : "POST";
       const url = aboutUuid
         ? `${BASE_URL}/employee-details/about/${employee_uuid}`
@@ -816,7 +813,7 @@ export default function EmployeeProfileView() {
       };
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
@@ -849,11 +846,10 @@ export default function EmployeeProfileView() {
     if (!fieldToDelete) return;
     setIsDeleting(true);
     try {
-      const token = localStorage.getItem("token");
       const updatedAbout = { ...about, [fieldToDelete]: "" };
       const res = await fetch(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({
           employee_uuid,
           ...(aboutUuid ? { employee_about_uuid: aboutUuid } : {}),

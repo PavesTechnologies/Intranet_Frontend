@@ -14,6 +14,7 @@ import { useNavigate, Navigate } from "react-router-dom";
 import axios from "axios";
 import Pagination from "../../../components/Pagination/pagination";
 import {useAuth} from "../../../contexts/AuthContext";
+import { KPICard } from "../../../components/kpi/KPI";
 
 /* ============================
    ADMIN APPROVAL DASHBOARD
@@ -274,18 +275,19 @@ function StatCard({
   onClick,
 }) {
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className="bg-white rounded-xl p-4 border border-black/20 shadow-sm 
-                 flex items-center gap-4 transition-all duration-300 
-                 hover:-translate-y-1 hover:shadow-xl cursor-pointer"
+      className="w-full text-left transition-all duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
     >
-      <Icon className={`h-6 w-6 ${color}`} />
-      <div>
-        <p className="text-sm text-gray-500">{title}</p>
-        <p className="text-xl font-semibold text-gray-900">{value}</p>
-      </div>
-    </div>
+      <KPICard
+        label={title}
+        value={value}
+        icon={<Icon className="h-5 w-5" />}
+        color={`bg-slate-100 ${color}`}
+        className="h-full w-full bg-white border-black/20 shadow-sm hover:shadow-xl"
+      />
+    </button>
   );
 }
 

@@ -18,6 +18,7 @@ import {
 import Button from "../../../components/Button/Button";
 import Pagination from "../../../components/Pagination/pagination";
 import { KPICard } from "../../../components/kpi/KPI";
+import GenericTable from "../../../components/Table/table";
 
 import {
   getAssetsByClient,
@@ -331,104 +332,53 @@ const AssetList = () => {
           </div>
 
           {/* Table Content */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <th className="px-6 py-4 font-semibold text-xs text-gray-500 uppercase tracking-wider">
-                    Asset Name
-                  </th>
-                  <th className="px-6 py-4 font-semibold text-xs text-gray-500 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-6 py-4 font-semibold text-xs text-gray-500 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-4 font-semibold text-xs text-gray-500 uppercase tracking-wider text-center">
-                    Qty
-                  </th>
-                  <th className="px-6 py-4 font-semibold text-xs text-gray-500 uppercase tracking-wider text-center">
-                    Status
-                  </th>
-                  <th className="px-6 py-4 font-semibold text-xs text-gray-500 uppercase tracking-wider text-right">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-gray-100">
-                {currentAssets.length > 0 ? (
-                  currentAssets.map((asset) => (
-                    <tr
-                      key={asset.assetId}
-                      className="group hover:bg-gray-50/80 transition-colors cursor-pointer"
-                      onClick={() =>
-                        navigate(`/assets/${clientId}/${asset.assetId}`)
-                      }
+          <div className="overflow-x-auto no-scrollbar">
+            <GenericTable
+              headers={["Asset Name", "Category", "Type", "Qty", "Status", "Actions"]}
+              columns={["assetName_info", "assetCategory", "assetType_info", "quantity_info", "status_info", "actions"]}
+              rows={currentAssets.map((asset) => ({
+                ...asset,
+                assetName_info: (
+                  <div className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                    {asset.assetName}
+                  </div>
+                ),
+                assetType_info: (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                    {asset.assetType}
+                  </span>
+                ),
+                quantity_info: <div className="text-center font-medium text-gray-700">{asset.quantity}</div>,
+                status_info: <div className="text-center"><StatusBadge status={asset.status} /></div>,
+                actions: (
+                  <div className="flex justify-end gap-2 text-right">
+                    <button
+                      className={`p-2 rounded-lg transition-colors ${asset.status === "INACTIVE" ? "text-gray-300 cursor-not-allowed" : "text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50"}`}
+                      title={asset.status === "INACTIVE" ? "Asset is inactive" : "Edit"}
+                      disabled={asset.status === "INACTIVE"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openModal(asset);
+                      }}
                     >
-                      <td className="px-6 py-4">
-                        <div className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                          {asset.assetName}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {asset.assetCategory}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                          {asset.assetType}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center font-medium text-gray-700">
-                        {asset.quantity}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <StatusBadge status={asset.status} />
-                      </td>
-
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2 text-right">
-                          <button
-                            className={`p-2 rounded-lg transition-colors ${asset.status === "INACTIVE" ? "text-gray-300 cursor-not-allowed" : "text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50"}`}
-                            title={asset.status === "INACTIVE" ? "Asset is inactive" : "Edit"}
-                            disabled={asset.status === "INACTIVE"}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openModal(asset);
-                            }}
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <button
-                            className={`p-2 rounded-lg transition-colors ${asset.status === "INACTIVE" ? "text-gray-300 cursor-not-allowed" : "text-red-600 hover:text-red-800 hover:bg-red-50"}`}
-                            title={asset.status === "INACTIVE" ? "Asset is inactive" : "Delete"}
-                            disabled={asset.status === "INACTIVE"}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTarget(asset);
-                            }}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="py-16 text-center text-gray-400 bg-white"
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      className={`p-2 rounded-lg transition-colors ${asset.status === "INACTIVE" ? "text-gray-300 cursor-not-allowed" : "text-red-600 hover:text-red-800 hover:bg-red-50"}`}
+                      title={asset.status === "INACTIVE" ? "Asset is inactive" : "Delete"}
+                      disabled={asset.status === "INACTIVE"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteTarget(asset);
+                      }}
                     >
-                      <div className="flex flex-col items-center gap-2">
-                        <Box size={40} className="text-gray-200" />
-                        <p>No assets found matching your search</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ),
+                onRowClick: () => navigate(`/assets/${clientId}/${asset.assetId}`)
+              }))}
+            />
           </div>
 
           {/* ✅ PAGINATION COMPONENT */}

@@ -7,6 +7,7 @@ import {
 import utilizationService from '../../../../services/utilizationService';
 import UtilizationNavbar from '../components/UtilizationNavbar';
 import LoadingSpinner from '../../../../components/LoadingSpinner';
+import GenericTable from "../../../../components/Table/table";
 
 const UtilizationGovernanceDashboard = () => {
    const [loading, setLoading] = useState(true);
@@ -124,62 +125,44 @@ const UtilizationGovernanceDashboard = () => {
                         </span>
                      </div>
                      <div className="overflow-x-auto no-scrollbar flex-1">
-                        <table className="w-full text-left">
-                           <thead>
-                              <tr className="bg-slate-50/50 border-b border-slate-50">
-                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em]">Resource / Project</th>
-                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em]">Breach Type</th>
-                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Utilization</th>
-                                 <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-right">Actions</th>
-                              </tr>
-                           </thead>
-                           <tbody className="divide-y divide-slate-50">
-                              {alerts.length === 0 ? (
-                                 <tr>
-                                    <td colSpan="4" className="px-8 py-20 text-center">
-                                       <div className="flex flex-col items-center gap-3 opacity-30">
-                                          <SuccessIcon size={48} className="text-emerald-500" />
-                                          <span className="text-[14px] font-black capitalize tracking-widest text-slate-500">No active governance breaches identified</span>
-                                       </div>
-                                    </td>
-                                 </tr>
-                              ) : (
-                                 alerts.map((alert, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50/50 transition-all group">
-                                       <td className="px-8 py-6">
-                                          <div className="flex flex-col gap-0.5">
-                                             <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{alert.scope || 'General'}</span>
-                                             <span className="text-[11px] font-bold text-slate-400 capitalize tracking-widest opacity-70 italic">{alert.id || 'N/A'}</span>
-                                          </div>
-                                       </td>
-                                       <td className="px-8 py-6">
-                                          <div className={`inline-flex items-center h-7 px-4 rounded-full text-[10px] font-black capitalize tracking-widest border shadow-sm ${
-                                             alert.severity?.toLowerCase() === 'critical' || alert.severity?.toLowerCase() === 'high' 
-                                             ? 'bg-rose-50 text-rose-600 border-rose-100' 
-                                             : 'bg-amber-50 text-amber-600 border-amber-100'
-                                          }`}>
-                                             {alert.severity || 'Warning'} Breach
-                                          </div>
-                                       </td>
-                                       <td className="px-8 py-6 text-center">
-                                          <div className="flex flex-col items-center gap-1.5">
-                                             <span className="text-[14px] font-black text-slate-900 tracking-tight">85.4%</span>
-                                             <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
-                                                <div className="h-full bg-rose-500 w-[85%]" />
-                                             </div>
-                                          </div>
-                                       </td>
-                                       <td className="px-8 py-6 text-right">
-                                          <div className="flex items-center justify-end gap-3">
-                                             <button className="h-9 px-4 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-black capitalize tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-95">Resolve</button>
-                                             <button className="h-9 px-4 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 text-[10px] font-black capitalize tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95">Escalate</button>
-                                          </div>
-                                       </td>
-                                    </tr>
-                                 ))
-                              )}
-                           </tbody>
-                        </table>
+                        <GenericTable
+                           headers={["Resource / Project", "Breach Type", "Utilization", "Actions"]}
+                           columns={["scope_info", "breach_info", "utilization_info", "actions_info"]}
+                           rows={alerts.map((alert) => ({
+                              ...alert,
+                              scope_info: (
+                                 <div className="flex flex-col gap-0.5 text-left">
+                                    <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{alert.scope || 'General'}</span>
+                                    <span className="text-[11px] font-bold text-slate-400 capitalize tracking-widest opacity-70 italic">{alert.id || 'N/A'}</span>
+                                 </div>
+                              ),
+                              breach_info: (
+                                 <div className="text-left">
+                                    <div className={`inline-flex items-center h-7 px-4 rounded-full text-[10px] font-black capitalize tracking-widest border shadow-sm ${
+                                       alert.severity?.toLowerCase() === 'critical' || alert.severity?.toLowerCase() === 'high' 
+                                       ? 'bg-rose-50 text-rose-600 border-rose-100' 
+                                       : 'bg-amber-50 text-amber-600 border-amber-100'
+                                    }`}>
+                                       {alert.severity || 'Warning'} Breach
+                                    </div>
+                                 </div>
+                              ),
+                              utilization_info: (
+                                 <div className="flex flex-col items-center gap-1.5">
+                                    <span className="text-[14px] font-black text-slate-900 tracking-tight">85.4%</span>
+                                    <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
+                                       <div className="h-full bg-rose-500 w-[85%]" />
+                                    </div>
+                                 </div>
+                              ),
+                              actions_info: (
+                                 <div className="flex items-center justify-end gap-3">
+                                    <button className="h-9 px-4 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-black capitalize tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-95">Resolve</button>
+                                    <button className="h-9 px-4 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 text-[10px] font-black capitalize tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95">Escalate</button>
+                                 </div>
+                              )
+                           }))}
+                        />
                      </div>
                   </div>
                </div>
