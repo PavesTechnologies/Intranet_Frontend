@@ -245,7 +245,6 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
                     </span>
                   </td>
 
-                  {/* ACTIONS */}
                   <td className="px-6 py-4">
                     {canEditConfig ? (
                       <div className="flex justify-center items-center gap-4">

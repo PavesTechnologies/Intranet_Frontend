@@ -4,7 +4,6 @@ import FilterListbox from "../../../../../components/filter/FilterListbox";
 import "react-phone-input-2/lib/style.css";
 import PhoneInput from "react-phone-input-2";
 
-
 const EscalationForm = ({ formData, setFormData }) => {
   const { getEnumValues } = useEnums();
   const CONTACT_ROLES = getEnumValues("ContactRole");
@@ -60,10 +59,18 @@ const EscalationForm = ({ formData, setFormData }) => {
           <FilterListbox
             options={[
               { value: "", label: "Select Role" },
-              ...CONTACT_ROLES.map((role) => ({ value: role, label: role.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) })),
+              ...CONTACT_ROLES.map((role) => ({
+                value: role,
+                label: role
+                  .replace(/_/g, " ")
+                  .toLowerCase()
+                  .replace(/^\w/, (c) => c.toUpperCase()),
+              })),
             ]}
             value={formData.contactRole || ""}
-            onChange={(val) => handleChange({ target: { name: "contactRole", value: val } })}
+            onChange={(val) =>
+              handleChange({ target: { name: "contactRole", value: val } })
+            }
           />
         </div>
 
@@ -75,10 +82,15 @@ const EscalationForm = ({ formData, setFormData }) => {
           <FilterListbox
             options={[
               { value: "", label: "Select Level" },
-              ...ESCALATION_LEVELS.map((level) => ({ value: level, label: level.replace(/_/g, " ") })),
+              ...ESCALATION_LEVELS.map((level) => ({
+                value: level,
+                label: level.replace(/_/g, " "),
+              })),
             ]}
             value={formData.escalationLevel || ""}
-            onChange={(val) => handleChange({ target: { name: "escalationLevel", value: val } })}
+            onChange={(val) =>
+              handleChange({ target: { name: "escalationLevel", value: val } })
+            }
           />
         </div>
       </div>
@@ -114,29 +126,40 @@ const EscalationForm = ({ formData, setFormData }) => {
           />
         </div> */}
         <div>
-            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+          <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
             Phone
           </label>
-                    <PhoneInput
-                      country={"in"}
-                      value={formData.contact || ""}
-                      onChange={(value) => setFormData({ ...formData, contact: value })}
-                      inputClass="!w-full !py-2 !text-base"
-                      dropdownClass="custom-phone-dropdown"
-                      countryCodeEditable={false}
-                      preferredCountries={["us", "in", "gb", "ca"]}
-                      enableSearch
-                      inputProps={{
-                        name: "contact",
-                        required: true,
-                        autoFocus: false,
-                      }}
-                    />
-                  </div>
+          <PhoneInput
+            country={"in"}
+            value={formData.phone || ""}
+            onChange={(value, country) => {
+              const countryCode = `+${country.dialCode}`;
+              const phoneNumber = value.slice(country.dialCode.length);
+
+              setFormData({
+                ...formData,
+                phone: `${countryCode} ${phoneNumber}`,
+              });
+            }}
+            inputClass="!w-full !py-2 !text-base"
+            dropdownClass="custom-phone-dropdown"
+            countryCodeEditable={false}
+            preferredCountries={["us", "in", "gb", "ca"]}
+            enableSearch
+            inputProps={{
+              name: "phone",
+              required: true,
+              autoFocus: false,
+            }}
+          />
+        </div>
 
         {/* Active */}
         <div className="flex items-center gap-3 py-2">
-          <label htmlFor="activeFlag" className="relative inline-flex items-center cursor-pointer">
+          <label
+            htmlFor="activeFlag"
+            className="relative inline-flex items-center cursor-pointer"
+          >
             <input
               type="checkbox"
               id="activeFlag"
@@ -168,9 +191,10 @@ const EscalationForm = ({ formData, setFormData }) => {
             <label
               key={trigger}
               className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-medium cursor-pointer transition-all duration-200 select-none
-                ${formData.triggers?.includes(trigger)
-                  ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
-                  : "bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                ${
+                  formData.triggers?.includes(trigger)
+                    ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
+                    : "bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
                 }`}
             >
               <input
@@ -179,7 +203,10 @@ const EscalationForm = ({ formData, setFormData }) => {
                 onChange={() => handleTriggerChange(trigger)}
                 className="hidden"
               />
-              {trigger.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
+              {trigger
+                .replace(/_/g, " ")
+                .toLowerCase()
+                .replace(/^\w/, (c) => c.toUpperCase())}
             </label>
           ))}
         </div>
@@ -189,3 +216,4 @@ const EscalationForm = ({ formData, setFormData }) => {
 };
 
 export default EscalationForm;
+
