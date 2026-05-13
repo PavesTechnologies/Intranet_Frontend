@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { Pencil, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "react-toastify";
@@ -41,12 +41,30 @@ export default function PermissionManagement() {
   const [selectedPermissionUuids, setSelectedPermissionUuids] = useState([]);
 
   const itemsPerPage = 5;
-  const token = localStorage.getItem("token");
 
-  const axiosInstance = axios.create({
-    baseURL: `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}`,
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const axiosInstance = useMemo(() => {
+    const instance = axios.create({
+      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    instance.interceptors.request.use(
+      (config) => {
+        const latestToken = localStorage.getItem("token");
+
+        if (latestToken) {
+          config.headers.Authorization = `Bearer ${latestToken}`;
+        }
+
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    return instance;
+  }, []);
 
   const showSingleToast = (msg, type) => {
     toast.dismiss();
@@ -71,6 +89,7 @@ export default function PermissionManagement() {
 
   useEffect(() => {
     initialize();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -384,8 +403,8 @@ export default function PermissionManagement() {
       } else {
         showSingleToast(
           detail ||
-          err?.response?.data?.message ||
-          "Failed to delete permissions",
+            err?.response?.data?.message ||
+            "Failed to delete permissions",
           "error"
         );
       }
@@ -466,30 +485,16 @@ export default function PermissionManagement() {
           <FilterListbox
             options={[
               { value: "", label: "Default Group" },
-              ...groups.map((g) => ({ value: g.group_uuid, label: g.group_name })),
+              ...groups.map((g) => ({
+                value: g.group_uuid,
+                label: g.group_name,
+              })),
             ]}
             value={selectedGroup}
             onChange={setSelectedGroup}
           />
 
           <div className="flex gap-3 mt-3">
-            <Button
-              onClick={handleCreate}
-              variant="primary"
-              size="medium"
-              disabled={creatingPermission}
-              className="flex items-center gap-2"
-            >
-              {creatingPermission ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Add Permission"
-              )}
-            </Button>
-
             <Button
               onClick={() => {
                 setAddPermissionModal(false);

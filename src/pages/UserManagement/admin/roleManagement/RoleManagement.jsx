@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import axios from "axios";
 
 import RoleForm from "./RoleForm";
@@ -15,22 +15,32 @@ export default function RoleManagement() {
   const [activeTab, setActiveTab] = useState("roles");
   const [loadingRoles, setLoadingRoles] = useState(false);
 
-  const token = localStorage.getItem("token");
+  const axiosInstance = useMemo(() => {
+    const instance = axios.create({
+      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
 
-  const authHeader = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
+    instance.interceptors.request.use((config) => {
+      const latestToken = localStorage.getItem("token");
+
+      if (latestToken) {
+        config.headers.Authorization = `Bearer ${latestToken}`;
+      }
+
+      return config;
+    });
+
+    return instance;
+  }, []);
 
   const fetchRoles = useCallback(async () => {
     try {
       setLoadingRoles(true);
 
-      const res = await axios.get(
-        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/roles`,
-        authHeader
-      );
+      const res = await axiosInstance.get("/admin/roles");
 
       setRoles(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
@@ -44,7 +54,7 @@ export default function RoleManagement() {
     } finally {
       setLoadingRoles(false);
     }
-  }, [token]);
+  }, [axiosInstance]);
 
   useEffect(() => {
     fetchRoles();

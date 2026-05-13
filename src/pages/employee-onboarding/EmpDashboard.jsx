@@ -66,7 +66,7 @@ export default function EmployeeOnboardingDashboard() {
       const res = await axios.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
       );
 

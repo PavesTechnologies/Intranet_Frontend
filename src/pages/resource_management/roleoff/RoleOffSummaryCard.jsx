@@ -1,28 +1,28 @@
 import React from "react";
 import {
-  AlertTriangle,
-  CheckCheck,
-  Layers,
-  UserRoundMinus,
-} from "lucide-react";
+  WarningIcon,
+  DoubleCheckIcon,
+  LayersIcon,
+  UserMinusIcon,
+} from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { KPICard } from "../../../components/kpi/KPI";
 
 const cardConfig = {
   "Active Allocations": {
-    icon: Layers,
+    icon: LayersIcon,
     colorClass: "bg-slate-100 text-slate-600",
   },
   "Pending Role-Offs": {
-    icon: UserRoundMinus,
+    icon: UserMinusIcon,
     colorClass: "bg-amber-100 text-amber-600",
   },
   "High Impact Allocations": {
-    icon: AlertTriangle,
+    icon: WarningIcon,
     colorClass: "bg-rose-100 text-rose-600",
   },
   "Total RoleOff": {
-    icon: CheckCheck,
+    icon: DoubleCheckIcon,
     colorClass: "bg-indigo-100 text-indigo-600",
   },
 };

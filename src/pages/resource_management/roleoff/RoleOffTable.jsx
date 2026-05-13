@@ -1,5 +1,5 @@
 import React from "react";
-import { Eye, ArrowRightCircle, Pencil, ShieldAlert, XCircle } from "lucide-react";
+import { ViewIcon, NextCircleIcon, EditIcon, SecurityAlertIcon, ErrorIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -7,14 +7,16 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import GenericTable from "../../../components/Table/table";
 
 const STATUS_STYLES = {
-  Active: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  Pending: "border-amber-200 bg-amber-50 text-amber-700",
-  "Not Requested": "border-slate-200 bg-slate-100 text-slate-700",
-  "Pending Approval": "border-amber-200 bg-amber-50 text-amber-700",
-  Approved: "border-blue-200 bg-blue-50 text-blue-700",
-  Rejected: "border-rose-200 bg-rose-50 text-rose-700",
-  Fulfilled: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  Cancelled: "border-slate-200 bg-slate-100 text-slate-700",
+  ACTIVE: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  PLANNED: "border-blue-200 bg-blue-50 text-blue-700",
+  ENDED: "border-slate-200 bg-slate-100 text-slate-700",
+  PENDING: "border-amber-200 bg-amber-50 text-amber-700",
+  NOT_REQUESTED: "border-slate-200 bg-slate-100 text-slate-700",
+  APPROVED: "border-blue-200 bg-blue-50 text-blue-700",
+  REJECTED: "border-rose-200 bg-rose-50 text-rose-700",
+  FULFILLED: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  CANCELLED: "border-slate-200 bg-slate-100 text-slate-700",
+  ROLLED_OFF: "border-slate-200 bg-slate-100 text-slate-700",
 };
 
 const IMPACT_STYLES = {
@@ -54,7 +56,7 @@ const getPmExtraColumnConfig = (pmTab) => {
   if (pmTab === "process") {
     return {
       header: "Role-Off Status",
-      renderCell: (row) => renderBadge(row.roleOffStatus || "Not Requested", STATUS_STYLES),
+      renderCell: (row) => renderBadge(row.roleOffStatus || "NOT_REQUESTED", STATUS_STYLES),
     };
   }
 
@@ -87,42 +89,45 @@ const RoleOffTable = ({
   const emptyStateMessage = hasActiveFilters
     ? "No records match the current filters."
     : "No role-off records available.";
+
   const canPmCancel = (row) =>
     pmTab === "process" &&
-    (row.roleOffStatus === "Pending Approval" || row.roleOffStatus === "Approved");
+    (row.roleOffStatus === "PENDING" || row.roleOffStatus === "APPROVED");
+
   const getPmAction = (row) => {
     if (pmTab === "active") {
       return {
         key: "roleoff",
         label: "Role-Off",
-        icon: ArrowRightCircle,
+        icon: NextCircleIcon,
       };
     }
 
     if (
-      row.roleOffStatus === "Approved" ||
-      row.roleOffStatus === "Fulfilled" ||
-      row.roleOffStatus === "Rejected"
+      row.roleOffStatus === "APPROVED" ||
+      row.roleOffStatus === "FULFILLED" ||
+      row.roleOffStatus === "REJECTED" ||
+      row.roleOffStatus === "ROLLED_OFF"
     ) {
       return {
         key: "view",
         label: "View",
-        icon: Eye,
+        icon: ViewIcon,
       };
     }
 
-    if (row.roleOffStatus && row.roleOffStatus !== "Not Requested") {
+    if (row.roleOffStatus && row.roleOffStatus !== "NOT_REQUESTED") {
       return {
         key: "edit",
         label: "Edit",
-        icon: Pencil,
+        icon: EditIcon,
       };
     }
 
     return {
       key: "roleoff",
       label: "Role-Off",
-      icon: ArrowRightCircle,
+      icon: NextCircleIcon,
     };
   };
 

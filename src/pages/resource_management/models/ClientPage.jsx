@@ -11,21 +11,21 @@ import { getAssetsByProjectId } from "../services/clientservice";
 import CompanyEscalationModal from "./client_configuration/CompanyEscalationModal";
 import { createCompanyContact } from "../services/clientservice";
 import {
-  ArrowLeft,
-  Building2,
-  Globe,
-  FileText,
-  CheckCircle2,
-  ShieldCheck,
-  Users,
-  Box,
-  MoreHorizontal,
-  Briefcase,
-  AlertTriangle,
-  Package,
-  Pencil,
-  Trash2,
-} from "lucide-react";
+  PrevIcon,
+  BuildingIcon,
+  GlobalIcon,
+  DocumentIcon,
+  SuccessIcon,
+  AuthSuccessIcon,
+  TeamIcon,
+  BoxIcon,
+  MoreHorizontalIcon,
+  ProjectsIcon,
+  WarningIcon,
+  PackageIcon,
+  EditIcon,
+  DeleteIcon,
+} from "@/components/icons";
 
 import { useAuth } from "../../../contexts/AuthContext";
 import { KPICard } from "../../../components/kpi/KPI";
@@ -349,6 +349,7 @@ const ClientPage = () => {
   const navigate = useNavigate();
 
   // State declarations - ALL hooks inside component
+  const getProjectId = (project) => project?.projectId || project?.pmsProjectId;
   const [selectedProject, setSelectedProject] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [openConfigModal, setOpenConfigModal] = useState(false);
@@ -386,11 +387,12 @@ const ClientPage = () => {
   const [loadingAssets, setLoadingAssets] = useState(false);
   useEffect(() => {
     const fetchAssetsByProject = async () => {
+      const pid = getProjectId(selectedProject);
+      if (!pid) return;
+
       try {
         setLoadingAssets(true);
-
-        const res = await getAssetsByProjectId(selectedProject?.pmsProjectId);
-
+        const res = await getAssetsByProjectId(pid);
         setClientAssets(res.data || []);
       } catch (err) {
         setClientAssets([]);
@@ -399,10 +401,8 @@ const ClientPage = () => {
       }
     };
 
-    if (selectedProject?.pmsProjectId) {
-      fetchAssetsByProject();
-    }
-  }, [selectedProject?.pmsProjectId]);
+    fetchAssetsByProject();
+  }, [getProjectId(selectedProject)]);
 
   // ✅ ADD HERE — Pagination
   const PROJECTS_PER_PAGE = 3;
@@ -430,7 +430,7 @@ const ClientPage = () => {
     overallHealth: "UNKNOWN",
   });
 
-  const getProjectId = (project) => project?.pmsProjectId;
+
 
   // useEffect(() => {
   //   const pid = getProjectId(selectedProject);
@@ -629,7 +629,7 @@ const ClientPage = () => {
     } else {
       setProjectSLA(null);
     }
-  }, [selectedProject?.pmsProjectId, slaRefetchKey]);
+  }, [getProjectId(selectedProject), slaRefetchKey]);
 
   // Fetch project compliance when selected project changes
   useEffect(() => {
@@ -637,7 +637,7 @@ const ClientPage = () => {
     if (pid) {
       fetchProjectCompliance(pid);
     }
-  }, [selectedProject]);
+  }, [getProjectId(selectedProject)]);
 
   // Fetch project escalations when selected project changes
   useEffect(() => {
@@ -645,18 +645,18 @@ const ClientPage = () => {
     if (pid) {
       fetchProjectEscalations(pid);
     }
-  }, [selectedProject]);
+  }, [getProjectId(selectedProject)]);
 
   // Tab icon helper
-  const ActivityIcon = CheckCircle2;
+  const ActivityIcon = SuccessIcon;
 
   // Determine available tabs for the selected project
   const getTabs = () => {
     return [
       { id: "sla", label: "SLA & Metrics", icon: ActivityIcon },
-      { id: "compliance", label: "Pre-requisites", icon: ShieldCheck },
-      { id: "assets", label: "Assets", icon: Box },
-      { id: "escalation", label: "Escalation", icon: Users },
+      { id: "compliance", label: "Pre-requisites", icon: AuthSuccessIcon },
+      { id: "assets", label: "Assets", icon: BoxIcon },
+      { id: "escalation", label: "Escalation", icon: TeamIcon },
     ];
   };
 
@@ -665,28 +665,28 @@ const ClientPage = () => {
     {
       label: "Active Projects",
       value: clientStats.activeProjects,
-      icon: FileText,
+      icon: DocumentIcon,
       color: "text-blue-600",
       bg: "bg-blue-100",
     },
     {
       label: "Total Spend",
       value: formatCurrency(clientStats.totalSpend),
-      icon: Box,
+      icon: BoxIcon,
       color: "text-emerald-600",
       bg: "bg-emerald-100",
     },
     {
       label: "Satisfaction",
       value: clientStats.satisfactionScore != null ? `${clientStats.satisfactionScore}%` : "0%",
-      icon: Users,
+      icon: TeamIcon,
       color: "text-purple-600",
       bg: "bg-purple-100",
     },
     {
       label: "Pending Issues",
       value: clientStats.pendingIssues || 0,
-      icon: AlertTriangle,
+      icon: WarningIcon,
       color: "text-orange-600",
       bg: "bg-orange-100",
     },
@@ -710,20 +710,20 @@ const ClientPage = () => {
             onClick={() => navigate(-1)}
             className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm"
           >
-            <ArrowLeft size={18} />
+            <PrevIcon size={18} />
           </button>
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center flex-wrap gap-2">
               <span className="truncate max-w-[200px] sm:max-w-none">{clientDetails.client_name}</span>
               {canEditProfile && (
                 <div className="flex gap-2">
-                  <Pencil
+                  <EditIcon
                     size={16}
                     className="text-blue-500 hover:text-blue-700 cursor-pointer"
                     title="Edit Client"
                     onClick={() => setOpenUpdateClient(true)}
                   />
-                  <Trash2
+                  <DeleteIcon
                     size={16}
                     className="text-red-500 hover:text-red-700 cursor-pointer"
                     title="Delete Client"
@@ -734,11 +734,11 @@ const ClientPage = () => {
             </h1>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 mt-1">
               <span className="flex items-center gap-1">
-                <Globe size={14} /> {clientDetails.country_name}
+                <GlobalIcon size={14} /> {clientDetails.country_name}
               </span>
               <span className="hidden sm:inline w-1 h-1 bg-gray-300 rounded-full"></span>
               <span className="flex items-center gap-1">
-                <Briefcase size={14} /> {clientDetails.client_type}
+                <ProjectsIcon size={14} /> {clientDetails.client_type}
               </span>
             </div>
           </div>
@@ -783,48 +783,7 @@ const ClientPage = () => {
         ))}
       </div>
 
-      {(canConfigAgreements || canManageAssets) && (
-        <div className="flex flex-wrap items-center justify-end gap-3 mt-5">
-          {/* ✅ COMPANY ESCALATION BUTTON */}
-          {canConfigAgreements && (
-            <Button
-              variant="secondary"
-              onClick={() => setOpenCompanyEscalation(true)}
-              className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
-            >
-              Company Escalation
-            </Button>
-          )}
-          {canConfigAgreements &&
-            (clientDetails.compliance ||
-              clientDetails.SLA ||
-              clientDetails.escalationContact) && (
-              <Button
-                variant="primary"
-                onClick={() => setOpenConfigModal(true)}
-                className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
-              >
-                + Add Configuration
-              </Button>
-            )}
 
-          {canManageAssets && (
-            <Button
-              variant="secondary"
-              onClick={() => navigate(`/manage-assets/${clientId}?name=${encodeURIComponent(clientDetails.client_name)}`)}
-              disabled={clientDetails.status !== "ACTIVE"}
-              title={clientDetails.status !== "ACTIVE" ? "Manage Assets is available only for ACTIVE clients" : ""}
-            // className={`${clientDetails.status === "ACTIVE"
-            //     ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
-            //     : "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-100 shadow-none opacity-80"
-            // }`}
-            >
-              <Package size={16} />
-              Manage Assets
-            </Button>
-          )}
-        </div>
-      )}
 
       {(clientDetails.compliance ||
         clientDetails.SLA ||
@@ -835,6 +794,45 @@ const ClientPage = () => {
               slaRefetchKey={slaRefetchKey}
               complianceRefetchKey={complianceRefetchKey}
               escalationRefetchKey={escalationRefetchKey}
+              actions={
+                (canConfigAgreements || canManageAssets) && (
+                  <>
+                    {canConfigAgreements && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => setOpenCompanyEscalation(true)}
+                        className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
+                      >
+                        Company Escalation
+                      </Button>
+                    )}
+                    {canConfigAgreements &&
+                      (clientDetails.compliance ||
+                        clientDetails.SLA ||
+                        clientDetails.escalationContact) && (
+                        <Button
+                          variant="primary"
+                          onClick={() => setOpenConfigModal(true)}
+                          className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
+                        >
+                          + Add Configuration
+                        </Button>
+                      )}
+
+                    {canManageAssets && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => navigate(`/manage-assets/${clientId}?name=${encodeURIComponent(clientDetails.client_name)}`)}
+                        disabled={clientDetails.status !== "ACTIVE"}
+                        title={clientDetails.status !== "ACTIVE" ? "Manage Assets is available only for ACTIVE clients" : ""}
+                      >
+                        <PackageIcon size={16} />
+                        Manage Assets
+                      </Button>
+                    )}
+                  </>
+                )
+              }
             />
           </div>
         )}
@@ -856,7 +854,7 @@ const ClientPage = () => {
             ) : (
               paginatedProjects.map((project) => (
                 <div
-                  key={project.pmsProjectId}
+                  key={project.projectId || project.pmsProjectId}
                   onClick={() => {
                     setSelectedProject(project);
                     setActiveTab("sla");
@@ -877,7 +875,7 @@ const ClientPage = () => {
                     </h3>
                     {getProjectId(selectedProject) ===
                       getProjectId(project) && (
-                        <CheckCircle2 className="w-5 h-5 text-indigo-600" />
+                        <SuccessIcon className="w-5 h-5 text-indigo-600" />
                       )}
                   </div>
 
@@ -943,7 +941,7 @@ const ClientPage = () => {
                   </p>
                 </div>
                 {/* <button className="text-gray-400 hover:text-gray-600">
-                  <MoreHorizontal />
+                  <MoreHorizontalIcon />
                 </button> */}
               </div>
 
@@ -998,7 +996,7 @@ const ClientPage = () => {
 
                 {!activeTab && getTabs().length > 0 && (
                   <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                    <FileText size={48} className="mb-4 text-gray-200" />
+                    <DocumentIcon size={48} className="mb-4 text-gray-200" />
                     <p>Select a category above to view details.</p>
                   </div>
                 )}
@@ -1006,7 +1004,7 @@ const ClientPage = () => {
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-              <Building2 size={64} className="mb-4 text-gray-300" />
+              <BuildingIcon size={64} className="mb-4 text-gray-300" />
               <p className="text-lg font-medium text-gray-500">
                 Select a project to view details
               </p>

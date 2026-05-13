@@ -307,7 +307,7 @@ const ResourceRow = memo(function ResourceRow({
     const visibleBlocks = timelineBlocks.filter((b) => {
       const bStart = parseDate(b.startDate);
       const bEnd = parseDate(b.endDate);
-      return bEnd >= startDate && bStart <= endDate;
+      return bEnd >= startDate && bStart <= endDate && b.status !== "ROLLED_OFF";
     });
 
     // Simple track assignment
@@ -510,7 +510,7 @@ function RoleAggregateRow({
       (res.allocationTimeline || []).forEach((block) => {
         const bStart = parseDate(block.startDate);
         const bEnd = parseDate(block.endDate);
-        if (bEnd >= startDate && bStart <= endDate) {
+        if (bEnd >= startDate && bStart <= endDate && block.status !== "ROLLED_OFF") {
           const key = block.project;
           if (!projects.has(key)) {
             projects.set(key, {
@@ -789,7 +789,7 @@ export function AvailabilityTimeline({
         (b) => {
           const bStart = parseDate(b.startDate);
           const bEnd = parseDate(b.endDate);
-          return bEnd >= startDate && bStart <= endDate;
+          return bEnd >= startDate && bStart <= endDate && b.status !== "ROLLED_OFF";
         },
       ).length;
 

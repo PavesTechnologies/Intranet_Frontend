@@ -7,7 +7,7 @@ import {
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
-import { Pencil, Trash2 } from "lucide-react";
+import { EditIcon, DeleteIcon } from "@/components/icons";
 import Modal from "../../../components/Modal/modal";
 import ComplianceForm from "./client_configuration/forms/ComplianceForm";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";

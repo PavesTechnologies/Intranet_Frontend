@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-   Users, Search, Filter, Download, Zap, ArrowUpRight, ArrowDownRight, 
-   X, Briefcase, History, BarChart2, PieChart, ShieldCheck, Mail, Phone,
-   ChevronRight, MoreHorizontal
-} from 'lucide-react';
+import { EmployeeIcon, SearchIcon, FilterIcon, DownloadIcon, ZapIcon, TrendUpIcon, TrendDownIcon, CloseIcon, ProjectsIcon, HistoryIcon, AnalyticsIcon, PieChartIcon, SuccessIcon, EmailIcon, PhoneIcon, ChevronRightIcon, MoreHorizontalIcon } from "@/components/icons";
 import { 
    ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip,
    LineChart, Line, CartesianGrid
@@ -73,7 +69,7 @@ const UtilizationResourceDashboard = () => {
                
                <div className="flex flex-wrap items-center gap-4">
                   <div className="relative group">
-                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                     <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                      <input 
                         type="text" 
                         placeholder="Search resource or role..."
@@ -83,10 +79,10 @@ const UtilizationResourceDashboard = () => {
                      />
                   </div>
                   <button className="h-11 w-11 bg-white border border-slate-200 rounded-2xl flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm">
-                     <Filter size={20} />
+                     <FilterIcon size={20} />
                   </button>
                   <button className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-2xl text-[11px] font-black capitalize tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
-                     <Download size={16} /> Export CSV
+                     <DownloadIcon size={16} /> Export CSV
                   </button>
                </div>
             </div>
@@ -194,7 +190,7 @@ const UtilizationResourceDashboard = () => {
                                  <div className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black capitalize tracking-widest rounded-lg border border-emerald-100">Active</div>
                               </div>
                               <p className="text-[14px] font-bold text-slate-400 capitalize tracking-widest flex items-center gap-2">
-                                 <Briefcase size={16} className="text-indigo-500" /> {selectedResource.role}
+                                 <ProjectsIcon size={16} className="text-indigo-500" /> {selectedResource.role}
                               </p>
                            </div>
                         </div>
@@ -202,7 +198,7 @@ const UtilizationResourceDashboard = () => {
                            onClick={() => setIsDrawerOpen(false)}
                            className="h-12 w-12 rounded-2xl bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all flex items-center justify-center shadow-inner border border-slate-100"
                         >
-                           <X size={24} />
+                           <CloseIcon size={24} />
                         </button>
                      </div>
 
@@ -210,7 +206,7 @@ const UtilizationResourceDashboard = () => {
                      <div className="grid grid-cols-2 gap-6 mb-12">
                         <div className="p-8 bg-[#081534] rounded-3xl border border-slate-800 shadow-2xl relative overflow-hidden group">
                            <div className="absolute top-0 right-0 p-8 opacity-[0.05] group-hover:scale-125 transition-transform duration-700">
-                              <Zap size={80} />
+                              <ZapIcon size={80} />
                            </div>
                            <p className="text-[11px] font-black text-indigo-400 capitalize tracking-widest mb-2">Total Utilization</p>
                            <p className="text-4xl font-black text-white tracking-tight">{selectedResource.billablePercentage}%</p>
@@ -223,7 +219,7 @@ const UtilizationResourceDashboard = () => {
                         </div>
                         <div className="p-8 bg-white border border-slate-100 rounded-3xl shadow-sm hover:shadow-xl transition-all duration-500 relative overflow-hidden group">
                            <div className="absolute top-0 right-0 p-8 opacity-[0.05] group-hover:scale-125 transition-transform duration-700">
-                              <PieChart size={80} />
+                              <PieChartIcon size={80} />
                            </div>
                            <p className="text-[11px] font-black text-slate-400 capitalize tracking-widest mb-2">Billable Ratio</p>
                            <p className="text-4xl font-black text-slate-900 tracking-tight">85.0%</p>
@@ -244,7 +240,7 @@ const UtilizationResourceDashboard = () => {
                         <div className="grid grid-cols-2 gap-4">
                            <div className="p-5 bg-slate-50 rounded-2xl flex items-center gap-4 border border-slate-100 group hover:bg-white hover:shadow-md transition-all">
                               <div className="h-10 w-10 rounded-xl bg-white text-slate-400 group-hover:text-indigo-600 flex items-center justify-center shadow-inner border border-slate-100">
-                                 <Mail size={18} />
+                                 <EmailIcon size={18} />
                               </div>
                               <div className="flex flex-col">
                                  <span className="text-[9px] font-black text-slate-400 capitalize tracking-widest">Enterprise Email</span>
@@ -253,7 +249,7 @@ const UtilizationResourceDashboard = () => {
                            </div>
                            <div className="p-5 bg-slate-50 rounded-2xl flex items-center gap-4 border border-slate-100 group hover:bg-white hover:shadow-md transition-all">
                               <div className="h-10 w-10 rounded-xl bg-white text-slate-400 group-hover:text-indigo-600 flex items-center justify-center shadow-inner border border-slate-100">
-                                 <Phone size={18} />
+                                 <PhoneIcon size={18} />
                               </div>
                               <div className="flex flex-col">
                                  <span className="text-[9px] font-black text-slate-400 capitalize tracking-widest">Internal Extension</span>
@@ -270,7 +266,7 @@ const UtilizationResourceDashboard = () => {
                               Performance Trend <div className="h-px flex-1 bg-slate-100" />
                            </h4>
                            <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 capitalize tracking-widest ml-4">
-                              <History size={14} /> Last 30 Days
+                              <HistoryIcon size={14} /> Last 30 Days
                            </div>
                         </div>
                         <div className="h-64 w-full bg-slate-50/50 rounded-3xl border border-slate-100 p-8">
@@ -291,7 +287,7 @@ const UtilizationResourceDashboard = () => {
                      {/* FOOTER ACTION */}
                      <div className="mt-12 pt-8 border-t border-slate-100 flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                           <ShieldCheck size={20} className="text-emerald-500" />
+                           <SuccessIcon size={20} className="text-emerald-500" />
                            <p className="text-[11px] font-black text-slate-400 capitalize tracking-widest italic">Validated capability profile synchronized with ERP</p>
                         </div>
                         <button className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-2xl text-[12px] font-black capitalize tracking-[0.2em] hover:bg-slate-800 transition-all shadow-xl shadow-slate-200">

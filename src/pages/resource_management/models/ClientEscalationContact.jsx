@@ -7,7 +7,7 @@ import {
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontalIcon, EditIcon, DeleteIcon } from "@/components/icons";
 import Modal from "../../../components/Modal/modal";
 import EscalationForm from "./client_configuration/forms/EscalationForm";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, X } from "lucide-react";
+import { WarningIcon, SuccessIcon, CloseIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -41,7 +41,7 @@ const ApprovalDrawer = ({ open, request, mode = "review", onClose, onApprove, on
               onClick={onClose}
               className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
             >
-              <X className="h-4 w-4" />
+              <CloseIcon className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -72,7 +72,7 @@ const ApprovalDrawer = ({ open, request, mode = "review", onClose, onApprove, on
           {request.impact === "High" ? (
             <section className="rounded-lg border border-rose-200 bg-rose-50 p-4">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 h-5 w-5 text-rose-700" />
+                <WarningIcon className="mt-0.5 h-5 w-5 text-rose-700" />
                 <div>
                   <h3 className="text-sm font-semibold text-rose-900">High impact review required</h3>
                   <p className="mt-1 text-sm text-rose-800">
@@ -142,7 +142,7 @@ const ApprovalDrawer = ({ open, request, mode = "review", onClose, onApprove, on
                 onApprove?.(request, reason.trim());
               }}
             >
-              <CheckCircle2 className="mr-2 h-4 w-4" />
+              <SuccessIcon className="mr-2 h-4 w-4" />
               {mode === "reject" ? "Confirm Rejection" : "Approve Request"}
             </Button>
           </div>

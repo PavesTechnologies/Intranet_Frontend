@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import StatusBadge from "../../components/status/statusbadge";
 import EntriesTable from "./EntriesTable";
-import { CheckCircle, XCircle, Clock, MoreVertical } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  MoreVertical,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import Tooltip from "../../components/status/Tooltip";
 import { showStatusToast } from "../../components/toastfy/toast";
 import { submitWeeklyTimesheet } from "./api";
@@ -164,7 +171,11 @@ const TimesheetGroup = ({
     { approverName: "Dummy Approver1", status: "Pending" },
     { approverName: "Dummy Approver2", status: "Approved" },
   ],
+  isCollapsed,
+  onToggleCollapse,
 }) => {
+  const collapsible = typeof onToggleCollapse === "function";
+  const showBody = !collapsible || !isCollapsed;
   const isWeeklyFormat = weekGroup && weekGroup.timesheets;
   const weekData = isWeeklyFormat ? weekGroup : null;
   const dailyData = !isWeeklyFormat
@@ -175,6 +186,7 @@ const TimesheetGroup = ({
     isWeeklyFormat ? [] : entries,
   );
   const [selectedEntryIds, setSelectedEntryIds] = useState([]);
+  const [pendingEntries, setPendingEntries] = useState([]);
   const [timesheetIdAdding, setTimesheetIdAdding] = useState(null);
   const [loadingHolidays, setLoadingHolidays] = useState(false);
   const [date, setDate] = useState(
@@ -183,7 +195,7 @@ const TimesheetGroup = ({
   const [editDateIndex, setEditDateIndex] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
-  const [showSelectionCheckboxes, setShowSelectionCheckboxes] = useState(false);
+  const [selectionTimesheetId, setSelectionTimesheetId] = useState(null);
   const menuRef = useRef(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSubmittingWeek, setIsSubmittingWeek] = useState(false); // Create individual refs for each timesheet menu
@@ -294,51 +306,42 @@ const TimesheetGroup = ({
 
   const handleConfirmDelete = async () => {
     setIsConfirmOpen(false);
-    let responseText = "";
+
+    const isPendingId = (id) =>
+      typeof id === "string" && id.startsWith("pending-");
+
+    const pendingIds = selectedEntryIds.filter(isPendingId);
+    const realIds = selectedEntryIds.filter(
+      (id) => id != null && !isPendingId(id),
+    );
+
+    // 1. Local-only removal for pending (draft) entries — no backend call.
+    if (pendingIds.length > 0) {
+      setPendingEntries((prev) =>
+        prev.filter((e) => !pendingIds.includes(e.timesheetEntryId)),
+      );
+    }
+
+    // 2. Backend call only when there are persisted ids AND a valid target timesheet.
+    //    Selection is scoped to one timesheet at a time, so we only ever delete
+    //    from that timesheet's URL — never fan out across the week.
+    const targetTimesheetId = selectionTimesheetId || timesheetId;
 
     try {
-      // For weekly format, delete from multiple timesheets
-      if (isWeeklyFormat) {
-        for (const timesheet of weekData.timesheets) {
-          const response = await fetch(
-            `${
-              window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
-            }/api/timesheet/deleteEntries/${timesheet.timesheetId}`,
-            {
-              method: "DELETE",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-              body: JSON.stringify({
-                entryIds: selectedEntryIds,
-              }),
-            },
-          );
+      let responseText = "";
 
-          const data = await response.text();
-
-          if (!response.ok) {
-            throw new Error(data || "Failed to delete entries");
-          }
-
-          responseText = data; // ✅ capture latest response message
-        }
-      } else {
-        // Single timesheet delete
+      if (realIds.length > 0 && targetTimesheetId) {
         const response = await fetch(
           `${
             window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
-          }/api/timesheet/deleteEntries/${timesheetId}`,
+          }/api/timesheet/deleteEntries/${targetTimesheetId}`,
           {
             method: "DELETE",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-            body: JSON.stringify({
-              entryIds: selectedEntryIds,
-            }),
+            body: JSON.stringify({ entryIds: realIds }),
           },
         );
 
@@ -349,11 +352,15 @@ const TimesheetGroup = ({
         }
 
         responseText = data;
+
+        if (responseText) showStatusToast(responseText, "success");
+        if (refreshData) await refreshData();
+      } else if (pendingIds.length > 0) {
+        showStatusToast("Entry deleted successfully", "success");
       }
-      showStatusToast(responseText, "success");
 
       setSelectedEntryIds([]);
-      if (refreshData) await refreshData();
+      setSelectionTimesheetId(null);
     } catch (error) {
       showStatusToast(error.message || "Error deleting entries", "error");
     }
@@ -363,10 +370,10 @@ const TimesheetGroup = ({
     setIsConfirmOpen(false);
   };
 
-  const handleSelect = () => {
+  const handleSelect = (id) => {
     setMenuOpen(false);
-    setShowSelectionCheckboxes((prev) => !prev); // toggle checkboxes
-    setSelectedEntryIds([]); // clear previous selection
+    setSelectedEntryIds([]); // clear previous selection (also when switching scope)
+    setSelectionTimesheetId((prev) => (prev === id ? null : id));
   };
 
   const approveStatus = approvers.every(
@@ -585,12 +592,23 @@ const TimesheetGroup = ({
     >
             {/* Week Header */}     {" "}
       {isWeeklyFormat && (
-        <div className={`${getWeekHeaderBgColor()} border-b px-4 py-3 mb-2`}>
+        <div
+          className={`${getWeekHeaderBgColor()} border-b px-4 py-3 ${showBody ? "mb-2" : ""} ${collapsible ? "cursor-pointer hover:brightness-95 transition" : ""}`}
+          onClick={collapsible ? () => onToggleCollapse() : undefined}
+          role={collapsible ? "button" : undefined}
+          aria-expanded={collapsible ? !isCollapsed : undefined}
+        >
                    {" "}
           <div className="flex justify-between items-center">
                        {" "}
             <div className="flex items-center gap-3">
                            {" "}
+              {collapsible &&
+                (isCollapsed ? (
+                  <ChevronDown size={20} className="text-gray-600 shrink-0" />
+                ) : (
+                  <ChevronUp size={20} className="text-gray-600 shrink-0" />
+                ))}
               <div
                 className={`${getWeekBadgeColor()} text-white px-3 py-1 rounded-full text-sm font-bold`}
               >
@@ -661,6 +679,8 @@ const TimesheetGroup = ({
         </div>
       )}
            {" "}
+      {showBody && (
+        <>
       <div
         className={
           !isWeeklyFormat
@@ -887,7 +907,7 @@ const TimesheetGroup = ({
                 </button>
                                {" "}
                 <button
-                  onClick={handleSelect}
+                  onClick={() => handleSelect(timesheetId)}
                   className="block w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-gray-100"
                 >
                                     Select                {" "}
@@ -1043,7 +1063,7 @@ const TimesheetGroup = ({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleSelect();
+                                  handleSelect(timesheet.timesheetId);
                                   setOpenMenuId(null);
                                   setMenuOpen(false);
                                 }}
@@ -1080,6 +1100,8 @@ const TimesheetGroup = ({
                       entries={timesheet.entries}
                       selectedEntryIds={selectedEntryIds}
                       setSelectedEntryIds={setSelectedEntryIds}
+                      pendingEntries={pendingEntries}
+                      setPendingEntries={setPendingEntries}
                       timesheetId={timesheet.timesheetId}
                       workDate={timesheet.workDate}
                       status={timesheet.status}
@@ -1094,7 +1116,9 @@ const TimesheetGroup = ({
                       }
                       refreshData={refreshData}
                       projectInfo={projectInfo}
-                      selectionMode={showSelectionCheckboxes}
+                      selectionMode={
+                        selectionTimesheetId === timesheet.timesheetId
+                      }
                     />
                                    {" "}
                   </div>
@@ -1137,6 +1161,8 @@ const TimesheetGroup = ({
           entries={entriesState}
           selectedEntryIds={selectedEntryIds}
           setSelectedEntryIds={setSelectedEntryIds}
+          pendingEntries={pendingEntries}
+          setPendingEntries={setPendingEntries}
           timesheetId={timesheetId}
           workDate={date}
           status={status}
@@ -1147,10 +1173,12 @@ const TimesheetGroup = ({
           }
           refreshData={refreshData}
           projectInfo={projectInfo}
-          selectionMode={showSelectionCheckboxes}
+          selectionMode={selectionTimesheetId === timesheetId}
         />
       )}
            {" "}
+        </>
+      )}
       <ConfirmDialog
         open={isConfirmOpen}
         title="Confirm Delete"

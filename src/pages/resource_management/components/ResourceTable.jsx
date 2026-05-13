@@ -26,17 +26,14 @@ function StatusBadge({ status }) {
 }
 
 function AllocationBar({ value }) {
-  let color = "bg-status-available"
-  if (value > 70) color = "bg-status-allocated"
-  else if (value > 20) color = "bg-status-partial"
+  let colorClass = "text-emerald-600"
+  if (value > 80) colorClass = "text-rose-600"
+  else if (value > 50) colorClass = "text-amber-600"
 
   return (
-    <div className="flex items-center justify-center gap-2 min-w-[100px]">
-      <div className="relative h-1.5 flex-1 rounded-full bg-secondary overflow-hidden">
-        <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${value}%` }} />
-      </div>
-      <span className="text-xs tabular-nums text-muted-foreground w-8 text-right">{value}%</span>
-    </div>
+    <span className={cn("text-xs font-bold tabular-nums", colorClass)}>
+      {value}%
+    </span>
   )
 }
 
@@ -94,106 +91,106 @@ export function ResourceTable({ resources, onResourceClick, loading = false }) {
 
       <div className="overflow-x-auto no-scrollbar">
         <GenericTable
-  headers={[
-    <div className="flex justify-center w-full">Resource</div>,
-    <div className="flex justify-center w-full">Skills</div>,
-    <div className="flex justify-center w-full">Allocation</div>,
-    <div className="flex justify-center w-full">Available From</div>,
-    <div className="flex justify-center w-full">Project</div>,
-    <div className="flex justify-center w-full">Status</div>,
-  ]}
-  columns={[
-    "resource_info",
-    "skills_info",
-    "allocation_info",
-    "available_from",
-    "project_info",
-    "status_info",
-  ]}
-  rows={sorted.map((resource) => ({
-    ...resource,
+          headers={[
+            <div className="flex justify-start w-full px-2">Resource</div>,
+            <div className="flex justify-start w-full px-2">Skills</div>,
+            <div className="flex justify-center">Allocation</div>,
+            <div className="flex justify-center">Available From</div>,
+            <div className="flex justify-center">Project</div>,
+            <div className="flex justify-center">Status</div>,
+          ]}
+          columns={[
+            "resource_info",
+            "skills_info",
+            "allocation_info",
+            "available_from",
+            "project_info",
+            "status_info",
+          ]}
+          rows={sorted.map((resource) => ({
+            ...resource,
 
-    resource_info: (
-      <div className="flex items-center justify-center gap-3 max-w-[260px] mx-auto">
-        <Avatar className="h-8 w-8 border shrink-0">
-          <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
-            {resource.avatar}
-          </AvatarFallback>
-        </Avatar>
+            resource_info: (
+              <div className="flex items-center justify-start gap-3 px-1 py-0.5 w-full">
+                <Avatar className="h-9 w-9 border-2 border-white shadow-sm shrink-0">
+                  <AvatarFallback className="text-[11px] font-bold bg-primary/10 text-primary">
+                    {resource.avatar}
+                  </AvatarFallback>
+                </Avatar>
 
-        <div className="min-w-0 flex-1 text-left">
-          <div className="flex items-center gap-2 min-w-0">
-            <p
-              className="text-sm font-heading font-bold text-card-foreground truncate min-w-0 flex-1 hover:text-indigo-900 cursor-pointer transition-colors"
-              onClick={() => onResourceClick(resource)}
-              title={resource.name}
-            >
-              {resource.name}
-            </p>
+                <div className="flex flex-col min-w-0 flex-1 text-left">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="text-sm font-bold text-slate-900 truncate min-w-0 flex-1 hover:text-indigo-600 cursor-pointer transition-colors"
+                      onClick={() => onResourceClick(resource)}
+                      title={resource.name}
+                    >
+                      {resource.name}
+                    </span>
 
-            {resource.noticeInfo?.isNoticePeriod && (
-              <span className="text-[10px] font-bold text-red-500 whitespace-nowrap px-1.5 py-0.5 bg-red-50 rounded shrink-0">
-                On Notice
-              </span>
-            )}
-          </div>
+                    {resource.noticeInfo?.isNoticePeriod && (
+                      <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-100 whitespace-nowrap px-1.5 py-0.5 rounded shrink-0">
+                        On Notice
+                      </span>
+                    )}
+                  </div>
 
-          <p
-            className="text-[10px] sm:text-xs text-muted-foreground truncate max-w-[160px] cursor-pointer hover:text-slate-700 transition-colors"
-            title={getResourceMeta(resource)}
-          >
-            {getResourceMeta(resource)}
-          </p>
-        </div>
-      </div>
-    ),
+                  <span
+                    className="text-[11px] leading-relaxed text-slate-500 truncate max-w-[180px] cursor-pointer hover:text-slate-700 transition-colors"
+                    title={getResourceMeta(resource)}
+                  >
+                    {getResourceMeta(resource)}
+                  </span>
+                </div>
+              </div>
+            ),
 
-    skills_info: (
-      <div className="flex justify-center">
-        <div
-          className="max-w-[220px] truncate overflow-hidden whitespace-nowrap cursor-pointer text-center"
-          title={resource.skills.join(", ")}
-        >
-          <span className="text-xs text-slate-700">
-            {resource.skills.join(", ")}
-          </span>
-        </div>
-      </div>
-    ),
+            skills_info: (
+              <div className="flex justify-start w-full px-1">
+                <div
+                  className="max-w-[200px] truncate overflow-hidden whitespace-nowrap cursor-pointer text-left"
+                  title={resource.skills.join(", ")}
+                >
+                  <span className="text-xs text-slate-600 font-medium">
+                    {resource.skills.join(", ")}
+                  </span>
+                </div>
+              </div>
+            ),
 
-    allocation_info: (
-      <div className="flex justify-center">
-        <AllocationBar value={resource.currentAllocation} />
-      </div>
-    ),
+            allocation_info: (
+              <div className="flex justify-center">
+                <AllocationBar value={resource.currentAllocation} />
+              </div>
+            ),
 
-    available_from: (
-      <div className="flex justify-center">
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
-          {resource.availableFrom}
-        </span>
-      </div>
-    ),
+            available_from: (
+              <div className="flex justify-center">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {resource.availableFrom}
+                </span>
+              </div>
+            ),
 
-    project_info: (
-      <div className="flex justify-center">
-        <span
-          className="text-xs text-card-foreground truncate overflow-hidden whitespace-nowrap cursor-pointer hover:text-slate-700 transition-colors block max-w-[200px] text-center"
-          title={resource.currentProject || "No Project"}
-        >
-          {resource.currentProject || "No Project"}
-        </span>
-      </div>
-    ),
+            project_info: (
+              <div className="flex justify-center">
+                <span
+                  className="text-xs text-card-foreground truncate overflow-hidden whitespace-nowrap cursor-pointer hover:text-slate-700 transition-colors block max-w-[200px] text-center"
+                  title={resource.currentProject || "No Project"}
+                >
+                  {resource.currentProject || "No Project"}
+                </span>
+              </div>
+            ),
 
-    status_info: (
-      <div className="flex justify-center">
-        <StatusBadge status={resource.status} />
-      </div>
-    ),
-  }))}
-  loading={loading}
-/>
+            status_info: (
+              <div className="flex justify-center">
+                <StatusBadge status={resource.status} />
+              </div>
+            ),
+          }))}
+          loading={loading}
+        />
       </div>
     </div>
   )

@@ -2,12 +2,6 @@ import axios from "axios";
 
 const RMS_BASE_URL = window.__APP_CONFIG__?.RMS_BASE_URL;
 
-const getAuthHeader = () => ({
-  headers: {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-  },
-});
-
 /**
  * Fetches High-Level KPI data for the Admin Dashboard
  * URL: /api/client/get-admin-kpi
@@ -16,8 +10,9 @@ export const getAdminKPI = async () => {
   try {
     const response = await axios.get(
       `${RMS_BASE_URL}/api/client/get-admin-kpi`,
-      getAuthHeader(),
-    );
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}`,
+     },
+    });
     return response.data;
   } catch (error) {
     console.error("KPI Fetch Error:", error);
@@ -39,7 +34,9 @@ export const getClientPageData = async (clientId) => {
   try {
     const response = await axios.get(
       `${RMS_BASE_URL}/api/client/${clientId}/page-data`,
-      getAuthHeader(),
+      {headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },}
     );
     return response.data;
   } catch (error) {
@@ -50,7 +47,9 @@ export const getClientPageData = async (clientId) => {
 export const searchClients = async (filters, page = 0, size = 10) => {
   try {
     const response = await axios.get(`${RMS_BASE_URL}/api/client/search`, {
-      ...getAuthHeader(),
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },
       params: {
         // Mapping Frontend Filter state -> Backend ClientFilterDTO
         clientName: filters.search,
@@ -76,7 +75,9 @@ export const createClient = async (clientData) => {
     const response = await axios.post(
       `${RMS_BASE_URL}/api/client/create`,
       clientData,
-      getAuthHeader(),
+      {headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },}
     );
     return response.data;
   } catch (error) {
@@ -413,7 +414,11 @@ export const getClientAssetAssignments = async (assetId) => {
     //    or perhaps /api/assets/54
     const response = await axios.get(
       `${RMS_BASE_URL}/api/client-asset-assignments/by-asset/${assetId}`,
-      getAuthHeader(),
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -451,7 +456,11 @@ export const assignClientAsset = async (assignmentData) => {
     const response = await axios.post(
       `${RMS_BASE_URL}/api/client-asset-assignments/${id}`,
       assignmentData,
-      getAuthHeader(),
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -487,7 +496,11 @@ export const updateClientStatus = async (clientId, clientData) => {
         clientId: clientId,
         ...clientData,
       },
-      getAuthHeader(),
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
 
     return response.data;
@@ -502,7 +515,11 @@ export const assignUpdateClientAsset = async (assignmentId, assignmentData) => {
     const response = await axios.put(
       `${RMS_BASE_URL}/api/client-asset-assignments/${assignmentId}`,
       assignmentData,
-      getAuthHeader(),
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -575,7 +592,11 @@ export const deleteClientAssignment = async (assignmentId) => {
   try {
     const response = await axios.delete(
       `${RMS_BASE_URL}/api/client-asset-assignments/${assignmentId}`,
-      getAuthHeader(),
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -587,7 +608,11 @@ export const deleteClientAssignment = async (assignmentId) => {
 export const getAssetDashboard = async () => {
   const res = await axios.get(
     `${RMS_BASE_URL}/api/client-assets/dashboard`,
-    getAuthHeader(),
+    {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    },
   );
   return res.data;
 };
@@ -756,7 +781,11 @@ export const createCompanyContact = async (companyContactData) => {
     const response = await axios.post(
       `${RMS_BASE_URL}/api/company-contact/create`,
       companyContactData,
-      getAuthHeader(),
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -774,7 +803,11 @@ export const getCompanyContactsByCompanyId = async () => {
   try {
     const response = await axios.get(
       `${RMS_BASE_URL}/api/company-contact/all`,
-      getAuthHeader(),
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -793,7 +826,11 @@ export const updateCompanyContact = async (companyContactData) => {
     const response = await axios.put(
       `${RMS_BASE_URL}/api/company-contact/update/${companyContactData.contactId}`,
       companyContactData,
-      getAuthHeader(),
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -811,7 +848,11 @@ export const deleteCompanyContact = async (contactId) => {
   try {
     const response = await axios.delete(
       `${RMS_BASE_URL}/api/company-contact/delete/${contactId}`,
-      getAuthHeader(),
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {

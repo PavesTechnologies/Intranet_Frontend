@@ -1,11 +1,11 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, useMemo } from "react";
 import { Dialog, Transition, Listbox, Switch, Combobox } from "@headlessui/react";
 import {
   CheckIcon,
-  ChevronUpDownIcon,
-  XMarkIcon,
-  MagnifyingGlassIcon,
-} from "@heroicons/react/20/solid";
+  ChevronDownIcon,
+  CloseIcon,
+  SearchIcon,
+} from "@/components/icons";
 import { createDemand, updateDemandStatus } from "../services/projectService";
 import { handleDMDecision, handleRMDecision } from "../services/demandService";
 import { getRoleExpectations } from "../services/workforceService";
@@ -67,7 +67,7 @@ const SearchableListboxField = ({ id, label, value, onChange, options, error, re
         <div className="relative">
           <Combobox.Button as="div" className={`relative w-full cursor-default overflow-hidden rounded-lg bg-white text-left shadow-sm border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${disabled ? "bg-slate-50 cursor-not-allowed" : ""}`}>
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
+              <SearchIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
             </div>
             <Combobox.Input
               className={`w-full border-none py-2.5 pl-9 pr-10 text-sm leading-5 text-gray-900 focus:ring-0 ${error ? "bg-red-50/30" : "bg-white"} ${disabled ? "bg-slate-50 cursor-not-allowed text-slate-400" : ""}`}
@@ -77,7 +77,7 @@ const SearchableListboxField = ({ id, label, value, onChange, options, error, re
               autoComplete="off"
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <ChevronUpDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
+              <ChevronDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
             </div>
           </Combobox.Button>
           <Transition
@@ -151,7 +151,7 @@ const ListboxField = ({ id, label, value, onChange, options, error, note, requir
             <span className={`block truncate ${!value ? "text-slate-400" : ""}`}>
               {displayLabel}
             </span>
-            <ChevronUpDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <ChevronDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           </Listbox.Button>
 
           <Transition
@@ -322,6 +322,11 @@ const buildCreateDemandPayload = (form, id) => {
   return payload;
 };
 
+const normalizeStatusOptions = (statuses = []) =>
+  statuses
+    .map((s) => (typeof s === "string" ? { label: s, value: s } : s))
+    .filter((s) => s && s.value);
+
 /* -------------------- Modal -------------------- */
 
 const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDetails, mode = "create", userRole = "" }) => {
@@ -329,32 +334,54 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
   const [fetchingResources, setFetchingResources] = useState(false);
   const [projectResources, setProjectResources] = useState([]);
-
-  // Master Data
-  const DEMAND_TYPES = getEnumValues("DemandType").length > 0 ? getEnumValues("DemandType") : [
-    { label: "Net New", value: "NET_NEW" },
-    { label: "Replacement", value: "REPLACEMENT" }
-  ];
-  const DEMAND_STATUSES = getEnumValues("DemandStatus");
-  const PRIORITIES = getEnumValues("PriorityLevel").length > 0 ? getEnumValues("PriorityLevel") : [
-    { label: "High", value: "HIGH" },
-    { label: "Medium", value: "MEDIUM" },
-    { label: "Low", value: "LOW" }
-  ];
-  const DELIVERY_MODELS = getEnumValues("DeliveryModel").length > 0 ? getEnumValues("DeliveryModel") : [
-    { label: "Offshore", value: "OFFSHORE" },
-    { label: "Onsite", value: "ONSITE" },
-    { label: "Hybrid", value: "HYBRID" }
-  ];
-  const COMMITMENT_TYPES = getEnumValues("DemandCommitment").length > 0 ? getEnumValues("DemandCommitment") : [
-    { label: "Confirmed", value: "CONFIRMED" },
-    { label: "Soft", value: "SOFT" }
-  ];
+  const startDateRef = useRef(null);
+  const scrollRef = useRef(null);
 
   const [roles, setRoles] = useState([]);
   const [locations, setLocations] = useState([]);
+
+  // Memoized Master Data
+  const DEMAND_TYPES = useMemo(() => {
+    const vals = getEnumValues("DemandType");
+    return vals.length > 0 ? normalizeStatusOptions(vals) : [
+      { label: "Net New", value: "NET_NEW" },
+      { label: "Replacement", value: "REPLACEMENT" }
+    ];
+  }, [getEnumValues]);
+
+  const DEMAND_STATUSES = useMemo(() => normalizeStatusOptions(getEnumValues("DemandStatus")), [getEnumValues]);
+
+  const PRIORITIES = useMemo(() => {
+    const vals = getEnumValues("PriorityLevel");
+    const titleCase = (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+    return vals.length > 0
+      ? vals.map(v => ({ label: titleCase(String(v)), value: String(v).toUpperCase() }))
+      : [
+        { label: "High", value: "HIGH" },
+        { label: "Medium", value: "MEDIUM" },
+        { label: "Low", value: "LOW" }
+      ];
+  }, [getEnumValues]);
+
+  const DELIVERY_MODELS = useMemo(() => {
+    const vals = getEnumValues("DeliveryModel");
+    return vals.length > 0 ? normalizeStatusOptions(vals) : [
+      { label: "Offshore", value: "OFFSHORE" },
+      { label: "Onsite", value: "ONSITE" },
+      { label: "Hybrid", value: "HYBRID" }
+    ];
+  }, [getEnumValues]);
+
+  const COMMITMENT_TYPES = useMemo(() => {
+    const vals = getEnumValues("DemandCommitment");
+    return vals.length > 0 ? normalizeStatusOptions(vals) : [
+      { label: "Confirmed", value: "CONFIRMED" },
+      { label: "Soft", value: "SOFT" }
+    ];
+  }, [getEnumValues]);
 
   const activeStatuses = DEMAND_STATUSES.length > 0 ? DEMAND_STATUSES : fallbackStatuses;
 
@@ -364,10 +391,6 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
 
   const isManagerOrPM = ["PROJECTMANAGER", "MANAGER"].includes(normalizedRole);
 
-  const normalizeStatusOptions = (statuses = []) =>
-    statuses
-      .map((s) => (typeof s === "string" ? { label: s, value: s } : s))
-      .filter((s) => s && s.value);
 
   const computedEditStatuses = (() => {
     if (normalizedRole === "DELIVERYMANAGER") {
@@ -379,8 +402,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
     if (isManagerOrPM) {
       return [
         { label: "Draft", value: "DRAFT" },
-        { label: "Requested", value: "REQUESTED" },
-        { label: "Cancelled", value: "CANCELLED" }
+        { label: "Requested", value: "REQUESTED" }
       ];
     }
     if (normalizedRole === "RESOURCEMANAGER") {
@@ -394,10 +416,6 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
       { label: "REJECTED", value: "REJECTED" }
     ];
   })();
-
-
-  const startDateRef = useRef(null);
-  const scrollRef = useRef(null);
 
   const fetchRoles = async () => {
     try {
@@ -466,9 +484,17 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
           allocation = allocation * 100; // Convert decimal to percentage
         }
 
-        const roleIdFromData = getVal(['deliveryRoleId', 'dev_role_id', 'roleId', 'role_id', 'RoleID', 'delivery_role_id', 'delivery_role_uuid']);
-        const roleNameFromData = getVal(['deliveryRoleName', 'deliveryRole', 'roleName', 'role_name']);
-        const resolvedRoleId = resolveRoleId(roleIdFromData || roleNameFromData, roles);
+        const getRoleValue = () => {
+          const rawRole = initialData.deliveryRole || initialData.role || initialData.demandRole || initialData.deliveryRoleName || initialData.roleName || "";
+          if (rawRole && typeof rawRole === 'object') {
+            return getRoleId(rawRole) || getRoleName(rawRole) || "";
+          }
+          return getVal(['deliveryRoleId', 'dev_role_id', 'roleId', 'role_id', 'RoleID', 'delivery_role_id', 'delivery_role_uuid', 'deliveryRole', 'roleName', 'role_name', 'role']);
+        };
+
+        const roleValueFromData = getRoleValue();
+        const roleNameFromData = (typeof initialData.deliveryRole === 'object') ? getRoleName(initialData.deliveryRole) : getVal(['deliveryRoleName', 'deliveryRole', 'roleName', 'role_name', 'role']);
+        const resolvedRoleId = resolveRoleId(roleValueFromData, roles);
 
         const mappedData = {
           ...emptyForm,
@@ -479,37 +505,45 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
           demandStartDate: sDate || toDateInputValue(getVal(['demandStartDate', 'startDate', 'start_date', 'demand_start_date', 'slaCreatedAt'])),
           demandEndDate: eDate || toDateInputValue(getVal(['demandEndDate', 'endDate', 'end_date', 'demand_end_date', 'slaDueAt'])),
           allocationPercentage: isNaN(allocation) ? "" : Math.round(allocation),
-          deliveryRole: resolvedRoleId,
+          deliveryRole: resolvedRoleId || roleValueFromData || "",
           deliveryRoleName: roleNameFromData,
           demandStatus: String(getVal(['demandStatus', 'lifecycleState', 'status', 'LifecycleState', 'demand_status'], "DRAFT")).toUpperCase().trim(),
           demandType: String(getVal(['demandType', 'type', 'type_of_demand', 'DemandType', 'demand_type'], "NET_NEW")).toUpperCase().replace(/ /g, "_"),
           demandPriority: String(getVal(['demandPriority', 'priority', 'Priority', 'demand_priority'], "MEDIUM")).toUpperCase().trim(),
           demandCommitment: String(getVal(['demandCommitment', 'commitment', 'Commitment', 'demand_commitment'], "CONFIRMED")).toUpperCase().trim(),
-          resourcesRequired: parseInt(getVal(['resourcesRequired', 'resourceRequired', 'resource_required', 'requiredResources'], 1)),
-          minExp: getVal(['minExp', 'experience', 'minimumExperience', 'min_experience', 'MinExperience', 'experience_required', 'min_experience']),
-          deliveryModel: String(getVal(['deliveryModel', 'model', 'DeliveryModel', 'delivery_model'], "OFFSHORE")).toUpperCase().trim(),
-          demandJustification: getVal(['demandJustification', 'justification', 'Justification', 'demand_justification', 'reason', 'demandJustification']),
-          requiresAdditionalApproval: !!getVal(['requiresAdditionalApproval', 'additionalApproval', 'RequiresAdditionalApproval', 'additional_approval'], false),
-          outgoingResourceId: getVal(['outgoingResourceId', 'outgoing_resource_id', 'replaced_resource_id', 'replacedResourceId']) || initialData?.outgoingResource?.resourceId || "",
+          resourcesRequired: parseInt(getVal(['resourcesRequired', 'resourceRequired', 'resource_required', 'requiredResources', 'ResourcesRequired'], 1)),
+          minExp: getVal(['minExp', 'experience', 'minimumExperience', 'min_experience', 'MinExperience', 'experience_required', 'min_experience', 'MinExp']),
+          deliveryModel: String(getVal(['deliveryModel', 'model', 'DeliveryModel', 'delivery_model', 'Delivery_Model'], "OFFSHORE")).toUpperCase().trim(),
+          demandJustification: getVal(['demandJustification', 'justification', 'Justification', 'demand_justification', 'reason', 'demandJustification', 'DemandJustification']),
+          requiresAdditionalApproval: !!getVal(['requiresAdditionalApproval', 'additionalApproval', 'RequiresAdditionalApproval', 'additional_approval', 'AdditionalApproval'], false),
+          outgoingResourceId: getVal(['outgoingResourceId', 'outgoing_resource_id', 'replaced_resource_id', 'replacedResourceId', 'OutgoingResourceId']) || initialData?.outgoingResource?.resourceId || "",
         };
 
         setForm(mappedData);
-
-
       } else {
-        setForm({
+        // Merge initialData but normalize common keys for pre-fill
+        const baseData = {
           ...emptyForm,
           projectId: pId,
           demandStartDate: sDate,
           demandEndDate: eDate,
-          ...initialData,
-        });
+        };
+
+        if (initialData) {
+          Object.keys(initialData).forEach(key => {
+            const lowerKey = key.toLowerCase();
+            if (lowerKey === 'priority' || lowerKey === 'demandpriority') baseData.demandPriority = String(initialData[key]).toUpperCase();
+            if (lowerKey === 'status' || lowerKey === 'lifecyclestate' || lowerKey === 'demandstatus') baseData.demandStatus = String(initialData[key]).toUpperCase();
+            if (lowerKey === 'role' || lowerKey === 'deliveryrole' || lowerKey === 'demandname') baseData.demandName = initialData[key];
+          });
+        }
+
+        setForm({ ...baseData, ...initialData });
       }
 
-      // if (pId) fetchProjectResources(pId);
       setErrors({});
     }
-  }, [open, initialData, projectDetails, mode]);
+  }, [open, initialData, projectDetails, mode, roles]);
 
   // Conditional Logic Reset
   useEffect(() => {
@@ -519,18 +553,25 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   }, [form.demandType]);
 
   useEffect(() => {
-    if (!open || mode !== "edit" || roles.length === 0 || !initialData) return;
+  if (!open || mode !== "edit" || roles.length === 0 || !initialData) return;
 
-    const sourceRole = form.deliveryRole || initialData.deliveryRoleId || initialData.roleId || initialData.deliveryRole;
-    const resolvedRoleId = resolveRoleId(sourceRole, roles);
+  const sourceRole =
+    initialData.deliveryRoleId ||
+    initialData.roleId ||
+    initialData.dev_role_id ||
+    initialData.deliveryRole ||
+    initialData.role ||
+    initialData.roleName;
 
-    if (resolvedRoleId && resolvedRoleId !== form.deliveryRole) {
-      setForm((prev) => ({
-        ...prev,
-        deliveryRole: resolvedRoleId,
-      }));
-    }
-  }, [open, mode, form.deliveryRole, roles, initialData]);
+  const resolvedRoleId = resolveRoleId(sourceRole, roles);
+
+  if (resolvedRoleId) {
+    setForm((prev) => ({
+      ...prev,
+      deliveryRole: resolvedRoleId,
+    }));
+  }
+}, [open, mode, roles, initialData]);
 
   const update = (k, v) => {
     setForm((p) => ({ ...p, [k]: v }));
@@ -735,7 +776,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                     onClick={onClose}
                     className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
                   >
-                    <XMarkIcon className="h-5 w-5" />
+                    <CloseIcon className="h-5 w-5" />
                   </button>
                 </div>
 

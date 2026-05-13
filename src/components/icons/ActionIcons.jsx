@@ -23,7 +23,17 @@ import {
   Loader2,
   LayoutGrid,
   Rows,
-  User
+  User,
+  ArrowRightCircle,
+  BarChart,
+  BarChart2,
+  DollarSign,
+  Award,
+  BrainCircuit,
+  RefreshCcw,
+  PieChart,
+  ExternalLink,
+  CheckCheck
 } from "lucide-react";
 
 export {
@@ -51,5 +61,16 @@ export {
   Loader2 as SpinnerIcon,
   LayoutGrid as LayoutGridIcon,
   Rows as RowsIcon,
-  User as UserIcon
+  User as UserIcon,
+  ArrowRightCircle as NextCircleIcon,
+  BarChart as BarChartIcon,
+  BarChart2 as AnalyticsIcon,
+  DollarSign as BillingIcon,
+  Award as AwardIcon,
+  BrainCircuit as IntelligenceIcon,
+  RefreshCcw as RefreshCcwIcon,
+  PieChart as PieChartIcon,
+  ExternalLink as ExportIcon,
+  CheckCheck as DoubleCheckIcon,
+  BrainCircuit as BrainCircuitIcon
 };

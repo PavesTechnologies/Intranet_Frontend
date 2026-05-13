@@ -1,18 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  Briefcase,
-  Clock3,
-  DollarSign,
-  Users,
-  Search,
-  PieChart as PieChartIcon,
-  BarChart3,
-  History,
-  Scale,
-  Circle,
-} from "lucide-react";
+import { PrevIcon, ProjectsIcon, TimeIcon, BillingIcon, EmployeeIcon, SearchIcon, AnalyticsIcon, BarChartIcon, HistoryIcon, ScaleIcon, CircleIcon } from "@/components/icons";
 import {
   Area,
   CartesianGrid,
@@ -151,7 +139,7 @@ const PerformanceTooltip = ({ active, payload, label }) => {
       <div className="bg-[#081534]/95 backdrop-blur-md border border-slate-700/50 rounded-2xl shadow-2xl p-5 flex flex-col gap-3 min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between border-b border-slate-700/50 pb-2 mb-1">
           <p className="text-[10px] font-black text-slate-400 capitalize tracking-[0.2em]">{label || 'Period'}</p>
-          <Circle size={8} className="text-indigo-400 fill-indigo-400 animate-pulse" />
+          <CircleIcon size={8} className="text-indigo-400 fill-indigo-400 animate-pulse" />
         </div>
         <div className="space-y-3">
           {payload.map((p, idx) => (
@@ -286,7 +274,7 @@ const OperationalProjectDetailPage = () => {
             onClick={() => navigate("/resource-management/bench/utilization-performance", { state: { activeTab: "projects" } })}
             className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
           >
-            <ArrowLeft size={18} />
+            <PrevIcon size={18} />
           </button>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-none">{project?.name}</h1>
@@ -300,7 +288,7 @@ const OperationalProjectDetailPage = () => {
             onClick={() => navigate('/resource-management/bench/utilization-reporting')}
             className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm h-[42px]"
           >
-            <BarChart3 className="h-4 w-4 text-emerald-600" />
+            <BarChartIcon className="h-4 w-4 text-emerald-600" />
             REPORT & DASHBOARD
           </button>
         </div>
@@ -309,10 +297,10 @@ const OperationalProjectDetailPage = () => {
       {/* KPI Stats Grid */}
       <div className="flex flex-nowrap gap-4 overflow-x-auto no-scrollbar mb-8">
         {[
-          { label: "Project Health", value: project?.utilization >= 90 ? "Optimal" : project?.utilization >= 70 ? "Warning" : "Critical", icon: Briefcase, color: "text-indigo-600", bg: "bg-indigo-50" },
-          { label: "Hours (Act / Plan)", value: `${formatMetric(project?.actualHours)} / ${formatMetric(project?.plannedHours, "h")}`, icon: Clock3, color: "text-rose-600", bg: "bg-rose-50" },
-          { label: "Utilization", value: formatMetric(project?.utilization, "%"), icon: Users, color: "text-emerald-600", bg: "bg-emerald-50" },
-          { label: "Billable Strip", value: `${formatMetric(project?.billableHours, "h")} B / ${formatMetric(project?.nonBillableHours, "h")} NB`, icon: DollarSign, color: "text-blue-600", bg: "bg-blue-50" },
+          { label: "Project Health", value: project?.utilization >= 90 ? "Optimal" : project?.utilization >= 70 ? "Warning" : "Critical", icon: ProjectsIcon, color: "text-indigo-600", bg: "bg-indigo-50" },
+          { label: "Hours (Act / Plan)", value: `${formatMetric(project?.actualHours)} / ${formatMetric(project?.plannedHours, "h")}`, icon: TimeIcon, color: "text-rose-600", bg: "bg-rose-50" },
+          { label: "Utilization", value: formatMetric(project?.utilization, "%"), icon: EmployeeIcon, color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "Billable Strip", value: `${formatMetric(project?.billableHours, "h")} B / ${formatMetric(project?.nonBillableHours, "h")} NB`, icon: BillingIcon, color: "text-blue-600", bg: "bg-blue-50" },
         ].map((card) => (
           <div key={card.label} className="flex min-w-[240px] flex-1 items-center gap-4 rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:border-indigo-100 hover:shadow-md group">
             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-sm ${card.bg} ${card.color} group-hover:scale-105 transition-transform`}>
@@ -329,8 +317,8 @@ const OperationalProjectDetailPage = () => {
       <div className="mb-6 border-b border-slate-200 flex items-center justify-between">
         <div className="flex items-end gap-10 overflow-x-auto no-scrollbar">
           {[
-            { id: "portfolio", label: "Portfolio Analytics", icon: PieChartIcon },
-            { id: "resources", label: "Resource Contributions", icon: Users },
+            { id: "portfolio", label: "Portfolio Analytics", icon: AnalyticsIcon },
+            { id: "resources", label: "Resource Contributions", icon: EmployeeIcon },
           ].map((tab) => {
             const isActive = activeDetailView === tab.id;
             return (
@@ -392,11 +380,11 @@ const OperationalProjectDetailPage = () => {
 
               <div className="mt-8 flex flex-wrap items-center justify-center gap-6 border-t border-slate-50 pt-6">
                 <div className="flex items-center gap-2.5">
-                  <History size={14} className="text-indigo-500" />
+                  <HistoryIcon size={14} className="text-indigo-500" />
                   <span className="text-[10px] font-black text-slate-600 capitalize tracking-widest">Trend Preservation Active</span>
                 </div>
                 <div className="flex items-center gap-2.5 border-l border-slate-200 pl-6">
-                  <Scale size={14} className="text-slate-400" />
+                  <ScaleIcon size={14} className="text-slate-400" />
                   <span className="text-[10px] font-black text-slate-400 capitalize tracking-widest italic opacity-70">Comparison: Planned vs Realized</span>
                 </div>
               </div>
@@ -408,14 +396,14 @@ const OperationalProjectDetailPage = () => {
                   <h3 className="text-[12px] font-black text-[#081534] capitalize tracking-[0.2em] leading-none mb-1">Billing Yield Index</h3>
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner group-hover:scale-110 transition-transform">
-                  <PieChartIcon size={20} />
+                  <AnalyticsIcon size={20} />
                 </div>
               </div>
 
               {billingPieData.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-8 rounded-2xl border border-dashed border-slate-100">
                   <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
-                    <PieChartIcon className="text-slate-300" size={24} />
+                    <AnalyticsIcon className="text-slate-300" size={24} />
                   </div>
                   <p className="text-xs font-bold text-slate-400 capitalize tracking-widest">No Intelligence Data</p>
                 </div>
@@ -473,7 +461,7 @@ const OperationalProjectDetailPage = () => {
                   <p className="text-[11px] font-medium text-slate-400 italic">Contribution breakdown of {projectDetail?.resources?.length || 0} active project members</p>
                 </div>
                 <div className="relative w-full md:w-80">
-                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <SearchIcon className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}

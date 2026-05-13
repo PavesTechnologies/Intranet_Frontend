@@ -56,7 +56,7 @@ function SectionHeader({ icon: Icon, title, badge }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function TimelineBar({ resource }) {
-  const blocks = resource.allocationTimeline || []
+  const blocks = (resource.allocationTimeline || []).filter(b => b.status !== "ROLLED_OFF")
   if (blocks.length === 0) return null
 
   const earliest = new Date(blocks[0].startDate).getTime()
@@ -754,7 +754,9 @@ export function ResourceDetailPanel({ resource, open, onOpenChange }) {
                 <SectionHeader icon={TrendingUp} title="Allocation Timeline" />
                 <TimelineBar resource={resource} />
                 <div className="mt-2 flex flex-col gap-1">
-                  {(resource.allocationTimeline || []).map((block, i) => (
+                  {(resource.allocationTimeline || [])
+                    .filter(block => block.status !== "ROLLED_OFF")
+                    .map((block, i) => (
                     <div key={i} className="flex items-center justify-between text-[10px]">
                       <span className={cn("text-muted-foreground", block.tentative && "italic")}>
                         {block.project}{block.tentative ? " (T)" : ""}

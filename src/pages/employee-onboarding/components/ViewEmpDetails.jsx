@@ -5,6 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import StatusBadge from "../../../components/status/statusbadge";
 import { useAuth } from "../../../contexts/AuthContext";
 import {
@@ -60,6 +61,14 @@ const CURRENCY_OPTIONS = [
 
 const getCurrencySymbol = (code) =>
   CURRENCY_OPTIONS.find((currency) => currency.value === code)?.symbol || "₹";
+
+const getApiErrorDetail = (error) => {
+  const detail = error?.response?.data?.detail;
+  return typeof detail === "string" ? detail : "";
+};
+
+const isMissingGreenletError = (error) =>
+  getApiErrorDetail(error).includes("MissingGreenlet");
 
 (function injectEmpStyles() {
   if (typeof document === "undefined") return;
@@ -239,28 +248,57 @@ export default function ViewEmpDetails() {
   const handleApprovalSubmit = async () => {
     if (!selectedAdmin) { showStatusToast("Please select approver"); return; }
     const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+    const selectedApproverId = Number(selectedAdmin);
+    const currentApproverId =
+      approvalHistory?.[0]?.action_taker_id || approvalHistory?.[0]?.approver_id;
+
+    if (isPending && String(currentApproverId) === String(selectedApproverId)) {
+      showStatusToast("This approver is already assigned");
+      setOpenApprovalModal(false);
+      setSelectedAdmin("");
+      return;
+    }
+
     setSendingApproval(true);
     try {
       if (isNoRequest) {
         await axios.post(
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval-requests/request`,
-          [{ user_uuid, action_taker_id: Number(selectedAdmin) }],
-          { headers: { Authorization: `Bearer ${token}` } },
+          [{ user_uuid, action_taker_id: selectedApproverId }],
+          { headers },
         );
         showStatusToast("Approval request sent");
       } else if (isPending) {
-        await axios.put(
-          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/reassign`,
-          { user_uuid, new_approver_id: Number(selectedAdmin), comments: "Reassigned from UI" },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        try {
+          await axios.put(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/reassign`,
+            { user_uuid, new_approver_id: selectedApproverId, comments: "Reassigned from UI" },
+            { headers }
+          );
+        } catch (error) {
+          if (!isMissingGreenletError(error)) throw error;
+
+          await axios.delete(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval-requests/request/delete`,
+            {
+              headers: { ...headers, "Content-Type": "application/json" },
+              data: [{ user_uuid }],
+            }
+          );
+          await axios.post(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval-requests/request`,
+            [{ user_uuid, action_taker_id: selectedApproverId }],
+            { headers },
+          );
+        }
         showStatusToast("Approval reassigned");
       }
       setOpenApprovalModal(false);
       setSelectedAdmin("");
       fetchApprovalHistory();
-    } catch {
-      showStatusToast("Failed to process approval");
+    } catch (error) {
+      showStatusToast(getApiErrorDetail(error) || "Failed to process approval");
     } finally {
       setSendingApproval(false);
     }
@@ -333,11 +371,8 @@ export default function ViewEmpDetails() {
 
   if (loading)
     return (
-      <div className="emp-page min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin" />
-          <p className="text-slate-500 text-sm">Loading offer details…</p>
-        </div>
+      <div className="emp-page min-h-screen bg-slate-50">
+        <LoadingSpinner text="Loading offer details..." />
       </div>
     );
 

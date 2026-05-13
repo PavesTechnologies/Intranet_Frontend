@@ -30,7 +30,7 @@ const GenericTable = ({
           No records found.
         </div>
       ) : (
-        <table className="w-full table-fixed border-collapse rounded-lg shadow-sm">
+        <table className="w-full table-auto border-collapse rounded-lg shadow-sm">
           
           {/* TABLE HEADER */}
           <thead>
@@ -38,9 +38,9 @@ const GenericTable = ({
               {headers.map((header, idx) => (
                 <th
                   key={idx}
-                  className="px-3 py-3 text-center align-middle font-semibold"
+                  className={`px-2 py-3 ${idx === 0 ? "text-left" : "text-center"} align-middle font-semibold`}
                 >
-                  <div className="flex justify-center items-center w-full text-center">
+                  <div className={`flex ${idx === 0 ? "justify-start" : "justify-center"} items-center w-full`}>
                     {header}
                   </div>
                 </th>
@@ -56,7 +56,7 @@ const GenericTable = ({
                 onClick={row.onRowClick}
                 className={`transition ${
                   row.rowClass
-                    ? `${row.rowClass} hover:!bg-green-100`
+                    ? `${row.rowClass} hover:!bg-blue-50`
                     : `${
                         rowIndex % 2 === 0
                           ? "bg-white"
@@ -67,9 +67,9 @@ const GenericTable = ({
                 {columns.map((col, colIndex) => (
                   <td
                     key={colIndex}
-                    className="p-2 px-3 text-gray-700 font-medium text-center align-middle relative overflow-visible"
+                    className={`p-2 px-2 text-gray-700 font-medium ${colIndex === 0 ? "text-left" : "text-center"} align-middle relative overflow-visible`}
                   >
-                    <div className="flex justify-center items-center w-full text-center">
+                    <div className={`flex ${colIndex === 0 ? "justify-start" : "justify-center"} items-center w-full`}>
                       {row[col]}
                     </div>
                   </td>
