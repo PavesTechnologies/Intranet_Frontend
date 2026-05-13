@@ -15,6 +15,7 @@ import {
   getOfferDisplayStatus,
 } from "./components/offerStatus";
 import { fetchOfferDetailsList } from "./components/fetchOfferDetails";
+import { KPICard } from "../../components/kpi/KPI";
 
 
 
@@ -336,20 +337,19 @@ export default function EmployeeOnboardingDashboard() {
 /* Reusable Stat Card */
 function StatCard({ title, value, icon: Icon, iconBg, iconColor, isActive, onClick }) {
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className={`bg-white shrink-0 min-w-[140px] flex-1 rounded-xl px-4 py-3 border shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex items-center gap-3 ${isActive
-          ? "border-indigo-500 ring-1 ring-indigo-500/20 shadow-md bg-indigo-50/10"
-          : "border-slate-200 hover:border-slate-300 hover:shadow-md"
-        }`}
+      className="shrink-0 min-w-[140px] flex-1 text-left transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
     >
-      <div className={`w-8 h-8 ${iconBg} rounded-lg flex items-center justify-center shrink-0`}>
-        <Icon className={`h-4 w-4 ${iconColor}`} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5 truncate">{title}</p>
-        <p className="text-lg font-bold text-slate-900 leading-none">{value}</p>
-      </div>
-    </div>
+      <KPICard
+        label={title}
+        value={value}
+        icon={<Icon className="h-5 w-5" />}
+        color={`${iconBg} ${iconColor}`}
+        active={isActive}
+        className="h-full w-full bg-white border-slate-200 shadow-sm"
+      />
+    </button>
   );
 }
