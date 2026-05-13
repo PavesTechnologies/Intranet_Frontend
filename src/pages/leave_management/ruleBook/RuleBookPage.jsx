@@ -4,14 +4,13 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const SECOND_URL = "/api/workflow/admin";
-const token = localStorage.getItem("token");
 
 // Axios instance with baseURL and token
 const api = axios.create({
   baseURL: BASE_URL,
   headers: {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
   },
 });
 

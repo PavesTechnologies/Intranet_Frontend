@@ -12,7 +12,6 @@ import CommentModal from "./CommentModal";
 import toast from "react-hot-toast";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
-const token = localStorage.getItem("token");
 
 const ActionDropdown = ({
   employeeId,
@@ -50,7 +49,7 @@ const ActionDropdown = ({
         try {
           const res = await axios.get(
             `${BASE_URL}/api/leave-balance/employee/${employeeId}/${new Date().getFullYear()}`,
-            { headers: { Authorization: `Bearer ${token}` } },
+            { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
           );
           setEmployeeLeaveBalances(res.data || []);
         } catch (error) {

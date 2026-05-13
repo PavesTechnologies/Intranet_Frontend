@@ -104,6 +104,13 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
     }
   }, [formData.leaveName]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, onClose]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({

@@ -22,7 +22,6 @@ import {useAuth} from "../../../contexts/AuthContext";
 export default function AdminApprovalDashboard() {
   const navigate = useNavigate();
 
-
  /* ---------- ROLE LOGIC ---------- */
 const { user, loading: authLoading } = useAuth();
 
@@ -83,7 +82,7 @@ const isAuthorizedManager = isManager || isAdmin;
     };
 
     fetchApprovals();
-  }, [BASE_URL, isAuthorizedManager]);
+  }, [BASE_URL, localStorage.getItem("token"), isAuthorizedManager]);
   // Redirect if not authorized
 if (!authLoading && !isAuthorizedManager) {
   return <Navigate to="/unauthorized" replace />;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, Fragment } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import FilterListbox from "../../../components/filter/FilterListbox";
@@ -41,6 +41,12 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
     start: "none",
     end: "none",
   });
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
 
   const formatDate = (date) => {
     if (!date) return null;

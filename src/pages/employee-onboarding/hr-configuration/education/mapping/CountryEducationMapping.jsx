@@ -8,14 +8,9 @@ import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 export default function CountryEducationMapping() {
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
   const { user } = useAuth();
   const roles = user?.roles?.map(r => r.toUpperCase()) || [];
   const canView = roles.includes("ADMIN") || roles.includes("HR");
-
-  const axiosConfig = {
-    headers: { Authorization: `Bearer ${token}` },
-  };
 
   /* ================= STATE ================= */
   const [countries, setCountries] = useState([]);
@@ -39,7 +34,11 @@ export default function CountryEducationMapping() {
   useEffect(() => {
     if (!canView) return;
     axios
-      .get(`${BASE}/masters/country`, axiosConfig)
+      .get(`${BASE}/masters/country`, 
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      )
       .then((res) => setCountries(res.data || []))
       .catch(() => setError("Failed to load countries"));
   }, [canView]);
@@ -62,7 +61,9 @@ export default function CountryEducationMapping() {
     try {
       const res = await axios.get(
         `${BASE}/education/country-mapping/${countryUuid}`,
-        axiosConfig,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
       );
       setMappings(res.data || []);
     } catch {
@@ -79,8 +80,16 @@ export default function CountryEducationMapping() {
 
     try {
       const [levelsRes, docsRes] = await Promise.all([
-        axios.get(`${BASE}/masters/education-level`, axiosConfig),
-        axios.get(`${BASE}/education/education-document`, axiosConfig),
+        axios.get(`${BASE}/masters/education-level`, 
+          {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+        ),
+        axios.get(`${BASE}/education/education-document`, 
+          {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          }
+        ),
       ]);
 
       setLevels(levelsRes.data || []);
@@ -104,7 +113,7 @@ export default function CountryEducationMapping() {
         `${BASE}/masters/${selectedLevel}/${selectedDocument}/${selectedCountry}`,
         null,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
       );
 

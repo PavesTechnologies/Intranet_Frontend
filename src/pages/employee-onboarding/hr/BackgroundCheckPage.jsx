@@ -113,7 +113,6 @@ const CandidateItem = ({ emp, isSelected, bgStatus, onClick }) => {
 const DocPreviewModal = ({ doc, onClose }) => {
   const [signedUrl, setSignedUrl] = useState(null);
   const [loading, setLoading]     = useState(true);
-  const token = localStorage.getItem("token");
   const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
 
   useEffect(() => {
@@ -125,7 +124,7 @@ const DocPreviewModal = ({ doc, onClose }) => {
       try {
         const res = await axios.get(`${BASE_URL}/hr/view_documents`, {
           params: { file_path: doc.file_path },
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
         });
         const url = typeof res.data === "string" ? res.data.replace(/^"+|"+$/g, "") : res.data.url;
         setSignedUrl(url);
@@ -137,7 +136,7 @@ const DocPreviewModal = ({ doc, onClose }) => {
       }
     };
     fetchSignedUrl();
-  }, [doc, BASE_URL, token]);
+  }, [doc, BASE_URL]);
 
   const name = doc?.document_name || doc?.doc_type || doc?.identity_type || "Document";
 
@@ -279,7 +278,6 @@ const DocCard = ({ doc, idx, onPreview, isVerified, onDelete, onUpload }) => {
 ═══════════════════════════════════════════════════════════════ */
 export default function BackgroundCheckPage() {
   /* ── API config ── */
-  const token    = localStorage.getItem("token");
   const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
 
   /* ── List ── */
@@ -331,7 +329,7 @@ export default function BackgroundCheckPage() {
     try {
       const res = await axios.get(
         `${BASE_URL}/permanent-employee/core-employee-details/`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       setEmployees(res.data || []);
     } catch (err) {
@@ -340,7 +338,7 @@ export default function BackgroundCheckPage() {
     } finally {
       setLoadingList(false);
     }
-  }, [BASE_URL, token]);
+  }, [BASE_URL]);
 
   useEffect(() => { loadEmployees(); }, [loadEmployees]);
 
@@ -362,7 +360,7 @@ export default function BackgroundCheckPage() {
     try {
       const res = await axios.get(
         `${BASE_URL}/hr/hr/${emp.user_uuid}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       prof = res.data || {};
     } catch (err) {
@@ -378,7 +376,7 @@ export default function BackgroundCheckPage() {
     try {
       const chkRes = await axios.get(
         `${BASE_URL}/hr/background-checks/${emp.user_uuid}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       raw = chkRes.data || [];
     } catch (err) {
@@ -562,7 +560,7 @@ export default function BackgroundCheckPage() {
     setEmpBgMap(prev => ({ ...prev, [emp.user_uuid]: overall }));
 
     setLoadingChecks(false);
-  }, [BASE_URL, token]);
+  }, [BASE_URL]);
 
 
   const handleSelectEmployee = (emp) => {
@@ -633,7 +631,7 @@ export default function BackgroundCheckPage() {
       await axios.patch(
         `${BASE_URL}/hr/background-checks/${id}`,
         { status, notes: reason },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
     } catch (err) {
       // If endpoint not yet implemented, apply optimistic update silently
@@ -667,7 +665,7 @@ export default function BackgroundCheckPage() {
     setUpdatingId(id);
     try {
       await axios.delete(`${BASE_URL}/hr/background-checks/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
     } catch (err) {
       console.warn("DELETE /hr/background-checks not available, applying optimistic update:", err?.response?.status);
@@ -693,7 +691,7 @@ export default function BackgroundCheckPage() {
 
     try {
       const res = await axios.post(`${BASE_URL}/hr/background-checks`, payload, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       const newCheck = {
         ...payload,
@@ -735,7 +733,7 @@ export default function BackgroundCheckPage() {
           message: emailForm.message,
           check_ids: selectedIds,
         },
-        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" } }
       );
     } catch (err) {
       console.warn("Send-to-consultancy API not available, applying optimistic update:", err?.response?.status);
