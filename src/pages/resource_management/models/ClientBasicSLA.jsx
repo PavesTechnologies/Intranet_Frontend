@@ -157,7 +157,7 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
   );
 
   return (
-    <div className="p-4">
+    <div className="p-2">
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         {/* <div className="px-6 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b">
           <p className="text-sm font-semibold text-gray-700">SLA Definitions</p>

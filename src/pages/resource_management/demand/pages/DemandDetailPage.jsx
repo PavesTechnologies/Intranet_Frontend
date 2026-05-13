@@ -1196,7 +1196,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
 
             {/* --- TOP HEADER (Slimmed Down) --- */}
             <header className="bg-white border-b border-slate-100 sticky top-0">
-                <div className="max-w-[1600px] mx-auto px-6 py-3">
+                <div className="max-w-[1600px] mx-auto px-3 py-1.5">
                     <div className="flex items-center justify-between">
 
                         {/* Header Left */}
@@ -1250,7 +1250,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
 
                 {/* Sub-Header Tabs */}
                 <div className="bg-white border-t border-slate-50">
-                    <div className="max-w-[1600px] mx-auto px-6">
+                    <div className="max-w-[1600px] mx-auto px-3">
                         <nav className="flex gap-8 -mb-[1px]">
                             {TABS.map((tab) => {
                                 const Icon = tab.icon;
@@ -1278,7 +1278,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
 
             {/* --- SINGLE COLUMN CONTENT AREA --- */}
             <main className="flex-1 overflow-y-auto bg-slate-50/50">
-                <div className="max-w-[1400px] mx-auto p-6 md:p-10 font-sans">
+                <div className="max-w-[1400px] mx-auto p-3 md:p-6 font-sans">
                     {activeTab === 'overview' && (
                         <OverviewTab
                             demand={demand}

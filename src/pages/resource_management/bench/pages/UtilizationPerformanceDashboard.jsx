@@ -859,7 +859,7 @@ const UtilizationPerformanceDashboard = () => {
                      </div>
                   ) : (
                      <>
-                        <div className="px-6 py-3 border-b border-slate-100 bg-white">
+                        <div className="px-3 py-1.5 border-b border-slate-100 bg-white">
                            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
                               {[
                                  { id: 'active', label: 'Active Projects' },

@@ -96,7 +96,7 @@ const ProjectSLA = ({ data, loading }) => {
       />
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="px-6 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b">
+        <div className="px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-blue-50 border-b">
           <p className="text-sm font-semibold text-gray-700">SLA Definitions</p>
         </div>
 

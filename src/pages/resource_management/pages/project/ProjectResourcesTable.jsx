@@ -104,7 +104,7 @@ const ProjectResourcesTable = ({ projectId, resources = null }) => {
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Users className="h-5 w-5 text-[#263383]" />
                     Project Resources ({allocations.length})
@@ -229,7 +229,7 @@ const ProjectResourcesTable = ({ projectId, resources = null }) => {
                     </div>
 
                     {totalPages > 1 && (
-                        <div className="py-4 border-t border-gray-100">
+                        <div className="py-2 border-t border-gray-100">
                             <Pagination
                                 currentPage={page}
                                 totalPages={totalPages}

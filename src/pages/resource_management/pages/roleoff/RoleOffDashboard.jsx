@@ -808,7 +808,7 @@ const RoleOffDashboard = () => {
 
       {activeTab === 'events' && (
         <div className="rounded-xl border border-slate-100 bg-white p-0 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+          <div className="px-3 py-1.5 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
             <h3 className="text-[10px] font-bold text-[#081534] uppercase tracking-widest opacity-60">Event History</h3>
             <div className="flex items-center gap-3">
               <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">{displayedEvents.length} Totals</span>

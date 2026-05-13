@@ -162,7 +162,7 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
   );
 
   return (
-    <div className="p-4">
+    <div className="p-2">
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
         <div className="overflow-x-auto">
         <GenericTable

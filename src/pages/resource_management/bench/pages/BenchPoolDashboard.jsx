@@ -542,7 +542,7 @@ const BenchPoolDashboard = () => {
                   </div>
                   
                   {totalPages > 1 && (
-                    <div className="border-t border-slate-100 px-6 py-3 bg-slate-50/30">
+                    <div className="border-t border-slate-100 px-3 py-1.5 bg-slate-50/30">
                       <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}

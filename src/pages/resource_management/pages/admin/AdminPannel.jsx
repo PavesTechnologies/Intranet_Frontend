@@ -292,23 +292,24 @@ const AdminPannel = () => {
           <h2 className="text-xl font-semibold text-gray-900">
             Clients Information
           </h2>
-          {canCreateClient && (
-            <Button
-              variant="primary"
-              size="medium"
-              onClick={() => setOpenCreateClient(true)}
-            // className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg flex items-center hover:bg-indigo-700 transition-all active:scale-[0.98] shadow-sm"
-            >
-              <Plus className="w-4 h-4 mr-1" /> Create New Client
-            </Button>
-          )}
+          <div className="flex items-center gap-4">
+            {canCreateClient && (
+              <Button
+                variant="primary"
+                size="medium"
+                onClick={() => setOpenCreateClient(true)}
+              // className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg flex items-center hover:bg-indigo-700 transition-all active:scale-[0.98] shadow-sm"
+              >
+                <Plus className="w-4 h-4 mr-1" /> Create New Client
+              </Button>
+            )}
+            <FilterBar
+              filters={filters}
+              onUpdate={handleFilterUpdate}
+              totalResults={pageInfo.totalElements}
+            />
+          </div>
         </div>
- 
-        <FilterBar
-          filters={filters}
-          onUpdate={handleFilterUpdate}
-          totalResults={pageInfo.totalElements}
-        />
  
         {loading ? (
           <div className="flex items-center justify-center py-12">

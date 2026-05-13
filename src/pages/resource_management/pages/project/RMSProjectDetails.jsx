@@ -1088,7 +1088,7 @@ const RMSProjectDetails = () => {
       )}
 
       {activeTab === "sla" && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-lg font-semibold">Project SLA Configuration</h3>
             {!isRM && (
@@ -1177,7 +1177,7 @@ const RMSProjectDetails = () => {
       {activeTab === "financials" && <ProjectFinancialsInline />}
 
       {activeTab === "pre-requisites" && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-lg font-semibold">
               Project Pre-requisites Configuration
@@ -1275,7 +1275,7 @@ const RMSProjectDetails = () => {
       )}
 
       {activeTab === "escalation" && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-lg font-semibold">Project Escalation Matrix</h3>
 
@@ -1385,7 +1385,7 @@ const RMSProjectDetails = () => {
               ✕
             </button>
 
-            <div className="px-6 py-4 border-b flex justify-between items-center">
+            <div className="px-3 py-1.5 border-b flex justify-between items-center">
               <h2 className="text-lg font-semibold capitalize">
                 {inheritMode
                   ? `Inherit ${configType === "sla"
@@ -1397,7 +1397,7 @@ const RMSProjectDetails = () => {
                   : `Create ${configType} Configuration`}
               </h2>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-y-auto px-3 py-3">
               {configType === "pre-requisites" && (
                 <>
                   {!inheritMode ? (

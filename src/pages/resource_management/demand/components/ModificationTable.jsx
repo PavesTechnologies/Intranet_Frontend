@@ -127,7 +127,7 @@ const ModificationTable = ({
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h3 className="text-sm font-black tracking-tight text-slate-900">
             Allocation Modifications ({items.length})
@@ -298,7 +298,7 @@ const ModificationTable = ({
           </div>
 
           {filteredItems.length > itemsPerPage && (
-            <div className="border-t border-slate-100 bg-slate-50/30 px-6 py-6">
+            <div className="border-t border-slate-100 bg-slate-50/30 px-3 py-3">
               <Pagination
                 currentPage={page}
                 totalPages={totalPages}
