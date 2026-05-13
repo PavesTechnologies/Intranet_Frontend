@@ -1,12 +1,10 @@
 import React, { useState, useMemo } from 'react';
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart
 } from 'recharts';
-import {
-  Download, Filter, Search, Users, Activity,
-  Briefcase, FileText, ChevronRight, TrendingUp, AlertTriangle, RefreshCcw, Monitor, ShieldCheck, Clock, Award, ShieldAlert, ArrowUpRight, ArrowDownRight, Zap, ArrowLeft, CalendarRange, BarChart3
-} from 'lucide-react';
+import { DownloadIcon, FilterIcon, SearchIcon, EmployeeIcon, ActivityIcon, ProjectsIcon, DocumentIcon, ChevronRightIcon, TrendingUpIcon, WarningIcon, RefreshIcon, DesktopIcon, SuccessIcon, PendingIcon, AwardIcon, SecurityAlertIcon, TrendUpIcon, TrendDownIcon, ZapIcon, PrevIcon, DateRangeIcon, BarChartIcon, CloseIcon } from "@/components/icons";
 import { utilizationService } from '../../services/utilizationService';
 import toast from 'react-hot-toast';
 
@@ -120,12 +118,12 @@ const UtilizationReportingDashboard = () => {
             onClick={() => navigate('/resource-management/bench/utilization-performance')}
             className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
           >
-            <ArrowLeft size={18} />
+            <PrevIcon size={18} />
           </button>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-none">Utilization Reporting & Dashboards</h1>
             <p className="mt-1 text-xs sm:text-sm font-medium text-slate-500 capitalize tracking-normal flex items-center gap-2">
-              <Activity size={14} className="text-emerald-600" /> Comprehensive utilization analytics by dimension
+              <ActivityIcon size={14} className="text-emerald-600" /> Comprehensive utilization analytics by dimension
             </p>
           </div>
         </div>
@@ -136,7 +134,7 @@ const UtilizationReportingDashboard = () => {
             disabled={!reportData || isExportingCSV}
             className="h-[42px] px-5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
           >
-            {isExportingCSV ? <RefreshCcw size={16} className="animate-spin text-emerald-600" /> : <Download size={16} />}
+            {isExportingCSV ? <RefreshIcon size={16} className="animate-spin text-emerald-600" /> : <DownloadIcon size={16} />}
             <span className="text-[12px] font-black capitalize">CSV</span>
           </button>
           <button
@@ -144,7 +142,7 @@ const UtilizationReportingDashboard = () => {
             disabled={!reportData || isExportingExcel}
             className="h-[42px] px-5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed shadow-md shadow-emerald-600/10"
           >
-            {isExportingExcel ? <RefreshCcw size={16} className="animate-spin" /> : <Download size={16} />}
+            {isExportingExcel ? <RefreshIcon size={16} className="animate-spin" /> : <DownloadIcon size={16} />}
             <span className="text-[12px] font-black capitalize">EXCEL</span>
           </button>
         </div>
@@ -158,7 +156,7 @@ const UtilizationReportingDashboard = () => {
             <div className="flex flex-col gap-1">
               <label className="text-[9px] font-black text-slate-400 capitalize tracking-widest pl-1">Utilization Period</label>
               <div className="flex items-center gap-2 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 hover:border-indigo-200 transition-all group/date">
-                <CalendarRange size={13} className="text-indigo-600 group-hover/date:scale-110 transition-transform" />
+                <DateRangeIcon size={13} className="text-indigo-600 group-hover/date:scale-110 transition-transform" />
                 <div className="flex items-center gap-1">
                   <input
                     type="date"
@@ -182,41 +180,31 @@ const UtilizationReportingDashboard = () => {
             <div className="flex flex-col gap-1">
               <label className="text-[9px] font-black text-slate-400 capitalize tracking-widest pl-1">Report Type</label>
               <div className="relative">
-                <select
+                <FilterListbox
+                  options={[
+                    { value: "SUMMARY", label: "SUMMARY" },
+                    { value: "RESOURCE", label: "RESOURCE" },
+                    { value: "PROJECT", label: "PROJECT" },
+                    { value: "CLIENT", label: "CLIENT" },
+                    { value: "ROLE", label: "ROLE" },
+                  ]}
                   value={reportParams.reportType}
-                  onChange={(e) => {
-                    const type = e.target.value;
-                    setReportParams({ ...reportParams, reportType: type });
-                    if (type === 'SUMMARY') {
-                      setActiveTab('ANOMALIES');
-                    } else {
-                      setActiveTab(type);
-                    }
+                  onChange={(val) => {
+                    setReportParams({ ...reportParams, reportType: val });
+                    if (val === 'SUMMARY') { setActiveTab('ANOMALIES'); } else { setActiveTab(val); }
                   }}
-                  className="h-9 min-w-[130px] pl-3 pr-8 rounded-lg border border-slate-100 text-[11px] font-bold text-slate-700 bg-slate-50 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all appearance-none cursor-pointer tracking-tight"
-                >
-                  <option value="SUMMARY">SUMMARY</option>
-                  <option value="RESOURCE">RESOURCE</option>
-                  <option value="PROJECT">PROJECT</option>
-                  <option value="CLIENT">CLIENT</option>
-                  <option value="ROLE">ROLE</option>
-                </select>
-                <ChevronRight size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" />
+                />
               </div>
             </div>
 
             <div className="flex flex-col gap-1">
               <label className="text-[9px] font-black text-slate-400 capitalize tracking-widest pl-1">Grouping</label>
               <div className="relative">
-                <select
+                <FilterListbox
+                  options={[{ value: "WEEKLY", label: "WEEKLY" }, { value: "MONTHLY", label: "MONTHLY" }]}
                   value={reportParams.groupBy}
-                  onChange={(e) => setReportParams({ ...reportParams, groupBy: e.target.value })}
-                  className="h-9 min-w-[100px] pl-3 pr-8 rounded-lg border border-slate-100 text-[11px] font-bold text-slate-700 bg-slate-50 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all appearance-none cursor-pointer tracking-tight"
-                >
-                  <option value="WEEKLY">WEEKLY</option>
-                  <option value="MONTHLY">MONTHLY</option>
-                </select>
-                <ChevronRight size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" />
+                  onChange={(val) => setReportParams({ ...reportParams, groupBy: val })}
+                />
               </div>
             </div>
           </div>
@@ -227,7 +215,7 @@ const UtilizationReportingDashboard = () => {
               disabled={isGenerating}
               className="h-9 px-6 rounded-lg bg-indigo-600 text-white text-[11px] font-black capitalize tracking-widest hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md shadow-indigo-600/20"
             >
-              {isGenerating ? <RefreshCcw size={14} className="animate-spin" /> : <BarChart3 size={14} />}
+              {isGenerating ? <RefreshIcon size={14} className="animate-spin" /> : <BarChartIcon size={14} />}
               {isGenerating ? 'ANALYZING...' : 'GENERATE'}
             </button>
           </div>
@@ -235,7 +223,7 @@ const UtilizationReportingDashboard = () => {
       </div>
       {error && (
         <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-center gap-4 mb-6 shadow-sm">
-          <AlertTriangle size={20} className="text-rose-500" />
+          <WarningIcon size={20} className="text-rose-500" />
           <div>
             <h4 className="text-[11px] font-black text-rose-900 capitalize">Error</h4>
             <p className="text-[12px] font-bold text-rose-600">{error}</p>
@@ -246,7 +234,7 @@ const UtilizationReportingDashboard = () => {
       {!reportData && !isGenerating && !error && (
         <div className="bg-white rounded-3xl border border-dotted border-slate-200 p-24 flex flex-col items-center justify-center text-center group">
           <div className="h-20 w-20 bg-emerald-50 rounded-3xl flex items-center justify-center text-emerald-600 mb-8 border border-emerald-100 group-hover:rotate-12 transition-transform duration-500 shadow-inner">
-            <BarChart className="w-10 h-10" />
+            <BarChartIcon className="w-10 h-10" />
           </div>
           <h3 className="text-xl font-black text-slate-900 capitalize tracking-tight">Utilization Reporting Engine</h3>
           <p className="mt-3 text-[13px] font-medium text-slate-400 max-w-sm italic">Configure your parameters above to generate utilization analytics across multiple dimensions.</p>
@@ -256,7 +244,7 @@ const UtilizationReportingDashboard = () => {
       {isGenerating && (
         <div className="bg-white rounded-3xl border border-slate-100 p-24 flex flex-col items-center justify-center text-center">
           <div className="h-20 w-20 bg-emerald-50 rounded-3xl flex items-center justify-center text-emerald-600 mb-8 border border-emerald-100 animate-pulse">
-            <RefreshCcw size={40} className="animate-spin" />
+            <RefreshIcon size={40} className="animate-spin" />
           </div>
           <h3 className="text-xl font-black text-emerald-900 capitalize tracking-tight">Compiling Intelligence Report</h3>
           <p className="mt-3 text-[13px] font-medium text-slate-400 max-w-sm italic leading-relaxed">Aggregating timesheet actuals...</p>
@@ -268,10 +256,10 @@ const UtilizationReportingDashboard = () => {
           {/* Top KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: 'Total Actual Hours', value: reportData.totalHours, icon: <Clock />, color: 'text-indigo-600' },
-              { label: 'Utilization %', value: `${reportData.utilizationPercentage}%`, icon: <TrendingUp />, color: 'text-emerald-600' },
-              { label: 'Total Resources', value: reportData.totalResources, icon: <Users />, color: 'text-blue-600' },
-              { label: 'Confidence Score', value: `${reportData.confidenceScore}%`, icon: <ShieldCheck />, color: 'text-amber-600' }
+              { label: 'Total Actual Hours', value: reportData.totalHours, icon: <PendingIcon />, color: 'text-indigo-600' },
+              { label: 'Utilization %', value: `${reportData.utilizationPercentage}%`, icon: <TrendingUpIcon />, color: 'text-emerald-600' },
+              { label: 'Total Resources', value: reportData.totalResources, icon: <EmployeeIcon />, color: 'text-blue-600' },
+              { label: 'Confidence Score', value: `${reportData.confidenceScore}%`, icon: <SuccessIcon />, color: 'text-amber-600' }
             ].map((kpi) => (
               <div key={kpi.label} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
                 <div className={`h-11 w-11 rounded-xl bg-slate-50 border border-slate-100 shadow-inner flex items-center justify-center ${kpi.color}`}>
@@ -304,7 +292,7 @@ const UtilizationReportingDashboard = () => {
               <div className="bg-rose-50/50 px-8 py-5 border-b border-rose-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-8 bg-rose-100 text-rose-500 rounded-lg flex items-center justify-center shadow-sm">
-                    <ShieldAlert size={20} />
+                    <SecurityAlertIcon size={20} />
                   </div>
                   <div>
                     <h4 className="text-[12px] font-black text-rose-900 capitalize tracking-[0.1em]">Utilization Anomalies ({reportData.alerts?.length || 0})</h4>
@@ -330,7 +318,7 @@ const UtilizationReportingDashboard = () => {
           {activeTab === 'RESOURCE' && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
-                  <Users className="text-indigo-600" />
+                  <EmployeeIcon className="text-indigo-600" />
                   <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Resource Utilization Report</h4>
                </div>
                <div className="overflow-x-auto">
@@ -371,7 +359,7 @@ const UtilizationReportingDashboard = () => {
                                  <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${res.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : res.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{res.utilizationBand || 'HEALTHY'}</span>
                               </td>
                               <td className="px-8 py-4 text-center">
-                                 {res.trendSignal === 'UP' ? <ArrowUpRight className="inline text-emerald-500" size={16} /> : res.trendSignal === 'DOWN' ? <ArrowDownRight className="inline text-rose-500" size={16} /> : <span className="text-slate-400 font-bold">-</span>}
+                                 {res.trendSignal === 'UP' ? <TrendUpIcon className="inline text-emerald-500" size={16} /> : res.trendSignal === 'DOWN' ? <TrendDownIcon className="inline text-rose-500" size={16} /> : <span className="text-slate-400 font-bold">-</span>}
                               </td>
                            </tr>
                         ))}
@@ -385,7 +373,7 @@ const UtilizationReportingDashboard = () => {
            {activeTab === 'PROJECT' && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mt-6">
                <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
-                  <Monitor className="text-blue-600" />
+                  <DesktopIcon className="text-blue-600" />
                   <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Project Utilization Report</h4>
                </div>
                <div className="overflow-x-auto">
@@ -433,7 +421,7 @@ const UtilizationReportingDashboard = () => {
            {activeTab === 'ROLE' && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mt-6">
                <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
-                  <Award className="text-amber-600" />
+                  <AwardIcon className="text-amber-600" />
                   <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Role Utilization Report</h4>
                </div>
                <div className="overflow-x-auto">
@@ -479,7 +467,7 @@ const UtilizationReportingDashboard = () => {
            {activeTab === 'CLIENT' && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mt-6">
                <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
-                  <Briefcase className="text-purple-600" />
+                  <ProjectsIcon className="text-purple-600" />
                   <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Client Utilization Report</h4>
                </div>
                <div className="overflow-x-auto">

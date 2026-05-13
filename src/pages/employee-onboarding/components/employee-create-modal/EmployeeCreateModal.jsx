@@ -22,8 +22,9 @@ export default function EmployeeCreateModal({
   const [error, setError] = useState("");
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
+  const [managerOptions, setManagerOptions] = useState([]);
 
-  const token = localStorage.getItem("token");
+  
   const isEditMode = !!employeeUuid;
 
   const fetchDepartments = async () => {
@@ -34,7 +35,7 @@ export default function EmployeeCreateModal({
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -66,8 +67,45 @@ export default function EmployeeCreateModal({
     }
   };
 
+  const fetchManagers = async () => {
+    try {
+      const res = await fetch(
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
+
+      const data = await res.json();
+      const managers = (Array.isArray(data) ? data : [])
+        .map((employee) => {
+          const employeeId = String(employee.employee_id || "").trim();
+          const fullName = `${employee.first_name || ""} ${
+            employee.last_name || ""
+          }`.trim();
+
+          if (!employeeId || !fullName) return null;
+
+          return {
+            label: fullName,
+            value: employeeId,
+          };
+        })
+        .filter(Boolean);
+
+      setManagerOptions(managers);
+    } catch (err) {
+      console.error("Failed to fetch managers", err);
+    }
+  };
+
   useEffect(() => {
     fetchDepartments();
+    fetchManagers();
   }, []);
 
   useEffect(() => {
@@ -86,7 +124,7 @@ export default function EmployeeCreateModal({
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
           {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           },
         );
@@ -123,7 +161,7 @@ export default function EmployeeCreateModal({
     };
 
     fetchEmployee();
-  }, [employeeUuid, token]);
+  }, [employeeUuid]);
 
   useEffect(() => {
     if (!userUuid || isEditMode) return;
@@ -265,7 +303,7 @@ export default function EmployeeCreateModal({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
         },
@@ -319,6 +357,7 @@ export default function EmployeeCreateModal({
             handleChange={handleChange}
             departments={departments}
             designations={designations}
+            managerOptions={managerOptions}
             isEditMode={isEditMode}
           />
 

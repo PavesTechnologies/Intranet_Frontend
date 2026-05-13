@@ -1,9 +1,10 @@
 // src/pages/Projects/manager/Sprint/CreateSprintModal.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { X } from "lucide-react";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Button from "../../../../components/Button/Button";
+import Modal from "../../../../components/Modal/modal";
 
 const getCurrentDateTime = () => {
   const now = new Date();
@@ -18,8 +19,6 @@ const CreateSprintModal = ({
   onClose,
   onCreated,
 }) => {
-  if (!isOpen) return null;
-
   const token = localStorage.getItem("token");
 
   // ---------------------------
@@ -59,7 +58,7 @@ const CreateSprintModal = ({
         );
         setProjectName(res.data.name);
       } catch (e) {
-        toast.error("Failed to load project details");
+        showStatusToast("Failed to load project details", "error");
       }
     };
     load();
@@ -106,7 +105,7 @@ const CreateSprintModal = ({
   const handleStartDateChange = (e) => {
     const newStart = e.target.value;
     if (!sprint && new Date(newStart) < new Date()) {
-      toast.error("Start date cannot be in the past");
+      showStatusToast("Start date cannot be in the past", "error");
       return;
     }
     let newEnd = formData.endDate;
@@ -175,7 +174,7 @@ const CreateSprintModal = ({
           { headers: { Authorization: `Bearer ${token}` } },
         );
 
-        toast.success("Sprint updated successfully!", {containerId: "global"});
+        showStatusToast("Sprint updated successfully!", "success");
       } else {
         // -------------------------
         // CREATE MODE
@@ -186,7 +185,7 @@ const CreateSprintModal = ({
           { headers: { Authorization: `Bearer ${token}` } },
         );
 
-        toast.success("Sprint created successfully!", {containerId: "global"});
+        showStatusToast("Sprint created successfully!", "success");
       }
 
       onCreated(res.data);
@@ -195,11 +194,7 @@ const CreateSprintModal = ({
     } catch (err) {
       console.log('[sprint-modal] handleSubmit - caught error', { err: err?.response?.data || err?.message, ts: Date.now() });
 
-      toast.error(err.response?.data?.message || "Error saving sprint", {
-          autoClose: 3000,
-          toastId: `sprint-error-${Date.now()}`, // ✅ prevents duplicate toasts on rapid clicks
-          containerId: "global",
-      });
+      showStatusToast(err.response?.data?.message || "Error saving sprint", "error");
     }
   };
 
@@ -207,22 +202,12 @@ const CreateSprintModal = ({
   // Render
   // ---------------------------
   return (
-    <div className="fixed inset-0 bg-black/40 z-[100] flex justify-center items-center">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto relative">
-        {/* Use global ToastContainer in App.jsx */}
-
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
-        >
-          <X size={20} />
-        </button>
-
-        <h2 className="text-2xl font-semibold text-center mb-6">
-          {sprint ? "Edit Sprint" : "Create New Sprint"}
-        </h2>
-
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={sprint ? "Edit Sprint" : "Create Sprint"}
+      className="max-w-xl"
+    >
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Sprint Name */}
           <div>
@@ -275,16 +260,11 @@ const CreateSprintModal = ({
               <label className="block text-gray-700 mb-1 font-medium">
                 Duration
               </label>
-              <select
+              <FilterListbox
+                options={[{value:"1W",label:"1 Week"},{value:"2W",label:"2 Weeks"},{value:"3W",label:"3 Weeks"},{value:"CUSTOM",label:"Custom"}]}
                 value={duration}
-                onChange={handleDurationChange}
-                className="border rounded-lg w-full p-2"
-              >
-                <option value="1W">1 Week</option>
-                <option value="2W">2 Weeks</option>
-                <option value="3W">3 Weeks</option>
-                <option value="CUSTOM">Custom</option>
-              </select>
+                onChange={(val) => handleDurationChange({ target: { value: val } })}
+              />
             </div>
           )}
 
@@ -358,24 +338,12 @@ const CreateSprintModal = ({
 
           {/* Buttons */}
           <div className="flex justify-end gap-4 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2 bg-gray-200 rounded-lg text-gray-700"
-            >
-              Cancel
-            </button>
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
 
-            <button
-              type="submit"
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg"
-            >
-              {sprint ? "Update Sprint" : "Create Sprint"}
-            </button>
+            <Button variant="primary" type="submit">{sprint ? "Update Sprint" : "Create Sprint"}</Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

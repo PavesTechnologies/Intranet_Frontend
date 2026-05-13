@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Calendar, CheckCircle2, Percent, User, X } from "lucide-react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import { WarningIcon, CalendarIcon, SuccessIcon, PercentIcon, UserIcon, CloseIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -225,7 +226,7 @@ const CreateModificationModal = ({
         <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600/10 text-indigo-600">
-              <CheckCircle2 className="h-4 w-4 text-white" />
+              <SuccessIcon className="h-4 w-4 text-white" />
             </div>
             <div>
               <h2 className="text-base font-semibold text-slate-900">Create Modification</h2>
@@ -239,7 +240,7 @@ const CreateModificationModal = ({
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
           >
-            <X className="h-4 w-4" />
+            <CloseIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -257,31 +258,22 @@ const CreateModificationModal = ({
 
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-[11px] font-medium text-slate-600">
-                  <User className="h-3.5 w-3.5 text-slate-400" />
+                  <UserIcon className="h-3.5 w-3.5 text-slate-400" />
                   Resource
                 </label>
-                <select
-                  value={form.allocationId}
-                  onChange={handleResourceChange}
-                  className={cn(
-                    "h-10 w-full rounded-lg border bg-white px-3 text-sm text-slate-900 outline-none transition-colors focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15",
-                    errors.allocationId ? "border-rose-300" : "border-slate-200"
-                  )}
-                >
-                  <option value="">Select allocated resource</option>
-                  {resourceOptions.map((resource) => (
-                    <option
-                      key={resource.allocationId || resource.resourceId}
-                      value={resource.allocationId || ""}
-                    >
-                      {String(form.allocationId) === String(resource.allocationId)
+                <FilterListbox
+                  options={[
+                    { value: "", label: "Select allocated resource" },
+                    ...resourceOptions.map((resource) => ({
+                      value: resource.allocationId || "",
+                      label: String(form.allocationId) === String(resource.allocationId)
                         ? resource.resourceName
-                        : `${resource.resourceName} | ${resource.allocationPercentage}% | ${
-                            resource.allocationStartDate || "N/A"
-                          } to ${resource.allocationEndDate || "N/A"}`}
-                    </option>
-                  ))}
-                </select>
+                        : `${resource.resourceName} | ${resource.allocationPercentage}% | ${resource.allocationStartDate || "N/A"} to ${resource.allocationEndDate || "N/A"}`
+                    }))
+                  ]}
+                  value={form.allocationId}
+                  onChange={(val) => handleResourceChange({ target: { value: val } })}
+                />
                 {errors.allocationId && (
                   <p className="text-[11px] text-rose-600">{errors.allocationId}</p>
                 )}
@@ -315,7 +307,7 @@ const CreateModificationModal = ({
 
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-[11px] font-medium text-slate-600">
-                  <Percent className="h-3.5 w-3.5 text-slate-400" />
+                  <PercentIcon className="h-3.5 w-3.5 text-slate-400" />
                   Requested Allocation %
                 </label>
                 <Input
@@ -337,7 +329,7 @@ const CreateModificationModal = ({
 
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-[11px] font-medium text-slate-600">
-                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  <CalendarIcon className="h-3.5 w-3.5 text-slate-400" />
                   Effective Date
                 </label>
                 <Input

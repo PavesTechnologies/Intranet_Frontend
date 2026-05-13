@@ -26,37 +26,40 @@ export default function ExcelPreviewModal({
           </button>
         </div>
 
-        {/* TABLE PREVIEW */}
-        {/* <div className="max-h-[400px] overflow-auto border rounded-lg">
+      <div className="grid grid-cols-2 gap-4 mb-4">
 
-          <table className="min-w-full text-sm">
+  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+    <p className="text-sm text-blue-600">
+      New Employees
+    </p>
 
-            <thead className="bg-gray-100 sticky top-0">
-              <tr>
-                {excelPreview.length > 0 &&
-                  Object.keys(excelPreview[0]).map((key) => (
-                    <th key={key} className="px-4 py-2 text-left">
-                      {key}
-                    </th>
-                  ))}
-              </tr>
-            </thead>
+    <h2 className="text-2xl font-bold text-blue-700">
+      {
+        excelPreview.filter(
+          (e) =>
+            e.exportType === "NEW"
+        ).length
+      }
+    </h2>
+  </div>
 
-            <tbody>
-              {excelPreview.map((row, index) => (
-                <tr key={index} className="border-t">
-                  {Object.values(row).map((val, i) => (
-                    <td key={i} className="px-4 py-2">
-                      {val}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
+  <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+    <p className="text-sm text-red-600">
+      Failed Retry
+    </p>
 
-          </table>
+    <h2 className="text-2xl font-bold text-red-700">
+      {
+        excelPreview.filter(
+          (e) =>
+            e.exportType ===
+            "FAILED RETRY"
+        ).length
+      }
+    </h2>
+  </div>
 
-        </div> */}
+</div>
         {/* TABLE PREVIEW */}
 <div className="max-h-[400px] overflow-auto border rounded-lg">
 

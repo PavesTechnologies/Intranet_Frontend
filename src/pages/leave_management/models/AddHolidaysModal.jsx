@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import Button from "../../../components/Button/Button";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL || "";
 
@@ -314,7 +315,7 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
                   <select
                     value={type}
                     onChange={(e) => setType(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white appearance-none"
+                    className="w-full p-2 pl-10 border rounded-lg"
                   >
                     <option value="NATIONAL">National</option>
                     <option value="REGIONAL">Regional</option>

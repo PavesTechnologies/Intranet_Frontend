@@ -17,7 +17,6 @@ import Pagination from "../../../../components/Pagination/pagination";
 import Button from "../../../../components/Button/Button";
 import SearchInput from "../../../../components/filter/Searchbar";
 import Modal from "../../../../components/Modal/modal";
-import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { Fonts } from "../../../../components/Fonts/Fonts";
@@ -75,8 +74,8 @@ export default function UsersTable() {
             limit: ITEMS_PER_PAGE,
             search: searchTerm,
           },
-          headers: { Authorization: `Bearer ${token}` },
-        }
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
       );
 
       setUsers(res.data.users || []);
@@ -106,7 +105,7 @@ export default function UsersTable() {
   }, [fetchUsers]);
 
   const handleSearch = useCallback((value) => {
-    setSearchTerm(value);
+    setSearchTerm(value || "");
     setCurrentPage(1);
   }, []);
 
@@ -164,7 +163,7 @@ export default function UsersTable() {
       if (actionType === "deactivate") {
         await axios.delete(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
         );
 
         showStatusToast("User deactivated successfully.", "success");
@@ -172,7 +171,7 @@ export default function UsersTable() {
         await axios.patch(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}/activate`,
           {},
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
         );
 
         showStatusToast("User activated successfully.", "success");
@@ -196,7 +195,7 @@ export default function UsersTable() {
 
     if (user.contact) {
       const phoneNumber = parsePhoneNumberFromString(
-        "+" + user.contact.replace(/\D/g, "")
+        "+" + user.contact.replace(/\D/g, ""),
       );
 
       if (phoneNumber) {
@@ -210,40 +209,46 @@ export default function UsersTable() {
       mail: user.mail || "N/A",
       contact: formattedContact,
       status: (
-        <StatusBadge
-          label={user.is_active ? "Active" : "Inactive"}
-          size="sm"
-        />
+        <StatusBadge label={user.is_active ? "Active" : "Inactive"} size="sm" />
       ),
       actions: (
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
-            onClick={() => handleEditClick(user.user_uuid)}
+            variant="link"
+            size="icon"
             title="Edit"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 transition hover:bg-blue-50 hover:text-blue-800"
+            aria-label="Edit user"
+            className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+            onClick={() => handleEditClick(user.user_uuid)}
           >
             <Pencil size={17} />
-          </button>
+          </Button>
 
           {user.is_active ? (
-            <button
+            <Button
               type="button"
-              onClick={() => handleToggleClick(user.user_uuid, true)}
+              variant="link"
+              size="icon"
               title="Deactivate"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-800"
+              aria-label="Deactivate user"
+              className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-800"
+              onClick={() => handleToggleClick(user.user_uuid, true)}
             >
               <UserX size={17} />
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
-              onClick={() => handleToggleClick(user.user_uuid, false)}
+              variant="link"
+              size="icon"
               title="Activate"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 transition hover:bg-green-50 hover:text-green-800"
+              aria-label="Activate user"
+              className="h-8 w-8 p-0 text-green-600 hover:bg-green-50 hover:text-green-800"
+              onClick={() => handleToggleClick(user.user_uuid, false)}
             >
               <UserCheck size={17} />
-            </button>
+            </Button>
           )}
         </div>
       ),
@@ -251,21 +256,21 @@ export default function UsersTable() {
   });
 
   return (
-    <div className="px-6 py-4">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <div className="w-full min-w-0 px-4 py-4 sm:px-6">
+      <div className="mb-5 flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
           <h2 className={Fonts.heading3}>Users</h2>
           <p className={Fonts.paragraphMuted}>
             Manage user creation, bulk upload, roles, and activation status.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
           <Button
             onClick={() => setUserBulkUploadModalOpen(true)}
             variant="primary"
             size="medium"
-            className="whitespace-nowrap"
+            className="w-full whitespace-nowrap sm:w-auto"
           >
             <Upload size={16} />
             Bulk Upload
@@ -275,7 +280,7 @@ export default function UsersTable() {
             onClick={() => setCreateModalOpen(true)}
             variant="primary"
             size="medium"
-            className="whitespace-nowrap"
+            className="w-full whitespace-nowrap sm:w-auto"
           >
             <Plus size={16} />
             Add User
@@ -285,50 +290,68 @@ export default function UsersTable() {
             onClick={() => navigate("/user-management/users/roles")}
             variant="secondary"
             size="medium"
-            className="whitespace-nowrap"
+            className="w-full whitespace-nowrap sm:w-auto"
           >
             User Roles
           </Button>
         </div>
       </div>
 
-      <div className="mb-4 max-w-md">
-        <SearchInput
-          onSearch={handleSearch}
-          placeholder="Search users by name, email, or contact..."
-        />
+      <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="w-full lg:max-w-md">
+          <SearchInput
+            onSearch={handleSearch}
+            placeholder="Search users by name, email, or contact..."
+          />
+        </div>
       </div>
 
-      {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white py-16">
-          <LoadingSpinner text="Loading users..." />
-        </div>
-      ) : (
-        <>
-          <GenericTable
-            headers={headers}
-            rows={tableData}
-            columns={columns}
-          />
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        {loading ? (
+          <div className="py-16">
+            <LoadingSpinner text="Loading users..." />
+          </div>
+        ) : users.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+            {searchTerm
+              ? `No users found matching "${searchTerm}".`
+              : "No users found."}
+          </div>
+        ) : (
+          <>
+            <div className="w-full overflow-x-auto">
+              <GenericTable
+                headers={headers}
+                rows={tableData}
+                columns={columns}
+              />
+            </div>
 
-          {totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPrevious={handlePreviousPage}
-              onNext={handleNextPage}
-              className="mt-4"
-            />
-          )}
-        </>
-      )}
+            {totalPages > 1 && (
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPrevious={handlePreviousPage}
+                  onNext={handleNextPage}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       <Modal
         isOpen={isCreateModalOpen}
         onClose={() => setCreateModalOpen(false)}
         title="Create New User"
         subtitle="Fill out the form to add a new user to the system."
-        className="!mt-16 !max-h-[calc(100vh-8rem)] overflow-y-auto"
+        size="3xl"
+        fullScreenMobile
+        maxHeight="max-h-[92vh]"
+        bodyClassName="p-0 overflow-visible"
+        scrollable={false}
+        closeOnBackdrop={false}
       >
         <Suspense fallback={<LoadingSpinner text="Loading create form..." />}>
           <CreateUserForm
@@ -343,7 +366,12 @@ export default function UsersTable() {
         onClose={() => setUserBulkUploadModalOpen(false)}
         title="Bulk Upload Users"
         subtitle="Upload Excel with first_name, last_name, mail, and contact columns."
-        className="!mt-16 !max-h-[calc(100vh-8rem)] !overflow-hidden"
+        size="xl"
+        fullScreenMobile
+        maxHeight="max-h-[92vh]"
+        bodyClassName="p-0 overflow-visible"
+        scrollable={false}
+        closeOnBackdrop={false}
       >
         <Suspense fallback={<LoadingSpinner text="Loading bulk upload..." />}>
           <BulkUserUpload
@@ -358,7 +386,12 @@ export default function UsersTable() {
         onClose={handleEditClose}
         title="Edit User"
         subtitle="Update the user information below."
-        className="!mt-16 !max-h-[calc(100vh-8rem)] overflow-hidden"
+        size="3xl"
+        fullScreenMobile
+        maxHeight="max-h-[92vh]"
+        bodyClassName="p-0 overflow-visible"
+        scrollable={false}
+        closeOnBackdrop={false}
       >
         {selectedUseruuId && (
           <Suspense fallback={<LoadingSpinner text="Loading edit form..." />}>
@@ -371,24 +404,55 @@ export default function UsersTable() {
         )}
       </Modal>
 
-      <ConfirmationModal
+      <Modal
         isOpen={isConfirmModalOpen}
+        onClose={closeConfirmModal}
         title={
           actionType === "deactivate"
             ? "Confirm Deactivation"
             : "Confirm Activation"
         }
-        message={
+        subtitle={
           actionType === "deactivate"
             ? "Are you sure you want to deactivate this user?"
             : "Are you sure you want to activate this user?"
         }
-        confirmText={actionType === "deactivate" ? "Deactivate" : "Activate"}
-        variant={actionType === "deactivate" ? "danger" : "success"}
-        isLoading={confirming}
-        onCancel={closeConfirmModal}
-        onConfirm={confirmToggle}
-      />
+        size="md"
+        closeOnBackdrop={!confirming}
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeConfirmModal}
+              disabled={confirming}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="button"
+              variant={actionType === "deactivate" ? "danger" : "success"}
+              onClick={confirmToggle}
+              loading={confirming}
+              loadingText={
+                actionType === "deactivate"
+                  ? "Deactivating..."
+                  : "Activating..."
+              }
+              disabled={confirming}
+              className="w-full sm:w-auto"
+            >
+              {actionType === "deactivate" ? "Deactivate" : "Activate"}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-gray-600">
+          This action will update the selected user status.
+        </p>
+      </Modal>
     </div>
   );
 }

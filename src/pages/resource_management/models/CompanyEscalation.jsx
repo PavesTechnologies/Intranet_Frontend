@@ -8,7 +8,7 @@ import {
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
-import { Pencil, Trash2 } from "lucide-react";
+import { EditIcon, DeleteIcon } from "@/components/icons";
 import Modal from "../../../components/Modal/modal";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -168,14 +168,16 @@ const CompanyEscalation = () => {
                   "Level",
                   "Status",
                   "Actions",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase"
-                  >
-                    {h}
-                  </th>
-                ))}
+                ]
+                  .filter((h) => (h === "Actions" ? canEditConfig : true))
+                  .map((h) => (
+                    <th
+                      key={h}
+                      className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase"
+                    >
+                      {h}
+                    </th>
+                  ))}
               </tr>
             </thead>
 
@@ -201,8 +203,8 @@ const CompanyEscalation = () => {
                     </span>
                   </td>
 
-                  <td className="px-6 py-4">
-                    {canEditConfig ? (
+                  {canEditConfig && (
+                    <td className="px-6 py-4">
                       <div className="flex justify-center gap-4">
                         <button
                           onClick={() => {
@@ -211,7 +213,7 @@ const CompanyEscalation = () => {
                           }}
                           className="text-blue-600 hover:text-blue-800"
                         >
-                          <Pencil size={14} />
+                          <EditIcon size={14} />
                         </button>
 
                         <button
@@ -221,15 +223,11 @@ const CompanyEscalation = () => {
                           }}
                           className="text-red-600 hover:text-red-800"
                         >
-                          <Trash2 size={14} />
+                          <DeleteIcon size={14} />
                         </button>
                       </div>
-                    ) : (
-                      <span className="text-gray-400 italic text-xs">
-                        No permission
-                      </span>
-                    )}
-                  </td>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -282,3 +280,4 @@ const CompanyEscalation = () => {
 };
 
 export default CompanyEscalation;
+

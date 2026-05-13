@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Fragment, useMemo } from "react";
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 import { Listbox, Combobox, Transition } from "@headlessui/react";
-import { ChevronUpDownIcon, CheckIcon } from "@heroicons/react/20/solid";
+import { ChevronDownIcon, CheckIcon } from "@/components/icons";
 import ct from "countries-and-timezones";
 import { createClient, updateClient, getProjectsByClient } from "../services/clientservice";
 import { toast } from "react-toastify";
@@ -32,7 +32,7 @@ const CustomListbox = ({
               {value || "Default time zone (editable)"}
             </span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <ChevronUpDownIcon
+              <ChevronDownIcon
                 className="h-5 w-5 text-gray-400"
                 aria-hidden="true"
               />
@@ -113,7 +113,7 @@ const SearchableCombobox = ({
               placeholder="Search country..."
             />
             <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
-              <ChevronUpDownIcon
+              <ChevronDownIcon
                 className="h-5 w-5 text-gray-400"
                 aria-hidden="true"
               />

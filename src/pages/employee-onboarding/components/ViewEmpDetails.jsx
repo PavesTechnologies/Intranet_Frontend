@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import StatusBadge from "../../../components/status/statusbadge";
 import { useAuth } from "../../../contexts/AuthContext";
 import {
@@ -59,6 +61,14 @@ const CURRENCY_OPTIONS = [
 
 const getCurrencySymbol = (code) =>
   CURRENCY_OPTIONS.find((currency) => currency.value === code)?.symbol || "₹";
+
+const getApiErrorDetail = (error) => {
+  const detail = error?.response?.data?.detail;
+  return typeof detail === "string" ? detail : "";
+};
+
+const isMissingGreenletError = (error) =>
+  getApiErrorDetail(error).includes("MissingGreenlet");
 
 (function injectEmpStyles() {
   if (typeof document === "undefined") return;
@@ -131,11 +141,11 @@ export default function ViewEmpDetails() {
 
   /* ── FETCH EMPLOYEE ── */
   const fetchEmployee = async () => {
-    const token = localStorage.getItem("token");
+  
     try {
       const res = await axios.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/offer/${user_uuid}`,
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
       const offerData = getOfferWithJoiningStatus(res.data);
       setEmployee(offerData);
@@ -154,19 +164,19 @@ export default function ViewEmpDetails() {
   };
 
   const fetchAdminUsers = async () => {
-    const token = localStorage.getItem("token");
+  
     const res = await axios.get(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/admin-users`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
     );
     setAdminUsers(res.data || []);
   };
 
   const fetchApprovalHistory = async () => {
-    const token = localStorage.getItem("token");
+   
     const res = await axios.get(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/status/${user_uuid}`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
     );
     const data = Array.isArray(res.data) ? res.data : [res.data];
     const mapped = data.map((item) => ({
@@ -192,11 +202,11 @@ export default function ViewEmpDetails() {
 
   /* ── PREVIEW ── */
   const handlePreviewOffer = async () => {
-    const token = localStorage.getItem("token");
+   
     try {
       const res = await axios.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${user_uuid}/generate-preview`,
-        { headers: { Authorization: `Bearer ${token}` }, responseType: "blob" }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }, responseType: "blob" }
       );
       const file = new Blob([res.data], { type: "application/pdf" });
       window.open(URL.createObjectURL(file), "_blank");
@@ -208,13 +218,13 @@ export default function ViewEmpDetails() {
   /* ── SEND OFFER ── */
   const handleSendOffer = async () => {
     setLoadingSendOffer(true);
-    const token = localStorage.getItem("token");
+  
     try {
       setSending(true);
       await axios.post(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/bulk-send`,
         { user_uuid_list: [user_uuid] },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
       showStatusToast("Offer sent successfully");
       fetchEmployee();
@@ -237,29 +247,58 @@ export default function ViewEmpDetails() {
 
   const handleApprovalSubmit = async () => {
     if (!selectedAdmin) { showStatusToast("Please select approver"); return; }
-    const token = localStorage.getItem("token");
+    
+    const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+    const selectedApproverId = Number(selectedAdmin);
+    const currentApproverId =
+      approvalHistory?.[0]?.action_taker_id || approvalHistory?.[0]?.approver_id;
+
+    if (isPending && String(currentApproverId) === String(selectedApproverId)) {
+      showStatusToast("This approver is already assigned");
+      setOpenApprovalModal(false);
+      setSelectedAdmin("");
+      return;
+    }
+
     setSendingApproval(true);
     try {
       if (isNoRequest) {
         await axios.post(
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval-requests/request`,
-          [{ user_uuid, action_taker_id: Number(selectedAdmin) }],
-          { headers: { Authorization: `Bearer ${token}` } },
+          [{ user_uuid, action_taker_id: selectedApproverId }],
+          { headers },
         );
         showStatusToast("Approval request sent");
       } else if (isPending) {
-        await axios.put(
-          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/reassign`,
-          { user_uuid, new_approver_id: Number(selectedAdmin), comments: "Reassigned from UI" },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        try {
+          await axios.put(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/reassign`,
+            { user_uuid, new_approver_id: selectedApproverId, comments: "Reassigned from UI" },
+            { headers }
+          );
+        } catch (error) {
+          if (!isMissingGreenletError(error)) throw error;
+
+          await axios.delete(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval-requests/request/delete`,
+            {
+              headers: { ...headers, "Content-Type": "application/json" },
+              data: [{ user_uuid }],
+            }
+          );
+          await axios.post(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval-requests/request`,
+            [{ user_uuid, action_taker_id: selectedApproverId }],
+            { headers },
+          );
+        }
         showStatusToast("Approval reassigned");
       }
       setOpenApprovalModal(false);
       setSelectedAdmin("");
       fetchApprovalHistory();
-    } catch {
-      showStatusToast("Failed to process approval");
+    } catch (error) {
+      showStatusToast(getApiErrorDetail(error) || "Failed to process approval");
     } finally {
       setSendingApproval(false);
     }
@@ -267,7 +306,7 @@ export default function ViewEmpDetails() {
 
   /* ── UPDATE ── */
   const handleUpdateOffer = async () => {
-    const token = localStorage.getItem("token");
+
     const payload = {
   first_name: editData.first_name,
   middle_name: editData.middle_name,
@@ -297,7 +336,7 @@ export default function ViewEmpDetails() {
       await axios.put(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${user_uuid}`,
         payload,
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
       showStatusToast("Offer updated successfully");
       setIsEditing(false);
@@ -311,12 +350,12 @@ export default function ViewEmpDetails() {
 
   /* ── DELETE ── */
   const handleDeleteOffer = async () => {
-    const token = localStorage.getItem("token");
+    
     try {
       setDeletingOffer(true);
       await axios.delete(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/delete/${user_uuid}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       showStatusToast("Offer deleted successfully");
       setDeleteOfferModal(false);
@@ -332,11 +371,8 @@ export default function ViewEmpDetails() {
 
   if (loading)
     return (
-      <div className="emp-page min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin" />
-          <p className="text-slate-500 text-sm">Loading offer details…</p>
-        </div>
+      <div className="emp-page min-h-screen bg-slate-50">
+        <LoadingSpinner text="Loading offer details..." />
       </div>
     );
 
@@ -621,17 +657,17 @@ export default function ViewEmpDetails() {
                         {toTitleCase(key.replace(/_/g, " "))}
                       </span>
                       {key === "employee_type" ? (
-                        <select
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "Select Employee Type" },
+                            { value: "Full-Time", label: "Full-Time" },
+                            { value: "Part-Time", label: "Part-Time" },
+                            { value: "Intern", label: "Intern" },
+                            { value: "Contract", label: "Contract" },
+                          ]}
                           value={editData[key] || ""}
-                          onChange={(e) => setEditData({ ...editData, [key]: e.target.value })}
-                          className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 ring-0 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
-                        >
-                          <option value="">Select Employee Type</option>
-                          <option value="Full-Time">Full-Time</option>
-                          <option value="Part-Time">Part-Time</option>
-                          <option value="Intern">Intern</option>
-                          <option value="Contract">Contract</option>
-                        </select>
+                          onChange={(val) => setEditData({ ...editData, [key]: val })}
+                        />
                       ) : key === "currency" ? (
                         <select
                           value={editData[key] || "INR"}
@@ -699,16 +735,11 @@ export default function ViewEmpDetails() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
                 Approver
               </label>
-              <select
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
+              <FilterListbox
+                options={[{value:"",label:"Select Approver"}, ...adminUsers.map((a) => ({value: String(a.user_id), label: a.name}))]}
                 value={selectedAdmin}
-                onChange={(e) => setSelectedAdmin(e.target.value)}
-              >
-                <option value="">Select Approver</option>
-                {adminUsers.map((a) => (
-                  <option key={a.user_id} value={a.user_id}>{a.name}</option>
-                ))}
-              </select>
+                onChange={setSelectedAdmin}
+              />
             </div>
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
               <button

@@ -6,6 +6,7 @@ import { reviewTimesheet, handleBulkReview } from "../api";
 import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { MoreVertical, X, ChevronDown, ChevronUp } from "lucide-react";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 import ConfirmationModal from "../../leave_management/models/ConfirmationModal";
@@ -438,7 +439,16 @@ const ManagerApprovalTable = ({
           statusFilter === "All" ||
           week.weeklyStatus?.toUpperCase() === statusFilter.toUpperCase(),
       )
-      .map((week) => (
+      .map((week) => {
+        // Hide individual timesheets that are already APPROVED — the manager
+        // only needs to see what still needs action. If nothing is left in the
+        // week, skip the week card entirely.
+        const pendingTimesheets = (week.timesheets || []).filter(
+          (ts) => ts.status?.toUpperCase() !== "APPROVED",
+        );
+        if (pendingTimesheets.length === 0) return null;
+
+        return (
         <div
           key={week.weekId}
           className="bg-white border rounded-xl shadow-sm mb-6 overflow-hidden"
@@ -559,7 +569,7 @@ const ManagerApprovalTable = ({
             onConfirm={async (reason) => {
               setActionLoading(true);
               try {
-                const timesheetIds = week.timesheets.map((t) => t.timesheetId);
+                const timesheetIds = pendingTimesheets.map((t) => t.timesheetId);
                 const comment = reason || "Rejected by manager";
                 await handleBulkReview(
                   user.userId,
@@ -596,7 +606,7 @@ const ManagerApprovalTable = ({
               }));
               setActionLoading(true);
               try {
-                const timesheetIds = week.timesheets.map((t) => t.timesheetId);
+                const timesheetIds = pendingTimesheets.map((t) => t.timesheetId);
                 await handleBulkReview(
                   user.userId,
                   timesheetIds,
@@ -620,7 +630,7 @@ const ManagerApprovalTable = ({
             weekGroup={{
               weekStart: week.startDate,
               weekEnd: week.endDate,
-              timesheets: week.timesheets,
+              timesheets: pendingTimesheets,
               weekRange: `${new Date(
                 week.startDate,
               ).toLocaleDateString()} - ${new Date(
@@ -639,7 +649,8 @@ const ManagerApprovalTable = ({
             projectInfo={projectInfo}
           />
         </div>
-      ));
+        );
+      });
   // Track selection mode and selected users
   const [isRemoveMode, setIsRemoveMode] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
@@ -1183,36 +1194,28 @@ const ManagerApprovalTable = ({
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Select Employee
                         </label>
-                        <select
-                          className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "-- Select Employee --" },
+                            ...managerUsers.map((u) => ({ value: u.id, label: `${u.id} - ${u.fullName}` })),
+                          ]}
                           value={selectedAddUser}
-                          onChange={(e) => setSelectedAddUser(e.target.value)}
-                        >
-                          <option value="">-- Select Employee --</option>
-                          {managerUsers.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.id} - {u.fullName}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setSelectedAddUser}
+                        />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Select Holiday
                         </label>
-                        <select
-                          className="w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "-- Select Holiday --" },
+                            ...monthlyHolidays.map((h) => ({ value: h.holidayDate, label: `${h.holidayDate} - ${h.holidayName}` })),
+                          ]}
                           value={selectedHoliday}
-                          onChange={(e) => setSelectedHoliday(e.target.value)}
-                        >
-                          <option value="">-- Select Holiday --</option>
-                          {monthlyHolidays.map((h) => (
-                            <option key={h.holidayId} value={h.holidayDate}>
-                              {h.holidayDate} - {h.holidayName}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setSelectedHoliday}
+                        />
                       </div>
 
                       <div>
@@ -1287,18 +1290,14 @@ const ManagerApprovalTable = ({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Select Holiday
                     </label>
-                    <select
-                      className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-400"
+                    <FilterListbox
+                      options={[
+                        { value: "", label: "-- Select Holiday --" },
+                        ...monthlyHolidays.map((h) => ({ value: h.holidayDate, label: `${h.holidayDate} - ${h.holidayDescription}` })),
+                      ]}
                       value={updateHoliday}
-                      onChange={(e) => setUpdateHoliday(e.target.value)}
-                    >
-                      <option value="">-- Select Holiday --</option>
-                      {monthlyHolidays.map((h) => (
-                        <option key={h.holidayId} value={h.holidayDate}>
-                          {h.holidayDate} - {h.holidayDescription}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setUpdateHoliday}
+                    />
                   </div>
 
                   {/* 🆕 Editable Reason */}

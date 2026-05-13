@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
-import { toast } from "react-toastify";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Button from "../../../../components/Button/Button";
 
 export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuccess, onClose }) {
 
@@ -26,7 +28,7 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
     e.preventDefault();
 
     if (!cycleId || !form.name || !form.status) {
-      toast.error("Cycle, Name & Status are required");
+      showStatusToast("Cycle, Name & Status are required", "error");
       return;
     }
 
@@ -44,11 +46,11 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
         payload,
       );
 
-      toast.success("Test Run Created Successfully");
+      showStatusToast("Test Run Created Successfully", "success");
       onSuccess && onSuccess();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to create test run");
+      showStatusToast("Failed to create test run", "error");
     } finally {
       setLoadingSubmit(false);
     }
@@ -102,24 +104,11 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
           {/* Status */}
           <div>
             <label className="block text-sm font-medium mb-1">Status *</label>
-            <select
-              name="status"
+            <FilterListbox
+              options={[{value:"",label:"Select Status"},{value:"CREATED",label:"CREATED"},{value:"IN_PROGRESS",label:"IN_PROGRESS"},{value:"COMPLETED",label:"COMPLETED"},{value:"CANCELLED",label:"CANCELLED"}]}
               value={form.status}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-lg"
-              required
-            >
-              <option value="">Select Status</option>
-              {/* <option value="NOT_STARTED">NOT_STARTED</option>
-              <option value="IN_PROGRESS">IN_PROGRESS</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="BLOCKED">BLOCKED</option>
-              <option value="FAILED">FAILED</option> */}
-              <option value="CREATED">CREATED</option>
-              <option value="IN_PROGRESS">IN_PROGRESS</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="CANCELLED">CANCELLED</option>
-            </select>
+              onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+            />
           </div>
 
           {/* Description (full width) */}
@@ -168,13 +157,16 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
 
           {/* Submit Button full width */}
           <div className="md:col-span-2">
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              className="w-full"
               disabled={loadingSubmit}
-              className="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
+              loading={loadingSubmit}
+              loadingText="Creating..."
             >
-              {loadingSubmit ? "Creating..." : "Create Test Run"}
-            </button>
+              Create Test Run
+            </Button>
           </div>
         </form>
     </div>

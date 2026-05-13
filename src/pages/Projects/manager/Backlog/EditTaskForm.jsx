@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import { X } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import FormTextArea from "../../../../components/forms/FormTextArea";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
+import Button from "../../../../components/Button/Button";
 
 // 🔥 Moved Wrapper OUTSIDE to prevent focus loss on re-render
 const Wrapper = ({ children, mode, onClose }) => {
@@ -124,7 +125,7 @@ const EditTaskForm = ({
         setStatuses(statusRes.data || []);
       } catch (err) {
         console.error(err);
-        toast.error("Failed to load task details");
+        showStatusToast("Failed to load task details", "error");
       } finally {
         setLoading(false);
       }
@@ -212,7 +213,7 @@ const EditTaskForm = ({
     // date validation
     if (formData.startDate && formData.dueDate) {
       if (new Date(formData.dueDate) < new Date(formData.startDate)) {
-        toast.error("Due date cannot be earlier than the start date.");
+        showStatusToast("Due date cannot be earlier than the start date.", "error");
         return;
       }
     }
@@ -224,7 +225,7 @@ const EditTaskForm = ({
         axiosConfig,
       );
 
-      toast.success("Task updated successfully!");
+      showStatusToast("Task updated successfully!", "success");
 
       setTimeout(() => {
         onUpdated?.();
@@ -232,7 +233,7 @@ const EditTaskForm = ({
       }, 500);
     } catch (error) {
       console.error(error);
-      toast.error(error.response?.data?.message || "Failed to update task");
+      showStatusToast(error.response?.data?.message || "Failed to update task", "error");
     }
   };
 
@@ -247,23 +248,24 @@ const EditTaskForm = ({
   // UI
   return (
     <Wrapper mode={mode} onClose={onClose}>
-      {/* HEADER */}
-      <div className="flex justify-between items-center p-6 border-b">
-        <h2 className="text-xl font-semibold">Edit Task</h2>
-        <button onClick={onClose}>
-          <X className="text-gray-600 hover:text-gray-900" />
-        </button>
-      </div>
+      <form onSubmit={handleSubmit} className="flex flex-col min-h-full">
+        {/* HEADER */}
+        <div className="flex justify-between items-center p-6 border-b">
+          <h2 className="text-xl font-semibold">Edit Task</h2>
+          <button type="button" onClick={onClose}>
+            <X className="text-gray-600 hover:text-gray-900" />
+          </button>
+        </div>
 
-      {/* BODY (scrollable) */}
-      <div className="p-6 overflow-y-auto flex-1 space-y-6">
-        <FormInput
-          label="Title *"
-          name="title"
-          value={formData.title}
-          onChange={handleChange}
-          required
-        />
+        {/* BODY (scrollable) */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          <FormInput
+            label="Title *"
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
+            required
+          />
 
         <FormTextArea
           label="Description"
@@ -391,24 +393,13 @@ const EditTaskForm = ({
         />
       </div>
 
-      {/* STICKY FOOTER */}
-      <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
-        >
-          Cancel
-        </button>
+        {/* STICKY FOOTER */}
+        <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3">
+          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
 
-        <button
-          type="button"
-          onClick={handleSubmit}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-        >
-          Save Changes
-        </button>
-      </div>
+          <Button variant="primary" type="submit">Save Changes</Button>
+        </div>
+      </form>
     </Wrapper>
   );
 };

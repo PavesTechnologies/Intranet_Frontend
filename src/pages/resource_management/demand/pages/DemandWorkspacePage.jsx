@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import {
-    Search, Filter, Activity, AlertTriangle, Zap, ShieldAlert, XCircle, CheckCircle2, Loader2
-} from "lucide-react";
+import { SearchIcon, FilterIcon, ActivityIcon, WarningIcon, ZapIcon, SecurityAlertIcon, ErrorIcon, SuccessIcon, SpinnerIcon, CloseIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import DemandKPIStrip from '../components/DemandKPIStrip';
 import DemandList from '../components/DemandList';
 import DemandFilters from '../components/DemandFilters';
 import { useDemand } from '../hooks/useDemand';
 import DemandModal from '../../models/DemandModal';
-import { handleDMDecision, handleRMDecision } from '../../services/demandService';
+import { handleDMDecision, handleRMDecision, deleteDemandByPM } from '../../services/demandService';
+import { updateDemandStatus } from '../../services/projectService';
 import {
     Select,
     SelectContent,
@@ -62,7 +61,7 @@ const DecisionModal = ({
             ? "Confirm that staffing is complete and close this demand."
         : "Confirm the demand and move it to the next step.";
     const buttonLabel = isReject ? "Submit Rejection" : isFulfill ? "Mark Fulfilled" : "Confirm Approval";
-    const Icon = isReject ? XCircle : CheckCircle2;
+    const Icon = isReject ? ErrorIcon : SuccessIcon;
 
     return createPortal(
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-[2px]">
@@ -87,7 +86,7 @@ const DecisionModal = ({
                             disabled={loading}
                             className="rounded-full border border-slate-200 p-2 text-slate-400 transition hover:border-slate-300 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            <XCircle className="h-4 w-4" />
+                            <CloseIcon className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
@@ -158,8 +157,76 @@ const DecisionModal = ({
                         disabled={loading}
                         className={cn("inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60", primaryButtonClass)}
                     >
-                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+                        {loading ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
                         {buttonLabel}
+                    </button>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+};
+
+const DeleteDemandModal = ({ demand, loading, onClose, onSubmit }) => {
+    if (!demand) return null;
+
+    return createPortal(
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-[2px]">
+            <div className="w-full max-w-md overflow-hidden rounded-[24px] border border-rose-100 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.22)]">
+                <div className="border-b border-rose-100 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_55%,#fff1f2_100%)] px-6 py-5">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <div className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-rose-600">
+                                <ErrorIcon className="h-3.5 w-3.5" />
+                                Delete
+                            </div>
+                            <h3 className="mt-3 text-lg font-bold text-slate-900">
+                                Delete requested demand?
+                            </h3>
+                            <p className="mt-1 text-sm text-slate-500">
+                                This will cancel the requested demand and remove it from the active pipeline.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={loading}
+                            className="rounded-full border border-slate-200 p-2 text-slate-400 transition hover:border-slate-300 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <CloseIcon className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="px-6 py-5">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Demand Summary</p>
+                        <p className="mt-3 text-base font-bold text-slate-900">{demand.projectName}</p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                            <span>{demand.client}</span>
+                            <span className="h-1 w-1 rounded-full bg-slate-300" />
+                            <span>{demand.role}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={loading}
+                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Keep Demand
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onSubmit}
+                        disabled={loading}
+                        className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-rose-200 transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {loading ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
+                        Delete Demand
                     </button>
                 </div>
             </div>
@@ -206,6 +273,7 @@ const DemandWorkspacePage = () => {
     const [rejectingDemand, setRejectingDemand] = useState(null);
     const [fulfillingDemand, setFulfillingDemand] = useState(null);
     const [rmRejectingDemand, setRmRejectingDemand] = useState(null);
+    const [deletingDemand, setDeletingDemand] = useState(null);
     const [rejectReason, setRejectReason] = useState("");
     const [rejectReasonError, setRejectReasonError] = useState("");
     const [rmRejectReason, setRmRejectReason] = useState("");
@@ -232,6 +300,10 @@ const DemandWorkspacePage = () => {
         setRmRejectReasonError("");
     };
 
+    const openDeleteModal = (demand) => {
+        setDeletingDemand(demand);
+    };
+
     const closeApproveModal = () => {
         if (decisionState.action === "approve") return;
         setApprovingDemand(null);
@@ -254,6 +326,11 @@ const DemandWorkspacePage = () => {
         setRmRejectingDemand(null);
         setRmRejectReason("");
         setRmRejectReasonError("");
+    };
+
+    const closeDeleteModal = () => {
+        if (decisionState.action === "delete") return;
+        setDeletingDemand(null);
     };
 
     const handleQuickApprove = async () => {
@@ -349,6 +426,23 @@ const DemandWorkspacePage = () => {
             await refreshData();
         } catch (error) {
             toast.error(getActionErrorMessage(error, "Demand rejection failed"));
+        } finally {
+            setDecisionState({ demandId: null, action: null });
+        }
+    };
+
+    const handleDeleteRequestedDemand = async () => {
+        const id = deletingDemand?.demandId || deletingDemand?.id;
+        if (!id) return;
+
+        setDecisionState({ demandId: id, action: "delete" });
+        try {
+            const response = await deleteDemandByPM(id);
+            toast.success(response?.message || "Demand deleted successfully");
+            setDeletingDemand(null);
+            await refreshData();
+        } catch (error) {
+            toast.error(getActionErrorMessage(error, "Failed to delete demand"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -498,14 +592,14 @@ const DemandWorkspacePage = () => {
 
                                 <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60">
                                     {[
-                                        { id: 'breached', label: 'Breached', icon: ShieldAlert, color: 'text-rose-600' },
-                                        { id: 'at_risk', label: 'At Risk', icon: AlertTriangle, color: 'text-orange-600' },
-                                        { id: 'active', label: 'Approved', icon: Activity, color: 'text-indigo-600' },
-                                        { id: 'soft', label: 'Soft', icon: Zap, color: 'text-slate-600' },
+                                        { id: 'breached', label: 'Breached', icon: SecurityAlertIcon, color: 'text-rose-600' },
+                                        { id: 'at_risk', label: 'At Risk', icon: WarningIcon, color: 'text-orange-600' },
+                                        { id: 'active', label: 'Approved', icon: ActivityIcon, color: 'text-indigo-600' },
+                                        { id: 'soft', label: 'Soft', icon: ZapIcon, color: 'text-slate-600' },
                                         ...(isRMView
-                                            ? [{ id: 'fulfilled', label: 'Fulfilled', icon: CheckCircle2, color: 'text-emerald-600' }]
+                                            ? [{ id: 'fulfilled', label: 'Fulfilled', icon: SuccessIcon, color: 'text-emerald-600' }]
                                             : []),
-                                        { id: 'rejected', label: 'Rejected', icon: XCircle, color: 'text-rose-600' }
+                                        { id: 'rejected', label: 'Rejected', icon: ErrorIcon, color: 'text-rose-600' }
                                     ].map(tab => (
                                         <button
                                             key={tab.id}
@@ -526,7 +620,7 @@ const DemandWorkspacePage = () => {
 
                             <div className="flex items-center gap-2">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                                     <input
                                         type="text"
                                         placeholder="Search pipeline..."
@@ -543,7 +637,7 @@ const DemandWorkspacePage = () => {
                                         !filterCollapsed ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-100" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                                     )}
                                 >
-                                    <Filter className="h-3.5 w-3.5" />
+                                    <FilterIcon className="h-3.5 w-3.5" />
                                     {filters.client !== 'ALL' ? filters.client : 'Filters'}
                                     {activeFilterCount > 0 && (
                                         <span className="ml-1 px-1 bg-indigo-100 text-indigo-600 rounded-sm text-[9px]">
@@ -557,15 +651,15 @@ const DemandWorkspacePage = () => {
 
                     <div className="overflow-x-auto border-t border-slate-100">
                         <div className="min-w-[1000px]">
-                            <div className="grid grid-cols-10 items-center gap-4 px-5 py-2.5 bg-slate-50 border-b border-slate-100">
+                            <div className="grid grid-cols-12 items-center gap-4 px-5 py-2.5 bg-slate-50 border-b border-slate-100">
                                 <div className="col-span-3 text-[10px] font-bold text-slate-400 tracking-wider uppercase">Demand Specifications & Context</div>
                                 <div className="col-span-1 text-[10px] font-bold text-slate-400 tracking-wider uppercase">Score</div>
                                 <div className="col-span-1 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Priority</div>
                                 <div className="col-span-2 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">
                                     {activeTab === 'rejected' ? 'Rejection Reason' : 'SLA Compliance'}
                                 </div>
-                                <div className="col-span-2 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Status</div>
-                                <div className="col-span-1 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Actions</div>
+                                <div className="col-span-3 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Status</div>
+                                <div className="col-span-2 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Actions</div>
                             </div>
 
                             <div className="bg-white min-h-[400px]">
@@ -588,7 +682,7 @@ const DemandWorkspacePage = () => {
                                 ) : filteredDemands.length === 0 ? (
                                     <div className="py-24 text-center">
                                         <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
-                                            <Search className="h-8 w-8 text-slate-200" />
+                                            <SearchIcon className="h-8 w-8 text-slate-200" />
                                         </div>
                                         <h3 className="text-sm font-bold text-slate-900">No matches found</h3>
                                         <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or search terms</p>
@@ -602,6 +696,7 @@ const DemandWorkspacePage = () => {
                                                 setEditingDemand(demand);
                                                 setEditModalOpen(true);
                                             }}
+                                            onDelete={openDeleteModal}
                                             onApprove={openApproveModal}
                                             onReject={openRejectModal}
                                             onFulfill={openFulfillModal}
@@ -724,6 +819,13 @@ const DemandWorkspacePage = () => {
                 }}
                 onClose={closeRMRejectModal}
                 onSubmit={handleRMReject}
+            />
+
+            <DeleteDemandModal
+                demand={deletingDemand}
+                loading={decisionState.action === "delete" && decisionState.demandId === deletingDemand?.id}
+                onClose={closeDeleteModal}
+                onSubmit={handleDeleteRequestedDemand}
             />
 
             {editModalOpen && (

@@ -14,6 +14,7 @@ import StatusBadge from "../../../../components/status/statusbadge";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 
 const ITEMS_PER_PAGE = 10;
+const ROLE_ITEMS_PER_PAGE = 6;
 
 const SORT_DIRECTIONS = {
   ASC: "asc",
@@ -23,49 +24,47 @@ const SORT_DIRECTIONS = {
 export default function UpdateUserRole() {
   const [users, setUsers] = useState([]);
   const [totalUsers, setTotalUsers] = useState(0);
-
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [sortDirection, setSortDirection] = useState(
-    SORT_DIRECTIONS.ASC
-  );
+  const [sortDirection, setSortDirection] = useState(SORT_DIRECTIONS.ASC);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser_uuId, setSelectedUser_uuId] = useState(null);
 
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
 
-  const totalPages = Math.ceil(totalUsers / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(totalUsers / ITEMS_PER_PAGE));
 
   const axiosInstance = useMemo(() => {
-    const headers = {
-      "Content-Type": "application/json",
-    };
-
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    return axios.create({
+    const instance = axios.create({
       baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-      headers,
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
-  }, [token]);
+
+    instance.interceptors.request.use((config) => {
+      const latestToken = localStorage.getItem("token");
+
+      if (latestToken) {
+        config.headers.Authorization = `Bearer ${latestToken}`;
+      }
+
+      return config;
+    });
+
+    return instance;
+  }, []);
 
   useEffect(() => {
-    if (!token) {
-      showStatusToast(
-        "Session expired. Please login again.",
-        "warning"
-      );
-
+    if (!localStorage.getItem("token")) {
+      showStatusToast("Session expired. Please login again.", "warning");
       navigate("/");
     }
-  }, [token, navigate]);
+  }, [navigate]);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -92,29 +91,27 @@ export default function UpdateUserRole() {
 
       showStatusToast(msg, "error");
 
-      if (
-        err.response?.status === 401 ||
-        err.response?.status === 403
-      ) {
+      if (err.response?.status === 401 || err.response?.status === 403) {
         navigate("/dashboard");
       }
     } finally {
       setLoading(false);
     }
-  }, [
-    axiosInstance,
-    currentPage,
-    searchTerm,
-    navigate,
-  ]);
+  }, [axiosInstance, currentPage, searchTerm, navigate]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
   const handleSearch = useCallback((value) => {
-    setSearchTerm(value || "");
-    setCurrentPage(1);
+    const nextSearch = value || "";
+
+    setSearchTerm((prev) => {
+      if (prev === nextSearch) return prev;
+
+      setCurrentPage(1);
+      return nextSearch;
+    });
   }, []);
 
   const handlePreviousPage = useCallback(() => {
@@ -122,16 +119,12 @@ export default function UpdateUserRole() {
   }, []);
 
   const handleNextPage = useCallback(() => {
-    setCurrentPage((prev) =>
-      Math.min(prev + 1, totalPages)
-    );
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
   }, [totalPages]);
 
   const toggleSort = () => {
     setSortDirection((prev) =>
-      prev === SORT_DIRECTIONS.ASC
-        ? SORT_DIRECTIONS.DESC
-        : SORT_DIRECTIONS.ASC
+      prev === SORT_DIRECTIONS.ASC ? SORT_DIRECTIONS.DESC : SORT_DIRECTIONS.ASC
     );
 
     setUsers((prev) => [...prev].reverse());
@@ -144,48 +137,27 @@ export default function UpdateUserRole() {
       className="cursor-pointer select-none"
       onClick={toggleSort}
     >
-      Name{" "}
-      {sortDirection === SORT_DIRECTIONS.ASC
-        ? "▲"
-        : "▼"}
+      Name {sortDirection === SORT_DIRECTIONS.ASC ? "▲" : "▼"}
     </span>,
     "Email",
     "Assigned Roles",
     "Actions",
   ];
 
-  const columns = [
-    "serial_no",
-    "name",
-    "mail",
-    "roles",
-    "actions",
-  ];
+  const columns = ["serial_no", "name", "mail", "roles", "actions"];
 
   const tableRows = users.map((user, index) => ({
-    serial_no: (
-      (currentPage - 1) * ITEMS_PER_PAGE +
-      index +
-      1
-    ).toString(),
+    serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
 
     name: user.name || "N/A",
 
-    mail: user.mail || (
-      <span className="italic text-gray-400">
-        N/A
-      </span>
-    ),
+    mail: user.mail || <span className="italic text-gray-400">N/A</span>,
 
     roles:
       user.roles?.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {user.roles.map((role, idx) => (
-            <StatusBadge
-              key={idx}
-              label={role}
-              size="sm"
-            />
+            <StatusBadge key={idx} label={role} size="sm" />
           ))}
         </div>
       ) : (
@@ -194,43 +166,39 @@ export default function UpdateUserRole() {
 
     actions: (
       <Button
+        type="button"
+        variant="link"
+        size="icon"
+        title="Edit"
+        className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
         onClick={() => {
           setSelectedUser_uuId(user.user_uuid);
           setIsModalOpen(true);
         }}
-        variant="primary"
-        size="small"
       >
-        <Pencil size={15} />
-        Edit
+        <Pencil size={17} />
       </Button>
     ),
   }));
 
-  const handleRolesSaved = (
-    userUuid,
-    updatedRoleNames
-  ) => {
+  const handleRolesSaved = (userUuid, updatedRoleNames) => {
     setUsers((prev) =>
-      prev.map((u) =>
-        u.user_uuid === userUuid
+      prev.map((user) =>
+        user.user_uuid === userUuid
           ? {
-              ...u,
+              ...user,
               roles: updatedRoleNames,
             }
-          : u
+          : user
       )
     );
   };
 
   return (
-    <div className="px-6 py-4">
-      {/* Header */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className={Fonts.heading3}>
-            Update User Roles
-          </h2>
+    <div className="w-full min-w-0 px-4 py-4 sm:px-6">
+      <div className="mb-5 flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h2 className={Fonts.heading3}>Update User Roles</h2>
 
           <p className={Fonts.paragraphMuted}>
             Assign and manage roles for users.
@@ -239,50 +207,59 @@ export default function UpdateUserRole() {
 
         <Button
           variant="secondary"
-          size="small"
-          onClick={() =>
-            navigate("/user-management/users")
-          }
+          size="medium"
+          onClick={() => navigate("/user-management/users")}
+          className="w-full sm:w-auto"
         >
           <ArrowLeft size={15} />
           Back
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="mb-4 max-w-md">
-        <SearchInput
-          onSearch={handleSearch}
-          placeholder="Search by name, email or role..."
-        />
+      <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="w-full lg:max-w-md">
+          <SearchInput
+            onSearch={handleSearch}
+            placeholder="Search by name, email or role..."
+          />
+        </div>
       </div>
 
-      {/* Table */}
-      {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white py-16">
-          <LoadingSpinner text="Loading user roles..." />
-        </div>
-      ) : (
-        <>
-          <GenericTable
-            headers={headers}
-            rows={tableRows}
-            columns={columns}
-          />
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        {loading ? (
+          <div className="py-16">
+            <LoadingSpinner text="Loading user roles..." />
+          </div>
+        ) : users.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+            {searchTerm
+              ? `No users found matching "${searchTerm}".`
+              : "No users found."}
+          </div>
+        ) : (
+          <>
+            <div className="w-full overflow-x-auto">
+              <GenericTable
+                headers={headers}
+                rows={tableRows}
+                columns={columns}
+              />
+            </div>
 
-          {totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPrevious={handlePreviousPage}
-              onNext={handleNextPage}
-              className="mt-4"
-            />
-          )}
-        </>
-      )}
+            {totalPages > 1 && (
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPrevious={handlePreviousPage}
+                  onNext={handleNextPage}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
-      {/* Modal */}
       {isModalOpen && selectedUser_uuId && (
         <EditUserRoleModal
           user_uuId={selectedUser_uuId}
@@ -292,10 +269,7 @@ export default function UpdateUserRole() {
           }}
           axiosInstance={axiosInstance}
           onSaved={(updatedRoleNames) =>
-            handleRolesSaved(
-              selectedUser_uuId,
-              updatedRoleNames
-            )
+            handleRolesSaved(selectedUser_uuId, updatedRoleNames)
           }
         />
       )}
@@ -303,36 +277,16 @@ export default function UpdateUserRole() {
   );
 }
 
-/* ---------------------------------------------------------
-   Edit Modal
---------------------------------------------------------- */
-
-function EditUserRoleModal({
-  user_uuId,
-  onClose,
-  axiosInstance,
-  onSaved,
-}) {
+function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
   const [user, setUser] = useState(null);
-
   const [roles, setRoles] = useState([]);
-
-  const [selectedRoleIds, setSelectedRoleIds] =
-    useState([]);
+  const [selectedRoleIds, setSelectedRoleIds] = useState([]);
 
   const [loading, setLoading] = useState(true);
-
   const [saving, setSaving] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
-
-  const token = localStorage.getItem("token");
-
-  const authHeader = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
+  const [rolePage, setRolePage] = useState(1);
 
   useEffect(() => {
     if (!user_uuId) return;
@@ -343,68 +297,36 @@ function EditUserRoleModal({
       setLoading(true);
 
       try {
-        const [
-          userRes,
-          rolesRes,
-          assignedRes,
-        ] = await Promise.all([
-          axiosInstance.get(
-            `/admin/users/uuid/${user_uuId}`,
-            authHeader
-          ),
-
-          axiosInstance.get(
-            `/admin/roles`,
-            authHeader
-          ),
-
-          axiosInstance.get(
-            `/admin/users/uuid/${user_uuId}/roles`,
-            authHeader
-          ),
+        const [userRes, rolesRes, assignedRes] = await Promise.all([
+          axiosInstance.get(`/admin/users/uuid/${user_uuId}`),
+          axiosInstance.get(`/admin/roles`),
+          axiosInstance.get(`/admin/users/uuid/${user_uuId}/roles`),
         ]);
 
         if (!mounted) return;
 
-        setUser(userRes.data);
+        const allRoles = Array.isArray(rolesRes.data) ? rolesRes.data : [];
 
-        setRoles(
-          Array.isArray(rolesRes.data)
-            ? rolesRes.data
-            : []
-        );
+        setUser(userRes.data);
+        setRoles(allRoles);
 
         let assignedIds = [];
 
-        if (
-          assignedRes.data?.roles &&
-          Array.isArray(assignedRes.data.roles)
-        ) {
-          const roleNameToId =
-            rolesRes.data.reduce((acc, r) => {
-              acc[r.role_name] = r.role_uuid;
-              return acc;
-            }, {});
+        if (assignedRes.data?.roles && Array.isArray(assignedRes.data.roles)) {
+          const roleNameToId = allRoles.reduce((acc, role) => {
+            acc[role.role_name] = role.role_uuid;
+            return acc;
+          }, {});
 
           assignedIds = assignedRes.data.roles
-            .map(
-              (roleName) =>
-                roleNameToId[roleName]
-            )
+            .map((roleName) => roleNameToId[roleName])
             .filter(Boolean);
         }
 
         setSelectedRoleIds(assignedIds);
       } catch (err) {
-        console.error(
-          "Failed to load roles",
-          err
-        );
-
-        showStatusToast(
-          "Unable to fetch user role data.",
-          "error"
-        );
+        console.error("Failed to load roles", err);
+        showStatusToast("Unable to fetch user role data.", "error");
       } finally {
         if (mounted) {
           setLoading(false);
@@ -418,6 +340,55 @@ function EditUserRoleModal({
       mounted = false;
     };
   }, [user_uuId, axiosInstance]);
+
+  const handleRoleSearch = useCallback((value) => {
+    const nextSearch = value || "";
+
+    setSearchTerm((prev) => {
+      if (prev === nextSearch) return prev;
+
+      setRolePage(1);
+      return nextSearch;
+    });
+  }, []);
+
+  const filteredRoles = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+
+    if (!term) return roles;
+
+    return roles.filter((role) =>
+      role.role_name?.toLowerCase().includes(term)
+    );
+  }, [roles, searchTerm]);
+
+  const totalRolePages = Math.max(
+    1,
+    Math.ceil(filteredRoles.length / ROLE_ITEMS_PER_PAGE)
+  );
+
+  const safeRolePage = Math.min(rolePage, totalRolePages);
+
+  const paginatedRoles = useMemo(() => {
+    return filteredRoles.slice(
+      (safeRolePage - 1) * ROLE_ITEMS_PER_PAGE,
+      safeRolePage * ROLE_ITEMS_PER_PAGE
+    );
+  }, [filteredRoles, safeRolePage]);
+
+  useEffect(() => {
+    if (rolePage > totalRolePages) {
+      setRolePage(totalRolePages);
+    }
+  }, [rolePage, totalRolePages]);
+
+  const handlePreviousRolePage = useCallback(() => {
+    setRolePage((prev) => Math.max(prev - 1, 1));
+  }, []);
+
+  const handleNextRolePage = useCallback(() => {
+    setRolePage((prev) => Math.min(prev + 1, totalRolePages));
+  }, [totalRolePages]);
 
   const toggleRole = (roleId) => {
     setSelectedRoleIds((prev) =>
@@ -437,19 +408,15 @@ function EditUserRoleModal({
         `/admin/users/uuid/${user_uuId}/role`,
         {
           role_ids: selectedRoleIds,
-        },
-        authHeader
+        }
       );
 
       const updatedRoleNames = roles
-        .filter((r) =>
-          selectedRoleIds.includes(r.role_uuid)
-        )
-        .map((r) => r.role_name);
+        .filter((role) => selectedRoleIds.includes(role.role_uuid))
+        .map((role) => role.role_name);
 
       showStatusToast(
-        response?.data?.message ||
-          "Roles updated successfully!",
+        response?.data?.message || "Roles updated successfully!",
         "success"
       );
 
@@ -459,121 +426,133 @@ function EditUserRoleModal({
 
       onClose();
     } catch (err) {
-      console.error(
-        "Failed to update roles",
-        err
-      );
+      console.error("Failed to update roles", err);
 
-      showStatusToast(
-        "Update failed.",
-        "error"
-      );
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Update failed.";
+
+      showStatusToast(msg, "error");
     } finally {
       setSaving(false);
     }
   };
-
-  const filteredRoles = useMemo(() => {
-    const term = searchTerm
-      .trim()
-      .toLowerCase();
-
-    if (!term) return roles;
-
-    return roles.filter((r) =>
-      r.role_name
-        .toLowerCase()
-        .includes(term)
-    );
-  }, [roles, searchTerm]);
 
   return (
     <Modal
       isOpen={true}
       onClose={onClose}
       title="Edit User Roles"
-      subtitle="Assign or remove roles for the selected user."
-      className="!mt-16 !max-h-[calc(100vh-8rem)] overflow-hidden"
-    >
-      <div className="p-2">
-        {loading ? (
-          <LoadingSpinner text="Loading role data..." />
-        ) : (
-          <>
-            <div className="mb-5">
-              <h3 className={Fonts.heading4}>
-                {user?.first_name}{" "}
-                {user?.last_name}
-              </h3>
+      subtitle={
+        user
+          ? `User: ${user.first_name || ""} ${user.last_name || ""}`.trim()
+          : "Assign or remove roles for the selected user."
+      }
+      size="2xl"
+      fullScreenMobile
+      maxHeight="max-h-[92vh]"
+      bodyClassName="p-0 overflow-hidden"
+      scrollable={false}
+      closeOnBackdrop={!saving}
+      footer={
+        !loading && (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+              disabled={saving}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
 
-              <p className="mt-1 text-sm text-gray-500">
-                Select or deselect roles below.
+            <Button
+              type="button"
+              onClick={handleSave}
+              variant="primary"
+              loading={saving}
+              loadingText="Saving..."
+              disabled={saving}
+              className="w-full sm:w-auto"
+            >
+              Save Changes
+            </Button>
+          </div>
+        )
+      }
+    >
+      {loading ? (
+        <div className="py-16">
+          <LoadingSpinner text="Loading role data..." />
+        </div>
+      ) : (
+        <div className="flex max-h-[calc(92vh-190px)] flex-col overflow-hidden">
+          <div className="shrink-0 border-b border-gray-100 p-4 sm:p-5">
+            <p className="text-sm text-gray-500">
+              Select or deselect roles below.
+            </p>
+
+            <div className="mt-4">
+              <SearchInput
+                placeholder="Search roles..."
+                onSearch={handleRoleSearch}
+              />
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-xs text-gray-500">
+                Showing {paginatedRoles.length} of {filteredRoles.length} role
+                {filteredRoles.length !== 1 ? "s" : ""}
               </p>
             </div>
 
-            <div className="mb-4">
-              <SearchInput
-                placeholder="Search roles..."
-                onSearch={(val) =>
-                  setSearchTerm(val)
-                }
-              />
-            </div>
-
-            <div className="mb-6 grid max-h-56 grid-cols-2 gap-3 overflow-y-auto rounded-lg border border-gray-200 p-4">
-              {filteredRoles.length > 0 ? (
-                filteredRoles.map((role) => (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {paginatedRoles.length > 0 ? (
+                paginatedRoles.map((role) => (
                   <label
                     key={role.role_uuid}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-2 transition hover:bg-gray-50"
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition ${
+                      selectedRoleIds.includes(role.role_uuid)
+                        ? "border-blue-300 bg-blue-50"
+                        : "border-gray-200 bg-white hover:bg-gray-50"
+                    }`}
                   >
                     <input
                       type="checkbox"
-                      checked={selectedRoleIds.includes(
-                        role.role_uuid
-                      )}
-                      onChange={() =>
-                        toggleRole(
-                          role.role_uuid
-                        )
-                      }
-                      className="h-4 w-4 accent-[#0A0082]"
+                      checked={selectedRoleIds.includes(role.role_uuid)}
+                      onChange={() => toggleRole(role.role_uuid)}
+                      className="h-4 w-4 shrink-0 accent-[#0A0082]"
                     />
 
-                    <span className="text-sm text-gray-700">
+                    <span className="min-w-0 truncate text-sm font-medium text-gray-700">
                       {role.role_name}
                     </span>
                   </label>
                 ))
               ) : (
-                <div className="col-span-2 text-sm italic text-gray-400">
+                <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm italic text-gray-400 sm:col-span-2">
                   No roles found.
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-3">
-              <Button
-                onClick={onClose}
-                variant="outline"
-                size="small"
-              >
-                Cancel
-              </Button>
-
-              <Button
-                onClick={handleSave}
-                variant="primary"
-                size="small"
-                loading={saving}
-                loadingText="Saving..."
-              >
-                Save Changes
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
+            {filteredRoles.length > ROLE_ITEMS_PER_PAGE && (
+              <div className="mt-4 flex justify-center border-t border-gray-100 pt-4">
+                <Pagination
+                  currentPage={safeRolePage}
+                  totalPages={totalRolePages}
+                  onPrevious={handlePreviousRolePage}
+                  onNext={handleNextRolePage}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }

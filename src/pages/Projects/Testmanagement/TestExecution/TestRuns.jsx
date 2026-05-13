@@ -1,11 +1,13 @@
 import axios from "axios";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../api/axiosInstance";
 import RunTestCaseComponent from "./RunTestCaseComponent";
 import TestCaseResultComponent from "./TestCaseResultComponent";
 import Select from "react-select";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Button from "../../../../components/Button/Button";
 
 export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -53,8 +55,9 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
   const loadTestCases = async () => {
     try {
       const res = await axiosInstance.get(
-        `/test-execution/test-runs/${run.id}/cases`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/runs/${run.id}/cases`,
       );
+      console.log("🔍 Test cases loaded:", res.data);
       setTestCases(res.data || []);
     } catch (err) {
       console.error("Error loading test cases:", err);
@@ -71,6 +74,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
+
       );
       setEmployee(res.data || []);
     } catch (err) {
@@ -95,6 +99,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
+
       );
       loadTestCases();
     } catch (err) {
@@ -106,23 +111,23 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!editForm.name || !editForm.status) {
-      toast.error("Name and Status are required");
+      showStatusToast("Name and Status are required", "error");
       return;
     }
     try {
       setSaving(true);
-      await axiosInstance.put(`/test-execution/test-runs/${run.id}`, {
+      await axiosInstance.put(`api/test-execution/test-runs/${run.id}`, {
         name: editForm.name,
         status: editForm.status,
         description: editForm.description || null,
         cycleId: run.cycleId,
       });
-      toast.success("Test run updated successfully");
+      showStatusToast("Test run updated successfully", "success");
       setIsEditing(false);
       refreshRuns && refreshRuns();
     } catch (err) {
       console.error("Error updating run:", err);
-      toast.error("Failed to update test run");
+      showStatusToast("Failed to update test run", "error");
     } finally {
       setSaving(false);
     }
@@ -175,15 +180,14 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
           </p>
           {/* STATUS BADGE */}
           <span
-            className={`inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded ${
-              status === "COMPLETED"
+            className={`inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded ${status === "COMPLETED"
                 ? "bg-green-100 text-green-700"
                 : status === "IN_PROGRESS"
-                ? "bg-blue-100 text-blue-700"
-                : status === "CANCELLED"
-                ? "bg-red-100 text-red-700"
-                : "bg-gray-100 text-gray-600"
-            }`}
+                  ? "bg-blue-100 text-blue-700"
+                  : status === "CANCELLED"
+                    ? "bg-red-100 text-red-700"
+                    : "bg-gray-100 text-gray-600"
+              }`}
           >
             {status}
           </span>
@@ -277,17 +281,11 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
               {/* Status */}
               <div>
                 <label className="block text-sm font-medium mb-1">Status *</label>
-                <select
+                <FilterListbox
+                  options={[{ value: "CREATED", label: "CREATED" }, { value: "IN_PROGRESS", label: "IN_PROGRESS" }, { value: "COMPLETED", label: "COMPLETED" }, { value: "CANCELLED", label: "CANCELLED" }]}
                   value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  required
-                >
-                  <option value="CREATED">CREATED</option>
-                  <option value="IN_PROGRESS">IN_PROGRESS</option>
-                  <option value="COMPLETED">COMPLETED</option>
-                  <option value="CANCELLED">CANCELLED</option>
-                </select>
+                  onChange={(val) => setEditForm({ ...editForm, status: val })}
+                />
               </div>
 
               {/* Description */}
@@ -302,13 +300,9 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:opacity-60"
-              >
+              <Button variant="primary" className="w-full" disabled={saving} type="submit">
                 {saving ? "Saving..." : "Save Changes"}
-              </button>
+              </Button>
             </form>
           </div>
         </div>
@@ -346,13 +340,12 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
                         </td>
                         <td className="py-3 px-3 text-center">
                           <span
-                            className={`px-2 py-1 rounded text-xs font-semibold ${
-                              tc.priority === "HIGH"
+                            className={`px-2 py-1 rounded text-xs font-semibold ${tc.priority === "HIGH"
                                 ? "bg-red-100 text-red-600"
                                 : tc.priority === "MEDIUM"
                                   ? "bg-yellow-100 text-yellow-700"
                                   : "bg-blue-100 text-blue-600"
-                            }`}
+                              }`}
                           >
                             {tc.priority}
                           </span>
@@ -377,19 +370,14 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
                           />
                         </td>
                         <td className="py-3 px-3 text-center">
-                          {tc.runStatus === "NOT_STARTED" ? (
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const idToRun = tc.testCaseId || tc.id;
-                                console.log("▶️ Opening Run Modal for ID:", idToRun);
-                                setRunTestCaseId(idToRun);
-                              }}
-                              className="px-3 py-1 text-blue-600 border border-blue-300 rounded hover:bg-blue-100"
-                            >
-                              ▶ Run
-                            </button>
+                          {tc.runStatus !== "COMPLETED" ? (
+                            <Button variant="secondary" size="small" onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const idToRun = tc.testCaseId || tc.id;
+                              console.log("▶️ Opening Run Modal for ID:", idToRun);
+                              setRunTestCaseId(idToRun);
+                            }}>▶ Run</Button>
                           ) : (
                             <button
                               onClick={(e) => {
@@ -410,22 +398,12 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
                   </tbody>
                 </table>
               </div>
-              <button
-                className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-                onClick={goToAddCases}
-              >
-                + Add More Cases
-              </button>
+              <Button variant="primary" onClick={goToAddCases}>+ Add More Cases</Button>
             </>
           ) : (
             <div className="text-center py-6">
               <p className="text-gray-500 mb-3">No test cases added yet.</p>
-              <button
-                className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-                onClick={goToAddCases}
-              >
-                + Add Test Cases
-              </button>
+              <Button variant="primary" onClick={goToAddCases}>+ Add Test Cases</Button>
             </div>
           )}
         </div>
@@ -435,7 +413,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
       {runTestCaseId != null && (
         <RunTestCaseComponent
           runId={run.id}
-          testCaseId={runTestCaseId}
+          runCaseId={runTestCaseId}
           onClose={() => {
             setRunTestCaseId(null);
             loadTestCases();

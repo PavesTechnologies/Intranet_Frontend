@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { useNavigate } from "react-router-dom";
 import {
-  Search,
-  MoreVertical,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Pencil,
-  Filter,
-  Calendar,
-  Target,
-} from "lucide-react";
+  SearchIcon,
+  MoreVerticalIcon,
+  SuccessIcon,
+  WarningIcon,
+  ErrorIcon,
+  EditIcon,
+  FilterIcon,
+  CalendarIcon,
+  TargetIcon,
+} from "@/components/icons";
 import { toast } from "react-toastify";
 import { getProjects, getProjectKPIs } from "../../services/projectService";
 import ProjectKPIs from "../../components/ProjectKPIs";
@@ -220,9 +221,9 @@ const RMSProjectList = () => {
 
       <ProjectKPIs stats={kpiStats} />
 
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row flex-wrap gap-4 items-center justify-between">
+      {/* <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row flex-wrap gap-4 items-center justify-between">
         <div className="relative w-full md:max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
             placeholder="Search project / client..."
@@ -232,47 +233,85 @@ const RMSProjectList = () => {
           />
         </div>
 
-        <div className="flex flex-wrap gap-3 w-full md:w-auto">
-          <select
-            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-w-[160px] cursor-pointer text-gray-700 hover:border-gray-300 transition-colors"
+        <div className="flex gap-5 w-full md:w-auto">
+          <FilterListbox
+            options={[
+              { value: "", label: "All Readiness" },
+              ...READINESS_STATUSES.map(val => ({ value: val, label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase()) }))
+            ]}
             value={filters.readinessStatus}
-            onChange={(e) =>
-              handleFilterChange("readinessStatus", e.target.value)
-            }
-          >
-            <option value="">All Readiness</option>
-            {READINESS_STATUSES.map((val) => (
-              <option key={val} value={val}>
-                {val.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleFilterChange("readinessStatus", val)}
+          />
 
-          <select
-            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-w-[140px] cursor-pointer text-gray-700 hover:border-gray-300 transition-colors"
+          <FilterListbox
+            options={[
+              { value: "", label: "All Status" },
+              ...PROJECT_STATUSES.map(val => ({ value: val, label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase()) }))
+            ]}
             value={filters.projectStatus}
-            onChange={(e) => handleFilterChange("projectStatus", e.target.value)}
-          >
-            <option value="">All Status</option>
-            {PROJECT_STATUSES.map((val) => (
-              <option key={val} value={val}>
-                {val.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleFilterChange("projectStatus", val)}
+          />
 
-          <select
-            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-w-[140px] cursor-pointer text-gray-700 hover:border-gray-300 transition-colors"
+          <FilterListbox
+            options={[
+              { value: "", label: "All Risk" },
+              ...RISK_LEVELS.map(val => ({ value: val, label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase()) }))
+            ]}
             value={filters.riskLevel}
-            onChange={(e) => handleFilterChange("riskLevel", e.target.value)}
-          >
-            <option value="">All Risk</option>
-            {RISK_LEVELS.map((val) => (
-              <option key={val} value={val}>
-                {val.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleFilterChange("riskLevel", val)}
+          />
+        </div>
+      </div> */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-row items-center gap-4">
+        {/* Search Bar Container - using flex-1 to grow and fill available space */}
+        <div className="relative flex-1 min-w-[200px]">
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search project / client..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* Filters Container - now set to flex-nowrap to prevent stacking */}
+        <div className="flex flex-row flex-nowrap gap-3 shrink-0">
+          <FilterListbox
+            options={[
+              { value: "", label: "All Readiness" },
+              ...READINESS_STATUSES.map(val => ({
+                value: val,
+                label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
+              }))
+            ]}
+            value={filters.readinessStatus}
+            onChange={(val) => handleFilterChange("readinessStatus", val)}
+          />
+
+          <FilterListbox
+            options={[
+              { value: "", label: "All Status" },
+              ...PROJECT_STATUSES.map(val => ({
+                value: val,
+                label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
+              }))
+            ]}
+            value={filters.projectStatus}
+            onChange={(val) => handleFilterChange("projectStatus", val)}
+          />
+
+          <FilterListbox
+            options={[
+              { value: "", label: "All Risk" },
+              ...RISK_LEVELS.map(val => ({
+                value: val,
+                label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
+              }))
+            ]}
+            value={filters.riskLevel}
+            onChange={(val) => handleFilterChange("riskLevel", val)}
+          />
         </div>
       </div>
 
@@ -312,7 +351,7 @@ const RMSProjectList = () => {
                       {/* 🔴 OVERLAP WARNING ICON */}
                       {project.hasOverlap && (
                         <div className="flex items-center gap-1 bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                          <AlertTriangle className="h-3 w-3" />
+                          <WarningIcon className="h-3 w-3" />
                           Overlap
                         </div>
                       )}
@@ -326,7 +365,7 @@ const RMSProjectList = () => {
                         }}
                         className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
                       >
-                        <MoreVertical className="h-4 w-4" />
+                        <MoreVerticalIcon className="h-4 w-4" />
                       </button>
 
                       {openMenuId === project.projectId && (
@@ -343,7 +382,7 @@ const RMSProjectList = () => {
                             }}
                             className="flex items-center gap-2 w-full px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
                           >
-                            <Pencil size={12} />
+                            <EditIcon size={12} />
                             Update Status
                           </button>
                         </div>
@@ -358,11 +397,11 @@ const RMSProjectList = () => {
 
                   <div className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-3 text-xs text-gray-600">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <Target className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                      <TargetIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                       <span className="capitalize truncate">{project.lifecycleStage?.toLowerCase() || 'Initiation'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                      <CalendarIcon className="h-3.5 w-3.5 text-gray-400 shrink-0" />
                       <span className="truncate">{formatDate(project.startDate)} - {formatDate(project.endDate)}</span>
                     </div>
                   </div>
@@ -371,13 +410,13 @@ const RMSProjectList = () => {
                 <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex justify-between items-center gap-2 text-xs">
                   <div className="flex items-center gap-1.5 font-medium">
                     {project.readinessStatus === "READY" && (
-                      <><CheckCircle2 className="h-4 w-4 text-emerald-600" /><span className="text-emerald-700">Staffing</span></>
+                      <><SuccessIcon className="h-4 w-4 text-emerald-600" /><span className="text-emerald-700">Staffing</span></>
                     )}
                     {project.readinessStatus === "NOT_READY" && (
-                      <><XCircle className="h-4 w-4 text-red-600" /><span className="text-red-700">Staffing</span></>
+                      <><ErrorIcon className="h-4 w-4 text-red-600" /><span className="text-red-700">Staffing</span></>
                     )}
                     {project.readinessStatus === "UPCOMING" && (
-                      <><AlertTriangle className="h-4 w-4 text-amber-500" /><span className="text-amber-600">Staffing Upcoming</span></>
+                      <><WarningIcon className="h-4 w-4 text-amber-500" /><span className="text-amber-600">Staffing Upcoming</span></>
                     )}
                   </div>
                   <div className="font-bold text-gray-800">
@@ -391,7 +430,7 @@ const RMSProjectList = () => {
               {errorMsg ? (
                 <>
                   {/* <div className="p-4 bg-amber-50 rounded-full mb-4">
-                  <AlertTriangle className="h-8 w-8 text-amber-500" />
+                  <WarningIcon className="h-8 w-8 text-amber-500" />
                 </div> */}
                   <p className="text-gray-600 font-medium text-lg">{errorMsg}</p>
                   <p className="text-gray-400 text-sm mt-1">Try adjusting your filters or search criteria.</p>
@@ -407,9 +446,9 @@ const RMSProjectList = () => {
       {/* PAGINATION */}
       {totalPages > 1 && (
         <div className="mt-6 flex flex-col items-center gap-2">
-          <p className="text-xs font-medium text-gray-500">
+          {/* <p className="text-xs font-medium text-gray-500">
             Showing {pageStart}-{pageEnd} of {totalElements} projects
-          </p>
+          </p> */}
           <Pagination
             currentPage={page + 1}
             totalPages={totalPages}

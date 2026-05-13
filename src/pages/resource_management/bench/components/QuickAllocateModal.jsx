@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { X, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { quickAllocate, getOpenDemands, getBenchMatches } from "../services/benchService";
 
 const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
@@ -166,19 +167,14 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
                     </div>
                   ) : (
                     <div className={`relative ${resource?.preSelectedDemandId ? "opacity-90 grayscale-[20%]" : ""}`}>
-                      <select
+                      <FilterListbox
+                        options={[
+                          { value: "", label: "Choose a demand..." },
+                          ...demands.map(demand => ({ value: demand.demandId, label: `${demand.displayName} (${demand.projectInfo})` }))
+                        ]}
                         value={selectedDemandId}
-                        onChange={(e) => setSelectedDemandId(e.target.value)}
-                        disabled={!!resource?.preSelectedDemandId}
-                        className={`w-full h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition-all appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.5rem_center] bg-no-repeat ${!resource?.preSelectedDemandId ? 'focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50/50' : 'cursor-not-allowed bg-slate-50'}`}
-                      >
-                        <option value="">Choose a demand...</option>
-                        {demands.map(demand => (
-                          <option key={demand.demandId} value={demand.demandId}>
-                            {demand.displayName} ({demand.projectInfo})
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setSelectedDemandId}
+                      />
                       {resource?.preSelectedDemandId && (
                         <div className="absolute inset-y-0 right-10 flex items-center pr-2 pointer-events-none">
                           <CheckCircle className="h-4 w-4 text-emerald-500" />

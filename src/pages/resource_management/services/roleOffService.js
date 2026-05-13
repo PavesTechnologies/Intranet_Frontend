@@ -286,6 +286,22 @@ export const getPendingRoleOffsForDM = async () => {
   }
 };
 
+export const getFulfilledRoleOffsForDM = async (projectId) => {
+  try {
+    const response = await axios.get(
+      `${BASE_URL}/api/role-off/fulfilled-dm-action`,
+      {
+        params: projectId ? { projectId } : {},
+        headers: getAuthHeaders(),
+      },
+    );
+
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // ✅ ROLE-OFF REPORTING & EXPORT
 export const getFilteredRoleOffs = async (payload) => {
   try {

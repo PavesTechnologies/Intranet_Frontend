@@ -42,7 +42,7 @@ jobs:
             cd ~/deploy
 
             echo "Pulling latest frontend image..."
-            docker compose pull frontend
+            docker compose pull 
 
             echo "Restarting frontend container..."
             docker compose up -d

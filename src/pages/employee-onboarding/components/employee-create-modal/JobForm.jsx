@@ -7,6 +7,7 @@ export default function JobForm({
   handleChange,
   designations = [],
   departments = [],
+  managerOptions = [],
   isEditMode,
 }) {
   const employeeTypes = ["Full-Time", "Intern", "Contract"];
@@ -18,6 +19,8 @@ export default function JobForm({
     "Resigned",
     "Terminated",
     "Absconded",
+    "Exited",
+    "On-Notice",
   ];
 
   const filteredDesignations = designations.filter(
@@ -85,11 +88,12 @@ export default function JobForm({
         disabled={isEditMode}
       />
 
-      <FormInput
+      <FormSelect
         label="Reporting Manager"
         name="reportingManagerUuid"
         value={form.reportingManagerUuid || ""}
         onChange={handleChange}
+        options={managerOptions}
       />
 
       <FormSelect

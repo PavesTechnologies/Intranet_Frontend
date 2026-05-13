@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const SECOND_URL = "/api/workflow/admin";
@@ -213,18 +214,16 @@ const RuleBookPage = () => {
             Action Type
           </label>
           <div className="flex gap-2">
-            <select
-              value={newRule.name}
-              onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
-              className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Select Action Type</option>
-              {actionTypes.map((type, i) => (
-                <option key={i} value={type}>
-                  {type.replaceAll("_", " ")}
-                </option>
-              ))}
-            </select>
+            <div className="flex-1">
+              <FilterListbox
+                options={[
+                  { value: "", label: "Select Action Type" },
+                  ...actionTypes.map((type) => ({ value: type, label: type.replaceAll("_", " ") })),
+                ]}
+                value={newRule.name}
+                onChange={(val) => setNewRule({ ...newRule, name: val })}
+              />
+            </div>
 
             {!showAddActionType ? (
               <button
@@ -306,18 +305,20 @@ const RuleBookPage = () => {
                   }}
                   className="flex-1 border border-gray-300 rounded px-2 py-1"
                 />
-                <select
-                  value={condition.operator}
-                  onChange={(e) => {
-                    const updated = [...newRule.conditions];
-                    updated[index].operator = e.target.value;
-                    setNewRule({ ...newRule, conditions: updated });
-                  }}
-                  className="w-28 border border-gray-300 rounded px-2 py-1"
-                >
-                  <option value="==">==</option>
-                  <option value="!=">!=</option>
-                </select>
+                <div className="w-28">
+                  <FilterListbox
+                    options={[
+                      { value: "==", label: "==" },
+                      { value: "!=", label: "!=" },
+                    ]}
+                    value={condition.operator}
+                    onChange={(val) => {
+                      const updated = [...newRule.conditions];
+                      updated[index].operator = val;
+                      setNewRule({ ...newRule, conditions: updated });
+                    }}
+                  />
+                </div>
                 <input
                   type="text"
                   placeholder="Value"
@@ -368,22 +369,20 @@ const RuleBookPage = () => {
                   }}
                   className="w-20 border border-gray-300 rounded px-2 py-1"
                 />
-                <select
-                  value={step.approverType}
-                  onChange={(e) => {
-                    const updated = [...newRule.approvalSteps];
-                    updated[index].approverType = e.target.value;
-                    setNewRule({ ...newRule, approvalSteps: updated });
-                  }}
-                  className="flex-1 border border-gray-300 rounded px-2 py-1"
-                >
-                  <option value="">Select Approver Type</option>
-                  {approverTypes.map((type, i) => (
-                    <option key={i} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex-1">
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select Approver Type" },
+                      ...approverTypes.map((type) => ({ value: type, label: type })),
+                    ]}
+                    value={step.approverType}
+                    onChange={(val) => {
+                      const updated = [...newRule.approvalSteps];
+                      updated[index].approverType = val;
+                      setNewRule({ ...newRule, approvalSteps: updated });
+                    }}
+                  />
+                </div>
                 <input
                   type="text"
                   value={step.approverValue}
@@ -395,18 +394,20 @@ const RuleBookPage = () => {
                   className="flex-1 border border-gray-300 rounded px-2 py-1"
                   placeholder="Approver Value"
                 />
-                <select
-                  value={step.mode}
-                  onChange={(e) => {
-                    const updated = [...newRule.approvalSteps];
-                    updated[index].mode = e.target.value;
-                    setNewRule({ ...newRule, approvalSteps: updated });
-                  }}
-                  className="w-32 border border-gray-300 rounded px-2 py-1"
-                >
-                  <option value="SEQUENTIAL">Sequential</option>
-                  <option value="PARALLEL">Parallel</option>
-                </select>
+                <div className="w-32">
+                  <FilterListbox
+                    options={[
+                      { value: "SEQUENTIAL", label: "Sequential" },
+                      { value: "PARALLEL", label: "Parallel" },
+                    ]}
+                    value={step.mode}
+                    onChange={(val) => {
+                      const updated = [...newRule.approvalSteps];
+                      updated[index].mode = val;
+                      setNewRule({ ...newRule, approvalSteps: updated });
+                    }}
+                  />
+                </div>
               </div>
             ))
           )}

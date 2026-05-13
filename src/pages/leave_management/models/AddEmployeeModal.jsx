@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, User } from "lucide-react";
 import axios from "axios";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -139,18 +140,16 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Gender *
               </label>
-              <select
-                name="gender"
+              <FilterListbox
+                options={[
+                  { value: "", label: "Select gender" },
+                  { value: "Male", label: "Male" },
+                  { value: "Female", label: "Female" },
+                  { value: "Other", label: "Other" },
+                ]}
                 value={formData.gender}
-                onChange={handleChange}
-                required
-                className="input"
-              >
-                <option value="">Select gender</option>
-                <option>Male</option>
-                <option>Female</option>
-                <option>Other</option>
-              </select>
+                onChange={(val) => handleChange({ target: { name: "gender", value: val } })}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

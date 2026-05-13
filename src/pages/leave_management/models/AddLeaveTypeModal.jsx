@@ -1,8 +1,8 @@
-import React, { useState, useEffect, Fragment } from "react";
-import { X, FileText, Check, ChevronDown } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, FileText } from "lucide-react";
 import axios from "axios";
-import { Listbox, Transition } from "@headlessui/react";
 import { toast } from "react-toastify";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
 
@@ -53,57 +53,7 @@ const GENDERS = [
 ];
 
 export function GenderDropdown({ value, onChange }) {
-  const selectedGender = GENDERS.find((g) => g.value === value);
-
-  return (
-    <Listbox value={value} onChange={onChange}>
-      <div className="relative w-full">
-        {/* Button */}
-        <Listbox.Button className="relative w-full cursor-pointer rounded-lg border border-gray-300 bg-white py-3 pl-4 pr-10 text-left focus:outline-none focus:ring-2 focus:ring-green-500 sm:text-sm">
-          <span className="block truncate text-gray-700">
-            {selectedGender ? selectedGender.label : "Select Gender"}
-          </span>
-          <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-            <ChevronDown className="h-5 w-5 text-gray-400" />
-          </span>
-        </Listbox.Button>
-
-        {/* Options */}
-        <Transition as={Fragment} leave="transition ease-in duration-100">
-          <Listbox.Options className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-            {GENDERS.map((gender) => (
-              <Listbox.Option
-                key={gender.value}
-                value={gender.value}
-                className={({ active }) =>
-                  `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                    active ? "bg-green-100 text-green-900" : "text-gray-900"
-                  }`
-                }
-              >
-                {({ selected }) => (
-                  <>
-                    <span
-                      className={`block truncate ${
-                        selected ? "font-medium" : "font-normal"
-                      }`}
-                    >
-                      {gender.label}
-                    </span>
-                    {selected && (
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-green-600">
-                        <Check className="h-5 w-5" />
-                      </span>
-                    )}
-                  </>
-                )}
-              </Listbox.Option>
-            ))}
-          </Listbox.Options>
-        </Transition>
-      </div>
-    </Listbox>
-  );
+  return <FilterListbox options={GENDERS} value={value} onChange={onChange} />;
 }
 
 const defaultForm = {
@@ -351,64 +301,13 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             {loadinglables ? (
               <p className="text-gray-500 text-sm">Loading leave labels...</p>
             ) : (
-              <Listbox
+              <FilterListbox
+                options={leavelables.map((item) => ({ value: item.name, label: item.label }))}
                 value={formData.leaveName}
                 onChange={(selectedName) =>
                   setFormData((prev) => ({ ...prev, leaveName: selectedName }))
                 }
-              >
-                <div className="relative mt-1">
-                  <Listbox.Button className="relative w-full cursor-pointer rounded-lg border border-gray-300 bg-white py-3 pl-4 pr-10 text-left focus:outline-none focus:ring-2 focus:ring-green-500 sm:text-sm">
-                    <span className="block truncate">
-                      {leavelables.find(
-                        (item) => item.name === formData.leaveName,
-                      )?.label || "Select leave name"}
-                    </span>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <ChevronDown className="w-5 h-5 text-gray-400" />
-                    </span>
-                  </Listbox.Button>
-                  <Transition
-                    as={Fragment}
-                    leave="transition ease-in duration-100"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                  >
-                    <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                      {leavelables.map((item) => (
-                        <Listbox.Option
-                          key={item.name}
-                          value={item.name}
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                              active
-                                ? "bg-green-100 text-green-900"
-                                : "text-gray-900"
-                            }`
-                          }
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span
-                                className={`block truncate ${
-                                  selected ? "font-medium" : "font-normal"
-                                }`}
-                              >
-                                {item.label}
-                              </span>
-                              {selected && (
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-green-600">
-                                  <Check className="w-5 h-5" />
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </Listbox.Option>
-                      ))}
-                    </Listbox.Options>
-                  </Transition>
-                </div>
-              </Listbox>
+              />
             )}
           </div>
 
@@ -463,66 +362,13 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                 Accrual Frequency <span className="text-red-500">*</span>
               </label>
 
-              <Listbox
+              <FilterListbox
+                options={accrualFrequency.map((freq) => ({ value: freq, label: freq }))}
                 value={formData.accrualFrequency}
                 onChange={(value) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    accrualFrequency: value,
-                  }))
+                  setFormData((prev) => ({ ...prev, accrualFrequency: value }))
                 }
-              >
-                <div className="relative mt-1">
-                  <Listbox.Button className="relative w-full cursor-pointer rounded-lg border border-gray-300 bg-white py-3 pl-4 pr-10 text-left focus:outline-none focus:ring-2 focus:ring-green-500 sm:text-sm">
-                    <span className="block truncate">
-                      {formData.accrualFrequency || "Select Frequency"}
-                    </span>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <ChevronDown className="w-5 h-5 text-gray-400" />
-                    </span>
-                  </Listbox.Button>
-
-                  <Transition
-                    as={Fragment}
-                    leave="transition ease-in duration-100"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                  >
-                    <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                      {accrualFrequency.map((freq, index) => (
-                        <Listbox.Option
-                          key={index}
-                          value={freq}
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                              active
-                                ? "bg-green-100 text-green-900"
-                                : "text-gray-900"
-                            }`
-                          }
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span
-                                className={`block truncate ${
-                                  selected ? "font-medium" : "font-normal"
-                                }`}
-                              >
-                                {freq}
-                              </span>
-                              {selected && (
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-green-600">
-                                  <Check className="w-5 h-5" />
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </Listbox.Option>
-                      ))}
-                    </Listbox.Options>
-                  </Transition>
-                </div>
-              </Listbox>
+              />
             </div>
           )}
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import FilterListbox from "../../components/filter/FilterListbox";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { XCircle, ArrowLeft } from "lucide-react";
@@ -699,31 +700,17 @@ const MonthlyTSReport = () => {
                       className="ml-15 report-filters"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <select
+                      <FilterListbox
+                        options={filteredMonths.map((m) => ({ value: m.value, label: m.name }))}
                         value={selectedMonth}
-                        onChange={(e) =>
-                          setSelectedMonth(Number(e.target.value))
-                        }
-                      >
-                        {filteredMonths.map((m) => (
-                          <option key={m.value} value={m.value}>
-                            {m.name}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setSelectedMonth}
+                      />
 
-                      <select
+                      <FilterListbox
+                        options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
                         value={selectedYear}
-                        onChange={(e) =>
-                          setSelectedYear(Number(e.target.value))
-                        }
-                      >
-                        {yearOptions.map((y) => (
-                          <option key={y} value={y}>
-                            {y}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setSelectedYear}
+                      />
 
                       <Button variant="primary" size="small" onClick={handleFilterApply}>
                         Apply

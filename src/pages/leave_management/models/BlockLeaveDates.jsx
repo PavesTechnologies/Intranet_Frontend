@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import {
   ChevronDownIcon,
   FunnelIcon,
@@ -516,19 +517,14 @@ export default function BlockLeaveDates({ employeeId }) {
                       {loading ? (
                         <div className={`${skeleton} h-10 w-full`} />
                       ) : (
-                        <select
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "Select a project" },
+                            ...projectOptions,
+                          ]}
                           value={projectId}
-                          onChange={(e) => setProjectId(e.target.value)}
-                          required
-                          className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                          <option value="">Select a project</option>
-                          {projectOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setProjectId}
+                        />
                       )}
                     </div>
 

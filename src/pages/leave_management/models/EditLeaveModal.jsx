@@ -1,5 +1,6 @@
 import React, { useState, useEffect, Fragment, useMemo } from "react";
 import axios, { all } from "axios";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import {
   X,
   Lock,
@@ -656,20 +657,15 @@ export default function EditLeaveModal({
                       <label className="text-xs font-medium text-gray-500">
                         Start — {formatDateForDisplay(startDate)}
                       </label>
-                      <select
+                      <FilterListbox
+                        options={[
+                          { value: "fullday", label: "Full Day" },
+                          { value: "first", label: "First Half" },
+                          { value: "second", label: "Second Half" },
+                        ]}
                         value={halfDayConfig.start}
-                        onChange={(e) =>
-                          setHalfDayConfig((p) => ({
-                            ...p,
-                            start: e.target.value,
-                          }))
-                        }
-                        className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
-                      >
-                        <option value="fullday">Full Day</option>
-                        <option value="first">First Half</option>
-                        <option value="second">Second Half</option>
-                      </select>
+                        onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                      />
                     </div>
                     {isMultiDay && (
                       <>
@@ -678,20 +674,15 @@ export default function EditLeaveModal({
                           <label className="text-xs font-medium text-gray-500">
                             End — {formatDateForDisplay(endDate)}
                           </label>
-                          <select
+                          <FilterListbox
+                            options={[
+                              { value: "fullday", label: "Full Day" },
+                              { value: "first", label: "First Half" },
+                              { value: "second", label: "Second Half" },
+                            ]}
                             value={halfDayConfig.end}
-                            onChange={(e) =>
-                              setHalfDayConfig((p) => ({
-                                ...p,
-                                end: e.target.value,
-                              }))
-                            }
-                            className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
-                          >
-                            <option value="fullday">Full Day</option>
-                            <option value="first">First Half</option>
-                            <option value="second">Second Half</option>
-                          </select>
+                            onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                          />
                         </div>
                       </>
                     )}
