@@ -3,6 +3,7 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 import EmployeeCard from "../components/EmployeeCard";
 import { Search, Loader2 } from "lucide-react";
 import axios from "axios";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const EmployeeDirectory = () => {
   const [employees, setEmployees] = useState([]);
@@ -141,9 +142,8 @@ const EmployeeDirectory = () => {
       {/* Employee Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
         {loading ? (
-          <div className="col-span-full flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-            <p className="text-gray-500 font-medium">Loading employees...</p>
+          <div className="col-span-full py-20">
+            <LoadingSpinner text="Loading employees..." />
           </div>
         ) : error ? (
           <div className="col-span-full text-center py-20">

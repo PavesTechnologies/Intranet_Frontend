@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarDays, ClipboardList, RefreshCcw, X } from "lucide-react";
+import { WarningIcon, CalendarIcon, ClipboardIcon, RefreshIcon, CloseIcon } from "@/components/icons";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -113,7 +113,7 @@ const RoleOffDrawer = ({
               onClick={onClose}
               className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
             >
-              <X className="h-4 w-4" />
+              <CloseIcon className="h-4 w-4" />
             </button>
           </div>
 
@@ -149,7 +149,7 @@ const RoleOffDrawer = ({
         <div className="space-y-6 px-6 py-6">
           <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center gap-2">
-              <ClipboardList className="h-4 w-4 text-gray-600" />
+              <ClipboardIcon className="h-4 w-4 text-gray-600" />
               <h3 className="text-sm font-semibold text-[#081534]">Context</h3>
             </div>
             <div className="grid gap-3 text-sm md:grid-cols-2">
@@ -194,7 +194,7 @@ const RoleOffDrawer = ({
                 Effective Date
               </label>
               <div className="relative mt-2">
-                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <CalendarIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   type="date"
                   value={formState.effectiveDate}
@@ -265,7 +265,7 @@ const RoleOffDrawer = ({
             {impact === "High" ? (
               <div className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3">
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 text-rose-700" />
+                  <WarningIcon className="mt-0.5 h-4 w-4 text-rose-700" />
                   <div className="text-sm text-rose-800">
                     This role-off impacts a critical delivery path and requires explicit acknowledgement.
                   </div>
@@ -345,7 +345,7 @@ const RoleOffDrawer = ({
                 onClick={() => onCancelRequest?.(request)}
                 className="h-10 border-rose-300 bg-white text-sm text-rose-700 hover:bg-rose-50 hover:text-rose-800"
               >
-                <RefreshCcw className="mr-2 h-4 w-4" />
+                <RefreshIcon className="mr-2 h-4 w-4" />
                 Cancel Request
               </Button>
             ) : (

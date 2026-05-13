@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
-  AlertTriangle,
-  Check,
-  ClipboardCheck,
-  Filter,
-  Search,
-  Users,
-  UserRoundMinus,
-} from "lucide-react";
+  WarningIcon,
+  SuccessIcon,
+  ClipboardCheckIcon,
+  FilterIcon,
+  SearchIcon,
+  UsersIcon,
+  UserMinusIcon,
+} from "@/components/icons";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -470,25 +470,25 @@ const buildKpis = (mode, allocations, roleOffRequests, selectedRows, approvedTod
       {
         label: "Active Allocations",
         value: activeAllocations.length,
-        icon: <Users className="h-5 w-5" />,
+        icon: <UsersIcon className="h-5 w-5" />,
         iconWrapperClassName: "border-blue-100 bg-blue-50 text-blue-700",
       },
       {
         label: "Pending Role-Offs",
         value: pendingRequests.length,
-        icon: <UserRoundMinus className="h-5 w-5" />,
+        icon: <UserMinusIcon className="h-5 w-5" />,
         iconWrapperClassName: "border-amber-100 bg-amber-50 text-amber-700",
       },
       {
         label: "At Risk",
         value: activeAllocations.filter((item) => item.impact === "High").length,
-        icon: <AlertTriangle className="h-5 w-5" />,
+        icon: <WarningIcon className="h-5 w-5" />,
         iconWrapperClassName: "border-rose-100 bg-rose-50 text-rose-700",
       },
       {
         label: "Selected Count",
         value: selectedRows.length,
-        icon: <Check className="h-5 w-5" />,
+        icon: <SuccessIcon className="h-5 w-5" />,
         iconWrapperClassName: "border-slate-100 bg-slate-100 text-slate-700",
       },
     ];
@@ -499,25 +499,25 @@ const buildKpis = (mode, allocations, roleOffRequests, selectedRows, approvedTod
       {
         label: "Active Allocations",
         value: activeRoleOffRequests.length,
-        icon: <Users className="h-5 w-5" />,
+        icon: <UsersIcon className="h-5 w-5" />,
         iconWrapperClassName: "border-blue-100 bg-blue-50 text-blue-700",
       },
       {
         label: "Pending Requests",
         value: pendingRequests.length,
-        icon: <ClipboardCheck className="h-5 w-5" />,
+        icon: <ClipboardCheckIcon className="h-5 w-5" />,
         iconWrapperClassName: "border-amber-100 bg-amber-50 text-amber-700",
       },
       {
         label: "At Risk",
         value: highImpactPending.length,
-        icon: <AlertTriangle className="h-5 w-5" />,
+        icon: <WarningIcon className="h-5 w-5" />,
         iconWrapperClassName: "border-rose-100 bg-rose-50 text-rose-700",
       },
       {
         label: "Replacement Created",
         value: roleOffRequests.filter((item) => item.replacementCreated).length,
-        icon: <Check className="h-5 w-5" />,
+        icon: <SuccessIcon className="h-5 w-5" />,
         iconWrapperClassName: "border-emerald-100 bg-emerald-50 text-emerald-700",
       },
     ];
@@ -527,7 +527,7 @@ const buildKpis = (mode, allocations, roleOffRequests, selectedRows, approvedTod
     {
       label: "Pending Approvals",
       value: mode === "dm" ? dlApprovalQueue.length : pendingRequests.length,
-      icon: <ClipboardCheck className="h-5 w-5" />,
+      icon: <ClipboardCheckIcon className="h-5 w-5" />,
       iconWrapperClassName: "border-amber-100 bg-amber-50 text-amber-700",
     },
     {
@@ -535,13 +535,13 @@ const buildKpis = (mode, allocations, roleOffRequests, selectedRows, approvedTod
       value: mode === "dm"
         ? dlApprovalQueue.filter((item) => item.impact === "High").length
         : highImpactPending.length,
-      icon: <AlertTriangle className="h-5 w-5" />,
+      icon: <WarningIcon className="h-5 w-5" />,
       iconWrapperClassName: "border-rose-100 bg-rose-50 text-rose-700",
     },
     {
       label: "Approved Today",
       value: typeof approvedTodayCount === "number" ? approvedTodayCount : fulfilledToday.length,
-      icon: <Check className="h-5 w-5" />,
+      icon: <SuccessIcon className="h-5 w-5" />,
       iconWrapperClassName: "border-emerald-100 bg-emerald-50 text-emerald-700",
     },
   ];
@@ -1793,7 +1793,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                   onClick={() => navigate("/resource-management/roleoff/report")}
                   className="inline-flex items-center gap-2 rounded-md bg-[#081534] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#10214f]"
                 >
-                  <ClipboardCheck className="h-4 w-4" />
+                  <ClipboardCheckIcon className="h-4 w-4" />
                   Roleoff Report
                 </button>
               </div>
@@ -1830,7 +1830,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                 <div className="flex flex-1 justify-end">
                   <div className="flex w-full max-w-md items-center gap-1">
                     <div className="relative flex-1">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                       <input
                         type="text"
                         value={filters.search}
@@ -1851,7 +1851,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                             : "border-[#081534] bg-[#081534] text-white hover:bg-[#10214f]"
                             }`}
                         >
-                          <Filter className="h-4 w-4" />
+                          <FilterIcon className="h-4 w-4" />
                           Filters
                         </button>
 

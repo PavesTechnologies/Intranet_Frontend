@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, Fragment } from "react";
 import { Listbox, Transition } from "@headlessui/react";
-import { X, Check, ChevronDown } from "lucide-react";
+import { CloseIcon, CheckIcon, ChevronDownIcon } from "@/components/icons";
 import SLAForm from "./forms/SLAForm";
 import EscalationForm from "./forms/EscalationForm";
 import ComplianceForm from "./forms/ComplianceForm";
@@ -113,7 +113,7 @@ const AddConfigurationModal = ({
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 
@@ -140,7 +140,7 @@ const AddConfigurationModal = ({
                       {allowedConfigs.find((c) => c.key === configType)
                         ?.label || "Select configuration"}
                     </span>
-                    <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+                    <ChevronDownIcon className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
                   </Listbox.Button>
 
                   <Transition
@@ -165,7 +165,7 @@ const AddConfigurationModal = ({
                             <div className="flex items-center justify-between">
                               {cfg.label}
                               {selected && (
-                                <Check className="h-4 w-4 text-indigo-600" />
+                                <CheckIcon className="h-4 w-4 text-indigo-600" />
                               )}
                             </div>
                           )}

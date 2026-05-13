@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Briefcase, Calendar, Check, Search, Trash2, UserCheck, Users, X } from "lucide-react";
+import {
+  JobIcon,
+  CalendarIcon,
+  CheckIcon,
+  SearchIcon,
+  DeleteIcon,
+  ActiveEmployeeIcon,
+  TeamIcon,
+  CloseIcon,
+} from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -138,7 +147,7 @@ const ModificationTable = ({
 
         <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
           <div className="relative w-full md:w-72">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
@@ -163,7 +172,7 @@ const ModificationTable = ({
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white p-16 text-center shadow-sm">
           <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-slate-50">
-            <Users className="h-10 w-10 text-slate-200" />
+            <TeamIcon className="h-10 w-10 text-slate-200" />
           </div>
           <h4 className="text-lg font-black tracking-tight text-slate-900">
             No Modification Requests
@@ -218,7 +227,7 @@ const ModificationTable = ({
                       </td>
                       <td className="p-5">
                         <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
-                          <Briefcase className="h-3.5 w-3.5 text-slate-400" />
+                          <JobIcon className="h-3.5 w-3.5 text-slate-400" />
                           <span>{item.projectName || "N/A"}</span>
                         </div>
                       </td>
@@ -234,7 +243,7 @@ const ModificationTable = ({
                       </td>
                       <td className="p-5 text-center">
                         <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
-                          <Calendar className="h-3 w-3 text-slate-400" />
+                          <CalendarIcon className="h-3 w-3 text-slate-400" />
                           <span>{formatDate(item.effectiveDate)}</span>
                         </div>
                       </td>
@@ -243,7 +252,7 @@ const ModificationTable = ({
                       </td>
                       <td className="p-5 text-center">
                         <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
-                          <UserCheck className="h-3.5 w-3.5 text-slate-400" />
+                          <ActiveEmployeeIcon className="h-3.5 w-3.5 text-slate-400" />
                           <span>{item.requestedBy || "N/A"}</span>
                         </div>
                       </td>
@@ -258,14 +267,14 @@ const ModificationTable = ({
                             <>
                               <ActionIconButton
                                 label="Approve modification"
-                                icon={Check}
+                                icon={CheckIcon}
                                 onClick={() => onApprove(item)}
                                 disabled={isApproving || isRejecting}
                                 className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                               />
                               <ActionIconButton
                                 label="Reject modification"
-                                icon={X}
+                                icon={CloseIcon}
                                 onClick={() => onReject(item)}
                                 disabled={isApproving || isRejecting}
                                 className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
@@ -276,7 +285,7 @@ const ModificationTable = ({
                           {canCancelRequest && (
                             <ActionIconButton
                               label="Cancel modification"
-                              icon={Trash2}
+                              icon={DeleteIcon}
                               onClick={() => onCancel(item)}
                               disabled={isCancelling}
                               className="border-slate-200 bg-white text-slate-600 hover:bg-slate-100"

@@ -1,5 +1,5 @@
 import React from "react";
-import { RotateCcw, X } from "lucide-react";
+import { RefreshIcon, CloseIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import FilterListbox from "../../../components/filter/FilterListbox";
 
@@ -26,7 +26,7 @@ const RoleOffFilterPanel = ({
           onClick={onClose}
           className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
         >
-          <X className="h-4 w-4" />
+          <CloseIcon className="h-4 w-4" />
         </button>
       </div>
 
@@ -96,7 +96,7 @@ const RoleOffFilterPanel = ({
             onClick={onReset}
             className="h-9 flex-1 border-gray-300 bg-white text-sm"
           >
-            <RotateCcw className="mr-2 h-4 w-4" />
+            <RefreshIcon className="mr-2 h-4 w-4" />
             Reset Filters
           </Button>
           <Button

@@ -2,10 +2,10 @@ import { Fragment, useEffect, useRef, useState, useMemo } from "react";
 import { Dialog, Transition, Listbox, Switch, Combobox } from "@headlessui/react";
 import {
   CheckIcon,
-  ChevronUpDownIcon,
-  XMarkIcon,
-  MagnifyingGlassIcon,
-} from "@heroicons/react/20/solid";
+  ChevronDownIcon,
+  CloseIcon,
+  SearchIcon,
+} from "@/components/icons";
 import { createDemand, updateDemandStatus } from "../services/projectService";
 import { handleDMDecision, handleRMDecision } from "../services/demandService";
 import { getRoleExpectations } from "../services/workforceService";
@@ -67,7 +67,7 @@ const SearchableListboxField = ({ id, label, value, onChange, options, error, re
         <div className="relative">
           <Combobox.Button as="div" className={`relative w-full cursor-default overflow-hidden rounded-lg bg-white text-left shadow-sm border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${disabled ? "bg-slate-50 cursor-not-allowed" : ""}`}>
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
+              <SearchIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
             </div>
             <Combobox.Input
               className={`w-full border-none py-2.5 pl-9 pr-10 text-sm leading-5 text-gray-900 focus:ring-0 ${error ? "bg-red-50/30" : "bg-white"} ${disabled ? "bg-slate-50 cursor-not-allowed text-slate-400" : ""}`}
@@ -77,7 +77,7 @@ const SearchableListboxField = ({ id, label, value, onChange, options, error, re
               autoComplete="off"
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <ChevronUpDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
+              <ChevronDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
             </div>
           </Combobox.Button>
           <Transition
@@ -151,7 +151,7 @@ const ListboxField = ({ id, label, value, onChange, options, error, note, requir
             <span className={`block truncate ${!value ? "text-slate-400" : ""}`}>
               {displayLabel}
             </span>
-            <ChevronUpDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <ChevronDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           </Listbox.Button>
 
           <Transition
@@ -776,7 +776,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                     onClick={onClose}
                     className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
                   >
-                    <XMarkIcon className="h-5 w-5" />
+                    <CloseIcon className="h-5 w-5" />
                   </button>
                 </div>
 

@@ -1,6 +1,9 @@
 import React, { useEffect } from "react";
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 import FilterListbox from "../../../../../components/filter/FilterListbox";
+import "react-phone-input-2/lib/style.css";
+import PhoneInput from "react-phone-input-2";
+
 
 const EscalationForm = ({ formData, setFormData }) => {
   const { getEnumValues } = useEnums();
@@ -98,7 +101,7 @@ const EscalationForm = ({ formData, setFormData }) => {
         </div>
 
         {/* Phone */}
-        <div>
+        {/* <div>
           <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
             Phone
           </label>
@@ -109,7 +112,27 @@ const EscalationForm = ({ formData, setFormData }) => {
             onChange={handleChange}
             className="w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none"
           />
-        </div>
+        </div> */}
+        <div>
+            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            Phone
+          </label>
+                    <PhoneInput
+                      country={"in"}
+                      value={formData.contact || ""}
+                      onChange={(value) => setFormData({ ...formData, contact: value })}
+                      inputClass="!w-full !py-2 !text-base"
+                      dropdownClass="custom-phone-dropdown"
+                      countryCodeEditable={false}
+                      preferredCountries={["us", "in", "gb", "ca"]}
+                      enableSearch
+                      inputProps={{
+                        name: "contact",
+                        required: true,
+                        autoFocus: false,
+                      }}
+                    />
+                  </div>
 
         {/* Active */}
         <div className="flex items-center gap-3 py-2">

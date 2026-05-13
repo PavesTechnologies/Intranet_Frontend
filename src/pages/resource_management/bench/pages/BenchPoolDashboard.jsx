@@ -5,10 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, Sector
 } from 'recharts';
-import { 
-  ArrowLeft, Download, Filter, TrendingUp, AlertCircle, 
-  Clock, Users, ShieldAlert, Zap, Loader2, Activity, List, LayoutDashboard, Search, X
-} from "lucide-react";
+import { PrevIcon, DownloadIcon, FilterIcon, TrendingUpIcon, AlertIcon, PendingIcon, EmployeeIcon, SecurityAlertIcon, ZapIcon, SpinnerIcon, ActivityIcon, TableIcon, DashboardIcon, SearchIcon, CloseIcon } from "@/components/icons";
 import { getBenchPoolReport, exportBenchPoolReport } from "../services/benchService";
 import { toast } from "react-toastify";
 import BenchFilters from "../components/BenchFilters";
@@ -211,7 +208,7 @@ const BenchPoolDashboard = () => {
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50 flex-col gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <SpinnerIcon className="h-8 w-8 animate-spin text-indigo-600" />
         <p className="text-sm font-medium text-slate-400 italic">Formatting Bench Analysis...</p>
       </div>
     );
@@ -241,7 +238,7 @@ const BenchPoolDashboard = () => {
             onClick={() => navigate('/resource-management/bench')}
             className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm shrink-0"
           >
-            <ArrowLeft size={18} />
+            <PrevIcon size={18} />
           </button>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Bench Intelligence Hub</h1>
@@ -255,7 +252,7 @@ const BenchPoolDashboard = () => {
             disabled={isExporting}
             className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[12px] font-bold text-slate-600 shadow-sm hover:bg-slate-50 transition-all capitalize tracking-wider disabled:opacity-70"
           >
-            <Download size={14} className="text-indigo-600" />
+            <DownloadIcon size={14} className="text-indigo-600" />
             {isExporting ? 'Exporting...' : 'Export Audit'}
           </button>
           
@@ -266,10 +263,10 @@ const BenchPoolDashboard = () => {
 
       {/* KPI Cards - Match Role-Off Style */}
       <div className="flex flex-nowrap gap-3 overflow-x-auto mb-4 pb-1">
-        <KPICard title="Total Bench" value={filteredContent.length} icon={<Users />} trend="Actual" subText="Resources on Bench" color="text-blue-700" bgColor="bg-blue-50" borderColor="border-blue-100" />
-        <KPICard title="Accumulated Cost" value={`₹${Math.round(totalCost).toLocaleString()}`} icon={<TrendingUp />} trend="Exposure" subText="Financial Impact" color="text-rose-700" bgColor="bg-rose-50" borderColor="border-rose-100" />
-        <KPICard title="Aging Avg" value={`${avgBenchDays}d`} icon={<Clock />} trend="Velocity" subText="Days on Bench" color="text-amber-700" bgColor="bg-amber-50" borderColor="border-amber-100" />
-        <KPICard title="Risk Alerts" value={highRiskCount} icon={<ShieldAlert />} trend={highRiskCount > 0 ? "Alert" : "Stable"} subText="Action Required" color={highRiskCount > 0 ? "text-rose-700" : "text-emerald-700"} bgColor={highRiskCount > 0 ? "bg-rose-50" : "bg-emerald-50"} borderColor={highRiskCount > 0 ? "border-rose-100" : "border-emerald-100"} />
+        <KPICard title="Total Bench" value={filteredContent.length} icon={<EmployeeIcon />} trend="Actual" subText="Resources on Bench" color="text-blue-700" bgColor="bg-blue-50" borderColor="border-blue-100" />
+        <KPICard title="Accumulated Cost" value={`₹${Math.round(totalCost).toLocaleString()}`} icon={<TrendingUpIcon />} trend="Exposure" subText="Financial Impact" color="text-rose-700" bgColor="bg-rose-50" borderColor="border-rose-100" />
+        <KPICard title="Aging Avg" value={`${avgBenchDays}d`} icon={<PendingIcon />} trend="Velocity" subText="Days on Bench" color="text-amber-700" bgColor="bg-amber-50" borderColor="border-amber-100" />
+        <KPICard title="Risk Alerts" value={highRiskCount} icon={<SecurityAlertIcon />} trend={highRiskCount > 0 ? "Alert" : "Stable"} subText="Action Required" color={highRiskCount > 0 ? "text-rose-700" : "text-emerald-700"} bgColor={highRiskCount > 0 ? "bg-rose-50" : "bg-emerald-50"} borderColor={highRiskCount > 0 ? "border-rose-100" : "border-emerald-100"} />
       </div>
 
       {/* Tabs - Match Role-Off Navigation Style */}
@@ -308,7 +305,7 @@ const BenchPoolDashboard = () => {
                 : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
             }`}
           >
-            <Filter size={14} />
+            <FilterIcon size={14} />
             <span className="text-[11px] font-bold capitalize tracking-wider">Filters</span>
             {activeFilterCount > 0 && (
               <span className={`ml-1 px-1.5 rounded-sm text-[10px] font-bold ${filterPanelOpen ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
@@ -332,11 +329,11 @@ const BenchPoolDashboard = () => {
             >
               <div className="shrink-0 px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Filter className="h-3.5 w-3.5 text-indigo-500" />
+                  <FilterIcon className="h-3.5 w-3.5 text-indigo-500" />
                   <h3 className="text-[12px] font-bold text-slate-800 capitalize tracking-widest leading-none mt-0.5">Bench Analysis Filters</h3>
                 </div>
                 <button onClick={() => setFilterPanelOpen(false)} className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors">
-                  <X className="h-4 w-4" />
+                  <CloseIcon className="h-4 w-4" />
                 </button>
               </div>
               <BenchFilters
@@ -372,7 +369,7 @@ const BenchPoolDashboard = () => {
                 <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-all" />
                 <div className="flex items-center justify-between w-full mb-2">
                   <h3 className="text-[10px] font-black text-slate-400 capitalize tracking-widest leading-none">Bench Composition</h3>
-                  <Activity size={12} className="text-indigo-400" />
+                  <ActivityIcon size={12} className="text-indigo-400" />
                 </div>
                 <div className="h-44 w-full relative">
                   <ResponsiveContainer width="100%" height="100%">
@@ -424,7 +421,7 @@ const BenchPoolDashboard = () => {
                     <h3 className="text-[10px] font-black text-slate-400 capitalize tracking-widest leading-none">Capability Saturation</h3>
                     <p className="text-[9px] font-medium text-slate-400 italic">Distribution across top technical skillsets</p>
                   </div>
-                  <Zap size={14} className="text-amber-400" />
+                  <ZapIcon size={14} className="text-amber-400" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                   {skillsChartData.map((skill) => (
@@ -463,7 +460,7 @@ const BenchPoolDashboard = () => {
 
             <div className="rounded-xl bg-orange-50/50 border border-orange-100 p-4 shadow-sm flex items-center gap-4">
                <div className="h-10 w-10 shrink-0 bg-white border border-orange-100 rounded-lg flex items-center justify-center text-orange-600 shadow-sm">
-                  <ShieldAlert size={20} />
+                  <SecurityAlertIcon size={20} />
                </div>
                <div>
                   <p className="text-[11px] font-bold text-orange-800 capitalize tracking-widest">Active High Risk Units: {highRiskCount}</p>
