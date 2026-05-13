@@ -153,7 +153,19 @@ export function useDemand(projectId = null) {
     }, [fetchData]);
 
     const filteredDemands = useMemo(() => {
-        let list = [...demands];
+        const currentUserIdentifier = user?.email || user?.sub || user?.name || user?.fullName;
+        const isPM = effectiveRole === "Project_Manager";
+        const isRM = effectiveRole === "Resource_Manager";
+        const isDM = effectiveRole === "Delivery_Manager";
+
+        // 1. Apply Draft Visibility Rule (Strict)
+        let list = demands.filter(d => {
+            const status = (d.demandStatus || d.lifecycleState)?.toUpperCase();
+            if (status !== 'DRAFT') return true;
+            if (isRM || isDM) return false;
+            if (isPM) return d.createdBy === currentUserIdentifier || d.createdByUserId === user?.id;
+            return false;
+        });
 
         // Tab Filtering (Segmented Logic)
         if (activeTab === 'breached') {
@@ -161,7 +173,7 @@ export function useDemand(projectId = null) {
         } else if (activeTab === 'at_risk') {
             list = list.filter(d => d.remainingDays >= 0 && d.remainingDays <= 5);
         } else if (activeTab === 'active') {
-            list = list.filter(d => ['APPROVED', 'OPEN', 'ACTIVE', 'REQUESTED', 'IN_PROGRESS', 'IN PROGRESS'].includes((d.demandStatus || d.lifecycleState)?.toUpperCase()));
+            list = list.filter(d => ['APPROVED', 'OPEN', 'ACTIVE', 'REQUESTED', 'IN_PROGRESS', 'IN PROGRESS', 'DRAFT'].includes((d.demandStatus || d.lifecycleState)?.toUpperCase()));
         } else if (activeTab === 'soft') {
             list = list.filter(isSoftDemand);
         } else if (activeTab === 'rejected') {
@@ -233,7 +245,7 @@ export function useDemand(projectId = null) {
             lifecycleState: d.demandStatus || d.lifecycleState,
             priorityScore: d.priorityScore || d.score || 85
         }));
-    }, [demands, activeTab, filters]);
+    }, [demands, activeTab, filters, effectiveRole, user]);
 
     const totalElements = filteredDemands.length;
     const totalPages = Math.ceil(totalElements / pageSize);
@@ -254,17 +266,58 @@ export function useDemand(projectId = null) {
     }, [page, totalPages]);
 
     const activeKPIs = useMemo(() => {
-        if (!kpiData) return [];
+        // Recalculate KPIs from the visibility-filtered list to ensure DRAFT rules are respected
+        const currentUserIdentifier = user?.email || user?.sub || user?.name || user?.fullName;
+        const isPM = effectiveRole === "Project_Manager";
+        const isRM = effectiveRole === "Resource_Manager";
+        const isDM = effectiveRole === "Delivery_Manager";
+
+        const baseList = demands.filter(d => {
+            const status = (d.demandStatus || d.lifecycleState)?.toUpperCase();
+            if (status !== 'DRAFT') return true;
+            if (isRM || isDM) return false;
+            if (isPM) return d.createdBy === currentUserIdentifier || d.createdByUserId === user?.id;
+            return false;
+        });
+
+        const counts = {
+            active: 0,
+            approved: 0,
+            pending: 0,
+            soft: 0,
+            atRisk: 0,
+            breached: 0
+        };
+
+        baseList.forEach(d => {
+            const status = (d.demandStatus || d.lifecycleState)?.toUpperCase();
+            const commitment = getDemandCommitment(d);
+            const isActiveSLA = ['REQUESTED', 'PENDING', 'DRAFT'].includes(status);
+            
+            if (['APPROVED', 'OPEN', 'ACTIVE'].includes(status)) counts.approved++;
+            if (['REQUESTED', 'PENDING', 'DRAFT'].includes(status)) counts.pending++;
+            if (['APPROVED', 'OPEN', 'ACTIVE', 'REQUESTED', 'PENDING', 'DRAFT', 'IN_PROGRESS', 'IN PROGRESS'].includes(status)) counts.active++;
+            
+            if (commitment === 'SOFT' || status === 'SOFT') counts.soft++;
+            
+            if (isActiveSLA) {
+                if (d.remainingDays < 0) {
+                    counts.breached++;
+                } else if (d.remainingDays >= 0 && d.remainingDays <= 5) {
+                    counts.atRisk++;
+                }
+            }
+        });
 
         return [
-            { label: "Active", count: kpiData.active || 0 },
-            { label: "Approved", count: kpiData.approved || 0 },
-            { label: "Pending", count: kpiData.pending || 0 },
-            { label: "Soft", count: kpiData.soft || 0 },
-            { label: "SLA At Risk", count: kpiData.slaAtRisk || 0 },
-            { label: "SLA Breached", count: kpiData.slaBreached || 0 }
+            { label: "Active", count: counts.active },
+            { label: "Approved", count: counts.approved },
+            { label: "Pending", count: counts.pending },
+            { label: "Soft", count: counts.soft },
+            { label: "SLA At Risk", count: counts.atRisk },
+            { label: "SLA Breached", count: counts.breached }
         ];
-    }, [kpiData]);
+    }, [demands, effectiveRole, user]);
 
     const availableClients = useMemo(() => {
         const clients = new Set(demands.map(d => d.clientName || d.client).filter(Boolean));

@@ -1138,6 +1138,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
 
     const isRM = user?.roles?.includes("Resource_Manager");
     const isDM = user?.roles?.includes("Delivery_Manager");
+    const isPM = user?.roles?.includes("Project_Manager");
 
     const [data, setData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -1244,7 +1245,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
         ...(isRM ? [{ id: 'skillGap', label: 'Skill Gap Analysis', icon: GitCompareIcon }] : []),
         { id: 'approvalFlow', label: 'Approval Flow', icon: ShieldIcon },
         ...(!isSoft && slaId ? [{ id: 'slaInsights', label: 'SLA Insights', icon: PendingIcon }] : []),
-        ...(isRM && allocationResults ? [{ id: 'allocationResults', label: 'Allocation Results', icon: Activity }] : [])
+        ...(isRM && allocationResults ? [{ id: 'allocationResults', label: 'Allocation Results', icon: ActivityIcon }] : [])
     ];
 
     return (
@@ -1291,22 +1292,24 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3 pr-4">
-                                <button
-                                    onClick={() => setEditModalOpen(true)}
-                                    className="text-blue-600 hover:text-blue-700 transition-all active:scale-90"
-                                    title="Edit Demand"
-                                >
-                                    <Pencil className="h-4 w-4" />
-                                </button>
-                                <button
-                                    onClick={() => setDeleteModalOpen(true)}
-                                    className="text-rose-600 hover:text-rose-700 transition-all active:scale-90"
-                                    title="Delete Demand"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            </div>
+                            {isPM && (
+                                <div className="flex items-center gap-3 pr-4">
+                                    <button
+                                        onClick={() => setEditModalOpen(true)}
+                                        className="text-blue-600 hover:text-blue-700 transition-all active:scale-90"
+                                        title="Edit Demand"
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setDeleteModalOpen(true)}
+                                        className="text-rose-600 hover:text-rose-700 transition-all active:scale-90"
+                                        title="Delete Demand"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            )}
 
                             {isRM && (
                                 <button

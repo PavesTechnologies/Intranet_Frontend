@@ -653,12 +653,12 @@ const DemandWorkspacePage = () => {
                         <div className="min-w-[1000px]">
                             <div className="grid grid-cols-12 items-center gap-4 px-5 py-2.5 bg-slate-50 border-b border-slate-100">
                                 <div className="col-span-3 text-[10px] font-bold text-slate-400 tracking-wider uppercase">Demand Specifications & Context</div>
-                                <div className="col-span-1 text-[10px] font-bold text-slate-400 tracking-wider uppercase">Score</div>
+                                <div className="col-span-1 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Score</div>
                                 <div className="col-span-1 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Priority</div>
-                                <div className="col-span-2 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">
+                                <div className="col-span-3 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">
                                     {activeTab === 'rejected' ? 'Rejection Reason' : 'SLA Compliance'}
                                 </div>
-                                <div className="col-span-3 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Status</div>
+                                <div className="col-span-2 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Status</div>
                                 <div className="col-span-2 text-[10px] font-bold text-slate-400 tracking-wider text-center uppercase">Actions</div>
                             </div>
 

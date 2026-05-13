@@ -1,6 +1,7 @@
 import React from 'react';
 import { DemandTypeBadge, PriorityBadge, StateBadge, SLABadge } from './FormalBadges';
-import { EditIcon, ProjectsIcon, UserIcon, PendingIcon, CheckIcon, SpinnerIcon, ErrorIcon, SuccessIcon, DeleteIcon } from "@/components/icons";
+import { Pencil, Trash2 } from "lucide-react";
+import { ProjectsIcon, UserIcon, PendingIcon, CheckIcon, SpinnerIcon, ErrorIcon, SuccessIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -82,8 +83,8 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                 </div>
 
                 {/* 2. Priority Score */}
-                <div className="col-span-1 flex justify-start">
-                    <div className="text-left">
+                <div className="col-span-1 flex justify-center">
+                    <div className="text-center">
                         <span className="text-base font-black text-slate-900 tracking-tighter leading-none">
                             {demand.priorityScore || 0}
                         </span>
@@ -172,17 +173,6 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                         </div>
                     ) : canRMCloseDemand ? (
                         <div className="flex items-center gap-2">
-                            <button
-                                title="Fulfill demand"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (onFulfill) onFulfill(demand);
-                                }}
-                                disabled={isFulfilling || isRejecting}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-[0_5px_14px_rgba(16,185,129,0.12)] transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                {isFulfilling ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <SuccessIcon className="h-[15px] w-[15px] stroke-[2.4]" />}
-                            </button>
                             <button
                                 title="Reject demand"
                                 onClick={(e) => {

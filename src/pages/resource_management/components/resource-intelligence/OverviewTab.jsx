@@ -7,7 +7,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getUtilization } from "../../services/workforceService";
+import { getDashboardSummaryDateRange } from "../../services/workforceService";
 import Pagination from "../../../../components/Pagination/pagination";
 
 // ── Date Helpers ───────────────────────────────────────────────────────────
@@ -33,6 +33,75 @@ const formatShortDate = (date) => {
     return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
+const formatApiDate = (date) => {
+    const d = new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const formatHours = (value) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "0h";
+    return `${number.toFixed(2).replace(/\.00$/, "")}h`;
+};
+
+const resolveResourceId = (resource) => (
+    resource?.employeeId ||
+    resource?.resourceId ||
+    resource?.userId ||
+    resource?.id
+);
+
+const buildUtilizationMonths = (today = new Date()) => {
+    const months = [];
+    for (let offset = 3; offset >= 0; offset -= 1) {
+        const start = new Date(today.getFullYear(), today.getMonth() - offset, 1);
+        const isCurrentMonth = offset === 0;
+        const end = isCurrentMonth
+            ? new Date(today.getFullYear(), today.getMonth(), today.getDate())
+            : new Date(today.getFullYear(), today.getMonth() - offset + 1, 0);
+
+        months.push({
+            startDate: formatApiDate(start),
+            endDate: formatApiDate(end),
+            period: start.toLocaleDateString(undefined, { month: "short" }),
+        });
+    }
+    return months;
+};
+
+const findEmployeeSummary = (summary, resourceId) => {
+    const list = Array.isArray(summary)
+        ? summary
+        : Array.isArray(summary?.data)
+            ? summary.data
+            : Array.isArray(summary?.users)
+                ? summary.users
+                : Array.isArray(summary?.resourceSummaries)
+                    ? summary.resourceSummaries
+                    : Array.isArray(summary?.employeeProductivity)
+                        ? summary.employeeProductivity
+                        : null;
+
+    if (!list) return summary;
+
+    return list.find((item) => String(item.employeeId || item.userId || item.resourceId || item.id) === String(resourceId)) || {};
+};
+
+const normalizeBillableSummary = (summary) => {
+    const billableHours = Number(summary?.billableActivity?.billableHours ?? summary?.billableHours ?? summary?.billable) || 0;
+    const nonBillableHours = Number(summary?.billableActivity?.nonBillableHours ?? summary?.nonBillableHours ?? summary?.nonBillable) || 0;
+    const totalHours = Number(summary?.totalHours) || billableHours + nonBillableHours;
+    const billablePercentage = Number(summary?.billableActivity?.billablePercentage ?? summary?.billablePercentage) || 0;
+
+    return {
+        billableHours,
+        nonBillableHours,
+        totalHours,
+        billablePercentage,
+        dateRange: summary?.dateRange,
+    };
+};
+
 // ── Mini Info Row ──────────────────────────────────────────────────────────
 function MiniInfoRow({ label, value, icon: Icon }) {
     return (
@@ -53,13 +122,13 @@ function UtilizationChart({ data }) {
     if (!list || list.length === 0) {
         return <div className="flex items-center justify-center h-full text-[10px] text-slate-400 font-medium font-sans">No trend data available</div>;
     }
-    const maxVal = Math.max(...list.map(d => (d.billable || 0) + (d.nonBillable || 0)), 100);
+    const maxVal = Math.max(...list.map(d => (d.billable || 0) + (d.nonBillable || 0)), 1);
 
     return (
-        <div className="flex items-end gap-1.5 h-full">
+        <div className="flex-1 w-full flex items-end gap-1.5 min-h-[80px]">
             {list.map((d, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
-                    <div className="w-full flex flex-col justify-end h-16">
+                <div key={i} className="flex-1 flex flex-col items-center gap-1.5 group relative">
+                    <div className="w-full flex flex-col justify-end flex-1 min-h-[40px]">
                         <div
                             className="w-full bg-emerald-400 rounded-t-[2px] transition-all hover:brightness-95"
                             style={{ height: `${((d.billable || 0) / maxVal) * 100}%` }}
@@ -69,7 +138,7 @@ function UtilizationChart({ data }) {
                             style={{ height: `${((d.nonBillable || 0) / maxVal) * 100}%` }}
                         />
                     </div>
-                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{d.period}</span>
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight whitespace-nowrap">{d.period}</span>
                 </div>
             ))}
         </div>
@@ -136,6 +205,7 @@ function TimelineBar({ resource }) {
 export default function OverviewTab({ resource }) {
     const [utilization, setUtilization] = useState(null);
     const [utilLoading, setUtilLoading] = useState(true);
+    const [billableSummary, setBillableSummary] = useState(null);
 
     // Pagination for Quick Views
     const [certPage, setCertPage] = useState(1);
@@ -147,36 +217,63 @@ export default function OverviewTab({ resource }) {
         const load = async () => {
             setUtilLoading(true);
             try {
-                const id = resource.resourceId || resource.id;
-                
-                // To show a "Trend", we fetch the last 4 months
-                const now = new Date();
-                const monthsToFetch = [0, 1, 2, 3].map(offset => {
-                    const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-                    return { month: d.getMonth() + 1, year: d.getFullYear() };
-                }).reverse();
+                const id = resolveResourceId(resource);
+                if (!id) {
+                    throw new Error("Resource id missing");
+                }
 
-                const trendData = await Promise.all(monthsToFetch.map(async (m) => {
-                    try {
-                        // Assuming getUtilization can take custom month/year or we adapt the service
-                        // For now, we'll try to use the current service if it's flexible, or simulate the trend
-                        const res = await getUtilization(id, m.month, m.year);
-                        return { ...res, period: new Date(m.year, m.month - 1).toLocaleDateString(undefined, { month: 'short' }) };
-                    } catch {
-                        return { billable: 0, nonBillable: 0, period: new Date(m.year, m.month - 1).toLocaleDateString(undefined, { month: 'short' }) };
-                    }
+                const monthWindows = buildUtilizationMonths();
+                const summaries = await Promise.all(
+                    monthWindows.map(async (month) => {
+                        const summary = await getDashboardSummaryDateRange(id, month.startDate, month.endDate);
+                        const normalized = normalizeBillableSummary(findEmployeeSummary(summary, id));
+                        return {
+                            ...normalized,
+                            period: month.period,
+                            dateRange: normalized.dateRange || {
+                                startDate: month.startDate,
+                                endDate: month.endDate,
+                            },
+                        };
+                    }),
+                );
+
+                const billableHours = summaries.reduce((sum, item) => sum + item.billableHours, 0);
+                const nonBillableHours = summaries.reduce((sum, item) => sum + item.nonBillableHours, 0);
+                const totalHours = summaries.reduce((sum, item) => sum + item.totalHours, 0);
+                const billablePercentage = totalHours > 0 ? (billableHours / totalHours) * 100 : 0;
+
+                const trendData = summaries.map((item) => ({
+                    billable: item.billableHours,
+                    nonBillable: item.nonBillableHours,
+                    period: item.period,
                 }));
 
-                if (!cancelled) setUtilization(trendData);
+                if (!cancelled) {
+                    setBillableSummary({
+                        billableHours,
+                        nonBillableHours,
+                        totalHours,
+                        billablePercentage,
+                        dateRange: {
+                            startDate: monthWindows[0].startDate,
+                            endDate: monthWindows[monthWindows.length - 1].endDate,
+                        },
+                    });
+                    setUtilization(trendData);
+                }
             } catch {
-                if (!cancelled) setUtilization(null);
+                if (!cancelled) {
+                    setBillableSummary(null);
+                    setUtilization(null);
+                }
             } finally {
                 if (!cancelled) setUtilLoading(false);
             }
         };
         load();
         return () => { cancelled = true; };
-    }, [resource.resourceId, resource.id]);
+    }, [resource.employeeId, resource.resourceId, resource.userId, resource.id]);
 
     const isNotice = resource.noticeInfo?.isNoticePeriod;
     const currentProjects = useMemo(() => {
@@ -260,20 +357,32 @@ export default function OverviewTab({ resource }) {
 
                             <TimelineBar resource={{ ...resource, allocationTimeline: sortedTimeline }} />
 
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
+                                    <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Billable</p>
+                                    <p className="mt-1 text-lg font-black text-emerald-700 tabular-nums">{formatHours(billableSummary?.billableHours)}</p>
+                                </div>
+                                <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Non-Billable</p>
+                                    <p className="mt-1 text-lg font-black text-slate-800 tabular-nums">{formatHours(billableSummary?.nonBillableHours)}</p>
+                                </div>
+                            </div>
+
                             <div className="bg-indigo-50/30 rounded-lg p-3 border border-indigo-100/50">
-                                <p className="text-[10px] font-bold text-indigo-700/70 font-sans uppercase tracking-[0.2em]">Strategy Insight</p>
+                                <p className="text-[10px] font-bold text-indigo-700/70 font-sans uppercase tracking-[0.2em]">
+                                    {billableSummary?.dateRange?.startDate && billableSummary?.dateRange?.endDate
+                                        ? `${formatShortDate(billableSummary.dateRange.startDate)} - ${formatShortDate(billableSummary.dateRange.endDate)}`
+                                        : "Current + Previous 3 Months"}
+                                </p>
                                 <p className="text-[11px] font-medium text-indigo-900 mt-1 leading-relaxed">
-                                    Current monthly capacity balance is <span className="font-black">{100 - (resource.currentAllocation || 0)}%</span>.
-                                    {resource.currentAllocation > 100 ? " Resource is currently over-allocated." :
-                                        resource.currentAllocation === 100 ? " Resource is at full capacity." :
-                                            " Optimal room for strategic upskilling or shadow roles."}
+                                    Total logged hours are <span className="font-black">{formatHours(billableSummary?.totalHours)}</span>, with billable utilization at <span className="font-black">{(billableSummary?.billablePercentage || 0).toFixed(2).replace(/\.00$/, "")}%</span>.
                                 </p>
                             </div>
                         </div>
 
-                        <div className="h-32">
-                            <div className="flex justify-between items-center mb-4">
-                                <span className="text-[10px] font-black text-slate-400 font-sans uppercase tracking-widest">Utilization Trend</span>
+                        <div className="h-36 flex flex-col pb-1">
+                            <div className="flex justify-between items-center mb-3">
+                                <span className="text-[10px] font-black text-slate-400 font-sans uppercase tracking-widest">Monthly Hours</span>
                             </div>
                             {utilLoading ? (
                                 <div className="h-full w-full bg-slate-50 animate-pulse rounded-lg" />

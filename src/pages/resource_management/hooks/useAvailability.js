@@ -94,9 +94,13 @@ export function useAvailability() {
             ? (currentProjects.length > 0 ? [...new Set(currentProjects)].join(", ") : "Bench")
             : (Array.isArray(r.currentProject) ? r.currentProject.join(", ") : (r.currentProject || "Bench"));
 
+          const resourceId = r.resourceId || r.employeeId || r.userId || r.id;
+
           return {
             ...r,
-            id: r.resourceId,
+            id: resourceId,
+            resourceId,
+            employeeId: r.employeeId || resourceId,
             currentAllocation: finalAllocation,
             status: computeStatus(finalAllocation),
             availableFrom: r.availableFrom || todayStr,
