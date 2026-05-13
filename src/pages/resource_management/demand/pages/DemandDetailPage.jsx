@@ -16,6 +16,10 @@ import SkillGapTab from '../../components/resource-intelligence/SkillGapTab';
 import AllocationModal from '../components/AllocationModal';
 import AllocationModificationTab from '../components/AllocationModificationTab';
 import demandService from '../services/demandService';
+import DemandModal from "../../models/DemandModal";
+import DeleteDemandModal from "../components/DeleteDemandModal";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { useAuth } from '../../../../contexts/AuthContext';
 import { PriorityBadge, StateBadge } from '../components/FormalBadges';
 import { Button } from "@/components/ui/button";
@@ -639,6 +643,74 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
 /**
  * --- TAB 4: SLA INSIGHTS ---
  */
+const SLAInsightsTab = ({ sla }) => {
+    const totalDays = sla?.slaDurationDays || 30;
+    const remaining = sla?.remainingDays || 0;
+    const warningDays = sla?.warningThresholdDays || 5;
+
+    // Position marker for "Today"
+    const todayPos = ((totalDays - remaining) / totalDays) * 100;
+
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <DetailCard title="SLA Compliance Vision" icon={Clock}>
+                <div className="p-4">
+                    <div className="relative mb-6 py-6">
+                        {/* Timeline Track */}
+                        <div className="h-1 w-full bg-slate-100 rounded-full flex overflow-hidden shadow-inner">
+                            <div className="h-full bg-emerald-500" style={{ width: `${((totalDays - warningDays) / totalDays) * 100}%` }} />
+                            <div className="h-full bg-orange-500" style={{ width: `${(warningDays / totalDays) * 100}%` }} />
+                        </div>
+
+                        {/* Threshold Labels */}
+                        <div className="absolute top-0 right-0 translate-y-3">
+                            <div className="flex flex-col items-end">
+                                <span className="text-[8px] font-black text-slate-400 tracking-widest mb-1">Breach Zone</span>
+                                <div className="h-8 w-px bg-rose-200 border-l border-dashed border-rose-300" />
+                            </div>
+                        </div>
+
+                        {/* Today Marker */}
+                        <div className="absolute top-0" style={{ left: `${todayPos}%`, transform: 'translateX(-50%)' }}>
+                            <div className="flex flex-col items-center">
+                                <div className="px-0.5 py-0.5 bg-indigo-600 text-white rounded text-[6px] font-black mb-0.5 shadow-lg ring-4 ring-white">Today</div>
+                                <div className="h-8 w-1 bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.4)]" />
+                            </div>
+                        </div>
+
+                        {/* Endpoints */}
+                        <div className="flex justify-between items-center mt-2 text-[7px] font-black tracking-widest text-slate-400">
+                            <div className="flex flex-col">
+                                <span className="text-slate-900">Created</span>
+                                <span className="font-mono">T+0</span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <span className="text-rose-600">SLA Due</span>
+                                <span className="font-mono">T+{totalDays}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-50">
+                        <div className="text-center">
+                            <span className="text-2xl font-black text-slate-900 tracking-tighter">{remaining}</span>
+                            <p className="text-[8px] font-bold text-slate-400 tracking-widest mt-1">Days Remaining</p>
+                        </div>
+                        <div className="text-center">
+                            <span className="text-2xl font-black text-amber-600 tracking-tighter">{warningDays}</span>
+                            <p className="text-[8px] font-bold text-slate-400 tracking-widest mt-1">Warning Threshold</p>
+                        </div>
+                        <div className="text-center">
+                            <span className="text-2xl font-black text-rose-600 tracking-tighter">{remaining < 0 ? Math.abs(remaining) : 0}</span>
+                            <p className="text-[8px] font-bold text-slate-400 tracking-widest mt-1">Current Overdue</p>
+                        </div>
+                    </div>
+                </div>
+            </DetailCard>
+        </div>
+    );
+};
+
 /**
  * --- TAB 5: ALLOCATION RESULTS ---
  */
@@ -819,75 +891,6 @@ const AllocationResultsTab = ({ results }) => {
                     )}
                 </div>
             </div>
-        </div>
-    );
-};
-
-
-const SLAInsightsTab = ({ sla }) => {
-    const totalDays = sla?.slaDurationDays || 30;
-    const remaining = sla?.remainingDays || 0;
-    const warningDays = sla?.warningThresholdDays || 5;
-
-    // Position marker for "Today"
-    const todayPos = ((totalDays - remaining) / totalDays) * 100;
-
-    return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <DetailCard title="SLA Compliance Vision" icon={PendingIcon}>
-                <div className="p-4">
-                    <div className="relative mb-6 py-6">
-                        {/* Timeline Track */}
-                        <div className="h-1 w-full bg-slate-100 rounded-full flex overflow-hidden shadow-inner">
-                            <div className="h-full bg-emerald-500" style={{ width: `${((totalDays - warningDays) / totalDays) * 100}%` }} />
-                            <div className="h-full bg-orange-500" style={{ width: `${(warningDays / totalDays) * 100}%` }} />
-                        </div>
-
-                        {/* Threshold Labels */}
-                        <div className="absolute top-0 right-0 translate-y-3">
-                            <div className="flex flex-col items-end">
-                                <span className="text-[8px] font-black text-slate-400 tracking-widest mb-1">Breach Zone</span>
-                                <div className="h-8 w-px bg-rose-200 border-l border-dashed border-rose-300" />
-                            </div>
-                        </div>
-
-                        {/* Today Marker */}
-                        <div className="absolute top-0" style={{ left: `${todayPos}%`, transform: 'translateX(-50%)' }}>
-                            <div className="flex flex-col items-center">
-                                <div className="px-0.5 py-0.5 bg-indigo-600 text-white rounded text-[6px] font-black mb-0.5 shadow-lg ring-4 ring-white">Today</div>
-                                <div className="h-8 w-1 bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.4)]" />
-                            </div>
-                        </div>
-
-                        {/* Endpoints */}
-                        <div className="flex justify-between items-center mt-2 text-[7px] font-black tracking-widest text-slate-400">
-                            <div className="flex flex-col">
-                                <span className="text-slate-900">Created</span>
-                                <span className="font-mono">T+0</span>
-                            </div>
-                            <div className="flex flex-col items-end">
-                                <span className="text-rose-600">SLA Due</span>
-                                <span className="font-mono">T+{totalDays}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-50">
-                        <div className="text-center">
-                            <span className="text-2xl font-black text-slate-900 tracking-tighter">{remaining}</span>
-                            <p className="text-[8px] font-bold text-slate-400 tracking-widest mt-1">Days Remaining</p>
-                        </div>
-                        <div className="text-center">
-                            <span className="text-2xl font-black text-amber-600 tracking-tighter">{warningDays}</span>
-                            <p className="text-[8px] font-bold text-slate-400 tracking-widest mt-1">Warning Threshold</p>
-                        </div>
-                        <div className="text-center">
-                            <span className="text-2xl font-black text-rose-600 tracking-tighter">{remaining < 0 ? Math.abs(remaining) : 0}</span>
-                            <p className="text-[8px] font-bold text-slate-400 tracking-widest mt-1">Current Overdue</p>
-                        </div>
-                    </div>
-                </div>
-            </DetailCard>
         </div>
     );
 };
@@ -1142,6 +1145,9 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
     const [activeTab, setActiveTab] = useState('overview');
     const [isAllocationModalOpen, setIsAllocationModalOpen] = useState(false);
     const [allocationResults, setAllocationResults] = useState(null);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         const fetchDetail = async () => {
@@ -1162,6 +1168,33 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
         };
         if (demandId) fetchDetail();
     }, [demandId, passedDemand]);
+
+    const handleUpdateSuccess = async () => {
+        setEditModalOpen(false);
+        try {
+            const result = await demandService.getDemandById(demandId);
+            setData(mergeDemandDetail(result, passedDemand));
+            showStatusToast("Demand updated successfully", "success");
+        } catch (err) {
+            console.error("Error refreshing demand:", err);
+        }
+    };
+
+    const handleDelete = async () => {
+        setIsDeleting(true);
+        try {
+            await demandService.deleteDemand(demandId);
+            showStatusToast("Demand deleted successfully", "success");
+            setDeleteModalOpen(false);
+            if (propOnBack) propOnBack();
+            else navigate('/resource-management/demand');
+        } catch (err) {
+            console.error("Error deleting demand:", err);
+            showStatusToast(err.response?.data?.message || "Failed to delete demand", "error");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     // Loading & Error States
     if (isLoading) return (
@@ -1258,6 +1291,23 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                 </div>
                             </div>
 
+                            <div className="flex items-center gap-3 pr-4">
+                                <button
+                                    onClick={() => setEditModalOpen(true)}
+                                    className="text-blue-600 hover:text-blue-700 transition-all active:scale-90"
+                                    title="Edit Demand"
+                                >
+                                    <Pencil className="h-4 w-4" />
+                                </button>
+                                <button
+                                    onClick={() => setDeleteModalOpen(true)}
+                                    className="text-rose-600 hover:text-rose-700 transition-all active:scale-90"
+                                    title="Delete Demand"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            </div>
+
                             {isRM && (
                                 <button
                                     onClick={() => setIsAllocationModalOpen(true)}
@@ -1335,6 +1385,22 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                     setAllocationResults(results);
                     setActiveTab('allocationResults');
                 }}
+            />
+
+            <DemandModal
+                open={editModalOpen}
+                onClose={() => setEditModalOpen(false)}
+                initialData={demand}
+                mode="edit"
+                onSuccess={handleUpdateSuccess}
+            />
+
+            <DeleteDemandModal
+                open={deleteModalOpen}
+                demand={demand}
+                loading={isDeleting}
+                onClose={() => setDeleteModalOpen(false)}
+                onSubmit={handleDelete}
             />
         </div>
     );

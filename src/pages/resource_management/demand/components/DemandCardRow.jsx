@@ -39,8 +39,8 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
     const isPMView = normalizedViewerRole === "PROJECTMANAGER" || normalizedViewerRole === "MANAGER";
     const canQuickDecision = isDMView && DM_PENDING_STATUSES.includes(status);
     const canRMCloseDemand = isRMView && status === 'APPROVED';
-    const canPMEditRequestedDemand = isPMView && status === 'REQUESTED';
-    const canPMDeleteRequestedDemand = isPMView && status === 'REQUESTED';
+    const canPMEditRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
+    const canPMDeleteRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
     const isFulfilled = status === 'FULFILLED';
     const isRejected = status === 'REJECTED';
     const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditRequestedDemand);
@@ -206,23 +206,22 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                                             : (isDMView && status === 'APPROVED')
                                                 ? 'Cannot edit approved demand'
                                                 : (isPMView && !canPMEditRequestedDemand)
-                                                    ? 'PM can edit only requested demands'
-                                                    : 'Edit requested demand'
+                                                    ? 'PM can edit only requested or draft demands'
+                                                    : 'Edit demand'
                                 }
                                 onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (onEdit) onEdit(demand);
+                                     e.stopPropagation();
+                                     if (onEdit) onEdit(demand);
                                 }}
                                 disabled={isEditDisabled}
                                 className={cn(
-                                    "inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold transition",
+                                    "inline-flex items-center gap-1.5 transition-all active:scale-95",
                                     isEditDisabled
-                                        ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
-                                        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                                        ? "cursor-not-allowed text-slate-300"
+                                        : "text-blue-600 hover:text-blue-700"
                                 )}
                             >
-                                <EditIcon className="h-3.5 w-3.5" />
-                                Edit
+                                <Pencil className="h-4 w-4" />
                             </button>
                             {canPMDeleteRequestedDemand && (
                                 <button
@@ -231,9 +230,9 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                                         e.stopPropagation();
                                         if (onDelete) onDelete(demand);
                                     }}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                                    className="inline-flex h-8 w-8 items-center justify-center text-rose-600 transition-all hover:text-rose-700 active:scale-90"
                                 >
-                                    <DeleteIcon className="h-3.5 w-3.5" />
+                                    <Trash2 className="h-4 w-4" />
                                 </button>
                             )}
                         </div>
