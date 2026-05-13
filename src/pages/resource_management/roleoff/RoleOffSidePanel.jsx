@@ -19,10 +19,10 @@ const formatReason = (str) => {
 };
 
 const isPendingStatus = (status) =>
-  status === "Pending" || status === "Pending Approval";
+  status === "PENDING";
 
 const isDmActionableStatus = (status) =>
-  status === "Pending" || status === "Pending Approval" || status === "Approved";
+  ["PENDING", "APPROVED"].includes(status);
 
 const impactStyles = {
   Low: "border-teal-200 bg-teal-50 text-teal-700",
@@ -31,11 +31,12 @@ const impactStyles = {
 };
 
 const roleOffStatusStyles = {
-  "Not Requested": "border-slate-200 bg-slate-100 text-slate-700",
-  "Pending Approval": "border-amber-200 bg-amber-50 text-amber-700",
-  Approved: "border-blue-200 bg-blue-50 text-blue-700",
-  Rejected: "border-rose-200 bg-rose-50 text-rose-700",
-  Fulfilled: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  NOT_REQUESTED: "border-slate-200 bg-slate-100 text-slate-700",
+  PENDING: "border-amber-200 bg-amber-50 text-amber-700",
+  APPROVED: "border-blue-200 bg-blue-50 text-blue-700",
+  REJECTED: "border-rose-200 bg-rose-50 text-rose-700",
+  FULFILLED: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  CANCELLED: "border-slate-200 bg-slate-100 text-slate-700",
 };
 
 const baseForm = {
@@ -238,7 +239,7 @@ const RoleOffSidePanel = ({
     isPM &&
     (pmTab === "process" || pmTab === "rejected") &&
     (
-      String(record.roleOffStatus || "").trim() === "Rejected" ||
+      String(record.roleOffStatus || "").trim() === "REJECTED" ||
       Boolean(record.rejectedBy) ||
       Boolean(record.rejectionReason)
     );
@@ -634,10 +635,10 @@ const RoleOffSidePanel = ({
                       <Badge
                         className={cn(
                           "text-[11px] font-semibold",
-                          roleOffStatusStyles[record.roleOffStatus || "Not Requested"] || "border-slate-200 bg-slate-100 text-slate-700"
+                          roleOffStatusStyles[record.roleOffStatus || "NOT_REQUESTED"] || "border-slate-200 bg-slate-100 text-slate-700"
                         )}
                       >
-                        {record.roleOffStatus || "Not Requested"}
+                        {record.roleOffStatus || "NOT_REQUESTED"}
                       </Badge>
                     </div>
                   ) : null}

@@ -162,8 +162,9 @@ const ProjectConfigurations = ({ projectId }) => {
   const saveInheritedSlas = async () => {
     try {
       if (projectSlas.length + selectedClientSlas.length > 3) {
-        toast.warning(
+        showStatusToast(
           "Adding these would exceed the limit of 3 SLAs for this project.",
+          "warning"
         );
         return;
       }
@@ -183,7 +184,7 @@ const ProjectConfigurations = ({ projectId }) => {
       setInheritMode(false);
       setSelectedClientSlas([]);
       fetchProjectSLAs();
-      toast.success("SLAs inherited successfully.");
+      showStatusToast("SLAs inherited successfully.", "success");
     } catch (err) {
       console.error("Error inheriting SLAs", err);
     }
@@ -194,14 +195,14 @@ const ProjectConfigurations = ({ projectId }) => {
       const isEditing = !!formData.projectSlaId;
       if (!isEditing) {
         if (projectSlas.length >= 3) {
-          toast.warning("Maximum of 3 SLA configurations allowed per project.");
+          showStatusToast("Maximum of 3 SLA configurations allowed per project.", "warning");
           return;
         }
         const isDuplicate = projectSlas.some(
           (sla) => sla.slaType === formData.slaType,
         );
         if (isDuplicate) {
-          toast.warning(`The SLA type "${formData.slaType}" is already configured.`);
+          showStatusToast(`The SLA type "${formData.slaType}" is already configured.`, "warning");
           return;
         }
       }
@@ -212,10 +213,10 @@ const ProjectConfigurations = ({ projectId }) => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectSLAs();
-      toast.success("SLA configuration saved successfully.");
+      showStatusToast("SLA configuration saved successfully.", "success");
     } catch (err) {
       console.error("Error saving project SLA", err);
-      toast.error(err.response?.data?.message || "Failed to save SLA configuration");
+      showStatusToast(err.response?.data?.message || "Failed to save SLA configuration", "error");
     }
   };
 
@@ -297,7 +298,7 @@ const ProjectConfigurations = ({ projectId }) => {
       setInheritMode(false);
       setSelectedClientCompliance([]);
       fetchProjectCompliance();
-      toast.success("Compliance requirements inherited successfully.");
+      showStatusToast("Compliance requirements inherited successfully.", "success");
     } catch (err) {
       console.error("Error inheriting compliance", err);
     }
@@ -311,8 +312,9 @@ const ProjectConfigurations = ({ projectId }) => {
           c.isInherited === false,
       );
       if (isDuplicate && !formData.projectComplianceId) {
-        toast.warning(
+        showStatusToast(
           `The compliance requirement "${formData.requirementType}" is already configured for this project.`,
+          "warning"
         );
         return;
       }
@@ -323,10 +325,10 @@ const ProjectConfigurations = ({ projectId }) => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectCompliance();
-      toast.success("Compliance configuration saved successfully.");
+      showStatusToast("Compliance configuration saved successfully.", "success");
     } catch (err) {
       console.error("Error saving project compliance", err);
-      toast.error(err.response?.data?.message || "An error occurred during save.");
+      showStatusToast(err.response?.data?.message || "An error occurred during save.", "error");
     }
   };
 
@@ -406,7 +408,7 @@ const ProjectConfigurations = ({ projectId }) => {
       setInheritMode(false);
       setSelectedClientEscalations([]);
       fetchProjectEscalations();
-      toast.success("Escalations inherited successfully.");
+      showStatusToast("Escalations inherited successfully.", "success");
     } catch (err) {
       console.error("Error inheriting escalation", err);
     }
@@ -425,7 +427,7 @@ const ProjectConfigurations = ({ projectId }) => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectEscalations();
-      toast.success("Escalation saved successfully.");
+      showStatusToast("Escalation saved successfully.", "success");
     } catch (err) {
       console.error("Error saving escalation", err);
     }
@@ -451,7 +453,7 @@ const ProjectConfigurations = ({ projectId }) => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectEscalations();
-      toast.success("Escalation updated successfully.");
+      showStatusToast("Escalation updated successfully.", "success");
     } catch (err) {
       console.error("Error updating escalation", err);
     }
