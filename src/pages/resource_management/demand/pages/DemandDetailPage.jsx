@@ -26,6 +26,12 @@ import { Button } from "@/components/ui/button";
 import Pagination from '../../../../components/Pagination/pagination';
 import { fetchResourcesByDemandId } from '../../services/resource';
 import GenericTable from '../../../../components/Table/table';
+import {
+    canProjectManagerEditDemand,
+    canProjectManagerMutateDemand,
+    PM_EDITABLE_DEMAND_MESSAGE,
+    PM_REQUESTED_DEMAND_ONLY_MESSAGE,
+} from '../utils/demandPermissions';
 
 
 /**
@@ -1159,9 +1165,15 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
     };
 
     const handleDelete = async () => {
+        if (isPM && !canProjectManagerMutateDemand(data)) {
+            showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+            setDeleteModalOpen(false);
+            return;
+        }
+
         setIsDeleting(true);
         try {
-            await demandService.deleteDemand(demandId);
+            await demandService.deleteDemandByPM(demandId, demand);
             showStatusToast("Demand deleted successfully", "success");
             setDeleteModalOpen(false);
             if (propOnBack) propOnBack();
@@ -1204,7 +1216,8 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
     const rejectionInfo = data?.rejectionInfo || {};
     const clientInfo = data?.clientInfo || {};
 
-    const isApproved = ['APPROVED', 'OPEN', 'ACTIVE', 'FULFILLED'].includes(demand?.demandStatus?.toUpperCase());
+    const canPMEditDemand = isPM && canProjectManagerEditDemand(demand);
+    const canPMDeleteDemand = isPM && canProjectManagerMutateDemand(demand);
 
     const slaId = sla?.demandSlaId;
 
@@ -1269,22 +1282,38 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                 </div>
                             </div>
 
-                            {isPM && (
+                            {(canPMEditDemand || canPMDeleteDemand) && (
                                 <div className="flex items-center gap-3 pr-4">
-                                    <button
-                                        onClick={() => setEditModalOpen(true)}
-                                        className="text-blue-600 hover:text-blue-700 transition-all active:scale-90"
-                                        title="Edit Demand"
-                                    >
-                                        <Pencil className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => setDeleteModalOpen(true)}
-                                        className="text-rose-600 hover:text-rose-700 transition-all active:scale-90"
-                                        title="Delete Demand"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
+                                    {canPMEditDemand && (
+                                        <button
+                                            onClick={() => {
+                                                if (!canProjectManagerEditDemand(demand)) {
+                                                    showStatusToast(PM_EDITABLE_DEMAND_MESSAGE, "error");
+                                                    return;
+                                                }
+                                                setEditModalOpen(true);
+                                            }}
+                                            className="text-blue-600 hover:text-blue-700 transition-all active:scale-90"
+                                            title="Edit Demand"
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </button>
+                                    )}
+                                    {canPMDeleteDemand && (
+                                        <button
+                                            onClick={() => {
+                                                if (!canProjectManagerMutateDemand(demand)) {
+                                                    showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+                                                    return;
+                                                }
+                                                setDeleteModalOpen(true);
+                                            }}
+                                            className="text-rose-600 hover:text-rose-700 transition-all active:scale-90"
+                                            title="Delete Demand"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    )}
                                 </div>
                             )}
 
@@ -1372,6 +1401,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                 onClose={() => setEditModalOpen(false)}
                 initialData={demand}
                 mode="edit"
+                userRole={isPM ? "Project_Manager" : isRM ? "Resource_Manager" : isDM ? "Delivery_Manager" : ""}
                 onSuccess={handleUpdateSuccess}
             />
 

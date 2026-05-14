@@ -3,6 +3,11 @@ import { DemandTypeBadge, PriorityBadge, StateBadge, SLABadge } from './FormalBa
 import { Pencil, Trash2 } from "lucide-react";
 import { ProjectsIcon, UserIcon, PendingIcon, CheckIcon, SpinnerIcon, ErrorIcon, SuccessIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import {
+    canProjectManagerEditDemand,
+    canProjectManagerMutateDemand,
+    PM_EDITABLE_DEMAND_MESSAGE,
+} from '../utils/demandPermissions';
 
 /**
  * DemandCardRow: Informative Workforce View
@@ -42,11 +47,11 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
     const canQuickDecision = isDMView && DM_PENDING_STATUSES.includes(status);
     const canDMRejectDemand = isDMView && DM_REJECTABLE_STATUSES.includes(status);
     const canRMCloseDemand = isRMView && status === 'APPROVED';
-    const canPMEditRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
-    const canPMDeleteRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
+    const canPMEditDemand = isPMView && canProjectManagerEditDemand(demand);
+    const canPMDeleteRequestedDemand = isPMView && canProjectManagerMutateDemand(demand);
     const isFulfilled = status === 'FULFILLED';
     const isRejected = status === 'REJECTED';
-    const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditRequestedDemand);
+    const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditDemand);
     const isApproving = decisionState?.demandId === demand.id && decisionState?.action === "approve";
     const isRejecting = decisionState?.demandId === demand.id && decisionState?.action === "reject";
     const isFulfilling = decisionState?.demandId === demand.id && decisionState?.action === "fulfill";
@@ -209,8 +214,8 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                                             ? 'Cannot edit rejected demand'
                                             : (isDMView && status === 'APPROVED')
                                                 ? 'Cannot edit approved demand'
-                                                : (isPMView && !canPMEditRequestedDemand)
-                                                    ? 'PM can edit only requested or draft demands'
+                                                : (isPMView && !canPMEditDemand)
+                                                    ? PM_EDITABLE_DEMAND_MESSAGE
                                                     : 'Edit demand'
                                 }
                                 onClick={(e) => {

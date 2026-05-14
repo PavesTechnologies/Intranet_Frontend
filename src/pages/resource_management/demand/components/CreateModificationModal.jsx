@@ -314,6 +314,7 @@ const CreateModificationModal = ({
                   type="number"
                   min="0"
                   value={form.requestedAllocationPercentage}
+                  onWheel={(e) => e.target.blur()}
                   onChange={handleRequestedAllocationChange}
                   className={cn(
                     "h-10 rounded-lg border text-sm text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-500/15",
