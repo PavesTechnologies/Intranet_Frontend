@@ -16,6 +16,12 @@ import DeleteDemandModal from "../../resource_management/demand/components/Delet
 import AddDeliverableRoleModal from "../../resource_management/models/AddDeliverableRoleModal";
 import Pagination from '../../../components/Pagination/pagination';
 import { useAuth } from "../../../contexts/AuthContext";
+import {
+    canProjectManagerEditDemand,
+    canProjectManagerMutateDemand,
+    PM_EDITABLE_DEMAND_MESSAGE,
+    PM_REQUESTED_DEMAND_ONLY_MESSAGE,
+} from '../../resource_management/demand/utils/demandPermissions';
 
 const normalizeRole = (role = "") =>
     String(role)
@@ -92,6 +98,10 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
     }, [user]);
 
     const handleEdit = (demand) => {
+        if (["PROJECTMANAGER", "MANAGER"].includes(normalizeRole(effectiveRole)) && !canProjectManagerEditDemand(demand)) {
+            showStatusToast(PM_EDITABLE_DEMAND_MESSAGE, "error");
+            return;
+        }
         setEditingDemand(demand);
         setEditModalOpen(true);
     };
@@ -137,6 +147,10 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
     }, []);
 
     const handleDelete = (demand) => {
+        if (["PROJECTMANAGER", "MANAGER"].includes(normalizeRole(effectiveRole)) && !canProjectManagerMutateDemand(demand)) {
+            showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+            return;
+        }
         setDeletingDemand(demand);
     };
 
@@ -144,9 +158,14 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
         const id = deletingDemand?.demandId || deletingDemand?.id;
         if (!id) return;
 
+        if (!canProjectManagerMutateDemand(deletingDemand)) {
+            showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+            return;
+        }
+
         setDeleteLoading(true);
         try {
-            const response = await demandService.deleteDemandByPM(id);
+            const response = await demandService.deleteDemandByPM(id, deletingDemand);
             showStatusToast(response?.message || "Demand deleted successfully", "success");
             setDeletingDemand(null);
             await fetchContext();

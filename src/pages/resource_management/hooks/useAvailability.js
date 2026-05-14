@@ -19,6 +19,27 @@ export const defaultFilters = {
   endDate: null,
 };
 
+const normalizeTimelineResponse = (response) => {
+  const pageData = response?.data ?? response;
+  const contentSource = Array.isArray(pageData)
+    ? pageData
+    : Array.isArray(pageData?.content)
+      ? pageData.content
+      : Array.isArray(pageData?.data)
+        ? pageData.data
+        : Array.isArray(pageData?.data?.content)
+          ? pageData.data.content
+          : [];
+
+  const paginationSource = pageData?.data?.content ? pageData.data : pageData;
+
+  return {
+    resources: contentSource,
+    totalPages: paginationSource?.totalPages ?? 1,
+    totalElements: paginationSource?.totalElements ?? contentSource.length,
+  };
+};
+
 export function useAvailability() {
   const [filters, setFilters] = useState(defaultFilters);
   const [statusFilter, setStatusFilter] = useState(null);
@@ -69,9 +90,14 @@ export function useAvailability() {
       }
       const response = await getAvailabilityTimeline(currentFilters, payload);
 
-      if (response && response.data) {
+      if (response) {
+        const {
+          resources,
+          totalPages: responseTotalPages,
+          totalElements: responseTotalElements,
+        } = normalizeTimelineResponse(response);
         const todayStr = new Date().toLocaleDateString("en-CA");
-        const mappedData = response.data.map((r) => {
+        const mappedData = resources.map((r) => {
           const timeline = r.allocationTimeline || r.allocations || [];
           let currentAllocation = 0;
           let currentProjects = [];
@@ -94,9 +120,13 @@ export function useAvailability() {
             ? (currentProjects.length > 0 ? [...new Set(currentProjects)].join(", ") : "Bench")
             : (Array.isArray(r.currentProject) ? r.currentProject.join(", ") : (r.currentProject || "Bench"));
 
+          const resourceId = r.resourceId || r.employeeId || r.userId || r.id;
+
           return {
             ...r,
-            id: r.resourceId,
+            id: resourceId,
+            resourceId,
+            employeeId: r.employeeId || resourceId,
             currentAllocation: finalAllocation,
             status: computeStatus(finalAllocation),
             availableFrom: r.availableFrom || todayStr,
@@ -124,8 +154,8 @@ export function useAvailability() {
         });
 
         setFilteredResources(visibleData);
-        setTotalPages(response.totalPages);
-        setTotalElements(response.totalElements);
+        setTotalPages(responseTotalPages);
+        setTotalElements(responseTotalElements);
       }
     } catch (error) {
       console.error("Failed to fetch timeline data", error);
