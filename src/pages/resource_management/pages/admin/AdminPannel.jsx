@@ -23,6 +23,7 @@ import { toast } from "react-toastify"; // Removed ToastContainer check
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import ExcelJS from "exceljs/dist/exceljs.min.js"; // Robust Vite Import
 import { saveAs } from "file-saver";
+import StatusBadge from "../../../../components/status/statusbadge";
  
 const priorityColor = {
   HIGH: "text-red-600 bg-red-50",
@@ -70,7 +71,13 @@ const AdminPannel = () => {
   const fetchKPIs = async () => {
     try {
       const response = await getAdminKPI();
-      if (response.success) setKpiData(response.data);
+      if (response) {
+        if (response.success && response.data) {
+          setKpiData(response.data);
+        } else if (response.totalClients !== undefined) {
+          setKpiData(response);
+        }
+      }
     } catch (error) {
       console.error("KPI Error:", error);
     }
@@ -89,19 +96,48 @@ const AdminPannel = () => {
         pageInfo.current,
         pageInfo.size,
       );
-      if (response.success && response.data) {
-        setClientDetails(response.data.records || []);
-        setPageInfo((prev) => ({
-          ...prev,
-          totalElements: response.data.totalElements,
-          totalPages: response.data.totalPages,
-        }));
-      } else {
-        setClientDetails([]);
-        setPageInfo((prev) => ({ ...prev, totalElements: 0, totalPages: 0 }));
+      let records = [];
+      let totalElements = 0;
+      let totalPages = 0;
+
+      if (response) {
+        if (response.success && response.data) {
+          records = response.data.records || response.data.content || [];
+          totalElements = response.data.totalElements || 0;
+          totalPages = response.data.totalPages || 0;
+        } else if (response.content) {
+          records = response.content;
+          totalElements = response.totalElements || 0;
+          totalPages = response.totalPages || 0;
+        } else if (response.records) {
+          records = response.records;
+          totalElements = response.totalElements || 0;
+          totalPages = response.totalPages || 0;
+        } else if (Array.isArray(response)) {
+          records = response;
+          totalElements = response.length;
+          totalPages = 1;
+        } else if (response.data && Array.isArray(response.data)) {
+          records = response.data;
+          totalElements = response.data.length;
+          totalPages = 1;
+        } else if (response.data && response.data.content) {
+          records = response.data.content;
+          totalElements = response.data.totalElements || 0;
+          totalPages = response.data.totalPages || 0;
+        }
       }
+
+      setClientDetails(records);
+      setPageInfo((prev) => ({
+        ...prev,
+        totalElements: totalElements,
+        totalPages: totalPages,
+      }));
     } catch (error) {
       toast.error("Failed to load clients.");
+      setClientDetails([]);
+      setPageInfo((prev) => ({ ...prev, totalElements: 0, totalPages: 0 }));
     } finally {
       setLoading(false);
     }
@@ -138,15 +174,40 @@ const AdminPannel = () => {
  
       while (currentPage < totalPagesToFetch) {
         const response = await searchClients(filters, currentPage, 50);
-        if (response.success && response.data) {
-          allRecords = [...allRecords, ...response.data.records];
-          totalPagesToFetch = response.data.totalPages;
+        let currentRecords = [];
+        let returnedTotalPages = totalPagesToFetch;
+
+        if (response) {
+          if (response.success && response.data) {
+            currentRecords = response.data.records || response.data.content || [];
+            returnedTotalPages = response.data.totalPages || 1;
+          } else if (response.content) {
+            currentRecords = response.content;
+            returnedTotalPages = response.totalPages || 1;
+          } else if (response.records) {
+            currentRecords = response.records;
+            returnedTotalPages = response.totalPages || 1;
+          } else if (Array.isArray(response)) {
+            currentRecords = response;
+            returnedTotalPages = 1;
+          } else if (response.data && Array.isArray(response.data)) {
+            currentRecords = response.data;
+            returnedTotalPages = 1;
+          } else if (response.data && response.data.content) {
+            currentRecords = response.data.content;
+            returnedTotalPages = response.data.totalPages || 1;
+          }
+        }
+
+        if (currentRecords.length > 0 || currentPage === 0) {
+          allRecords = [...allRecords, ...currentRecords];
+          totalPagesToFetch = returnedTotalPages;
           currentPage++;
           setExportProgress(
-            Math.round((currentPage / totalPagesToFetch) * 100),
+            Math.round((currentPage / totalPagesToFetch) * 100) || 100,
           );
         } else {
-          throw new Error("Batch retrieval interrupted.");
+          break;
         }
       }
  
@@ -351,11 +412,7 @@ const AdminPannel = () => {
                       </p>
                       <p>
                         <span className="font-medium text-gray-800">Status:</span>{" "}
-                        <span
-                          className={`${statusColor[client.status] || "text-gray-600"}`}
-                        >
-                          {client.status}
-                        </span>
+                        <StatusBadge label={client.status} size="sm" />
                       </p>
                     </div>
                   </div>
