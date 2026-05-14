@@ -524,7 +524,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
 
   // ── Shared header (board + swimlane) ─────────────────────────
   const header = (
-    <div className="mb-4">
+    <div>
       {/* Single row — Title + sprint meta + Toolbar */}
       <div className="flex items-center justify-between">
         {/* Left: sprint title + name badge + meta + ending pill */}
@@ -839,16 +839,20 @@ const Board = ({ projectId, sprintId, projectName }) => {
   // ── Swimlane path ─────────────────────────────────────────────
   if (viewMode === "swimlane") {
     return (
-      <div className="p-4 pt-5">
-        {header}
-        <SwimlaneBoard
-          projectId={projectId}
-          projectName={projectName}
-          hideHeader
-          externalAssignees={selectedAssignees}
-          externalPriorities={selectedPriorities}
-          externalStatusesFilter={selectedStatusesFilter}
-        />
+      <div className="flex flex-col h-full min-h-0">
+        <div className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm px-4 pt-4 pb-3">
+          {header}
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          <SwimlaneBoard
+            projectId={projectId}
+            projectName={projectName}
+            hideHeader
+            externalAssignees={selectedAssignees}
+            externalPriorities={selectedPriorities}
+            externalStatusesFilter={selectedStatusesFilter}
+          />
+        </div>
         {sharedModals}
       </div>
     );
@@ -856,9 +860,11 @@ const Board = ({ projectId, sprintId, projectName }) => {
 
   // ── Board path ────────────────────────────────────────────────
   return (
-    <div className="p-4 pt-5 relative">
-      {header}
-
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm px-4 pt-4 pb-3">
+        {header}
+      </div>
+      <div className="flex-1 overflow-x-auto p-4">
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId="board-statuses" direction="horizontal" type="STATUS">
           {(provided) => (
@@ -886,7 +892,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
                         <div
                           ref={draggableProvided.innerRef}
                           {...draggableProvided.draggableProps}
-                          className="bg-white rounded-xl w-72 flex-shrink-0 border border-gray-200 shadow-sm flex flex-col"
+                          className="bg-white rounded-xl w-80 flex-shrink-0 border border-gray-200 shadow-sm flex flex-col"
                         >
                           {/* ── Drag handle: accent bar + column header ── */}
                           <div {...draggableProvided.dragHandleProps}>
@@ -986,7 +992,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
                                 className={`overflow-y-auto p-2 transition-colors ${
                                   snapshot.isDraggingOver ? "bg-indigo-50/60" : ""
                                 }`}
-                                style={{ minHeight: 80, maxHeight: 196 }}
+                                style={{ minHeight: 80, maxHeight: "calc(100vh - 280px)" }}
                               >
                                 {taskItems.length === 0 && activeSprintId && safeTasks.length === 0 ? (
                                   <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-gray-500 italic">
@@ -1083,6 +1089,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
         </div>
       </div>
 
+      </div>
       {sharedModals}
     </div>
   );

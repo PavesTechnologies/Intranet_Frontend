@@ -11,6 +11,21 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
+import {jwtDecode} from "jwt-decode";
+
+const token = localStorage.getItem("token");
+
+let canCreateTestPlan = false;
+
+if (token) {
+  const decoded = jwtDecode(token);
+
+  const roles = decoded?.roles || [];
+
+  canCreateTestPlan =
+    roles.includes("Tester") ||
+    roles.includes("Project_Manager");
+}
 const priorityColors = {
   HIGH:   "bg-red-50 text-red-700 border-red-200",
   MEDIUM: "bg-amber-50 text-amber-700 border-amber-200",
@@ -116,9 +131,15 @@ export default function TestPlans() {
             Manage and organize your testing strategies and scenarios.
           </p>
         </div>
-        <Button variant="primary" size="small" onClick={() => setOpenCreateModal(true)}>
-          <Plus size={14} /> New Test Plan
-        </Button>
+        {canCreateTestPlan && (
+      <Button
+        variant="primary"
+        size="small"
+        onClick={() => setOpenCreateModal(true)}
+      >
+        <Plus size={14} /> New Test Plan
+      </Button>
+    )}
       </div>
 
       {/* Split layout */}
@@ -162,6 +183,8 @@ export default function TestPlans() {
                           )}
                         </div>
                         <div className={`flex items-center gap-1 flex-shrink-0 ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
+                          {canCreateTestPlan && (
+                            <>
                           <button
                             onClick={(e) => { e.stopPropagation(); setEditPlanId(plan.id); setOpenEditModal(true); }}
                             className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
@@ -176,6 +199,8 @@ export default function TestPlans() {
                           >
                             <Trash2 size={13} />
                           </button>
+                          </>
+                          )}
                         </div>
                       </div>
                     </button>
