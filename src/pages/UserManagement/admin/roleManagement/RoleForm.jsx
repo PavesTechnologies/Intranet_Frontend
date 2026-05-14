@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
 import Button from "../../../../components/Button/Button";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -41,26 +41,26 @@ export default function RoleForm({
   const [selectedRoleUuids, setSelectedRoleUuids] = useState([]);
   const [bulkDeletingRoles, setBulkDeletingRoles] = useState(false);
 
-  const axiosInstance = useMemo(() => {
-    const instance = axios.create({
-      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+  // const axiosInstance = useMemo(() => {
+  //   const instance = axios.create({
+  //     baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
+  //     headers: {
+  //       "Content-Type": "application/json",
+  //     },
+  //   });
 
-    instance.interceptors.request.use((config) => {
-      const latestToken = localStorage.getItem("token");
+  //   instance.interceptors.request.use((config) => {
+  //     const latestToken = localStorage.getItem("token");
 
-      if (latestToken) {
-        config.headers.Authorization = `Bearer ${latestToken}`;
-      }
+  //     if (latestToken) {
+  //       config.headers.Authorization = `Bearer ${latestToken}`;
+  //     }
 
-      return config;
-    });
+  //     return config;
+  //   });
 
-    return instance;
-  }, []);
+  //   return instance;
+  // }, []);
 
   useEffect(() => {
     setLocalRoles(roles || []);
@@ -115,7 +115,7 @@ export default function RoleForm({
     setLoading(true);
 
     try {
-      const res = await axiosInstance.get("/admin/roles");
+      const res = await api.get("/admin/roles");
       const latestRoles = Array.isArray(res.data) ? res.data : [];
 
       syncRoles(latestRoles);
@@ -167,7 +167,7 @@ export default function RoleForm({
     setSaving(true);
 
     try {
-      const res = await axiosInstance.post("/admin/roles", {
+      const res = await api.post("/admin/roles", {
         role_name: newRoleName.trim(),
       });
 
@@ -207,7 +207,7 @@ export default function RoleForm({
     setSaving(true);
 
     try {
-      const res = await axiosInstance.put(
+      const res = await api.put(
         `/admin/roles/uuid/${editRole.role_uuid}`,
         { role_name: editRole.role_name.trim() }
       );
@@ -272,7 +272,7 @@ export default function RoleForm({
     setBulkDeletingRoles(true);
 
     try {
-      const res = await axiosInstance.delete("/admin/roles/bulk-delete", {
+      const res = await api.delete("/admin/roles/bulk-delete", {
         data: {
           role_uuids: selectedRoleUuids,
         },

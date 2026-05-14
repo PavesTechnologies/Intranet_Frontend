@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { Pencil, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -42,29 +42,7 @@ export default function PermissionManagement() {
 
   const itemsPerPage = 5;
 
-  const axiosInstance = useMemo(() => {
-    const instance = axios.create({
-      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    instance.interceptors.request.use(
-      (config) => {
-        const latestToken = localStorage.getItem("token");
-
-        if (latestToken) {
-          config.headers.Authorization = `Bearer ${latestToken}`;
-        }
-
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
-
-    return instance;
-  }, []);
+  const axiosInstance = useMemo(() => api, []);
 
   const showSingleToast = (msg, type) => {
     toast.dismiss();
