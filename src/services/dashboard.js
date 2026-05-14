@@ -52,7 +52,7 @@ export const pmsSummary = async (userId) => {
 
 export const todayOnLeave = async () => {
     try {
-        const response = await api.get(`${LMS_BASE_URL}/api/leave-requests/today-on-leave`, {
+        const response = await axios.get(`${LMS_BASE_URL}/api/leave-requests/dashboard/today-on-leave`, {
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
