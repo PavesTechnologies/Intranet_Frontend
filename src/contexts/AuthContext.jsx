@@ -40,8 +40,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ✅ stores access token + refresh token
-  // refreshToken passed from LoginPage after login API response
-  const login = (token, isFirstLogin = false, refreshToken = null) => {
+  const login = (token, isFirstLogin = false) => {
     if (isFirstLogin) {
       localStorage.setItem("lastPath", "/change-password");
       setIsfirsttlogin(true);
@@ -53,11 +52,6 @@ export const AuthProvider = ({ children }) => {
     // store access token — axiosInstance reads this key
     localStorage.setItem("token", token);
 
-    // store refresh token — axiosInstance reads this key on 401
-    if (refreshToken) {
-      localStorage.setItem("refresh_token", refreshToken);
-    }
-
     loadUser(token);
   };
 
@@ -65,27 +59,26 @@ export const AuthProvider = ({ children }) => {
     if (isLoggingOut.current) return;
     isLoggingOut.current = true;
 
-    const refreshToken = localStorage.getItem("refresh_token");
-
 // blacklist both tokens on backend
     if (localStorage.getItem("token")) {
-      axios
-        .post(
-          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
-          { refresh_token: refreshToken },
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          },
-        )
+
+      axios.post(
+      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
+      {},
+      {
+        withCredentials: true,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    )
         .then((res) => console.log("Logout:", res.data))
         .catch((err) => console.error("Logout failed:", err.response?.data || err.message));
     }
 
     // clear all auth keys
     localStorage.removeItem("token");
-    localStorage.removeItem("refresh_token");
+    // localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
     localStorage.removeItem("lastPath");
 

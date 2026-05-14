@@ -1,7 +1,7 @@
 // src/pages/EditUserHr.jsx
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 export default function EditUserHr() {
   const { user_id } = useParams();
@@ -11,7 +11,7 @@ export default function EditUserHr() {
   useEffect(() => {
 
 
-    axios
+    api
       .get(
         `${
           window.__APP_CONFIG__.USER_MANAGEMENT_URL

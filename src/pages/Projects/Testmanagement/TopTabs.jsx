@@ -1,7 +1,21 @@
 "use client";
 
 import { NavLink, useParams } from "react-router-dom";
-import { FileText, PenTool, Play, Bug } from "lucide-react";
+import { FileText, PenTool, Play, Bug, Code2 } from "lucide-react";
+import {jwtDecode} from "jwt-decode";
+const token = localStorage.getItem("token");
+  
+  let canCreateTest = false;
+  
+  if (token) {
+    const decoded = jwtDecode(token);
+  
+    const roles = decoded?.roles || [];
+  
+    canCreateTest =
+      roles.includes("General") ;
+      // roles.includes("Project_Manager");
+  }
 
 export default function TopTabs({ selectedTab }) {
   const { projectId } = useParams();
@@ -11,6 +25,7 @@ export default function TopTabs({ selectedTab }) {
     "test-management/test-design",
     "test-management/test-execution",
     "test-management/test-bugs",
+    "test-management/dev-dashboard",
   ];
 
   const activeTab = validTabs.includes(selectedTab)
@@ -42,7 +57,13 @@ export default function TopTabs({ selectedTab }) {
       tab: "test-management/test-bugs",
       icon: <Bug size={16} />,
     },
-  ];
+    canCreateTest && {
+      name: "Dev Dashboard",
+      path: `/projects/${projectId}?tab=test-management/dev-dashboard`,
+      tab: "test-management/dev-dashboard",
+      icon: <Code2 size={16} />,
+    },
+  ].filter(Boolean);
 
   return (
     <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200 flex-shrink-0">

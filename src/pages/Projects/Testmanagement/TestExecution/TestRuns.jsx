@@ -9,10 +9,25 @@ import Select from "react-select";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
 
+import{jwtDecode} from "jwt-decode";
+const token = localStorage.getItem("token");
+  
+  let canCreateTest = false;
+  
+  if (token) {
+    const decoded = jwtDecode(token);
+  
+    const roles = decoded?.roles || [];
+  
+    canCreateTest =
+      roles.includes("Tester") ||
+      roles.includes("Project_Manager");
+  }
 export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete }) {
   const [isOpen, setIsOpen] = useState(false);
   const [testCases, setTestCases] = useState([]);
   const [runTestCaseId, setRunTestCaseId] = useState(null);
+  const [runTestCaseTestCaseId, setRunTestCaseTestCaseId] = useState(null);
   const [viewResultCaseId, setViewResultCaseId] = useState(null);
   const [employee, setEmployee] = useState([]);
 
@@ -55,7 +70,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
   const loadTestCases = async () => {
     try {
       const res = await axiosInstance.get(
-        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/runs/${run.id}/cases`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-runs/${run.id}/cases`,
       );
       console.log("🔍 Test cases loaded:", res.data);
       setTestCases(res.data || []);
@@ -199,6 +214,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
 
             {/* ── 3-DOT MENU ─────────────────────────────────────────────── */}
             <div className="relative" ref={menuRef}>
+              {canCreateTest && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -209,9 +225,11 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
               >
                 ⋮
               </button>
+              )}
 
               {menuOpen && (
                 <div className="absolute right-0 top-8 bg-white border rounded-lg shadow-lg z-50 w-36">
+
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -258,12 +276,14 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-lg font-semibold mb-4">Edit Test Run</h2>
+            {canCreateTest && (
             <button
               onClick={() => setIsEditing(false)}
               className="absolute top-3 right-4 text-gray-400 hover:text-black"
             >
               ✕
             </button>
+            )}
 
             <form onSubmit={handleEditSubmit} className="grid grid-cols-1 gap-4">
               {/* Name */}
@@ -322,14 +342,14 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
                       <th className="py-2 px-3 text-center">Test Case Title</th>
                       <th className="py-2 px-3 text-center">Priority</th>
                       <th className="py-2 px-3 text-left">Status</th>
-                      <th className="py-2 px-3 text-left">Assignee</th>
+                      {canCreateTest && <th className="py-2 px-3 text-left">Assignee</th>}
                       <th className="py-2 px-3 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {testCases.map((tc) => (
                       <tr
-                        key={tc.testCaseId}
+                        key={tc.runCaseId || tc.testCaseId}
                         className="border-b hover:bg-gray-50"
                       >
                         <td className="py-3 px-3 text-center font-medium text-gray-700">
@@ -353,39 +373,38 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
                         <td className="py-3 px-3 font-medium text-gray-700">
                           {tc.runStatus}
                         </td>
+                        {canCreateTest && (
+                          <td className="py-3 px-3 text-center">
+                            <Select
+                              styles={customStyles}
+                              options={options}
+                              placeholder="Select Employee"
+                              isSearchable
+                              onChange={(selected) =>
+                                addAssignee(tc.testCaseId, selected.value)
+                              }
+                              value={
+                                options.find(
+                                  (option) => option.value === tc.assigneeId,
+                                ) || null
+                              }
+                            />
+                          </td>
+                        )}
                         <td className="py-3 px-3 text-center">
-                          <Select
-                            styles={customStyles}
-                            options={options}
-                            placeholder="Select Employee"
-                            isSearchable
-                            onChange={(selected) =>
-                              addAssignee(tc.testCaseId, selected.value)
-                            }
-                            value={
-                              options.find(
-                                (option) => option.value === tc.assigneeId,
-                              ) || null
-                            }
-                          />
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          {tc.runStatus !== "COMPLETED" ? (
+                          {canCreateTest && tc.runStatus !== "COMPLETED" ? (
                             <Button variant="secondary" size="small" onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              const idToRun = tc.testCaseId || tc.id;
-                              console.log("▶️ Opening Run Modal for ID:", idToRun);
-                              setRunTestCaseId(idToRun);
+                              setRunTestCaseId(tc.runCaseId);
+                              setRunTestCaseTestCaseId(tc.testCaseId);
                             }}>▶ Run</Button>
                           ) : (
                             <button
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                const idToView = tc.testCaseId || tc.id;
-                                console.log("🔍 Opening View Result Modal for ID:", idToView);
-                                setViewResultCaseId(idToView);
+                                setViewResultCaseId(tc.testCaseId);
                               }}
                               className="text-blue-600 hover:underline"
                             >
@@ -398,12 +417,20 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
                   </tbody>
                 </table>
               </div>
-              <Button variant="primary" onClick={goToAddCases}>+ Add More Cases</Button>
+              {canCreateTest && (
+                <Button variant="primary" onClick={goToAddCases}>
+                  + Add More Cases
+                </Button>
+              )}
             </>
           ) : (
             <div className="text-center py-6">
               <p className="text-gray-500 mb-3">No test cases added yet.</p>
-              <Button variant="primary" onClick={goToAddCases}>+ Add Test Cases</Button>
+              {canCreateTest && (
+                <Button variant="primary" onClick={goToAddCases}>
+                  + Add Test Cases
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -414,8 +441,10 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
         <RunTestCaseComponent
           runId={run.id}
           runCaseId={runTestCaseId}
+          testCaseId={runTestCaseTestCaseId}
           onClose={() => {
             setRunTestCaseId(null);
+            setRunTestCaseTestCaseId(null);
             loadTestCases();
           }}
         />

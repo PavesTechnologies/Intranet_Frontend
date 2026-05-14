@@ -1,22 +1,6 @@
-import axios from "axios";
+import api from "../api/axiosInstance";
 
-// Create axios instance with base configuration
-const axiosInstance = axios.create({
-  baseURL: `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}`,
-  timeout: 10000,
-});
-
-// Request interceptor to add auth token
-axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
+const axiosInstance = api;
 
 const ROLE_URL = "/admin/roles";
 

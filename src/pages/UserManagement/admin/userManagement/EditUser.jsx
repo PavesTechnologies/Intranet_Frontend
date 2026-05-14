@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
@@ -24,26 +24,7 @@ export default function EditUserForm({ userId, onSuccess, onClose }) {
   const [loading, setLoading] = useState(false);
   const isSubmittingRef = useRef(false);
 
-  const axiosInstance = useMemo(() => {
-    const instance = axios.create({
-      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    instance.interceptors.request.use((config) => {
-      const latestToken = localStorage.getItem("token");
-
-      if (latestToken) {
-        config.headers.Authorization = `Bearer ${latestToken}`;
-      }
-
-      return config;
-    });
-
-    return instance;
-  }, []);
+  const axiosInstance = useMemo(() => api, []);
 
   useEffect(() => {
     const fetchUser = async () => {
