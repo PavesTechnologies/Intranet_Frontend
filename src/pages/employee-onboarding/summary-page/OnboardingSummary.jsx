@@ -330,7 +330,7 @@ export default function OnboardingSummary() {
       </div>
 
       {/* 1. Overview Section - Column Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4 mb-8">
         {overviewMetrics.map((metric, i) => (
           <KPICard
             key={i}
