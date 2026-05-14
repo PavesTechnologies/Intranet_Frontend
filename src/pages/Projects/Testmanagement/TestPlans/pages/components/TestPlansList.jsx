@@ -10,6 +10,21 @@ import EditTestPlan from "./EditTestPlan";
 import TestPlanTableRow from "../../components/TestPlanTableRow";
 import Loader from "../../../../components/ui/Loader";
 import Modal from "../../../../components/ui/Modal";
+import { jwtDecode } from "jwt-decode";
+const token = localStorage.getItem("token");
+
+let canCreateTestPlan = false;
+
+if (token) {
+  const decoded = jwtDecode(token);
+
+  const roles = decoded?.roles || [];
+
+  canCreateTestPlan =
+    roles.includes("Tester") ||
+    roles.includes("Project_Manager");
+}
+
 
 const TestPlansList = ({ projectId }) => {
   const [testPlans, setTestPlans] = useState([]);
@@ -83,10 +98,13 @@ const TestPlansList = ({ projectId }) => {
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Test Plans</h2>
-        <Button variant="primary" onClick={() => setShowCreateModal(true)}>
-          <Plus size={16} />
-          Create Test Plan
-        </Button>
+
+        {canCreateTestPlan && (
+          <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+            <Plus size={16} />
+            Create Test Plan
+          </Button>
+        )}
       </div>
 
       {/* Table */}
