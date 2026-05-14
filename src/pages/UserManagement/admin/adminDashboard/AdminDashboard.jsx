@@ -1,7 +1,7 @@
 // src/pages/admin/adminDashboard/AdminDashboard.jsx
 
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { FaSearch } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import debounce from "lodash.debounce";
@@ -16,7 +16,7 @@ export default function AdminDashboard() {
     if (q.length > 1) {
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.get(
+        const res = await api.get(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/general_user/search`,
           {
             params: { query: q },

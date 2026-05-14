@@ -1,24 +1,7 @@
 // accessPointService.js
-import axios from "axios";
+import api from "../api/axiosInstance";
 
-const axiosInstance = axios.create({
-  baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-// 🔐 Add token before every request
-axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
+const axiosInstance = api;
 
 const ACCESS_POINT_URL = "/admin/access-points/";
 
