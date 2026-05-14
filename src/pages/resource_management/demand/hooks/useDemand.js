@@ -68,6 +68,49 @@ const ROLE_CANONICAL_BY_KEY = ROLE_PRIORITY.reduce((acc, role) => {
 
 const toCanonicalDemandRole = (role = "") => ROLE_CANONICAL_BY_KEY[normalizeRoleKey(role)] || role;
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const isUuid = (value) => typeof value === "string" && UUID_REGEX.test(value.trim());
+
+const getRoleObjectId = (role = {}) =>
+    role.deliveryRoleId ||
+    role.roleId ||
+    role.role_id ||
+    role.dev_role_id ||
+    role.id ||
+    "";
+
+const getRoleObjectName = (role = {}) =>
+    role.deliveryRoleName ||
+    role.roleName ||
+    role.role ||
+    role.name ||
+    "";
+
+const getDemandDeliveryRoleId = (demand = {}) => {
+    const roleObjectId = typeof demand.deliveryRole === "object"
+        ? getRoleObjectId(demand.deliveryRole)
+        : "";
+
+    const candidates = [
+        demand.deliveryRoleId,
+        demand.roleId,
+        demand.delivery_role_id,
+        demand.delivery_role_uuid,
+        demand.dev_role_id,
+        roleObjectId,
+        demand.deliveryRole,
+    ];
+
+    return candidates.find(isUuid) || "";
+};
+
+const getDemandDeliveryRoleName = (demand = {}) => {
+    if (demand.deliveryRoleName) return demand.deliveryRoleName;
+    if (typeof demand.deliveryRole === "object") return getRoleObjectName(demand.deliveryRole);
+    return isUuid(demand.deliveryRole) ? "" : demand.deliveryRole;
+};
+
 const getDemandCommitment = (demand = {}) =>
     String(
         demand.demandCommitment ||
@@ -77,6 +120,21 @@ const getDemandCommitment = (demand = {}) =>
     ).toUpperCase();
 
 const isSoftDemand = (demand) => getDemandCommitment(demand) === "SOFT";
+
+const getDemandStatus = (demand = {}) =>
+    String(demand.demandStatus || demand.lifecycleState || "").toUpperCase();
+
+const isFulfilledDemand = (demand = {}) => getDemandStatus(demand) === "FULFILLED";
+
+const isCancelledOrClosedDemand = (demand = {}) =>
+    ["CANCELLED", "CLOSED"].includes(getDemandStatus(demand));
+
+const isRejectedDemand = (demand = {}) => getDemandStatus(demand) === "REJECTED";
+
+const isAtRiskDemand = (demand = {}) =>
+    !isFulfilledDemand(demand) &&
+    Number(demand.remainingDays) >= 0 &&
+    Number(demand.remainingDays) <= 5;
 
 const getDemandRoleOptions = (roles = []) => {
     if (!Array.isArray(roles) || roles.length === 0) return [];
@@ -160,7 +218,7 @@ export function useDemand(projectId = null) {
 
         // 1. Apply Draft Visibility Rule (Strict)
         let list = demands.filter(d => {
-            const status = (d.demandStatus || d.lifecycleState)?.toUpperCase();
+            const status = getDemandStatus(d);
             if (status !== 'DRAFT') return true;
             if (isRM || isDM) return false;
             if (isPM) return d.createdBy === currentUserIdentifier || d.createdByUserId === user?.id;
@@ -169,27 +227,27 @@ export function useDemand(projectId = null) {
 
         // Tab Filtering (Segmented Logic)
         if (activeTab === 'breached') {
-            list = list.filter(d => d.remainingDays < 0);
+            list = list.filter(d => !isFulfilledDemand(d) && Number(d.remainingDays) < 0);
         } else if (activeTab === 'at_risk') {
-            list = list.filter(d => d.remainingDays >= 0 && d.remainingDays <= 5);
+            list = list.filter(isAtRiskDemand);
         } else if (activeTab === 'active') {
-            list = list.filter(d => ['APPROVED', 'OPEN', 'ACTIVE', 'REQUESTED', 'IN_PROGRESS', 'IN PROGRESS', 'DRAFT'].includes((d.demandStatus || d.lifecycleState)?.toUpperCase()));
+            list = list.filter(d => ['APPROVED', 'OPEN', 'ACTIVE', 'REQUESTED', 'IN_PROGRESS', 'IN PROGRESS', 'DRAFT'].includes(getDemandStatus(d)));
         } else if (activeTab === 'soft') {
             list = list.filter(isSoftDemand);
         } else if (activeTab === 'rejected') {
-            list = list.filter(d => (d.demandStatus || d.lifecycleState)?.toUpperCase() === 'REJECTED');
+            list = list.filter(isRejectedDemand);
         }
         else if (activeTab === 'fulfilled') {
-            list = list.filter(d => d.lifecycleState?.toUpperCase() === 'FULFILLED' || d.demandStatus?.toUpperCase() === 'FULFILLED');
+            list = list.filter(isFulfilledDemand);
         }
         // 'all' fallthrough shows everything minus cancelled/closed if we want to be strict, 
         // but usually 'all' means all relevant demands.
 
         // Standard Filter: Remove Cancelled/Closed unless explicitly requested
         if (activeTab !== 'all' && activeTab !== 'rejected') {
-            list = list.filter(d => !['CANCELLED', 'CLOSED', 'REJECTED'].includes((d.demandStatus || d.lifecycleState)?.toUpperCase()));
+            list = list.filter(d => !isCancelledOrClosedDemand(d) && !isRejectedDemand(d));
         } else if (activeTab !== 'all') {
-            list = list.filter(d => !['CANCELLED', 'CLOSED'].includes((d.demandStatus || d.lifecycleState)?.toUpperCase()));
+            list = list.filter(d => !isCancelledOrClosedDemand(d));
         }
 
         // Search
@@ -213,7 +271,7 @@ export function useDemand(projectId = null) {
         }
         if (filters.status?.length > 0) {
             const us = filters.status.map(s => s.toUpperCase());
-            list = list.filter(d => us.includes((d.demandStatus || d.lifecycleState)?.toUpperCase()));
+            list = list.filter(d => us.includes(getDemandStatus(d)));
         }
         if (filters.demandName?.length > 0) {
             list = list.filter(d => filters.demandName.includes(d.demandName) || filters.demandName.includes(d.role));
@@ -234,9 +292,9 @@ export function useDemand(projectId = null) {
             demandCommitment: d.demandCommitment || d.commitment || d.demand_commitment,
             demandType: d.demandType || d.type || d.demand_type || d.type_of_demand,
             type: d.type || d.demandType || d.demand_type || d.type_of_demand,
-            deliveryRole: d.deliveryRoleId || d.roleId || d.delivery_role_id || d.deliveryRole,
-            deliveryRoleId: d.deliveryRoleId || d.deliveryRole || d.roleId || d.delivery_role_id,
-            deliveryRoleName: d.deliveryRoleName || d.deliveryRole,
+            deliveryRole: getDemandDeliveryRoleId(d),
+            deliveryRoleId: getDemandDeliveryRoleId(d),
+            deliveryRoleName: getDemandDeliveryRoleName(d),
             resourcesRequired: d.resourcesRequired || d.resourceRequired || d.resource_required,
             resourceRequired: d.resourceRequired || d.resourcesRequired || d.resource_required,
             slaDueAt: d.slaDueAt,
@@ -273,7 +331,7 @@ export function useDemand(projectId = null) {
         const isDM = effectiveRole === "Delivery_Manager";
 
         const baseList = demands.filter(d => {
-            const status = (d.demandStatus || d.lifecycleState)?.toUpperCase();
+            const status = getDemandStatus(d);
             if (status !== 'DRAFT') return true;
             if (isRM || isDM) return false;
             if (isPM) return d.createdBy === currentUserIdentifier || d.createdByUserId === user?.id;
@@ -290,7 +348,7 @@ export function useDemand(projectId = null) {
         };
 
         baseList.forEach(d => {
-            const status = (d.demandStatus || d.lifecycleState)?.toUpperCase();
+            const status = getDemandStatus(d);
             const commitment = getDemandCommitment(d);
             const isActiveSLA = ['REQUESTED', 'PENDING', 'DRAFT'].includes(status);
             
@@ -303,7 +361,7 @@ export function useDemand(projectId = null) {
             if (isActiveSLA) {
                 if (d.remainingDays < 0) {
                     counts.breached++;
-                } else if (d.remainingDays >= 0 && d.remainingDays <= 5) {
+                } else if (isAtRiskDemand(d)) {
                     counts.atRisk++;
                 }
             }

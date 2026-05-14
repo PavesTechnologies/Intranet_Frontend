@@ -31,6 +31,7 @@ const getActionErrorMessage = (error, fallback) =>
     fallback;
 
 const DM_PENDING_STATUSES = ['REQUESTED', 'DRAFT', 'SOFT', 'PROPOSED', 'PENDING', 'OPEN', 'IN_PROGRESS', 'IN PROGRESS'];
+const DM_REJECTABLE_STATUSES = [...DM_PENDING_STATUSES, 'APPROVED'];
 
 const normalizeRole = (role = "") =>
     String(role)
@@ -52,6 +53,60 @@ const getDemandType = (demand = {}) =>
     demand.demand_type ||
     demand.type_of_demand ||
     "";
+
+const getDemandId = (demand = {}) => demand.demandId || demand.id;
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const isUuid = (value) => typeof value === "string" && UUID_REGEX.test(value.trim());
+
+const getRoleObjectId = (role = {}) =>
+    role.deliveryRoleId ||
+    role.roleId ||
+    role.role_id ||
+    role.dev_role_id ||
+    role.id ||
+    "";
+
+const getDemandDeliveryRoleId = (demand = {}) => {
+    const roleObjectId = typeof demand.deliveryRole === "object"
+        ? getRoleObjectId(demand.deliveryRole)
+        : "";
+
+    const candidates = [
+        demand.deliveryRoleId,
+        demand.roleId,
+        demand.delivery_role_id,
+        demand.delivery_role_uuid,
+        demand.dev_role_id,
+        roleObjectId,
+        demand.deliveryRole,
+    ];
+
+    return candidates.find(isUuid) || "";
+};
+
+const buildDemandStatusUpdatePayload = (demand = {}, demandStatus, rejectionReason = "") => ({
+    demandId: getDemandId(demand),
+    demandType: getDemandType(demand),
+    demandName: demand.demandName || demand.role,
+    minExp: demand.minExp ?? demand.minimumExperience ?? null,
+    outgoingResourceId: demand.outgoingResourceId || null,
+    deliveryRole: getDemandDeliveryRoleId(demand),
+    demandJustification: demand.demandJustification || demand.justification || "",
+    demandStartDate: demand.demandStartDate || demand.startDate || null,
+    demandEndDate: demand.demandEndDate || demand.endDate || null,
+    allocationPercentage: demand.allocationPercentage ?? demand.allocation ?? null,
+    deliveryModel: demand.deliveryModel || "",
+    demandPriority: demand.demandPriority || demand.priority,
+    demandStatus,
+    demandCommitment: demand.demandCommitment || demand.commitment || demand.demand_commitment,
+    requiresAdditionalApproval: Boolean(demand.requiresAdditionalApproval),
+    resourcesRequired: demand.resourcesRequired || demand.resourceRequired || demand.resource_required,
+    modifiedBy: demand.modifiedBy || null,
+    rejectionReason: rejectionReason || null,
+    dmRejectionReason: rejectionReason || null,
+});
 
 const DecisionModal = ({
     type,
@@ -383,22 +438,31 @@ const DemandWorkspacePage = () => {
 
     const handleQuickReject = async () => {
         const cleanedReason = rejectReason.trim();
+        const currentStatus = String(rejectingDemand?.lifecycleState || rejectingDemand?.demandStatus || "").toUpperCase();
 
         if (!cleanedReason) {
             setRejectReasonError("Please enter a rejection reason.");
             return;
         }
 
-        if (!rejectingDemand?.id) return;
+        const demandId = getDemandId(rejectingDemand);
+        if (!demandId) return;
 
-        setDecisionState({ demandId: rejectingDemand.id, action: "reject" });
+        if (!DM_REJECTABLE_STATUSES.includes(currentStatus)) {
+            toast.error("Only pending or approved demands can be rejected by DM.");
+            return;
+        }
+
+        setDecisionState({ demandId, action: "reject" });
         try {
-            const response = await handleDMDecision({
-                demandId: rejectingDemand.id,
-                decision: "REJECTED",
-                rejectionReason: cleanedReason
-            });
-            toast.success(response?.message || "Demand rejected successfully");
+            const response = currentStatus === "APPROVED"
+                ? await updateDemandStatus(buildDemandStatusUpdatePayload(rejectingDemand, "REJECTED", cleanedReason))
+                : await handleDMDecision({
+                    demandId,
+                    decision: "REJECTED",
+                    rejectionReason: cleanedReason
+                });
+            toast.success(response?.message || (currentStatus === "APPROVED" ? "Demand reverted and rejected successfully" : "Demand rejected successfully"));
             setRejectingDemand(null);
             setRejectReason("");
             setRejectReasonError("");
@@ -697,6 +761,7 @@ const DemandWorkspacePage = () => {
                                 const isRMView = normalizedViewerRole === "RESOURCEMANAGER";
                                 const isPMView = normalizedViewerRole === "PROJECTMANAGER" || normalizedViewerRole === "MANAGER";
                                 const canQuickDecision = isDMView && DM_PENDING_STATUSES.includes(status);
+                                const canDMRevertApprovedDemand = isDMView && status === 'APPROVED';
                                 const canRMCloseDemand = isRMView && status === 'APPROVED';
                                 const canPMEditRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
                                 const canPMDeleteRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
@@ -812,6 +877,15 @@ const DemandWorkspacePage = () => {
                                                         {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
                                                     </button>
                                                 </div>
+                                            ) : canDMRevertApprovedDemand ? (
+                                                <button
+                                                    title="Reject approved demand"
+                                                    onClick={() => openRejectModal(demand)}
+                                                    disabled={isRejecting}
+                                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                                                >
+                                                    {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
+                                                </button>
                                             ) : canRMCloseDemand ? (
                                                 <div className="flex items-center gap-2">
                                                     <button

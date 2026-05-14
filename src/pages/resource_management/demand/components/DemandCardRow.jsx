@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
  * Redesigned for maximum clarity and logical information grouping.
  */
 const DM_PENDING_STATUSES = ['REQUESTED', 'DRAFT', 'SOFT', 'PROPOSED', 'PENDING', 'OPEN', 'IN_PROGRESS', 'IN PROGRESS'];
+const DM_REJECTABLE_STATUSES = [...DM_PENDING_STATUSES, 'APPROVED'];
 
 const normalizeRole = (role = "") =>
     String(role)
@@ -39,6 +40,7 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
     const isRMView = normalizedViewerRole === "RESOURCEMANAGER";
     const isPMView = normalizedViewerRole === "PROJECTMANAGER" || normalizedViewerRole === "MANAGER";
     const canQuickDecision = isDMView && DM_PENDING_STATUSES.includes(status);
+    const canDMRejectDemand = isDMView && DM_REJECTABLE_STATUSES.includes(status);
     const canRMCloseDemand = isRMView && status === 'APPROVED';
     const canPMEditRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
     const canPMDeleteRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
@@ -171,6 +173,18 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                                 {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-[14px] w-[14px] stroke-[2.4]" />}
                             </button>
                         </div>
+                    ) : canDMRejectDemand ? (
+                        <button
+                            title="Reject approved demand"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onReject) onReject(demand);
+                            }}
+                            disabled={isRejecting}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50/70 text-rose-600 shadow-[0_5px_14px_rgba(244,63,94,0.10)] transition hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-100 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-[14px] w-[14px] stroke-[2.4]" />}
+                        </button>
                     ) : canRMCloseDemand ? (
                         <div className="flex items-center gap-2">
                             <button
