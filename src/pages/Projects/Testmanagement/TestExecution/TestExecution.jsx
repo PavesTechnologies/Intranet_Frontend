@@ -11,7 +11,20 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import SearchInput from "../../../../components/filter/Searchbar";
 import Button from "../../../../components/Button/Button";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
-
+import{jwtDecode} from "jwt-decode";
+const token = localStorage.getItem("token");
+  
+  let canCreateTest = false;
+  
+  if (token) {
+    const decoded = jwtDecode(token);
+  
+    const roles = decoded?.roles || [];
+  
+    canCreateTest =
+      roles.includes("Tester") ||
+      roles.includes("Project_Manager");
+  }
 export default function TestExecution() {
   const { projectId } = useParams();
 
@@ -147,18 +160,22 @@ export default function TestExecution() {
               placeholder="Search cycles..."
               className="w-56"
             />
-            <Button variant="primary" size="small" onClick={() => setShowCycleModal(true)}>
-              + Create Cycle
-            </Button>
+            {canCreateTest && (
+              <Button variant="primary" size="small" onClick={() => setShowCycleModal(true)}>
+                + Create Cycle
+              </Button>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-3">
             <Button variant="secondary" size="small" onClick={() => setShowCyclesView(true)}>
               ← Back to Cycles
             </Button>
-            <Button variant="primary" size="small" onClick={() => setShowRunModal(true)}>
-              + Create Run
-            </Button>
+            {canCreateTest && (
+              <Button variant="primary" size="small" onClick={() => setShowRunModal(true)}>
+                + Create Run
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -195,6 +212,7 @@ export default function TestExecution() {
                       ref={openDropdownId === cycle.id ? dropdownRef : null}
                       onClick={(e) => e.stopPropagation()}
                     >
+                     {canCreateTest && (
                       <button
                         className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full p-1 transition"
                         onClick={(e) => {
@@ -204,8 +222,11 @@ export default function TestExecution() {
                       >
                         <MoreVertical size={16} />
                       </button>
+                     )}
                       {openDropdownId === cycle.id && (
                         <div className="absolute right-0 mt-1 w-32 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                          {canCreateTest && (
+                            <>
                           <button
                             className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition"
                             onClick={(e) => handleEditClick(e, cycle)}
@@ -222,6 +243,8 @@ export default function TestExecution() {
                           >
                             <Trash2 size={13} /> Delete
                           </button>
+                          </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -235,17 +258,19 @@ export default function TestExecution() {
                   {/* Status + Create Run */}
                   <div className="flex justify-between items-center mt-4">
                     <StatusBadge label={cycle.status} />
-                    <Button
-                      variant="primary"
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCycleId(cycle.id);
-                        setShowRunModal(true);
-                      }}
-                    >
-                      + Create Run
-                    </Button>
+                    {canCreateTest && (
+                      <Button
+                        variant="primary"
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCycleId(cycle.id);
+                          setShowRunModal(true);
+                        }}
+                      >
+                        + Create Run
+                      </Button>
+                    )}  
                   </div>
                 </div>
               ))}
