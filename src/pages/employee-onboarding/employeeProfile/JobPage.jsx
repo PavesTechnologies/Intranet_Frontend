@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import { Briefcase, Building2, Clock, FileText } from "lucide-react";
 
 export default function JobPage({ user_uuid, coreData = {}, hrData = {} }) {
   const { employee_uuid } = useParams();
@@ -66,7 +67,7 @@ export default function JobPage({ user_uuid, coreData = {}, hrData = {} }) {
 
       {/* ROW 1 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <Card title="Job Details">
+        <Card title="Job Details" color="#263383" iconBg="#eff6ff" Icon={Briefcase}>
           <Row label="Employee Number" value={jobData?.employee_number || "NA"} />
           <Row label="Date of Joining" value={jobData?.date_of_joining || "NA"} />
           <Row label="Designation" value={jobData?.primary_job || "NA"} />
@@ -76,7 +77,7 @@ export default function JobPage({ user_uuid, coreData = {}, hrData = {} }) {
           <Row label="Contract Status" value={jobData?.contract_status || "NA"} />
         </Card>
 
-        <Card title="Organization">
+        <Card title="Organization" color="#059669" iconBg="#ecfdf5" Icon={Building2}>
           <Row label="Business Unit" value={organizationData?.business_unit || "NA"} />
           <Row label="Department" value={organizationData?.department || "NA"} />
           <Row label="Location" value={organizationData?.location || "NA"} />
@@ -90,7 +91,7 @@ export default function JobPage({ user_uuid, coreData = {}, hrData = {} }) {
 
       {/* ROW 2 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <Card title="Employee Time">
+        <Card title="Employee Time" color="#ea580c" iconBg="#fff7ed" Icon={Clock}>
           <Row label="Shift" value={timeData?.shift || "NA"} />
           <Row label="Weekly Off Policy" value={timeData?.weekly_policy || "NA"} />
           <Row label="Leave Plan" value={timeData?.leave_plan || "NA"} />
@@ -100,7 +101,7 @@ export default function JobPage({ user_uuid, coreData = {}, hrData = {} }) {
           <Row label="Overtime" value={timeData?.overtime || "NA"} />
         </Card>
 
-        <Card title="Other">
+        <Card title="Other" color="#7c3aed" iconBg="#faf5ff" Icon={FileText}>
           <Row label="Expense Policy" value={otherData?.expense_policy || "NA"} />
           <Row label="Loan Policy" value={otherData?.loan_policy || "NA"} />
           <Row label="AR Ticket Policy" value={otherData?.ar_ticket_policy || "NA"} />
@@ -112,22 +113,28 @@ export default function JobPage({ user_uuid, coreData = {}, hrData = {} }) {
 
 /* ---------------- UI COMPONENTS ---------------- */
 
-const Card = ({ title, children }) => (
-  <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md border border-indigo-100 overflow-hidden">
-    <div className="px-6 py-4 border-b border-indigo-100 bg-indigo-50/60">
-      <h3 className="text-sm font-semibold text-indigo-800">{title}</h3>
+const Card = ({ title, children, color = "#263383", iconBg = "#eff6ff", Icon }) => (
+  <div className="bg-white rounded-xl border border-[#e4e8f2] overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(8,21,52,0.06)", borderLeft: `3px solid ${color}` }}>
+    <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#e4e8f2]">
+      {Icon && (
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: iconBg, color }}>
+          <Icon size={13} />
+        </div>
+      )}
+      <h3 className="text-[11px] font-bold text-[#081534] uppercase tracking-[0.06em]">{title}</h3>
     </div>
-    <div className="p-6 space-y-3 text-sm">
+    <div className="px-5 py-1">
       {children}
     </div>
   </div>
 );
 
 const Row = ({ label, value }) => (
-  <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 text-sm min-w-0">
-    <span className="text-gray-500 shrink-0">{label}</span>
-    <span className="text-gray-900 font-medium sm:text-right break-words min-w-0">
-      {value}
+  <div className="grid grid-cols-[42%_1fr] gap-3 items-baseline py-2.5 border-b border-[#f4f6fc] last:border-0">
+    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.05em]">{label}</span>
+    <span className="text-[13px] font-medium text-[#1e293b] break-words">
+      {value || <span className="text-gray-300">—</span>}
     </span>
   </div>
 );

@@ -37,41 +37,48 @@ const EPV3_STYLES = `
   padding: 0;
 }
   .epv3-display { font-family: "Poppins", system-ui, sans-serif; }
-
-  .epv3-hero-wrap {
+.epv3-hero-wrap {
   position: relative;
   overflow: hidden;
 
-  border-radius: 0;
-
   background: #ffffff;
 
-  min-height: 115px;
+  min-height: 72px;
 
   display: flex;
 
   width: 100%;
 
-  box-shadow:
-    0 6px 20px rgba(15,23,42,0.05);
+  margin: 0;
+
+  box-shadow: none;
+
+  border: none;
 }
   /* ─── Left dark panel — diagonal slant divider ─── */
-  .epv3-hero-left {
-    position: relative;
-    width: 44%;
-    min-width: 360px;
-    padding: 10px 70px 10px 24px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    overflow: hidden;
-    z-index: 2;
-    background:
-      radial-gradient(circle at 20% 30%, rgba(72,98,255,0.28), transparent 40%),
-      radial-gradient(circle at 80% 80%, rgba(255,61,114,0.14), transparent 35%),
-      linear-gradient(145deg, #020817 0%, #04153c 35%, #081d58 70%, #132766 100%);
-    clip-path: polygon(0 0, 100% 0, 80% 100%, 0 100%);
-  }
+ .epv3-hero-left {
+  position: relative;
+
+  width: 38%;
+  min-width: 300px;
+
+  padding: 0 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  overflow: hidden;
+
+  z-index: 2;
+
+  background:
+    radial-gradient(circle at 20% 30%, rgba(72,98,255,0.28), transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(255,61,114,0.14), transparent 35%),
+    linear-gradient(145deg, #020817 0%, #04153c 35%, #081d58 70%, #132766 100%);
+
+  clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%);
+}
   .epv3-hero-left::after {
     content: "";
     position: absolute;
@@ -104,7 +111,7 @@ const EPV3_STYLES = `
   /* ─── Avatar ring ─── */
   .epv3-av-ring {
     position: relative;
-    width: 90px; height: 90px;
+    width: 72px; height: 72px;
     border-radius: 999px;
     border: 5px solid rgba(255,255,255,0.95);
     display: flex; align-items: center; justify-content: center;
@@ -114,19 +121,6 @@ const EPV3_STYLES = `
     z-index: 2;
     flex-shrink: 0;
   }
-  // /* Pink floating dot attached to ring */
-  // .epv3-av-ring::after {
-  //   content: "";
-  //   position: absolute;
-  //   right: 8px; bottom: 12px;
-  //   width: 24px; height: 24px;
-  //   border-radius: 999px;
-  //   background: linear-gradient(145deg, #ff6b98, #ff2d72);
-  //   border: 3px solid #081534;
-  //   box-shadow: 0 0 20px rgba(255,61,114,0.75);
-  //   z-index: 3;
-  // }
-
   /* ─── Avatar ─── */
   .epv3-av {
     width: 90px; height: 90px;
@@ -432,7 +426,7 @@ const EPV3_STYLES = `
   /* ── Generic card ── */
   .epv3-card {
     background: #fff;
-    border-radius: 16px;
+    border-radius: 0px;
     border: 1px solid #e4e8f2;
     box-shadow: 0 1px 4px rgba(8,21,52,0.04), 0 4px 16px rgba(8,21,52,0.03);
     overflow: hidden;
@@ -464,7 +458,7 @@ const EPV3_STYLES = `
 
   /* ── Quick-nav mini cards ── */
   .epv3-nav-card {
-    background: #fff; border-radius: 14px;
+    background: #fff; border-radius: 0px;
     border: 1px solid #e4e8f2;
     box-shadow: 0 1px 4px rgba(8,21,52,0.04);
     padding: 14px; cursor: pointer;
@@ -484,7 +478,7 @@ const EPV3_STYLES = `
 
   /* ── Skill tiles ── */
   .epv3-skill-tile {
-    background: #fff; border: 1px solid #e4e8f4; border-radius: 14px;
+    background: #fff; border: 1px solid #e4e8f4; border-radius: 0px;
     transition: all 0.2s ease; overflow: hidden;
   }
   .epv3-skill-tile:hover { border-color: #adb5d9; box-shadow: 0 4px 16px rgba(38,51,131,0.09); }
@@ -498,7 +492,7 @@ const EPV3_STYLES = `
 
   /* ── Pill tabs ── */
   .epv3-tabs {
-    display: flex; gap: 2px; background: #e8ecf5; border-radius: 12px; padding: 3px;
+    display: flex; gap: 0px; background: #e8ecf5; border-radius: 0px; padding: 0px width: 100%;
   }
   .epv3-tab {
     display: flex; align-items: center; gap: 6px;
@@ -1033,12 +1027,12 @@ export default function EmployeeProfileView() {
      RENDER
   ════════════════════════════════════════════════ */
   return (
-    <div className="epv3">
+    <div className="epv3 w-full m-0 p-0">
 
       {/* ╔══════════════════════════════════════════════════════════╗
           ║  HERO  —  split left-dark / right-info                  ║
           ╚══════════════════════════════════════════════════════════╝ */}
-      <div className="w-full px-0 pt-0 pb-4">
+      <div className="w-full m-0 p-0">
         <div className="epv3-hero-wrap epv3-anim">
 
           {/* ── LEFT DARK PANEL ── */}
@@ -1122,14 +1116,18 @@ export default function EmployeeProfileView() {
       {/* ╔══════════════════════════════════════════════════════════╗
           ║  TABS + CONTENT                                          ║
           ╚══════════════════════════════════════════════════════════╝ */}
-      <div className="w-full px-4 pb-14">
+      <div className="w-full px-0 pt-0 pb-10">
 
-        {/* Tab navigation */}
-        <div className="epv3-anim mb-5 overflow-x-auto epv3-noscroll" style={{ animationDelay: "80ms" }}>
-          <div className="epv3-tabs min-w-max sm:min-w-0">
+        {/* Tab navigation — underline style */}
+        <div className="bg-white overflow-x-auto epv3-noscroll mb-4" style={{ borderBottom: "1px solid #e4e8f2" }}>
+          <div className="flex min-w-max sm:min-w-0 px-4">
             {TABS.map(({ key, label, icon }) => (
               <button key={key} onClick={() => handleTabChange(key)}
-                className={`epv3-tab ${activeTab === key ? "epv3-tab-on" : ""}`}>
+                className={`flex items-center gap-1.5 px-4 py-3.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
+                  activeTab === key
+                    ? "border-[#263383] text-[#263383]"
+                    : "border-transparent text-gray-500 hover:text-[#263383] hover:border-[#263383]/30"
+                }`}>
                 {icon}{label}
               </button>
             ))}
