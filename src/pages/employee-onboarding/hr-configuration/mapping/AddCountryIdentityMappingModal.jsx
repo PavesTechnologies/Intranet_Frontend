@@ -14,8 +14,7 @@ export default function AddCountryIdentityMappingModal({
   const [saving, setSaving] = useState(false);
 
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
   /* -------- LOAD IDENTITIES -------- */
   useEffect(() => {
@@ -49,7 +48,7 @@ export default function AddCountryIdentityMappingModal({
         },
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
         },

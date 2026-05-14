@@ -6,6 +6,7 @@ import {
   TrendingDown,
 } from "lucide-react";
 import Pagination from "../../../components/Pagination/pagination";
+import GenericTable from "../../../components/Table/table";
 
 export default function ProjectFinancialsInline() {
   const financialData = {
@@ -99,31 +100,18 @@ export default function ProjectFinancialsInline() {
               Cost Breakdown
             </h3>
 
-            <div className="overflow-hidden rounded-lg border border-gray-100">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500">
-                  <tr>
-                    <th className="px-6 py-3">Role</th>
-                    <th className="px-6 py-3">Headcount</th>
-                    <th className="px-6 py-3">Monthly Cost</th>
-                    <th className="px-6 py-3">Months</th>
-                    <th className="px-6 py-3 text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {paginatedData.map((item, idx) => (
-                    <tr key={idx}>
-                      <td className="px-6 py-4 font-medium">{item.role}</td>
-                      <td className="px-6 py-4">{item.headcount}</td>
-                      <td className="px-6 py-4">{usd(item.monthlyCost)}</td>
-                      <td className="px-6 py-4">{item.months}</td>
-                      <td className="px-6 py-4 text-right font-medium">
-                        {usd(item.headcount * item.monthlyCost * item.months)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="overflow-hidden rounded-lg border border-gray-100 no-scrollbar">
+              <GenericTable
+                headers={["Role", "Headcount", "Monthly Cost", "Months", "Total"]}
+                columns={["role", "headcount", "monthly_cost_info", "months", "total_info"]}
+                rows={paginatedData.map((item) => ({
+                  ...item,
+                  monthly_cost_info: <div className="text-center">{usd(item.monthlyCost)}</div>,
+                  total_info: <div className="text-right font-medium">{usd(item.headcount * item.monthlyCost * item.months)}</div>,
+                  headcount: <div className="text-center">{item.headcount}</div>,
+                  months: <div className="text-center">{item.months}</div>
+                }))}
+              />
             </div>
 
             {/* ================= Pagination ================= */}

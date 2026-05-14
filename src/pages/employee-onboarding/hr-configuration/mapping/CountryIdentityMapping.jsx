@@ -26,17 +26,19 @@ export default function CountryIdentityMapping() {
   const [isMandatory, setIsMandatory] = useState(true);
 
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
-  const headers = { Authorization: `Bearer ${token}` };
 
   /* ---------------- FETCH DATA ---------------- */
   const fetchCountries = async () => {
-    const res = await axios.get(`${BASE_URL}/masters/country`, { headers });
+    const res = await axios.get(`${BASE_URL}/masters/country`, { headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    } });
     setCountries(res.data);
   };
 
   const fetchIdentityTypes = async () => {
-    const res = await axios.get(`${BASE_URL}/identity`, { headers });
+    const res = await axios.get(`${BASE_URL}/identity`, { headers : {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    } });
     setIdentityTypes(res.data);
   };
 
@@ -46,7 +48,9 @@ export default function CountryIdentityMapping() {
 
       const res = await axios.get(
         `${BASE_URL}/identity/country-mapping/identities/${countryUuid}`,
-        { headers },
+        { headers : {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        } },
       );
 
       // ✅ handle empty list
@@ -88,7 +92,9 @@ export default function CountryIdentityMapping() {
             identity_type_uuid: identityTypeUuid,
             is_mandatory: isMandatory,
           },
-          { headers },
+          { headers : {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          } },
         );
 
         setMappings((prev) =>
@@ -116,7 +122,9 @@ export default function CountryIdentityMapping() {
             identity_type_uuid: identityTypeUuid,
             is_mandatory: isMandatory,
           },
-          { headers },
+          { headers : {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          } },
         );
 
         setMappings((prev) => [
@@ -150,7 +158,9 @@ export default function CountryIdentityMapping() {
 
       await axios.delete(
         `${BASE_URL}/identity/country-mapping/${confirmDelete.mapping_uuid}`,
-        { headers },
+        { headers : {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        } },
       );
 
       setMappings((prev) =>
@@ -179,7 +189,9 @@ export default function CountryIdentityMapping() {
 
       await axios.delete(
         `${BASE_URL}/employee-details/identity/${document_uuid}`,
-        { headers },
+        { headers : {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        } },
       );
 
       // remove only this document from deleteError

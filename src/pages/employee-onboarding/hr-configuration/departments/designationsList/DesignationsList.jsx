@@ -17,14 +17,13 @@ export default function DesignationManagement() {
   const [editData, setEditData] = useState(null);
 
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
 
   /* ---------------- FETCH DEPARTMENTS ---------------- */
 
   const fetchDepartments = async () => {
     try {
       const res = await fetch(`${BASE}/masters/departments/`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
       const data = await res.json();
@@ -41,7 +40,7 @@ export default function DesignationManagement() {
       setLoading(true);
 
       const res = await fetch(`${BASE}/masters/designations/`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
       const data = await res.json();
@@ -66,7 +65,7 @@ export default function DesignationManagement() {
     try {
       const res = await fetch(`${BASE}/masters/designations/${uuid}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
       if (!res.ok) throw new Error();
@@ -247,7 +246,6 @@ export default function DesignationManagement() {
 
 function DesignationModal({ editData, departments, onClose, onSuccess }) {
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
 
   const [name, setName] = useState(editData?.designation_name || "");
   const [description, setDescription] = useState(editData?.description || "");
@@ -278,7 +276,7 @@ function DesignationModal({ editData, departments, onClose, onSuccess }) {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
             body: JSON.stringify(payload),
           },
@@ -288,7 +286,7 @@ function DesignationModal({ editData, departments, onClose, onSuccess }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
         });

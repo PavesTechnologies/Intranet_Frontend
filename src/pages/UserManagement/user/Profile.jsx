@@ -11,15 +11,14 @@ export default function Profile() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
 
-    if (token) {
+    if (localStorage.getItem("token")) {
       axios
         .get(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/general_user/profile`,
           {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           },
         )

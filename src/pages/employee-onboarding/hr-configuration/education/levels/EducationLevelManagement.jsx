@@ -8,17 +8,12 @@ export default function EducationLevelManagement() {
   const { user } = useAuth();
   const roles = user?.roles?.map(r => r.toUpperCase()) || [];
   const canView = roles.includes("ADMIN") || roles.includes("HR");
-
-
-  
-
   const [levels, setLevels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState(null);
 
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
 
   /* -------------------- FETCH -------------------- */
 
@@ -26,7 +21,7 @@ export default function EducationLevelManagement() {
     try {
       setLoading(true);
       const res = await axios.get(`${BASE}/masters/education-level`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setLevels(res.data);
     } catch {
@@ -54,7 +49,7 @@ export default function EducationLevelManagement() {
 
     try {
       await axios.delete(`${BASE}/masters/education-level/${uuid}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setLevels((prev) => prev.filter((l) => l.education_uuid !== uuid));
       toast.success("Education level deleted");
@@ -199,7 +194,6 @@ function LevelModal({ editData, onClose, onSuccess }) {
   const [saving, setSaving] = useState(false);
 
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
 
   const save = async () => {
     if (!name.trim()) {
@@ -223,13 +217,13 @@ function LevelModal({ editData, onClose, onSuccess }) {
           `${BASE}/masters/education-level/${editData.education_uuid}`,
           payload,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
             responseType: "text",
           },
         );
       } else {
         res = await axios.post(`${BASE}/masters/education-level/`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           responseType: "text",
         });
       }

@@ -74,7 +74,7 @@ export default function UsersTable() {
             limit: ITEMS_PER_PAGE,
             search: searchTerm,
           },
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
       );
 
@@ -163,7 +163,7 @@ export default function UsersTable() {
       if (actionType === "deactivate") {
         await axios.delete(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}`,
-          { headers: { Authorization: `Bearer ${token}` } },
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
         );
 
         showStatusToast("User deactivated successfully.", "success");
@@ -171,7 +171,7 @@ export default function UsersTable() {
         await axios.patch(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}/activate`,
           {},
-          { headers: { Authorization: `Bearer ${token}` } },
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
         );
 
         showStatusToast("User activated successfully.", "success");

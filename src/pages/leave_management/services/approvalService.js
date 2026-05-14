@@ -4,8 +4,7 @@ const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 // Get token from localStorage (or sessionStorage if you're using that)
 const getAuthHeader = () => {
-  const token = localStorage.getItem("token"); // change if you stored it differently
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return localStorage.getItem("token") ? { Authorization: `Bearer ${localStorage.getItem("token")}` } : {};
 };
 
 export const approvalService = {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { KeyRound, Layers } from "lucide-react";
@@ -27,26 +27,35 @@ export default function GroupDetails() {
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const token = localStorage.getItem("token");
+  const axiosInstance = useMemo(() => {
+    const instance = axios.create({
+      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    instance.interceptors.request.use((config) => {
+      const latestToken = localStorage.getItem("token");
+
+      if (latestToken) {
+        config.headers.Authorization = `Bearer ${latestToken}`;
+      }
+
+      return config;
+    });
+
+    return instance;
+  }, []);
 
   useEffect(() => {
     const fetchGroup = async () => {
       try {
         setLoading(true);
 
-        const authConfig = {
-          headers: { Authorization: `Bearer ${token}` },
-        };
-
         const [groupRes, permissionRes] = await Promise.all([
-          axios.get(
-            `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/groups/${groupId}`,
-            authConfig
-          ),
-          axios.get(
-            `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/groups/${groupId}/permissions`,
-            authConfig
-          ),
+          axiosInstance.get(`/admin/groups/${groupId}`),
+          axiosInstance.get(`/admin/groups/${groupId}/permissions`),
         ]);
 
         setGroup(groupRes.data);
@@ -64,7 +73,7 @@ export default function GroupDetails() {
     if (groupId) {
       fetchGroup();
     }
-  }, [groupId, token]);
+  }, [groupId, axiosInstance]);
 
   if (loading) {
     return (

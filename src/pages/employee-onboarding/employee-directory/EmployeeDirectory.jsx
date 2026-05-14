@@ -3,6 +3,7 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 import EmployeeCard from "../components/EmployeeCard";
 import { Search, Loader2 } from "lucide-react";
 import axios from "axios";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const EmployeeDirectory = () => {
   const [employees, setEmployees] = useState([]);
@@ -13,7 +14,7 @@ const EmployeeDirectory = () => {
   const [departmentsList, setDepartmentsList] = useState([]);
   const [designationsList, setDesignationsList] = useState([]);
 
-  const token = localStorage.getItem("token");
+
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   useEffect(() => {
@@ -24,13 +25,13 @@ const EmployeeDirectory = () => {
         // Fetch employees, departments, and designations in parallel
         const [empRes, deptRes, desigRes] = await Promise.all([
           axios.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }),
           axios.get(`${BASE_URL}/masters/departments/`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }),
           axios.get(`${BASE_URL}/masters/designations/`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }),
         ]);
 
@@ -83,7 +84,7 @@ const EmployeeDirectory = () => {
     };
 
     fetchData();
-  }, [BASE_URL, token]);
+  }, [BASE_URL]);
 
   // Departments for the filter chips
   const departments = ["All", ...departmentsList.map((d) => d.department_name)];
@@ -141,9 +142,8 @@ const EmployeeDirectory = () => {
       {/* Employee Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
         {loading ? (
-          <div className="col-span-full flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-            <p className="text-gray-500 font-medium">Loading employees...</p>
+          <div className="col-span-full py-20">
+            <LoadingSpinner text="Loading employees..." />
           </div>
         ) : error ? (
           <div className="col-span-full text-center py-20">

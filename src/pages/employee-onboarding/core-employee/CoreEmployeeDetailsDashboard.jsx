@@ -10,6 +10,7 @@ import EmployeeCreateModal from "../components/employee-create-modal/EmployeeCre
 import ExcelPreviewModal from "./components/ExcelPreviewModal";
 import * as XLSX from "xlsx";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import { KPICard } from "../../../components/kpi/KPI";
 
 const PAGE_SIZE = 5;
 
@@ -86,11 +87,17 @@ export default function EmployeeOnboardingPage() {
 
   const [exportLoading, setExportLoading] = useState(false);
 
-  const [exportedEmails, setExportedEmails] = useState([]);
   const fileInputRef = useRef(null);
   const [uploadLoading, setUploadLoading] = useState(false);
-  const [failedRecords, setFailedRecords] = useState([]);
+  
+ const failedCount = useMemo(() => {
 
+  return excelPreview.filter(
+    (emp) =>
+      emp.export_status === "FAILED"
+  ).length;
+
+}, [excelPreview]);
   
 
   /* ============================
@@ -101,7 +108,7 @@ export default function EmployeeOnboardingPage() {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem("token");
+
 
       const response = await fetch(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
@@ -109,7 +116,7 @@ export default function EmployeeOnboardingPage() {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -130,15 +137,14 @@ export default function EmployeeOnboardingPage() {
 
   const fetchDepartments = async () => {
     try {
-      const token = localStorage.getItem("token");
-
+    
       const response = await fetch(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
         {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -153,7 +159,7 @@ export default function EmployeeOnboardingPage() {
 
   const fetchDesignations = async () => {
     try {
-      const token = localStorage.getItem("token");
+
 
       const res = await fetch(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/`,
@@ -161,7 +167,7 @@ export default function EmployeeOnboardingPage() {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -181,7 +187,7 @@ export default function EmployeeOnboardingPage() {
 
       if (!file) return;
 
-      const token = localStorage.getItem("token");
+    
 
       const formData = new FormData();
       formData.append("file", file);
@@ -193,7 +199,7 @@ export default function EmployeeOnboardingPage() {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${localStorage.getItem("token")}`
           },
           body: formData
         }
@@ -317,150 +323,252 @@ export default function EmployeeOnboardingPage() {
     });
   }, [employees, searchTerm, statusFilter, departmentFilter]);
 
-  const handleExportPreview = async () => {
+const handleExportPreview = async () => {
+
+  try {
+
     setExportLoading(true);
 
-    try {
-      // const excelData = filteredEmployees.map(emp => ({
-      //   "Employee ID": emp.employee_id,
-      //   "Name": `${emp.first_name} ${emp.last_name}`,
-      //   "Email": emp.work_email,
-      //   "Contact": emp.contact_number,
-      //   "Department": departmentMap[emp.department_uuid],
-      //   "Designation": designationMap[emp.designation_uuid],
-      //   "Joining Date": emp.joining_date,
-      //   "Status": emp.employment_status
-      // }));
-
-      const newEmployees = filteredEmployees.filter(
-        (emp) => !exportedEmails.includes(emp.work_email?.toLowerCase()),
-      );
-
-      if (newEmployees.length === 0) {
-        showStatusToast("No new employees to export", "info");
-        setExportLoading(false);
-        return;
-      }
-
-      const excelData = newEmployees.map((emp) => ({
-        user_uuid: emp.user_uuid,
-        employee_id: emp.employee_id,
-        first_name: emp.first_name,
-        last_name: emp.last_name,
-        mail: emp.work_email,
-        contact: emp.contact_number,
-        Department: departmentMap[emp.department_uuid],
-        Designation: designationMap[emp.designation_uuid],
-        Status: emp.employment_status,
-        
-      }));
-      setExcelPreview(excelData);
-      setShowPreview(true);
-    } catch (error) {
-      console.error("Excel preview error", error);
-    } finally {
-      setExportLoading(false);
-    }
-  };
-
-  // const downloadExcel = () => {
-  //   const worksheet = XLSX.utils.json_to_sheet(excelPreview);
-
-  //   const workbook = XLSX.utils.book_new();
-
-  //   XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
-
-  //   // Auto column width
-  //   const cols = Object.keys(excelPreview[0]).map(() => ({ wch: 25 }));
-  //   worksheet["!cols"] = cols;
-
-  //   XLSX.writeFile(workbook, "Employee_Report.xlsx");
-
-  //   const newEmails = excelPreview.map((emp) => emp.Email.toLowerCase());
-  //   setExportedEmails((prev) => [...new Set([...prev, ...newEmails])]);
-
-  //   setShowPreview(false);
-  // };
-const downloadExcel = async () => {
-  try {
-    const token = localStorage.getItem("token");
-
-    // Create worksheet
-    const worksheet = XLSX.utils.json_to_sheet(excelPreview);
-
-    // Create workbook
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
-
-    // Auto column width
-    const cols = Object.keys(excelPreview[0]).map(() => ({ wch: 25 }));
-    worksheet["!cols"] = cols;
-
-    // Convert workbook to buffer
-    const excelBuffer = XLSX.write(workbook, {
-      bookType: "xlsx",
-      type: "array",
-    });
-
-    // Create Blob
-    const blob = new Blob(
-      [excelBuffer],
+ 
+    const response = await fetch(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/export-preview`,
       {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        method: "GET",
+
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       }
     );
 
-    // Create File
+    const result = await response.json();
+
+    if (response.ok) {
+
+      const previewData =
+        result.data || [];
+
+      if (previewData.length === 0) {
+
+        showStatusToast(
+          "No employees available for export",
+          "info"
+        );
+
+        return;
+      }
+
+      const formattedData =
+        previewData.map((emp) => ({
+
+          user_uuid: emp.employee_uuid,
+
+          employee_id: emp.employee_id,
+
+          first_name: emp.first_name,
+
+          last_name: emp.last_name,
+
+          mail: emp.mail,
+
+          contact: emp.contact,
+
+          Department:
+            departmentMap[
+              emp.department_uuid
+            ] || "—",
+
+          Designation:
+            designationMap[
+              emp.designation_uuid
+            ] || "—",
+
+          Status:
+            emp.employment_status,
+
+          export_status:
+            emp.export_status,
+
+          export_error:
+            emp.export_error
+        }));
+
+      setExcelPreview(
+        formattedData
+      );
+
+      setShowPreview(true);
+
+    }
+
+  } catch (error) {
+
+    console.error(error);
+
+    showStatusToast(
+      "Failed to fetch export preview",
+      "error"
+    );
+
+  } finally {
+
+    setExportLoading(false);
+  }
+};
+
+const downloadExcel = async () => {
+console.log(
+  "calling ums api"
+);
+  try {
+
+ 
+
+    // =========================
+    // REMOVE BACKEND META FIELDS
+    // =========================
+
+    const exportData = excelPreview.map(
+      ({
+        export_status,
+        export_error,
+        ...rest
+      }) => rest
+    );
+
+    // =========================
+    // CREATE EXCEL
+    // =========================
+
+    const worksheet =
+      XLSX.utils.json_to_sheet(
+        exportData
+      );
+
+    const workbook =
+      XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "Employees"
+    );
+
+    const excelBuffer =
+      XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+console.log(
+  "calling ums api"
+);
+    const blob = new Blob(
+      [excelBuffer],
+      {
+        type:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }
+    );
+
     const file = new File(
       [blob],
       "Employee_Report.xlsx",
       {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       }
     );
 
-    // FormData
+    // =========================
+    // CREATE FORM DATA
+    // =========================
+
     const formData = new FormData();
+
     formData.append("file", file);
 
-    // API call
+    // =========================
+    // SEND TO UMS
+    // =========================
+
     const response = await fetch(
+
       `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/multiple-users`,
+
       {
         method: "POST",
+
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
+
         body: formData,
       }
     );
 
     const data = await response.json();
 
+    // =========================
+    // UPDATE EXPORT STATUS
+    // =========================
+
+    await fetch(
+
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/update-export-status`,
+
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+
+          Authorization:
+            `Bearer ${localStorage.getItem("token")}`,
+        },
+
+        body: JSON.stringify(data),
+      }
+    );
+
+    // =========================
+    // SUCCESS UI
+    // =========================
+
     if (response.ok) {
-      showStatusToast("Excel sent successfully", "success");
 
-      const newEmails = excelPreview.map((emp) =>
-        emp.Email.toLowerCase()
+      showStatusToast(
+
+        data.message ||
+        "Employees exported successfully",
+
+        "success"
       );
-
-      setExportedEmails((prev) => [
-        ...new Set([...prev, ...newEmails]),
-      ]);
 
       setShowPreview(false);
 
+      // Refresh latest employees
+      fetchEmployees();
+
+      // Refresh preview queue
+      setExcelPreview([]);
+
     } else {
+
       showStatusToast(
-        data.message || "Failed to send excel",
+        "Export failed",
         "error"
       );
     }
 
   } catch (error) {
-    console.error("Send excel error:", error);
 
-    showStatusToast("Failed to send excel", "error");
+    console.error(error);
+
+    showStatusToast(
+      "Failed to send excel",
+      "error"
+    );
   }
 };
   /* ============================
@@ -588,32 +696,37 @@ const downloadExcel = async () => {
           "Export Excel"
         )}
       </button>
-      {failedRecords.length > 0 && (
-  <div className="mt-4 border rounded-lg p-4 bg-red-50">
-    <h3 className="font-semibold text-red-600 mb-2">
-      Failed Records
-    </h3>
+      {failedCount > 0 && (
 
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b">
-          <th className="text-left p-2">Row</th>
-          <th className="text-left p-2">Reason</th>
-        </tr>
-      </thead>
+  <button
+    onClick={handleExportPreview}
+    className="
+      px-4 py-2
+      bg-red-600
+      hover:bg-red-700
+      text-white
+      rounded-lg
+      shadow-sm
+      flex items-center gap-2
+    "
+  >
 
-      <tbody>
-        {failedRecords.map((item, index) => (
-          <tr key={index} className="border-b">
-            <td className="p-2">{item.row}</td>
-            <td className="p-2">{formatError(item.reason)}</td>
-          </tr>
-        ))}
-      </tbody>
+    Retry Failed
 
-    </table>
+    <span
+      className="
+        bg-white
+        text-red-600
+        px-2 py-0.5
+        rounded-full
+        text-xs
+        font-semibold
+      "
+    >
+      {failedCount}
+    </span>
 
-  </div>
+  </button>
 )}
 
       </div>
@@ -732,18 +845,12 @@ const formatError = (error) => {
 
 function StatCard({ title, value, icon: Icon }) {
   return (
-    <div
-      className="bg-white p-4 rounded-xl border border-black/20 shadow-sm 
-                 flex gap-4 transition-all duration-300 
-                 hover:-translate-y-1 hover:shadow-xl"
-    >
-      <Icon className="text-indigo-600" />
-
-      <div>
-        <p className="text-sm text-gray-500">{title}</p>
-
-        <p className="text-xl font-semibold text-gray-900">{value}</p>
-      </div>
-    </div>
+    <KPICard
+      label={title}
+      value={value}
+      icon={<Icon className="h-5 w-5" />}
+      color="bg-indigo-50 text-indigo-600"
+      className="bg-white border-black/20 shadow-sm hover:-translate-y-1 hover:shadow-xl"
+    />
   );
 }

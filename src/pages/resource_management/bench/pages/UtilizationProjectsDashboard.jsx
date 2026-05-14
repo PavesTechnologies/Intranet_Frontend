@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-   Award, Briefcase, PieChart as PieChartIcon, BarChart3, 
-   Users, TrendingUp, Zap, Target, Download, Share2,
-   ChevronRight, MoreHorizontal, ShieldCheck
-} from 'lucide-react';
+import { AwardIcon, ProjectsIcon, PieChartIcon, BarChartIcon, EmployeeIcon, TrendingUpIcon, ZapIcon, TargetIcon, DownloadIcon, ShareIcon, ChevronRightIcon, MoreHorizontalIcon, SecurityIcon } from "@/components/icons";
 import { 
    ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
    Tooltip as RechartsTooltip, Cell, PieChart, Pie, Legend
@@ -49,10 +45,10 @@ const UtilizationProjectsDashboard = () => {
                </div>
                <div className="flex items-center gap-3">
                   <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-2xl text-[11px] font-black text-slate-600 capitalize tracking-widest hover:bg-slate-50 transition-all shadow-sm">
-                     <Share2 size={16} /> Share Analytics
+                     <ShareIcon size={16} /> Share Analytics
                   </button>
                   <button className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-2xl text-[11px] font-black capitalize tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
-                     <Download size={16} /> Capability Report
+                     <DownloadIcon size={16} /> Capability Report
                   </button>
                </div>
             </div>
@@ -64,7 +60,7 @@ const UtilizationProjectsDashboard = () => {
                      <div className="flex items-center justify-between mb-10">
                         <div className="flex items-center gap-4">
                            <div className="h-12 w-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-100 shadow-sm">
-                              <Award size={26} strokeWidth={2.5} />
+                              <AwardIcon size={26} strokeWidth={2.5} />
                            </div>
                            <div>
                               <h3 className="text-[16px] font-black text-slate-900 capitalize tracking-widest">Role Performance Matrix</h3>
@@ -72,7 +68,7 @@ const UtilizationProjectsDashboard = () => {
                            </div>
                         </div>
                         <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shadow-inner">
-                           <BarChart3 size={20} />
+                           <BarChartIcon size={20} />
                         </div>
                      </div>
 
@@ -129,7 +125,7 @@ const UtilizationProjectsDashboard = () => {
                            </div>
                         </div>
                         <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shadow-inner">
-                           <Target size={20} />
+                           <TargetIcon size={20} />
                         </div>
                      </div>
 
@@ -187,7 +183,7 @@ const UtilizationProjectsDashboard = () => {
             <div className="mt-10 bg-[#081534] rounded-[2.5rem] p-10 border border-slate-800 shadow-2xl relative overflow-hidden group">
                <div className="flex items-center gap-6 mb-8">
                   <div className="h-12 w-12 bg-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center border border-indigo-500/30">
-                     <ShieldCheck size={26} strokeWidth={2.5} />
+                     <SecurityIcon size={26} strokeWidth={2.5} />
                   </div>
                   <div>
                      <h4 className="text-[16px] font-black text-white capitalize tracking-[0.2em]">Capability Intelligence Footer</h4>
