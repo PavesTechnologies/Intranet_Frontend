@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Edit, Trash2, ArrowLeft } from "lucide-react";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 
 // Services & Hooks
 import { getProjectById } from "../../../resource_management/services/projectService";
@@ -74,8 +74,9 @@ const ProjectConfigurations = ({ projectId }) => {
       setProject(res.data);
     } catch (err) {
       console.error("Failed to fetch project details", err);
-      toast.error(
+      showStatusToast(
         err.response?.data?.message || "Failed to fetch project details.",
+        "error",
       );
     } finally {
       setLoading(false);
@@ -161,8 +162,9 @@ const ProjectConfigurations = ({ projectId }) => {
   const saveInheritedSlas = async () => {
     try {
       if (projectSlas.length + selectedClientSlas.length > 3) {
-        alert(
+        showStatusToast(
           "Adding these would exceed the limit of 3 SLAs for this project.",
+          "warning"
         );
         return;
       }
@@ -182,6 +184,7 @@ const ProjectConfigurations = ({ projectId }) => {
       setInheritMode(false);
       setSelectedClientSlas([]);
       fetchProjectSLAs();
+      showStatusToast("SLAs inherited successfully.", "success");
     } catch (err) {
       console.error("Error inheriting SLAs", err);
     }
@@ -192,14 +195,14 @@ const ProjectConfigurations = ({ projectId }) => {
       const isEditing = !!formData.projectSlaId;
       if (!isEditing) {
         if (projectSlas.length >= 3) {
-          alert("Maximum of 3 SLA configurations allowed per project.");
+          showStatusToast("Maximum of 3 SLA configurations allowed per project.", "warning");
           return;
         }
         const isDuplicate = projectSlas.some(
           (sla) => sla.slaType === formData.slaType,
         );
         if (isDuplicate) {
-          alert(`The SLA type "${formData.slaType}" is already configured.`);
+          showStatusToast(`The SLA type "${formData.slaType}" is already configured.`, "warning");
           return;
         }
       }
@@ -210,9 +213,10 @@ const ProjectConfigurations = ({ projectId }) => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectSLAs();
+      showStatusToast("SLA configuration saved successfully.", "success");
     } catch (err) {
       console.error("Error saving project SLA", err);
-      alert(err.response?.data?.message || "Failed to save SLA configuration");
+      showStatusToast(err.response?.data?.message || "Failed to save SLA configuration", "error");
     }
   };
 
@@ -294,6 +298,7 @@ const ProjectConfigurations = ({ projectId }) => {
       setInheritMode(false);
       setSelectedClientCompliance([]);
       fetchProjectCompliance();
+      showStatusToast("Compliance requirements inherited successfully.", "success");
     } catch (err) {
       console.error("Error inheriting compliance", err);
     }
@@ -307,8 +312,9 @@ const ProjectConfigurations = ({ projectId }) => {
           c.isInherited === false,
       );
       if (isDuplicate && !formData.projectComplianceId) {
-        alert(
+        showStatusToast(
           `The compliance requirement "${formData.requirementType}" is already configured for this project.`,
+          "warning"
         );
         return;
       }
@@ -319,9 +325,10 @@ const ProjectConfigurations = ({ projectId }) => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectCompliance();
+      showStatusToast("Compliance configuration saved successfully.", "success");
     } catch (err) {
       console.error("Error saving project compliance", err);
-      alert(err.response?.data?.message || "An error occurred during save.");
+      showStatusToast(err.response?.data?.message || "An error occurred during save.", "error");
     }
   };
 
@@ -401,6 +408,7 @@ const ProjectConfigurations = ({ projectId }) => {
       setInheritMode(false);
       setSelectedClientEscalations([]);
       fetchProjectEscalations();
+      showStatusToast("Escalations inherited successfully.", "success");
     } catch (err) {
       console.error("Error inheriting escalation", err);
     }
@@ -419,6 +427,7 @@ const ProjectConfigurations = ({ projectId }) => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectEscalations();
+      showStatusToast("Escalation saved successfully.", "success");
     } catch (err) {
       console.error("Error saving escalation", err);
     }
@@ -444,6 +453,7 @@ const ProjectConfigurations = ({ projectId }) => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectEscalations();
+      showStatusToast("Escalation updated successfully.", "success");
     } catch (err) {
       console.error("Error updating escalation", err);
     }
@@ -500,7 +510,7 @@ const ProjectConfigurations = ({ projectId }) => {
           },
         );
         fetchProjectSLAs();
-        toast.success("SLA configuration deleted successfully.");
+        showStatusToast("SLA configuration deleted successfully.", "success");
       }
       if (deleteType === "compliance") {
         await axios.delete(
@@ -512,7 +522,7 @@ const ProjectConfigurations = ({ projectId }) => {
           },
         );
         fetchProjectCompliance();
-        toast.success("Compliance configuration deleted successfully.");
+        showStatusToast("Compliance configuration deleted successfully.", "success");
       }
       if (deleteType === "escalation") {
         await axios.delete(
@@ -524,11 +534,11 @@ const ProjectConfigurations = ({ projectId }) => {
           },
         );
         fetchProjectEscalations();
-        toast.success("Escalation deleted successfully.");
+        showStatusToast("Escalation deleted successfully.", "success");
       }
       setOpenConfirmModal(false);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Delete failed.");
+      showStatusToast(err.response?.data?.message || "Delete failed.", "error");
     } finally {
       setDeleteLoading(false);
     }
@@ -880,40 +890,46 @@ const ProjectConfigurations = ({ projectId }) => {
                 (inheritMode ? (
                   <div className="space-y-4">
                     <p className="text-sm">Select client SLAs to map:</p>
-                    <table className="w-full text-sm">
-                      <tbody className="divide-y">
-                        {clientSlas.map((sla) => (
-                          <tr key={sla.slaId}>
-                            <td>
-                              <input
-                                type="checkbox"
-                                disabled={sla.isAlreadyMapped}
-                                checked={selectedClientSlas.includes(
-                                  sla.slaType,
-                                )}
-                                onChange={(e) =>
-                                  e.target.checked
-                                    ? setSelectedClientSlas([
-                                      ...selectedClientSlas,
-                                      sla.slaType,
-                                    ])
-                                    : setSelectedClientSlas(
-                                      selectedClientSlas.filter(
-                                        (t) => t !== sla.slaType,
-                                      ),
-                                    )
-                                }
-                              />
-                            </td>
-                            <td className="p-2">{sla.slaType}</td>
-                            <td className="p-2 text-gray-500">
-                              {sla.slaDurationDays}d /{" "}
-                              {sla.warningThresholdDays}d
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    {clientSlas.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <tbody className="divide-y">
+                          {clientSlas.map((sla) => (
+                            <tr key={sla.slaId}>
+                              <td>
+                                <input
+                                  type="checkbox"
+                                  disabled={sla.isAlreadyMapped}
+                                  checked={selectedClientSlas.includes(
+                                    sla.slaType,
+                                  )}
+                                  onChange={(e) =>
+                                    e.target.checked
+                                      ? setSelectedClientSlas([
+                                        ...selectedClientSlas,
+                                        sla.slaType,
+                                      ])
+                                      : setSelectedClientSlas(
+                                        selectedClientSlas.filter(
+                                          (t) => t !== sla.slaType,
+                                        ),
+                                      )
+                                  }
+                                />
+                              </td>
+                              <td className="p-2">{sla.slaType}</td>
+                              <td className="p-2 text-gray-500">
+                                {sla.slaDurationDays}d /{" "}
+                                {sla.warningThresholdDays}d
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-sm text-gray-500 py-8 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                        No SLAs found for this client to inherit.
+                      </p>
+                    )}
                     <div className="flex justify-end gap-3 mt-4">
                       <button
                         onClick={() => setInheritMode(false)}
@@ -953,36 +969,42 @@ const ProjectConfigurations = ({ projectId }) => {
               {configType === "pre-requisites" &&
                 (inheritMode ? (
                   <div className="space-y-4">
-                    <table className="w-full text-sm">
-                      <tbody className="divide-y">
-                        {clientCompliance.map((comp) => (
-                          <tr key={comp.clientcomplianceId}>
-                            <td>
-                              <input
-                                type="checkbox"
-                                disabled={comp.isAlreadyMapped}
-                                checked={selectedClientCompliance.includes(
-                                  comp.requirementType,
-                                )}
-                                onChange={(e) =>
-                                  e.target.checked
-                                    ? setSelectedClientCompliance([
-                                      ...selectedClientCompliance,
-                                      comp.requirementType,
-                                    ])
-                                    : setSelectedClientCompliance(
-                                      selectedClientCompliance.filter(
-                                        (t) => t !== comp.requirementType,
-                                      ),
-                                    )
-                                }
-                              />
-                            </td>
-                            <td className="p-2">{comp.requirementName}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    {clientCompliance.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <tbody className="divide-y">
+                          {clientCompliance.map((comp) => (
+                            <tr key={comp.clientcomplianceId}>
+                              <td>
+                                <input
+                                  type="checkbox"
+                                  disabled={comp.isAlreadyMapped}
+                                  checked={selectedClientCompliance.includes(
+                                    comp.requirementType,
+                                  )}
+                                  onChange={(e) =>
+                                    e.target.checked
+                                      ? setSelectedClientCompliance([
+                                        ...selectedClientCompliance,
+                                        comp.requirementType,
+                                      ])
+                                      : setSelectedClientCompliance(
+                                        selectedClientCompliance.filter(
+                                          (t) => t !== comp.requirementType,
+                                        ),
+                                      )
+                                  }
+                                />
+                              </td>
+                              <td className="p-2">{comp.requirementName}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-sm text-gray-500 py-8 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                        No pre-requisites found for this client to inherit.
+                      </p>
+                    )}
                     <div className="flex justify-end gap-3 mt-4">
                       <button
                         onClick={() => setInheritMode(false)}
@@ -1025,38 +1047,44 @@ const ProjectConfigurations = ({ projectId }) => {
               {configType === "escalation" &&
                 (inheritMode ? (
                   <div className="space-y-4">
-                    <table className="w-full text-sm">
-                      <tbody className="divide-y">
-                        {clientEscalations.map((esc) => (
-                          <tr key={esc.contactId}>
-                            <td>
-                              <input
-                                type="checkbox"
-                                disabled={esc.isAlreadyMapped}
-                                checked={selectedClientEscalations.includes(
-                                  esc.contactId,
-                                )}
-                                onChange={(e) =>
-                                  e.target.checked
-                                    ? setSelectedClientEscalations([
-                                      ...selectedClientEscalations,
-                                      esc.contactId,
-                                    ])
-                                    : setSelectedClientEscalations(
-                                      selectedClientEscalations.filter(
-                                        (id) => id !== esc.contactId,
-                                      ),
-                                    )
-                                }
-                              />
-                            </td>
-                            <td className="p-2">
-                              {esc.contactName} ({esc.contactRole})
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    {clientEscalations.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <tbody className="divide-y">
+                          {clientEscalations.map((esc) => (
+                            <tr key={esc.contactId}>
+                              <td>
+                                <input
+                                  type="checkbox"
+                                  disabled={esc.isAlreadyMapped}
+                                  checked={selectedClientEscalations.includes(
+                                    esc.contactId,
+                                  )}
+                                  onChange={(e) =>
+                                    e.target.checked
+                                      ? setSelectedClientEscalations([
+                                        ...selectedClientEscalations,
+                                        esc.contactId,
+                                      ])
+                                      : setSelectedClientEscalations(
+                                        selectedClientEscalations.filter(
+                                          (id) => id !== esc.contactId,
+                                        ),
+                                      )
+                                  }
+                                />
+                              </td>
+                              <td className="p-2">
+                                {esc.contactName} ({esc.contactRole})
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-sm text-gray-500 py-8 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                        No escalation contacts found for this client to inherit.
+                      </p>
+                    )}
                     <div className="flex justify-end gap-3 mt-4">
                       <button
                         onClick={() => setInheritMode(false)}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, Fragment } from "react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { jwtDecode } from "jwt-decode";
 
 import { useNavigate, useParams } from "react-router-dom";
@@ -34,6 +35,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import { Listbox, Transition } from "@headlessui/react";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import Pagination from "../../../components/Pagination/pagination";
+import GenericTable from "../../../components/Table/table";
 
 /* ---------------- CONSTANTS & STYLES ---------------- */
 
@@ -249,7 +251,7 @@ const AssetDetail = () => {
   }, [formData.projectId]);
 
   const [returnData, setReturnData] = useState({
-    conditionOnReturn: "Good",
+    conditionOnReturn: "",
     returnNotes: "",
   });
   const [clientProjects, setClientProjects] = useState([]);
@@ -410,6 +412,10 @@ const AssetDetail = () => {
 
   const handleReturnSubmit = async (e) => {
     e.preventDefault();
+    if (!returnData.conditionOnReturn) {
+      toast.warning("Please select the condition on return.");
+      return;
+    }
     setReturnLoading(true);
     try {
       const res = await returnAssetAssignment(
@@ -455,6 +461,7 @@ const AssetDetail = () => {
       expectedReturnDate: a.expectedReturnDate || "",
       assignmentStatus: a.assignmentStatus || "ASSIGNED",
       assignedBy: a.assignedBy || getLoggedInUserName(), // 🔥 fallback
+      locationType: a.locationType || "",
       locationDetails: a.locationDetails || "",
       description: a.description || "",
       serialNumber: a.serialNumber || "",
@@ -599,127 +606,93 @@ const AssetDetail = () => {
       </div>
 
       {/* TABLE */}
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-gray-500 border-b bg-gray-50/50">
-              <tr>
-                <th className="py-3 px-4 text-center w-[15%]">Resource</th>
-                <th className="py-3 px-4 text-center w-[15%]">Project</th>
-                <th className="py-3 px-4 text-center w-[15%]">Serial</th>
-                <th className="py-3 px-4 text-center w-[15%]">Location</th>
-                <th className="py-3 px-4 text-center w-[15%]">Assigned</th>
-                {activeTab === "HISTORY" && (
-                  <th className="py-3 px-4 text-center w-[15%]">Returned</th>
+      <div className="bg-white border rounded-xl shadow-sm overflow-hidden no-scrollbar">
+        <GenericTable
+          headers={[
+            "Resource",
+            "Project",
+            "Serial",
+            "Location",
+            "Assigned",
+            ...(activeTab === "HISTORY" ? ["Returned"] : []),
+            "Status",
+            "Actions",
+          ]}
+          columns={[
+            "resourceName",
+            "projectName",
+            "serial_info",
+            "location_info",
+            "assigned_info",
+            ...(activeTab === "HISTORY" ? ["returned_info"] : []),
+            "status_info",
+            "actions",
+          ]}
+          rows={paginatedAssignments.map((a) => ({
+            ...a,
+            serial_info: <div className="text-xs font-mono text-slate-500 text-center">{a.serialNumber || "-"}</div>,
+            location_info: <div className="text-slate-600 text-center">{a.locationDetails || "-"}</div>,
+            assigned_info: (
+              <div className="text-slate-600 text-center">
+                {new Date(a.assignedDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </div>
+            ),
+            returned_info: a.actualReturnDate ? (
+              <div className="text-slate-600 text-center">
+                {new Date(a.actualReturnDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </div>
+            ) : "-",
+            status_info: (
+              <div className="text-center">
+                <span
+                  className={`inline-flex items-center justify-center min-w-[80px] py-1 px-2 rounded-full text-[10px] font-bold uppercase tracking-wide ${STATUS_COLORS[a.assignmentStatus] || "bg-gray-100 text-gray-600"}`}
+                >
+                  {a.assignmentStatus}
+                </span>
+              </div>
+            ),
+            actions: (
+              <div className="text-center">
+                {activeTab === "ACTIVE" ? (
+                  <div className="flex justify-center gap-2">
+                    <button
+                      onClick={() => openEditModal(a)}
+                      className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setReturnData({
+                          conditionOnReturn: "",
+                          returnNotes: "",
+                        });
+                        setReturnItem(a);
+                        setReturnModal(true);
+                      }}
+                      className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      title="Return"
+                    >
+                      <Undo2 size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400 italic">Read Only</span>
                 )}
-                <th className="py-3 px-4 text-center w-[10%]">Status</th>
-                <th className="py-3 px-4 text-center w-[15%]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan="7" className="py-8 text-center text-gray-400">
-                    Loading data...
-                  </td>
-                </tr>
-              ) : paginatedAssignments.length > 0 ? (
-                paginatedAssignments.map((a) => (
-                  <tr
-                    key={a.assignmentId}
-                    className="hover:bg-slate-50/80 transition-colors"
-                  >
-                    <td className="py-3 px-4 font-medium text-slate-700">
-                      {a.resourceName}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      {a.projectName}
-                    </td>
-                    <td className="py-3 px-4 text-xs font-mono text-slate-500 text-center">
-                      {a.serialNumber || "-"}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {a.locationDetails || "-"}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 text-center">
-                      {new Date(a.assignedDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </td>
-                    {activeTab === "HISTORY" && (
-                      <td className="py-3 px-4 text-slate-600 text-center">
-                        {new Date(a.actualReturnDate).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          },
-                        )}
-                      </td>
-                    )}
-                    <td className="py-3 px-4 text-center">
-                      <span
-                        className={`inline-flex items-center justify-center min-w-[80px] py-1 px-2 rounded-full text-[10px] font-bold uppercase tracking-wide ${STATUS_COLORS[a.assignmentStatus] || "bg-gray-100 text-gray-600"}`}
-                      >
-                        {a.assignmentStatus}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      {activeTab === "ACTIVE" ? (
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={() => openEditModal(a)}
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setReturnItem(a);
-                              setReturnModal(true);
-                            }}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Return"
-                          >
-                            <Undo2 size={16} />
-                          </button>
-                          {/* <button
-                            onClick={() => setDeleteTarget(a)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 size={16} />
-                          </button> */}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">
-                          Read Only
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="py-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-400 gap-3">
-                      <div className="bg-slate-50 p-3 rounded-full">
-                        <Box size={24} className="opacity-40" />
-                      </div>
-                      <p className="text-sm">No assignments found.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </div>
+            )
+          }))}
+          loading={loading}
+        />
       </div>
 
       {/* PAGINATION */}
@@ -749,63 +722,34 @@ const AssetDetail = () => {
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
                     Project
                   </label>
-                  <select
-                    name="projectId"
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select Project" },
+                      ...clientProjects.map((p) => ({ value: p.pmsProjectId, label: p.projectName }))
+                    ]}
                     value={formData.projectId || ""}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData((prev) => ({
                         ...prev,
-                        projectId: e.target.value,
-                        projectName:
-                          clientProjects.find(
-                            (p) => p.pmsProjectId == e.target.value,
-                          )?.projectName || "",
+                        projectId: val,
+                        projectName: clientProjects.find((p) => p.pmsProjectId == val)?.projectName || "",
                       }))
                     }
-                    required
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">Select Project</option>
-                    {clientProjects.map((p) => (
-                      <option key={p.pmsProjectId} value={p.pmsProjectId}>
-                        {p.projectName}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
                     Resource Name
                   </label>
-                  <select
-                    name="resourceName"
+                  <FilterListbox
+                    options={[
+                      { value: "", label: !formData.projectId ? "Select Resource" : projectResourcesLoading ? "Loading resources..." : availableProjectResources.length === 0 ? "No resources allocated to this project" : "Select Resource" },
+                      ...availableProjectResources.map((res) => ({ value: res.resourceName, label: `${res.resourceName} - ${res.resourceRole}` }))
+                    ]}
                     value={formData.resourceName || ""}
-                    onChange={handleFormChange}
-                    required
-                    disabled={!formData.projectId || projectResourcesLoading || availableProjectResources.length === 0}
-                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all ${projectResourcesLoading
-                      ? "cursor-wait opacity-60"
-                      : !formData.projectId || availableProjectResources.length === 0
-                        ? "cursor-not-allowed opacity-60"
-                        : "appearance-none cursor-pointer"
-                      }`}
-                  >
-                    <option value="">
-                      {!formData.projectId
-                        ? "Select Resource"
-                        : projectResourcesLoading
-                          ? "Loading resources..."
-                          : availableProjectResources.length === 0
-                            ? "No resources allocated to this project"
-                            : "Select Resource"}
-                    </option>
-                    {availableProjectResources.map((res) => (
-                      <option key={res.resourceId} value={res.resourceName}>
-                        {res.resourceName} - {res.resourceRole}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => handleFormChange({ target: { name: "resourceName", value: val } })}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -813,33 +757,15 @@ const AssetDetail = () => {
                     Serial Number
                   </label>
 
-                  <select
-                    name="serialNumber"
+                  <FilterListbox
+                    options={[
+                      { value: "", label: serialLoading ? "Loading serials..." : "Select Serial Number" },
+                      ...(editingAssignment && formData.serialNumber ? [{ value: formData.serialNumber, label: `${formData.serialNumber} (Current)` }] : []),
+                      ...availableSerials.map((s) => ({ value: s.serialNumber, label: s.serialNumber }))
+                    ]}
                     value={formData.serialNumber}
-                    onChange={handleFormChange}
-                    required
-                    disabled={serialLoading}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">
-                      {serialLoading
-                        ? "Loading serials..."
-                        : "Select Serial Number"}
-                    </option>
-
-                    {/* Keep current serial visible in edit mode */}
-                    {editingAssignment && formData.serialNumber && (
-                      <option value={formData.serialNumber}>
-                        {formData.serialNumber} (Current)
-                      </option>
-                    )}
-
-                    {availableSerials.map((s) => (
-                      <option key={s.serialNumber} value={s.serialNumber}>
-                        {s.serialNumber}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => handleFormChange({ target: { name: "serialNumber", value: val } })}
+                  />
                 </div>
                 <Input
                   label="Assigned By"
@@ -869,7 +795,7 @@ const AssetDetail = () => {
                   name="assignmentStatus"
                   value={formData.assignmentStatus}
                   onChange={handleFormChange}
-                  options={["ASSIGNED", "REQUESTED", "RETURNED", "REJECTED"]}
+                  options={["ASSIGNED", "REQUESTED", "REJECTED"]}
                 />
                 <Input
                   label="Location"
@@ -882,25 +808,16 @@ const AssetDetail = () => {
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
                     Work Type
                   </label>
-                  <select
-                    id="locationType"
-                    name="locationType"
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        locationType: e.target.value,
-                      }))
-                    }
-                    required
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="" disabled selected>
-                      Select work mode
-                    </option>
-                    <option value="HYBRID">Hybrid</option>
-                    <option value="ON_SITE">On Site</option>
-                    <option value="CLIENT_LOCATION">Client Location</option>
-                  </select>
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select work mode" },
+                      { value: "HYBRID", label: "Hybrid" },
+                      { value: "ON_SITE", label: "On Site" },
+                      { value: "CLIENT_LOCATION", label: "Client Location" },
+                    ]}
+                    value={formData.locationType || ""}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, locationType: val }))}
+                  />
                 </div>
               </div>
               <div>
@@ -975,8 +892,8 @@ const AssetDetail = () => {
                 >
                   <div className="relative">
                     <Listbox.Button className="relative w-full cursor-pointer bg-slate-50 border border-slate-200 rounded-xl py-2 pl-3 pr-10 text-left text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
-                      <span className="block truncate text-slate-700">
-                        {returnData.conditionOnReturn}
+                      <span className={`block truncate ${!returnData.conditionOnReturn ? "text-slate-400 italic" : "text-slate-700"}`}>
+                        {returnData.conditionOnReturn || "Select Condition Type"}
                       </span>
                       <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                         <ChevronDown

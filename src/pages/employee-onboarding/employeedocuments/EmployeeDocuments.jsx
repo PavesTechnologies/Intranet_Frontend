@@ -13,6 +13,7 @@ import {
   Clock,
   Briefcase,
 } from "lucide-react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 export default function EmployeeDocumentsPage() {
   const [search, setSearch] = useState("");
@@ -203,8 +204,6 @@ export default function EmployeeDocumentsPage() {
       try {
         setLoading(true);
 
-        const token = localStorage.getItem("token");
-
         const [documentsResponse, offersResponse] = await Promise.all([
           fetch(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/employees/documents`,
@@ -212,7 +211,7 @@ export default function EmployeeDocumentsPage() {
               method: "GET",
               headers: {
                 accept: "application/json",
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
               },
             },
           ),
@@ -222,7 +221,7 @@ export default function EmployeeDocumentsPage() {
               method: "GET",
               headers: {
                 accept: "application/json",
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
               },
             },
           ),
@@ -306,7 +305,7 @@ export default function EmployeeDocumentsPage() {
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/view_documents?file_path=${filePath}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -510,19 +509,11 @@ export default function EmployeeDocumentsPage() {
                   <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-pink-500 to-violet-500 opacity-0 blur transition duration-500 group-focus-within:opacity-20"></div>
                   <div className="relative flex items-center">
                     <Filter className="absolute left-3.5 h-4 w-4 text-zinc-400 transition-colors group-focus-within:text-violet-500" />
-                    <select
+                    <FilterListbox
+                      options={[{value:"",label:"All Categories"}, ...categoryOptions.map((option) => ({value: option, label: option}))]}
                       value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="h-11 w-full appearance-none rounded-2xl border-0 bg-zinc-50/50 backdrop-blur-md pl-10 pr-10 text-sm text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-200 backdrop-blur-sm transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-violet-600 sm:w-48"
-                    >
-                      <option value="">All Categories</option>
-                      {categoryOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3.5 h-4 w-4 text-zinc-400 pointer-events-none transition-colors group-hover:text-zinc-600" />
+                      onChange={setCategoryFilter}
+                    />
                   </div>
                 </div>
 
@@ -530,19 +521,11 @@ export default function EmployeeDocumentsPage() {
                   <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-violet-500 to-rose-500 opacity-0 blur transition duration-500 group-focus-within:opacity-20"></div>
                   <div className="relative flex items-center">
                     <Briefcase className="absolute left-3.5 h-4 w-4 text-zinc-400 transition-colors group-focus-within:text-violet-500" />
-                    <select
+                    <FilterListbox
+                      options={[{value:"",label:"All Departments"}, ...departmentOptions.map((option) => ({value: option, label: option}))]}
                       value={departmentFilter}
-                      onChange={(e) => setDepartmentFilter(e.target.value)}
-                      className="h-11 w-full appearance-none rounded-2xl border-0 bg-zinc-50/50 backdrop-blur-md pl-10 pr-10 text-sm text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-200 backdrop-blur-sm transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-violet-600 sm:w-52"
-                    >
-                      <option value="">All Departments</option>
-                      {departmentOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3.5 h-4 w-4 text-zinc-400 pointer-events-none transition-colors group-hover:text-zinc-600" />
+                      onChange={setDepartmentFilter}
+                    />
                   </div>
                 </div>
               </div>
@@ -603,24 +586,11 @@ export default function EmployeeDocumentsPage() {
                         <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
                           <div className="relative flex items-center">
                             <Filter className="absolute left-3.5 h-4 w-4 text-zinc-400" />
-                            <select
+                            <FilterListbox
+                              options={[{value:"",label:"All In This Department"}, ...categoryOptions.map((option) => ({value: option, label: option}))]}
                               value={groupCategoryFilter}
-                              onChange={(e) =>
-                                setGroupCategoryFilters((prev) => ({
-                                  ...prev,
-                                  [departmentName]: e.target.value,
-                                }))
-                              }
-                              className="h-11 w-full appearance-none rounded-2xl border-0 bg-zinc-50 pl-10 pr-10 text-sm text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-200 transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-violet-600 sm:w-56"
-                            >
-                              <option value="">All In This Department</option>
-                              {categoryOptions.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="absolute right-3.5 h-4 w-4 text-zinc-400 pointer-events-none" />
+                              onChange={(val) => setGroupCategoryFilters((prev) => ({ ...prev, [departmentName]: val }))}
+                            />
                           </div>
                         </div>
                       </div>

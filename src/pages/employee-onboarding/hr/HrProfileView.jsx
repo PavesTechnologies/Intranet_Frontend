@@ -19,7 +19,6 @@ export default function HrProfileView() {
   const { user_uuid } = useParams();
   const navigate = useNavigate();
 
-  const token = localStorage.getItem("token");
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const tabs = ["overview", "education", "experience", "identity documents"];
@@ -76,7 +75,7 @@ export default function HrProfileView() {
         },
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -109,48 +108,87 @@ export default function HrProfileView() {
     (async () => {
       try {
         const res = await axios.get(`${BASE_URL}/hr/hr/${user_uuid}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
         setProfile(res.data);
-        const status = res.data.offer?.offer_status;
-        setVerificationStatus(status);
+const status = res.data.offer?.offer_status;
+setVerificationStatus(status);
 
-        if (status === "Verified") {
-          setSectionStatus({
-            overview: true,
-            education: true,
-            experience: true,
-            "identity documents": true,
-          });
+// Initialize section status
+const newSectionStatus = {
+  overview: false,
+  education: false,
+  experience: false,
+  "identity documents": false,
+};
 
-          const allDocs = {};
+// Initialize document status
+const newDocStatus = {};
 
-          [
-            ...(res.data.education_documents || []),
-            ...(res.data.identity_documents || []),
-            ...(res.data.experience?.flatMap((e) => e.documents || []) || []),
-          ].forEach((d, i) => {
-            allDocs[getDocKey(d, i)] = true;
-          });
+// Education documents
+(res.data.education_documents || []).forEach((doc, i) => {
+  const key = getDocKey(doc, i);
+  const isVerified = doc.verification_status === "Verified";
+  newDocStatus[key] = isVerified;
 
-          setDocStatus(allDocs);
-          setActiveTab("overview");
-        } else {
-          // Submitted → reset UI
-          setSectionStatus({
-            overview: false,
-            education: false,
-            experience: false,
-            "identity documents": false,
-          });
+  if (isVerified) {
+    newSectionStatus.education = true;
+  }
+});
 
-          setDocStatus({});
-          setActiveTab("overview");
-        }
-        /* restore saved verification */
+// Identity documents
+(res.data.identity_documents || []).forEach((doc, i) => {
+  const key = getDocKey(doc, i);
+  const isVerified = doc.verification_status === "Verified";
+  newDocStatus[key] = isVerified;
 
-        setLoadedFromStorage(true);
+  if (isVerified) {
+    newSectionStatus["identity documents"] = true;
+  }
+});
+
+// Experience documents
+(res.data.experience || []).forEach((exp) => {
+  (exp.documents || []).forEach((doc, i) => {
+    const key = getDocKey(doc, i);
+    const isVerified = doc.verification_status === "Verified";
+    newDocStatus[key] = isVerified;
+
+    if (isVerified) {
+      newSectionStatus.experience = true;
+    }
+  });
+});
+
+// Overview section
+if (
+  res.data.personal_details?.verification_status === "Verified" ||
+  res.data.bank_details?.verification_status === "Verified" ||
+  res.data.pf_details?.verification_status === "Verified" ||
+  (res.data.addresses || []).some(
+    (a) => a.verification_status === "Verified"
+  )
+) {
+  newSectionStatus.overview = true;
+}
+
+// If profile is fully verified
+if (status === "Verified") {
+  Object.keys(newSectionStatus).forEach((key) => {
+    newSectionStatus[key] = true;
+  });
+
+  Object.keys(newDocStatus).forEach((key) => {
+    newDocStatus[key] = true;
+  });
+}
+
+// Set states
+setSectionStatus(newSectionStatus);
+setDocStatus(newDocStatus);
+setActiveTab("overview");
+setLoadedFromStorage(true);
       } catch {
         showStatusToast("Failed to load profile", "error");
       } finally {
@@ -168,7 +206,7 @@ export default function HrProfileView() {
     try {
       const res = await axios.get(`${BASE_URL}/hr/view_documents`, {
         params: { file_path: encodeURIComponent(url) },
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
       const fileUrl = res.data.replace(/^"+|"+$/g, "");
@@ -273,7 +311,7 @@ export default function HrProfileView() {
       await axios.post(
         `${BASE_URL}/hr/verify-profile`,
         { user_uuid, status: "Verified" },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
 
       setVerificationStatus("Verified");

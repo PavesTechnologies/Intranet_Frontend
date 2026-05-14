@@ -7,11 +7,12 @@ import {
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
-import { Pencil, Trash2 } from "lucide-react";
+import { EditIcon, DeleteIcon } from "@/components/icons";
 import Modal from "../../../components/Modal/modal";
 import ComplianceForm from "./client_configuration/forms/ComplianceForm";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { useAuth } from "../../../contexts/AuthContext";
+import GenericTable from "../../../components/Table/table";
 
 const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
   const { user } = useAuth();
@@ -161,128 +162,58 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
   );
 
   return (
-    <div className="p-4">
+    <div className="p-2">
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-max w-full text-sm text-center">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Requirement
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Mandatory
-                </th>
-                {/* <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Source
-              </th> */}
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-
-            {/* BODY */}
-            <tbody className="divide-y divide-gray-100">
-              {paginatedData.map((item) => (
-                <tr key={item.complianceId} className="hover:bg-gray-50">
-                  {/* REQUIREMENT */}
-                  <td className="px-6 py-4 font-semibold text-gray-900">
-                    {item.requirementName}
-                  </td>
-
-                  {/* TYPE */}
-                  <td className="px-6 py-4 text-gray-700">
-                    {item.requirementType}
-                  </td>
-
-                  {/* MANDATORY */}
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${item.mandatoryFlag
-                          ? "bg-red-100 text-red-700"
-                          : "bg-gray-100 text-gray-600"
-                        }
-                    `}
+        <GenericTable
+          headers={["Requirement", "Type", "Mandatory", "Status", "Actions"]}
+          columns={["requirementName", "requirementType", "mandatory_info", "status_info", "actions"]}
+          rows={paginatedData.map((item) => ({
+            ...item,
+            mandatory_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${item.mandatoryFlag ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+                {item.mandatoryFlag ? "Mandatory" : "Optional"}
+              </span>
+            ),
+            status_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${item.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                {item.activeFlag ? "Active" : "Inactive"}
+              </span>
+            ),
+            actions: (
+              <div className="flex justify-center items-center gap-4">
+                {canEditConfig ? (
+                  <>
+                    <button
+                      title="Edit Compliance"
+                      onClick={() => {
+                        handleSetFormData(item);
+                        setOpenUpdateCompliance(true);
+                      }}
+                      className="px-2 text-blue-600 hover:text-blue-800 transition"
                     >
-                      {item.mandatoryFlag ? "Mandatory" : "Optional"}
-                    </span>
-                  </td>
-
-                  {/* SOURCE */}
-                  {/* <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${
-                        item.isInherited
-                          ? "bg-indigo-100 text-indigo-700"
-                          : "bg-purple-100 text-purple-700"
-                      }
-                    `}
-                  >
-                    {item.isInherited ? "Inherited" : "Project"}
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      title="Delete Compliance"
+                      onClick={() => {
+                        setSelectedComplianceId(item.complianceId);
+                        setOpenConfirmModal(true);
+                      }}
+                      className="p-1 text-red-600 hover:text-red-800 transition"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-gray-500 italic text-xs">
+                    Don't have permission to take actions
                   </span>
-                </td> */}
-
-                  {/* STATUS */}
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${item.activeFlag
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-600"
-                        }
-                    `}
-                    >
-                      {item.activeFlag ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-
-                  {/* ACTIONS */}
-                  <td className="px-6 py-4">
-                    {canEditConfig ? (
-                      <div className="flex justify-center items-center gap-4">
-                        <button
-                          title="Edit Compliance"
-                          onClick={() => {
-                            handleSetFormData(item);
-                            // setOpenMenu(false);
-                            setOpenUpdateCompliance(true);
-                          }}
-                          className="px-2 text-blue-600 hover:text-blue-800 transition"
-                        >
-                          <Pencil size={14} />
-                        </button>
-
-                        <button
-                          title="Delete Compliance"
-                          onClick={() => {
-                            setSelectedComplianceId(item.complianceId);
-                            // setOpenMenu(false);
-                            setOpenConfirmModal(true);
-                          }}
-                          className="p-1 text-red-600 hover:text-red-800 transition"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-gray-500 italic text-xs">
-                        Don't have permission to take actions
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                )}
+              </div>
+            )
+          }))}
+        />
         </div>
       </div>
 
@@ -298,21 +229,32 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
       {/* Update Compliance Modal */}
       <Modal
         title="Update Compliance"
-        subtitle="Update Compliance details."
+        subtitle="Update Compliance details for the client."
         isOpen={openUpdateCompliance}
         onClose={() => setOpenUpdateCompliance(false)}
+        bodyClassName="p-5 overflow-y-auto max-h-[60vh]"
+        scrollable={true}
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setOpenUpdateCompliance(false)}
+              className="px-6 py-2 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition-all active:scale-95 text-[12px] uppercase tracking-wider"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUpdateCompliance}
+              disabled={updateLoading}
+              className={`px-8 py-2 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-md ${
+                updateLoading ? "opacity-50 cursor-not-allowed" : "active:scale-95"
+              } text-[12px] uppercase tracking-wider`}
+            >
+              {updateLoading ? "Updating..." : "Update"}
+            </button>
+          </div>
+        }
       >
         <ComplianceForm formData={formData} setFormData={setFormData} />
-        <div className="flex justify-end mt-4">
-          <button
-            type="button"
-            onClick={handleUpdateCompliance}
-            disabled={updateLoading}
-            className={`px-4 py-2 rounded-xl bg-blue-700 text-white hover:bg-blue-800 ${updateLoading && "opacity-50 cursor-not-allowed"}`}
-          >
-            {updateLoading ? "Updating..." : "Update"}
-          </button>
-        </div>
       </Modal>
 
       {/* Delete Compliance Modal */}

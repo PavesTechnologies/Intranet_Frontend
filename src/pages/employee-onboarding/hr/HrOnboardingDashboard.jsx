@@ -33,10 +33,10 @@ import JoinModal from "./components/JoinModal";
 import OfferStatusCell from "./components/OfferStatusCell";
 import ReassignJoiningModal from "./components/ReassignJoiningModal";
 import StatCard from "./components/StatCard";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 export default function HrOnboardingDashboard() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const [data, setData] = useState([]);
@@ -79,6 +79,31 @@ export default function HrOnboardingDashboard() {
     joining_comments: "",
   });
 
+  const getManagerDisplayName = (manager) =>
+    `${manager.first_name || ""} ${manager.last_name || ""}`.trim();
+
+  const getManagerPayloadValue = (manager) =>
+    String(manager.employee_id || "").trim();
+
+  const resolveReportingManager = (value) => {
+    const normalizedValue = String(value || "").trim();
+    if (!normalizedValue) return "";
+
+    const manager = managerOptions.find((option) => {
+      const optionValue = String(option.value || "").trim();
+      const optionLabel = String(option.label || "").trim();
+      const optionName = String(option.name || "").trim();
+
+      return (
+        optionValue === normalizedValue ||
+        optionLabel === normalizedValue ||
+        optionName === normalizedValue
+      );
+    });
+
+    return manager?.value || normalizedValue;
+  };
+
   const handleKpiClick = (status) => {
     setStatusFilter(status);
     setCurrentPage(1);
@@ -87,7 +112,7 @@ export default function HrOnboardingDashboard() {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const offers = await fetchOfferDetailsList(BASE_URL, token);
+      const offers = await fetchOfferDetailsList(BASE_URL, localStorage.getItem("token"));
       setData(offers);
     } catch (err) {
       console.error(err);
@@ -102,7 +127,7 @@ export default function HrOnboardingDashboard() {
         `${BASE_URL}/permanent-employee/core-employee-details/`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -148,7 +173,7 @@ export default function HrOnboardingDashboard() {
         `${BASE_URL}/hr/offerletters/${employee.user_uuid}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
@@ -207,14 +232,23 @@ export default function HrOnboardingDashboard() {
 
     try {
       const res = await axios.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
-      console.log("CORE EMPLOYEE RESPONSE:", res.data);
-      const managers = (res.data || []).map((u) => ({
-        value: `${u.first_name || ""} ${u.last_name || ""}`.trim(),
-        label: `${u.first_name || ""} ${u.last_name || ""}`.trim(),
-      }));
+      const managers = (res.data || [])
+        .map((u) => {
+          const displayName = getManagerDisplayName(u);
+          const payloadValue = getManagerPayloadValue(u);
+
+          if (!displayName || !payloadValue) return null;
+
+          return {
+            value: payloadValue,
+            label: displayName,
+            name: displayName,
+          };
+        })
+        .filter(Boolean);
 
       setManagerOptions(managers);
     } catch (err) {
@@ -240,7 +274,7 @@ export default function HrOnboardingDashboard() {
       const res = await axios.get(
         `${BASE_URL}/hr/offerletters/${userUuid}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
       );
 
@@ -308,7 +342,7 @@ export default function HrOnboardingDashboard() {
       location: "",
       department: "",
       reporting_manager: "",
-      joining_comments: "",
+      custom_message: "",
     });
   };
 
@@ -347,9 +381,17 @@ export default function HrOnboardingDashboard() {
       return;
     }
 
+    const normalizedReportingManager =
+      resolveReportingManager(reporting_manager);
+
     const payload = {
       user_emails_list: emails,
       ...joinForm,
+      reporting_manager: normalizedReportingManager,
+    };
+    const joiningDetails = {
+      ...joinForm,
+      reporting_manager: normalizedReportingManager,
     };
 
     try {
@@ -357,7 +399,7 @@ export default function HrOnboardingDashboard() {
 
       await axios.post(`${BASE_URL}/hr/offerletters/bulk-join`, payload, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
         },
       });
@@ -367,7 +409,7 @@ export default function HrOnboardingDashboard() {
           selectedIds.includes(emp.user_uuid)
             ? {
               ...emp,
-              ...joinForm,
+              ...joiningDetails,
               status:
                 getNormalizedStatus(emp.status) === "VERIFIED"
                   ? "JOINING"
@@ -380,7 +422,7 @@ export default function HrOnboardingDashboard() {
       selectedEmployees.forEach((employee) =>
         persistJoiningStatus({
           ...employee,
-          ...joinForm,
+          ...joiningDetails,
           status: "JOINING",
         }),
       );
@@ -424,10 +466,13 @@ export default function HrOnboardingDashboard() {
       return;
     }
 
+    const normalizedReportingManager =
+      resolveReportingManager(reporting_manager);
+
     const payload = {
       user_uuid: editingEmployee.user_uuid,
       new_joining_date: joining_date,
-      reporting_manager,
+      reporting_manager: normalizedReportingManager,
       reporting_time,
       location,
       department,
@@ -439,7 +484,7 @@ export default function HrOnboardingDashboard() {
 
       const res = await axios.put(`${BASE_URL}/hr/offerletters/reassign-joining`, payload, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
         },
       });
@@ -453,7 +498,7 @@ export default function HrOnboardingDashboard() {
         reporting_time,
         location,
         department,
-        reporting_manager,
+        reporting_manager: normalizedReportingManager,
         joining_comments,
       });
 
@@ -467,7 +512,7 @@ export default function HrOnboardingDashboard() {
               reporting_time,
               location,
               department,
-              reporting_manager,
+              reporting_manager: normalizedReportingManager,
               joining_comments,
             }
             : emp,
@@ -758,23 +803,25 @@ export default function HrOnboardingDashboard() {
               />
             </div>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full md:w-48 px-3 py-2 bg-white border border-slate-300 text-slate-900 text-sm rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium"
-            >
-              <option value="ALL">All Status</option>
-              <option value="SUBMITTED">Submitted</option>
-              <option value="VERIFIED">Verified</option>
-              <option value="JOINING">Joining</option>
-              <option value="JOINING_PENDING">Joining Pending</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="RESCHEDULED">Rescheduled</option>
-              <option value="REJECTED">Rejected</option>
-            </select>
+            <div className="w-full md:w-48">
+              <FilterListbox
+                options={[
+                  { value: "ALL", label: "All Status" },
+                  { value: "SUBMITTED", label: "Submitted" },
+                  { value: "VERIFIED", label: "Verified" },
+                  { value: "JOINING", label: "Joining" },
+                  { value: "JOINING_PENDING", label: "Joining Pending" },
+                  { value: "COMPLETED", label: "Completed" },
+                  { value: "RESCHEDULED", label: "Rescheduled" },
+                  { value: "REJECTED", label: "Rejected" },
+                ]}
+                value={statusFilter}
+                onChange={(val) => {
+                  setStatusFilter(val);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-3">

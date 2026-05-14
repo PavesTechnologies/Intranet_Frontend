@@ -9,7 +9,7 @@ export default function EditUserHr() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+
 
     axios
       .get(
@@ -18,7 +18,7 @@ export default function EditUserHr() {
         }/general_user/edit-user/${user_id}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       )
@@ -35,7 +35,7 @@ export default function EditUserHr() {
   };
 
   const handleSubmit = async () => {
-    const token = localStorage.getItem("token");
+
 
     try {
       await axios.put(
@@ -45,7 +45,7 @@ export default function EditUserHr() {
         form,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );

@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { AlertTriangle, Eye, Edit2, Check, X } from "lucide-react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { CATEGORY_OPTIONS } from "../constants/benchConstants";
 import { getAgingTone } from "../models/benchModel";
 import { updateStatusResource } from "../services/benchService";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { toast } from "react-toastify";
+import GenericTable from "../../../../components/Table/table";
 
 const BENCH_STATES = [
   "READY",
@@ -112,205 +114,160 @@ const BenchTable = ({
   const validStates = activeTab === "bench" ? BENCH_STATES : POOL_STATES;
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50">
-            <tr className="bg-slate-50 hover:bg-slate-50 border-b border-slate-100">
-              {/* <th className="w-12 px-5 py-4 text-left">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  ref={(node) => {
-                    if (node) node.indeterminate = !allSelected && anySelected;
-                  }}
-                  onChange={(event) => onToggleAll(event.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                />
-              </th> */}
-              <th className="px-4 py-4 text-left text-[10px] font-black capitalize tracking-widest text-slate-400">Consultant Details</th>
-              <th className="px-4 py-4 text-left text-[10px] font-black capitalize tracking-widest text-slate-400">Core Expertise</th>
-              <th className="px-4 py-4 text-left text-[10px] font-black capitalize tracking-widest text-slate-400 min-w-[130px]">Status</th>
-              <th className="px-4 py-4 text-center text-[10px] font-black capitalize tracking-widest text-slate-400">Availability</th>
-              <th className="px-4 py-4 text-left text-[10px] font-black capitalize tracking-widest text-slate-400 min-w-[100px]">Aging</th>
-              <th className="px-4 py-4 text-right text-[10px] font-black capitalize tracking-widest text-slate-400">Daily Exposure</th>
-              <th className="px-5 py-4 text-center text-[10px] font-black capitalize tracking-widest text-slate-400">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading ? (
-              <tr>
-                <td colSpan={8} className="px-6 py-20 text-center">
-                  <div className="flex justify-center items-center">
-                    <LoadingSpinner text="Loading Resources..." />
-                  </div>
-                </td>
-              </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-6 py-20 text-center text-[13px] font-medium text-slate-400 italic">
-                  {emptyState}
-                </td>
-              </tr>
-            ) : null}
+    <>
+      <div className="overflow-x-auto no-scrollbar">
+        <GenericTable
+          headers={["Consultant Details", "Core Expertise", "Status", "Availability", "Aging", "Daily Exposure", "Actions"]}
+          columns={["consultant_info", "expertise_info", "status_info", "availability_info", "aging_info", "cost_info", "actions"]}
+          rows={rows.map((row) => {
+            const agingTone = getAgingTone(row.agingDays);
+            const isEditing = editingRow?.id === row.id;
 
-            {!loading && rows.map((row) => {
-              const agingTone = getAgingTone(row.agingDays);
-
-              return (
-                <tr
-                  key={row.id}
-                  onClick={() => onView(row)}
-                  className={`group transition-all cursor-pointer hover:bg-indigo-50/30 ${activeRowId === row.id ? "bg-indigo-50/50" : ""}`}
-                >
-                  <td className="px-4 py-4 align-middle">
-                    <div className="flex flex-col">
-                      <span className="text-[13px] font-bold text-slate-900 leading-tight tracking-tight">{row.name}</span>
-                      <span className="text-[11px] font-medium text-slate-400 leading-normal">{row.role}</span>
-                    </div>
-                  </td>
-                  <td className={`px-4 py-4 align-middle min-w-[200px] ${editingRow?.id === row.id ? "opacity-50 pointer-events-none" : ""}`}>
-                    <div className="flex flex-col gap-1">
-                      {row.topSkills.length === 0 ? (
-                        <span className="text-[10px] text-slate-300 italic">No expertise logged</span>
-                      ) : (
-                        <>
-                          <div className="flex flex-wrap gap-1">
-                            {row.topSkills.slice(0, 3).map((skill) => (
-                              <span
-                                key={`${row.id}-${skill.name}`}
-                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${skill.stale
-                                  ? "bg-amber-50 text-amber-700 border-amber-100"
-                                  : "bg-slate-50 text-slate-600 border-slate-100"
-                                  }`}
-                              >
-                                {skill.name}
-                              </span>
-                            ))}
-                          </div>
-                          {(row.topSkills.length > 3 || row.skills?.length > 5) && (
-                            <div className="flex flex-wrap gap-1">
-                              {row.topSkills.slice(3, 5).map((skill) => (
-                                <span
-                                  key={`${row.id}-${skill.name}`}
-                                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${skill.stale
-                                    ? "bg-amber-50 text-amber-700 border-amber-100"
-                                    : "bg-slate-50 text-slate-600 border-slate-100"
-                                    }`}
-                                >
-                                  {skill.name}
-                                </span>
-                              ))}
-                              {row.skills?.length > 5 && (
-                                <span
-                                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border bg-indigo-50 text-indigo-600 border-indigo-100 cursor-help"
-                                  title={row.skills.slice(5).join(", ")}
-                                >
-                                  +{row.skills.length - 5}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    {(row.warnings.missingSkills || row.missingSkills.length > 0) && (
-                      <div className="mt-1.5 flex gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                        <AlertTriangle className="h-3 w-3 text-rose-500 mt-0.5" />
-                        <span className="text-[9px] font-bold text-rose-600 capitalize">Skill Gaps Detected</span>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 align-middle min-w-[130px]" onClick={(event) => event.stopPropagation()}>
-                    {editingRow?.id === row.id ? (
-                      <div className="flex flex-col gap-2 min-w-[150px] py-1">
-                        <div className="relative">
-                          <select
-                            value={editStatus}
-                            onChange={(e) => setEditStatus(e.target.value)}
-                            disabled={isSaving}
-                            className="h-9 w-full rounded-lg border border-slate-300 bg-white pl-3 pr-8 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 appearance-none transition-all cursor-pointer"
+            return {
+              ...row,
+              rowClass: activeRowId === row.id ? "bg-indigo-50/50" : "",
+              onRowClick: () => onView(row),
+              consultant_info: (
+                <div className="flex flex-col">
+                  <span className="text-[13px] font-bold text-slate-900 leading-tight tracking-tight">{row.name}</span>
+                  <span className="text-[11px] font-medium text-slate-400 leading-normal">{row.role}</span>
+                </div>
+              ),
+              expertise_info: (
+                <div className={`flex flex-col gap-1 ${isEditing ? "opacity-50 pointer-events-none" : ""}`}>
+                  {row.topSkills.length === 0 ? (
+                    <span className="text-[10px] text-slate-300 italic">No expertise logged</span>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-1">
+                        {row.topSkills.slice(0, 3).map((skill) => (
+                          <span
+                            key={`${row.id}-${skill.name}`}
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${skill.stale
+                              ? "bg-amber-50 text-amber-700 border-amber-100"
+                              : "bg-slate-50 text-slate-600 border-slate-100"
+                              }`}
                           >
-                            <option value="" disabled>Select Status</option>
-                            {validStates.map((status) => (
-                              <option key={status} value={status}>
-                                {status.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        </div>
-                        <input
-                          type="text"
-                          value={editReason}
-                          onChange={(e) => setEditReason(e.target.value)}
-                          placeholder="Reason..."
-                          disabled={isSaving}
-                          className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-[11px] font-medium text-slate-600 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 transition-all"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex flex-wrap gap-1">
-                          <span className="text-[10px] font-black text-slate-600 capitalize">
-                            {row.category?.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                            {skill.name}
                           </span>
-                        </div>
+                        ))}
                       </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 align-middle text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className={`text-[13px] font-bold ${row.allocation < 50 ? 'text-rose-600' : 'text-slate-900'}`}>
-                        {row.allocation}%
-                      </span>
-                      <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${row.allocation >= 75 ? 'bg-emerald-500' : row.allocation >= 25 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                          style={{ width: `${row.allocation}%` }}
+                      {(row.topSkills.length > 3 || row.skills?.length > 5) && (
+                        <div className="flex flex-wrap gap-1">
+                          {row.topSkills.slice(3, 5).map((skill) => (
+                            <span
+                              key={`${row.id}-${skill.name}`}
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${skill.stale
+                                ? "bg-amber-50 text-amber-700 border-amber-100"
+                                : "bg-slate-50 text-slate-600 border-slate-100"
+                                }`}
+                            >
+                              {skill.name}
+                            </span>
+                          ))}
+                          {row.skills?.length > 5 && (
+                            <span
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border bg-indigo-50 text-indigo-600 border-indigo-100 cursor-help"
+                              title={row.skills.slice(5).join(", ")}
+                            >
+                              +{row.skills.length - 5}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {(row.warnings.missingSkills || row.missingSkills.length > 0) && (
+                    <div className="mt-1.5 flex gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                      <AlertTriangle className="h-3 w-3 text-rose-500 mt-0.5" />
+                      <span className="text-[9px] font-bold text-rose-600 capitalize">Skill Gaps Detected</span>
+                    </div>
+                  )}
+                </div>
+              ),
+              status_info: (
+                <div onClick={(e) => e.stopPropagation()}>
+                  {isEditing ? (
+                    <div className="flex flex-col gap-2 min-w-[150px] py-1">
+                      <div className="relative">
+                        <FilterListbox
+                          options={validStates.map((status) => ({
+                            value: status,
+                            label: status.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+                          }))}
+                          value={editStatus}
+                          onChange={setEditStatus}
                         />
                       </div>
+                      <input
+                        type="text"
+                        value={editReason}
+                        onChange={(e) => setEditReason(e.target.value)}
+                        placeholder="Reason..."
+                        disabled={isSaving}
+                        className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-[11px] font-medium text-slate-600 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 transition-all"
+                      />
                     </div>
-                  </td>
-                  <td className={`px-4 py-4 align-middle min-w-[100px] ${editingRow?.id === row.id ? "opacity-50 pointer-events-none" : ""}`}>
-                    {renderPill(agingTone.label, `${agingTone.className} !px-2.5 !py-1 text-[10px] capitalize whitespace-nowrap`)}
-                  </td>
-                  <td className="px-4 py-4 align-middle text-right">
-                    <div className="flex flex-col">
-                      <span className={`text-[12px] font-bold ${row.warnings.highCost ? "text-rose-700" : "text-slate-900"}`}>
-                        {row.costPerDay === null ? "—" : `₹${row.costPerDay.toLocaleString()}`}
-                      </span>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-wrap gap-1">
+                        <span className="text-[10px] font-black text-slate-600 capitalize">
+                          {row.category?.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                        </span>
+                      </div>
                     </div>
-                  </td>
-                  <td className="px-5 py-4 align-middle text-center" onClick={(event) => event.stopPropagation()}>
-                    <div className="flex justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onView(row)}
-                        title="View Details"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleEditClick(row, e)}
-                        title="Edit Status"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-blue-600 transition-all hover:bg-blue-50 hover:text-blue-700"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  )}
+                </div>
+              ),
+              availability_info: (
+                <div className="flex flex-col items-center gap-1">
+                  <span className={`text-[13px] font-bold ${row.availability < 50 ? 'text-rose-600' : 'text-slate-900'}`}>
+                    {row.availability}%
+                  </span>
+                  <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${row.availability >= 75 ? 'bg-emerald-500' : row.availability >= 25 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                      style={{ width: `${row.availability}%` }}
+                    />
+                  </div>
+                </div>
+              ),
+              aging_info: (
+                <div className={isEditing ? "opacity-50 pointer-events-none" : ""}>
+                  {renderPill(agingTone.label, `${agingTone.className} !px-2.5 !py-1 text-[10px] capitalize whitespace-nowrap`)}
+                </div>
+              ),
+              cost_info: (
+                <div className="flex flex-col text-right">
+                  <span className={`text-[12px] font-bold ${row.warnings.highCost ? "text-rose-700" : "text-slate-900"}`}>
+                    {row.costPerDay === null ? "—" : `₹${row.costPerDay.toLocaleString()}`}
+                  </span>
+                </div>
+              ),
+              actions: (
+                <div className="flex justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => onView(row)}
+                    title="View Details"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleEditClick(row, e)}
+                    title="Edit Status"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-blue-600 transition-all hover:bg-blue-50 hover:text-blue-700"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                </div>
+              )
+            };
+          })}
+          loading={loading}
+        />
       </div>
 
       {editingRow && (
@@ -338,22 +295,11 @@ const BenchTable = ({
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">New Target State</label>
                 <div className="relative">
-                  <select
+                  <FilterListbox
+                    options={[{value:"",label:"Select a substate"},...validStates.map((status) => ({ value: status, label: status.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') }))]}
                     value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                    disabled={isSaving}
-                    className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 outline-none transition-all hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60"
-                  >
-                    <option value="" disabled>Select a substate</option>
-                    {validStates.map((state) => (
-                      <option key={state} value={state} className="font-medium">
-                        {state.replace(/_/g, " ")}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                  </div>
+                    onChange={setEditStatus}
+                  />
                 </div>
               </div>
 
@@ -400,7 +346,7 @@ const BenchTable = ({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

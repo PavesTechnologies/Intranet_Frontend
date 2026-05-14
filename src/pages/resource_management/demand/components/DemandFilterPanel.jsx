@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Filter, X, ChevronDown, Check } from "lucide-react";
+import { FilterIcon, CloseIcon, ChevronDownIcon, CheckIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -77,7 +77,7 @@ function SearchableDropdown({ label, value, options, onChange, placeholder }) {
                     placeholder={placeholder}
                     onClick={() => setIsOpen(true)}
                 />
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+                <ChevronDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
             </div>
 
             {isOpen &&
@@ -101,7 +101,7 @@ function SearchableDropdown({ label, value, options, onChange, placeholder }) {
                                 onClick={() => handleSelect("All")}
                             >
                                 All
-                                {value === "All" && <Check className="ml-auto h-3 w-3 opacity-100" />}
+                                {value === "All" && <CheckIcon className="ml-auto h-3 w-3 opacity-100" />}
                             </div>
                             {filteredOptions.length > 0 ? (
                                 filteredOptions.map((option) => (
@@ -114,7 +114,7 @@ function SearchableDropdown({ label, value, options, onChange, placeholder }) {
                                         onClick={() => handleSelect(option)}
                                     >
                                         {option}
-                                        {value === option && <Check className="ml-auto h-3 w-3 opacity-100" />}
+                                        {value === option && <CheckIcon className="ml-auto h-3 w-3 opacity-100" />}
                                     </div>
                                 ))
                             ) : search && (
@@ -153,7 +153,7 @@ export function DemandFilterPanel({
                 onClick={onToggleCollapse}
                 className="flex items-center gap-2 bg-background border shadow-sm"
             >
-                <Filter className="h-4 w-4" />
+                <FilterIcon className="h-4 w-4" />
                 Filters
                 {activeCount > 0 && (
                     <Badge className="bg-primary text-primary-foreground text-xs h-5 px-1.5">
@@ -168,7 +168,7 @@ export function DemandFilterPanel({
         <div className="w-full lg:w-64 lg:shrink-0 rounded-lg border bg-card flex flex-col shadow-sm lg:sticky lg:top-6">
             <div className="flex items-center justify-between p-4 border-b bg-card z-10">
                 <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <FilterIcon className="h-4 w-4 text-muted-foreground" />
                     <h3 className="text-sm font-heading font-bold text-card-foreground">
                         Filters
                     </h3>
@@ -193,7 +193,7 @@ export function DemandFilterPanel({
                         className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                         onClick={onToggleCollapse}
                     >
-                        <X className="h-4 w-4" />
+                        <CloseIcon className="h-4 w-4" />
                     </button>
                 </div>
             </div>

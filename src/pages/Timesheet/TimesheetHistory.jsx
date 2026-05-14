@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TimesheetHistoryGroup } from "./TimesheetHistoryGroup";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import Button from "../../components/Button/Button";
 
 // Converts a "YYYY-MM-DD" string safely to a Date object in local Indian time
 const parseLocalDate = (dateStr) => {
@@ -241,22 +242,26 @@ const TimesheetHistory = () => {
             maxDate={new Date()}
           />
         </div>
-        <button
-          type="button"
+        <Button
+          // type="button"
+          variant="primary"
+          size="small"
           onClick={() => fetchHistory(startDate, endDate)}
           disabled={!startDate || !endDate || loading}
-          className={`px-4 py-2 rounded text-sm font-medium ${
-            !startDate || !endDate || loading
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-              : "bg-blue-600 text-white hover:bg-blue-700"
-          }`}
+          loading={loading}
+          loadingText={loading ? "Loading..." : ""}
+        // className={`px-4 py-2 rounded text-sm font-medium ${
+        //   !startDate || !endDate || loading
+        //     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+        //     : "bg-blue-600 text-white hover:bg-blue-700"
+        // }`}
         >
-          {loading ? "Loading..." : "Apply"}
-        </button>
+          Apply
+        </Button>
       </div>
       {error && <div className="mb-3 text-sm text-red-600">{error}</div>}
       {loading && (
-        <div>
+        <div className="flex justify-center items-center h-[300px]">
           <LoadingSpinner text="Loading..." />
         </div>
       )}

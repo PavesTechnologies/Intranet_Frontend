@@ -11,23 +11,24 @@ import { getAssetsByProjectId } from "../services/clientservice";
 import CompanyEscalationModal from "./client_configuration/CompanyEscalationModal";
 import { createCompanyContact } from "../services/clientservice";
 import {
-  ArrowLeft,
-  Building2,
-  Globe,
-  FileText,
-  CheckCircle2,
-  ShieldCheck,
-  Users,
-  Box,
-  MoreHorizontal,
-  Briefcase,
-  AlertTriangle,
-  Package,
-  Pencil,
-  Trash2,
-} from "lucide-react";
+  PrevIcon,
+  BuildingIcon,
+  GlobalIcon,
+  DocumentIcon,
+  SuccessIcon,
+  AuthSuccessIcon,
+  TeamIcon,
+  BoxIcon,
+  MoreHorizontalIcon,
+  ProjectsIcon,
+  WarningIcon,
+  PackageIcon,
+  EditIcon,
+  DeleteIcon,
+} from "@/components/icons";
 
 import { useAuth } from "../../../contexts/AuthContext";
+import { KPICard } from "../../../components/kpi/KPI";
 
 import ClientSection from "./ClientSection";
 import AddConfigurationModal from "../models/client_configuration/AddConfigurationModal";
@@ -45,6 +46,7 @@ import {
   createClientCompliance,
   createClientEscalation,
 } from "../services/clientservice";
+import GenericTable from "../../../components/Table/table";
 
 /* ---------------- SUB COMPONENTS ---------------- */
 
@@ -62,7 +64,7 @@ const ProjectSLA = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No SLA configuration found for this project.
       </div>
     );
@@ -93,66 +95,38 @@ const ProjectSLA = ({ data, loading }) => {
         subtitle="Contractual obligations and metrics."
       />
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
-        <div className="px-6 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b min-w-max">
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-blue-50 border-b">
           <p className="text-sm font-semibold text-gray-700">SLA Definitions</p>
         </div>
 
-        <table className="w-full text-sm min-w-[600px]">
-          {/* TABLE HEADER */}
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
-                SLA Type
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
-                Duration
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
-                Warning Threshold
-              </th>
-            </tr>
-          </thead>
-
-          {/* TABLE BODY */}
-          <tbody className="divide-y divide-gray-100">
-            {data.map((sla) => (
-              <tr
-                key={sla.projectSlaId}
-                className="hover:bg-gray-50 transition"
-              >
-                {/* SLA TYPE */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${getSlaTypeColor(
-                      sla.slaType,
-                    )}`}
-                  >
-                    {sla.slaType.replaceAll("_", " ")}
-                  </span>
-                </td>
-
-                {/* DURATION */}
-                <td className="px-6 py-4">
-                  <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
-                    {sla.slaDurationDays} days
-                  </span>
-                </td>
-
-                {/* WARNING */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${getWarningColor(
-                      sla.warningThresholdDays,
-                    )}`}
-                  >
-                    {sla.warningThresholdDays} days
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <GenericTable
+          headers={["SLA Type", "Duration", "Warning Threshold", "Status"]}
+          columns={["slaType_info", "duration_info", "warning_info", "status_info"]}
+          rows={data.map((sla) => ({
+            ...sla,
+            slaType_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getSlaTypeColor(sla.slaType)}`}>
+                {sla.slaType.replaceAll("_", " ")}
+              </span>
+            ),
+            duration_info: (
+              <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                {sla.slaDurationDays} days
+              </span>
+            ),
+            warning_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getWarningColor(sla.warningThresholdDays)}`}>
+                {sla.warningThresholdDays} days
+              </span>
+            ),
+            status_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                {sla.activeFlag ? "Active" : "Inactive"}
+              </span>
+            )
+          }))}
+        />
       </div>
     </div>
   );
@@ -165,7 +139,7 @@ const ProjectCompliance = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No compliance requirements configured for this project.
       </div>
     );
@@ -178,88 +152,29 @@ const ProjectCompliance = ({ data, loading }) => {
         subtitle="Required certifications and audit status."
       />
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
-        <table className="w-full text-sm text-left min-w-[800px]">
-          {/* HEADER */}
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Requirement
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Type
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Mandatory
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Source
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Status
-              </th>
-            </tr>
-          </thead>
-
-          {/* BODY */}
-          <tbody className="divide-y divide-gray-100">
-            {data.map((item) => (
-              <tr key={item.projectComplianceId} className="hover:bg-gray-50">
-                {/* REQUIREMENT */}
-                <td className="px-6 py-4 font-semibold text-gray-900">
-                  {item.requirementName}
-                </td>
-
-                {/* TYPE */}
-                <td className="px-6 py-4 text-gray-700">
-                  {item.requirementType}
-                </td>
-
-                {/* MANDATORY */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${item.mandatoryFlag
-                        ? "bg-red-100 text-red-700"
-                        : "bg-gray-100 text-gray-600"
-                      }
-                    `}
-                  >
-                    {item.mandatoryFlag ? "Mandatory" : "Optional"}
-                  </span>
-                </td>
-
-                {/* SOURCE */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${item.isInherited
-                        ? "bg-indigo-100 text-indigo-700"
-                        : "bg-purple-100 text-purple-700"
-                      }
-                    `}
-                  >
-                    {item.isInherited ? "Inherited" : "Project"}
-                  </span>
-                </td>
-
-                {/* STATUS */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${item.activeFlag
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
-                      }
-                    `}
-                  >
-                    {item.activeFlag ? "Active" : "Inactive"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+        <GenericTable
+          headers={["Requirement", "Type", "Mandatory", "Source", "Status"]}
+          columns={["requirementName", "requirementType", "mandatory_info", "source_info", "status_info"]}
+          rows={data.map((item) => ({
+            ...item,
+            mandatory_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${item.mandatoryFlag ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+                {item.mandatoryFlag ? "Mandatory" : "Optional"}
+              </span>
+            ),
+            source_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${item.isInherited ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"}`}>
+                {item.isInherited ? "Inherited" : "Project"}
+              </span>
+            ),
+            status_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${item.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                {item.activeFlag ? "Active" : "Inactive"}
+              </span>
+            )
+          }))}
+        />
       </div>
     </div>
   );
@@ -272,8 +187,8 @@ const ProjectAssets = ({ assets, loading }) => {
 
   if (!assets || assets.length === 0) {
     return (
-      <div className="text-center p-6 border-2 border-dashed rounded-lg text-gray-400">
-        No assets assigned
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
+        No assets assigned for this project.
       </div>
     );
   }
@@ -285,57 +200,22 @@ const ProjectAssets = ({ assets, loading }) => {
         subtitle="Hardware and licenses allocated to this project."
       />
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
-        <table className="w-full text-sm text-left min-w-[600px]">
-          {/* HEADER */}
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Asset Name
-              </th>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Serial / ID
-              </th>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Assigned User
-              </th>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-            </tr>
-          </thead>
-
-          {/* BODY */}
-          <tbody className="divide-y divide-gray-100">
-            {assets.map((asset, index) => (
-              <tr key={index} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4 font-medium text-gray-900">
-                  {asset.asset?.assetName || asset.assetName || "—"}
-                </td>
-
-                <td className="px-6 py-4 font-mono text-gray-600">
-                  {asset.serialNumber || asset.serial || "—"}
-                </td>
-
-                <td className="px-6 py-4 text-gray-700">
-                  {asset.assignedBy || asset.assignedTo || "—"}
-                </td>
-
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${(asset.asset?.status || asset.status) === "ACTIVE"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
-                      }`}
-                  >
-                    {asset.asset?.status || asset.status || "UNKNOWN"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <GenericTable
+          headers={["Asset Name", "Serial / ID", "Assigned User", "Status"]}
+          columns={["asset_info", "serial_info", "assigned_info", "status_info"]}
+          rows={assets.map((asset, index) => ({
+            ...asset,
+            asset_info: <span>{asset.asset?.assetName || asset.assetName || "—"}</span>,
+            serial_info: <span className="font-mono text-gray-600">{asset.serialNumber || asset.serial || "—"}</span>,
+            assigned_info: <span>{asset.assignedBy || asset.assignedTo || "—"}</span>,
+            status_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${(asset.asset?.status || asset.status) === "ACTIVE" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                {asset.asset?.status || asset.status || "UNKNOWN"}
+              </span>
+            )
+          }))}
+        />
       </div>
     </div>
   );
@@ -351,7 +231,7 @@ const ProjectEscalation = ({ data, loading }) => {
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 italic font-semibold text-center">
         No escalation contacts configured for this project.
       </div>
     );
@@ -469,6 +349,7 @@ const ClientPage = () => {
   const navigate = useNavigate();
 
   // State declarations - ALL hooks inside component
+  const getProjectId = (project) => project?.projectId || project?.pmsProjectId;
   const [selectedProject, setSelectedProject] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [openConfigModal, setOpenConfigModal] = useState(false);
@@ -506,11 +387,12 @@ const ClientPage = () => {
   const [loadingAssets, setLoadingAssets] = useState(false);
   useEffect(() => {
     const fetchAssetsByProject = async () => {
+      const pid = getProjectId(selectedProject);
+      if (!pid) return;
+
       try {
         setLoadingAssets(true);
-
-        const res = await getAssetsByProjectId(selectedProject?.pmsProjectId);
-
+        const res = await getAssetsByProjectId(pid);
         setClientAssets(res.data || []);
       } catch (err) {
         setClientAssets([]);
@@ -519,10 +401,8 @@ const ClientPage = () => {
       }
     };
 
-    if (selectedProject?.pmsProjectId) {
-      fetchAssetsByProject();
-    }
-  }, [selectedProject?.pmsProjectId]);
+    fetchAssetsByProject();
+  }, [getProjectId(selectedProject)]);
 
   // ✅ ADD HERE — Pagination
   const PROJECTS_PER_PAGE = 3;
@@ -550,7 +430,7 @@ const ClientPage = () => {
     overallHealth: "UNKNOWN",
   });
 
-  const getProjectId = (project) => project?.pmsProjectId;
+
 
   // useEffect(() => {
   //   const pid = getProjectId(selectedProject);
@@ -749,7 +629,7 @@ const ClientPage = () => {
     } else {
       setProjectSLA(null);
     }
-  }, [selectedProject?.pmsProjectId, slaRefetchKey]);
+  }, [getProjectId(selectedProject), slaRefetchKey]);
 
   // Fetch project compliance when selected project changes
   useEffect(() => {
@@ -757,7 +637,7 @@ const ClientPage = () => {
     if (pid) {
       fetchProjectCompliance(pid);
     }
-  }, [selectedProject]);
+  }, [getProjectId(selectedProject)]);
 
   // Fetch project escalations when selected project changes
   useEffect(() => {
@@ -765,18 +645,18 @@ const ClientPage = () => {
     if (pid) {
       fetchProjectEscalations(pid);
     }
-  }, [selectedProject]);
+  }, [getProjectId(selectedProject)]);
 
   // Tab icon helper
-  const ActivityIcon = CheckCircle2;
+  const ActivityIcon = SuccessIcon;
 
   // Determine available tabs for the selected project
   const getTabs = () => {
     return [
       { id: "sla", label: "SLA & Metrics", icon: ActivityIcon },
-      { id: "compliance", label: "Pre-requisites", icon: ShieldCheck },
-      { id: "assets", label: "Assets", icon: Box },
-      { id: "escalation", label: "Escalation", icon: Users },
+      { id: "compliance", label: "Pre-requisites", icon: AuthSuccessIcon },
+      { id: "assets", label: "Assets", icon: BoxIcon },
+      { id: "escalation", label: "Escalation", icon: TeamIcon },
     ];
   };
 
@@ -785,28 +665,28 @@ const ClientPage = () => {
     {
       label: "Active Projects",
       value: clientStats.activeProjects,
-      icon: FileText,
+      icon: DocumentIcon,
       color: "text-blue-600",
       bg: "bg-blue-100",
     },
     {
       label: "Total Spend",
       value: formatCurrency(clientStats.totalSpend),
-      icon: Box,
+      icon: BoxIcon,
       color: "text-emerald-600",
       bg: "bg-emerald-100",
     },
     {
       label: "Satisfaction",
       value: clientStats.satisfactionScore != null ? `${clientStats.satisfactionScore}%` : "0%",
-      icon: Users,
+      icon: TeamIcon,
       color: "text-purple-600",
       bg: "bg-purple-100",
     },
     {
       label: "Pending Issues",
       value: clientStats.pendingIssues || 0,
-      icon: AlertTriangle,
+      icon: WarningIcon,
       color: "text-orange-600",
       bg: "bg-orange-100",
     },
@@ -830,20 +710,20 @@ const ClientPage = () => {
             onClick={() => navigate(-1)}
             className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm"
           >
-            <ArrowLeft size={18} />
+            <PrevIcon size={18} />
           </button>
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center flex-wrap gap-2">
               <span className="truncate max-w-[200px] sm:max-w-none">{clientDetails.client_name}</span>
               {canEditProfile && (
                 <div className="flex gap-2">
-                  <Pencil
+                  <EditIcon
                     size={16}
                     className="text-blue-500 hover:text-blue-700 cursor-pointer"
                     title="Edit Client"
                     onClick={() => setOpenUpdateClient(true)}
                   />
-                  <Trash2
+                  <DeleteIcon
                     size={16}
                     className="text-red-500 hover:text-red-700 cursor-pointer"
                     title="Delete Client"
@@ -854,11 +734,11 @@ const ClientPage = () => {
             </h1>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 mt-1">
               <span className="flex items-center gap-1">
-                <Globe size={14} /> {clientDetails.country_name}
+                <GlobalIcon size={14} /> {clientDetails.country_name}
               </span>
               <span className="hidden sm:inline w-1 h-1 bg-gray-300 rounded-full"></span>
               <span className="flex items-center gap-1">
-                <Briefcase size={14} /> {clientDetails.client_type}
+                <ProjectsIcon size={14} /> {clientDetails.client_type}
               </span>
             </div>
           </div>
@@ -893,68 +773,17 @@ const ClientPage = () => {
       {/* Client KPI's */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 mb-10">
         {kpiData.map((kpi, idx) => (
-          <div
+          <KPICard
             key={idx}
-            className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between"
-          >
-            <div>
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                {kpi.label}
-              </p>
-              <h3 className="text-xl font-bold text-gray-900 mt-1">
-                {kpi.value}
-              </h3>
-            </div>
-            <div className={`p-2 rounded-lg ${kpi.bg}`}>
-              <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
-            </div>
-          </div>
+            label={kpi.label}
+            value={kpi.value}
+            icon={<kpi.icon className={`w-5 h-5 ${kpi.color}`} />}
+            color={`${kpi.bg} ${kpi.color}`}
+          />
         ))}
       </div>
 
-      {(canConfigAgreements || canManageAssets) && (
-        <div className="flex flex-wrap items-center justify-end gap-3 mt-5">
-          {/* ✅ COMPANY ESCALATION BUTTON */}
-          {canConfigAgreements && (
-            <Button
-              variant="secondary"
-              onClick={() => setOpenCompanyEscalation(true)}
-              className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
-            >
-              Company Escalation
-            </Button>
-          )}
-          {canConfigAgreements &&
-            (clientDetails.compliance ||
-              clientDetails.SLA ||
-              clientDetails.escalationContact) && (
-              <Button
-                variant="primary"
-                onClick={() => setOpenConfigModal(true)}
-                className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
-              >
-                + Add Configuration
-              </Button>
-            )}
 
-          {canManageAssets && (
-            <Button
-              variant="secondary"
-              onClick={() => navigate(`/manage-assets/${clientId}`)}
-              disabled={clientDetails.status !== "ACTIVE"}
-              title={clientDetails.status !== "ACTIVE" ? "Manage Assets is available only for ACTIVE clients" : ""}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all
-                ${clientDetails.status === "ACTIVE"
-                  ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-100 shadow-none opacity-80"
-                }`}
-            >
-              <Package size={16} />
-              Manage Assets
-            </Button>
-          )}
-        </div>
-      )}
 
       {(clientDetails.compliance ||
         clientDetails.SLA ||
@@ -965,6 +794,45 @@ const ClientPage = () => {
               slaRefetchKey={slaRefetchKey}
               complianceRefetchKey={complianceRefetchKey}
               escalationRefetchKey={escalationRefetchKey}
+              actions={
+                (canConfigAgreements || canManageAssets) && (
+                  <>
+                    {canConfigAgreements && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => setOpenCompanyEscalation(true)}
+                        className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
+                      >
+                        Company Escalation
+                      </Button>
+                    )}
+                    {canConfigAgreements &&
+                      (clientDetails.compliance ||
+                        clientDetails.SLA ||
+                        clientDetails.escalationContact) && (
+                        <Button
+                          variant="primary"
+                          onClick={() => setOpenConfigModal(true)}
+                          className="px-4 py-2 text-sm border rounded-lg whitespace-nowrap"
+                        >
+                          + Add Configuration
+                        </Button>
+                      )}
+
+                    {canManageAssets && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => navigate(`/manage-assets/${clientId}?name=${encodeURIComponent(clientDetails.client_name)}`)}
+                        disabled={clientDetails.status !== "ACTIVE"}
+                        title={clientDetails.status !== "ACTIVE" ? "Manage Assets is available only for ACTIVE clients" : ""}
+                      >
+                        <PackageIcon size={16} />
+                        Manage Assets
+                      </Button>
+                    )}
+                  </>
+                )
+              }
             />
           </div>
         )}
@@ -986,7 +854,7 @@ const ClientPage = () => {
             ) : (
               paginatedProjects.map((project) => (
                 <div
-                  key={project.pmsProjectId}
+                  key={project.projectId || project.pmsProjectId}
                   onClick={() => {
                     setSelectedProject(project);
                     setActiveTab("sla");
@@ -1007,7 +875,7 @@ const ClientPage = () => {
                     </h3>
                     {getProjectId(selectedProject) ===
                       getProjectId(project) && (
-                        <CheckCircle2 className="w-5 h-5 text-indigo-600" />
+                        <SuccessIcon className="w-5 h-5 text-indigo-600" />
                       )}
                   </div>
 
@@ -1073,7 +941,7 @@ const ClientPage = () => {
                   </p>
                 </div>
                 {/* <button className="text-gray-400 hover:text-gray-600">
-                  <MoreHorizontal />
+                  <MoreHorizontalIcon />
                 </button> */}
               </div>
 
@@ -1128,7 +996,7 @@ const ClientPage = () => {
 
                 {!activeTab && getTabs().length > 0 && (
                   <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                    <FileText size={48} className="mb-4 text-gray-200" />
+                    <DocumentIcon size={48} className="mb-4 text-gray-200" />
                     <p>Select a category above to view details.</p>
                   </div>
                 )}
@@ -1136,7 +1004,7 @@ const ClientPage = () => {
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-              <Building2 size={64} className="mb-4 text-gray-300" />
+              <BuildingIcon size={64} className="mb-4 text-gray-300" />
               <p className="text-lg font-medium text-gray-500">
                 Select a project to view details
               </p>

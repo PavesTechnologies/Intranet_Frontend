@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import AddCountryIdentityMappingModal from "./AddCountryIdentityMappingModal";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 export default function CountryIdentityMapping() {
   const [countries, setCountries] = useState([]);
@@ -25,17 +26,19 @@ export default function CountryIdentityMapping() {
   const [isMandatory, setIsMandatory] = useState(true);
 
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
-  const headers = { Authorization: `Bearer ${token}` };
 
   /* ---------------- FETCH DATA ---------------- */
   const fetchCountries = async () => {
-    const res = await axios.get(`${BASE_URL}/masters/country`, { headers });
+    const res = await axios.get(`${BASE_URL}/masters/country`, { headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    } });
     setCountries(res.data);
   };
 
   const fetchIdentityTypes = async () => {
-    const res = await axios.get(`${BASE_URL}/identity`, { headers });
+    const res = await axios.get(`${BASE_URL}/identity`, { headers : {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    } });
     setIdentityTypes(res.data);
   };
 
@@ -45,7 +48,9 @@ export default function CountryIdentityMapping() {
 
       const res = await axios.get(
         `${BASE_URL}/identity/country-mapping/identities/${countryUuid}`,
-        { headers },
+        { headers : {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        } },
       );
 
       // ✅ handle empty list
@@ -87,7 +92,9 @@ export default function CountryIdentityMapping() {
             identity_type_uuid: identityTypeUuid,
             is_mandatory: isMandatory,
           },
-          { headers },
+          { headers : {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          } },
         );
 
         setMappings((prev) =>
@@ -115,7 +122,9 @@ export default function CountryIdentityMapping() {
             identity_type_uuid: identityTypeUuid,
             is_mandatory: isMandatory,
           },
-          { headers },
+          { headers : {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          } },
         );
 
         setMappings((prev) => [
@@ -149,7 +158,9 @@ export default function CountryIdentityMapping() {
 
       await axios.delete(
         `${BASE_URL}/identity/country-mapping/${confirmDelete.mapping_uuid}`,
-        { headers },
+        { headers : {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        } },
       );
 
       setMappings((prev) =>
@@ -178,7 +189,9 @@ export default function CountryIdentityMapping() {
 
       await axios.delete(
         `${BASE_URL}/employee-details/identity/${document_uuid}`,
-        { headers },
+        { headers : {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        } },
       );
 
       // remove only this document from deleteError
@@ -230,18 +243,11 @@ export default function CountryIdentityMapping() {
       </p>
 
       {/* Country Selector */}
-      <select
+      <FilterListbox
+        options={[{value:"",label:"Select Country"}, ...countries.map((c) => ({value: c.country_uuid, label: c.country_name}))]}
         value={selectedCountry}
-        onChange={(e) => setSelectedCountry(e.target.value)}
-        className="border rounded-lg px-3 py-2 mb-6 w-80"
-      >
-        <option value="">Select Country</option>
-        {countries.map((c) => (
-          <option key={c.country_uuid} value={c.country_uuid}>
-            {c.country_name}
-          </option>
-        ))}
-      </select>
+        onChange={setSelectedCountry}
+      />
       {showForm && (
         <AddCountryIdentityMappingModal
           countryUuid={selectedCountry}

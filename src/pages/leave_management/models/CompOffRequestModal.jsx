@@ -1,13 +1,13 @@
-import React, { useState, Fragment, useEffect} from "react"; // Added Fragment
+import React, { useState, useEffect, Fragment } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { useNotification } from "../../../contexts/NotificationContext";
-import { X } from "lucide-react";
+import { X, CalendarDays, StickyNote, Clock } from "lucide-react";
+import Button from "../../../components/Button/Button";
 
-// ++ NEW Helper to format dates for the UI (from your other modal)
 function formatDateForDisplay(date) {
   if (!date) return "";
-  // This modal uses Date objects, so we can format directly
   return date.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
@@ -15,22 +15,38 @@ function formatDateForDisplay(date) {
   });
 }
 
+const SectionLabel = ({ icon: Icon, children }) => (
+  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+    {Icon && <Icon className="w-3.5 h-3.5" />}
+    {children}
+  </label>
+);
+
+const StyledDatePicker = ({ ...props }) => (
+  <DatePicker
+    {...props}
+    className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition disabled:opacity-50 disabled:cursor-not-allowed"
+    wrapperClassName="w-full"
+  />
+);
+
 const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
-  // const [isHalfDay, setIsHalfDay] = useState(false); // -- REMOVED
   const [note, setNote] = useState("");
   const { showNotification } = useNotification();
 
-  // ++ NEW state for custom half-day logic
   const [showCustomHalfDay, setShowCustomHalfDay] = useState(false);
   const [halfDayConfig, setHalfDayConfig] = useState({
-    start: "none", // 'none' is treated as a full day in calculation
+    start: "none",
     end: "none",
   });
 
-
-
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
 
   const formatDate = (date) => {
     if (!date) return null;
@@ -41,89 +57,65 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
     return `${year}-${month}-${day}`;
   };
 
-  // ++ NEW: Check for multi-day selection
   const isMultiDay =
     startDate && endDate && formatDate(startDate) !== formatDate(endDate);
 
-  // ++ UPDATED: Calculate duration based on halfDayConfig
   const calculateDays = () => {
     if (!startDate) return 0;
-
-    // Normalize dates to start of day for accurate comparison
     const start = new Date(startDate.setHours(0, 0, 0, 0));
     const end = endDate
       ? new Date(endDate.setHours(0, 0, 0, 0))
       : new Date(start);
-
-    if (end < start) return 0; // Should not happen with minDate logic
-
+    if (end < start) return 0;
     let total = 0;
     const current = new Date(start);
-
     while (current <= end) {
       const isStartDate = current.getTime() === start.getTime();
       const isEndDate = current.getTime() === end.getTime();
-
-      // Note: Comp-off calculation DOES include weekends, unlike regular leave.
-
       if (isStartDate && isEndDate) {
-        // Single Day
         total +=
           halfDayConfig.start === "first" || halfDayConfig.start === "second"
             ? 0.5
             : 1;
       } else if (isStartDate) {
-        // Multi-day Start
         total +=
           halfDayConfig.start === "first" || halfDayConfig.start === "second"
             ? 0.5
             : 1;
       } else if (isEndDate) {
-        // Multi-day End
         total +=
           halfDayConfig.end === "first" || halfDayConfig.end === "second"
             ? 0.5
             : 1;
       } else {
-        // Middle Day
         total += 1;
       }
-
       current.setDate(current.getDate() + 1);
     }
     return total;
   };
 
-  // ++ NEW: Handler for the Full/Custom toggle
   const handleHalfDayModeChange = (isCustom) => {
     setShowCustomHalfDay(isCustom);
-
-    if (isCustom) {
-      // When switching to custom, default to Full Day selections
-      setHalfDayConfig({ start: "fullday", end: "fullday" });
-    } else {
-      // When switching to "Full days" mode, reset to 'none'
-      setHalfDayConfig({ start: "none", end: "none" });
-    }
+    setHalfDayConfig(
+      isCustom ? { start: "fullday", end: "fullday" } : { start: "none", end: "none" }
+    );
   };
 
-  // ++ UPDATED: Add startSession and endSession to payload
   const handleSubmit = async () => {
     if (loading) return;
     if (!startDate) {
       showNotification("Please select a start date", "error");
       return;
     }
-
     const payload = {
       startDate: formatDate(startDate),
       endDate: formatDate(endDate || startDate),
       note,
       duration: calculateDays(),
       startSession: halfDayConfig.start,
-      endSession: isMultiDay ? halfDayConfig.end : "none", 
+      endSession: isMultiDay ? halfDayConfig.end : "none",
     };
-
     const isSuccess = await onSubmit(payload);
     if (isSuccess) {
       if (onSuccess) onSuccess();
@@ -131,174 +123,166 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
     }
   };
 
+  const days = calculateDays();
+
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-      <div className="bg-white rounded-xl p-6 shadow-xl w-[90%] max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">
-            Request Comp-Off
-          </h2>
+    <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Request Comp-Off</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Submit compensatory leave request</p>
+          </div>
           <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-              type="button"
-              aria-label="Close"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            onClick={onClose}
+            type="button"
+            aria-label="Close"
+            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Start Date */}
-        <label className="block text-sm font-medium text-gray-700">
-          Start Date
-        </label>
-        <DatePicker
-          selected={startDate}
-          onChange={(date) => {
-            setStartDate(date);
-            // Also update end date if it's not set or before new start date
-            if (!endDate || endDate < date) {
-              setEndDate(date);
-            }
-          }}
-          className="border rounded px-3 py-2 w-full"
-          maxDate={new Date()}
-          placeholderText="Select start date"
-        />
+        {/* Body */}
+        <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
 
-        {/* End Date */}
-        <>
-          <label className="block text-sm font-medium text-gray-700">
-            End Date
-          </label>
-          <DatePicker
-            selected={endDate}
-            onChange={(date) => setEndDate(date)}
-            className="border rounded px-3 py-2 w-full"
-            maxDate={new Date()}
-            minDate={startDate} // Ensures end date is on or after start date
-            disabled={!startDate}
-            placeholderText="Select end date"
-          />
-        </>
-
-        {/* ++ NEW: Half Day Config UI (copied from RequestLeaveModal) */}
-        <div className="space-y-3 pt-2">
-          <div className="p-1 inline-flex items-center bg-gray-200 rounded-lg">
-            <button
-              type="button"
-              onClick={() => handleHalfDayModeChange(false)}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                !showCustomHalfDay
-                  ? "bg-white text-gray-800 shadow"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Full days
-            </button>
-            <button
-              type="button"
-              onClick={() => handleHalfDayModeChange(true)}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                showCustomHalfDay
-                  ? "bg-white text-gray-800 shadow"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Custom
-            </button>
+          {/* Date Range */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <SectionLabel icon={CalendarDays}>Start Date</SectionLabel>
+              <StyledDatePicker
+                selected={startDate}
+                onChange={(date) => {
+                  setStartDate(date);
+                  if (!endDate || endDate < date) setEndDate(date);
+                }}
+                maxDate={new Date()}
+                placeholderText="DD Mon YYYY"
+              />
+            </div>
+            <div>
+              <SectionLabel icon={CalendarDays}>End Date</SectionLabel>
+              <StyledDatePicker
+                selected={endDate}
+                onChange={(date) => setEndDate(date)}
+                maxDate={new Date()}
+                minDate={startDate}
+                disabled={!startDate}
+                placeholderText="DD Mon YYYY"
+              />
+            </div>
           </div>
 
-          {showCustomHalfDay && (
-            <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border">
-              {/* Start Date Section */}
-              <div className="flex-1 space-y-1">
-                <label className="text-xs font-medium text-gray-600">
-                  From {formatDateForDisplay(startDate)}
-                </label>
-                <select
-                  value={halfDayConfig.start}
-                  onChange={(e) =>
-                    setHalfDayConfig((p) => ({
-                      ...p,
-                      start: e.target.value,
-                    }))
-                  }
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="fullday">Full Day</option>
-                  <option value="first">First Half</option>
-                  <option value="second">Second Half</option>
-                </select>
-              </div>
+          {/* Half Day Toggle */}
+          <div className="space-y-3">
+            <SectionLabel icon={Clock}>Duration Type</SectionLabel>
+            <div className="p-1 inline-flex items-center bg-gray-100 rounded-lg w-full">
+              {["Full days", "Custom"].map((label, i) => {
+                const isActive = i === 0 ? !showCustomHalfDay : showCustomHalfDay;
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => handleHalfDayModeChange(i === 1)}
+                    className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                      isActive
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
 
-              {/* End Date Section */}
-              {isMultiDay && (
-                <>
-                  <div className="pt-8 text-gray-500 font-medium"> – </div>
-                  <div className="flex-1 space-y-1">
-                    <label className="text-xs font-medium text-gray-600">
-                      To {formatDateForDisplay(endDate)}
-                    </label>
-                    <select
-                      value={halfDayConfig.end}
-                      onChange={(e) =>
-                        setHalfDayConfig((p) => ({
-                          ...p,
-                          end: e.target.value,
-                        }))
-                      }
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="fullday">Full Day</option>
-                      <option value="first">First Half</option>
-                      <option value="second">Second Half</option>
-                    </select>
-                  </div>
-                </>
-              )}
+            {showCustomHalfDay && (
+              <div className="flex items-start gap-3 p-4 bg-indigo-50/60 rounded-xl border border-indigo-100">
+                <div className="flex-1 space-y-1.5">
+                  <p className="text-xs font-semibold text-indigo-600">
+                    From {formatDateForDisplay(startDate)}
+                  </p>
+                  <FilterListbox
+                    options={[
+                      { value: "fullday", label: "Full Day" },
+                      { value: "first", label: "First Half" },
+                      { value: "second", label: "Second Half" },
+                    ]}
+                    value={halfDayConfig.start}
+                    onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                  />
+                </div>
+
+                {isMultiDay && (
+                  <>
+                    <div className="pt-8 text-gray-400 font-light text-lg select-none">→</div>
+                    <div className="flex-1 space-y-1.5">
+                      <p className="text-xs font-semibold text-indigo-600">
+                        To {formatDateForDisplay(endDate)}
+                      </p>
+                      <FilterListbox
+                        options={[
+                          { value: "fullday", label: "Full Day" },
+                          { value: "first", label: "First Half" },
+                          { value: "second", label: "Second Half" },
+                        ]}
+                        value={halfDayConfig.end}
+                        onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Duration Badge */}
+          {startDate && (
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
+              <span className="text-sm text-gray-500 font-medium">Total Duration</span>
+              <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
+                {days} {days === 1 ? "day" : "days"}
+              </span>
             </div>
           )}
-        </div>
-        {/* -- END of new UI -- */}
 
-        {/* Note */}
-        <label className="block text-sm font-medium text-gray-700">Note</label>
-        <textarea
-          maxLength="100"
-          rows="3"
-          cols="40"
-          className="border rounded px-3 py-2 w-full"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Comment or note..."
-        />
-
-        {/* Days */}
-        {startDate && (
-          <div className="text-sm text-gray-600">
-            <strong>Days:</strong> {calculateDays()}
+          {/* Note */}
+          <div>
+            <SectionLabel icon={StickyNote}>Note</SectionLabel>
+            <textarea
+              maxLength={100}
+              rows={3}
+              className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Add a reason or note..."
+            />
+            <p className="text-right text-xs text-gray-400 mt-1">{note.length}/100</p>
           </div>
-        )}
+        </div>
 
-        {/* Actions */}
-        <div className="flex justify-end gap-3 pt-3">
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
           <button
             onClick={onClose}
             disabled={loading}
-            className="text-gray-600 hover:text-gray-800 text-sm"
+            type="button"
+            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
-          <button
+          <Button
             onClick={handleSubmit}
-            disabled={loading}
-            className={`px-4 py-2 rounded-lg text-sm text-white ${
-              loading ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"
-            }`}
+            variant="primary"
+            size="medium"
+            loading={loading}
+            loadingText="Submitting..."
+            disabled={!startDate}
           >
-            {loading ? "Submitting..." : "Submit Request"}
-          </button>
+            Submit Request
+          </Button>
         </div>
       </div>
     </div>

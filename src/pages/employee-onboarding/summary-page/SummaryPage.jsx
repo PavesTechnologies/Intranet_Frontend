@@ -15,7 +15,12 @@ import {
   ClipboardList,
   LogOut,
   UserCog,
+  Users,
+  UserPlus,
+  MailX,
+  UserRoundX,
 } from "lucide-react";
+import { KPICard } from "../../../components/kpi/KPI";
 
 
 /* ================= LOGIN DATA ================= */
@@ -39,20 +44,20 @@ const loginData = [
 
 /* ================= STATS ================= */
 const employeesStats = [
-  { label: "Total headcount", value: 26, trend: "+1" },
-  { label: "Registered", value: 26 },
-  { label: "Not invited", value: 0 },
-  { label: "Yet to register", value: 0 },
+  { label: "Total headcount", value: 26, trend: "+1", icon: Users, bg: "bg-slate-100", color: "text-slate-600" },
+  { label: "Registered", value: 26, icon: UserPlus, bg: "bg-emerald-100", color: "text-emerald-600" },
+  { label: "Not invited", value: 0, icon: MailX, bg: "bg-amber-100", color: "text-amber-600" },
+  { label: "Yet to register", value: 0, icon: UserRoundX, bg: "bg-rose-100", color: "text-rose-600" },
 ];
 
 /* ================= PENDING ================= */
 const pending = [
-  { label: "Documents", value: 7, icon: FileText, bg: "#f3e8ff", color: "#7c3aed" },
-  { label: "Expenses", value: 0, icon: Receipt, bg: "#dcfce7", color: "#16a34a" },
-  { label: "Probations", value: 0, icon: UserCheck, bg: "#fee2e2", color: "#ef4444" },
-  { label: "Onboarding Tasks", value: 347, icon: ClipboardList, bg: "#fef3c7", color: "#ca8a04" },
-  { label: "Exit Tasks", value: 0, icon: LogOut, bg: "#e0e7ff", color: "#4f46e5" },
-  { label: "Profile changes", value: 0, icon: UserCog, bg: "#f3e8ff", color: "#7c3aed" },
+  { label: "Documents", value: 7, icon: FileText, bg: "bg-violet-100", color: "text-violet-600" },
+  { label: "Expenses", value: 0, icon: Receipt, bg: "bg-green-100", color: "text-green-600" },
+  { label: "Probations", value: 0, icon: UserCheck, bg: "bg-red-100", color: "text-red-600" },
+  { label: "Onboarding Tasks", value: 347, icon: ClipboardList, bg: "bg-amber-100", color: "text-amber-600" },
+  { label: "Exit Tasks", value: 0, icon: LogOut, bg: "bg-indigo-100", color: "text-indigo-600" },
+  { label: "Profile changes", value: 0, icon: UserCog, bg: "bg-fuchsia-100", color: "text-fuchsia-600" },
 ];
 
 export default function OnboardingSummaryPage() {
@@ -73,14 +78,19 @@ export default function OnboardingSummaryPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                 {employeesStats.map((s, i) => (
-                  <div key={i}>
-                    <div className="flex items-end gap-1">
-                      <span className="text-xl font-semibold">{s.value}</span>
-                      {s.trend && (
-                        <span className="text-green-600 text-xs">{s.trend}</span>
-                      )}
-                    </div>
-                    <p className="text-gray-500 text-xs mt-1">{s.label}</p>
+                  <div key={i} className="relative">
+                    <KPICard
+                      label={s.label}
+                      value={s.value}
+                      icon={<s.icon className="h-5 w-5" />}
+                      color={`${s.bg} ${s.color}`}
+                      className="bg-white border-slate-200 shadow-sm"
+                    />
+                    {s.trend && (
+                      <span className="absolute right-4 top-4 rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">
+                        {s.trend}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -126,18 +136,14 @@ export default function OnboardingSummaryPage() {
                 {pending.map((p, i) => {
                   const Icon = p.icon;
                   return (
-                    <div key={i} className="flex flex-col items-center text-center">
-                      <div
-                        className="w-11 h-11 rounded-full flex items-center justify-center"
-                        style={{ background: p.bg }}
-                      >
-                        <Icon size={16} color={p.color} />
-                      </div>
-                      <p className="mt-1 font-semibold" style={{ color: p.color }}>
-                        {p.value}
-                      </p>
-                      <p className="text-[11px] text-gray-500">{p.label}</p>
-                    </div>
+                    <KPICard
+                      key={i}
+                      label={p.label}
+                      value={p.value}
+                      icon={<Icon className="h-5 w-5" />}
+                      color={`${p.bg} ${p.color}`}
+                      className="bg-white border-slate-200 shadow-sm"
+                    />
                   );
                 })}
               </div>

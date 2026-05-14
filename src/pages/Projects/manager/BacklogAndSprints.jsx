@@ -2,13 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
 import axios from "axios";
 import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { Plus, List, ChevronRight, ChevronDown } from "lucide-react";
-// Use the global ToastContainer mounted in App.jsx to avoid duplicate containers
 import { showStatusToast } from "../../../components/toastfy/toast";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { jwtDecode } from "jwt-decode";
 import { useAuth } from "../../../contexts/AuthContext";
 
@@ -47,6 +46,8 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const [showCompletedSprints, setShowCompletedSprints] = useState(false);
   const [expandedBacklogStories, setExpandedBacklogStories] = useState([]);
   const [permissions, setPermissions] = useState(null);
+  const [deleteSprintConfirmOpen, setDeleteSprintConfirmOpen] = useState(false);
+  const [sprintIdToDelete, setSprintIdToDelete] = useState(null);
   const toggleStoryExpand = (storyId) => {
     setExpandedBacklogStories((prev) =>
       prev.includes(storyId)
@@ -123,9 +124,9 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
         { headers },
       );
 
-      toast.success(
+      showStatusToast(
         sprintId ? "Story moved successfully!" : "Moved to backlog",
-        { autoClose: 1500 },
+        "success",
       );
       fetchStories();
     } catch (err) {
@@ -134,7 +135,7 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
         err?.message || // axios/network message
         "Failed to move story"; // fallback
 
-      toast.error(errorMessage, { autoClose: 2000 });
+      showStatusToast(errorMessage, "error");
 
       fetchStories(); // rollback to server truth
     }
@@ -151,9 +152,9 @@ const handleSprintStatus = async (sprintId, action) => {
             { headers },
         );
 
-        toast.success(
+        showStatusToast(
             action === "start" ? "Sprint started" : "Sprint completed",
-            { autoClose: 1500 }  // ← no containerId
+            "success",
         );
         fetchSprints();
         fetchStories();
@@ -174,9 +175,9 @@ const handleSprintStatus = async (sprintId, action) => {
 
         // Check 2 — another active sprint
         if (data.message?.toLowerCase().includes("another active sprint")) {
-            toast.warn(
+            showStatusToast(
                 "Cannot start sprint: Another active sprint already exists in this project.",
-                { autoClose: 3000 }  // ← no containerId
+                "warn",
             );
             fetchSprints();
             return;
@@ -187,26 +188,18 @@ const handleSprintStatus = async (sprintId, action) => {
             data.message?.toLowerCase().includes("empty sprint") ||
             data.message?.toLowerCase().includes("at least one task or story")
         ) {
-            toast.warn(
-                data.message,  // show exact backend message
-                { autoClose: 3000 }
-            );
+            showStatusToast(data.message, "warn");
             return;
         }
 
         // ✅ Check 4 — epic not assigned (Story must belong to an Epic)
         if (data.message?.toLowerCase().includes("epic")) {
-            toast.warn(
-                data.message,  // show exact backend message
-                { autoClose: 3000 }
-            );
+            showStatusToast(data.message, "warn");
             return;
         }
 
         // Fallback — all other errors
-        toast.error(data.message || "Failed to update sprint status", {
-            autoClose: 2000   // ← no containerId
-        });
+        showStatusToast(data.message || "Failed to update sprint status", "error");
     }
 };
 
@@ -222,10 +215,10 @@ const handleSprintStatus = async (sprintId, action) => {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
       );
-      toast.success("Epic assigned successfully!", { autoClose: 1500 });
+      showStatusToast("Epic assigned successfully!", "success");
       fetchStories(); // Refresh the list
     } catch (err) {
-      toast.error("Failed to assign epic", { autoClose: 2000 });
+      showStatusToast("Failed to assign epic", "error");
     }
   };
 
@@ -248,10 +241,10 @@ const handleSprintStatus = async (sprintId, action) => {
           },
         },
       );
-      toast.success("Task moved!", { autoClose: 1500 });
+      showStatusToast("Task moved!", "success");
       fetchTasks();
     } catch (err) {
-      toast.error("Failed to move task", { autoClose: 2000 });
+      showStatusToast("Failed to move task", "error");
     }
   };
 
@@ -265,14 +258,10 @@ const handleSprintStatus = async (sprintId, action) => {
         {},
         { headers },
       );
-      toast.success("Task successfully assigned to story!", {
-        autoClose: 1500,
-      });
+      showStatusToast("Task successfully assigned to story!", "success");
       fetchTasks(); // Refresh to update the UI hierarchy
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to assign story", {
-        autoClose: 2000,
-      });
+      showStatusToast(err.response?.data?.message || "Failed to assign story", "error");
     }
   };
   // =======================================
@@ -293,7 +282,7 @@ const handleSprintStatus = async (sprintId, action) => {
       setStories(list);
       setBacklogStories(list.filter((s) => !s.sprintId));
     } catch {
-      toast.error("Failed to fetch stories", { autoClose: 2000 });
+      showStatusToast("Failed to fetch stories", "error");
     }
   };
 
@@ -325,7 +314,7 @@ const handleSprintStatus = async (sprintId, action) => {
       setTasks(list);
       setBacklogTasks(list.filter((t) => !t.sprintId));
     } catch {
-      toast.error("Failed to fetch tasks", { autoClose: 2000 });
+      showStatusToast("Failed to fetch tasks", "error");
     }
   };
 
@@ -342,7 +331,7 @@ const handleSprintStatus = async (sprintId, action) => {
 
       setEpics(Array.isArray(res.data) ? res.data : res.data.content || []);
     } catch {
-      toast.error("Failed to fetch epics", { autoClose: 2000 });
+      showStatusToast("Failed to fetch epics", "error");
     }
   };
 
@@ -359,79 +348,44 @@ const handleSprintStatus = async (sprintId, action) => {
 
       setSprints(Array.isArray(res.data) ? res.data : res.data.content || []);
     } catch {
-      toast.error("Failed to fetch sprints", { autoClose: 2000 });
+      showStatusToast("Failed to fetch sprints", "error");
     }
   };
   // =======================================
   // Delete Sprint
   // =======================================
-  // =======================================
-  // Delete Sprint
-  // =======================================
+  const executeDeleteSprint = async () => {
+    const sprintId = sprintIdToDelete;
+    setDeleteSprintConfirmOpen(false);
+    setSprintIdToDelete(null);
+    try {
+      await axios.delete(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
+      showStatusToast("Sprint deleted successfully", "success");
+      fetchSprints();
+      fetchStories();
+    } catch (err) {
+      const message = err.response?.data?.message || "";
+      if (message.includes("foreign key constraint")) {
+        showStatusToast(
+          "Cannot delete sprint because tasks are still assigned to it. Move them to backlog first.",
+          "error",
+        );
+      } else {
+        showStatusToast("Failed to delete sprint", "error");
+      }
+    }
+  };
+
   const handleDeleteSprint = (sprintId) => {
-    toast(
-      ({ closeToast }) => (
-        <div className="p-1">
-          <h3 className="font-semibold text-gray-900 mb-1">Delete Sprint?</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Are you sure you want to delete this sprint?
-          </p>
-          <div className="flex justify-between gap-2">
-            <button
-              onClick={closeToast}
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={async () => {
-                closeToast(); // Close the confirmation toast immediately
-
-                // Execute the deletion logic
-                try {
-                  await axios.delete(
-                    `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}`,
-                    {
-                      headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
-                      },
-                    },
-                  );
-
-                  toast.success("Sprint deleted successfully", {
-                    autoClose: 1500,
-                  });
-                  fetchSprints();
-                  fetchStories();
-                } catch (err) {
-                  const message = err.response?.data?.message || "";
-
-                  if (message.includes("foreign key constraint")) {
-                    toast.error(
-                      "Cannot delete sprint because tasks are still assigned to it. Move them to backlog first.",
-                      { autoClose: 4000 },
-                    );
-                  } else {
-                    toast.error("Failed to delete sprint", { autoClose: 2000 });
-                  }
-                }
-              }}
-              className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      ),
-      {
-        autoClose: false, // Keep open until user interacts
-        closeButton: false, // Hide default close 'x'
-        closeOnClick: false, // Don't close if they click the background of the toast
-        draggable: false, // Disable dragging to dismiss
-        toastId: `delete-sprint-${sprintId}`, // Prevent opening multiple duplicate toasts
-        className: "border border-gray-100 shadow-xl rounded-xl",
-      },
-    );
+    setSprintIdToDelete(sprintId);
+    setDeleteSprintConfirmOpen(true);
   };
 
   useEffect(() => {
@@ -481,17 +435,13 @@ const handleSprintStatus = async (sprintId, action) => {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
-  {/* Use the global ToastContainer mounted in App.jsx */}
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          {/* <h1 className="text-2xl font-semibold text-indigo-900">
-            Backlog & Sprint Planning {projectName}
-          </h1> */}
+      <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
 
-          <div className="flex gap-3 align-middle">
+        {/* ── Enterprise Header ── */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200 flex-shrink-0">
+          <div className="flex gap-2">
             <Button
-              size="medium"
+              size="small"
               variant="outline"
               className="flex items-center gap-2"
               onClick={() =>
@@ -500,10 +450,11 @@ const handleSprintStatus = async (sprintId, action) => {
                 })
               }
             >
-              <List size={18} /> Issue Tracker
+              <List size={16} /> Issue Tracker
             </Button>
 
             <Button
+              size="small"
               className={`flex items-center gap-2 ${
                 !permissions?.canEdit ? "opacity-50 cursor-not-allowed" : ""
               }`}
@@ -514,20 +465,24 @@ const handleSprintStatus = async (sprintId, action) => {
                 }
               }}
             >
-              <Plus size={18} /> Create Sprint
+              <Plus size={16} /> Create Sprint
             </Button>
 
             <Button
+              size="small"
               variant="outline"
               className="flex items-center gap-2"
               onClick={() => setShowIssueForm(true)}
             >
-              <Plus size={18} /> Create Issue
+              <Plus size={16} /> Create Issue
             </Button>
           </div>
         </div>
+
+        {/* ── Scrollable Content ── */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         {/* Sprints */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {activeAndPlanningSprints.map((sprint) => {
             const sprintStories = stories.filter(
               (s) => s.sprintId === sprint.id || s.sprint?.id === sprint.id,
@@ -597,16 +552,16 @@ const handleSprintStatus = async (sprintId, action) => {
             <div className="mt-10">
               <button
                 onClick={() => setShowCompletedSprints(!showCompletedSprints)}
-                className="flex items-center gap-2 w-full text-left pb-2 border-b border-gray-200 group focus:outline-none"
+                className="flex items-center gap-2 w-full text-left pb-2 border-b border-slate-200 group focus:outline-none"
               >
-                <div className="p-1 rounded-md bg-gray-100 group-hover:bg-indigo-100 text-gray-500 group-hover:text-indigo-600 transition-colors">
+                <div className="p-1 rounded-md bg-slate-100 group-hover:bg-indigo-100 text-slate-500 group-hover:text-indigo-600 transition-colors">
                   {showCompletedSprints ? (
                     <ChevronDown size={18} />
                   ) : (
                     <ChevronRight size={18} />
                   )}
                 </div>
-                <h2 className="text-lg font-bold text-gray-600 group-hover:text-gray-900 transition-colors">
+                <h2 className="text-sm font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">
                   Completed Sprints ({completedSprints.length})
                 </h2>
               </button>
@@ -659,10 +614,8 @@ const handleSprintStatus = async (sprintId, action) => {
           )}
         </div>
         {/* Backlog */}
-        {/* Backlog */}
-        {/* Backlog */}
         <BacklogDropWrapper>
-          <h2 className="text-lg font-semibold text-indigo-900 mb-4 pb-2 border-b">
+          <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-slate-200">
             Product Backlog
           </h2>
 
@@ -683,7 +636,7 @@ const handleSprintStatus = async (sprintId, action) => {
                     {childTasks.length > 0 ? (
                       <button
                         onClick={() => toggleStoryExpand(story.id)}
-                        className="p-1 rounded-md bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-700 transition-colors shadow-sm"
+                        className="p-1 rounded-md bg-slate-100 hover:bg-indigo-100 text-slate-600 hover:text-indigo-700 transition-colors shadow-sm"
                         title={isExpanded ? "Collapse tasks" : "Expand tasks"}
                       >
                         {isExpanded ? (
@@ -743,8 +696,8 @@ const handleSprintStatus = async (sprintId, action) => {
               if (orphanTasks.length === 0) return null;
 
               return (
-                <div className="mt-8 pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
+                <div className="mt-6 pt-4 border-t border-slate-200">
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
                     Independent Tasks
                   </h3>
                   <div className="flex flex-col gap-2">
@@ -769,7 +722,8 @@ const handleSprintStatus = async (sprintId, action) => {
             })()}
           </div>
         </BacklogDropWrapper>
-      </div>
+        </div>{/* end scrollable content */}
+      </div>{/* end h-full flex-col */}
 
       {/* Modals */}
       {showIssueForm && (
@@ -842,6 +796,16 @@ const handleSprintStatus = async (sprintId, action) => {
           fetchSprints();
           fetchStories();
         }}
+      />
+
+      <ConfirmationModal
+        isOpen={deleteSprintConfirmOpen}
+        title="Delete Sprint"
+        message="Are you sure you want to delete this sprint? Tasks assigned to it must be moved to backlog first."
+        onConfirm={executeDeleteSprint}
+        onCancel={() => { setDeleteSprintConfirmOpen(false); setSprintIdToDelete(null); }}
+        confirmText="Delete"
+        variant="danger"
       />
     </DndProvider>
   );

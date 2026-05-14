@@ -13,6 +13,7 @@ import {
   CalendarDays
 } from 'lucide-react';
 import { exit_list, employees } from './data/mockData';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 import ApprovalsTab from './tabs/ApprovalsTab';
 import ClearanceTab from './tabs/ClearanceTab';
@@ -46,7 +47,7 @@ export default function ExitDetailsPage() {
     }
   }, [exit_uuid]);
 
-  if (!exitData) return <div className="p-8 text-center text-gray-500">Loading exit details...</div>;
+  if (!exitData) return <LoadingSpinner text="Loading exit details..." />;
 
   const renderActiveTab = () => {
     switch (activeTab) {

@@ -24,11 +24,11 @@ export default function InitialPasswordSetup() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [loading, setLoading] = useState(false);
-  const token = localStorage.getItem("token");
+
 
   const authHeader = {
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
     },
   };
 

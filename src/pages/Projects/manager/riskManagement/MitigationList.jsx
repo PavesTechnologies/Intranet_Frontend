@@ -1,5 +1,6 @@
 import { Trash2, Pencil, Check, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import axios from "axios";
 
 /* =========================
@@ -25,6 +26,7 @@ function Toggle({ checked, onChange, label, color }) {
           `}
         />
       </div>
+
       <span className="text-xs text-slate-600">{label}</span>
     </label>
   );
@@ -63,30 +65,58 @@ function MitigationRow({ mitigation, members, onUpdated, onDelete }) {
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState(mitigation);
 
-  const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
-  const token = localStorage.getItem("token");
-
-  async function updateStatus(field, value) {
-    await axios.patch(
-      `${BASE_URL}/api/mitigation-plans/${mitigation.id}/status`,
-      {
-        used: field === "used" ? value : mitigation.used,
-        effective: field === "effective" ? value : mitigation.effective,
+  const axiosInstance = useMemo(() => {
+    const instance = axios.create({
+      baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
+      headers: {
+        "Content-Type": "application/json",
       },
-      { headers: { Authorization: `Bearer ${token}` } },
+    });
+
+    instance.interceptors.request.use(
+      (config) => {
+        const latestToken = localStorage.getItem("token");
+
+        if (latestToken) {
+          config.headers.Authorization = `Bearer ${latestToken}`;
+        }
+
+        return config;
+      },
+      (error) => Promise.reject(error)
     );
 
-    onUpdated({ ...mitigation, [field]: value });
+    return instance;
+  }, []);
+
+  async function updateStatus(field, value) {
+    try {
+      await axiosInstance.patch(
+        `/api/mitigation-plans/${mitigation.id}/status`,
+        {
+          used: field === "used" ? value : mitigation.used,
+          effective: field === "effective" ? value : mitigation.effective,
+        }
+      );
+
+      onUpdated({ ...mitigation, [field]: value });
+    } catch (err) {
+      console.error("Failed to update mitigation status", err);
+    }
   }
 
   async function saveEdit() {
-    const res = await axios.put(
-      `${BASE_URL}/api/mitigation-plans/${mitigation.id}`,
-      form,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-    onUpdated(res.data);
-    setEdit(false);
+    try {
+      const res = await axiosInstance.put(
+        `/api/mitigation-plans/${mitigation.id}`,
+        form
+      );
+
+      onUpdated(res.data);
+      setEdit(false);
+    } catch (err) {
+      console.error("Failed to save mitigation", err);
+    }
   }
 
   return (
@@ -96,28 +126,36 @@ function MitigationRow({ mitigation, members, onUpdated, onDelete }) {
         <div className="space-y-3">
           <textarea
             value={form.mitigation}
-            onChange={(e) => setForm({ ...form, mitigation: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, mitigation: e.target.value })
+            }
             className="border rounded-lg p-2 w-full text-sm"
           />
 
           <textarea
             value={form.contingency || ""}
-            onChange={(e) => setForm({ ...form, contingency: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, contingency: e.target.value })
+            }
             className="border rounded-lg p-2 w-full text-sm"
           />
 
-          <select
+          <FilterListbox
+            options={[
+              { value: "", label: "Select owner" },
+              ...members.map((m) => ({
+                value: m.id,
+                label: m.name,
+              })),
+            ]}
             value={form.ownerId || ""}
-            onChange={(e) => setForm({ ...form, ownerId: e.target.value })}
-            className="border rounded-lg p-2 text-sm bg-white"
-          >
-            <option value="">Select owner</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) =>
+              setForm({
+                ...form,
+                ownerId: val,
+              })
+            }
+          />
 
           <div className="flex gap-3 pt-2">
             <button
@@ -126,8 +164,12 @@ function MitigationRow({ mitigation, members, onUpdated, onDelete }) {
             >
               <Check size={16} /> Save
             </button>
+
             <button
-              onClick={() => setEdit(false)}
+              onClick={() => {
+                setForm(mitigation);
+                setEdit(false);
+              }}
               className="flex items-center gap-1 text-sm text-slate-500"
             >
               <X size={16} /> Cancel
@@ -154,6 +196,7 @@ function MitigationRow({ mitigation, members, onUpdated, onDelete }) {
               <button onClick={() => setEdit(true)}>
                 <Pencil size={16} />
               </button>
+
               <button
                 onClick={() => onDelete(mitigation.id)}
                 className="text-red-500"
@@ -171,6 +214,7 @@ function MitigationRow({ mitigation, members, onUpdated, onDelete }) {
               color="blue"
               onChange={(v) => updateStatus("used", v)}
             />
+
             <Toggle
               label="Effective"
               checked={mitigation.effective}

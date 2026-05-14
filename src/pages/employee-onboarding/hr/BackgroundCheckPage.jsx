@@ -6,11 +6,13 @@ import {
   GraduationCap, Briefcase, MapPin, CreditCard, Award,
   Lock, Upload, Trash2, Plus
 } from "lucide-react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
 import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
+import { KPICard } from "../../../components/kpi/KPI";
 
 /* ── Static BG Checks (not document-linked) ── */
 const STATIC_CHECKS = [
@@ -70,17 +72,18 @@ const SectionCard = ({ title, icon: Icon, children }) => (
 const StatCard = ({ label, count, color, Icon, onClick, isActive, activeColor }) => (
   <button
     onClick={onClick}
-    className={`bg-white rounded-xl border p-4 flex items-center gap-3 transition-all hover:shadow-md hover:-translate-y-0.5 w-full text-left ${
-      isActive ? `ring-2 ${activeColor} border-transparent shadow-md` : "border-gray-200 shadow-sm"
+    className={`w-full text-left transition-all hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
+      isActive ? `ring-2 ${activeColor} rounded-xl shadow-md` : ""
     }`}
   >
-    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
-      <Icon className="w-4 h-4 text-white" />
-    </div>
-    <div className="min-w-0">
-      <p className="text-lg font-bold text-gray-800 leading-tight">{count}</p>
-      <p className="text-[11px] text-gray-500 font-medium truncate">{label}</p>
-    </div>
+    <KPICard
+      label={label}
+      value={count}
+      icon={<Icon className="h-5 w-5" />}
+      color={`${color} text-white`}
+      active={isActive}
+      className="h-full w-full bg-white border-gray-200 shadow-sm"
+    />
   </button>
 );
 
@@ -112,7 +115,6 @@ const CandidateItem = ({ emp, isSelected, bgStatus, onClick }) => {
 const DocPreviewModal = ({ doc, onClose }) => {
   const [signedUrl, setSignedUrl] = useState(null);
   const [loading, setLoading]     = useState(true);
-  const token = localStorage.getItem("token");
   const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
 
   useEffect(() => {
@@ -124,7 +126,7 @@ const DocPreviewModal = ({ doc, onClose }) => {
       try {
         const res = await axios.get(`${BASE_URL}/hr/view_documents`, {
           params: { file_path: doc.file_path },
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
         });
         const url = typeof res.data === "string" ? res.data.replace(/^"+|"+$/g, "") : res.data.url;
         setSignedUrl(url);
@@ -136,7 +138,7 @@ const DocPreviewModal = ({ doc, onClose }) => {
       }
     };
     fetchSignedUrl();
-  }, [doc, BASE_URL, token]);
+  }, [doc, BASE_URL]);
 
   const name = doc?.document_name || doc?.doc_type || doc?.identity_type || "Document";
 
@@ -278,7 +280,6 @@ const DocCard = ({ doc, idx, onPreview, isVerified, onDelete, onUpload }) => {
 ═══════════════════════════════════════════════════════════════ */
 export default function BackgroundCheckPage() {
   /* ── API config ── */
-  const token    = localStorage.getItem("token");
   const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
 
   /* ── List ── */
@@ -330,7 +331,7 @@ export default function BackgroundCheckPage() {
     try {
       const res = await axios.get(
         `${BASE_URL}/permanent-employee/core-employee-details/`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       setEmployees(res.data || []);
     } catch (err) {
@@ -339,7 +340,7 @@ export default function BackgroundCheckPage() {
     } finally {
       setLoadingList(false);
     }
-  }, [BASE_URL, token]);
+  }, [BASE_URL]);
 
   useEffect(() => { loadEmployees(); }, [loadEmployees]);
 
@@ -361,7 +362,7 @@ export default function BackgroundCheckPage() {
     try {
       const res = await axios.get(
         `${BASE_URL}/hr/hr/${emp.user_uuid}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       prof = res.data || {};
     } catch (err) {
@@ -377,7 +378,7 @@ export default function BackgroundCheckPage() {
     try {
       const chkRes = await axios.get(
         `${BASE_URL}/hr/background-checks/${emp.user_uuid}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       raw = chkRes.data || [];
     } catch (err) {
@@ -561,7 +562,7 @@ export default function BackgroundCheckPage() {
     setEmpBgMap(prev => ({ ...prev, [emp.user_uuid]: overall }));
 
     setLoadingChecks(false);
-  }, [BASE_URL, token]);
+  }, [BASE_URL]);
 
 
   const handleSelectEmployee = (emp) => {
@@ -632,7 +633,7 @@ export default function BackgroundCheckPage() {
       await axios.patch(
         `${BASE_URL}/hr/background-checks/${id}`,
         { status, notes: reason },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
     } catch (err) {
       // If endpoint not yet implemented, apply optimistic update silently
@@ -666,7 +667,7 @@ export default function BackgroundCheckPage() {
     setUpdatingId(id);
     try {
       await axios.delete(`${BASE_URL}/hr/background-checks/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
     } catch (err) {
       console.warn("DELETE /hr/background-checks not available, applying optimistic update:", err?.response?.status);
@@ -692,7 +693,7 @@ export default function BackgroundCheckPage() {
 
     try {
       const res = await axios.post(`${BASE_URL}/hr/background-checks`, payload, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       const newCheck = {
         ...payload,
@@ -734,7 +735,7 @@ export default function BackgroundCheckPage() {
           message: emailForm.message,
           check_ids: selectedIds,
         },
-        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" } }
       );
     } catch (err) {
       console.warn("Send-to-consultancy API not available, applying optimistic update:", err?.response?.status);
@@ -843,14 +844,17 @@ export default function BackgroundCheckPage() {
             </div>
           </div>
           <div className="px-3 py-2 border-b border-gray-100">
-            <select value={bgFilter} onChange={e => setBgFilter(e.target.value)}
-              className="w-full text-xs border border-gray-200 px-2 py-1.5 rounded-lg bg-white outline-none">
-              <option value="ALL">All Status</option>
-              <option value="PENDING">Pending</option>
-              <option value="IN_REVIEW">In Review</option>
-              <option value="VERIFIED">Verified</option>
-              <option value="REJECTED">Rejected</option>
-            </select>
+            <FilterListbox
+              options={[
+                { value: "ALL", label: "All Status" },
+                { value: "PENDING", label: "Pending" },
+                { value: "IN_REVIEW", label: "In Review" },
+                { value: "VERIFIED", label: "Verified" },
+                { value: "REJECTED", label: "Rejected" },
+              ]}
+              value={bgFilter}
+              onChange={setBgFilter}
+            />
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1 max-h-[520px]">
             {loadingList ? (
@@ -990,14 +994,17 @@ export default function BackgroundCheckPage() {
                             />
                             Select All
                           </label>
-                          <select value={checkFilter} onChange={e => setCheckFilter(e.target.value)}
-                            className="border border-gray-200 text-xs px-2 py-1.5 rounded-lg bg-white outline-none">
-                            <option value="ALL">All</option>
-                            <option value="PENDING">Pending</option>
-                            <option value="IN_REVIEW">In Review</option>
-                            <option value="VERIFIED">Verified</option>
-                            <option value="REJECTED">Rejected</option>
-                          </select>
+                          <FilterListbox
+                            options={[
+                              { value: "ALL", label: "All" },
+                              { value: "PENDING", label: "Pending" },
+                              { value: "IN_REVIEW", label: "In Review" },
+                              { value: "VERIFIED", label: "Verified" },
+                              { value: "REJECTED", label: "Rejected" },
+                            ]}
+                            value={checkFilter}
+                            onChange={setCheckFilter}
+                          />
                         </div>
                         <div className="flex items-center gap-2">
                           <Button variant="primary" size="small" onClick={() => setIsModalOpen(true)} disabled={selectedIds.length === 0}>

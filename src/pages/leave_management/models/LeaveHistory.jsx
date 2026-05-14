@@ -8,28 +8,49 @@ import { XCircle } from "lucide-react";
 import CancellationModal from "./CancellationModal";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 import { get } from "react-hook-form";
+import FilterListbox from "../../../components/filter/FilterListbox";
+
+const MONTHS = [
+  { value: "", label: "All Months" },
+  { value: 1, label: "January" },
+  { value: 2, label: "February" },
+  { value: 3, label: "March" },
+  { value: 4, label: "April" },
+  { value: 5, label: "May" },
+  { value: 6, label: "June" },
+  { value: 7, label: "July" },
+  { value: 8, label: "August" },
+  { value: 9, label: "September" },
+  { value: 10, label: "October" },
+  { value: 11, label: "November" },
+  { value: 12, label: "December" },
+];
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
-const LeaveHistory = ({ employeeId }) => {
-  // ✅ Removed refreshKey + setRefreshKey props — self-sufficient now
-  const [leaves, setLeaves]               = useState([]);
+const LeaveHistory = ({ employeeId, year }) => {
+  const [leaves, setLeaves] = useState([]);
   const [leaveTypeOptions, setLeaveTypeOptions] = useState([]);
-  const [leaveTypes, setLeaveTypes]       = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [error, setError]                 = useState(null);
+  const [leaveTypes, setLeaveTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const [selectedYear, setSelectedYear]   = useState(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState(year ?? new Date().getFullYear());
+
+  // Sync with parent year when it changes
+  useEffect(() => {
+    if (year != null) setSelectedYear(year);
+  }, [year]);
   const [selectedMonth, setSelectedMonth] = useState("");
-  const [searchTerm, setSearchTerm]       = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [filterLeaveType, setFilterLeaveType] = useState("All");
-  const [filterStatus, setFilterStatus]   = useState("All");
-  const [currentPage, setCurrentPage]     = useState(1);
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [selectedLeaveId, setSelectedLeaveId]     = useState(null);
-  const [isCancelling, setIsCancelling]           = useState(false);
+  const [selectedLeaveId, setSelectedLeaveId] = useState(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 4 }, (_, i) => currentYear - i);
@@ -46,9 +67,11 @@ const LeaveHistory = ({ employeeId }) => {
         axios.get(
           `${BASE_URL}/api/leave-requests/employee/${employeeId}/${selectedYear}`,
           {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
             withCredentials: true,
-          }
+          },
         ),
         axios.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -60,9 +83,8 @@ const LeaveHistory = ({ employeeId }) => {
       setLeaves(Array.isArray(leaveData) ? leaveData : []);
 
       const regularLeaves = typesResp.data?.regular || [];
-      const genderLeaves  = typesResp.data?.genderBasedLeaves || [];
+      const genderLeaves = typesResp.data?.genderBasedLeaves || [];
       setLeaveTypeOptions([...regularLeaves, ...genderLeaves]);
-
     } catch (err) {
       setError("Failed to fetch leave history.");
       toast.error("Failed to fetch leave history.");
@@ -83,9 +105,9 @@ const LeaveHistory = ({ employeeId }) => {
   // Channel: "employee-update" because manager sends personal notification
   // to the employee via convertAndSendToUser → /queue/data-updated
   useLeaveWebSocket(
-    "employee-update",                         // ✅ correct channel
-    ["LEAVE_APPROVED", "LEAVE_REJECTED", "REVOKE_APPROVED", "REVOKE_REJECTED"],      // ✅ events that affect history
-    fetchData                                  // ✅ reference, NOT fetchData()
+    "employee-update", // ✅ correct channel
+    ["LEAVE_APPROVED", "LEAVE_REJECTED", "REVOKE_APPROVED", "REVOKE_REJECTED"], // ✅ events that affect history
+    fetchData, // ✅ reference, NOT fetchData()
   );
 
   // ─── Fetch leave type labels ──────────────────────────────────────────
@@ -114,9 +136,14 @@ const LeaveHistory = ({ employeeId }) => {
       leaves
         .filter((l) => l.status?.toUpperCase() !== "PENDING")
         .map((l) => l.status)
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   );
+
+  const statusFilterOptions = [
+    { value: "All", label: "All Status" },
+    ...statusOptions.map((s) => ({ value: s, label: s })),
+  ];
 
   const getLeaveLabel = (leaveName) => {
     if (!leaveName) return "-";
@@ -124,12 +151,26 @@ const LeaveHistory = ({ employeeId }) => {
     return match ? match.label : leaveName.replace(/^L-/, "");
   };
 
+  const leaveTypeFilterOptions = [
+    { value: "All", label: "All Leave Types" },
+    ...leaveTypeOptions.map((type) => ({
+      value: getLeaveLabel(type.leaveName),
+      label: getLeaveLabel(type.leaveName),
+    })),
+  ];
+
+  const yearOptions = [
+    { value: "", label: "All Years" },
+    ...years.map((y) => ({ value: y, label: String(y) })),
+  ];
+
   // ─── Filtering ────────────────────────────────────────────────────────
   const filteredLeaves = leaves
     .filter((leave) => leave.status?.toUpperCase() !== "PENDING")
     .filter((leave) => {
       const search = searchTerm.toLowerCase();
-      const searchMatch = !search ||
+      const searchMatch =
+        !search ||
         (leave.leaveName || "").toLowerCase().includes(search) ||
         (leave.employee?.fullName || "").toLowerCase().includes(search) ||
         (leave.reason || "").toLowerCase().includes(search) ||
@@ -142,11 +183,13 @@ const LeaveHistory = ({ employeeId }) => {
         filterStatus === "All" || leave.status === filterStatus;
 
       const leaveYear = leave.startDate
-        ? new Date(leave.startDate).getFullYear() : null;
+        ? new Date(leave.startDate).getFullYear()
+        : null;
       const yearMatch = !selectedYear || leaveYear === Number(selectedYear);
 
       const leaveMonth = leave.startDate
-        ? new Date(leave.startDate).getMonth() + 1 : null;
+        ? new Date(leave.startDate).getMonth() + 1
+        : null;
       const monthMatch = !selectedMonth || leaveMonth === Number(selectedMonth);
 
       return searchMatch && typeMatch && statusMatch && yearMatch && monthMatch;
@@ -155,23 +198,35 @@ const LeaveHistory = ({ employeeId }) => {
   const totalPages = Math.ceil(filteredLeaves.length / itemsPerPage);
   const paginatedRequests = filteredLeaves.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   // ─── Modal handlers ───────────────────────────────────────────────────
-  const handleModalOpen  = (leaveId) => { setSelectedLeaveId(leaveId); setIsCancelModalOpen(true); };
-  const handleModalClose = () => { setSelectedLeaveId(null); setIsCancelModalOpen(false); setIsCancelling(false); };
+  const handleModalOpen = (leaveId) => {
+    setSelectedLeaveId(leaveId);
+    setIsCancelModalOpen(true);
+  };
+  const handleModalClose = () => {
+    setSelectedLeaveId(null);
+    setIsCancelModalOpen(false);
+    setIsCancelling(false);
+  };
 
   const handleConfirmCancellation = async (reason) => {
     if (isCancelling) return;
-    if (!reason) { toast.error("Reason is required"); return; }
+    if (!reason) {
+      toast.error("Reason is required");
+      return;
+    }
 
     setIsCancelling(true);
     try {
       const res = await axios.post(
         `${BASE_URL}/api/leave-revoke/revoke`,
-        { leaveRequestId: selectedLeaveId, reason , employeeId: employeeId}, // ✅ added employeeId for better logging on backend
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        { leaveRequestId: selectedLeaveId, reason, employeeId: employeeId }, // ✅ added employeeId for better logging on backend
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
       );
 
       if (res.data?.success) {
@@ -189,45 +244,62 @@ const LeaveHistory = ({ employeeId }) => {
   };
 
   // ─── UI States ────────────────────────────────────────────────────────
-  if (loading) return <div className="text-center py-10"><LoadingSpinner text="Loading leave history..." /></div>;
-  if (error)   return <div className="text-center py-10 text-red-500 font-semibold">{error}</div>;
+  if (loading)
+    return (
+      <div className="text-center py-10">
+        <LoadingSpinner text="Loading leave history..." />
+      </div>
+    );
+  if (error)
+    return (
+      <div className="text-center py-10 text-red-500 font-semibold">
+        {error}
+      </div>
+    );
 
   return (
     <div className="w-6xl mx-auto px-6 py-8 bg-white rounded-lg shadow-md">
       {/* FILTERS */}
       <div className="flex flex-wrap gap-3 mb-5">
-        <input type="text" placeholder="Search..." className="border px-3 py-2 rounded-lg text-sm"
-          value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <input
+          type="text"
+          placeholder="Search..."
+          className="border px-3 py-2 rounded-lg text-sm"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
 
-        <select value={filterLeaveType} onChange={(e) => setFilterLeaveType(e.target.value)}
-          className="border px-4 w-[200px] py-2 rounded-lg text-sm">
-          <option value="All">All Leave Types</option>
-          {leaveTypeOptions.map((type) => (
-            <option key={type.leaveTypeId} value={getLeaveLabel(type.leaveName)}>
-              {getLeaveLabel(type.leaveName)}
-            </option>
-          ))}
-        </select>
+        <div className="w-[200px]">
+          <FilterListbox
+            options={leaveTypeFilterOptions}
+            value={filterLeaveType}
+            onChange={setFilterLeaveType}
+          />
+        </div>
 
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-          className="border px-3 w-[120px] py-2 rounded-lg text-sm">
-          <option value="All">All Status</option>
-          {statusOptions.map((s) => <option key={s}>{s}</option>)}
-        </select>
+        <div className="w-[150px]">
+          <FilterListbox
+            options={statusFilterOptions}
+            value={filterStatus}
+            onChange={setFilterStatus}
+          />
+        </div>
 
-        <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}
-          className="border px-3 w-[100px] py-2 rounded-lg text-sm">
-          <option value="">All Years</option>
-          {years.map((y) => <option key={y}>{y}</option>)}
-        </select>
+        <div className="w-[150px]">
+          <FilterListbox
+            options={yearOptions}
+            value={selectedYear}
+            onChange={setSelectedYear}
+          />
+        </div>
 
-        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
-          className="border px-3 w-[140px] py-2 rounded-lg text-sm">
-          <option value="">All Months</option>
-          {["January","February","March","April","May","June",
-            "July","August","September","October","November","December"]
-            .map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
-        </select>
+        <div className="w-[150px]">
+          <FilterListbox
+            options={MONTHS}
+            value={selectedMonth}
+            onChange={setSelectedMonth}
+          />
+        </div>
       </div>
 
       {/* TABLE */}
@@ -250,17 +322,41 @@ const LeaveHistory = ({ employeeId }) => {
             </thead>
             <tbody>
               {paginatedRequests.map((leave, index) => (
-                <tr key={leave.leaveId || index} className="text-center border-b">
-                  <td className="p-3">{getLeaveLabel(leave.leaveType?.leaveName || leave.leaveName)}</td>
-                  <td className="p-3">{leave.employee?.fullName || leave.employeeFullName || "-"}</td>
-                  <td className="p-3">{leave.startDate ? new Date(leave.startDate).toLocaleDateString() : "-"}</td>
-                  <td className="p-3">{leave.endDate ? new Date(leave.endDate).toLocaleDateString() : "-"}</td>
+                <tr
+                  key={leave.leaveId || index}
+                  className="text-center border-b"
+                >
+                  <td className="p-3">
+                    {getLeaveLabel(
+                      leave.leaveType?.leaveName || leave.leaveName,
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {leave.employee?.fullName || leave.employeeFullName || "-"}
+                  </td>
+                  <td className="p-3">
+                    {leave.startDate
+                      ? new Date(leave.startDate).toLocaleDateString()
+                      : "-"}
+                  </td>
+                  <td className="p-3">
+                    {leave.endDate
+                      ? new Date(leave.endDate).toLocaleDateString()
+                      : "-"}
+                  </td>
                   <td className="p-3">{leave.daysRequested}</td>
                   <td className="p-3">
-                    <span className={`px-2 py-1 text-white rounded-full text-xs ${
-                      leave.status === "APPROVED" ? "bg-green-500" :
-                      leave.status === "REJECTED" ? "bg-red-500" : "bg-gray-500"
-                    }`}>{leave.status}</span>
+                    <span
+                      className={`px-2 py-1 text-white rounded-full text-xs ${
+                        leave.status === "APPROVED"
+                          ? "bg-green-500"
+                          : leave.status === "REJECTED"
+                            ? "bg-red-500"
+                            : "bg-gray-500"
+                      }`}
+                    >
+                      {leave.status}
+                    </span>
                   </td>
                   <td className="p-3">{leave.reason || "-"}</td>
                   <td className="p-3">{leave.managerComment || "-"}</td>
@@ -284,24 +380,29 @@ const LeaveHistory = ({ employeeId }) => {
       )}
 
       {totalPages > 1 && (
-        <Pagination currentPage={currentPage} totalPages={totalPages}
-          onPrevious={() => setCurrentPage(p => Math.max(p - 1, 1))}
-          onNext={() => setCurrentPage(p => Math.min(p + 1, totalPages))} />
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+          onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+        />
       )}
 
-      <CancellationModal title="Confirm Cancellation"
+      <CancellationModal
+        title="Confirm Cancellation"
         subtitle="Are you sure you want to cancel this leave?"
-        isOpen={isCancelModalOpen} onCancel={handleModalClose}
-        onConfirm={handleConfirmCancellation} isLoading={isCancelling}
-        confirmText="Confirm" isRevoke={true} />
+        isOpen={isCancelModalOpen}
+        onCancel={handleModalClose}
+        onConfirm={handleConfirmCancellation}
+        isLoading={isCancelling}
+        confirmText="Confirm"
+        isRevoke={true}
+      />
     </div>
   );
 };
 
 export default LeaveHistory;
-
-
-
 
 // // import React, { useEffect, useState } from "react";
 // // import axios from "axios";

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axiosInstance from "../../api/axiosInstance";
-import { X } from "lucide-react";
-import toast from "react-hot-toast";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
+import { showStatusToast } from "../../../../../components/toastfy/toast";
+import Button from "../../../../../components/Button/Button";
+import Modal from "../../../../../components/Modal/modal";
 
 // ⭐ 1. Add `storyToEdit` to props
 export default function AddTestStoryModal({
@@ -52,7 +54,7 @@ export default function AddTestStoryModal({
   // SAVE / UPDATE TEST STORY
   // ---------------------------------------------------------
   const handleSave = async () => {
-    if (!name.trim()) return toast.error("Story name is required");
+    if (!name.trim()) return showStatusToast("Story name is required", "error");
 
     setSaving(true);
 
@@ -70,24 +72,22 @@ export default function AddTestStoryModal({
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-stories/project-test-data/${testStoryId}`,
           payload,
         );
-        toast.success("Test Story updated successfully!");
+        showStatusToast("Test Story updated successfully!", "success");
       } else {
         await axiosInstance.post(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-stories`,
           payload,
         );
-        toast.success("Test Story created successfully!");
+        showStatusToast("Test Story created successfully!", "success");
       }
 
       if (onCreated) onCreated();
       onClose();
     } catch (err) {
       console.error("Save Test Story FAILED →", err);
-      // ⭐ 4. Dynamic error message
-      toast.error(
-        storyToEdit
-          ? "Failed to update test story"
-          : "Failed to create test story",
+      showStatusToast(
+        storyToEdit ? "Failed to update test story" : "Failed to create test story",
+        "error",
       );
     } finally {
       setSaving(false);
@@ -95,22 +95,12 @@ export default function AddTestStoryModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white w-[520px] p-6 rounded-xl shadow-lg">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-5">
-          {/* ⭐ 5. Dynamic Modal Title */}
-          <h2 className="text-lg font-semibold text-gray-800">
-            {storyToEdit ? "Edit Test Story" : "Add Test Story"}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={storyToEdit ? "Edit Test Story" : "Create Test Story"}
+      className="max-w-[520px]"
+    >
         <div className="space-y-4">
           {/* STORY NAME */}
           <div>
@@ -135,18 +125,11 @@ export default function AddTestStoryModal({
                 <span className="animate-pulse mr-2">●</span> Loading stories…
               </div>
             ) : (
-              <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-shadow bg-white"
+              <FilterListbox
+                options={[{value:"",label:"-- Select a PMS story --"},...pmsStories.map(story=>({value:story.id,label:story.title||story.name||`Story #${story.id}`}))]}
                 value={linkedStoryId}
-                onChange={(e) => setLinkedStoryId(e.target.value)}
-              >
-                <option value="">-- Select a PMS story --</option>
-                {pmsStories.map((story) => (
-                  <option key={story.id} value={story.id}>
-                    {story.title || story.name || `Story #${story.id}`}
-                  </option>
-                ))}
-              </select>
+                onChange={setLinkedStoryId}
+              />
             )}
           </div>
 
@@ -166,28 +149,12 @@ export default function AddTestStoryModal({
 
           {/* ACTION BUTTONS */}
           <div className="flex justify-end gap-3 pt-4 border-t mt-6">
-            <button
-              className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-              onClick={onClose}
-              disabled={saving}
-            >
-              Cancel
-            </button>
-            <button
-              className={`px-4 py-2 bg-blue-600 text-white rounded-lg transition-colors ${saving ? "opacity-70 cursor-not-allowed" : "hover:bg-blue-700"}`}
-              onClick={handleSave}
-              disabled={saving}
-            >
-              {/* ⭐ 6. Dynamic Button Text */}
-              {saving
-                ? "Saving..."
-                : storyToEdit
-                  ? "Update Story"
-                  : "Create Story"}
-            </button>
+            <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button variant="primary" onClick={handleSave} disabled={saving} loading={saving} loadingText="Saving...">
+              {storyToEdit ? "Update Story" : "Create Story"}
+            </Button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

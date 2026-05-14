@@ -1,87 +1,115 @@
 import React, { useEffect, useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   getAccessPoint,
   updateAccessPoint,
   listModules,
 } from "../../../../services/accessPointService";
+
 import { useParams, useNavigate } from "react-router-dom";
+
+import {
+  Link,
+  Settings,
+  Package,
+  Globe,
+  Shield,
+  Trash2,
+  ArrowLeft,
+} from "lucide-react";
+
 import Button from "../../../../components/Button/Button";
+import FormInput from "../../../../components/forms/FormInput";
+import FormSelect from "../../../../components/forms/FormSelect";
+import AppCard from "../../../../components/Cards/AppCard";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
-import { toast } from "react-toastify"; // ✅ Import toast
+
+import { toast } from "react-toastify";
 
 const AccessPointEdit = () => {
   const { access_uuid } = useParams();
-  const [form, setForm] = useState(null); // Keep null initially to show loading
+
+  const [form, setForm] = useState(null);
   const [modules, setModules] = useState([]);
   const [accessPointData, setAccessPointData] = useState(null);
+
   const [isDeleting, setIsDeleting] = useState(false);
-  const [loading, setLoading] = useState(false); // ✅ Added loading state
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
 
-  // ✅ Validation function from AccessPointForm
+  const methodOptions = [
+    { label: "GET", value: "GET" },
+    { label: "POST", value: "POST" },
+    { label: "PUT", value: "PUT" },
+    { label: "DELETE", value: "DELETE" },
+    { label: "PATCH", value: "PATCH" },
+  ];
+
   const validateEndpointPath = (path) => {
     const regex = /^\/[a-zA-Z0-9\-_\/{}:]*$/;
     return regex.test(path.trim());
   };
 
-  // ✅ Validation function from AccessPointForm
   const validateModuleName = (name) => {
     const regex = /^[A-Za-z\s\-_]+$/;
     return regex.test(name.trim());
   };
 
-  // ✅ Unique toast function from AccessPointForm
   const showUniqueToast = (message, type) => {
-    toast.dismiss(); // Dismiss all existing toasts
+    toast.dismiss();
     showStatusToast(message, type, { toastId: "unique-toast" });
   };
 
   useEffect(() => {
-    let isMounted = true; // Flag to prevent state update on unmounted component
+    let isMounted = true;
+
     const fetchData = async () => {
       try {
-        // Fetch modules list
         const modulesRes = await listModules();
-        if (isMounted) setModules(modulesRes.data);
 
-        // Fetch existing access point data
+        if (isMounted) {
+          setModules(modulesRes.data || []);
+        }
+
         const accessPointRes = await getAccessPoint(access_uuid);
+
         if (isMounted) {
           setAccessPointData(accessPointRes.data);
+
           setForm({
-            endpoint_path: accessPointRes.data.endpoint_path,
-            method: accessPointRes.data.method,
-            module: accessPointRes.data.module,
-            is_public: accessPointRes.data.is_public,
+            endpoint_path: accessPointRes.data.endpoint_path || "",
+            method: accessPointRes.data.method || "GET",
+            module: accessPointRes.data.module || "",
+            is_public: accessPointRes.data.is_public || false,
           });
         }
       } catch (error) {
-        if (isMounted) {
-          showUniqueToast("Failed to load access point data", "error");
-          console.error("Error fetching data:", error);
-          // Optionally navigate back or show an error state
-          // navigate("/user-management/access-points");
-        }
+        showUniqueToast("Failed to load access point data", "error");
       }
     };
 
     fetchData();
 
     return () => {
-      isMounted = false; // Cleanup function to set flag false when component unmounts
+      isMounted = false;
     };
-  }, [access_uuid]); // Removed navigate from dependencies as it's stable
+  }, [access_uuid]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm({ ...form, [name]: type === "checkbox" ? checked : value });
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
-  // ✅ Enhanced handleSubmit with validation, loading, trimming, and specific toasts
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation checks
     if (!form.endpoint_path.trim()) {
       return showUniqueToast("Enter the Endpoint Path", "error");
     }
@@ -92,22 +120,21 @@ const AccessPointEdit = () => {
 
     if (!validateEndpointPath(form.endpoint_path)) {
       return showUniqueToast(
-        "Endpoint path must start with '/' and contain only valid URL characters",
-        "error",
+        "Endpoint path must start with '/' and contain valid URL characters",
+        "error"
       );
     }
 
     if (!validateModuleName(form.module)) {
       return showUniqueToast(
         "Module name can only contain letters, spaces, hyphens, and underscores",
-        "error",
+        "error"
       );
     }
 
-    setLoading(true); // Start loading
+    setLoading(true);
 
     try {
-      // Prepare form data with trimmed values
       const formDataToUpdate = {
         ...form,
         endpoint_path: form.endpoint_path.trim(),
@@ -115,38 +142,31 @@ const AccessPointEdit = () => {
       };
 
       await updateAccessPoint(access_uuid, formDataToUpdate);
+
       showUniqueToast("Access point updated successfully!", "success");
 
-      // Redirect after update
       setTimeout(() => {
-        // Keep delay consistent with create form
         navigate("/user-management/access-points");
       }, 1000);
     } catch (error) {
-      console.error("Error updating access point:", error);
-      // Show backend error message or fallback
       const errorMessage =
         error?.response?.data?.detail ||
         error?.response?.data?.message ||
         error?.message ||
         "Failed to update access point";
+
       showUniqueToast(errorMessage, "error");
     } finally {
-      setLoading(false); // Stop loading
+      setLoading(false);
     }
   };
 
   const handleDeletePermission = async () => {
     if (!accessPointData?.permission_uuid) return;
 
-    // Optional: Add a confirmation dialog here
-    // if (!window.confirm("Are you sure you want to unmap this permission?")) {
-    //   return;
-    // }
-
     setIsDeleting(true);
+
     try {
-      // Call the unmap permission API
       const response = await fetch(
         `${
           window.__APP_CONFIG__.USER_MANAGEMENT_URL
@@ -159,197 +179,302 @@ const AccessPointEdit = () => {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
-        },
+        }
       );
 
       if (response.ok) {
-        // Refresh the access point data to reflect the change
         const updatedData = await getAccessPoint(access_uuid);
+
         setAccessPointData(updatedData.data);
+
         showUniqueToast("Permission unmapped successfully", "success");
       } else {
-        const errorData = await response.json(); // Try to get error details
-        const errorMessage =
-          errorData?.detail ||
-          errorData?.message ||
-          "Failed to unmap permission";
-        console.error("Failed to delete permission:", errorMessage);
-        showUniqueToast(errorMessage, "error");
+        const errorData = await response.json();
+
+        showUniqueToast(
+          errorData?.detail || "Failed to unmap permission",
+          "error"
+        );
       }
     } catch (error) {
-      console.error("Error deleting permission:", error);
       showUniqueToast("Error unmapping permission", "error");
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // Keep Loading indicator while form data is being fetched
   if (!form) {
     return (
-      <div className="text-center mt-10 text-gray-600 text-lg">Loading...</div>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <LoadingSpinner text="Loading access point..." />
+      </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
-        <h2 className="text-3xl font-semibold text-blue-700">
-          Edit Access Point
-        </h2>
-        <Button
-          variant="secondary"
-          size="medium"
-          onClick={() => navigate("/user-management/access-points")}
-        >
-          ← Back
-        </Button>
-      </div>
-
-      {/* ✅ Styling adjusted slightly for consistency */}
-      <div className="max-w-xl mx-auto bg-white p-8 rounded-2xl shadow-md mt-4">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-gray-700 font-medium mb-1">
-              Endpoint Path <span className="text-red-500">*</span>
-            </label>
-            <input
-              name="endpoint_path"
-              value={form.endpoint_path}
-              onChange={handleChange}
-              required
-              className="w-full border border-gray-300 p-2 rounded-lg focus:ring focus:ring-blue-300 focus:border-blue-500" // Matched create form style
-              placeholder="/api/resource (must start with /)"
-              onKeyPress={(e) => e.key === "Enter" && e.preventDefault()} // ✅ Prevent Enter submit
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              Must start with '/' and contain only valid URL characters
-              (letters, numbers, -, _, /, {}, :)
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-gray-700 font-medium mb-1">
-              Method <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="method"
-              value={form.method}
-              onChange={handleChange}
-              className="w-full border border-gray-300 p-2 rounded-lg focus:ring focus:ring-blue-300 focus:border-blue-500" // Matched create form style
-            >
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
-              <option value="PATCH">PATCH</option> {/* ✅ Added PATCH */}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-gray-700 font-medium mb-1">
-              Module <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="module"
-              value={form.module}
-              onChange={handleChange}
-              required
-              className="w-full border border-gray-300 p-2 rounded-lg focus:ring focus:ring-blue-300 focus:border-blue-500" // Matched create form style
-            >
-              <option value="">Select Module</option>
-              {modules.map((mod, idx) => (
-                <option key={idx} value={mod}>
-                  {mod}
-                </option>
-              ))}
-            </select>
-            <p className="text-sm text-gray-500 mt-1">
-              Can contain letters, spaces, hyphens, and underscores only
-            </p>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {" "}
-            {/* ✅ Matched create form style */}
-            <input
-              type="checkbox"
-              name="is_public"
-              checked={form.is_public}
-              onChange={handleChange}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" // Matched create form style
-              id="is_public_edit" // ✅ Added unique ID
-            />
-            <label
-              htmlFor="is_public_edit"
-              className="text-gray-700 font-medium cursor-pointer"
-            >
-              {" "}
-              {/* ✅ Matched create form style */}
-              Public Access Point
-            </label>
-          </div>
-
-          {/* ✅ Note section like create form */}
-          <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-            <strong>Note:</strong> Public access points don't require
-            authentication. Use this carefully for endpoints that should be
-            accessible without login.
-          </div>
-
-          {/* Permission Display with Delete Button */}
-          {accessPointData && accessPointData.permission_code && (
-            <div className="border-t pt-4">
-              <label className="block text-gray-700 font-medium mb-1">
-                Mapped Permission
-              </label>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                {" "}
-                {/* Added border */}
-                <span className="font-medium text-gray-800">
-                  {accessPointData.permission_code}
-                </span>
-                <Button
-                  type="button"
-                  onClick={handleDeletePermission}
-                  disabled={isDeleting}
-                  variant="danger" // ✅ Use Button component variant
-                  size="small" // ✅ Use Button component size
-                  className={`transition disabled:opacity-50 disabled:cursor-not-allowed ${isDeleting ? "bg-red-300" : "hover:bg-red-700"}`} // Adjusted hover/disabled
-                >
-                  {isDeleting ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
-                      Unmapping...
-                    </div>
-                  ) : (
-                    "Unmap" // ✅ Changed text
-                  )}
-                </Button>
-              </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
+        {/* HEADER */}
+        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+              <Shield className="h-5 w-5" />
             </div>
-          )}
 
-          {/* ✅ Submit Button styled like create form */}
+            <div>
+              <h2 className={Fonts.heading3}>
+                Edit Access Point
+              </h2>
+
+              <p className={`${Fonts.paragraphMuted} mt-1`}>
+                Update access point configuration and permissions.
+              </p>
+            </div>
+          </div>
+
           <Button
-            type="submit"
-            disabled={loading}
-            className={`w-full py-2 px-4 rounded-lg transition duration-300 ${
-              loading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700"
-            } text-white`}
+            variant="outline"
+            onClick={() => navigate("/user-management/access-points")}
+            className="w-full sm:w-auto"
           >
-            {loading ? (
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Updating...
-              </div>
-            ) : (
-              "Update Access Point"
-            )}
+            <ArrowLeft className="h-4 w-4" />
+            Back
           </Button>
-        </form>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          {/* FORM */}
+          <div className="xl:col-span-2">
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <FormInput
+                    label="Endpoint Path"
+                    name="endpoint_path"
+                    value={form.endpoint_path}
+                    onChange={handleChange}
+                    placeholder="/api/resource"
+                    required
+                  />
+
+                  <p className="mt-1 text-sm text-gray-500">
+                    Must start with '/' and contain valid URL characters.
+                  </p>
+                </div>
+
+                <FormSelect
+                  label="Method"
+                  name="method"
+                  value={form.method}
+                  onChange={handleChange}
+                  options={methodOptions}
+                  required
+                />
+
+                <div>
+                  <FormSelect
+                    label="Module"
+                    name="module"
+                    value={form.module}
+                    onChange={handleChange}
+                    options={[
+                      { label: "Select Module", value: "" },
+                      ...modules.map((mod) => ({
+                        label: mod,
+                        value: mod,
+                      })),
+                    ]}
+                    required
+                  />
+
+                  <p className="mt-1 text-sm text-gray-500">
+                    Letters, spaces, hyphens, and underscores only.
+                  </p>
+                </div>
+
+                {/* PUBLIC */}
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      name="is_public"
+                      checked={form.is_public}
+                      onChange={handleChange}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      id="is_public_edit"
+                    />
+
+                    <div className="min-w-0">
+                      <label
+                        htmlFor="is_public_edit"
+                        className="cursor-pointer text-sm font-semibold text-gray-700"
+                      >
+                        Public Access Point
+                      </label>
+
+                      <p className="mt-1 text-sm text-gray-500">
+                        Public access points don't require authentication.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* MAPPED PERMISSION */}
+                {accessPointData?.permission_code && (
+                  <div className="rounded-xl border border-gray-200 bg-white p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700">
+                          Mapped Permission
+                        </h4>
+
+                        <p className="mt-1 text-sm text-gray-500">
+                          Currently assigned permission.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 rounded-xl bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="break-all text-sm font-medium text-gray-800">
+                        {accessPointData.permission_code}
+                      </span>
+
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="small"
+                        onClick={handleDeletePermission}
+                        disabled={isDeleting}
+                        loading={isDeleting}
+                        loadingText="Unmapping..."
+                        className="w-full sm:w-auto"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Unmap
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ACTIONS */}
+                <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      navigate("/user-management/access-points")
+                    }
+                    className="w-full sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+
+                  <Button
+                    type="submit"
+                    loading={loading}
+                    loadingText="Updating..."
+                    variant="primary"
+                    className="w-full sm:w-auto"
+                  >
+                    <Shield className="h-4 w-4" />
+                    Update Access Point
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* PREVIEW */}
+          <div className="xl:col-span-1">
+            <AppCard
+              className="sticky top-24 border-gray-200"
+              title="Preview"
+              subtitle="Live access point details"
+              icon={<Globe className="h-5 w-5" />}
+              renderBody={() => (
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3 rounded-xl bg-gray-50 p-3">
+                    <Link className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                        Endpoint
+                      </p>
+
+                      <p className="mt-1 break-all text-sm font-medium text-gray-800">
+                        {form.endpoint_path || "Not set"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 rounded-xl bg-gray-50 p-3">
+                    <Settings className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
+
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                        Method
+                      </p>
+
+                      <span className="mt-1 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                        {form.method}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 rounded-xl bg-gray-50 p-3">
+                    <Package className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                        Module
+                      </p>
+
+                      <p className="mt-1 break-words text-sm font-medium text-gray-800">
+                        {form.module || "Not set"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 rounded-xl bg-gray-50 p-3">
+                    <Globe className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
+
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                        Access Type
+                      </p>
+
+                      <span
+                        className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          form.is_public
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                        {form.is_public ? "Public" : "Private"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {accessPointData?.permission_code && (
+                    <div className="flex items-start gap-3 rounded-xl bg-gray-50 p-3">
+                      <Shield className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                          Permission
+                        </p>
+
+                        <p className="mt-1 break-all text-sm font-medium text-gray-800">
+                          {accessPointData.permission_code}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

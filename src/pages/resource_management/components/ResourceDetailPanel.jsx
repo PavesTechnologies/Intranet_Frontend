@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { getUtilization } from "../services/workforceService"
 import { useSkillGapAnalysis } from "../hooks/useSkillGapAnalysis"
 import { toast } from "react-toastify"
+import GenericTable from "../../../components/Table/table"
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHARED SUB-COMPONENTS
@@ -55,7 +56,7 @@ function SectionHeader({ icon: Icon, title, badge }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function TimelineBar({ resource }) {
-  const blocks = resource.allocationTimeline || []
+  const blocks = (resource.allocationTimeline || []).filter(b => b.status !== "ROLLED_OFF")
   if (blocks.length === 0) return null
 
   const earliest = new Date(blocks[0].startDate).getTime()
@@ -397,65 +398,55 @@ function SkillComparisonTable({ comparisons }) {
   }
 
   return (
-    <div className="rounded-lg border overflow-hidden">
-      <table className="w-full text-[11px]">
-        <thead>
-          <tr className="bg-muted/50 text-muted-foreground">
-            <th className="text-left px-2.5 py-2 font-semibold">Skill</th>
-            <th className="text-center px-2 py-2 font-semibold">Required</th>
-            <th className="text-center px-2 py-2 font-semibold">Actual</th>
-            <th className="text-center px-2 py-2 font-semibold">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {comparisons.map((skill, i) => (
-            <tr
-              key={`${skill.skillName}-${skill.subSkillName}-${i}`}
-              className={cn(
-                "border-t transition-colors",
-                skill.status === "GAP" ? "bg-red-50/40" : "bg-green-50/30"
+    <div className="rounded-lg border overflow-hidden no-scrollbar">
+      <GenericTable
+        headers={["Skill", "Required", "Actual", "Status"]}
+        columns={["skill_info", "required_info", "actual_info", "status_info"]}
+        rows={comparisons.map((skill, i) => ({
+          ...skill,
+          skill_info: (
+            <div className="text-left">
+              <div className="font-medium text-foreground">{skill.subSkillName || skill.skillName}</div>
+              {skill.subSkillName && (
+                <div className="text-[9px] text-muted-foreground">{skill.skillName}</div>
               )}
-            >
-              <td className="px-2.5 py-2">
-                <div className="font-medium text-foreground">{skill.subSkillName || skill.skillName}</div>
-                {skill.subSkillName && (
-                  <div className="text-[9px] text-muted-foreground">{skill.skillName}</div>
-                )}
-                {skill.mandatory && (
-                  <Badge variant="outline" className="text-[8px] h-3.5 px-1 mt-0.5 bg-purple-50 text-purple-600 border-purple-200">
-                    Required
-                  </Badge>
-                )}
-              </td>
-              <td className="text-center px-2 py-2">
-                <span className="text-muted-foreground">{skill.requiredProficiency || "—"}</span>
-              </td>
-              <td className="text-center px-2 py-2">
-                <span className={cn(
-                  skill.resourceProficiency
-                    ? "text-foreground font-medium"
-                    : "text-muted-foreground/50 italic"
-                )}>
-                  {skill.resourceProficiency || "N/A"}
+              {skill.mandatory && (
+                <Badge variant="outline" className="text-[8px] h-3.5 px-1 mt-0.5 bg-purple-50 text-purple-600 border-purple-200">
+                  Required
+                </Badge>
+              )}
+            </div>
+          ),
+          required_info: <div className="text-center text-muted-foreground">{skill.requiredProficiency || "—"}</div>,
+          actual_info: (
+            <div className="text-center">
+              <span className={cn(
+                skill.resourceProficiency
+                  ? "text-foreground font-medium"
+                  : "text-muted-foreground/50 italic"
+              )}>
+                {skill.resourceProficiency || "N/A"}
+              </span>
+            </div>
+          ),
+          status_info: (
+            <div className="text-center">
+              {skill.status === "MATCH" ? (
+                <span className="inline-flex items-center gap-0.5 text-green-700 font-semibold">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Match
                 </span>
-              </td>
-              <td className="text-center px-2 py-2">
-                {skill.status === "MATCH" ? (
-                  <span className="inline-flex items-center gap-0.5 text-green-700 font-semibold">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Match
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-0.5 text-red-600 font-semibold">
-                    <XCircle className="h-3 w-3" />
-                    Gap
-                  </span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              ) : (
+                <span className="inline-flex items-center gap-0.5 text-red-600 font-semibold">
+                  <XCircle className="h-3 w-3" />
+                  Gap
+                </span>
+              )}
+            </div>
+          ),
+          rowClass: skill.status === "GAP" ? "bg-red-50/40" : "bg-green-50/30"
+        }))}
+      />
     </div>
   )
 }
@@ -763,7 +754,9 @@ export function ResourceDetailPanel({ resource, open, onOpenChange }) {
                 <SectionHeader icon={TrendingUp} title="Allocation Timeline" />
                 <TimelineBar resource={resource} />
                 <div className="mt-2 flex flex-col gap-1">
-                  {(resource.allocationTimeline || []).map((block, i) => (
+                  {(resource.allocationTimeline || [])
+                    .filter(block => block.status !== "ROLLED_OFF")
+                    .map((block, i) => (
                     <div key={i} className="flex items-center justify-between text-[10px]">
                       <span className={cn("text-muted-foreground", block.tentative && "italic")}>
                         {block.project}{block.tentative ? " (T)" : ""}

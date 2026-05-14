@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Download, Filter, Layers, Search, Users, ArrowLeft, BarChart2 } from "lucide-react";
+import { DownloadIcon, FilterIcon, LayersIcon, SearchIcon, EmployeeIcon, PrevIcon, AnalyticsIcon } from "@/components/icons";
 import { useNavigate } from "react-router-dom";
 import BenchKPI from "../components/BenchKPI";
 import BenchFilters from "../components/BenchFilters";
@@ -8,6 +8,7 @@ import BenchDrawer from "../components/BenchDrawer";
 import AllocationModal from "../../demand/components/AllocationModal";
 import MoveToPoolModal from "../components/MoveToPoolModal";
 import { getBenchMatches } from "../services/benchService";
+import Pagination from "../../../../components/Pagination/pagination";
 import { createPortal } from "react-dom";
 import {
   BENCH_STORAGE_KEY,
@@ -71,6 +72,10 @@ const BenchPage = () => {
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  
   const updatePosition = () => {
     if (filterButtonRef.current) {
       const rect = filterButtonRef.current.getBoundingClientRect();
@@ -185,12 +190,20 @@ const BenchPage = () => {
         filters,
       }),
     );
+    setCurrentPage(1); // Reset pagination on search/filter/tab change
   }, [search, activeTab, filters]);
 
   const visibleRows = useMemo(
     () => filterResources(resources, search, filters, activeTab),
     [resources, search, filters, activeTab],
   );
+
+  // Pagination calculations
+  const totalPages = Math.ceil(visibleRows.length / itemsPerPage);
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return visibleRows.slice(start, start + itemsPerPage);
+  }, [visibleRows, currentPage, itemsPerPage]);
   const selectedResource = useMemo(
     () => resources.find((item) => item.id === selectedResourceId) || null,
     [resources, selectedResourceId],
@@ -323,7 +336,7 @@ const BenchPage = () => {
             onClick={() => navigate('/resource-management/bench/report')}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[11px] font-black text-slate-700 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm h-[42px] capitalize tracking-wider"
           >
-            <BarChart2 className="h-4 w-4 text-indigo-600" />
+            <AnalyticsIcon className="h-4 w-4 text-indigo-600" />
             Bench Analytics
           </button>
           <button
@@ -331,7 +344,7 @@ const BenchPage = () => {
             onClick={handleExport}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-[11px] font-black text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98] h-[42px] capitalize tracking-wider"
           >
-            <Download className="h-4 w-4" />
+            <DownloadIcon className="h-4 w-4" />
             Export Audit
           </button>
         </div>
@@ -345,7 +358,7 @@ const BenchPage = () => {
             <div className="flex items-center gap-6 overflow-x-auto no-scrollbar px-1">
               {BENCH_TABS.map((tab) => {
                 const isActive = activeTab === tab.id;
-                const Icon = tab.id === "bench" ? Users : Layers;
+                const Icon = tab.id === "bench" ? EmployeeIcon : LayersIcon;
 
                 return (
                   <button
@@ -375,7 +388,7 @@ const BenchPage = () => {
 
             <div className="flex items-center gap-3 flex-1 lg:flex-none lg:min-w-[450px] justify-end pb-2 lg:pb-0">
               <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={search}
@@ -395,7 +408,7 @@ const BenchPage = () => {
                     : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                 >
-                  <Filter className={`h-3.5 w-3.5 ${filterPanelOpen ? 'fill-current' : ''}`} />
+                  <FilterIcon className={`h-3.5 w-3.5 ${filterPanelOpen ? 'fill-current' : ''}`} />
                   <span className="text-[11px] font-black capitalize tracking-widest">Filters</span>
                   {Object.values(filters).filter(v => v !== "" && v !== "ALL").length > 0 && (
                     <span className={`ml-1 px-1.5 rounded-sm text-[10px] font-bold ${filterPanelOpen ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
@@ -441,7 +454,7 @@ const BenchPage = () => {
 
         <div className="p-4">
           <BenchTable
-            rows={visibleRows}
+            rows={paginatedRows}
             selectedRows={selectedRows}
             activeRowId={selectedResourceId}
             emptyState={emptyState}
@@ -454,6 +467,16 @@ const BenchPage = () => {
             loading={loading}
             activeTab={activeTab}
           />
+          {totalPages > 1 && (
+            <div className="mt-4">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              />
+            </div>
+          )}
         </div>
       </div>
 

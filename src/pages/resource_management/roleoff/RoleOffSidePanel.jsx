@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from "react";
 import {
-  AlertTriangle,
-  CheckCircle2,
-  ClipboardList,
-  ShieldAlert,
-  X,
-  Loader2,
-} from "lucide-react";
+  WarningIcon,
+  SuccessIcon,
+  ClipboardIcon,
+  SecurityAlertIcon,
+  CloseIcon,
+  SpinnerIcon,
+} from "@/components/icons";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,10 @@ const formatReason = (str) => {
 };
 
 const isPendingStatus = (status) =>
-  status === "Pending" || status === "Pending Approval";
+  status === "PENDING";
+
+const isDmActionableStatus = (status) =>
+  ["PENDING", "APPROVED"].includes(status);
 
 const impactStyles = {
   Low: "border-teal-200 bg-teal-50 text-teal-700",
@@ -27,11 +31,12 @@ const impactStyles = {
 };
 
 const roleOffStatusStyles = {
-  "Not Requested": "border-slate-200 bg-slate-100 text-slate-700",
-  "Pending Approval": "border-amber-200 bg-amber-50 text-amber-700",
-  Approved: "border-blue-200 bg-blue-50 text-blue-700",
-  Rejected: "border-rose-200 bg-rose-50 text-rose-700",
-  Fulfilled: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  NOT_REQUESTED: "border-slate-200 bg-slate-100 text-slate-700",
+  PENDING: "border-amber-200 bg-amber-50 text-amber-700",
+  APPROVED: "border-blue-200 bg-blue-50 text-blue-700",
+  REJECTED: "border-rose-200 bg-rose-50 text-rose-700",
+  FULFILLED: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  CANCELLED: "border-slate-200 bg-slate-100 text-slate-700",
 };
 
 const baseForm = {
@@ -232,9 +237,9 @@ const RoleOffSidePanel = ({
   const isReadOnlyPm = isPM && actionType === "view";
   const showRejectedDetails =
     isPM &&
-    pmTab === "process" &&
+    (pmTab === "process" || pmTab === "rejected") &&
     (
-      String(record.roleOffStatus || "").trim() === "Rejected" ||
+      String(record.roleOffStatus || "").trim() === "REJECTED" ||
       Boolean(record.rejectedBy) ||
       Boolean(record.rejectionReason)
     );
@@ -264,8 +269,8 @@ const RoleOffSidePanel = ({
 
   const showRmApproveAction = isRM && (!isBulkRecord || isRmBulkApproveFlow);
   const showRmRejectAction = isRM && (!isBulkRecord || isRmBulkRejectFlow);
-  const showDmApproveAction = isDM && (!isBulkRecord || isDmBulkApproveFlow);
-  const showDmRejectAction = isDM && (!isBulkRecord || isDmBulkRejectFlow);
+  const showDmApproveAction = isDM && isDmActionableStatus(record.status) && (!isBulkRecord || isDmBulkApproveFlow);
+  const showDmRejectAction = isDM && isDmActionableStatus(record.status) && (!isBulkRecord || isDmBulkRejectFlow);
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -477,14 +482,14 @@ const RoleOffSidePanel = ({
             disabled={isSubmitting}
             className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <X className="h-4 w-4" />
+            <CloseIcon className="h-4 w-4" />
           </button>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
           <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center gap-2">
-              <ClipboardList className="h-4 w-4 text-gray-600" />
+              <ClipboardIcon className="h-4 w-4 text-gray-600" />
               <h3 className="text-sm font-semibold text-[#081534]">Context</h3>
             </div>
             <div className="space-y-3 text-sm">
@@ -630,10 +635,10 @@ const RoleOffSidePanel = ({
                       <Badge
                         className={cn(
                           "text-[11px] font-semibold",
-                          roleOffStatusStyles[record.roleOffStatus || "Not Requested"] || "border-slate-200 bg-slate-100 text-slate-700"
+                          roleOffStatusStyles[record.roleOffStatus || "NOT_REQUESTED"] || "border-slate-200 bg-slate-100 text-slate-700"
                         )}
                       >
-                        {record.roleOffStatus || "Not Requested"}
+                        {record.roleOffStatus || "NOT_REQUESTED"}
                       </Badge>
                     </div>
                   ) : null}
@@ -688,15 +693,15 @@ const RoleOffSidePanel = ({
                   <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
                     Role-Off Type
                   </label>
-                  <select
+                  <FilterListbox
+                    options={[
+                      { value: "Planned", label: "Planned" },
+                      { value: "Emergency", label: "Emergency" },
+                    ]}
                     value={isBulkPmFlow ? "Planned" : form.type}
-                    onChange={(event) => updateField("type", event.target.value)}
+                    onChange={(val) => updateField("type", val)}
                     disabled={isReadOnlyPm || isSubmitting || isBulkPmFlow}
-                    className="mt-2 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-                  >
-                    <option value="Planned">Planned</option>
-                    <option value="Emergency">Emergency</option>
-                  </select>
+                  />
                 </div>
 
                 <div>
@@ -727,23 +732,15 @@ const RoleOffSidePanel = ({
                   <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
                     Reason
                   </label>
-                  <select
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select reason" },
+                      ...reasons.map((r) => ({ value: getReasonOptionValue(r), label: getReasonOptionLabel(r) })),
+                    ]}
                     value={form.reason}
-                    onChange={(event) => updateField("reason", event.target.value)}
+                    onChange={(val) => updateField("reason", val)}
                     disabled={isReadOnlyPm || isSubmitting}
-                    className={cn(getFieldClassName(fieldErrors.reason), "h-10 px-3")}
-                  >
-                    <option value="">Select reason</option>
-                    {reasons.map((r, idx) => {
-                      const value = getReasonOptionValue(r);
-                      const label = getReasonOptionLabel(r);
-                      return (
-                        <option key={idx} value={value}>
-                          {label}
-                        </option>
-                      );
-                    })}
-                  </select>
+                  />
                   {fieldErrors.reason ? (
                     <p className="mt-1 text-xs text-rose-600">{fieldErrors.reason}</p>
                   ) : null}
@@ -753,21 +750,21 @@ const RoleOffSidePanel = ({
                   <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
                     Resource Performance
                   </label>
-                  <select
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select performance" },
+                      { value: "HIGH_PERFORMER", label: "High Performer" },
+                      { value: "AVERAGE_PERFORMER", label: "Average Performer" },
+                      { value: "LOW_PERFORMER", label: "Low Performer" },
+                      { value: "EXCEPTIONAL", label: "Exceptional" },
+                      { value: "NEEDS_IMPROVEMENT", label: "Needs Improvement" },
+                      { value: "CONSISTENT", label: "Consistent" },
+                      { value: "NEW_RESOURCE", label: "New Resource" },
+                    ]}
                     value={form.resourcePerformance}
-                    onChange={(event) => updateField("resourcePerformance", event.target.value)}
+                    onChange={(val) => updateField("resourcePerformance", val)}
                     disabled={isReadOnlyPm || isSubmitting}
-                    className={cn(getFieldClassName(fieldErrors.resourcePerformance), "h-10 px-3")}
-                  >
-                    <option value="">Select performance</option>
-                    <option value="HIGH_PERFORMER">High Performer</option>
-                    <option value="AVERAGE_PERFORMER">Average Performer</option>
-                    <option value="LOW_PERFORMER">Low Performer</option>
-                    <option value="EXCEPTIONAL">Exceptional</option>
-                    <option value="NEEDS_IMPROVEMENT">Needs Improvement</option>
-                    <option value="CONSISTENT">Consistent</option>
-                    <option value="NEW_RESOURCE">New Resource</option>
-                  </select>
+                  />
                   {fieldErrors.resourcePerformance ? (
                     <p className="mt-1 text-xs text-rose-600">{fieldErrors.resourcePerformance}</p>
                   ) : null}
@@ -820,7 +817,7 @@ const RoleOffSidePanel = ({
 
                 {!isBulkPmFlow && needsRiskAck ? (
                   <label className="flex gap-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-900">
-                    <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-700" />
+                    <SecurityAlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-rose-700" />
                     <span className="flex-1">
                       <span className="mb-2 block">
                         High impact request. Acknowledge risk before submission.
@@ -934,7 +931,7 @@ const RoleOffSidePanel = ({
               {record.impact === "High" ? (
                 <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-900">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-700" />
+                    <WarningIcon className="mt-0.5 h-4 w-4 shrink-0 text-rose-700" />
                     <span>High impact request. Review continuity, replacement, and transition risk before approval.</span>
                   </div>
                 </div>
@@ -985,9 +982,9 @@ const RoleOffSidePanel = ({
             {isPM && !isReadOnlyPm ? (
               <Button onClick={handleSubmit} disabled={isSubmitting || (reviewState?.requiresConfirmation && !form.reviewConfirmed)} className="h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed">
                 {submittingAction === "submit" ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <SpinnerIcon className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  <SuccessIcon className="mr-2 h-4 w-4" />
                 )}
                 {submittingAction === "submit"
                   ? (
@@ -1014,7 +1011,7 @@ const RoleOffSidePanel = ({
                     disabled={isSubmitting || !isPendingStatus(record.status)}
                     className={`h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting || !isPendingStatus(record.status) ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
-                    {submittingAction === "approve" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {submittingAction === "approve" ? <SpinnerIcon className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Approve
                   </Button>
                 ) : null}
@@ -1025,7 +1022,7 @@ const RoleOffSidePanel = ({
                     disabled={isSubmitting || !isPendingStatus(record.status)}
                     className={`h-10 border-rose-300 bg-white text-sm text-rose-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting || !isPendingStatus(record.status) ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
-                    {submittingAction === "reject" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {submittingAction === "reject" ? <SpinnerIcon className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Reject
                   </Button>
                 ) : null}
@@ -1039,7 +1036,7 @@ const RoleOffSidePanel = ({
                     disabled={isSubmitting}
                     className="h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {submittingAction === "approve" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {submittingAction === "approve" ? <SpinnerIcon className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Fulfill
                   </Button>
                 ) : null}
@@ -1050,7 +1047,7 @@ const RoleOffSidePanel = ({
                     disabled={isSubmitting}
                     className="h-10 border-rose-300 bg-white text-sm text-rose-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {submittingAction === "reject" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {submittingAction === "reject" ? <SpinnerIcon className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Reject
                   </Button>
                 ) : null}

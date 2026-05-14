@@ -1,20 +1,16 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../../../../../contexts/AuthContext";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 
 
 
 export default function CountryEducationMapping() {
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
   const { user } = useAuth();
   const roles = user?.roles?.map(r => r.toUpperCase()) || [];
   const canView = roles.includes("ADMIN") || roles.includes("HR");
-
-  const axiosConfig = {
-    headers: { Authorization: `Bearer ${token}` },
-  };
 
   /* ================= STATE ================= */
   const [countries, setCountries] = useState([]);
@@ -38,7 +34,11 @@ export default function CountryEducationMapping() {
   useEffect(() => {
     if (!canView) return;
     axios
-      .get(`${BASE}/masters/country`, axiosConfig)
+      .get(`${BASE}/masters/country`, 
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      )
       .then((res) => setCountries(res.data || []))
       .catch(() => setError("Failed to load countries"));
   }, [canView]);
@@ -61,7 +61,9 @@ export default function CountryEducationMapping() {
     try {
       const res = await axios.get(
         `${BASE}/education/country-mapping/${countryUuid}`,
-        axiosConfig,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
       );
       setMappings(res.data || []);
     } catch {
@@ -78,8 +80,16 @@ export default function CountryEducationMapping() {
 
     try {
       const [levelsRes, docsRes] = await Promise.all([
-        axios.get(`${BASE}/masters/education-level`, axiosConfig),
-        axios.get(`${BASE}/education/education-document`, axiosConfig),
+        axios.get(`${BASE}/masters/education-level`, 
+          {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+        ),
+        axios.get(`${BASE}/education/education-document`, 
+          {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          }
+        ),
       ]);
 
       setLevels(levelsRes.data || []);
@@ -103,7 +113,7 @@ export default function CountryEducationMapping() {
         `${BASE}/masters/${selectedLevel}/${selectedDocument}/${selectedCountry}`,
         null,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
       );
 
@@ -148,21 +158,11 @@ export default function CountryEducationMapping() {
           <label className="block text-sm font-medium mb-1">
             Select Country
           </label>
-          <select
-            className="border rounded px-3 py-2 w-80"
+          <FilterListbox
+            options={[{value:"",label:"-- Choose Country --"}, ...countries.map((c) => ({value: c.country_uuid, label: c.country_name}))]}
             value={selectedCountry}
-            onChange={(e) => {
-              setSelectedCountry(e.target.value);
-              loadMappings(e.target.value);
-            }}
-          >
-            <option value="">-- Choose Country --</option>
-            {countries.map((c) => (
-              <option key={c.country_uuid} value={c.country_uuid}>
-                {c.country_name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => { setSelectedCountry(val); loadMappings(val); }}
+          />
         </div>
 
         {/* Existing Mappings */}
@@ -224,37 +224,20 @@ export default function CountryEducationMapping() {
             <div className="flex items-end gap-4">
               <div>
                 <label className="block text-sm mb-1">Education Level</label>
-                <select
-                  className="border rounded px-3 py-2"
+                <FilterListbox
+                  options={[{value:"",label:"Select Level"}, ...levels.map((l) => ({value: l.education_uuid, label: l.education_name}))]}
                   value={selectedLevel}
-                  onChange={(e) => setSelectedLevel(e.target.value)}
-                >
-                  <option value="">Select Level</option>
-                  {levels.map((l) => (
-                    <option key={l.education_uuid} value={l.education_uuid}>
-                      {l.education_name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedLevel}
+                />
               </div>
 
               <div>
                 <label className="block text-sm mb-1">Document</label>
-                <select
-                  className="border rounded px-3 py-2"
+                <FilterListbox
+                  options={[{value:"",label:"Select Document"}, ...documents.map((d) => ({value: d.education_document_uuid, label: d.document_name}))]}
                   value={selectedDocument}
-                  onChange={(e) => setSelectedDocument(e.target.value)}
-                >
-                  <option value="">Select Document</option>
-                  {documents.map((d) => (
-                    <option
-                      key={d.education_document_uuid}
-                      value={d.education_document_uuid}
-                    >
-                      {d.document_name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedDocument}
+                />
               </div>
 
               <label className="flex items-center gap-2 mb-1">

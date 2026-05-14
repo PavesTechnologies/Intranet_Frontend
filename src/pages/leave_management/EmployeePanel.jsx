@@ -18,13 +18,15 @@ const EmployeePanel = () => {
   if (!Array.isArray(roles)) {
     roles = roles.split(',').map((r) => r.trim());
   }
-  roles = roles.map((r) => r.toLowerCase().replace('hr-manager', 'hr-administrator'));
+  // roles = roles.map((r) => r.replace('Hr_Manager', 'hr-administrator'));
+
+  console.log("EmployeePanel Roles:", roles);
 
   const employeeId = employee.user?.user_id;
 
-  const isManager = roles.includes('manager') || (employee?.roles || '').toLowerCase() === 'super admin';
+  const isManager = roles.includes('reporting_manager') || (employee?.roles || '').toLowerCase() === 'super admin';
   const isHR = roles.includes('hr');
-  const isHRAdministrator = roles.includes('hr-administrator');
+  const isHRAdministrator = roles.includes('Hr_Manager');
   
   // Default view logic remains the same
   useEffect(() => {

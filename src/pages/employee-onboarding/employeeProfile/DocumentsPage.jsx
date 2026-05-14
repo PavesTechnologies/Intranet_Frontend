@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import {
   FileText,
   GraduationCap,
@@ -157,11 +158,10 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   useEffect(() => {
     const fetchSkills = async () => {
       try {
-        const token = localStorage.getItem("token");
         const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
         const res = await fetch(`${BASE_URL}/api/skills/active`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
         const result = await res.json();
@@ -185,11 +185,11 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   useEffect(() => {
     const fetchCertificates = async () => {
       try {
-        const token = localStorage.getItem("token");
+
         const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
         const res = await fetch(`${BASE_URL}/api/certificates`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
         const result = await res.json();
@@ -242,13 +242,12 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   useEffect(() => {
     const fetchProficiencies = async () => {
       try {
-        const token = localStorage.getItem("token");
         const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
         const res = await fetch(
           `${BASE_URL}/api/proficiency/get-all-proficiency-levels`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }
         );
 
@@ -331,12 +330,12 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
   /* ---- Resolve signed URL from file_path ---- */
   const getSignedUrl = async (filePath) => {
-    const token = localStorage.getItem("token");
+
     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
     const response = await fetch(
       `${BASE_URL}/hr/view_documents?file_path=${encodeURIComponent(filePath)}`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
     );
 
     const textResult = await response.text();
@@ -407,197 +406,6 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   const openInNewTab = (url) => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
-
-  /* ---- Upload Document ---- */
-  // const handleUpload = async () => {
-  //   if (!uploadFile && uploadModal.category!=="certifications") return;
-
-  //   try {
-  //     setUploading(true);
-  //     const token = localStorage.getItem("token");
-  //     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-
-  //     const targetUserUuid = user_uuid;
-
-  //     const formData = new FormData();
-  //     formData.append("file", uploadFile);
-  //     formData.append("user_uuid", targetUserUuid || "");
-  //     formData.append("category", uploadModal.category);
-
-  //     if (uploadModal.docId) {
-  //       formData.append("document_id", uploadModal.docId);
-  //     }
-
-  //     // Append category-specific metadata
-  //     Object.entries(uploadFormData).forEach(([key, value]) => {
-  //       if (value) formData.append(key, value);
-  //     });
-
-  //     const response = await fetch(
-  //       `${BASE_URL}/hr/upload-document`,
-  //       {
-  //         method: "POST",
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //         },
-  //         body: formData,
-  //       }
-  //     );
-
-  //     if (response.ok) {
-  //       setUploadSuccess(true);
-  //       setTimeout(() => {
-  //         setUploadModal({ open: false, category: "", docId: null });
-  //         setUploadFile(null);
-  //         setUploadFormData({});
-  //         setUploadSuccess(false);
-  //         // Refresh documents
-  //         window.location.reload();
-  //       }, 1500);
-  //     } else {
-  //       const errData = await response.json().catch(() => ({}));
-  //       showStatusToast(errData.detail || "Upload failed. Please try again.", "error");
-  //     }
-  //   } catch (error) {
-  //     console.error("Error uploading document:", error);
-  //     showStatusToast("Upload failed. Please try again.", "error");
-  //   } finally {
-  //     setUploading(false);
-  //   }
-  // };
-  // const handleUpload = async () => {
-  //   if (!uploadFile && uploadModal.category !== "certifications") return;
-
-  //   try {
-  //     setUploading(true);
-
-  //     const token = localStorage.getItem("token");
-
-  //     // 🔥 1. CERTIFICATIONS → RMS
-  //     if (uploadModal.category === "certifications") {
-  //       const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
-
-  //       const formData = new FormData();
-
-  //       // ✅ VALIDATION BEFORE API CALL
-  //         if (!employee?.empId) {
-  //           alert("Employee ID missing");
-  //           return;
-  //         }
-
-  //         if (!selectedCertificate?.value) {
-  //           alert("Please select a certificate");
-  //           return;
-  //         }
-
-  //         if (!uploadFormData.proficiencyId) {
-  //           alert("Please select proficiency");
-  //           return;
-  //         }
-
-  //       const certData = {
-  //         resourceId: Number(employee?.empId),
-  //         certificateId: selectedCertificate?.value,
-  //         skillId: selectedSkill?.value=== "other" ? null : selectedSkill?.value,
-  //         proficiencyId: uploadFormData.proficiencyId,
-  //         issuedDate: uploadFormData.issue_date,
-  //         expiryDate: uploadFormData.expiry_date || null,
-  //         activeFlag: true
-  //       };
-
-        
-
-  //       formData.append(
-  //         "certificateData",
-  //         new Blob([JSON.stringify(certData)], { type: "application/json" })
-  //       );
-
-  //       if (uploadFile) {
-  //         formData.append("certificateFile", uploadFile);
-  //       }
-  //       const isEdit = !!uploadModal.docId;
-
-  //       const url = isEdit
-  //         ? `${BASE_URL}/api/resource-certificates/${uploadModal.docId}`
-  //         : `${BASE_URL}/api/resource-certificates`;
-
-  //       const method = isEdit ? "PUT" : "POST";
-
-  //       const response = await fetch(
-  //         url,
-  //         {
-  //           method,
-  //           headers: {
-  //             Authorization: `Bearer ${token}`,
-  //           },
-  //           body: formData,
-  //         }
-  //       );
-
-  //       if (!response.ok) {
-  //         alert("Certification upload failed");
-  //         return;
-  //       }
-
-  //       alert(isEdit ? "Certification updated successfully" : "Certification saved successfully");
-  //       await fetchCertifications();
-  //       // reset
-  //       setUploadModal({ open: false, category: "", docId: null });
-  //       setUploadFormData({});
-  //       setSelectedSkill(null);
-  //       setSelectedCertificate(null);
-  //       setUploadFile(null);
-
-  //       return; // ✅ IMPORTANT → stops here
-  //     }
-
-  //     // 🔥 2. OTHER DOCUMENTS → EMPLOYEE ONBOARDING
-  //     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-
-  //     const formData = new FormData();
-
-  //     formData.append("file", uploadFile);
-  //     formData.append("user_uuid", user_uuid);
-  //     formData.append("category", uploadModal.category);
-
-  //     if (uploadModal.docId) {
-  //       formData.append("document_id", uploadModal.docId);
-  //     }
-
-  //     Object.entries(uploadFormData).forEach(([key, value]) => {
-  //       if (value) formData.append(key, value);
-  //     });
-
-  //     const response = await fetch(
-  //       `${BASE_URL}/hr/upload-document`,
-  //       {
-  //         method: "POST",
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //         },
-  //         body: formData,
-  //       }
-  //     );
-
-  //     if (response.ok) {
-  //       setUploadSuccess(true);
-  //       setTimeout(() => {
-  //         setUploadModal({ open: false, category: "", docId: null });
-  //         setUploadFile(null);
-  //         setUploadFormData({});
-  //         setUploadSuccess(false);
-  //         window.location.reload();
-  //       }, 1500);
-  //     } else {
-  //       alert("Upload failed");
-  //     }
-
-  //   } catch (error) {
-  //     console.error(error);
-  //   } finally {
-  //     setUploading(false);
-  //   }
-  // };
 
  const handleUpload = async () => {
   if (!uploadFile && uploadModal.category !== "certifications") return;
@@ -1697,31 +1505,14 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                           <label className="block text-sm font-medium text-gray-700 mb-1.5">
                             Document Type
                           </label>
-                          <select
+                          <FilterListbox
+                            options={[{value:"",label:"Select type"}, ...identityTypes.map((idType) => ({value: idType.identity_type_uuid, label: idType.identity_type_name}))]}
                             value={uploadFormData.identity_type_uuid || ""}
-                            onChange={(e) => {
-                              const selected = identityTypes.find(
-                                (t) => t.identity_type_uuid === e.target.value,
-                              );
-                              setUploadFormData((d) => ({
-                                ...d,
-                                identity_type_uuid: e.target.value,
-                                identity_type:
-                                  selected?.identity_type_name || "",
-                              }));
+                            onChange={(val) => {
+                              const selected = identityTypes.find(t => t.identity_type_uuid === val);
+                              setUploadFormData(d => ({ ...d, identity_type_uuid: val, identity_type: selected?.identity_type_name || "" }));
                             }}
-                            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 bg-white"
-                          >
-                            <option value="">Select type</option>
-                            {identityTypes.map((idType) => (
-                              <option
-                                key={idType.identity_type_uuid}
-                                value={idType.identity_type_uuid}
-                              >
-                                {idType.identity_type_name}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
                         <UploadField
                           label="Document Number"

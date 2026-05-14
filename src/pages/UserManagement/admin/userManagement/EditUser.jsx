@@ -1,78 +1,112 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import axios from "axios";
-import FormInput from "../../../../components/forms/FormInput";
-import Button from "../../../../components/Button/Button";
-import { showStatusToast } from "../../../../components/toastfy/toast";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
-import { FiEye, FiEyeOff } from "react-icons/fi";
+
+import FormInput from "../../../../components/forms/FormInput";
+import Button from "../../../../components/Button/Button";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { Fonts } from "../../../../components/Fonts/Fonts";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 
 export default function EditUserForm({ userId, onSuccess, onClose }) {
-  const token = localStorage.getItem("token");
-
   const [user, setUser] = useState({
     first_name: "",
     last_name: "",
     mail: "",
-    contact: "", // raw phone (no "+")
+    contact: "",
     password: "",
     is_active: true,
   });
 
+  const [fetching, setFetching] = useState(true);
   const [loading, setLoading] = useState(false);
   const isSubmittingRef = useRef(false);
 
-  // ✅ Fetch user details
+  const axiosInstance = useMemo(() => {
+    const instance = axios.create({
+      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    instance.interceptors.request.use((config) => {
+      const latestToken = localStorage.getItem("token");
+
+      if (latestToken) {
+        config.headers.Authorization = `Bearer ${latestToken}`;
+      }
+
+      return config;
+    });
+
+    return instance;
+  }, []);
+
   useEffect(() => {
-    console.log("Fetching user with ID:", userId);
-    if (userId) {
-      axios
-        .get(
-          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        )
-        .then((res) => {
-          const { password, contact, ...rest } = res.data;
-          setUser((prev) => ({
-            ...prev,
-            ...rest,
-            contact: contact?.replace(/^\+/, "") || "", // store without "+"
-          }));
-        })
-        .catch((err) => {
-          console.error("Failed to fetch user:", err);
-          showStatusToast("Access denied or user not found.", "error");
-          onClose();
-        });
-    }
-  }, [userId, token, onClose]);
+    const fetchUser = async () => {
+      if (!userId) return;
+
+      try {
+        setFetching(true);
+
+        const res = await axiosInstance.get(`/admin/users/uuid/${userId}`);
+
+        const { password, contact, ...rest } = res.data || {};
+
+        setUser((prev) => ({
+          ...prev,
+          ...rest,
+          password: "",
+          contact: String(contact || "").replace(/\D/g, ""),
+        }));
+      } catch (err) {
+        console.error("Failed to fetch user:", err);
+        showStatusToast("Access denied or user not found.", "error");
+        onClose();
+      } finally {
+        setFetching(false);
+      }
+    };
+
+    fetchUser();
+  }, [userId, axiosInstance, onClose]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
     setUser((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
   };
 
-  // ✅ Validation
   const validateForm = () => {
     if (!user.first_name.trim()) return "First Name is required.";
-    if (!/^[A-Za-z ]*$/.test(user.first_name))
+
+    if (!/^[A-Za-z ]*$/.test(user.first_name)) {
       return "First Name must contain only letters and spaces.";
+    }
+
     if (!user.last_name.trim()) return "Last Name is required.";
-    if (!/^[A-Za-z ]*$/.test(user.last_name))
+
+    if (!/^[A-Za-z ]*$/.test(user.last_name)) {
       return "Last Name must contain only letters and spaces.";
+    }
+
     if (!user.mail.trim()) return "Email is required.";
-    if (!/^[a-zA-Z0-9@._-]+$/.test(user.mail))
+
+    if (!/^[a-zA-Z0-9@._-]+$/.test(user.mail)) {
       return "Email contains invalid characters.";
+    }
+
     if (!user.contact.trim()) return "Contact number is required.";
 
-    // ✅ Always prefix with "+"
-    const phoneNumber = parsePhoneNumberFromString("+" + user.contact);
+    const digitsOnly = user.contact.replace(/\D/g, "");
+    const phoneNumber = parsePhoneNumberFromString(`+${digitsOnly}`);
+
     if (!phoneNumber || !phoneNumber.isValid()) {
       return "Invalid phone number for the selected country.";
     }
@@ -83,6 +117,7 @@ export default function EditUserForm({ userId, onSuccess, onClose }) {
     ) {
       return "Indian contact number must be exactly 10 digits.";
     }
+
     if (
       phoneNumber.countryCallingCode === "1" &&
       phoneNumber.nationalNumber.length !== 10
@@ -93,44 +128,49 @@ export default function EditUserForm({ userId, onSuccess, onClose }) {
     return null;
   };
 
-  // ✅ Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (loading || isSubmittingRef.current) return;
-    isSubmittingRef.current = true;
 
     const validationError = validateForm();
+
     if (validationError) {
       showStatusToast(validationError, "error");
-      isSubmittingRef.current = false;
       return;
     }
 
+    isSubmittingRef.current = true;
     setLoading(true);
 
     try {
-      const payload = { ...user };
+      const digitsOnly = user.contact.replace(/\D/g, "");
 
-      // ✅ Normalize phone with "+" prefix
-      if (payload.contact && !payload.contact.startsWith("+")) {
-        payload.contact = `+${payload.contact}`;
+      const payload = {
+        first_name: user.first_name.trim(),
+        last_name: user.last_name.trim(),
+        mail: user.mail.trim(),
+        contact: `+${digitsOnly}`,
+        is_active: user.is_active,
+      };
+
+      if (user.password?.trim()) {
+        payload.password = user.password.trim();
       }
 
-      if (!payload.password) delete payload.password;
+      await axiosInstance.put(`/admin/users/uuid/${userId}`, payload);
 
-      await axios.put(
-        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userId}`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      // showStatusToast("User updated successfully.", "success");
 
-      onSuccess();
+      if (typeof onSuccess === "function") {
+        onSuccess();
+      }
     } catch (err) {
       console.error("Update failed:", err);
+
       showStatusToast(
         err.response?.data?.detail || "Failed to update user.",
-        "error",
+        "error"
       );
     } finally {
       setLoading(false);
@@ -138,135 +178,131 @@ export default function EditUserForm({ userId, onSuccess, onClose }) {
     }
   };
 
+  if (fetching) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white py-12">
+        <LoadingSpinner text="Loading user details..." />
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div className="mx-auto w-full max-w-4xl rounded-xl bg-white">
       <form
         onSubmit={handleSubmit}
-        className="space-y-4 p-4 max-h-[60vh] overflow-y-auto"
+        className="flex max-h-[70vh] flex-col overflow-hidden"
       >
-        {/* First + Last Name */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
+          <div>
+            <h3 className={Fonts.heading4}>Edit User</h3>
+            <p className={Fonts.paragraphMuted}>
+              Update user information and save changes.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormInput
+              label="First Name"
+              name="first_name"
+              value={user.first_name}
+              onChange={(e) => {
+                if (/^[A-Za-z ]*$/.test(e.target.value)) handleChange(e);
+              }}
+              placeholder="Enter first name"
+            />
+
+            <FormInput
+              label="Last Name"
+              name="last_name"
+              value={user.last_name}
+              onChange={(e) => {
+                if (/^[A-Za-z ]*$/.test(e.target.value)) handleChange(e);
+              }}
+              placeholder="Enter last name"
+            />
+          </div>
+
           <FormInput
-            label="First Name"
-            name="first_name"
-            value={user.first_name}
+            label="Email"
+            name="mail"
+            type="email"
+            value={user.mail}
             onChange={(e) => {
-              if (/^[a-zA-Z\s]*$/.test(e.target.value)) handleChange(e);
+              if (/^[a-zA-Z0-9@._-]*$/.test(e.target.value)) handleChange(e);
             }}
-            placeholder="Enter first name"
+            placeholder="Enter email"
           />
+
+          <div className="space-y-1">
+            <label className={Fonts.label}>Contact</label>
+
+            <PhoneInput
+              country="in"
+              value={user.contact}
+              onChange={(phone) => {
+                setUser((prev) => ({
+                  ...prev,
+                  contact: String(phone || "").replace(/\D/g, ""),
+                }));
+              }}
+              enableSearch={true}
+              countryCodeEditable={false}
+              disableDropdown={false}
+              placeholder="Enter phone number"
+              inputStyle={{
+                width: "100%",
+                height: "42px",
+                padding: "0px 12px 0px 48px",
+                border: "1px solid #d1d5db",
+                borderRadius: "10px",
+                fontSize: "0.875rem",
+                backgroundColor: "white",
+              }}
+              buttonStyle={{
+                border: "1px solid #d1d5db",
+                borderRight: "none",
+                borderRadius: "10px 0 0 10px",
+                backgroundColor: "white",
+                display: "flex",
+                alignItems: "center",
+              }}
+              dropdownStyle={{
+                maxHeight: "250px",
+                overflowY: "auto",
+              }}
+            />
+          </div>
+
           <FormInput
-            label="Last Name"
-            name="last_name"
-            value={user.last_name}
-            onChange={(e) => {
-              if (/^[a-zA-Z\s]*$/.test(e.target.value)) handleChange(e);
-            }}
-            placeholder="Enter last name"
-          />
-        </div>
-
-        {/* Email */}
-        <FormInput
-          label="Email"
-          name="mail"
-          type="email"
-          value={user.mail}
-          onChange={(e) => {
-            if (/^[a-zA-Z0-9@._-]*$/.test(e.target.value)) handleChange(e);
-          }}
-          placeholder="Enter email"
-        />
-
-        {/* ✅ Updated Contact Input (latest format) */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Contact
-          </label>
-          <PhoneInput
-            country={"us"} // default to US
-            value={user.contact}
-            onChange={(phone) =>
-              setUser((prev) => ({
-                ...prev,
-                contact: phone,
-              }))
-            }
-            enableSearch={true}
-            countryCodeEditable={false}
-            disableDropdown={false}
-            placeholder="Enter phone number"
-            inputStyle={{
-              width: "100%",
-              padding: "6px 10px 6px 40px",
-              border: "1px solid #d1d5db",
-              borderRadius: "6px",
-              fontSize: "0.875rem",
-              boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-              backgroundColor: "white",
-            }}
-            buttonStyle={{
-              // border: "1px solid",
-              // borderRadius: "6px",
-              // marginRight: "0px",
-              backgroundColor: "white",
-              display: "flex",
-              alignItems: "center",
-            }}
-            dropdownStyle={{
-              maxHeight: "250px",
-              overflowY: "auto",
-            }}
-            containerStyle={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-between",
-            }}
-          />
-        </div>
-
-        {/* Password */}
-        <FormInput
-          label="New Password (Optional)"
-          name="password"
-          type="password"
-          value={user.password}
-          onChange={handleChange}
-          placeholder="Leave blank to keep current password"
-        />
-
-        {/* Active checkbox */}
-        {/* <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            name="is_active"
-            checked={user.is_active}
+            label="New Password (Optional)"
+            name="password"
+            type="password"
+            value={user.password}
             onChange={handleChange}
-            id="is_active"
-            className="rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+            placeholder="Leave blank to keep current password"
           />
-          <label htmlFor="is_active" className="text-sm text-gray-700">
-            Is Active
-          </label>
-        </div> */}
+        </div>
 
-        {/* Buttons */}
-        <div className="flex gap-4 pt-4 border-t sticky bottom-0 bg-white">
-          <Button
-            type="submit"
-            disabled={loading || isSubmittingRef.current}
-            className="flex-1 sm:flex-none"
-          >
-            {loading ? "Saving..." : "Save Changes"}
-          </Button>
+        <div className="sticky bottom-0 flex flex-col-reverse gap-3 border-t bg-gray-50 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             onClick={onClose}
             disabled={loading || isSubmittingRef.current}
-            className="flex-1 sm:flex-none"
+            className="w-full sm:w-auto"
           >
             Cancel
+          </Button>
+
+          <Button
+            type="submit"
+            variant="primary"
+            loading={loading}
+            loadingText="Saving..."
+            disabled={loading || isSubmittingRef.current}
+            className="w-full sm:w-auto"
+          >
+            Save Changes
           </Button>
         </div>
       </form>
