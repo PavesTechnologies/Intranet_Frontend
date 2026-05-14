@@ -189,7 +189,7 @@ const EscalationForm = ({ formData, setFormData, onSave, onClose, loading, showB
       </div>
 
       {/* Buttons */}
-      {showButtons && (
+      {/* {showButtons && (
         <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 mt-8">
           <button
             onClick={onClose}
@@ -208,7 +208,7 @@ const EscalationForm = ({ formData, setFormData, onSave, onClose, loading, showB
             {loading ? "Updating..." : "Update"}
           </button>
         </div>
-      )}
+      )} */}
     </div>
   );
 };
