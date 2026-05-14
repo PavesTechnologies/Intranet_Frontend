@@ -56,7 +56,7 @@ export default function CreateTestCycleForm({
     const fetchSprints = async () => {
       try {
         const res = await axiosInstance.get(
-          `/projects/${projectId}/sprints`  // ✅ correct
+          `/api/projects/${projectId}/sprints`  // ✅ correct
         );
         setSprints(res.data || []);
       } catch (err) {

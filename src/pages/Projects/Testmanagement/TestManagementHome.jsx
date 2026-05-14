@@ -8,6 +8,7 @@ import TestPlans from "./TestPlans";
 import TestDesign from "./TestDesign/TestDesign";
 import TestExecution from "./TestExecution/TestExecution";
 import BugPage from "./Bug/BugPage";
+import DevDashboard from "./Bug/DevDashboard";
 
 import { useEffect, useState } from "react";
 
@@ -42,6 +43,9 @@ export default function TestManagement() {
 
       case "test-management/test-bugs":
         return <BugPage projectId={projectId} />;
+
+      case "test-management/dev-dashboard":
+        return <DevDashboard />;
 
       default:
         return <TestPlans  projectId={projectId} />;

@@ -1,5 +1,19 @@
 // src/pages/Projects/Testmanagement/TestDesign/panels/StepsPanel.jsx
 import React from "react";
+import{jwtDecode} from "jwt-decode";
+const token = localStorage.getItem("token");
+  
+  let canCreateTest = false;
+  
+  if (token) {
+    const decoded = jwtDecode(token);
+  
+    const roles = decoded?.roles || [];
+  
+    canCreateTest =
+      roles.includes("Tester") ||
+      roles.includes("Project_Manager");
+  }
 
 export default function StepsPanel({ step }) {
   if (!step) return null;

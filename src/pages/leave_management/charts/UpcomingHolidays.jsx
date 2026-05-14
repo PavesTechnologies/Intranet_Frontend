@@ -169,10 +169,6 @@ export default function UpcomingHolidays({ year }) {
     fetchHolidays();
   }, [year]);
 
-  const todayHoliday = holidays.find(
-    (h) => new Date(h.holidayDate).toDateString() === today.toDateString(),
-  );
-
   const upcoming = holidays
     .filter((h) => {
       const d = new Date(h.holidayDate);
@@ -231,7 +227,7 @@ export default function UpcomingHolidays({ year }) {
             style={{ color: theme.text }}
           >
             <span>{theme.emoji}</span>
-            <span>{todayHoliday ? "Today is a Holiday!" : "Upcoming Holiday"}</span>
+            <span>{activeHoliday && new Date(activeHoliday.holidayDate).toDateString() === today.toDateString() ? "Today is a Holiday!" : "Upcoming Holiday"}</span>
           </h3>
           <button
             className="text-xs font-semibold px-2.5 py-1 rounded-md transition-colors"
