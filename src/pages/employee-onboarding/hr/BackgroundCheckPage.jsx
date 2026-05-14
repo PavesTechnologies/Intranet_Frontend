@@ -12,6 +12,7 @@ import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
 import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
+import { KPICard } from "../../../components/kpi/KPI";
 
 /* ── Static BG Checks (not document-linked) ── */
 const STATIC_CHECKS = [
@@ -71,17 +72,18 @@ const SectionCard = ({ title, icon: Icon, children }) => (
 const StatCard = ({ label, count, color, Icon, onClick, isActive, activeColor }) => (
   <button
     onClick={onClick}
-    className={`bg-white rounded-xl border p-4 flex items-center gap-3 transition-all hover:shadow-md hover:-translate-y-0.5 w-full text-left ${
-      isActive ? `ring-2 ${activeColor} border-transparent shadow-md` : "border-gray-200 shadow-sm"
+    className={`w-full text-left transition-all hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
+      isActive ? `ring-2 ${activeColor} rounded-xl shadow-md` : ""
     }`}
   >
-    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
-      <Icon className="w-4 h-4 text-white" />
-    </div>
-    <div className="min-w-0">
-      <p className="text-lg font-bold text-gray-800 leading-tight">{count}</p>
-      <p className="text-[11px] text-gray-500 font-medium truncate">{label}</p>
-    </div>
+    <KPICard
+      label={label}
+      value={count}
+      icon={<Icon className="h-5 w-5" />}
+      color={`${color} text-white`}
+      active={isActive}
+      className="h-full w-full bg-white border-gray-200 shadow-sm"
+    />
   </button>
 );
 

@@ -34,6 +34,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { KPICard } from "../../../components/kpi/KPI";
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -233,6 +234,7 @@ export default function OnboardingSummary() {
       trend: "+0%",
       color: "text-emerald-600",
       bg: "bg-emerald-50",
+      icon: CheckCircle,
     },
     {
       label: "Completion Rate",
@@ -240,6 +242,7 @@ export default function OnboardingSummary() {
       trend: "+0%",
       color: "text-blue-600",
       bg: "bg-blue-50",
+      icon: ShieldCheck,
     },
     {
       label: "Drop-off Rate",
@@ -247,6 +250,7 @@ export default function OnboardingSummary() {
       trend: "-0%",
       color: "text-rose-600",
       bg: "bg-rose-50",
+      icon: XCircle,
     },
   ];
 
@@ -256,12 +260,14 @@ export default function OnboardingSummary() {
       count: summaryData?.aging?.pending_3_days || 0,
       color: "text-amber-600",
       bg: "bg-amber-100",
+      icon: Clock,
     },
     {
       label: "Pending > 7 Days",
       count: summaryData?.aging?.pending_7_days || 0,
       color: "text-rose-600",
       bg: "bg-rose-100",
+      icon: AlertCircle,
     },
   ];
 
@@ -326,20 +332,14 @@ export default function OnboardingSummary() {
       {/* 1. Overview Section - Column Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
         {overviewMetrics.map((metric, i) => (
-          <div
+          <KPICard
             key={i}
-            className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all hover:-translate-y-1"
-          >
-            <div className={`p-2 w-fit rounded-lg ${metric.bg} mb-3`}>
-              <metric.icon className={`w-4 h-4 ${metric.color}`} />
-            </div>
-            <h4 className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
-              {metric.title}
-            </h4>
-            <h2 className="text-2xl font-bold text-slate-900 mt-1">
-              {metric.value}
-            </h2>
-          </div>
+            label={metric.title}
+            value={metric.value}
+            icon={<metric.icon className="h-5 w-5" />}
+            color={`${metric.bg} ${metric.color}`}
+            className="bg-white border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-1"
+          />
         ))}
       </div>
 
@@ -348,20 +348,23 @@ export default function OnboardingSummary() {
         {metrics.map((metric, i) => (
           <div
             key={i}
-            className={`p-6 rounded-2xl border border-slate-200 shadow-sm ${metric.bg}`}
+            className={`rounded-xl border border-slate-200 shadow-sm ${metric.bg}`}
           >
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="text-slate-600 font-semibold">{metric.label}</h3>
+            <div className="relative">
+              <KPICard
+                label={metric.label}
+                value={metric.value}
+                icon={<metric.icon className="h-5 w-5" />}
+                color={`${metric.bg} ${metric.color}`}
+                className="border-0 bg-transparent shadow-none pr-16"
+              />
               <span
-                className={`text-xs font-bold px-2 py-1 rounded-full ${metric.trend.startsWith("+") ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}
+                className={`absolute right-4 top-4 text-xs font-bold px-2 py-1 rounded-full ${metric.trend.startsWith("+") ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}
               >
                 {metric.trend}
               </span>
             </div>
-            <div className="text-3xl font-bold text-slate-900">
-              {metric.value}
-            </div>
-            <div className="mt-4 h-1 w-full bg-slate-200 rounded-full overflow-hidden">
+            <div className="mx-4 mb-4 h-1 w-[calc(100%-2rem)] bg-slate-200 rounded-full overflow-hidden">
               <div
                 className={`h-full ${metric.color.replace("text", "bg")}`}
                 style={{ width: metric.value }}
@@ -443,20 +446,15 @@ export default function OnboardingSummary() {
             </h3>
             <div className="grid grid-cols-2 gap-4">
               {agingData.map((age, i) => (
-                <div
+                <KPICard
                   key={i}
-                  className={`p-4 rounded-xl border border-slate-100 ${age.bg}`}
-                >
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-tighter">
-                    {age.label}
-                  </p>
-                  <p className={`text-3xl font-black mt-1 ${age.color}`}>
-                    {age.count}
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-1 font-medium">
-                    Candidates
-                  </p>
-                </div>
+                  label={age.label}
+                  value={age.count}
+                  suffix=" Candidates"
+                  icon={<age.icon className="h-5 w-5" />}
+                  color={`${age.bg} ${age.color}`}
+                  className="border-slate-100 bg-white"
+                />
               ))}
             </div>
           </div>
