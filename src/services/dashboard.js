@@ -50,6 +50,20 @@ export const pmsSummary = async (userId) => {
     }
 };
 
+export const todayOnLeave = async () => {
+    try {
+        const response = await axios.get(`${LMS_BASE_URL}/api/leave-requests/today-on-leave`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching today on leave:", error);
+        throw error;
+    }
+};
+
 export const leaveBalance = async (employeeId, year) => {
     try {
         const response = await axios.get(`${LMS_BASE_URL}/api/leave-balance/employee-dashboard/leave-balance/${employeeId}/${year}`, {

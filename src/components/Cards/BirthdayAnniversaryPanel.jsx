@@ -108,7 +108,6 @@ function EmptyState({ tab }) {
 
 export default function BirthdayAnniversaryPanel() {
   const [activeTab, setActiveTab] = useState("birthdays");
-  const [collapsed, setCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [celebrationData, setCelebrationData] = useState({
     birthdays: { today: [], upcoming: [] },
@@ -217,120 +216,106 @@ export default function BirthdayAnniversaryPanel() {
           <span className={`w-1.5 h-4 rounded-full ${activeTabMeta?.dotClass}`} />
           <span className="text-sm font-semibold text-gray-800">Celebrations</span>
         </div>
-        <button
-          onClick={() => setCollapsed((c) => !c)}
-          className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-50"
-          aria-label="Toggle panel"
-        >
-          <svg
-            className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`}
-            fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
-          >
-            <path d="M18 15l-6-6-6 6" />
-          </svg>
-        </button>
       </div>
 
-      {!collapsed && (
-        <>
-          {/* Segmented tabs */}
-          <div className="px-4 pb-3">
-            <div className="flex gap-1 bg-gray-50 rounded-xl p-1">
-              {TABS.map((tab) => {
-                const isActive = activeTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${isActive
-                      ? `${tab.activeClass} shadow-sm`
-                      : "text-gray-400 hover:text-gray-600"
-                      }`}
-                  >
-                    {tab.icon}
-                    <span className="hidden sm:inline truncate">{tab.label}</span>
-                    <span className={`min-w-[16px] h-4 rounded-full text-[10px] font-semibold flex items-center justify-center px-1 ${isActive ? "bg-white/70" : "bg-gray-200 text-gray-500"
-                      }`}>
-                      {tab.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+      <>
+        {/* Segmented tabs */}
+        <div className="px-4 pb-3">
+          <div className="flex gap-1 bg-gray-50 rounded-xl p-1">
+            {TABS.map((tab) => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${isActive
+                    ? `${tab.activeClass} shadow-sm`
+                    : "text-gray-400 hover:text-gray-600"
+                    }`}
+                >
+                  {tab.icon}
+                  <span className="hidden sm:inline truncate">{tab.label}</span>
+                  <span className={`min-w-[16px] h-4 rounded-full text-[10px] font-semibold flex items-center justify-center px-1 ${isActive ? "bg-white/70" : "bg-gray-200 text-gray-500"
+                    }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
+        </div>
 
-          {loading ? (
-            <div className="px-4 pb-10 flex flex-col items-center justify-center gap-3">
-              <LoadingSpinner text="Loading Celebrations..." />
-            </div>
-          ) : (
-            <div className="px-4 pb-5">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Today Section */}
-                <div className={`relative p-5 rounded-2xl transition-all duration-500 group/today ${activeTab === "birthdays"
-                  ? "bg-gradient-to-br from-rose-50/80 via-orange-50/50 to-white border border-rose-100/50 shadow-sm shadow-rose-100/20"
-                  : activeTab === "anniversaries"
-                    ? "bg-gradient-to-br from-violet-50/80 via-purple-50/50 to-white border border-violet-100/50 shadow-sm shadow-violet-100/20"
-                    : "bg-gradient-to-br from-blue-50/80 via-emerald-50/50 to-white border border-blue-100/50 shadow-sm shadow-blue-100/20"
-                  }`}>
+        {loading ? (
+          <div className="px-4 pb-10 flex flex-col items-center justify-center gap-3">
+            <LoadingSpinner text="Loading Celebrations..." />
+          </div>
+        ) : (
+          <div className="px-4 pb-5">
+            <div className="grid grid-cols-2 gap-6">
+              {/* Today Section */}
+              <div className={`relative p-5 rounded-2xl transition-all duration-500 group/today ${activeTab === "birthdays"
+                ? "bg-gradient-to-br from-rose-50/80 via-orange-50/50 to-white border border-rose-100/50 shadow-sm shadow-rose-100/20"
+                : activeTab === "anniversaries"
+                  ? "bg-gradient-to-br from-violet-50/80 via-purple-50/50 to-white border border-violet-100/50 shadow-sm shadow-violet-100/20"
+                  : "bg-gradient-to-br from-blue-50/80 via-emerald-50/50 to-white border border-blue-100/50 shadow-sm shadow-blue-100/20"
+                }`}>
 
-                  {todayItems.length > 0 && (
-                    <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
-                      <div className="absolute -bottom-6 -left-6 w-56 h-56 opacity-[0.08] transform -rotate-12 transition-all duration-1000 ease-out group-hover/today:translate-x-8 group-hover/today:-translate-y-8 group-hover/today:rotate-0 group-hover/today:scale-125 z-0 flex items-center justify-center">
-                        <span className="text-[100px] select-none">
-                          {activeTab === "birthdays" ? "🎉" : activeTab === "anniversaries" ? "🏆" : "🚀"}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between items-start mb-5">
-                    <p className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${activeTab === "birthdays" ? "text-rose-500" : activeTab === "anniversaries" ? "text-violet-500" : "text-blue-500"
-                      }`}>
-                      {activeTab === "birthdays" ? <span>🎂</span> : activeTab === "anniversaries" ? <span>✨</span> : <span>🤝</span>}
-                      Today
-                    </p>
-                    {todayItems.length > 0 && (
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter animate-pulse ${activeTab === "birthdays" ? "bg-rose-100/80 text-rose-600" : activeTab === "anniversaries" ? "bg-violet-100/80 text-violet-600" : "bg-blue-100/80 text-blue-600"
-                        }`}>
-                        {activeTab === "birthdays" ? "Party Time!" : activeTab === "anniversaries" ? "Congrats!" : "Welcome!"}
+                {todayItems.length > 0 && (
+                  <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+                    <div className="absolute -bottom-6 -left-6 w-56 h-56 opacity-[0.08] transform -rotate-12 transition-all duration-1000 ease-out group-hover/today:translate-x-8 group-hover/today:-translate-y-8 group-hover/today:rotate-0 group-hover/today:scale-125 z-0 flex items-center justify-center">
+                      <span className="text-[100px] select-none">
+                        {activeTab === "birthdays" ? "🎉" : activeTab === "anniversaries" ? "🏆" : "🚀"}
                       </span>
-                    )}
+                    </div>
                   </div>
+                )}
 
-                  {todayItems.length === 0 ? (
-                    <EmptyState tab={activeTab} />
-                  ) : (
-                    <div className="flex flex-wrap gap-x-6 gap-y-6">
-                      {todayItems.map((item) => (
-                        <CelebrationItem key={item.id} item={item} isActive={true} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Upcoming Section */}
-                <div className="p-5 border border-transparent">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-5">
-                    Upcoming
+                <div className="flex justify-between items-start mb-5">
+                  <p className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${activeTab === "birthdays" ? "text-rose-500" : activeTab === "anniversaries" ? "text-violet-500" : "text-blue-500"
+                    }`}>
+                    {activeTab === "birthdays" ? <span>🎂</span> : activeTab === "anniversaries" ? <span>✨</span> : <span>🤝</span>}
+                    Today
                   </p>
-                  {upcomingItems.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-gray-100 rounded-2xl">
-                      <p className="text-[10px] text-gray-400 font-medium">No upcoming celebrations</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-x-6 gap-y-6">
-                      {upcomingItems.map((item) => (
-                        <CelebrationItem key={item.id} item={item} isActive={false} />
-                      ))}
-                    </div>
+                  {todayItems.length > 0 && (
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter animate-pulse ${activeTab === "birthdays" ? "bg-rose-100/80 text-rose-600" : activeTab === "anniversaries" ? "bg-violet-100/80 text-violet-600" : "bg-blue-100/80 text-blue-600"
+                      }`}>
+                      {activeTab === "birthdays" ? "Party Time!" : activeTab === "anniversaries" ? "Congrats!" : "Welcome!"}
+                    </span>
                   )}
                 </div>
+
+                {todayItems.length === 0 ? (
+                  <EmptyState tab={activeTab} />
+                ) : (
+                  <div className="flex flex-wrap gap-x-6 gap-y-6">
+                    {todayItems.map((item) => (
+                      <CelebrationItem key={item.id} item={item} isActive={true} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Upcoming Section */}
+              <div className="p-5 border border-transparent">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-5">
+                  Upcoming
+                </p>
+                {upcomingItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-gray-100 rounded-2xl">
+                    <p className="text-[10px] text-gray-400 font-medium">No upcoming celebrations</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-x-6 gap-y-6">
+                    {upcomingItems.map((item) => (
+                      <CelebrationItem key={item.id} item={item} isActive={false} />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </>
-      )}
+          </div>
+        )}
+      </>
     </div>
   );
 }
