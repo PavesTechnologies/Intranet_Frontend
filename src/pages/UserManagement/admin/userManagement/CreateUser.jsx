@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import FormInput from "../../../../components/forms/FormInput";
 import Button from "../../../../components/Button/Button";
@@ -21,26 +21,7 @@ export default function CreateUserForm({ onSuccess, onClose }) {
   const [toastActive, setToastActive] = useState(false);
   const [generating, setGenerating] = useState(false);
 
-  const axiosInstance = useMemo(() => {
-    const instance = axios.create({
-      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    instance.interceptors.request.use((config) => {
-      const latestToken = localStorage.getItem("token");
-
-      if (latestToken) {
-        config.headers.Authorization = `Bearer ${latestToken}`;
-      }
-
-      return config;
-    });
-
-    return instance;
-  }, []);
+  const axiosInstance = useMemo(() => api, []);
 
   const showSingleToast = (message, type = "error") => {
     if (!toastActive) {

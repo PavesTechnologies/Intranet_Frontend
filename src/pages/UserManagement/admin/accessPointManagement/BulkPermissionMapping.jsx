@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import {
   UploadCloud,
@@ -101,7 +101,7 @@ const BulkPermissionMapping = ({ onClose, onSuccess }) => {
         "Uploading file and mapping permissions..."
       );
 
-      const response = await axios.post(
+      const response = await api.post(
         `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/access-points/access-point-map-permission-bulk`,
         formData,
         {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { FaLock } from "react-icons/fa";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -54,7 +54,7 @@ export default function InitialPasswordSetup() {
 
     setLoading(true);
     try {
-      await axios.post(
+      await api.post(
         `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/send-otp`,
         {
           email,
@@ -82,7 +82,7 @@ export default function InitialPasswordSetup() {
 
     setLoading(true);
     try {
-      await axios.post(
+      await api.post(
         `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/validate-otp`,
         {
           email,
@@ -120,7 +120,7 @@ export default function InitialPasswordSetup() {
 
     setLoading(true);
     try {
-      await axios.post(
+      await api.post(
         `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/first-login/change-password`,
         {
           email,

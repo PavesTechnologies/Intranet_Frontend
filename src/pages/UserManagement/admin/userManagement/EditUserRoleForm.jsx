@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { ArrowLeft } from "lucide-react";
 
 import { showStatusToast } from "../../../../components/toastfy/toast";
@@ -12,7 +12,7 @@ import { Fonts } from "../../../../components/Fonts/Fonts";
 
 const ROLES_PER_PAGE = 6;
 
-export default function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
+export default function EditUserRoleModal({ user_uuId, onClose, onSaved }) {
   const [user, setUser] = useState(null);
   const [roles, setRoles] = useState([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState([]);
@@ -31,9 +31,9 @@ export default function EditUserRoleModal({ user_uuId, onClose, axiosInstance, o
 
       try {
         const [userRes, rolesRes, assignedRes] = await Promise.all([
-          axiosInstance.get(`/admin/users/uuid/${user_uuId}`),
-          axiosInstance.get(`/admin/roles`),
-          axiosInstance.get(`/admin/users/uuid/${user_uuId}/roles`),
+          api.get(`/admin/users/uuid/${user_uuId}`),
+          api.get(`/admin/roles`),
+          api.get(`/admin/users/uuid/${user_uuId}/roles`),
         ]);
 
         if (!mounted) return;
@@ -70,7 +70,7 @@ export default function EditUserRoleModal({ user_uuId, onClose, axiosInstance, o
     return () => {
       mounted = false;
     };
-  }, [user_uuId, axiosInstance]);
+  }, [user_uuId]);
 
   const filteredRoles = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -114,7 +114,7 @@ export default function EditUserRoleModal({ user_uuId, onClose, axiosInstance, o
     setSaving(true);
 
     try {
-      const response = await axiosInstance.put(
+      const response = await api.put(
         `/admin/users/uuid/${user_uuId}/role`,
         { role_ids: selectedRoleIds }
       );
