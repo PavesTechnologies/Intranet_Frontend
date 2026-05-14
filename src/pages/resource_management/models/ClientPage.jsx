@@ -47,6 +47,7 @@ import {
   createClientEscalation,
 } from "../services/clientservice";
 import GenericTable from "../../../components/Table/table";
+import StatusBadge from "../../../components/status/statusbadge";
 
 /* ---------------- SUB COMPONENTS ---------------- */
 
@@ -121,9 +122,7 @@ const ProjectSLA = ({ data, loading }) => {
               </span>
             ),
             status_info: (
-              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                {sla.activeFlag ? "Active" : "Inactive"}
-              </span>
+              <StatusBadge label={sla.activeFlag ? "ACTIVE" : "INACTIVE"} size="sm" />
             )
           }))}
         />
@@ -169,9 +168,7 @@ const ProjectCompliance = ({ data, loading }) => {
               </span>
             ),
             status_info: (
-              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${item.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                {item.activeFlag ? "Active" : "Inactive"}
-              </span>
+              <StatusBadge label={item.activeFlag ? "ACTIVE" : "INACTIVE"} size="sm" />
             )
           }))}
         />
@@ -210,9 +207,7 @@ const ProjectAssets = ({ assets, loading }) => {
             serial_info: <span className="font-mono text-gray-600">{asset.serialNumber || asset.serial || "—"}</span>,
             assigned_info: <span>{asset.assignedBy || asset.assignedTo || "—"}</span>,
             status_info: (
-              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${(asset.asset?.status || asset.status) === "ACTIVE" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                {asset.asset?.status || asset.status || "UNKNOWN"}
-              </span>
+              <StatusBadge label={asset.asset?.status || asset.status || "UNKNOWN"} size="sm" />
             )
           }))}
         />
@@ -497,7 +492,11 @@ const ClientPage = () => {
       const res = await getProjectSLA(projectId);
       setProjectSLA(res.data || res);
     } catch (error) {
-      console.error("Failed to fetch project SLA", error);
+      if (error.response?.status === 403) {
+        console.warn(`Access denied (403): Cannot view SLA for project ${projectId}`);
+      } else {
+        console.error("Failed to fetch project SLA", error);
+      }
       setProjectSLA(null);
     } finally {
       setLoadingSLA(false);
@@ -510,7 +509,11 @@ const ClientPage = () => {
       const res = await getProjectCompliance(projectId);
       setProjectCompliance(res.data || res || []);
     } catch (error) {
-      console.error("Failed to fetch compliance", error);
+      if (error.response?.status === 403) {
+        console.warn(`Access denied (403): Cannot view compliance for project ${projectId}`);
+      } else {
+        console.error("Failed to fetch compliance", error);
+      }
       setProjectCompliance([]);
     } finally {
       setLoadingCompliance(false);
@@ -523,7 +526,11 @@ const ClientPage = () => {
       const res = await getProjectEscalations(projectId);
       setProjectEscalations(res.data || res || []);
     } catch (error) {
-      console.error("Failed to fetch escalations", error);
+      if (error.response?.status === 403) {
+        console.warn(`Access denied (403): Cannot view escalations for project ${projectId}`);
+      } else {
+        console.error("Failed to fetch escalations", error);
+      }
       setProjectEscalations([]);
     } finally {
       setLoadingEscalations(false);
@@ -882,14 +889,7 @@ const ClientPage = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500">Status</span>
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${project.projectStatus === "ACTIVE"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-600"
-                          }`}
-                      >
-                        {project.projectStatus}
-                      </span>
+                      <StatusBadge label={project.projectStatus || "UNKNOWN"} size="sm" />
                     </div>
 
                     <div className="flex items-center justify-between text-sm">
