@@ -33,6 +33,7 @@ export default function OnboardingNavBar() {
 
   const hideNavbarRoutes = [
     "/employee-onboarding/employee-credentials",
+    "/employee-onboarding/employeeProfile",
   ];
 
   if (hideNavbarRoutes.some((route) => location.pathname.startsWith(route))) {
