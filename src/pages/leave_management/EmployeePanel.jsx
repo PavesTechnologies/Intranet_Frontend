@@ -24,7 +24,7 @@ const EmployeePanel = () => {
 
   const employeeId = employee.user?.user_id;
 
-  const isManager = roles.includes('reporting_manager') || (employee?.roles || '').toLowerCase() === 'super admin';
+  const isManager = roles.includes('Reporting_Manager') || (employee?.roles || '').toLowerCase() === 'super admin';
   const isHR = roles.includes('HR');
   const isHRAdministrator = roles.includes('Hr_Manager');
 

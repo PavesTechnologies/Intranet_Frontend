@@ -443,19 +443,19 @@ export default function Dashboard() {
                       <>
                         <DonutChart
                           label="Earned Leave"
-                          used={earned.totalBalance - earned.remainingBalance}
+                          used={earned.usedLeaves}
                           remaining={earned.remainingBalance}
                           color="#10b981"
                         />
                         <DonutChart
                           label="Sick Leave"
-                          used={sick.totalBalance - sick.remainingBalance}
+                          used={sick.usedLeaves}
                           remaining={sick.remainingBalance}
                           color="#f43f5e"
                         />
                         <DonutChart
                           label="Comp Off"
-                          used={comp.totalBalance - comp.remainingBalance}
+                          used={comp.usedLeaves}
                           remaining={comp.remainingBalance}
                           color="#3b82f6"
                         />
