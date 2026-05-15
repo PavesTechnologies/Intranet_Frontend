@@ -269,8 +269,7 @@ export default function CreateOffer() {
                 </div>
               </div>
 
-              <div className="relative flex-1">
-                <div className="absolute left-5 top-3 bottom-3 w-[2px] bg-white/15" />
+              <div className="relative">
                 <div className="space-y-8">
                   {steps.map((step) => {
                     const active = activeStep === step.id;
