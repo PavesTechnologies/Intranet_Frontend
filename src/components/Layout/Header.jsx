@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, LogOut, User, Menu, X, Eye, KeyRound, ChevronDown } from "lucide-react";
+import { Bell, LogOut, User, Menu, X, Eye, KeyRound, ChevronDown, } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
@@ -163,25 +163,26 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
         {/* Right Section */}
         <div className="flex items-center space-x-4">
           {/* Notifications */}
-          <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+          {/* <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
             <Bell className="h-5 w-5" />
 
             <span className="absolute top-1 right-1 h-2 w-2 bg-[#ff3d72] rounded-full"></span>
-          </button>
+          </button> */}
 
           {/* Profile dropdown */}
           <div className="relative pl-4 border-l border-gray-200" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(prev => !prev)}
               className="flex items-center space-x-3 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-gray-100 transition-colors"
+              title={role}
             >
               <div className="h-8 w-8 bg-[#263383] rounded-full flex items-center justify-center flex-shrink-0">
                 <User className="h-4 w-4 text-white" />
               </div>
 
-              <div className="hidden md:block text-left">
-                <p className="text-sm font-medium text-gray-900 leading-tight">{name}</p>
-                <p className="text-xs text-gray-500">{role}</p>
+              <div className="hidden md:block text-left max-w-[180px]">
+                <p className="text-sm font-medium text-gray-900 leading-tight truncate">{name}</p>
+                <p className="text-xs text-gray-500 line-clamp-1">{role}</p>
               </div>
 
               <ChevronDown
