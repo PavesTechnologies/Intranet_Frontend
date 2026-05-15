@@ -1,9 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Bell, LogOut, User, Menu, X,
-  Eye, EyeOff, KeyRound, ChevronDown,
-} from "lucide-react";
+import { Bell, LogOut, User, Menu, X, Eye, KeyRound, ChevronDown, } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
@@ -285,36 +282,10 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
       >
         <div className="space-y-4">
 
-          {/* Current Password */}
-          <div>
-            <label className="block text-xs font-semibold text-[#081534] mb-1.5">
-              Current Password
-            </label>
-            <div className="relative">
-              <input
-                type={showPw.current ? "text" : "password"}
-                value={pwForm.currentPassword}
-                onChange={(e) => {
-                  setPwForm((prev) => ({ ...prev, currentPassword: e.target.value }));
-                  if (pwErrors.currentPassword) setPwErrors((prev) => ({ ...prev, currentPassword: "" }));
-                }}
-                placeholder="Enter current password"
-                autoComplete="current-password"
-                className={inputClass(!!pwErrors.currentPassword)}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPw((prev) => ({ ...prev, current: !prev.current }))}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#263383] transition-colors"
-                tabIndex={-1}
-              >
-                {showPw.current ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-            {pwErrors.currentPassword && (
-              <p className="mt-1 text-xs text-red-500">{pwErrors.currentPassword}</p>
-            )}
-          </div>
+              <div className="hidden md:block text-left max-w-[180px]">
+                <p className="text-sm font-medium text-gray-900 leading-tight truncate">{name}</p>
+                <p className="text-xs text-gray-500 line-clamp-1">{role}</p>
+              </div>
 
           {/* New Password */}
           <div>
