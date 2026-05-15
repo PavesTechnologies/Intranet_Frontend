@@ -7,69 +7,59 @@ import {
   Tooltip,
   CartesianGrid,
   Legend,
+  ResponsiveContainer,
 } from "recharts";
+import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import RawDataModal from "./RawDataModal";
+import ViewRawButton from "./ViewRawButton";
 
 export default function DeptBarChartCard({
   title,
-  data,
+  data = [],
   xKey,
   bars,
+  accentColor,
 }) {
   const [showRaw, setShowRaw] = useState(false);
 
   return (
     <>
-      <div
-        style={{
-          background: "white",
-          borderRadius: 10,
-          padding: 18,
-          marginTop: 20,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-        }}
+      <PageCard
+        className="relative mt-5 overflow-hidden rounded-2xl border-slate-200 bg-white"
       >
-        {/* Header */}
-        <div
+        <span
+          className="absolute inset-y-0 left-0 w-1 rounded-l-2xl"
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 10,
+            backgroundColor: accentColor || bars?.[0]?.color || "#6366F1",
           }}
-        >
-          <h3 style={{ margin: 0 }}>{title}</h3>
+        />
+        <PageCardContent className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-base font-bold text-slate-900">{title}</h3>
+            <ViewRawButton onClick={() => setShowRaw(true)} />
+          </div>
 
-          <button
-            onClick={() => setShowRaw(true)}
-            style={{
-              border: "none",
-              background: "transparent",
-              color: "#6c5ce7",
-              cursor: "pointer",
-            }}
-          >
-            👁 View Raw Data
-          </button>
-        </div>
-
-        {/* Chart */}
-        <BarChart width={900} height={300} data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey={xKey} />
-          <YAxis />
-          <Tooltip />
-          <Legend />
-
-          {bars.map((b, i) => (
-            <Bar
-              key={i}
-              dataKey={b.key}
-              fill={b.color}
-              radius={[4, 4, 0, 0]}
-            />
-          ))}
-        </BarChart>
-      </div>
+          <div className="h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                <XAxis dataKey={xKey} />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                {bars.map((bar, index) => (
+                  <Bar
+                    key={index}
+                    dataKey={bar.key}
+                    fill={bar.color}
+                    radius={[4, 4, 0, 0]}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </PageCardContent>
+      </PageCard>
 
       {showRaw && (
         <RawDataModal

@@ -1,13 +1,6 @@
 export default function CardContainer({ children }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(2, 1fr)",
-        gap: 20,
-        marginTop: 10,
-      }}
-    >
+    <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2">
       {children}
     </div>
   );
