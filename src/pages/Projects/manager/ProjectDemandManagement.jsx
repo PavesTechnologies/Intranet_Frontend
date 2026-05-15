@@ -606,20 +606,21 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
                     <Tabs
                         value={activeTab}
                         onValueChange={setActiveTab}
-                        className="border-b -mx-4 px-4 pt-2"
+                        className="border-b -mx-4"
                     >
-                        <TabsList className="!inline-flex !h-auto !bg-transparent !p-0 !rounded-none items-center justify-start gap-1 w-full">
+                        <TabsList className="!flex !h-auto !w-full !justify-start !bg-transparent !p-0 !pl-4 !rounded-none items-center gap-1">
                             {[
                                 { id: 'all', label: 'All Demands' },
                                 { id: 'active', label: 'Active & Approved' },
                                 { id: 'fulfilled', label: 'Fulfilled' },
                                 { id: 'soft', label: 'Soft Demands' }
-                            ].map((tab) => (
+                            ].map((tab, index) => (
                                 <TabsTrigger
                                     key={tab.id}
                                     value={tab.id}
                                     className={cn(
-                                        "px-6 py-3 text-xs font-bold transition-all border-b-2 relative -mb-px flex-shrink-0 !rounded-none !bg-transparent !shadow-none",
+                                        "py-3 pr-6 text-xs font-bold transition-all border-b-2 relative -mb-px flex-shrink-0 !rounded-none !bg-transparent !shadow-none",
+                                        index === 0 ? "pl-0" : "pl-6",
                                         "data-[state=active]:!text-indigo-600 data-[state=active]:!border-indigo-600 data-[state=active]:!bg-indigo-50/30",
                                         "data-[state=inactive]:text-slate-400 data-[state=inactive]:border-transparent hover:text-slate-700 hover:!bg-slate-50/50"
                                     )}
