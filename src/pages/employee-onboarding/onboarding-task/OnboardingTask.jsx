@@ -5,6 +5,9 @@ import TaskBoard from "./components/TaskBoard";
 import AddTaskModal from "./components/AddTaskModal";
 import useApiConfig from "./hooks/useApiConfig";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import Button from "../../../components/Button/Button";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const normalizeStatus = (status) => {
   if (!status) return "todo";
@@ -32,39 +35,7 @@ const getEmployeeName = (employee = {}) => {
   );
 };
 
-const getAssigneeName = (assignee = {}) =>
-  assignee.name || assignee.full_name || assignee.mail || assignee.email || "Unassigned";
-
-const getAssigneeValue = (assignee = {}) =>
-  assignee.user_uuid ||
-  assignee.user_id ||
-  assignee.id ||
-  "";
-// const normalizeTask = (task, employeeMap, assigneeMap) => {
-//   const employeeRecord = employeeMap.get(String(task.user_uuid || ""));
-//   const assigneeRecord = assigneeMap.get(String(task.assigned_to || ""));
-
-//   return {
-//     ...task,
-//     task_uuid: task.task_uuid,
-//     title: task.task_title,
-//     description: task.description || "",
-//     status: normalizeStatus(task.status),
-//     priority: String(task.priority || "medium").toLowerCase(),
-//     dueDate: task.due_date || "",
-//     reminderDate: task.reminder_date || "",
-//     taskType: task.task_type || "Onboarding",
-//     user_uuid: task.user_uuid,
-//     employee: employeeRecord ? getEmployeeName(employeeRecord) : task.employee,
-//    assignedTo:
-//   employees.find(e => String(e.user_uuid) === String(task.assigned_to))
-//     ? getEmployeeName(
-//         employees.find(e => String(e.user_uuid) === String(task.assigned_to))
-//       )
-//     : "Unassigned",
-//   };
-// };
-const normalizeTask = (task, employeeMap, assigneeMap) => {
+const normalizeTask = (task, employeeMap) => {
   const employeeRecord = employeeMap.get(String(task.user_uuid || ""));
   const assignee = employeeMap.get(String(task.assigned_to || ""));
 
@@ -79,14 +50,8 @@ const normalizeTask = (task, employeeMap, assigneeMap) => {
     reminderDate: task.reminder_date || "",
     taskType: task.task_type || "Onboarding",
     user_uuid: task.user_uuid,
-
-    employee: employeeRecord
-      ? getEmployeeName(employeeRecord)
-      : task.employee,
-
-    assignedTo: assignee
-      ? getEmployeeName(assignee)
-      : "Unassigned",
+    employee: employeeRecord ? getEmployeeName(employeeRecord) : task.employee,
+    assignedTo: assignee ? getEmployeeName(assignee) : "Unassigned",
   };
 };
 
@@ -95,51 +60,31 @@ export default function OnboardingTask() {
 
   const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
-  const [assignees, setAssignees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [optionsLoading, setOptionsLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
 
   const TASKS_API = `${BASE_URL}/api/tasks`;
   const EMPLOYEES_API = `${BASE_URL}/permanent-employee/core-employee-details/`;
-  const ASSIGNEES_API = `${BASE_URL}/offer-approval/admin-users`;
 
   const employeeMap = useMemo(() => {
-  const map = new Map();
-  employees.forEach((e) => {
-    if (e.user_uuid) {
-      map.set(String(e.user_uuid), e);   // ✅ ONLY UUID
-    }
-  });
-  return map;
-}, [employees]);
-
-const assigneeMap = useMemo(() => {
-  const map = new Map();
-
-  assignees.forEach((a) => {
-    const key =
-      a.user_uuid
-
-    if (key) {
-      map.set(String(key), a);
-    }
-  });
-
-  return map;
-}, [assignees]);
+    const map = new Map();
+    employees.forEach((employee) => {
+      if (employee.user_uuid) {
+        map.set(String(employee.user_uuid), employee);
+      }
+    });
+    return map;
+  }, [employees]);
 
   const fetchTasks = async () => {
     try {
       setLoading(true);
       const res = await axios.get(`${TASKS_API}/all`, { headers });
       const data = Array.isArray(res.data) ? res.data : res.data.tasks || [];
-      setTasks(data.map((t) => normalizeTask(t, employeeMap, assigneeMap)));
+      setTasks(data.map((task) => normalizeTask(task, employeeMap)));
     } catch {
-      setError("Failed to fetch tasks");
       showStatusToast("Failed to fetch tasks", "error");
     } finally {
       setLoading(false);
@@ -148,83 +93,72 @@ const assigneeMap = useMemo(() => {
 
   const fetchOptions = async () => {
     try {
-      setOptionsLoading(true);
       const empRes = await axios.get(EMPLOYEES_API, { headers });
-
-    setEmployees(empRes.data || []);
-    setAssignees(empRes.data || []); // ✅ SAME DATA
+      setEmployees(empRes.data || []);
     } catch {
       showStatusToast("Failed to load options", "error");
-    } finally {
-      setOptionsLoading(false);
     }
   };
 
   useEffect(() => {
     if (BASE_URL) {
       fetchOptions();
-      fetchTasks();
     }
   }, [BASE_URL]);
 
-const buildTaskPayload = (task) => {
-  return {
+  useEffect(() => {
+    if (BASE_URL && employees.length) {
+      fetchTasks();
+    }
+  }, [BASE_URL, employees.length]);
+
+  useEffect(() => {
+    if (tasks.length && employees.length) {
+      setTasks((prev) => prev.map((task) => normalizeTask(task, employeeMap)));
+    }
+  }, [employees, employeeMap]);
+
+  const buildTaskPayload = (task) => ({
     user_uuid: task.user_uuid,
     task_title: task.task_title,
-    task_type: task.task_type || task.taskType, 
+    task_type: task.task_type || task.taskType,
     description: task.description || "",
-
-    assigned_to: task.assigned_to, // ✅ FIXED
-
+    assigned_to: task.assigned_to,
     assigned_team: "IT Team",
     priority: task.priority,
-
     status:
       task.status === "todo"
         ? "To Do"
         : task.status === "progress"
-        ? "In Progress"
-        : "Completed",
-
+          ? "In Progress"
+          : "Completed",
     progress: task.progress || 0,
-    due_date:
-      task.dueDate ||
-      new Date().toISOString().split("T")[0],
-
+    due_date: task.dueDate || new Date().toISOString().split("T")[0],
     reminder_date:
-      task.reminderDate ||
-      task.dueDate ||
-      new Date().toISOString().split("T")[0],
-      updated_by: "Admin",
-      };
-    
-};
- const handleCreateTask = async (task) => {
-  try {
-    setSaving(true);
+      task.reminderDate || task.dueDate || new Date().toISOString().split("T")[0],
+    updated_by: "Admin",
+  });
 
-    
+  const handleCreateTask = async (task) => {
+    try {
+      setSaving(true);
+      await axios.post(`${TASKS_API}/create`, task, { headers });
+      await fetchTasks();
+      showStatusToast("Task created successfully", "success");
+      setShowModal(false);
+    } catch {
+      showStatusToast("Failed to create task", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    await axios.post(`${TASKS_API}/create`, task, { headers });
-
-    await fetchTasks();
-    showStatusToast("Task created successfully", "success");
-    setShowModal(false);
-  } catch (err) {
-    
-    showStatusToast("Failed to create task", "error");
-  } finally {
-    setSaving(false);
-  }
-};
   const handleUpdateTask = async (task) => {
     try {
       setSaving(true);
-      await axios.put(
-        `${TASKS_API}/update/${selectedTask.task_uuid}`,
-        buildTaskPayload(task),
-        { headers }
-      );
+      await axios.put(`${TASKS_API}/update/${selectedTask.task_uuid}`, buildTaskPayload(task), {
+        headers,
+      });
       await fetchTasks();
       showStatusToast("Task updated successfully", "success");
       setShowModal(false);
@@ -236,109 +170,90 @@ const buildTaskPayload = (task) => {
     }
   };
 
-
-  // const deleteTask = async (id) => {
-  //   await axios.delete(`${TASKS_API}/delete/${id}`, { headers });
-  //   fetchTasks();
-  // };
   const deleteTask = async (id) => {
-  try {
-    await axios.delete(`${TASKS_API}/delete/${id}`, { headers });
-
-    showStatusToast("🗑️ Task deleted successfully", "success");
-
-    fetchTasks();
-  } catch (err) {
-    
-
-    showStatusToast("❌ Failed to delete task", "error");
-  }
-};
-
-  const groupedTasks = {
-    todo: tasks.filter((t) => t.status === "todo"),
-    progress: tasks.filter((t) => t.status === "progress"),
-    completed: tasks.filter((t) => t.status === "completed"),
+    try {
+      await axios.delete(`${TASKS_API}/delete/${id}`, { headers });
+      showStatusToast("Task deleted successfully", "success");
+      fetchTasks();
+    } catch {
+      showStatusToast("Failed to delete task", "error");
+    }
   };
 
-  useEffect(() => {
-  if (tasks.length && (employees.length || assignees.length)) {
-    setTasks((prev) =>
-      prev.map((t) => normalizeTask(t, employeeMap, assigneeMap))
-    );
-  }
-}, [employees, assignees]);
-
-
+  const groupedTasks = {
+    todo: tasks.filter((task) => task.status === "todo"),
+    progress: tasks.filter((task) => task.status === "progress"),
+    completed: tasks.filter((task) => task.status === "completed"),
+  };
 
   return (
-    <div style={{ padding: 24 }}>
-      {/* <button onClick={() => { setSelectedTask(null); setShowModal(true); }}>
-        + Add Task
-      </button> */}
-      <div style={{
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: "20px"
-}}>
-  <h1 style={{ margin: 0, fontSize: "28px", fontWeight: "bold" }}>Task Management</h1>
+    <div className="p-6">
+      <PageCard className="border-slate-200">
+        <PageCardContent className="p-6 md:p-8">
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="flex-1">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 h-10 w-1.5 rounded-full bg-indigo-600" />
+                  <div>
+                    <h1 className={Fonts.heading3}>Task Management</h1>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Configure and track onboarding tasks across each workflow stage.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-  <button
-    onClick={() => {
-      setSelectedTask(null);
-      setShowModal(true);
-    }}
-    style={{
-      background: "#3b82f6",
-      color: "#fff",
-      padding: "10px 18px",
-      border: "none",
-      borderRadius: "8px",
-      fontSize: "14px",
-      fontWeight: "600",
-      cursor: "pointer",
-      boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-      transition: "all 0.2s ease"
-    }}
-    onMouseEnter={(e) => e.target.style.background = "#2563eb"}
-    onMouseLeave={(e) => e.target.style.background = "#3b82f6"}
-  >
-    + Add Task
-  </button>
-</div>
+            <Button
+              onClick={() => {
+                setSelectedTask(null);
+                setShowModal(true);
+              }}
+              variant="primary"
+              size="medium"
+              className="md:mt-10"
+            >
+              + Add Task
+            </Button>
+          </div>
 
-      <TaskBoard
-        tasks={groupedTasks}
-        onCardClick={(task) => {
-          setSelectedTask(task);
-          setShowModal(true);
-        }}
-        onDelete={deleteTask}
-      />
+          <TaskBoard
+            tasks={groupedTasks}
+            loading={loading}
+            onCardClick={(task) => {
+              setSelectedTask(task);
+              setShowModal(true);
+            }}
+            onDelete={deleteTask}
+          />
+        </PageCardContent>
+      </PageCard>
 
       <AddTaskModal
         isOpen={showModal}
         mode={selectedTask ? "edit" : "create"}
+        saving={saving}
         initialData={
           selectedTask
             ? {
                 ...selectedTask,
-                assigned_to: selectedTask.assigned_to, // ✅ FIXED
+                assigned_to: selectedTask.assigned_to,
               }
             : null
         }
         onClose={() => {
+          if (saving) return;
           setShowModal(false);
           setSelectedTask(null);
         }}
-        employees={employees.map((e) => ({
-          value: e.user_uuid,
-          label: getEmployeeName(e),
+        employees={employees.map((employee) => ({
+          value: employee.user_uuid,
+          label: getEmployeeName(employee),
         }))}
-       assignees={employees.map((e) => ({
-          value: e.user_uuid,           
-          label: getEmployeeName(e),    
+        assignees={employees.map((employee) => ({
+          value: employee.user_uuid,
+          label: getEmployeeName(employee),
         }))}
         onSave={(task) => {
           if (selectedTask) handleUpdateTask(task);
