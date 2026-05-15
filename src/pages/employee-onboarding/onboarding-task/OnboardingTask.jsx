@@ -8,6 +8,21 @@ import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import { Fonts } from "../../../components/Fonts/Fonts";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
+
+function SectionHeaderCard({ title, description, className = "" }) {
+  return (
+    <div className={`rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm ${className}`}>
+      <div className="flex items-start gap-4">
+        <span className="mt-0.5 h-14 w-1.5 shrink-0 rounded-full bg-indigo-600" />
+        <div className="min-w-0">
+          <h1 className={Fonts.heading3}>{title}</h1>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const normalizeStatus = (status) => {
   if (!status) return "todo";
@@ -62,8 +77,10 @@ export default function OnboardingTask() {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [taskToDelete, setTaskToDelete] = useState(null);
 
   const TASKS_API = `${BASE_URL}/api/tasks`;
   const EMPLOYEES_API = `${BASE_URL}/permanent-employee/core-employee-details/`;
@@ -172,11 +189,15 @@ export default function OnboardingTask() {
 
   const deleteTask = async (id) => {
     try {
+      setDeleting(true);
       await axios.delete(`${TASKS_API}/delete/${id}`, { headers });
       showStatusToast("Task deleted successfully", "success");
-      fetchTasks();
+      await fetchTasks();
+      setTaskToDelete(null);
     } catch {
       showStatusToast("Failed to delete task", "error");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -190,19 +211,12 @@ export default function OnboardingTask() {
     <div className="p-6">
       <PageCard className="border-slate-200">
         <PageCardContent className="p-6 md:p-8">
-          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex-1">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 h-10 w-1.5 rounded-full bg-indigo-600" />
-                  <div>
-                    <h1 className={Fonts.heading3}>Task Management</h1>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Configure and track onboarding tasks across each workflow stage.
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <SectionHeaderCard
+                title="Task Management"
+                description="Configure and track onboarding tasks across each workflow stage."
+              />
             </div>
 
             <Button
@@ -212,7 +226,7 @@ export default function OnboardingTask() {
               }}
               variant="primary"
               size="medium"
-              className="md:mt-10"
+              className="self-start xl:self-center"
             >
               + Add Task
             </Button>
@@ -225,7 +239,7 @@ export default function OnboardingTask() {
               setSelectedTask(task);
               setShowModal(true);
             }}
-            onDelete={deleteTask}
+            onDelete={(task) => setTaskToDelete(task)}
           />
         </PageCardContent>
       </PageCard>
@@ -258,6 +272,25 @@ export default function OnboardingTask() {
         onSave={(task) => {
           if (selectedTask) handleUpdateTask(task);
           else handleCreateTask(task);
+        }}
+      />
+
+      <ConfirmationModal
+        isOpen={Boolean(taskToDelete)}
+        title="Delete Task"
+        message="Are you sure you want to delete this task? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleting}
+        onCancel={() => {
+          if (deleting) return;
+          setTaskToDelete(null);
+        }}
+        onConfirm={() => {
+          if (taskToDelete) {
+            deleteTask(taskToDelete.task_uuid);
+          }
         }}
       />
     </div>

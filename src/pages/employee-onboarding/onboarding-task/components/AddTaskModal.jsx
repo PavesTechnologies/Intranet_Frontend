@@ -3,6 +3,21 @@ import FilterListbox from "../../../../components/filter/FilterListbox";
 import Button from "../../../../components/Button/Button";
 import FormInput from "../../../../components/forms/FormInput";
 import { Fonts } from "../../../../components/Fonts/Fonts";
+import Modal from "../../../../components/Modal/modal";
+
+function ModalHeaderCard({ title, description }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+      <div className="flex items-start gap-4">
+        <span className="mt-0.5 h-12 w-1.5 shrink-0 rounded-full bg-indigo-600" />
+        <div className="min-w-0">
+          <h2 className={Fonts.heading4}>{title}</h2>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const normalizeStatusValue = (status) => {
   if (!status) return "todo";
@@ -158,102 +173,17 @@ export default function AddTaskModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="border-b border-slate-200 px-6 py-5">
-          <h2 className={Fonts.heading4}>{mode === "edit" ? "Edit Task" : "Create Task"}</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Configure the employee, owner, priority, and dates for this task.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <FormInput name="title" label="Task Title" value={formData.title} onChange={handleChange} />
-          </div>
-
-          <Field label="Employee">
-            <FilterListbox
-              options={[{ value: "", label: "Select" }, ...employees]}
-              value={String(formData.user_uuid)}
-              onChange={(value) => handleChange({ target: { name: "user_uuid", value } })}
-            />
-          </Field>
-
-          <Field label="Assigned To">
-            <FilterListbox
-              options={[{ value: "", label: "Select" }, ...assignees]}
-              value={String(formData.assigned_to)}
-              onChange={(value) => handleChange({ target: { name: "assigned_to", value } })}
-            />
-          </Field>
-
-          <Field label="Priority">
-            <FilterListbox
-              options={[
-                { value: "High", label: "High" },
-                { value: "Medium", label: "Medium" },
-                { value: "Low", label: "Low" },
-              ]}
-              value={formData.priority}
-              onChange={(value) => handleChange({ target: { name: "priority", value } })}
-            />
-          </Field>
-
-          <Field label="Status">
-            <FilterListbox
-              options={[
-                { value: "todo", label: "To Do" },
-                { value: "progress", label: "In Progress" },
-                { value: "completed", label: "Completed" },
-              ]}
-              value={formData.status}
-              onChange={(value) => handleChange({ target: { name: "status", value } })}
-            />
-          </Field>
-
-          <Field label="Task Type">
-            <FilterListbox
-              options={[
-                { value: "Onboarding", label: "Onboarding" },
-                { value: "Exit", label: "Exit" },
-                { value: "IT Provisioning", label: "IT Provisioning" },
-                { value: "Finance Clearance", label: "Finance Clearance" },
-                { value: "Admin", label: "Admin" },
-              ]}
-              value={formData.taskType}
-              onChange={(value) => handleChange({ target: { name: "taskType", value } })}
-            />
-          </Field>
-
-          <FormInput
-            type="date"
-            name="dueDate"
-            label="Due Date"
-            value={formData.dueDate}
-            onChange={handleChange}
-          />
-
-          <FormInput
-            type="date"
-            name="reminderDate"
-            label="Reminder Date"
-            value={formData.reminderDate}
-            onChange={handleChange}
-          />
-
-          <div className="md:col-span-2">
-            <label className={`${Fonts.label} mb-1 block`}>Description</label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              className="min-h-24 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={saving ? () => {} : onClose}
+      size="4xl"
+      maxHeight="max-h-[90vh]"
+      showHeader={false}
+      bodyClassName="p-0"
+      panelClassName="overflow-hidden"
+      footerClassName="px-6 py-4"
+      footer={
+        <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" size="medium" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
@@ -269,8 +199,101 @@ export default function AddTaskModal({
             {mode === "edit" ? "Update Task" : "Create Task"}
           </Button>
         </div>
+      }
+    >
+      <div className="px-6 py-5">
+        <ModalHeaderCard
+          title={mode === "edit" ? "Edit Task" : "Create Task"}
+          description="Configure the employee, owner, priority, and dates for this task."
+        />
       </div>
-    </div>
+
+      <div className="grid grid-cols-1 gap-4 px-6 pb-6 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <FormInput name="title" label="Task Title" value={formData.title} onChange={handleChange} />
+        </div>
+
+        <Field label="Employee">
+          <FilterListbox
+            options={[{ value: "", label: "Select" }, ...employees]}
+            value={String(formData.user_uuid)}
+            onChange={(value) => handleChange({ target: { name: "user_uuid", value } })}
+          />
+        </Field>
+
+        <Field label="Assigned To">
+          <FilterListbox
+            options={[{ value: "", label: "Select" }, ...assignees]}
+            value={String(formData.assigned_to)}
+            onChange={(value) => handleChange({ target: { name: "assigned_to", value } })}
+          />
+        </Field>
+
+        <Field label="Priority">
+          <FilterListbox
+            options={[
+              { value: "High", label: "High" },
+              { value: "Medium", label: "Medium" },
+              { value: "Low", label: "Low" },
+            ]}
+            value={formData.priority}
+            onChange={(value) => handleChange({ target: { name: "priority", value } })}
+          />
+        </Field>
+
+        <Field label="Status">
+          <FilterListbox
+            options={[
+              { value: "todo", label: "To Do" },
+              { value: "progress", label: "In Progress" },
+              { value: "completed", label: "Completed" },
+            ]}
+            value={formData.status}
+            onChange={(value) => handleChange({ target: { name: "status", value } })}
+          />
+        </Field>
+
+        <Field label="Task Type">
+          <FilterListbox
+            options={[
+              { value: "Onboarding", label: "Onboarding" },
+              { value: "Exit", label: "Exit" },
+              { value: "IT Provisioning", label: "IT Provisioning" },
+              { value: "Finance Clearance", label: "Finance Clearance" },
+              { value: "Admin", label: "Admin" },
+            ]}
+            value={formData.taskType}
+            onChange={(value) => handleChange({ target: { name: "taskType", value } })}
+          />
+        </Field>
+
+        <FormInput
+          type="date"
+          name="dueDate"
+          label="Due Date"
+          value={formData.dueDate}
+          onChange={handleChange}
+        />
+
+        <FormInput
+          type="date"
+          name="reminderDate"
+          label="Reminder Date"
+          value={formData.reminderDate}
+          onChange={handleChange}
+        />
+
+        <div className="md:col-span-2">
+          <label className={`${Fonts.label} mb-1 block`}>Description</label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            className="min-h-24 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
+          />
+        </div>
+      </div>
+    </Modal>
   );
 }
 

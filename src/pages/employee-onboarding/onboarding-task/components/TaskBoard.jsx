@@ -124,7 +124,7 @@ export default function TaskBoard({ tasks, loading = false, onCardClick, onDelet
                         Edit Task
                       </Button>
                       <Button
-                        onClick={() => onDelete(task.task_uuid)}
+                        onClick={() => onDelete?.(task)}
                         variant="danger"
                         size="small"
                       >
