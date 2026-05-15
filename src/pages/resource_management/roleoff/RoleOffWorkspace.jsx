@@ -165,6 +165,25 @@ const getFirstDefinedValue = (sources, keys, fallback = undefined) => {
   return fallback;
 };
 
+const ACKNOWLEDGEMENT_TYPE_KEYS = [
+  "acknowledgementType",
+  "acknowledgmentType",
+  "ackType",
+  "acknowledgeType",
+  "acknowledgement_type",
+  "acknowledgment_type",
+];
+
+const ACKNOWLEDGEMENT_TYPE_OPTION_KEYS = [
+  "acknowledgementTypes",
+  "acknowledgmentTypes",
+  "acknowledgementTypeOptions",
+  "acknowledgmentTypeOptions",
+  "ackTypes",
+  "acknowledgement_type_options",
+  "acknowledgment_type_options",
+];
+
 const toBoolean = (value) => {
   if (typeof value === "boolean") return value;
   if (typeof value === "string") {
@@ -274,6 +293,8 @@ const mapResourceToAllocation = (item, index) => {
   const impactSummary = getFirstDefinedValue(roleOffSources, ["impactSummary"], "");
   const rejectionReason = getFirstDefinedValue(roleOffSources, ["rejectionReason", "rejectReason"], "");
   const rejectedBy = getFirstDefinedValue(roleOffSources, ["rejectedBy"], "");
+  const acknowledgementType = getFirstDefinedValue(roleOffSources, ACKNOWLEDGEMENT_TYPE_KEYS, "");
+  const acknowledgementTypeOptions = getFirstDefinedValue(roleOffSources, ACKNOWLEDGEMENT_TYPE_OPTION_KEYS, []);
 
   const allocation = {
     // 🔥 CRITICAL FIXES
@@ -330,6 +351,8 @@ const mapResourceToAllocation = (item, index) => {
     replacementRequired: toBoolean(replacementRequired),
     rejectionReason,
     rejectedBy,
+    acknowledgementType,
+    acknowledgementTypeOptions,
     isBulkCreated: isBulkCreatedRoleOff(item),
 
     businessCritical: Number(item.allocationPercentage || 0) >= 90,
@@ -376,6 +399,8 @@ const mapPendingRoleOffToRequest = (item) => {
     item.replacementNeeded,
   ].some(toBoolean);
   const replacementCreated = isReplacementCreated(item);
+  const acknowledgementType = getFirstDefinedValue(roleOffSources, ACKNOWLEDGEMENT_TYPE_KEYS, "");
+  const acknowledgementTypeOptions = getFirstDefinedValue(roleOffSources, ACKNOWLEDGEMENT_TYPE_OPTION_KEYS, []);
 
   return {
     id: fallbackId,
@@ -421,6 +446,8 @@ const mapPendingRoleOffToRequest = (item) => {
     replacementCreated,
     reason: item.roleOffReason || item.demandName || "",
     resourcePerformance: item.resourcePerformance || "",
+    acknowledgementType,
+    acknowledgementTypeOptions,
   };
 };
 
@@ -1096,14 +1123,14 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           );
         })
         : mode === "rm"
-          ? scopedRoleOffRequests.filter((item) => 
-              item.status !== "ROLLED_OFF" && item.roleOffStatus !== "FULFILLED"
-            )
+          ? scopedRoleOffRequests.filter((item) =>
+            item.status !== "ROLLED_OFF" && item.roleOffStatus !== "FULFILLED"
+          )
           : scopedRoleOffRequests.filter((item) =>
-              isDlActionableStatus(item.status) && 
-              item.status !== "ROLLED_OFF" && 
-              item.roleOffStatus !== "FULFILLED"
-            );
+            isDlActionableStatus(item.status) &&
+            item.status !== "ROLLED_OFF" &&
+            item.roleOffStatus !== "FULFILLED"
+          );
 
     return baseRows.filter((row) => {
       const searchTarget = [row.resource, row.project, row.role, row.client].join(" ").toLowerCase();
@@ -1341,7 +1368,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     // 🔥 DM APPROVE (FULFILL)
     if (mode === "dm" && action === "approve") {
       try {
-        await dlFulfill(row.id);
+        await dlFulfill(row.id, row.acknowledgementType);
         toast.success("Role-off request fulfilled by DM");
         refreshAll();
       } catch (err) {
@@ -1424,6 +1451,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           roleOffType: "PLANNED",
           confirmed: Boolean(formState.reviewConfirmed),
           resourcePerformance: formState.resourcePerformance,
+          acknowledgementType: formState.acknowledgementType || undefined,
         };
 
         const response = await bulkPlannedRoleOff(bulkPayload);
@@ -1445,6 +1473,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
               autoReplacementRequired: formState.replacementRequired,
               skipReason: formState.skipReason,
               resourcePerformance: formState.resourcePerformance,
+              acknowledgementType: formState.acknowledgementType,
               roleOffStatus: "PENDING",
             },
           );
@@ -1484,6 +1513,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           effectiveRoleOffDate: formState.effectiveDate,
           roleOffReason: formState.reason,
           resourcePerformance: formState.resourcePerformance,
+          acknowledgementType: formState.acknowledgementType || undefined,
           autoReplacementRequired: isBulkStyleUpdate ? false : formState.replacementRequired,
           skipReason: isBulkStyleUpdate
             ? null
@@ -1498,8 +1528,13 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
         const response = await createRoleOff(payload);
         lastResponse = response;
-        if (response?.requiresConfirmation && !formState.reviewConfirmed) {
-          confirmationResponse = response;
+
+        // FIX: backend response now comes inside response.data
+        if (
+          response?.data?.requiresConfirmation &&
+          !formState.reviewConfirmed
+        ) {
+          confirmationResponse = response.data;
           break;
         }
 
@@ -1522,6 +1557,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             autoReplacementRequired: formState.replacementRequired,
             skipReason: formState.skipReason,
             resourcePerformance: formState.resourcePerformance,
+            acknowledgementType: formState.acknowledgementType,
             roleOffStatus: "PENDING",
           },
         );
@@ -1637,7 +1673,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         removeCachedRoleOffDetails(request.records.map((item) => item.roleOffId));
         removeCachedRoleOffDetails(request.records.map((item) => item.allocationId));
       } else {
-        await dlFulfill(request.id);
+        await dlFulfill(request.id, request.acknowledgementType);
         removeCachedRoleOffDetails([request.id, request.roleOffId, request.allocationId]);
       }
       await refreshAll();

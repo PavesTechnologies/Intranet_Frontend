@@ -49,6 +49,7 @@ const baseForm = {
   reviewConfirmed: false,
   decisionNotes: "",
   skipReason: "",
+  acknowledgementType: "",
 };
 
 const getTodayDate = () => new Date().toISOString().slice(0, 10);
@@ -86,6 +87,31 @@ const normalizeReasonValue = (reasonValue, options = []) => {
   if (labelMatch) return String(getReasonOptionValue(labelMatch));
 
   return current;
+};
+
+const getAcknowledgementOptionValue = (option) =>
+  option?.code || option?.id || option?.value || option?.type || option?.name || option;
+
+const getAcknowledgementOptionLabel = (option) =>
+  option?.label || option?.displayName || option?.name || option?.type || formatReason(option);
+
+const normalizeAcknowledgementOptions = (record) => {
+  const rawOptions = Array.isArray(record?.acknowledgementTypeOptions)
+    ? record.acknowledgementTypeOptions
+    : [];
+  const options = rawOptions
+    .map((option) => ({
+      value: String(getAcknowledgementOptionValue(option) || "").trim(),
+      label: String(getAcknowledgementOptionLabel(option) || "").trim(),
+    }))
+    .filter((option) => option.value);
+  const currentValue = String(record?.acknowledgementType || "").trim();
+
+  if (currentValue && !options.some((option) => option.value === currentValue)) {
+    options.unshift({ value: currentValue, label: formatReason(currentValue) });
+  }
+
+  return options;
 };
 
 const getBulkSummary = (record) => {
@@ -213,6 +239,7 @@ const RoleOffSidePanel = ({
       reviewConfirmed: false,
       decisionNotes: isExistingRequest ? (record.rejectionReason || "") : "",
       skipReason: isExistingRequest ? (record.skipReason || "") : "",
+      acknowledgementType: record.acknowledgementType || "",
     });
     setReviewState(null);
     setError("");
@@ -271,6 +298,11 @@ const RoleOffSidePanel = ({
   const showRmRejectAction = isRM && (!isBulkRecord || isRmBulkRejectFlow);
   const showDmApproveAction = isDM && isDmActionableStatus(record.status) && (!isBulkRecord || isDmBulkApproveFlow);
   const showDmRejectAction = isDM && isDmActionableStatus(record.status) && (!isBulkRecord || isDmBulkRejectFlow);
+  const acknowledgementOptions = normalizeAcknowledgementOptions(record);
+  const showAcknowledgementType = !isBulkRecord && (isDM || record.acknowledgementType || acknowledgementOptions.length > 0);
+  const requiresAcknowledgementType =
+    ((isPM && !isReadOnlyPm && !isBulkPmFlow) || (isDM && showDmApproveAction)) &&
+    acknowledgementOptions.length > 0;
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -294,6 +326,9 @@ const RoleOffSidePanel = ({
       }
       if (!form.resourcePerformance) {
         nextFieldErrors.resourcePerformance = "Performance is required.";
+      }
+      if (!isBulkPmFlow && acknowledgementOptions.length > 0 && !form.acknowledgementType) {
+        nextFieldErrors.acknowledgementType = "Acknowledgement type is required.";
       }
       if (
         !isBulkPmFlow &&
@@ -319,7 +354,11 @@ const RoleOffSidePanel = ({
       setFieldErrors({});
       setSubmittingAction("submit");
       try {
-        const response = await onSubmit?.(form);
+        const response = await onSubmit?.({
+          ...form,
+          reviewConfirmed: form.reviewConfirmed,
+        });
+        console.log("SUBMIT RESPONSE:", response);
         if (response?.requiresConfirmation && !form.reviewConfirmed) {
           setReviewState(response);
           setForm((prev) => ({
@@ -399,11 +438,17 @@ const RoleOffSidePanel = ({
   };
 
   const handleDmApproveClick = async () => {
+    if (requiresAcknowledgementType && !form.acknowledgementType) {
+      setFieldErrors({ acknowledgementType: "Acknowledgement type is required." });
+      setError("Select acknowledgement type.");
+      return;
+    }
+
     setError("");
     setFieldErrors({});
     setSubmittingAction("approve");
     try {
-      await onApprove?.(record, form.decisionNotes.trim());
+      await onApprove?.({ ...record, acknowledgementType: form.acknowledgementType }, form.decisionNotes.trim());
       onClose?.();
     } finally {
       setSubmittingAction(null);
@@ -487,6 +532,52 @@ const RoleOffSidePanel = ({
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+          {reviewState?.requiresConfirmation && (
+            <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-1">
+                  <WarningIcon className="h-5 w-5 text-amber-600" />
+                </div>
+
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-amber-900">
+                    Review Role-Off Impact
+                  </h3>
+
+                  <p className="mt-1 text-sm text-amber-800 whitespace-pre-line">
+                    {reviewState.warning}
+                  </p>
+                </div>
+              </div>
+
+              <label className="flex items-start gap-3 rounded-lg border border-amber-300 bg-white p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.reviewConfirmed}
+                  onChange={(e) =>
+                    updateField("reviewConfirmed", e.target.checked)
+                  }
+                  className="mt-1 h-4 w-4 rounded border-gray-300"
+                />
+
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    I reviewed the impact analysis
+                  </p>
+
+                  <p className="text-xs text-gray-500 mt-1">
+                    Confirm to proceed with role-off request.
+                  </p>
+                </div>
+              </label>
+
+              {fieldErrors.reviewConfirmed && (
+                <p className="text-xs text-red-600">
+                  {fieldErrors.reviewConfirmed}
+                </p>
+              )}
+            </section>
+          )}
           <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <ClipboardIcon className="h-4 w-4 text-gray-600" />
@@ -664,6 +755,18 @@ const RoleOffSidePanel = ({
                     <span className="text-gray-500">Demand Skills</span>
                     <span className="font-medium text-gray-800 text-right">{record.skill || "-"}</span>
                   </div>
+                  {showAcknowledgementType ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-gray-500">Acknowledgement Type</span>
+                      <span className="font-medium text-gray-800 text-right">
+                        {form.acknowledgementType
+                          ? formatReason(form.acknowledgementType)
+                          : record.acknowledgementType
+                            ? formatReason(record.acknowledgementType)
+                            : "-"}
+                      </span>
+                    </div>
+                  ) : null}
                 </>
               )}
               {!isBulkRecord && record.impactSummary ? (
@@ -769,6 +872,26 @@ const RoleOffSidePanel = ({
                     <p className="mt-1 text-xs text-rose-600">{fieldErrors.resourcePerformance}</p>
                   ) : null}
                 </div>
+
+                {!isBulkPmFlow && acknowledgementOptions.length > 0 ? (
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      Acknowledgement Type
+                    </label>
+                    <FilterListbox
+                      options={[
+                        { value: "", label: "Select acknowledgement type" },
+                        ...acknowledgementOptions,
+                      ]}
+                      value={form.acknowledgementType}
+                      onChange={(val) => updateField("acknowledgementType", val)}
+                      disabled={isReadOnlyPm || isSubmitting}
+                    />
+                    {fieldErrors.acknowledgementType ? (
+                      <p className="mt-1 text-xs text-rose-600">{fieldErrors.acknowledgementType}</p>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 {!isBulkPmFlow ? (
                   <label className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
@@ -936,6 +1059,25 @@ const RoleOffSidePanel = ({
                   </div>
                 </div>
               ) : null}
+              {showDmApproveAction && acknowledgementOptions.length > 0 ? (
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    Acknowledgement Type
+                  </label>
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select acknowledgement type" },
+                      ...acknowledgementOptions,
+                    ]}
+                    value={form.acknowledgementType}
+                    onChange={(val) => updateField("acknowledgementType", val)}
+                    disabled={isSubmitting}
+                  />
+                  {fieldErrors.acknowledgementType ? (
+                    <p className="mt-1 text-xs text-rose-600">{fieldErrors.acknowledgementType}</p>
+                  ) : null}
+                </div>
+              ) : null}
               <div ref={rejectReasonRef}>
                 <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
                   Rejection Reason
@@ -980,7 +1122,7 @@ const RoleOffSidePanel = ({
               </Button>
             ) : null}
             {isPM && !isReadOnlyPm ? (
-              <Button onClick={handleSubmit} disabled={isSubmitting || (reviewState?.requiresConfirmation && !form.reviewConfirmed)} className="h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed">
+              <Button onClick={handleSubmit} disabled={isSubmitting} className="h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed">
                 {submittingAction === "submit" ? (
                   <SpinnerIcon className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
