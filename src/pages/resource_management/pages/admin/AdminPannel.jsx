@@ -135,7 +135,7 @@ const AdminPannel = () => {
         totalPages: totalPages,
       }));
     } catch (error) {
-      toast.error("Failed to load clients.");
+      toast.error("Failed To Load Clients.");
       setClientDetails([]);
       setPageInfo((prev) => ({ ...prev, totalElements: 0, totalPages: 0 }));
     } finally {

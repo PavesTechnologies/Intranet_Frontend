@@ -47,7 +47,7 @@ const FormField = ({ id, label, error, note, required, children, className = "" 
   </div>
 );
 
-const SearchableListboxField = ({ id, label, value, onChange, options, error, required = true, placeholder = "Search and select...", disabled = false, emptyMessage = "Nothing found." }) => {
+const SearchableListboxField = ({ id, label, value, onChange, options, error, required = true, placeholder = "Search And Select...", disabled = false, emptyMessage = "Nothing Found." }) => {
   const [query, setQuery] = useState("");
 
   const filteredOptions = query === ""
@@ -94,7 +94,7 @@ const SearchableListboxField = ({ id, label, value, onChange, options, error, re
             <Combobox.Options className="absolute z-[100] mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm border border-slate-100">
               {filteredOptions.length === 0 ? (
                 <div className="relative cursor-default select-none py-2 px-4 text-gray-700 italic">
-                  {query !== "" ? "Nothing found." : emptyMessage}
+                  {query !== "" ? "Nothing Found." : emptyMessage}
                 </div>
               ) : (
                 filteredOptions.map((opt, idx) => {
@@ -167,7 +167,7 @@ const ListboxField = ({ id, label, value, onChange, options, error, note, requir
             <Listbox.Options className="absolute z-[60] mt-1 w-full rounded-lg bg-white shadow-xl border border-slate-200 max-h-60 overflow-auto focus:outline-none py-1">
               {options.length === 0 ? (
                 <div className="px-3 py-2 text-xs text-slate-400 text-center italic">
-                  No options available
+                  No Options Available
                 </div>
               ) : (
                 options.map((opt, idx) => {
@@ -596,48 +596,48 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
       const allowedEditStatuses = computedEditStatuses.map((s) => String(s.value).toUpperCase());
       const selectedStatus = String(form.demandStatus || "").toUpperCase();
       if (!selectedStatus) {
-        e.demandStatus = "Status is required";
+        e.demandStatus = "Status Is Required";
       } else if (!allowedEditStatuses.includes(selectedStatus)) {
-        e.demandStatus = "Select a valid status";
+        e.demandStatus = "Select A Valid Status";
       }
 
       if ((normalizedRole === "DELIVERYMANAGER" || normalizedRole === "RESOURCEMANAGER") && selectedStatus === "REJECTED" && !form.rejectionReason?.trim()) {
-        e.rejectionReason = "Reason for rejection is required";
+        e.rejectionReason = "Reason For Rejection Is Required";
       }
       // In edit mode for non-managers, we only validate the status and rejection reason as other fields are read-only
       return e;
     }
 
-    if (!form.projectId) e.projectId = "Project selection is required";
-    if (!form.demandName?.trim()) e.demandName = "Demand name is required";
-    if (!form.deliveryRole) e.deliveryRole = "Role is required";
-    if (!form.demandType) e.demandType = "Demand type is required";
+    if (!form.projectId) e.projectId = "Project Selection Is Required";
+    if (!form.demandName?.trim()) e.demandName = "Demand Name Is Required";
+    if (!form.deliveryRole) e.deliveryRole = "Role Is Required";
+    if (!form.demandType) e.demandType = "Demand Type Is Required";
 
 
 
-    if (!form.demandStartDate) e.demandStartDate = "Start date is required";
-    if (!form.demandEndDate) e.demandEndDate = "End date is required";
+    if (!form.demandStartDate) e.demandStartDate = "Start Date Is Required";
+    if (!form.demandEndDate) e.demandEndDate = "End Date Is Required";
     if (form.demandStartDate && form.demandEndDate && form.demandEndDate < form.demandStartDate) {
-      e.demandEndDate = "End date cannot be before start date";
+      e.demandEndDate = "End Date Cannot Be Before Start Date";
     }
 
     const alloc = parseFloat(form.allocationPercentage);
     if (isNaN(alloc) || alloc < 1 || alloc > 100) {
-      e.allocationPercentage = "Allocation must be 1-100";
+      e.allocationPercentage = "Allocation Must Be 1-100";
     }
 
     const resReq = parseInt(form.resourcesRequired);
     if (isNaN(resReq) || resReq < 1) {
-      e.resourcesRequired = "At least 1 resource is required";
+      e.resourcesRequired = "At Least 1 Resource Is Required";
     }
 
-    if (!form.minExp) e.minExp = "Minimum experience is required";
-    if (!form.deliveryModel) e.deliveryModel = "Delivery model is required";
-    if (!form.demandStatus) e.demandStatus = "Status is required";
-    if (!form.demandPriority) e.demandPriority = "Priority is required";
-    if (!form.demandCommitment) e.demandCommitment = "Commitment type is required";
+    if (!form.minExp) e.minExp = "Minimum Experience Is Required";
+    if (!form.deliveryModel) e.deliveryModel = "Delivery Model Is Required";
+    if (!form.demandStatus) e.demandStatus = "Status Is Required";
+    if (!form.demandPriority) e.demandPriority = "Priority Is Required";
+    if (!form.demandCommitment) e.demandCommitment = "Commitment Type Is Required";
 
-    if (!form.demandJustification?.trim()) e.demandJustification = "Justification is required";
+    if (!form.demandJustification?.trim()) e.demandJustification = "Justification Is Required";
 
     return e;
   };
@@ -648,7 +648,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      toast.warning("Please correct the errors in the form");
+      toast.warning("Please Correct The Errors In The Form");
 
       const firstErrorKey = Object.keys(validationErrors)[0];
       const errorElement = document.getElementById(`field-${firstErrorKey}`);
@@ -681,7 +681,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
               : null
           };
           const res = await handleDMDecision(dmPayload);
-          toast.success(res?.message || "Decision submitted successfully");
+          toast.success(res?.message || "Decision Submitted Successfully");
           if (onSuccess) await onSuccess(res, dmPayload);
           onClose();
           return;
@@ -696,7 +696,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
               : null
           };
           const res = await handleRMDecision(rmPayload);
-          toast.success(res?.message || "Decision submitted successfully");
+          toast.success(res?.message || "Decision Submitted Successfully");
           if (onSuccess) await onSuccess(res, rmPayload);
           onClose();
           return;
@@ -704,7 +704,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
 
         const submissionData = buildUpdateDemandPayload(normalizedForm, id);
         const res = await updateDemandStatus(submissionData);
-        toast.success(res.message || "Demand updated successfully");
+        toast.success(res.message || "Demand Updated Successfully");
         if (onSuccess) await onSuccess(res, submissionData);
         onClose();
         return;
@@ -717,11 +717,11 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
       const submissionData = buildCreateDemandPayload(normalizedForm, form.demandId || form.id || undefined);
 
       const res = await createDemand(submissionData);
-      toast.success(res.message || "Demand saved successfully");
+      toast.success(res.message || "Demand Saved Successfully");
       if (onSuccess) await onSuccess(res, submissionData);
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to save demand");
+      toast.error(err.response?.data?.message || "Failed To Save Demand");
     } finally {
       setLoading(false);
     }
@@ -774,7 +774,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       {mode === "edit" || initialData ? "Update Demand" : "Create New Demand"}
                     </Dialog.Title>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Configure staffing requirements for your project
+                      Configure Staffing Requirements For Your Project
                     </p>
                   </div>
 
@@ -829,7 +829,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                     <FormField id="field-demandName" label="Demand Name" error={errors.demandName} required>
                       <input
                         type="text"
-                        placeholder="e.g. Senior Frontend Dev"
+                        placeholder="E.g. Senior Frontend Dev"
                         value={form.demandName}
                         onChange={(e) => update("demandName", e.target.value)}
                         disabled={mode === "edit" && !isManagerOrPM}
@@ -845,7 +845,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("deliveryRole", v)}
                       options={roles.map((r) => ({ label: getRoleName(r), value: getRoleId(r) }))}
                       error={errors.deliveryRole}
-                      placeholder="Search and Select Role"
+                      placeholder="Search And Select Role"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
@@ -858,7 +858,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("demandType", v)}
                       options={DEMAND_TYPES}
                       error={errors.demandType}
-                      placeholder="Select demand type"
+                      placeholder="Select Demand Type"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
@@ -914,7 +914,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       <input
                         type="number"
                         min="1"
-                        placeholder="Enter resources required"
+                        placeholder="Enter Resources Required"
                         value={form.resourcesRequired}
                         onChange={(e) => update("resourcesRequired", e.target.value)}
                         onWheel={(e) => e.target.blur()}
@@ -928,7 +928,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       <input
                         type="number"
                         step="0.5"
-                        placeholder="e.g. 5"
+                        placeholder="E.g. 5"
                         value={form.minExp}
                         onChange={(e) => update("minExp", e.target.value)}
                         onWheel={(e) => e.target.blur()}
@@ -945,7 +945,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("deliveryModel", v)}
                       options={DELIVERY_MODELS}
                       error={errors.deliveryModel}
-                      placeholder="Select delivery model"
+                      placeholder="Select Delivery Model"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
@@ -959,7 +959,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       options={computedEditStatuses || normalizeStatusOptions(activeStatuses)}
 
                       error={errors.demandStatus}
-                      placeholder="Select demand status"
+                      placeholder="Select Demand Status"
                       required
                     />
 
@@ -968,7 +968,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       <FormField id="field-rejectionReason" label="Rejection Reason" error={errors.rejectionReason} required className="md:col-span-2">
                         <textarea
                           rows={2}
-                          placeholder="Explain why this demand is being rejected..."
+                          placeholder="Explain Why This Demand Is Being Rejected..."
                           value={form.rejectionReason}
                           onChange={(e) => update("rejectionReason", e.target.value)}
                           className={`w-full rounded-lg border py-2 px-3 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${errors.rejectionReason ? "border-red-500 bg-red-50/30" : "border-slate-200 hover:border-slate-300"}`}
@@ -984,7 +984,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("demandPriority", v)}
                       options={PRIORITIES}
                       error={errors.demandPriority}
-                      placeholder="Select priority"
+                      placeholder="Select Priority"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
@@ -996,8 +996,8 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("demandCommitment", v)}
                       options={COMMITMENT_TYPES}
                       error={errors.demandCommitment}
-                      note={form.demandCommitment === "SOFT" ? "Note: This Demand will expire in 30 days" : ""}
-                      placeholder="Select commitment"
+                      note={form.demandCommitment === "SOFT" ? "Note: This Demand Will Expire In 30 Days" : ""}
+                      placeholder="Select Commitment"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
@@ -1027,7 +1027,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                     <FormField id="field-demandJustification" label="Demand Justification" error={errors.demandJustification} required className="md:col-span-2">
                       <textarea
                         rows={3}
-                        placeholder="Explain why this resource is needed..."
+                        placeholder="Explain Why This Resource Is Needed..."
                         value={form.demandJustification}
                         onChange={(e) => update("demandJustification", e.target.value)}
                         disabled={mode === "edit" && !isManagerOrPM}

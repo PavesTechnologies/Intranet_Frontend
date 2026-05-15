@@ -80,23 +80,23 @@ const DecisionModal = ({
         ? "border-rose-200 bg-rose-50 text-rose-600"
         : isFulfill
             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-        : "border-emerald-200 bg-emerald-50 text-emerald-700";
+            : "border-emerald-200 bg-emerald-50 text-emerald-700";
     const headerBg = isReject
         ? "bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_55%,#fef2f2_100%)]"
         : isFulfill
             ? "bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#f8fafc_100%)]"
-        : "bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#eff6ff_100%)]";
+            : "bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#eff6ff_100%)]";
     const primaryButtonClass = isReject
         ? "bg-rose-600 shadow-rose-200 hover:bg-rose-700"
         : isFulfill
             ? "bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700"
-        : "bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700";
-    const title = isReject ? "Share the rejection reason" : isFulfill ? "Fulfill this demand" : "Approve this demand";
+            : "bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700";
+    const title = isReject ? "Share The Rejection Reason" : isFulfill ? "Fulfill This Demand" : "Approve This Demand";
     const helperText = isReject
-        ? "Add a short reason and submit your decision."
+        ? "Add A Short Reason And Submit Your Decision."
         : isFulfill
-            ? "Confirm that staffing is complete and close this demand."
-        : "Confirm the demand and move it to the next step.";
+            ? "Confirm That Staffing Is Complete And Close This Demand."
+            : "Confirm The Demand And Move It To The Next Step.";
     const buttonLabel = isReject ? "Submit Rejection" : isFulfill ? "Mark Fulfilled" : "Confirm Approval";
     const Icon = isReject ? ErrorIcon : SuccessIcon;
 
@@ -129,7 +129,7 @@ const DecisionModal = ({
                         </Button>
                     </div>
                 </div>
-                
+
 
                 <div className="flex flex-1 flex-col justify-between gap-5 px-6 py-5">
                     <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
@@ -153,7 +153,7 @@ const DecisionModal = ({
                                 value={reason}
                                 onChange={(e) => onReasonChange(e.target.value)}
                                 rows={4}
-                                placeholder="Explain briefly why this demand is being rejected."
+                                placeholder="Explain Briefly Why This Demand Is Being Rejected."
                                 className={cn(
                                     "w-full rounded-2xl border bg-white px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-350",
                                     error
@@ -163,7 +163,7 @@ const DecisionModal = ({
                             />
                             <div className="mt-2 flex items-center justify-between">
                                 <p className={cn("text-xs", error ? "text-rose-600" : "text-slate-400")}>
-                                    {error || "A reason is required when rejecting a demand."}
+                                    {error || "A Reason Is Required When Rejecting A Demand."}
                                 </p>
                                 <p className="text-[11px] text-slate-400">{reason.trim().length}/250</p>
                             </div>
@@ -172,11 +172,11 @@ const DecisionModal = ({
                         <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
                             <p className="text-sm font-semibold text-slate-800">
                                 {isFulfill
-                                    ? "The demand will be marked as fulfilled immediately after confirmation."
-                                    : "The demand will be approved immediately after confirmation."}
+                                    ? "The Demand Will Be Marked As Fulfilled Immediately After Confirmation."
+                                    : "The Demand Will Be Approved Immediately After Confirmation."}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
-                                No extra form update is needed.
+                                No Extra Form Update Is Needed.
                             </p>
                         </div>
                     )}
@@ -224,10 +224,10 @@ const DeleteDemandModal = ({ demand, loading, onClose, onSubmit }) => {
                                 Delete
                             </div>
                             <h3 className="mt-3 text-lg font-bold text-slate-900">
-                                Delete requested demand?
+                                Delete Requested Demand?
                             </h3>
                             <p className="mt-1 text-sm text-slate-500">
-                                This will cancel the requested demand and remove it from the active pipeline.
+                                This Will Cancel The Requested Demand And Remove It From The Active Pipeline.
                             </p>
                         </div>
                         <Button
@@ -353,9 +353,9 @@ const DemandWorkspacePage = () => {
         const normalizedRole = normalizeRole(effectiveRole);
         const isRM = normalizedRole === "RESOURCEMANAGER";
         const isPM = normalizedRole === "PROJECTMANAGER" || normalizedRole === "MANAGER";
-        
+
         if ((isPM || isRM) && !canProjectManagerMutateDemand(demand)) {
-            toast.error("Only REQUESTED demands can be deleted.");
+            toast.error("Only Requested Demands Can Be Deleted.");
             return;
         }
         setDeletingDemand(demand);
@@ -400,11 +400,11 @@ const DemandWorkspacePage = () => {
                 decision: "APPROVED",
                 rejectionReason: null
             });
-            toast.success(response?.message || "Demand approved successfully");
+            toast.success(response?.message || "Demand Approved Successfully");
             setApprovingDemand(null);
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand approval failed"));
+            toast.error(getActionErrorMessage(error, "Demand Approval Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -415,7 +415,7 @@ const DemandWorkspacePage = () => {
         const currentStatus = String(rejectingDemand?.lifecycleState || rejectingDemand?.demandStatus || "").toUpperCase();
 
         if (!cleanedReason) {
-            setRejectReasonError("Please enter a rejection reason.");
+            setRejectReasonError("Please Enter A Rejection Reason.");
             return;
         }
 
@@ -423,7 +423,7 @@ const DemandWorkspacePage = () => {
         if (!demandId) return;
 
         if (!DM_REJECTABLE_STATUSES.includes(currentStatus)) {
-            toast.error("Only pending or approved demands can be rejected by DM.");
+            toast.error("Only Pending Or Approved Demands Can Be Rejected By Dm.");
             return;
         }
 
@@ -434,13 +434,13 @@ const DemandWorkspacePage = () => {
                 decision: "REJECTED",
                 rejectionReason: cleanedReason
             });
-            toast.success(response?.message || (currentStatus === "APPROVED" ? "Approved demand rejected successfully" : "Demand rejected successfully"));
+            toast.success(response?.message || (currentStatus === "APPROVED" ? "Approved Demand Rejected Successfully" : "Demand Rejected Successfully"));
             setRejectingDemand(null);
             setRejectReason("");
             setRejectReasonError("");
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand rejection failed"));
+            toast.error(getActionErrorMessage(error, "Demand Rejection Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -456,11 +456,11 @@ const DemandWorkspacePage = () => {
                 decision: "FULFILLED",
                 rejectionReason: null
             });
-            toast.success(response?.message || "Demand fulfilled successfully");
+            toast.success(response?.message || "Demand Fulfilled Successfully");
             setFulfillingDemand(null);
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand fulfillment failed"));
+            toast.error(getActionErrorMessage(error, "Demand Fulfillment Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -470,7 +470,7 @@ const DemandWorkspacePage = () => {
         const cleanedReason = rmRejectReason.trim();
 
         if (!cleanedReason) {
-            setRmRejectReasonError("Please enter a rejection reason.");
+            setRmRejectReasonError("Please Enter A Rejection Reason.");
             return;
         }
 
@@ -483,13 +483,13 @@ const DemandWorkspacePage = () => {
                 decision: "REJECTED",
                 rejectionReason: cleanedReason
             });
-            toast.success(response?.message || "Demand rejected successfully");
+            toast.success(response?.message || "Demand Rejected Successfully");
             setRmRejectingDemand(null);
             setRmRejectReason("");
             setRmRejectReasonError("");
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand rejection failed"));
+            toast.error(getActionErrorMessage(error, "Demand Rejection Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -504,18 +504,18 @@ const DemandWorkspacePage = () => {
         const isPM = normalizedRole === "PROJECTMANAGER" || normalizedRole === "MANAGER";
 
         if ((isPM || isRM) && !canProjectManagerMutateDemand(deletingDemand)) {
-            toast.error("Only REQUESTED demands can be deleted.");
+            toast.error("Only Requested Demands Can Be Deleted.");
             return;
         }
 
         setDecisionState({ demandId: id, action: "delete" });
         try {
             const response = await deleteDemandByPM(id, deletingDemand);
-            toast.success(response?.message || "Demand deleted successfully");
+            toast.success(response?.message || "Demand Deleted Successfully");
             setDeletingDemand(null);
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Failed to delete demand"));
+            toast.error(getActionErrorMessage(error, "Failed To Delete Demand"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -619,7 +619,7 @@ const DemandWorkspacePage = () => {
                                 Demand Pipeline Management
                             </h1>
                             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                                A real-time snapshot of resource mandates, SLA compliance, and fulfillment status across the enterprise.
+                                A Real-Time Snapshot Of Resource Mandates, Sla Compliance, And Fulfillment Status Across The Enterprise.
                             </p>
                         </div>
                         {demandRoleOptions.length > 1 && (
@@ -670,9 +670,7 @@ const DemandWorkspacePage = () => {
                                         { id: 'at_risk', label: 'At Risk', icon: WarningIcon, color: 'text-orange-600' },
                                         { id: 'active', label: 'Approved', icon: ActivityIcon, color: 'text-indigo-600' },
                                         { id: 'soft', label: 'Soft', icon: ZapIcon, color: 'text-slate-600' },
-                                        ...(isRMView
-                                            ? [{ id: 'fulfilled', label: 'Fulfilled', icon: SuccessIcon, color: 'text-emerald-600' }]
-                                            : []),
+                                        { id: 'fulfilled', label: 'Fulfilled', icon: SuccessIcon, color: 'text-emerald-600' },
                                         { id: 'rejected', label: 'Rejected', icon: ErrorIcon, color: 'text-rose-600' }
                                     ].map(tab => (
                                         <Button
@@ -695,11 +693,12 @@ const DemandWorkspacePage = () => {
                             </div>
 
                             <div className="flex items-center gap-2">
+                                
                                 <div className="relative">
                                     <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                                     <input
                                         type="text"
-                                        placeholder="Search pipeline..."
+                                        placeholder="Search Pipeline..."
                                         value={filters.search}
                                         onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                                         className="h-8 w-[240px] pl-9 pr-4 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all placeholder:text-slate-400"
@@ -752,15 +751,15 @@ const DemandWorkspacePage = () => {
                                 const isFulfilled = status === 'FULFILLED';
                                 const isRejected = status === 'REJECTED';
                                 const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditDemand);
-                                
+
                                 const isApproving = decisionState?.demandId === demand.id && decisionState?.action === "approve";
                                 const isRejecting = decisionState?.demandId === demand.id && decisionState?.action === "reject";
                                 const isFulfilling = decisionState?.demandId === demand.id && decisionState?.action === "fulfill";
 
                                 return {
                                     ...demand,
-                                    onRowClick: () => navigate(`/resource-management/demand/${demand.id}`, { 
-                                        state: { clientName: demand.clientName || demand.client } 
+                                    onRowClick: () => navigate(`/resource-management/demand/${demand.id}`, {
+                                        state: { clientName: demand.clientName || demand.client }
                                     }),
                                     rowClass: "group",
                                     demand_details: (
@@ -812,7 +811,7 @@ const DemandWorkspacePage = () => {
                                                             "{demand.rmRejectionReason || demand.dmRejectionReason || demand.rejectionReason}"
                                                         </span>
                                                     ) : (
-                                                        <span className="text-[10px] text-slate-400 italic font-bold">No reason specified</span>
+                                                        <span className="text-[10px] text-slate-400 italic font-bold">No Reason Specified</span>
                                                     )}
                                                 </div>
                                             ) : (demand.demandSlaId || demand.slaId) ? (
