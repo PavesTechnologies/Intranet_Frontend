@@ -446,15 +446,31 @@ export default function OnboardingSummary() {
             </h3>
             <div className="grid grid-cols-2 gap-4">
               {agingData.map((age, i) => (
-                <KPICard
+                <div
                   key={i}
-                  label={age.label}
-                  value={age.count}
-                  suffix=" Candidates"
-                  icon={<age.icon className="h-5 w-5" />}
-                  color={`${age.bg} ${age.color}`}
-                  className="border-slate-100 bg-white"
-                />
+                  className="rounded-2xl border border-slate-100 bg-white p-5 min-w-0"
+                >
+                  <div className="flex flex-col gap-4 min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${age.bg} ${age.color}`}
+                      >
+                        <age.icon className="h-5 w-5" />
+                      </div>
+                      <p className="min-w-0 text-right text-sm font-medium text-slate-500 break-words">
+                        {age.label}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-2xl md:text-3xl font-bold leading-none text-slate-900 tabular-nums">
+                        {age.count}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-slate-600 break-words">
+                        Candidates
+                      </p>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
