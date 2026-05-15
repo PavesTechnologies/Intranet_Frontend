@@ -125,7 +125,7 @@ const ComplianceForm = ({ formData, setFormData }) => {
               <FilterListbox
                 options={[
                   { value: "", label: "SELECT A CERTIFICATE" },
-                  ...certificates.map((cert) => ({ value: cert.certificateId, label: cert.providerName.toUpperCase() })),
+                  ...certificates.map((cert) => ({ value: cert.certificateId, label: cert.certificateName})),
                 ]}
                 value={formData.certificate?.certificateId || ""}
                 onChange={(val) => handleChange({ target: { name: "certificate", value: val } })}

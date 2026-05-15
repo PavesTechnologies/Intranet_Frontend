@@ -138,7 +138,7 @@ const EscalationForm = ({ formData, setFormData, onSave, onClose, loading, showB
         </div>
 
         {/* Status */}
-        <div className="pb-2">
+        <div className="pb-2 pt-7">
           <label htmlFor="activeFlag" className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
