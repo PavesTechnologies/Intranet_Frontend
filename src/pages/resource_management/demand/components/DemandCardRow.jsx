@@ -1,6 +1,6 @@
 import React from 'react';
 import { DemandTypeBadge, PriorityBadge, StateBadge, SLABadge } from './FormalBadges';
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2} from "lucide-react";
 import { ProjectsIcon, UserIcon, PendingIcon, CheckIcon, SpinnerIcon, ErrorIcon, SuccessIcon ,EditIcon} from "@/components/icons";
 import { cn } from "@/lib/utils";
 import {
@@ -241,7 +241,7 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                                     }}
                                     className="inline-flex h-8 w-8 items-center justify-center text-rose-600 transition-all hover:text-rose-700 active:scale-90"
                                 >
-                                    <DeleteIcon size={16} />
+                                    <Trash2 size={16} />
                                 </button>
                             )}
                         </div>

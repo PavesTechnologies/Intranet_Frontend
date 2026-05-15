@@ -1023,7 +1023,7 @@ const DemandResourcesTable = ({ demandId }) => {
                                         <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100">
                                             <CalendarIcon className="h-3 w-3 text-indigo-400" />
                                             <span className="text-[10px] text-slate-700 font-black">{item.allocationStartDate}</span>
-                                            <ChevronRight className="h-2.5 w-2.5 text-slate-300" />
+                                            <ChevronRightIcon className="h-2.5 w-2.5 text-slate-300" />
                                             <span className="text-[10px] text-slate-700 font-black">{item.allocationEndDate}</span>
                                         </div>
                                     </div>
@@ -1041,7 +1041,7 @@ const DemandResourcesTable = ({ demandId }) => {
                                 createdBy_info: (
                                     <div className="text-center">
                                         <div className="inline-flex items-center gap-2 text-[10px] text-slate-500 font-black bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-                                            <UserCheck className="h-3.5 w-3.5 text-indigo-500" />
+                                            <AuthorizedIcon className="h-3.5 w-3.5 text-indigo-500" />
                                             <span>{item.createdBy || "System"}</span>
                                         </div>
                                     </div>
