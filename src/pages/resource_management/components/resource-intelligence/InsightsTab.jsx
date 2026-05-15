@@ -35,7 +35,7 @@ export default function InsightsTab({ resource }) {
         {
             icon: Brain,
             title: "Allocation Propensity",
-            desc: "Predicted success rates for upcoming demand pipeline matches based on historical performance",
+            desc: "Predicted Success Rates For Upcoming Demand Pipeline Matches Based On Historical Performance",
             color: "from-rose-50 to-orange-50/30 border-rose-100",
             iconColor: "text-rose-500",
             metric: `${propensityScore}%`
@@ -43,7 +43,7 @@ export default function InsightsTab({ resource }) {
         {
             icon: Sparkles,
             title: "Intelligent Re-skilling",
-            desc: "Targeted skill upgrades that would maximize billability for current market demand",
+            desc: "Targeted Skill Upgrades That Would Maximize Billability For Current Market Demand",
             color: "from-violet-50 to-indigo-50/30 border-violet-100",
             iconColor: "text-indigo-500",
             metric: experience > 8 ? "Leadership" : "Technical"
@@ -51,7 +51,7 @@ export default function InsightsTab({ resource }) {
         {
             icon: Target,
             title: "Pipeline Synchronization",
-            desc: "Auto-identification of high-priority project vacancies matching verified credentials",
+            desc: "Auto-Identification Of High-Priority Project Vacancies Matching Verified Credentials",
             color: "from-sky-50 to-blue-50/30 border-sky-100",
             iconColor: "text-sky-500",
             metric: certsCount > 2 ? "High-Sync" : "Standard"
@@ -59,7 +59,7 @@ export default function InsightsTab({ resource }) {
         {
             icon: GraduationCap,
             title: "Credential Acceleration",
-            desc: "Recommended certifications to achieve strategic tier advancement in current domain",
+            desc: "Recommended Certifications To Achieve Strategic Tier Advancement In Current Domain",
             color: "from-emerald-50 to-teal-50/30 border-emerald-100",
             iconColor: "text-emerald-500",
             metric: `${Math.max(1, 4 - certsCount)} Targets`
@@ -126,7 +126,7 @@ export default function InsightsTab({ resource }) {
                                     <Zap className="h-3 w-3 text-amber-400 group-hover:scale-110 transition-transform" />
                                     AI ENGINE SYNCING
                                 </div>
-                                <div className="text-[9px] font-bold text-slate-400 tracking-wider font-sans uppercase">LEVEL-2 INTELLIGENCE</div>
+                                <div className="text-[9px] font-bold text-slate-400 tracking-wider font-sans uppercase">Level-2 Intelligence</div>
                             </div>
                         </div>
                     );
@@ -139,7 +139,7 @@ export default function InsightsTab({ resource }) {
                 <div className="flex-1">
                     <p className="text-xs font-bold text-indigo-900 font-heading">Strategic Roadmap Insights</p>
                     <p className="text-[10px] font-medium text-indigo-700/70 mt-1 leading-relaxed italic font-sans">
-                        AI-driven projections are based on internal resource trends, certification velocity, and current market demand signals.
+                        Ai-Driven Projections Are Based On Internal Resource Trends, Certification Velocity, And Current Market Demand Signals.
                     </p>
                 </div>
                 <Button variant="outline" size="sm" className="w-full sm:w-auto mt-2 sm:mt-0 text-[10px] font-bold h-7 gap-1.5 bg-white border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-sans">

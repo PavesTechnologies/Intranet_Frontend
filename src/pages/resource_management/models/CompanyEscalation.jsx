@@ -130,7 +130,7 @@ const CompanyEscalation = () => {
     setDeleteLoading(true);
     try {
       await deleteCompanyContact(selectedContactId);
-      toast.success("Escalation contact deleted successfully");
+      toast.success("Escalation Contact Deleted Successfully");
       fetchContact();
     } catch (error) {
       toast.error(

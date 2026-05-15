@@ -302,7 +302,7 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
     //     }
     //   } catch (error) {
     //     console.error("Error checking client projects:", error);
-    //     // toast.error("Failed to check client projects.");
+    //     // toast.error("Failed To Check Client Projects.");
     //     // setIsSubmitting(false);
     //   }
     // } else {

@@ -3,10 +3,12 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import DemandDetailPage from '../../resource_management/demand/pages/DemandDetailPage';
 import DemandKPIStrip from '../../resource_management/demand/components/DemandKPIStrip';
-import DemandList from '../../resource_management/demand/components/DemandList';
 import DemandFilters from '../../resource_management/demand/components/DemandFilters';
 import demandService from '../../resource_management/demand/services/demandService';
-import { Search, Filter, Plus, FilePlus, Calendar, XCircle, Loader2 } from "lucide-react";
+import {
+    SearchIcon, FilterIcon, AddIcon, FileAddIcon, CalendarIcon,
+    ProjectsIcon, UserIcon, PendingIcon, EditIcon, DeleteIcon
+} from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { getProjectById, checkDemandCreation, updateDemandStatus } from '../../resource_management/services/projectService';
@@ -15,7 +17,16 @@ import DemandModal from "../../resource_management/models/DemandModal";
 import DeleteDemandModal from "../../resource_management/demand/components/DeleteDemandModal";
 import AddDeliverableRoleModal from "../../resource_management/models/AddDeliverableRoleModal";
 import Pagination from '../../../components/Pagination/pagination';
+import Button from '../../../components/Button/Button';
+import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { useAuth } from "../../../contexts/AuthContext";
+import GenericTable from "../../../components/Table/table";
+import {
+    DemandTypeBadge,
+    PriorityBadge,
+    SLABadge,
+    StateBadge,
+} from "../../resource_management/demand/components/FormalBadges";
 import {
     canProjectManagerEditDemand,
     canProjectManagerMutateDemand,
@@ -43,6 +54,13 @@ const getDemandCommitment = (demand = {}) =>
     ).toUpperCase();
 
 const isSoftDemand = (demand) => getDemandCommitment(demand) === "SOFT";
+
+const getDemandType = (demand = {}) =>
+    demand.demandType ||
+    demand.type ||
+    demand.demand_type ||
+    demand.type_of_demand ||
+    "";
 
 
 const ProjectDemandManagement = ({ projectId, projectName }) => {
@@ -166,11 +184,11 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
         setDeleteLoading(true);
         try {
             const response = await demandService.deleteDemandByPM(id, deletingDemand);
-            showStatusToast(response?.message || "Demand deleted successfully", "success");
+            showStatusToast(response?.message || "Demand Deleted Successfully", "success");
             setDeletingDemand(null);
             await fetchContext();
         } catch (error) {
-            showStatusToast(getDemandActionErrorMessage(error, "Failed to delete demand"), "error");
+            showStatusToast(getDemandActionErrorMessage(error, "Failed To Delete Demand"), "error");
         } finally {
             setDeleteLoading(false);
         }
@@ -201,7 +219,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
             setKpiData(kpis);
         } catch (err) {
             console.error("Failed to fetch project context", err);
-            showStatusToast("Failed to load project details for demand creation", "error");
+            showStatusToast("Failed To Load Project Details For Demand Creation", "error");
         } finally {
             setLoadingProject(false);
         }
@@ -500,7 +518,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                                     <div className="flex items-center gap-2">
                                         <span className="h-3 w-[1px] bg-slate-300 mx-1" />
                                         <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100 shadow-sm">
-                                            <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                                            <CalendarIcon className="w-3.5 h-3.5 text-indigo-500" />
                                             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">
                                                 {new Date(project.startDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                 <span className="mx-1 text-slate-300">—</span>
@@ -513,28 +531,27 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <button
+                            <Button
                                 onClick={() => setDeliverableModalOpen(true)}
-                                className="flex items-center gap-2 bg-white border border-indigo-600 text-indigo-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-50 transition-all active:scale-[0.98] shadow-sm"
+                                variant="outline"
+                                size="small"
+                                className="!border-indigo-600 !text-indigo-600 hover:!bg-indigo-50 !rounded-xl !font-bold active:scale-[0.98]"
                             >
-                                <Plus className="w-3.5 h-3.5" />
+                                <AddIcon className="w-3.5 h-3.5" />
                                 Add Deliverable Role
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
                                 disabled={!demandResponse?.create || loadingDemand}
                                 onClick={() => setDemandModalOpen(true)}
                                 title={!demandResponse?.create ? demandResponse?.reason : ""}
-                                className={cn(
-                                    "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] shadow-sm",
-                                    demandResponse?.create
-                                        ? "bg-indigo-600 hover:bg-indigo-700"
-                                        : "bg-slate-300 cursor-not-allowed opacity-70"
-                                )}
+                                variant="primary"
+                                size="small"
+                                className="!bg-indigo-600 hover:!bg-indigo-700 !rounded-xl active:scale-[0.98]"
                             >
-                                <FilePlus className="w-3.5 h-3.5" />
+                                <FileAddIcon className="w-3.5 h-3.5" />
                                 Create Demand
-                            </button>
+                            </Button>
                         </div>
                     </div>
 
@@ -545,19 +562,18 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                             <h3 className="text-sm font-bold text-slate-900">
                                 Project Demand Pipeline
                             </h3>
-                            <span className="text-[11px] text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
-                                {totalElements} records
+                                {totalElements} Records
                             </span>
                         </div>
 
                         <div className="flex items-center gap-3">
                             <div className="relative group">
-                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 group-focus-within:text-indigo-600 transition-colors" />
+                                <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 group-focus-within:text-indigo-600 transition-colors" />
                                 <input
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search project demands..."
+                                    placeholder="Search Project Demands..."
                                     className="w-72 pl-10 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 shadow-sm transition-all placeholder:text-slate-400"
                                 />
                             </div>
@@ -572,7 +588,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                                         : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
                                 )}
                             >
-                                <Filter className={cn("h-3.5 w-3.5", !filterCollapsed ? "text-white" : "text-slate-500")} />
+                                <FilterIcon className={cn("h-3.5 w-3.5", !filterCollapsed ? "text-white" : "text-slate-500")} />
                                 Filters
                                 {activeFilterCount > 0 && (
                                     <span className={cn(
@@ -586,69 +602,200 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-start gap-1 border-b -mx-4 px-4 pt-2">
-                        {[
-                            { id: 'all', label: 'All Demands' },
-                            { id: 'active', label: 'Active & Approved' },
-                            { id: 'fulfilled', label: 'Fulfilled' },
-                            { id: 'soft', label: 'Soft Demands' }
-                        ].map((tab) => {
-                            const isActive = activeTab === tab.id;
-                            return (
-                                <button
+                    <Tabs
+                        value={activeTab}
+                        onValueChange={setActiveTab}
+                        className="border-b -mx-4"
+                    >
+                        <TabsList className="!flex !h-auto !w-full !justify-start !bg-transparent !p-0 !pl-4 !rounded-none items-center gap-1">
+                            {[
+                                { id: 'all', label: 'All Demands' },
+                                { id: 'active', label: 'Active & Approved' },
+                                { id: 'fulfilled', label: 'Fulfilled' },
+                                { id: 'soft', label: 'Soft Demands' }
+                            ].map((tab, index) => (
+                                <TabsTrigger
                                     key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
+                                    value={tab.id}
                                     className={cn(
-                                        "px-6 py-3 text-xs font-bold transition-all border-b-2 relative -mb-px flex-shrink-0",
-                                        isActive
-                                            ? "text-indigo-600 border-indigo-600 bg-indigo-50/30"
-                                            : "text-slate-400 border-transparent hover:text-slate-700 hover:bg-slate-50/50"
+                                        "py-3 pr-6 text-xs font-bold transition-all border-b-2 relative -mb-px flex-shrink-0 !rounded-none !bg-transparent !shadow-none",
+                                        index === 0 ? "pl-0" : "pl-6",
+                                        "data-[state=active]:!text-indigo-600 data-[state=active]:!border-indigo-600 data-[state=active]:!bg-indigo-50/30",
+                                        "data-[state=inactive]:text-slate-400 data-[state=inactive]:border-transparent hover:text-slate-700 hover:!bg-slate-50/50"
                                     )}
                                 >
                                     {tab.label}
-                                </button>
-                            );
-                        })}
-                    </div>
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </Tabs>
                 </div>
             </div>
 
             {/* List Content Area */}
             <div className="p-0 relative">
-                <div className="grid grid-cols-12 items-center gap-4 px-5 py-3 bg-slate-50 border-b">
-                    <div className="col-span-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">Demand Specifications & Context</div>
-                    <div className="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left pl-2">Score</div>
-                    <div className="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Priority</div>
-                    <div className="col-span-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">SLA Compliance</div>
-                    <div className="col-span-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</div>
-                    <div className="col-span-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Actions</div>
-                </div>
-
                 <div className="flex flex-col">
-                    {paginatedDemands.length > 0 ? (
-                        <div className="flex flex-col">
-                            <DemandList
-                                demands={paginatedDemands}
-                                onViewDetail={handleViewDetail}
-                                onEdit={handleEdit}
-                                onDelete={handleDelete}
-                                activeTab={activeTab}
-                                viewerRole={effectiveRole}
+                    <div className="overflow-x-auto">
+                        <GenericTable
+                            headers={[
+                                "Demand Details",
+                                "Score",
+                                "Priority",
+                                "SLA Compliance",
+                                "Status",
+                                "Actions",
+                            ]}
+                            columns={[
+                                "demand_details",
+                                "score",
+                                "priority",
+                                "sla_compliance",
+                                "status",
+                                "actions",
+                            ]}
+                            loading={loadingProject}
+                            rows={paginatedDemands.map((demand) => {
+                                const status = String(demand.lifecycleState || demand.demandStatus || "").toUpperCase();
+                                const demandCommitment = getDemandCommitment(demand);
+                                const normalizedViewerRole = normalizeRole(effectiveRole);
+                                const isDMView = normalizedViewerRole === "DELIVERYMANAGER";
+                                const isPMView = normalizedViewerRole === "PROJECTMANAGER" || normalizedViewerRole === "MANAGER";
+                                const canPMEditDemand = isPMView && canProjectManagerEditDemand(demand);
+                                const canDeleteDemand = isPMView && canProjectManagerMutateDemand(demand);
+                                const isFulfilled = status === "FULFILLED";
+                                const isRejected = status === "REJECTED";
+                                const isEditDisabled =
+                                    isFulfilled ||
+                                    isRejected ||
+                                    (isDMView && status === "APPROVED") ||
+                                    (isPMView && !canPMEditDemand);
+
+                                return {
+                                    ...demand,
+                                    onRowClick: () => handleViewDetail(demand),
+                                    rowClass: "group cursor-pointer",
+                                    demand_details: (
+                                        <div className="flex flex-col gap-1 text-left px-2">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-[13px] font-bold text-slate-900 truncate tracking-tight group-hover:text-indigo-600 transition-colors">
+                                                    {demand.projectName || projectName}
+                                                </h3>
+                                                <div className="px-1.5 py-0.5 bg-slate-100 rounded text-[8px] font-black text-slate-500 tracking-tighter">
+                                                    ID: {String(demand.id || demand.demandId || "-").split("-")[0]}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="flex items-center gap-1 min-w-0">
+                                                    <ProjectsIcon className="h-3 w-3 text-slate-400" />
+                                                    <span className="text-[11px] font-semibold text-slate-500 truncate">
+                                                        {demand.client || "-"}
+                                                    </span>
+                                                </div>
+                                                <div className="h-2.5 w-[1px] bg-slate-200" />
+                                                <div className="flex items-center gap-1 min-w-0">
+                                                    <UserIcon className="h-3 w-3 text-slate-400" />
+                                                    <span className="text-[11px] text-slate-400 truncate">
+                                                        {demand.role || "-"}
+                                                    </span>
+                                                </div>
+                                                <DemandTypeBadge type={getDemandType(demand)} />
+                                            </div>
+                                        </div>
+                                    ),
+                                    score: (
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-base font-black text-slate-900 tracking-tighter leading-none">
+                                                {demand.priorityScore || 0}
+                                            </span>
+                                            <div className="text-[8px] font-bold text-slate-400 tracking-widest mt-0.5 uppercase">
+                                                Score
+                                            </div>
+                                        </div>
+                                    ),
+                                    priority: (
+                                        <div className="flex justify-center">
+                                            <PriorityBadge priority={demand.priority} />
+                                        </div>
+                                    ),
+                                    sla_compliance: (
+                                        <div className="flex justify-center w-full">
+                                            {(demand.demandSlaId || demand.slaId) ? (
+                                                <SLABadge
+                                                    days={demand.slaDays}
+                                                    isSoft={
+                                                        !demand.demandSlaId && (
+                                                            activeTab === "soft" ||
+                                                            demandCommitment === "SOFT" ||
+                                                            demand.lifecycleState?.toUpperCase() === "SOFT"
+                                                        )
+                                                    }
+                                                />
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-0.5 px-2 py-0.5 rounded-lg border min-w-[80px] bg-slate-50 border-slate-100 text-slate-400">
+                                                    <div className="flex items-center gap-1">
+                                                        <PendingIcon className="h-2 w-2 opacity-40" />
+                                                        <span className="text-[8px] font-black tracking-widest uppercase">SLA</span>
+                                                    </div>
+                                                    <span className="text-[11px] font-black">No SLA</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ),
+                                    status: (
+                                        <div className="flex justify-center">
+                                            <StateBadge state={demand.lifecycleState} />
+                                        </div>
+                                    ),
+                                    actions: (
+                                        <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                                type="button"
+                                                title={
+                                                    isFulfilled
+                                                        ? "Cannot edit fulfilled demand"
+                                                        : isRejected
+                                                            ? "Cannot edit rejected demand"
+                                                            : (isDMView && status === "APPROVED")
+                                                                ? "Cannot edit approved demand"
+                                                                : (isPMView && !canPMEditDemand)
+                                                                    ? PM_EDITABLE_DEMAND_MESSAGE
+                                                                    : "Edit Demand"
+                                                }
+                                                onClick={() => handleEdit(demand)}
+                                                disabled={isEditDisabled}
+                                                className={cn(
+                                                    "p-1.5 rounded-lg transition-colors",
+                                                    isEditDisabled
+                                                        ? "cursor-not-allowed text-slate-300"
+                                                        : "text-blue-600 hover:bg-blue-50"
+                                                )}
+                                            >
+                                                <EditIcon className="h-4 w-4" />
+                                            </button>
+                                            {canDeleteDemand && (
+                                                <button
+                                                    type="button"
+                                                    title="Delete Requested Demand"
+                                                    onClick={() => handleDelete(demand)}
+                                                    className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                                                >
+                                                    <DeleteIcon className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ),
+                                };
+                            })}
+                        />
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="py-6 border-t border-slate-100">
+                            <Pagination
+                                currentPage={page}
+                                totalPages={totalPages}
+                                onPrevious={() => setPage(p => Math.max(1, p - 1))}
+                                onNext={() => setPage(p => Math.min(totalPages, p + 1))}
                             />
-                            {totalPages > 1 && (
-                                <div className="py-6 border-t border-slate-100">
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={totalPages}
-                                        onPrevious={() => setPage(p => Math.max(1, p - 1))}
-                                        onNext={() => setPage(p => Math.min(totalPages, p + 1))}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="py-24 text-center">
-                            <p className="text-sm font-medium text-slate-400">No demands found for this project matching criteria.</p>
                         </div>
                     )}
                 </div>

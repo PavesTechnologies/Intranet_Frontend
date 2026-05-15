@@ -18,7 +18,7 @@ const ComplianceForm = ({ formData, setFormData }) => {
       const res = await getSkills();
       setSkills(res.data);
     } catch (error) {
-      toast.error("Failed to fetch skills");
+      toast.error("Failed To Fetch Skills");
     } finally {
       setLoading(false);
     }
@@ -30,7 +30,7 @@ const ComplianceForm = ({ formData, setFormData }) => {
       const res = await getCertificates();
       setCertificates(res.data);
     } catch (err) {
-      toast.error("Failed to fetch certificates");
+      toast.error("Failed To Fetch Certificates");
     } finally {
       setLoading(false);
     }
@@ -89,7 +89,7 @@ const ComplianceForm = ({ formData, setFormData }) => {
           </label>
           <FilterListbox
             options={[
-              { value: "", label: "SELECT TYPE" },
+              { value: "", label: "Select Type" },
               ...REQUIREMENT_TYPES.map((type) => ({
                 value: type,
                 label: type.replace(/_/g, " ").toUpperCase(),
@@ -109,7 +109,7 @@ const ComplianceForm = ({ formData, setFormData }) => {
               </label>
               <FilterListbox
                 options={[
-                  { value: "", label: "SELECT A SKILL" },
+                  { value: "", label: "Select A Skill" },
                   ...skills.map((skill) => ({ value: skill.id, label: skill.name.toUpperCase() })),
                 ]}
                 value={formData.skill?.id || ""}
@@ -124,7 +124,7 @@ const ComplianceForm = ({ formData, setFormData }) => {
               </label>
               <FilterListbox
                 options={[
-                  { value: "", label: "SELECT A CERTIFICATE" },
+                  { value: "", label: "Select A Certificate" },
                   ...certificates.map((cert) => ({ value: cert.certificateId, label: cert.certificateName})),
                 ]}
                 value={formData.certificate?.certificateId || ""}
