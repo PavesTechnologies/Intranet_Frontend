@@ -171,7 +171,7 @@ const RoleOffTable = ({
             ),
             resource_info: (
               <div className="flex items-start gap-3">
-                {row.impact === "High" && <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />}
+                {row.impact === "High" && <SecurityAlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />}
                 <div>
                   <p className="font-semibold text-[#081534]">{row.resource}</p>
                   <p className="text-xs text-gray-500">{row.department}</p>
@@ -198,14 +198,14 @@ const RoleOffTable = ({
                     </Button>
                     {canPmCancel(row) && (
                       <Button variant="outline" className="h-8 border-rose-300 bg-white px-3 text-xs text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={() => onAction("cancel", row)}>
-                        <XCircle className="mr-1 h-3.5 w-3.5" />
+                        <ErrorIcon className="mr-1 h-3.5 w-3.5" />
                         Cancel
                       </Button>
                     )}
                   </>
                 ) : (
                   <Button variant="outline" className="h-8 border-gray-300 bg-white px-3 text-xs" onClick={() => onAction("view", row)}>
-                    <Eye className="mr-1 h-3.5 w-3.5" />
+                    <ViewIcon className="mr-1 h-3.5 w-3.5" />
                     View
                   </Button>
                 )}
