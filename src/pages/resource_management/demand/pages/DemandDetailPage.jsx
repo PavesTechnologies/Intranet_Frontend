@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-    PrevIcon, CalendarIcon, HireIcon, SecurityAlertIcon, AuthSuccessIcon,
+    PrevIcon, CalendarIcon, HireIcon, SecurityAlertIcon,
     GlobalIcon, DatabaseIcon, ProjectsIcon, MapPinIcon,
-    TargetIcon, PendingIcon, ChevronRightIcon, ActivityIcon,
+    TargetIcon, PendingIcon, ActivityIcon,
     DashboardIcon, SuccessIcon, MoreVerticalIcon,
-    DocumentIcon, ZapIcon, ShieldIcon, WarningIcon,
+    EditIcon, DeleteIcon, DocumentIcon, ZapIcon, ShieldIcon, WarningIcon,
     EmailIcon, LinkIcon, PenToolIcon, ErrorIcon, InfoIcon,
-    AuthorizedIcon, FileSearchIcon, HistoryIcon, StarIcon, ConfigIcon, DownloadIcon,
+    FileSearchIcon, HistoryIcon, StarIcon, ConfigIcon, DownloadIcon,
     TrendingUpIcon, SkillIcon, LayersIcon, HashIcon, BuildingIcon, GitCompareIcon, CodeIcon, PercentIcon,
-    TeamIcon, SearchIcon, AddIcon, AwardIcon
+    TeamIcon, SearchIcon, AddIcon
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import SkillGapTab from '../../components/resource-intelligence/SkillGapTab';
@@ -19,7 +19,6 @@ import demandService from '../services/demandService';
 import DemandModal from "../../models/DemandModal";
 import DeleteDemandModal from "../components/DeleteDemandModal";
 import { showStatusToast } from "../../../../components/toastfy/toast";
-import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { useAuth } from '../../../../contexts/AuthContext';
 import { PriorityBadge, StateBadge } from '../components/FormalBadges';
 import { Button } from "@/components/ui/button";
@@ -294,81 +293,49 @@ const RoleInfoTab = ({ demand, skillsRequirements }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Skills Table */}
-                <div className="lg:col-span-2">
-                    <DetailCard title="Technical Blueprint & Skills Matrix" icon={AwardIcon}>
-                        <div className="overflow-x-auto no-scrollbar">
-                            <GenericTable
-                                headers={["Skill", "Sub Skill", "Proficiency", "Mandatory", "Source"]}
-                                columns={["primary_info", "sub", "proficiency_info", "mandatory_info", "source_info"]}
-                                rows={paginatedSkills.map((skill) => ({
-                                    ...skill,
-                                    primary_info: <span className="text-xs font-black text-slate-900 tracking-tight">{skill.primary}</span>,
-                                    proficiency_info: (
-                                        <div className="flex flex-col items-center gap-1.5 w-32 mx-auto">
-                                            <span className="text-[9px] font-black text-indigo-600 italic">{skill.proficiency}</span>
-                                            <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-indigo-500" style={{ width: '60%' }} />
-                                            </div>
-                                        </div>
-                                    ),
-                                    mandatory_info: (
-                                        <div className="flex justify-center">
-                                            {skill.mandatory ? (
-                                                <div className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" title="Mandatory" />
-                                            ) : (
-                                                <div className="h-2 w-2 rounded-full bg-slate-200" title="Optional" />
-                                            )}
-                                        </div>
-                                    ),
-                                    source_info: (
-                                        <span className={cn(
-                                            "px-2 py-0.5 rounded text-[9px] font-black border text-center block",
-                                            skill.source === "Requirement" ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-600 border-slate-100"
-                                        )}>{skill.source}</span>
-                                    )
-                                }))}
+            <div className="space-y-6">
+                <section>
+                    <div className="mb-3 flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-slate-900">Technical Blueprint & Skills Matrix</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <GenericTable
+                            headers={["Skill", "Sub Skill", "Proficiency", "Mandatory", "Source"]}
+                            columns={["primary", "sub", "proficiency", "mandatory_info", "source"]}
+                            rows={paginatedSkills.map((skill) => ({
+                                ...skill,
+                                mandatory_info: skill.mandatory ? "Yes" : "No",
+                            }))}
+                        />
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="mt-4">
+                            <Pagination
+                                currentPage={page}
+                                totalPages={totalPages}
+                                onPrevious={() => setPage(p => Math.max(1, p - 1))}
+                                onNext={() => setPage(p => Math.min(totalPages, p + 1))}
                             />
                         </div>
-                        {totalPages > 1 && (
-                            <div className="mt-4 pt-4 border-t border-slate-100">
-                                <Pagination
-                                    currentPage={page}
-                                    totalPages={totalPages}
-                                    onPrevious={() => setPage(p => Math.max(1, p - 1))}
-                                    onNext={() => setPage(p => Math.min(totalPages, p + 1))}
-                                />
-                            </div>
-                        )}
-                    </DetailCard>
-                </div>
+                    )}
+                </section>
 
-                {/* Certificates */}
-                <div className="lg:col-span-1">
-                    <DetailCard title="Required Certifications" icon={AwardIcon}>
-                        <div className="space-y-4">
-                            {certificates.length > 0 ? certificates.map((cert, idx) => (
-                                <div key={idx} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:shadow-sm transition-shadow">
-                                    <div className="flex items-start gap-3">
-                                        <div className="h-8 w-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center shrink-0">
-                                            <AuthSuccessIcon className="h-4 w-4 text-emerald-500" />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-black text-slate-900 tracking-tight">{cert.certificateName}</p>
-                                            <p className="text-[10px] font-bold text-slate-500 mt-0.5">{cert.issuingAuthority}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )) : (
-                                <div className="py-10 text-center flex flex-col items-center gap-3 opacity-40">
-                                    <AwardIcon className="h-10 w-10 text-slate-300" />
-                                    <p className="text-[10px] font-black uppercase tracking-widest">No certifications required</p>
-                                </div>
-                            )}
-                        </div>
-                    </DetailCard>
-                </div>
+                <section>
+                    <div className="mb-3 flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-slate-900">Required Certifications</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <GenericTable
+                            headers={["Certificate", "Issuing Authority"]}
+                            columns={["certificate_name", "issuing_authority"]}
+                            rows={certificates.map((cert) => ({
+                                ...cert,
+                                certificate_name: cert.certificateName || "-",
+                                issuing_authority: cert.issuingAuthority || "-",
+                            }))}
+                        />
+                    </div>
+                </section>
             </div>
         </div>
     );
@@ -972,94 +939,26 @@ const DemandResourcesTable = ({ demandId }) => {
                 </div>
             </div>
 
-            {allocations.length === 0 ? (
-                <div className="bg-white p-16 rounded-3xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-center shadow-sm">
-                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                        <TeamIcon className="text-slate-200 h-10 w-10" />
-                    </div>
-                    <h4 className="text-lg font-black text-slate-900 tracking-tight">No Resources Allocated</h4>
-                    <p className="text-sm text-slate-400 max-w-[320px] mt-2 font-medium leading-relaxed">
-                        There are currently no resources assigned to this specific demand requirement.
-                    </p>
-                </div>
-            ) : (
-                <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xl shadow-slate-200/50">
-                    <div className="overflow-x-auto no-scrollbar">
-                        <GenericTable
-                            headers={["Resource", "Allocation", "Period", "Status", "Created By"]}
-                            columns={["resource_info", "allocation_info", "period_info", "status_info", "createdBy_info"]}
-                            rows={paginatedAllocations.map((item) => ({
-                                ...item,
-                                resource_info: (
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-11 h-11 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs shrink-0 border border-indigo-100 uppercase shadow-sm group-hover:scale-105 transition-transform">
-                                            {item.fullName.split(" ").map(n => n[0]).join("")}
-                                        </div>
-                                        <div className="min-w-0 text-left">
-                                            <p className="font-black text-slate-900 truncate tracking-tight">{item.fullName}</p>
-                                            <p className="text-[10px] text-slate-400 font-bold truncate mt-0.5">{item.email}</p>
-                                        </div>
-                                    </div>
-                                ),
-                                allocation_info: (
-                                    <div className="flex flex-col items-center gap-2">
-                                        <span className={`text-[11px] font-black ${item.allocationPercentage >= 80 ? "text-rose-600" :
-                                            item.allocationPercentage >= 50 ? "text-indigo-600" : "text-emerald-600"
-                                            }`}>
-                                            {item.allocationPercentage}%
-                                        </span>
-                                        <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-1000 ${item.allocationPercentage >= 80 ? "bg-rose-500" :
-                                                    item.allocationPercentage >= 50 ? "bg-indigo-500" : "bg-emerald-500"
-                                                    }`}
-                                                style={{ width: `${item.allocationPercentage}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                ),
-                                period_info: (
-                                    <div className="flex flex-col items-center">
-                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100">
-                                            <CalendarIcon className="h-3 w-3 text-indigo-400" />
-                                            <span className="text-[10px] text-slate-700 font-black">{item.allocationStartDate}</span>
-                                            <ChevronRight className="h-2.5 w-2.5 text-slate-300" />
-                                            <span className="text-[10px] text-slate-700 font-black">{item.allocationEndDate}</span>
-                                        </div>
-                                    </div>
-                                ),
-                                status_info: (
-                                    <div className="text-center">
-                                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.15em] border ${item.allocationStatus === "ACTIVE"
-                                            ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                            : "bg-amber-50 text-amber-600 border-amber-100"
-                                            }`}>
-                                            {item.allocationStatus}
-                                        </span>
-                                    </div>
-                                ),
-                                createdBy_info: (
-                                    <div className="text-center">
-                                        <div className="inline-flex items-center gap-2 text-[10px] text-slate-500 font-black bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-                                            <UserCheck className="h-3.5 w-3.5 text-indigo-500" />
-                                            <span>{item.createdBy || "System"}</span>
-                                        </div>
-                                    </div>
-                                )
-                            }))}
-                        />
-                    </div>
+            <div className="overflow-x-auto">
+                <GenericTable
+                    headers={["Resource", "Email", "Allocation", "Start Date", "End Date", "Status", "Created By"]}
+                    columns={["fullName", "email", "allocation_info", "allocationStartDate", "allocationEndDate", "allocationStatus", "createdBy_info"]}
+                    rows={paginatedAllocations.map((item) => ({
+                        ...item,
+                        allocation_info: `${item.allocationPercentage}%`,
+                        createdBy_info: item.createdBy || "System",
+                    }))}
+                />
+            </div>
 
-                    {totalPages > 1 && (
-                        <div className="py-6 px-6 border-t border-slate-100 bg-slate-50/30">
-                            <Pagination
-                                currentPage={page}
-                                totalPages={totalPages}
-                                onPrevious={() => setPage(p => Math.max(1, p - 1))}
-                                onNext={() => setPage(p => Math.min(totalPages, p + 1))}
-                            />
-                        </div>
-                    )}
+            {totalPages > 1 && (
+                <div className="py-6">
+                    <Pagination
+                        currentPage={page}
+                        totalPages={totalPages}
+                        onPrevious={() => setPage(p => Math.max(1, p - 1))}
+                        onNext={() => setPage(p => Math.min(totalPages, p + 1))}
+                    />
                 </div>
             )}
         </div>
@@ -1296,7 +1195,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                             className="text-blue-600 hover:text-blue-700 transition-all active:scale-90"
                                             title="Edit Demand"
                                         >
-                                            <Pencil className="h-4 w-4" />
+                                            <EditIcon className="h-4 w-4" />
                                         </button>
                                     )}
                                     {canPMDeleteDemand && (
@@ -1311,7 +1210,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                             className="text-rose-600 hover:text-rose-700 transition-all active:scale-90"
                                             title="Delete Demand"
                                         >
-                                            <Trash2 className="h-4 w-4" />
+                                            <DeleteIcon className="h-4 w-4" />
                                         </button>
                                     )}
                                 </div>

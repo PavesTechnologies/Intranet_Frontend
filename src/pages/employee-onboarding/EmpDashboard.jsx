@@ -2,11 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { FileEdit, Send, Users, ShieldCheck, XCircle, FileText, Handshake, Search } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { Navigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { useLocation } from "react-router-dom";
-// import Button from "../../components/Button/Button";
+import Button from "../../components/Button/Button";
 import EmpTable from "./components/EmpTable";
 import axios from "axios";
 import AdminApprovalDashboard from "./admin/AdminApprovalDashboard";
@@ -16,12 +13,11 @@ import {
 } from "./components/offerStatus";
 import { fetchOfferDetailsList } from "./components/fetchOfferDetails";
 import { KPICard } from "../../components/kpi/KPI";
+import { PageCard } from "../../components/Cards/PageCard";
 
 
 
 export default function EmployeeOnboardingDashboard() {
-  const navigate = useNavigate();
-
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [employeeUserIds, setEmployeeUserIds] = useState([]);
@@ -156,20 +152,24 @@ export default function EmployeeOnboardingDashboard() {
         {/* THE TOGGLE: Only shows if user has BOTH HR and (Manager or Admin) roles */}
         {isHR && hasApprovalPrivileges && (
           <div className="flex bg-slate-200/50 p-1 rounded-xl shadow-sm border border-slate-200/50">
-            <button
+            <Button
               onClick={() => setViewRole("HR")}
-              className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${viewRole === "HR" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+              variant={viewRole === "HR" ? "outline" : "ghost"}
+              size="medium"
+              className={`${viewRole === "HR" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200 border-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border-transparent shadow-none"
                 }`}
             >
               HR View
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setViewRole("ADMIN")}
-              className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${viewRole === "ADMIN" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+              variant={viewRole === "ADMIN" ? "outline" : "ghost"}
+              size="medium"
+              className={`${viewRole === "ADMIN" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200 border-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border-transparent shadow-none"
                 }`}
             >
               Admin View
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -276,7 +276,7 @@ export default function EmployeeOnboardingDashboard() {
           </div>
 
           {/* SEARCH & TABLE SECTION */}
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <PageCard className="overflow-hidden rounded-2xl border-slate-200">
             {/* Toolbar */}
             <div className="bg-slate-50/50 border-b border-slate-200 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="relative w-full md:w-96">
@@ -292,12 +292,14 @@ export default function EmployeeOnboardingDashboard() {
 
               {/* Optional Reset Filters Button */}
               {hasActiveFilters && (
-                <button
+                <Button
                   onClick={() => { setSearchTerm(""); setStatusFilter("ALL"); }}
-                  className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors"
+                  variant="link"
+                  size="small"
+                  className="text-slate-600 hover:text-indigo-600"
                 >
                   Clear Filters
-                </button>
+                </Button>
               )}
             </div>
 
@@ -311,12 +313,13 @@ export default function EmployeeOnboardingDashboard() {
                 <p className="text-slate-500 text-sm mb-6 max-w-sm">
                   We couldn't find any offers matching your current search and filters.
                 </p>
-                <button
+                <Button
                   onClick={() => { setSearchTerm(""); setStatusFilter("ALL"); }}
-                  className="px-6 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all hover:-translate-y-0.5 shadow-sm"
+                  variant="primary"
+                  size="medium"
                 >
                   Reset Filters
-                </button>
+                </Button>
               </div>
             ) : (
               <EmpTable
@@ -327,7 +330,7 @@ export default function EmployeeOnboardingDashboard() {
                 stage="HR_VIEW"
               />
             )}
-          </div>
+          </PageCard>
         </div>
       )}
     </div>

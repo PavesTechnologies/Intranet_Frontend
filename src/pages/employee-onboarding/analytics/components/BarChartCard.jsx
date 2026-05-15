@@ -8,41 +8,23 @@ import {
   CartesianGrid,
   LabelList,
   Legend,
+  ResponsiveContainer,
+  Rectangle,
 } from "recharts";
+import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import RawDataModal from "./RawDataModal";
+import ViewRawButton from "./ViewRawButton";
 
-/* 🔹 Circle Legend (Female / Male style) */
 const renderCircleLegend = ({ payload }) => {
   if (!payload) return null;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        gap: 20,
-        marginTop: 10,
-        flexWrap: "wrap",
-        fontSize: 13,
-      }}
-    >
+    <div className="mt-3 flex flex-wrap justify-center gap-5 text-sm">
       {payload.map((entry, index) => (
-        <div
-          key={index}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
+        <div key={index} className="flex items-center gap-2">
           <span
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: "50%",
-              background: entry.color,
-              display: "inline-block",
-            }}
+            className="inline-block h-2.5 w-2.5 rounded-full"
+            style={{ background: entry.color }}
           />
           <span>{entry.value}</span>
         </div>
@@ -51,71 +33,31 @@ const renderCircleLegend = ({ payload }) => {
   );
 };
 
-/* 🔹 Experience Key : Value Legend */
-const renderKeyValueLegend = (data, xKey, bars) => {
-  if (!data || !bars || bars.length !== 1) return null;
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        gap: 20,
-        marginTop: 8,
-        flexWrap: "wrap",
-        fontSize: 13,
-      }}
-    >
-      {data.map((d, i) => (
-        <div key={i}>
-          <b>{d[xKey]}</b> : {d[bars[0].key]}
-        </div>
-      ))}
-    </div>
-  );
-};
-
-/* 🔹 Custom Tooltip (Experience format) */
-/* 🔹 Custom Tooltip (Single + Stacked support) */
 const renderCustomTooltip = ({ active, payload, label, title }) => {
   if (!active || !payload || !payload.length) return null;
 
   const isStacked = payload.length > 1;
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #ddd",
-        borderRadius: 4,
-        padding: "8px 10px",
-        fontSize: 13,
-      }}
-    >
-      {/* Title line */}
-      <div style={{ fontWeight: 600, marginBottom: 4 }}>
+    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
+      <div className="mb-1 font-semibold text-slate-900">
         {title ? `${title} : ${label}` : label}
       </div>
 
-      {/* 🔹 Stacked bars (Age / Gender / Worker etc.) */}
       {isStacked ? (
         <>
-          {payload.map((p, i) =>
-            p.value ? (
-              <div key={i} style={{ color: p.color }}>
-                {p.name} : {p.value}
+          {payload.map((item, index) =>
+            item.value ? (
+              <div key={index} style={{ color: item.color }}>
+                {item.name} : {item.value}
               </div>
-            ) : null
+            ) : null,
           )}
-
-          {/* Total */}
-          <div style={{ marginTop: 4, fontWeight: 600 }}>
-            Total :{" "}
-            {payload.reduce((sum, p) => sum + (p.value || 0), 0)}
+          <div className="mt-1 font-semibold text-slate-900">
+            Total : {payload.reduce((sum, item) => sum + (item.value || 0), 0)}
           </div>
         </>
       ) : (
-        /* 🔹 Single bar (Experience) */
         <div style={{ color: payload[0].color }}>
           value : {payload[0].value}
         </div>
@@ -124,133 +66,105 @@ const renderCustomTooltip = ({ active, payload, label, title }) => {
   );
 };
 
+const buildBarShape = (bars) => (props) => {
+  const { payload, dataKey } = props;
+  const currentIndex = bars.findIndex((bar) => bar.key === dataKey);
+  const hasVisibleBarAbove = bars
+    .slice(currentIndex + 1)
+    .some((bar) => (payload?.[bar.key] || 0) > 0);
 
-export default function BarChartCard({ title, data, xKey, bars }) {
+  return (
+    <Rectangle
+      {...props}
+      radius={hasVisibleBarAbove ? [0, 0, 0, 0] : [6, 6, 0, 0]}
+    />
+  );
+};
+
+export default function BarChartCard({
+  title,
+  data = [],
+  xKey,
+  bars,
+  accentColor,
+}) {
   const [showRaw, setShowRaw] = useState(false);
 
-  /* 🔹 Add total automatically */
-  const processedData = data.map((d) => {
-    let total = 0;
-    bars.forEach((b) => {
-      total += d[b.key] || 0;
-    });
-    return { ...d, total };
+  const processedData = data.map((item) => {
+    const total = bars.reduce((sum, bar) => sum + (item[bar.key] || 0), 0);
+    return { ...item, total };
   });
 
   return (
     <>
-      <div
-        style={{
-          background: "white",
-          borderRadius: 10,
-          padding: 18,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-        }}
+      <PageCard
+        className="relative overflow-hidden rounded-2xl border-slate-200 bg-white"
       >
-        {/* Header */}
-        <div
+        <span
+          className="absolute inset-y-0 left-0 w-1 rounded-l-2xl"
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 10,
+            backgroundColor: accentColor || bars?.[0]?.color || "#6366F1",
           }}
-        >
-          <h3 style={{ margin: 0 }}>{title}</h3>
+        />
+        <PageCardContent className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-base font-bold text-slate-900">{title}</h3>
+            <ViewRawButton onClick={() => setShowRaw(true)} />
+          </div>
 
-          <button
-            onClick={() => setShowRaw(true)}
-            style={{
-              border: "none",
-              background: "transparent",
-              color: "#6c5ce7",
-              cursor: "pointer",
-              fontSize: 13,
-            }}
-          >
-            👁 View Raw Data
-          </button>
-        </div>
-
-        {/* Chart */}
-        <BarChart
-          width={420}
-          height={260}
-          data={processedData}
-          barGap={0}
-          barCategoryGap="22%"
-          maxBarSize={40}
-        >
-          <CartesianGrid strokeDasharray={2} />
-          <XAxis dataKey={xKey} axisLine={false} tickLine={false} />
-          <YAxis axisLine={false} tickLine={false} />
-
-          <Tooltip
-            content={(props) =>
-              renderCustomTooltip({
-                ...props,
-                title:
-                 title.includes("Experience")
-                  ? "Experience"
-                  : title.includes("Age")
-                  ? "Age of Employees"
-                  : "",
-              })
-            }
-          />
-
-          {/* Circle Legend */}
-          <Legend content={renderCircleLegend} />
-
-          {bars.map((b, i) => (
-            <Bar
-              key={i}
-              dataKey={b.key}
-              fill={b.color}
-              stackId={bars.length > 1 ? "a" : undefined}
-              barSize={50}
-              stroke="none"
-              radius={
-                bars.length === 1
-                  ? [6, 6, 0, 0]
-                  : i === bars.length - 1
-                  ? [6, 6, 0, 0]
-                  : [0, 0, 0, 0]
-              }
-            >
-              {/* Value inside bar */}
-              <LabelList
-                dataKey={b.key}
-                position="center"
-                formatter={(v) => (v === 0 ? "" : v)}
-                style={{
-                  fill: "#fff",
-                  fontWeight: 600,
-                  fontSize: 12,
-                }}
-              />
-
-              {/* Total on top */}
-              {i === bars.length - 1 && (
-                <LabelList
-                  dataKey="total"
-                  position="top"
-                  formatter={(v) => (v === 0 ? "" : v)}
-                  style={{
-                    fill: "#000",
-                    fontWeight: 600,
-                    fontSize: 12,
-                  }}
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={processedData}
+                barGap={0}
+                barCategoryGap="22%"
+                maxBarSize={40}
+              >
+                <CartesianGrid strokeDasharray="2 2" stroke="#E2E8F0" />
+                <XAxis dataKey={xKey} axisLine={false} tickLine={false} />
+                <YAxis axisLine={false} tickLine={false} />
+                <Tooltip
+                  content={(props) =>
+                    renderCustomTooltip({
+                      ...props,
+                      title: title.includes("Experience")
+                        ? "Experience"
+                        : title.includes("Age")
+                          ? "Age of Employees"
+                          : "",
+                    })
+                  }
                 />
-              )}
-            </Bar>
-          ))}
-        </BarChart>
+                <Legend content={renderCircleLegend} />
 
-        {/* Experience Key : Value Legend */}
-        {bars.length === 1 && renderKeyValueLegend(data, xKey, bars)}
-      </div>
+                {bars.map((bar, index) => (
+                  <Bar
+                    key={index}
+                    dataKey={bar.key}
+                    fill={bar.color}
+                    stackId={bars.length > 1 ? "a" : undefined}
+                    barSize={50}
+                    stroke="none"
+                    shape={buildBarShape(bars)}
+                  >
+                    <LabelList
+                      dataKey={bar.key}
+                      position="center"
+                      formatter={(value) => (value === 0 ? "" : value)}
+                      style={{
+                        fill: "#fff",
+                        fontWeight: 600,
+                        fontSize: 12,
+                      }}
+                    />
+                  </Bar>
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </PageCardContent>
+      </PageCard>
 
-      {/* Raw Data Modal */}
       {showRaw && (
         <RawDataModal
           title={title}
