@@ -119,8 +119,7 @@ function MiniInfoRow({ label, value, icon: Icon }) {
 function UtilizationChart({ data }) {
     const list = Array.isArray(data) ? data : (data?.data && Array.isArray(data.data) ? data.data : []);
 
-    if (!list || list.length === 0) {
-        return <div className="flex items-center justify-center h-full text-[10px] text-slate-400 font-medium font-sans">No trend data available</div>;
+        return <div className="flex items-center justify-center h-full text-[10px] text-slate-400 font-medium font-sans">No Trend Data Available</div>;
     }
     const maxVal = Math.max(...list.map(d => (d.billable || 0) + (d.nonBillable || 0)), 1);
 
@@ -375,7 +374,7 @@ export default function OverviewTab({ resource }) {
                                         : "Current + Previous 3 Months"}
                                 </p>
                                 <p className="text-[11px] font-medium text-indigo-900 mt-1 leading-relaxed">
-                                    Total logged hours are <span className="font-black">{formatHours(billableSummary?.totalHours)}</span>, with billable utilization at <span className="font-black">{(billableSummary?.billablePercentage || 0).toFixed(2).replace(/\.00$/, "")}%</span>.
+                                    Total Logged Hours Are <span className="font-black">{formatHours(billableSummary?.totalHours)}</span>, With Billable Utilization At <span className="font-black">{(billableSummary?.billablePercentage || 0).toFixed(2).replace(/\.00$/, "")}%</span>.
                                 </p>
                             </div>
                         </div>
@@ -424,7 +423,7 @@ export default function OverviewTab({ resource }) {
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-[10px] text-slate-400 italic">No detailed timeline available</p>
+                                <p className="text-[10px] text-slate-400 italic">No Detailed Timeline Available</p>
                             )}
                         </div>
 
@@ -440,7 +439,7 @@ export default function OverviewTab({ resource }) {
                                     <AlertTriangle className="h-4 w-4" />
                                     <span className="text-xs font-bold font-sans tracking-tight">Critical Outcome</span>
                                 </div>
-                                <p className="text-[10px] font-medium text-rose-500 leading-tight font-sans">Serving notice period. Immediate bench risk upon completion.</p>
+                                <p className="text-[10px] font-medium text-rose-500 leading-tight font-sans">Serving Notice Period. Immediate Bench Risk Upon Completion.</p>
                             </div>
                         ) : resource.currentAllocation === 0 ? (
                             <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg">
@@ -448,7 +447,7 @@ export default function OverviewTab({ resource }) {
                                     <AlertTriangle className="h-4 w-4" />
                                     <span className="text-xs font-bold font-sans tracking-tight">Bench Risk</span>
                                 </div>
-                                <p className="text-[10px] font-medium text-amber-500 leading-tight font-sans">Resource unallocated. Prioritize project matching.</p>
+                                <p className="text-[10px] font-medium text-amber-500 leading-tight font-sans">Resource Unallocated. Prioritize Project Matching.</p>
                             </div>
                         ) : (
                             <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-lg">
@@ -456,7 +455,7 @@ export default function OverviewTab({ resource }) {
                                     <CheckCircle2 className="h-4 w-4" />
                                     <span className="text-xs font-bold font-sans tracking-tight">Stable Capacity</span>
                                 </div>
-                                <p className="text-[10px] font-medium text-emerald-500 leading-tight font-sans">Active allocation within optimal performance range.</p>
+                                <p className="text-[10px] font-medium text-emerald-500 leading-tight font-sans">Active Allocation Within Optimal Performance Range.</p>
                             </div>
                         )}
                     </div>
@@ -512,7 +511,7 @@ export default function OverviewTab({ resource }) {
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center py-8 text-slate-300 font-sans">
                                 <Award className="h-8 w-8 mb-2 opacity-20" />
-                                <p className="text-xs font-bold">No active records found</p>
+                                <p className="text-xs font-bold">No Active Records Found</p>
                             </div>
                         )}
                     </div>
@@ -538,7 +537,7 @@ export default function OverviewTab({ resource }) {
                                                 </div>
                                                 <div>
                                                     <p className="text-xs font-bold text-slate-900 font-sans">{projectName}</p>
-                                                    <p className="text-[10px] font-medium text-slate-500 mt-0.5 whitespace-nowrap font-sans">Active client engagement</p>
+                                                    <p className="text-[10px] font-medium text-slate-500 mt-0.5 whitespace-nowrap font-sans">Active Client Engagement</p>
                                                 </div>
                                             </div>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -561,7 +560,7 @@ export default function OverviewTab({ resource }) {
                         ) : (
                             <div className="py-16 text-center font-sans">
                                 <FolderKanban className="h-10 w-10 text-slate-200 mx-auto mb-3" />
-                                <p className="text-xs font-bold text-slate-400">No active project engagements found</p>
+                                <p className="text-xs font-bold text-slate-400">No Active Project Engagements Found</p>
                             </div>
                         )}
                     </div>

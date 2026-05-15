@@ -465,7 +465,7 @@ const OperationalProjectDetailPage = () => {
                   <input
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search resources..."
+                    placeholder="Search Resources..."
                     className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-11 pr-4 text-[12px] font-bold text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50"
                   />
                 </div>

@@ -241,7 +241,7 @@ function DemandDropdown({
         <span className={cn("truncate", !selectedDemand && "text-muted-foreground")}>
           {selectedDemand
             ? `${selectedDemand.demandName} — ${selectedDemand.projectName}`
-            : "Choose a demand to analyze..."}
+            : "Choose A Demand To Analyze..."}
         </span>
         <ChevronDown className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", open && "rotate-180")} />
       </button>
@@ -254,7 +254,7 @@ function DemandDropdown({
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search demands..."
+                placeholder="Search Demands..."
                 value={search}
                 onChange={(e) => onSearchChange(e.target.value)}
                 className="w-full pl-8 pr-3 py-2 text-sm rounded-md border bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -269,7 +269,7 @@ function DemandDropdown({
               <div className="p-4 text-center">
                 <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
                   <div className="h-3.5 w-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                  Loading demands...
+                  Loading Demands...
                 </div>
               </div>
             ) : error ? (
@@ -279,7 +279,7 @@ function DemandDropdown({
               </div>
             ) : filteredDemands.length === 0 ? (
               <div className="p-4 text-center text-xs text-muted-foreground">
-                No demands found
+                No Demands Found
               </div>
             ) : (
               filteredDemands.map((d) => (
@@ -391,7 +391,7 @@ function SkillComparisonTable({ comparisons }) {
         <Activity className="h-8 w-8 text-muted-foreground/30 mb-2" />
         <p className="text-xs text-muted-foreground font-medium">No Skill Data Found</p>
         <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-          No skill comparisons available for this demand
+          No Skill Comparisons Available For This Demand
         </p>
       </div>
     )
@@ -483,9 +483,9 @@ function RecencyWarnings({ warnings }) {
               <div className="text-muted-foreground mt-0.5">
                 {w.lastUsedDate
                   ? `Last used: ${w.lastUsedDate}`
-                  : "Never used"}
+                  : "Never Used"}
                 {w.yearsUnused && w.yearsUnused < 999 && (
-                  <span className="ml-1">• {w.yearsUnused}y unused</span>
+                  <span className="ml-1">• {w.yearsUnused}Y Unused</span>
                 )}
               </div>
             </div>
@@ -554,7 +554,7 @@ function AnalysisEmptyState() {
       </div>
       <h4 className="text-sm font-semibold text-foreground mb-1">Skill Intelligence</h4>
       <p className="text-xs text-muted-foreground max-w-[220px] leading-relaxed">
-        Select a demand and click <strong>"Get Match Score"</strong> to analyze skill alignment for this resource.
+        Select A Demand And Click <strong>"Get Match Score"</strong> To Analyze Skill Alignment For This Resource.
       </p>
     </div>
   )
@@ -598,7 +598,7 @@ export function ResourceDetailPanel({ resource, open, onOpenChange }) {
       setUtilizationData(response)
     } catch (error) {
       console.error("Error fetching utilization:", error)
-      toast.error(error.response?.data?.message || "Failed to fetch utilization data.")
+      toast.error(error.response?.data?.message || "Failed To Fetch Utilization Data.")
       setUtilizationData({ monthlySummary: {} })
     } finally {
       setUtilizationLoading(false)
@@ -703,7 +703,7 @@ export function ResourceDetailPanel({ resource, open, onOpenChange }) {
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Briefcase className="h-3.5 w-3.5 shrink-0" />
-                  {resource.experience} years exp
+                  {resource.experience} Years Exp
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Calendar className="h-3.5 w-3.5 shrink-0" />
@@ -869,7 +869,7 @@ export function ResourceDetailPanel({ resource, open, onOpenChange }) {
                     <SectionHeader
                       icon={Activity}
                       title="Skill Comparison"
-                      badge={`${analysisResult.skillComparisons?.length || 0} skills`}
+                      badge={`${analysisResult.skillComparisons?.length || 0} Skills`}
                     />
                     <SkillComparisonTable comparisons={analysisResult.skillComparisons} />
                   </div>

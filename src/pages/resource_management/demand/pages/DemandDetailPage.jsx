@@ -124,7 +124,7 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
                 {/* Column 1: Demand Specification */}
                 <DetailCard title="Demand Specification" icon={DocumentIcon}>
                     <div className="space-y-0.5">
-                        <InfoRow label="Internal ID" value={demand.demandId?.slice(0, 8)} colorClass="font-mono text-indigo-600" />
+                        <InfoRow label="Internal Id" value={demand.demandId?.slice(0, 8)} colorClass="font-mono text-indigo-600" />
                         <InfoRow label="Demand Type" value={demand.demandType} />
                         <InfoRow label="Priority" value={<PriorityBadge priority={demand.demandPriority} />} />
                         <InfoRow label="Resources Needed" value={demand.resourceRequired || "1"} />
@@ -162,10 +162,10 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
                         </div>
                     </DetailCard>
 
-                    <DetailCard title="SLA Compliance" icon={ActivityIcon}>
+                    <DetailCard title="Sla Compliance" icon={ActivityIcon}>
                         {!slaId ? (
                             <div className="text-center py-2">
-                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">No Active SLA</p>
+                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">No Active Sla</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -187,7 +187,7 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
             {/* Strategic Justification (Full Width) */}
             <DetailCard title="Strategic Justification" icon={TargetIcon}>
                 <p className="text-[11px] font-medium text-slate-600 leading-relaxed italic bg-slate-50/50 p-4 rounded-xl border border-slate-100">
-                    {demand.demandJustification || "No justification provided for this demand."}
+                    {demand.demandJustification || "No Justification Provided For This Demand."}
                 </p>
             </DetailCard>
 
@@ -197,13 +197,13 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {rejectionInfo.dmRejectionReason && (
                             <div className="p-3 bg-rose-50/50 rounded-lg border border-rose-100">
-                                <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest block mb-1">DM Reason</span>
+                                <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest block mb-1">Dm Reason</span>
                                 <p className="text-[11px] font-bold text-rose-700">{rejectionInfo.dmRejectionReason}</p>
                             </div>
                         )}
                         {rejectionInfo.rmRejectionReason && (
                             <div className="p-3 bg-rose-50/50 rounded-lg border border-rose-100">
-                                <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest block mb-1">RM Reason</span>
+                                <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest block mb-1">Rm Reason</span>
                                 <p className="text-[11px] font-bold text-rose-700">{rejectionInfo.rmRejectionReason}</p>
                             </div>
                         )}
@@ -496,11 +496,11 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
                         <div className="flex items-center gap-3 text-rose-700">
                             <ErrorIcon className="h-5 w-5 shrink-0" />
                             <span className="text-[10px] sm:text-[11px] font-bold tracking-wider">
-                                This demand was <strong>rejected by the Delivery Manager</strong>. Please review the requirements and resubmit.
+                                This Demand Was <strong>Rejected By The Delivery Manager</strong>. Please Review The Requirements And Resubmit.
                             </span>
                         </div>
                         <div className="w-full sm:w-auto text-center px-4 py-2 bg-rose-600 text-white rounded-xl text-[9px] sm:text-[10px] font-black tracking-[0.15em] shadow-lg shadow-rose-600/20 whitespace-nowrap">
-                            DM REJECTED
+                            Dm Rejected
                         </div>
                     </div>
 
@@ -508,7 +508,7 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
                         <div className="mx-4 sm:mx-5 mb-4 sm:mb-5 p-4 bg-white border border-rose-200 rounded-xl">
                             <p className="text-[9px] font-black text-rose-400 uppercase tracking-[0.15em] mb-2 flex items-center gap-1.5">
                                 <WarningIcon className="h-3 w-3" />
-                                DM Rejection Reason
+                                Dm Rejection Reason
                             </p>
                             <p className="text-sm font-bold text-rose-700 leading-relaxed">
                                 &ldquo;{dmRejection}&rdquo;
@@ -525,11 +525,11 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
                         <div className="flex items-center gap-3 text-rose-700">
                             <ErrorIcon className="h-5 w-5 shrink-0" />
                             <span className="text-[10px] sm:text-[11px] font-bold tracking-wider">
-                                This demand was <strong>rejected by the Resource Manager</strong>. Please review the requirements and resubmit.
+                                This Demand Was <strong>Rejected By The Resource Manager</strong>. Please Review The Requirements And Resubmit.
                             </span>
                         </div>
                         <div className="w-full sm:w-auto text-center px-4 py-2 bg-rose-600 text-white rounded-xl text-[9px] sm:text-[10px] font-black tracking-[0.15em] shadow-lg shadow-rose-600/20 whitespace-nowrap">
-                            RM REJECTED
+                            Rm Rejected
                         </div>
                     </div>
 
@@ -537,7 +537,7 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
                         <div className="mx-4 sm:mx-5 mb-4 sm:mb-5 p-4 bg-white border border-rose-200 rounded-xl">
                             <p className="text-[9px] font-black text-rose-400 uppercase tracking-[0.15em] mb-2 flex items-center gap-1.5">
                                 <WarningIcon className="h-3 w-3" />
-                                RM Rejection Reason
+                                Rm Rejection Reason
                             </p>
                             <p className="text-sm font-bold text-rose-700 leading-relaxed">
                                 &ldquo;{rmRejection}&rdquo;
@@ -553,11 +553,11 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
                     <div className="flex items-center gap-4 text-amber-700">
                         <InfoIcon className="h-5 w-5 shrink-0" />
                         <span className="text-[10px] sm:text-[11px] font-bold tracking-wider">
-                            Delivery Manager has approved this demand. Awaiting <strong>Resource Manager approval</strong> to proceed to final confirmation.
+                            Delivery Manager Has Approved This Demand. Awaiting <strong>Resource Manager Approval</strong> To Proceed To Final Confirmation.
                         </span>
                     </div>
                     <div className="w-full sm:w-auto text-center px-4 py-2 bg-amber-600 text-white rounded-xl text-[9px] sm:text-[10px] font-black tracking-[0.15em] shadow-lg shadow-amber-600/20 whitespace-nowrap">
-                        AWAITING RM
+                        Awaiting Rm
                     </div>
                 </div>
             )}
@@ -568,11 +568,11 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
                     <div className="flex items-center gap-4 text-blue-700">
                         <InfoIcon className="h-5 w-5 shrink-0" />
                         <span className="text-[10px] sm:text-[11px] font-bold tracking-wider">
-                            This demand has been created and is awaiting <strong>Delivery Manager approval</strong>.
+                            This Demand Has Been Created And Is Awaiting <strong>Delivery Manager Approval</strong>.
                         </span>
                     </div>
                     <div className="w-full sm:w-auto text-center px-4 py-2 bg-blue-600 text-white rounded-xl text-[9px] sm:text-[10px] font-black tracking-[0.15em] shadow-lg shadow-blue-600/20 whitespace-nowrap">
-                        AWAITING DM
+                        Awaiting Dm
                     </div>
                 </div>
             )}
@@ -583,11 +583,11 @@ const ApprovalFlowTab = ({ demand, rejectionInfo }) => {
                     <div className="flex items-center gap-4 text-emerald-700">
                         <SuccessIcon className="h-5 w-5 shrink-0" />
                         <span className="text-[10px] sm:text-[11px] font-bold tracking-wider">
-                            All approvals complete. This demand has been <strong>fulfilled</strong> and a resource has been successfully allocated.
+                            All Approvals Complete. This Demand Has Been <strong>Fulfilled</strong> And A Resource Has Been Successfully Allocated.
                         </span>
                     </div>
                     <div className="w-full sm:w-auto text-center px-4 py-2 bg-emerald-600 text-white rounded-xl text-[9px] sm:text-[10px] font-black tracking-[0.15em] shadow-lg shadow-emerald-600/20 whitespace-nowrap">
-                        FULFILLED
+                        Fulfilled
                     </div>
                 </div>
             )}
@@ -609,7 +609,7 @@ const SLAInsightsTab = ({ sla }) => {
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <DetailCard title="SLA Compliance Vision" icon={PendingIcon}>
+            <DetailCard title="Sla Compliance Vision" icon={PendingIcon}>
                 <div className="p-4">
                     <div className="relative mb-6 py-6">
                         {/* Timeline Track */}
@@ -641,7 +641,7 @@ const SLAInsightsTab = ({ sla }) => {
                                 <span className="font-mono">T+0</span>
                             </div>
                             <div className="flex flex-col items-end">
-                                <span className="text-rose-600">SLA Due</span>
+                                <span className="text-rose-600">Sla Due</span>
                                 <span className="font-mono">T+{totalDays}</span>
                             </div>
                         </div>
@@ -769,7 +769,7 @@ const AllocationResultsTab = ({ results }) => {
                         {items.length === 0 && (
                             <div className="p-12 text-center opacity-40">
                                 <DatabaseIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">No records found</p>
+                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">No Records Found</p>
                             </div>
                         )}
                     </div>
@@ -785,7 +785,7 @@ const AllocationResultsTab = ({ results }) => {
                                     {selectedItem.resourceName || `Resource ${selectedItem.resourceId}`}
                                 </h3>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                                    {activeSubTab === 'Successful' ? "Allocation successfully confirmed" : "Allocation failure analysis"}
+                                    {activeSubTab === 'Successful' ? "Allocation Successfully Confirmed" : "Allocation Failure Analysis"}
                                 </p>
                             </div>
 

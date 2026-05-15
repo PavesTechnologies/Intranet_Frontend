@@ -152,7 +152,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                 deliveryModel: updatedDemand.deliveryModel || demand.deliveryModel,
                 deliveryRoleId: updatedDemand.deliveryRoleId || updatedDemand.deliveryRole || demand.deliveryRoleId,
                 deliveryRole: updatedDemand.deliveryRoleId || demand.deliveryRole,
-deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
+                deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
                 allocationPercentage: updatedDemand.allocationPercentage ?? demand.allocationPercentage,
                 resourcesRequired: updatedDemand.resourcesRequired ?? updatedDemand.resourceRequired ?? demand.resourcesRequired,
                 resourceRequired: updatedDemand.resourceRequired ?? updatedDemand.resourcesRequired ?? demand.resourceRequired,
@@ -184,11 +184,11 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
         setDeleteLoading(true);
         try {
             const response = await demandService.deleteDemandByPM(id, deletingDemand);
-            showStatusToast(response?.message || "Demand deleted successfully", "success");
+            showStatusToast(response?.message || "Demand Deleted Successfully", "success");
             setDeletingDemand(null);
             await fetchContext();
         } catch (error) {
-            showStatusToast(getDemandActionErrorMessage(error, "Failed to delete demand"), "error");
+            showStatusToast(getDemandActionErrorMessage(error, "Failed To Delete Demand"), "error");
         } finally {
             setDeleteLoading(false);
         }
@@ -219,7 +219,7 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
             setKpiData(kpis);
         } catch (err) {
             console.error("Failed to fetch project context", err);
-            showStatusToast("Failed to load project details for demand creation", "error");
+            showStatusToast("Failed To Load Project Details For Demand Creation", "error");
         } finally {
             setLoadingProject(false);
         }
@@ -562,8 +562,7 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
                             <h3 className="text-sm font-bold text-slate-900">
                                 Project Demand Pipeline
                             </h3>
-                            <span className="text-[11px] text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
-                                {totalElements} records
+                                {totalElements} Records
                             </span>
                         </div>
 
@@ -574,7 +573,7 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search project demands..."
+                                    placeholder="Search Project Demands..."
                                     className="w-72 pl-10 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 shadow-sm transition-all placeholder:text-slate-400"
                                 />
                             </div>
@@ -760,7 +759,7 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
                                                                 ? "Cannot edit approved demand"
                                                                 : (isPMView && !canPMEditDemand)
                                                                     ? PM_EDITABLE_DEMAND_MESSAGE
-                                                                    : "Edit demand"
+                                                                    : "Edit Demand"
                                                 }
                                                 onClick={() => handleEdit(demand)}
                                                 disabled={isEditDisabled}
@@ -776,7 +775,7 @@ deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
                                             {canDeleteDemand && (
                                                 <button
                                                     type="button"
-                                                    title="Delete requested demand"
+                                                    title="Delete Requested Demand"
                                                     onClick={() => handleDelete(demand)}
                                                     className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
                                                 >

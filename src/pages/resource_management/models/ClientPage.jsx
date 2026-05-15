@@ -452,7 +452,7 @@ const ClientPage = () => {
       const data = await getClientById(clientId);
       setClientDetails(data.data);
     } catch (error) {
-      toast.error("Failed to fetch client details.");
+      toast.error("Failed To Fetch Client Details.");
     } finally {
       setLoading(false);
     }
