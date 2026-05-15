@@ -1140,6 +1140,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
     return (
         <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans selection:bg-indigo-100 overflow-hidden">
 
+
             {/* --- TOP HEADER (Slimmed Down) --- */}
             <header className="mt-1 bg-white border-b border-slate-100 sticky top-4 z-30">
                 <div className="max-w-[1600px] mx-auto px-3 py-1.5">
