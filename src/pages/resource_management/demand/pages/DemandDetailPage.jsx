@@ -1021,7 +1021,7 @@ const DemandResourcesTable = ({ demandId }) => {
                                 period_info: (
                                     <div className="flex flex-col items-center">
                                         <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100">
-                                            <Calendar className="h-3 w-3 text-indigo-400" />
+                                            <CalendarIcon className="h-3 w-3 text-indigo-400" />
                                             <span className="text-[10px] text-slate-700 font-black">{item.allocationStartDate}</span>
                                             <ChevronRight className="h-2.5 w-2.5 text-slate-300" />
                                             <span className="text-[10px] text-slate-700 font-black">{item.allocationEndDate}</span>
