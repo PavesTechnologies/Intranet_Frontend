@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlertTriangle, Eye, Edit2, Check, X } from "lucide-react";
+import { CloseIcon, EditIcon, ViewIcon, WarningIcon } from "@/components/icons";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { CATEGORY_OPTIONS } from "../constants/benchConstants";
 import { getAgingTone } from "../models/benchModel";
@@ -116,10 +116,15 @@ const BenchTable = ({
   return (
     <>
       <div className="overflow-x-auto no-scrollbar">
-        <GenericTable
-          headers={["Consultant Details", "Core Expertise", "Status", "Availability", "Aging", "Daily Exposure", "Actions"]}
-          columns={["consultant_info", "expertise_info", "status_info", "availability_info", "aging_info", "cost_info", "actions"]}
-          rows={rows.map((row) => {
+        {loading ? (
+          <div className="rounded-xl border border-slate-100 bg-white py-8 shadow-sm">
+            <LoadingSpinner text="Loading data..." />
+          </div>
+        ) : (
+          <GenericTable
+            headers={["Consultant Details", "Core Expertise", "Status", "Availability", "Aging", "Daily Exposure", "Actions"]}
+            columns={["consultant_info", "expertise_info", "status_info", "availability_info", "aging_info", "cost_info", "actions"]}
+            rows={rows.map((row) => {
             const agingTone = getAgingTone(row.agingDays);
             const isEditing = editingRow?.id === row.id;
 
@@ -179,7 +184,7 @@ const BenchTable = ({
                   )}
                   {(row.warnings.missingSkills || row.missingSkills.length > 0) && (
                     <div className="mt-1.5 flex gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                      <AlertTriangle className="h-3 w-3 text-rose-500 mt-0.5" />
+                      <WarningIcon className="h-3 w-3 text-rose-500 mt-0.5" />
                       <span className="text-[9px] font-bold text-rose-600 capitalize">Skill Gaps Detected</span>
                     </div>
                   )}
@@ -252,7 +257,7 @@ const BenchTable = ({
                     title="View Details"
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700"
                   >
-                    <Eye className="h-4 w-4" />
+                    <ViewIcon className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
@@ -260,14 +265,14 @@ const BenchTable = ({
                     title="Edit Status"
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-blue-600 transition-all hover:bg-blue-50 hover:text-blue-700"
                   >
-                    <Edit2 className="h-4 w-4" />
+                    <EditIcon className="h-4 w-4" />
                   </button>
                 </div>
               )
             };
-          })}
-          loading={loading}
-        />
+            })}
+          />
+        )}
       </div>
 
       {editingRow && (
@@ -279,7 +284,7 @@ const BenchTable = ({
                 onClick={handleCancelEdit}
                 className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
               >
-                <X className="h-4 w-4" />
+                <CloseIcon className="h-4 w-4" />
               </button>
             </div>
             
