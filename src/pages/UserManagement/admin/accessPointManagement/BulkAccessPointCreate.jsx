@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import {
   UploadCloud,
   ShieldCheck,
@@ -50,27 +50,6 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
   const [isUploading, setIsUploading] = useState(false);
 
   const fileInputRef = useRef(null);
-
-  const axiosInstance = useMemo(() => {
-    const instance = axios.create({
-      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-    });
-
-    instance.interceptors.request.use(
-      (config) => {
-        const latestToken = localStorage.getItem("token");
-
-        if (latestToken) {
-          config.headers.Authorization = `Bearer ${latestToken}`;
-        }
-
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
-
-    return instance;
-  }, []);
 
   const navItems = [
     {
@@ -142,7 +121,7 @@ const BulkAccessPointCreate = ({ onClose, onSuccess }) => {
     try {
       setIsUploading(true);
 
-      const response = await axiosInstance.post(
+      const response = await api.post(
         "/admin/access-points/bulk-access-points-create",
         formData,
         {

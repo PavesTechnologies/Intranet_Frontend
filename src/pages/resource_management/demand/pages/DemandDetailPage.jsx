@@ -26,6 +26,12 @@ import { Button } from "@/components/ui/button";
 import Pagination from '../../../../components/Pagination/pagination';
 import { fetchResourcesByDemandId } from '../../services/resource';
 import GenericTable from '../../../../components/Table/table';
+import {
+    canProjectManagerEditDemand,
+    canProjectManagerMutateDemand,
+    PM_EDITABLE_DEMAND_MESSAGE,
+    PM_REQUESTED_DEMAND_ONLY_MESSAGE,
+} from '../utils/demandPermissions';
 
 
 /**
@@ -1115,6 +1121,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
 
     const isRM = user?.roles?.includes("Resource_Manager");
     const isDM = user?.roles?.includes("Delivery_Manager");
+    const isPM = user?.roles?.includes("Project_Manager");
 
     const [data, setData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -1158,9 +1165,15 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
     };
 
     const handleDelete = async () => {
+        if (isPM && !canProjectManagerMutateDemand(data)) {
+            showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+            setDeleteModalOpen(false);
+            return;
+        }
+
         setIsDeleting(true);
         try {
-            await demandService.deleteDemand(demandId);
+            await demandService.deleteDemandByPM(demandId, demand);
             showStatusToast("Demand deleted successfully", "success");
             setDeleteModalOpen(false);
             if (propOnBack) propOnBack();
@@ -1203,7 +1216,8 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
     const rejectionInfo = data?.rejectionInfo || {};
     const clientInfo = data?.clientInfo || {};
 
-    const isApproved = ['APPROVED', 'OPEN', 'ACTIVE', 'FULFILLED'].includes(demand?.demandStatus?.toUpperCase());
+    const canPMEditDemand = isPM && canProjectManagerEditDemand(demand);
+    const canPMDeleteDemand = isPM && canProjectManagerMutateDemand(demand);
 
     const slaId = sla?.demandSlaId;
 
@@ -1221,7 +1235,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
         ...(isRM ? [{ id: 'skillGap', label: 'Skill Gap Analysis', icon: GitCompareIcon }] : []),
         { id: 'approvalFlow', label: 'Approval Flow', icon: ShieldIcon },
         ...(!isSoft && slaId ? [{ id: 'slaInsights', label: 'SLA Insights', icon: PendingIcon }] : []),
-        ...(isRM && allocationResults ? [{ id: 'allocationResults', label: 'Allocation Results', icon: Activity }] : [])
+        ...(isRM && allocationResults ? [{ id: 'allocationResults', label: 'Allocation Results', icon: ActivityIcon }] : [])
     ];
 
     return (
@@ -1267,6 +1281,41 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                     <p className="text-sm font-black text-slate-900">{demand.allocation || 0}%</p>
                                 </div>
                             </div>
+
+                            {(canPMEditDemand || canPMDeleteDemand) && (
+                                <div className="flex items-center gap-3 pr-4">
+                                    {canPMEditDemand && (
+                                        <button
+                                            onClick={() => {
+                                                if (!canProjectManagerEditDemand(demand)) {
+                                                    showStatusToast(PM_EDITABLE_DEMAND_MESSAGE, "error");
+                                                    return;
+                                                }
+                                                setEditModalOpen(true);
+                                            }}
+                                            className="text-blue-600 hover:text-blue-700 transition-all active:scale-90"
+                                            title="Edit Demand"
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </button>
+                                    )}
+                                    {canPMDeleteDemand && (
+                                        <button
+                                            onClick={() => {
+                                                if (!canProjectManagerMutateDemand(demand)) {
+                                                    showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+                                                    return;
+                                                }
+                                                setDeleteModalOpen(true);
+                                            }}
+                                            className="text-rose-600 hover:text-rose-700 transition-all active:scale-90"
+                                            title="Delete Demand"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    )}
+                                </div>
+                            )}
 
                             {isRM && (
                                 <button
@@ -1352,6 +1401,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                 onClose={() => setEditModalOpen(false)}
                 initialData={demand}
                 mode="edit"
+                userRole={isPM ? "Project_Manager" : isRM ? "Resource_Manager" : isDM ? "Delivery_Manager" : ""}
                 onSuccess={handleUpdateSuccess}
             />
 

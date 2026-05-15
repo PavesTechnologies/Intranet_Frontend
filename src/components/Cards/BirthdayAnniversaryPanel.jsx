@@ -71,13 +71,14 @@ function CelebrationItem({ item, isActive }) {
         )}
       </div>
 
-      {/* Date */}
-      <div className="flex flex-col items-center leading-tight">
+      {/* Date + Name */}
+      <div className="flex flex-col items-center leading-tight gap-0.5">
         <span className={`text-[10px] font-bold ${isActive ? 'text-gray-800' : 'text-gray-500'}`}>
           {item.date}
         </span>
-        {/* <span className={`text-[9px] font-medium opacity-50 uppercase tracking-tighter`}>
-          {item.when === "Today" ? "Today" : item.when}
+        {/* <span className="text-[9px] text-gray-400 font-medium text-center max-w-[72px] truncate leading-tight">
+          {item.name.split(" ")[0]}
+          {item.years ? <span className="text-violet-400 font-semibold"> ({item.years}y)</span> : null}
         </span> */}
       </div>
     </div>
@@ -134,7 +135,7 @@ export default function BirthdayAnniversaryPanel() {
               color: getColor(item.name),
               when: isToday ? "Today" : formatDate(item.date),
               date: formatDate(item.date),
-              years: item.years || null
+              years: item.anniversaryYear || null
             };
             if (isToday) result.today.push(processedItem);
             else result.upcoming.push(processedItem);

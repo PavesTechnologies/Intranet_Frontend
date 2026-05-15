@@ -14,6 +14,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { EO_SUBMENU } from "../../config/sidebarConfig";
+import { filterMenuByRole } from "../../utils/sidebarPermissions";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -46,87 +48,15 @@ const deliveryManagerResourceManagementSubmenu = resourceManagementSubmenu.filte
   (item) => item.label === "Demand Management" || item.label === "Role-Off Management"
 );
 
-const employeeOnboardingSubmenu = [
-  {
-    label: "Onboarding Dashboard",
-    to: "/employee-onboarding/onboarding-summary",
-    children: [
-      { label: "Summary", to: "/employee-onboarding/onboarding-summary" },
-      { label: "Analytics", to: "/employee-onboarding/analytics" },
-    ],
-  },
-  {
-    label: "Onboarding Task",
-    to: "/employee-onboarding/",
-    children: [
-      { label: "Task Dashboard", to: "/employee-onboarding" },
-      { label: "Create Offer", to: "/employee-onboarding/create" },
-      { label: "BulkUpload", to: "/employee-onboarding/bulk-upload" },
-      { label: "Add task", to: "/employee-onboarding/onboarding-task" },
-      {
-        label: "HR Configuration",
-        to: "/employee-onboarding/hr-configuration",
-      },
-    ],
-  },
-  {
-    label: "Employee Directory",
-    to: "/employee-onboarding/employee-directory",
-    children: [
-      {
-        label: "Employee Directory",
-        to: "/employee-onboarding/employee-directory",
-      },
-      { label: "Employee List", to: "/employee-onboarding/employeelist" },
-      {
-        label: "Organization Tree ",
-        to: "/employee-onboarding/organization-tree",
-      },
-    ],
-  },
-  {
-    label: "Employee Verification",
-    to: "/employee-onboarding/hr",
-    children: [
-      { label: "Employee Verification", to: "/employee-onboarding/hr" },
-      {
-        label: "Admin Approval Dashboard",
-        to: "/employee-onboarding/admin/approval-dashboard",
-      },
-
-      {
-        label: "Employee Credentials",
-        to: "/employee-onboarding/employee-credentials",
-      },
-    ],
-  },
-  {
-    label: "Employee Documents ",
-    to: "/employee-onboarding/employeedocuments",
-    children: [
-      {
-        label: "Employee Documents",
-        to: "/employee-onboarding/employeedocuments",
-      },
-      {
-        label: "Document Template",
-        to: "/employee-onboarding/documents-template",
-      },
-      {
-        label: "Organization Documents",
-        to: "/employee-onboarding/organization-documents",
-      },
-    ],
-  },
-  {
-    label: "Employee Exit Process",
-    to: "/employee-exit",
-  }
-];
+// EO_SUBMENU is now config-driven from src/config/sidebarConfig.js.
+// filterMenuByRole() trims it to only the items allowed for the current user's roles.
 
 const Sidebar = ({ isCollapsed }) => {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+
+  // Role-filtered EO submenu — recomputed whenever the component re-renders with a new user
+  const filteredEoSubmenu = filterMenuByRole(EO_SUBMENU, hasRole);
 
   // Role checks
   const isAdmin =
@@ -434,7 +364,7 @@ const Sidebar = ({ isCollapsed }) => {
           )}
 
           {/* 4. Employee Onboarding (Non-General, Non-DM) */}
-          {!isGeneral && (
+          { (
             <li
               ref={eoRef}
               className="relative"
@@ -478,7 +408,7 @@ const Sidebar = ({ isCollapsed }) => {
                     scheduleClose();
                   }}
                 >
-                  {employeeOnboardingSubmenu.map((item) => (
+                  {filteredEoSubmenu.map((item) => (
                     <li
                       key={item.label}
                       onMouseEnter={(e) => handleParentHover(item, e)}

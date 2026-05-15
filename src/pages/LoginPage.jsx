@@ -288,13 +288,14 @@ export default function LoginPage() {
       try {
         const response = await axios.get(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/callback?code=${encodeURIComponent(code)}`,
+          { withCredentials: true }
         );
 
-        const { access_token, refresh_token, redirect: redirectPath } = response.data;
+        const { access_token, redirect: redirectPath } = response.data;
         const path = redirectPath || "/dashboard";
 
         // ✅ login stores both tokens in localStorage
-        login(access_token, path === "/change-password", refresh_token);
+        login(access_token, path === "/change-password");
         navigate(path, { replace: true });
         window.history.replaceState({}, document.title, window.location.pathname);
 
@@ -326,35 +327,55 @@ export default function LoginPage() {
 
   // ── Normal login ────────────────────────────────────────────────
   const handleSubmit = async () => {
-    const v = validate();
-    if (Object.keys(v).length) {
-      setErrors(v);
-      setShake(v.email ? "email" : "pw");
-      setTimeout(() => setShake(null), 450);
-      return;
-    }
-    setErrors({});
-    setLoading(true);
 
-    try {
-      const res = await axios.post(
-        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/login`,
-        { email, password: pw },
-      );
+  const v = validate();
 
-      const { access_token, refresh_token, redirect } = res.data;
-      const redirectPath = redirect || "/dashboard";
+  if (Object.keys(v).length) {
+    setErrors(v);
+    setShake(v.email ? "email" : "pw");
+    setTimeout(() => setShake(null), 450);
+    return;
+  }
 
-      // ✅ pass refresh_token — AuthContext stores both tokens
-      login(access_token, redirectPath === "/change-password", refresh_token);
-      navigate(redirectPath, { replace: true });
+  setErrors({});
+  setLoading(true);
 
-    } catch (err) {
-      showStatusToast("Login failed: " + (err.response?.data?.detail || err.message), "error");
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+
+    const res = await axios.post(
+      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/login`,
+      { email, password: pw },
+      {
+        withCredentials: true,
+      }
+    );
+
+    const { access_token, redirect } = res.data;
+
+    const redirectPath =
+      redirect || "/dashboard";
+
+    login(
+      access_token,
+      redirectPath === "/change-password"
+    );
+
+    navigate(redirectPath, {
+      replace: true
+    });
+
+  } catch (err) {
+
+    showStatusToast(
+      "Login failed: " +
+      (err.response?.data?.detail || err.message),
+      "error"
+    );
+
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ── Forgot password ─────────────────────────────────────────────
   const handleSendOtp = async () => {
