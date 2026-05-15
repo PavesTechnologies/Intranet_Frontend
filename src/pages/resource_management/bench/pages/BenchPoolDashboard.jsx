@@ -108,7 +108,7 @@ const BenchPoolDashboard = () => {
       const res = await getBenchPoolReport();
       setData(res?.data || {});
     } catch (err) {
-      toast.error("Failed to fetch bench report");
+      toast.error("Failed To Fetch Bench Report");
     } finally {
       setIsLoading(false);
     }
@@ -125,9 +125,9 @@ const BenchPoolDashboard = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success("Export successful");
+      toast.success("Export Successful");
     } catch (err) {
-      toast.error("Failed to generate export");
+      toast.error("Failed To Generate Export");
     } finally {
       setIsExporting(false);
     }

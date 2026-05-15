@@ -249,6 +249,23 @@ export const getRoleExpectations = async () => {
   }
 };
 
+export const deleteRoleExpectation = async (roleId) => {
+  try {
+    const response = await axios.delete(
+      `${BASE_URL}/api/admin/role-expectations/${roleId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    );
+    return response.data;
+  } catch (err) {
+    throw err;
+  }
+};
+
+
 export const getProficiencyLevels = async () => {
   try {
     const response = await axios.get(

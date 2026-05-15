@@ -67,7 +67,7 @@ const getBannerErrorMessage = (errors) => {
     return messages[0] || "";
   }
 
-  return "Enter all required fields.";
+  return "Enter All Required Fields.";
 };
 
 const getReasonOptionValue = (reason) => reason?.code || reason?.id || reason?.reason || reason;
@@ -319,13 +319,13 @@ const RoleOffSidePanel = ({
       const nextFieldErrors = {};
 
       if (!form.effectiveDate) {
-        nextFieldErrors.effectiveDate = "Effective date is required.";
+        nextFieldErrors.effectiveDate = "Effective Date Is Required.";
       }
       if (!form.reason) {
-        nextFieldErrors.reason = "Reason is required.";
+        nextFieldErrors.reason = "Reason Is Required.";
       }
       if (!form.resourcePerformance) {
-        nextFieldErrors.resourcePerformance = "Performance is required.";
+        nextFieldErrors.resourcePerformance = "Performance Is Required.";
       }
       if (!isBulkPmFlow && acknowledgementOptions.length > 0 && !form.acknowledgementType) {
         nextFieldErrors.acknowledgementType = "Acknowledgement type is required.";
@@ -336,13 +336,13 @@ const RoleOffSidePanel = ({
         !form.replacementRequired &&
         !form.skipReason?.trim()
       ) {
-        nextFieldErrors.skipReason = "Skip reason is required for planned role-off.";
+        nextFieldErrors.skipReason = "Skip Reason Is Required For Planned Role-Off.";
       }
       if (!isBulkPmFlow && needsRiskAck && !form.acknowledgeRisk) {
-        nextFieldErrors.acknowledgeRisk = "High impact requests require acknowledgement.";
+        nextFieldErrors.acknowledgeRisk = "High Impact Requests Require Acknowledgement.";
       }
       if (reviewState?.requiresConfirmation && !form.reviewConfirmed) {
-        nextFieldErrors.reviewConfirmed = "Please review the role-off impact and confirm to proceed.";
+        nextFieldErrors.reviewConfirmed = "Please Review The Role-Off Impact And Confirm To Proceed.";
       }
 
       if (Object.keys(nextFieldErrors).length > 0) {
@@ -371,7 +371,7 @@ const RoleOffSidePanel = ({
         onClose?.();
       } catch (error) {
         console.error("Error submitting role-off:", error);
-        setError("Failed to submit role-off request.");
+        setError("Failed To Submit Role-Off Request.");
       } finally {
         setSubmittingAction(null);
       }
@@ -837,7 +837,7 @@ const RoleOffSidePanel = ({
                   </label>
                   <FilterListbox
                     options={[
-                      { value: "", label: "Select reason" },
+                      { value: "", label: "Select Reason" },
                       ...reasons.map((r) => ({ value: getReasonOptionValue(r), label: getReasonOptionLabel(r) })),
                     ]}
                     value={form.reason}
@@ -855,7 +855,7 @@ const RoleOffSidePanel = ({
                   </label>
                   <FilterListbox
                     options={[
-                      { value: "", label: "Select performance" },
+                      { value: "", label: "Select Performance" },
                       { value: "HIGH_PERFORMER", label: "High Performer" },
                       { value: "AVERAGE_PERFORMER", label: "Average Performer" },
                       { value: "LOW_PERFORMER", label: "Low Performer" },
@@ -895,7 +895,7 @@ const RoleOffSidePanel = ({
 
                 {!isBulkPmFlow ? (
                   <label className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
-                    <span>Replacement required</span>
+                    <span>Replacement Required</span>
                     <input
                       type="checkbox"
                       checked={form.replacementRequired}

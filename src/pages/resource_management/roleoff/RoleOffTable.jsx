@@ -87,8 +87,8 @@ const RoleOffTable = ({
   const anySelected = rows.some((row) => selectedRows.includes(row.id));
   const pmExtraColumn = getPmExtraColumnConfig(pmTab);
   const emptyStateMessage = hasActiveFilters
-    ? "No records match the current filters."
-    : "No role-off records available.";
+    ? "No Records Match The Current Filters."
+    : "No Role-Off Records Available.";
 
   const canPmCancel = (row) =>
     pmTab === "process" &&
