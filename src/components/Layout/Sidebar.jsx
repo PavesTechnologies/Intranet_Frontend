@@ -19,6 +19,12 @@ import { filterMenuByRole } from "../../utils/sidebarPermissions";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  {
+    name: "Projects",
+    href: "/projects",
+    icon: FolderKanban,
+    allowedRoles: ["Project_Manager", "General", "Tester"],
+  },
   { name: "Leave Management", href: "/leave-management", icon: PlaneTakeoff },
   { name: "Timesheets", href: "/timesheets", icon: Clock },
   // { name: "Calendar", href: "/calendar", icon: Calendar },
@@ -55,6 +61,11 @@ const Sidebar = ({ isCollapsed }) => {
   const location = useLocation();
   const { user, hasRole } = useAuth();
 
+  // Filter main navigation based on allowedRoles
+  const filteredNavigation = navigation.filter(
+    (item) => !item.allowedRoles || hasRole(item.allowedRoles)
+  );
+
   // Role-filtered EO submenu — recomputed whenever the component re-renders with a new user
   const filteredEoSubmenu = filterMenuByRole(EO_SUBMENU, hasRole);
 
@@ -86,15 +97,22 @@ const Sidebar = ({ isCollapsed }) => {
   const childHoverRef = useRef(false);
   const closeTimerRef = useRef(null);
 
+  const closeAllSubmenus = () => {
+    setUserHovered(false);
+    setRmHovered(false);
+    setEoHovered(false);
+    setChildMenu(null);
+  };
+
   // --- Handlers for User Management ---
   const handleUserMouseEnter = () => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    closeAllSubmenus();
     if (userManagementRef.current) {
       const rect = userManagementRef.current.getBoundingClientRect();
       setSubmenuTop(rect.top);
     }
     setUserHovered(true);
-    setRmHovered(false); // Close others
   };
 
   const handleUserMouseLeave = () => {
@@ -145,12 +163,12 @@ const Sidebar = ({ isCollapsed }) => {
   // --- Handlers for Resource Management (NEW) ---
   const handleRmMouseEnter = () => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    closeAllSubmenus();
     if (rmRef.current) {
       const rect = rmRef.current.getBoundingClientRect();
       setSubmenuTop(rect.top);
     }
     setRmHovered(true);
-    setUserHovered(false); // Close others
   };
 
   const handleRmMouseLeave = () => {
@@ -161,13 +179,12 @@ const Sidebar = ({ isCollapsed }) => {
 
   const handleEoMouseEnter = () => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    closeAllSubmenus();
     if (eoRef.current) {
       const rect = eoRef.current.getBoundingClientRect();
       setSubmenuTop(rect.top);
     }
     setEoHovered(true);
-    setUserHovered(false);
-    setRmHovered(false);
   };
 
   const handleEoMouseLeave = () => {
@@ -217,6 +234,7 @@ const Sidebar = ({ isCollapsed }) => {
             <li>
               <Link
                 to="/dashboard"
+                onMouseEnter={closeAllSubmenus}
                 className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${location.pathname === "/dashboard"
                   ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
                   : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
@@ -229,7 +247,178 @@ const Sidebar = ({ isCollapsed }) => {
             </li>
           }
 
-          {/* 2. Resource Management (With Pop Label/Submenu) */}
+          {/* Employee Onboarding (Non-General, Non-DM) */}
+          {(
+            <li
+              ref={eoRef}
+              className="relative"
+              onMouseEnter={handleEoMouseEnter}
+              onMouseLeave={handleEoMouseLeave}
+            >
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname == "/employee-onboarding" ||
+                  location.pathname == "/employee-onboarding/"
+                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                  }`}
+                title={isCollapsed ? "Employee Onboarding" : ""}
+              >
+                <Handshake className="h-5 w-5 shrink-0" />
+
+                {!isCollapsed && (
+                  <>
+                    <span className="flex-1">Employee Onboarding</span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform duration-200 ${eoHovered ? "rotate-180" : ""
+                        }`}
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* SAME POPUP STYLE AS RESOURCE MANAGEMENT */}
+              {eoHovered && (
+                <ul
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
+                    }`}
+                  style={{ top: `${submenuTop}px` }}
+                  onMouseEnter={() => {
+                    parentHoverRef.current = true;
+                    cancelClose();
+                    // if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+                  }}
+                  onMouseLeave={() => {
+                    parentHoverRef.current = false;
+                    scheduleClose();
+                  }}
+                >
+                  {filteredEoSubmenu.map((item) => (
+                    <li
+                      key={item.label}
+                      onMouseEnter={(e) => handleParentHover(item, e)}
+                      onMouseDown={(e) => handleParentLeave()}
+                      // onMouseLeave={handleParentLeave}
+                      className="relative group"
+                    >
+                      <NavLink
+                        to={item.to}
+                        className={({ isActive }) =>
+                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                            ? "bg-blue-100 text-[#0a174e] font-semibold"
+                            : "hover:bg-[#263383] hover:text-white"
+                          }`
+                        }
+                      >
+                        <span>{item.label}</span>
+                        {item.children && (
+                          <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
+                        )}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {childMenu && (
+                <ul
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[300px]" : "left-[520px]"
+                    }`}
+                  style={{ top: `${childTop - 4}px` }}
+                  onMouseEnter={() => {
+                    childHoverRef.current = true;
+                    cancelClose();
+                  }}
+                  onMouseLeave={() => {
+                    childHoverRef.current = false;
+                    scheduleClose();
+                  }}
+                  onMouseDown={() => {
+                    childHoverRef.current = false;
+                    scheduleClose();
+                  }}
+                >
+                  {childMenu.map((child) => (
+                    <li key={child.label} className="group relative">
+                      <NavLink
+                        to={child.to}
+                        className={({ isActive }) =>
+                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                            ? "bg-blue-100 text-[#0a174e] font-semibold"
+                            : "hover:bg-[#263383] hover:text-white"
+                          }`
+                        }
+                      >
+                        <span>{child.label}</span>
+                        {child.children && (
+                          <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
+                        )}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          )}
+
+          {/* User Management (Admin Only) */}
+          {isAdmin && (
+            <li
+              ref={userManagementRef}
+              className="relative"
+              onMouseEnter={handleUserMouseEnter}
+              onMouseLeave={handleUserMouseLeave}
+            >
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/user-management")
+                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                  }`}
+                title={isCollapsed ? "User Management" : ""}
+              >
+                <Users className="h-5 w-5 shrink-0" />
+                {!isCollapsed && (
+                  <>
+                    <span className="flex-1">User Management</span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform duration-200 ${userHovered ? "rotate-180" : ""
+                        }`}
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* User Management Submenu */}
+              {userHovered && (
+                <ul
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
+                    }`}
+                  style={{ top: `${submenuTop}px` }}
+                  onMouseEnter={handleUserMouseEnter}
+                  onMouseLeave={handleUserMouseLeave}
+                >
+                  {userManagementSubmenu.map((item) => (
+                    <li key={item.label} className="group relative">
+                      <NavLink
+                        to={item.to}
+                        className={({ isActive }) =>
+                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                            ? "bg-blue-100 text-[#0a174e] font-semibold"
+                            : "hover:bg-[#263383] hover:text-white"
+                          }`
+                        }
+                      >
+                        <span>{item.label}</span>
+                        {item.children && (
+                          <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
+                        )}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          )}
+
+          {/* Resource Management (With Pop Label/Submenu) */}
           {(isRMSAdmin || isRM || isDM) && (
             <li
               ref={rmRef}
@@ -241,6 +430,7 @@ const Sidebar = ({ isCollapsed }) => {
               {isRMSAdmin && !isRM && !isDM ? (
                 <Link
                   to="/resource-management"
+                  onMouseEnter={closeAllSubmenus}
                   className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${location.pathname.startsWith("/resource-management")
                     ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
                     : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
@@ -275,7 +465,7 @@ const Sidebar = ({ isCollapsed }) => {
                   {/* Show submenu only for Resource Manager or Delivery Manager */}
                   {rmHovered && (isRM || isDM || isRMSAdmin) && (
                     <ul
-                      className={`fixed w-64 bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
+                      className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
                         }`}
                       style={{ top: `${submenuTop}px` }}
                       onMouseEnter={handleRmMouseEnter}
@@ -285,18 +475,21 @@ const Sidebar = ({ isCollapsed }) => {
                         ? deliveryManagerResourceManagementSubmenu
                         : resourceManagementSubmenu
                       ).map((item) => (
-                        <li key={item.label}>
+                        <li key={item.label} className="group relative">
                           <NavLink
                             to={item.to}
                             end
                             className={({ isActive }) =>
-                              `block px-4 py-2 text-xs transition-colors ${isActive
+                              `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
                                 ? "bg-blue-100 text-[#0a174e] font-semibold"
                                 : "hover:bg-[#263383] hover:text-white"
                               }`
                             }
                           >
-                            {item.label}
+                            <span>{item.label}</span>
+                            {item.children && (
+                              <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
+                            )}
                           </NavLink>
                         </li>
                       ))}
@@ -307,175 +500,14 @@ const Sidebar = ({ isCollapsed }) => {
             </li>
           )}
 
-          {/* 3. User Management (Admin Only) */}
-          {isAdmin && (
-            <li
-              ref={userManagementRef}
-              className="relative"
-              onMouseEnter={handleUserMouseEnter}
-              onMouseLeave={handleUserMouseLeave}
-            >
-              <div
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/user-management")
-                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                  }`}
-                title={isCollapsed ? "User Management" : ""}
-              >
-                <Users className="h-5 w-5 shrink-0" />
-                {!isCollapsed && (
-                  <>
-                    <span className="flex-1">User Management</span>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform duration-200 ${userHovered ? "rotate-180" : ""
-                        }`}
-                    />
-                  </>
-                )}
-              </div>
-
-              {/* User Management Submenu */}
-              {userHovered && (
-                <ul
-                  className={`fixed w-56 bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
-                    }`}
-                  style={{ top: `${submenuTop}px` }}
-                  onMouseEnter={handleUserMouseEnter}
-                  onMouseLeave={handleUserMouseLeave}
-                >
-                  {userManagementSubmenu.map((item) => (
-                    <li key={item.label}>
-                      <NavLink
-                        to={item.to}
-                        className={({ isActive }) =>
-                          `block px-4 py-2 text-xs transition-colors ${isActive
-                            ? "bg-blue-100 text-[#0a174e] font-semibold"
-                            : "hover:bg-[#263383] hover:text-white"
-                          }`
-                        }
-                      >
-                        {item.label}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          )}
-
-          {/* 4. Employee Onboarding (Non-General, Non-DM) */}
-          { (
-            <li
-              ref={eoRef}
-              className="relative"
-              onMouseEnter={handleEoMouseEnter}
-              onMouseLeave={handleEoMouseLeave}
-            >
-              <div
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname == "/employee-onboarding" ||
-                  location.pathname == "/employee-onboarding/"
-                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                  }`}
-                title={isCollapsed ? "Employee Onboarding" : ""}
-              >
-                <Handshake className="h-5 w-5 shrink-0" />
-
-                {!isCollapsed && (
-                  <>
-                    <span className="flex-1">Employee Onboarding</span>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform duration-200 ${eoHovered ? "rotate-180" : ""
-                        }`}
-                    />
-                  </>
-                )}
-              </div>
-
-              {/* SAME POPUP STYLE AS RESOURCE MANAGEMENT */}
-              {eoHovered && (
-                <ul
-                  className={`fixed w-64 bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
-                    }`}
-                  style={{ top: `${submenuTop}px` }}
-                  onMouseEnter={() => {
-                    parentHoverRef.current = true;
-                    cancelClose();
-                    // if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-                  }}
-                  onMouseLeave={() => {
-                    parentHoverRef.current = false;
-                    scheduleClose();
-                  }}
-                >
-                  {filteredEoSubmenu.map((item) => (
-                    <li
-                      key={item.label}
-                      onMouseEnter={(e) => handleParentHover(item, e)}
-                      onMouseDown={(e) => handleParentLeave()}
-                      // onMouseLeave={handleParentLeave}
-                      className="relative"
-                    >
-                      <NavLink
-                        to={item.to}
-                        className={({ isActive }) =>
-                          `block px-4 py-2 text-xs transition-colors ${isActive
-                            ? "bg-blue-100 text-[#0a174e] font-semibold"
-                            : "hover:bg-[#263383] hover:text-white"
-                          }`
-                        }
-                      >
-                        {item.label}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {childMenu && (
-                <ul
-                  className={`fixed w-56 bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[300px]" : "left-[520px]"
-                    }`}
-                  style={{ top: `${childTop - 4}px` }}
-                  onMouseEnter={() => {
-                    childHoverRef.current = true;
-                    cancelClose();
-                  }}
-                  onMouseLeave={() => {
-                    childHoverRef.current = false;
-                    scheduleClose();
-                  }}
-                  onMouseDown={() => {
-                    childHoverRef.current = false;
-                    scheduleClose();
-                  }}
-                >
-                  {childMenu.map((child) => (
-                    <li key={child.label}>
-                      <NavLink
-                        to={child.to}
-                        className={({ isActive }) =>
-                          `block px-4 py-2 text-xs transition-colors ${isActive
-                            ? "bg-blue-100 text-[#0a174e] font-semibold"
-                            : "hover:bg-[#263383] hover:text-white"
-                          }`
-                        }
-                      >
-                        {child.label}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          )}
-
           {/* 5. Remaining Items (Leave, Timesheets, Calendar) */}
-          {navigation.slice(1).map((item) => {
+          {filteredNavigation.slice(1).map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <li key={item.name}>
                 <Link
                   to={item.href}
+                  onMouseEnter={closeAllSubmenus}
                   className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${isActive
                     ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
                     : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
