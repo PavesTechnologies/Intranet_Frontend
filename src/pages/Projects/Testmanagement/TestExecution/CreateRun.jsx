@@ -3,6 +3,7 @@ import axiosInstance from "../api/axiosInstance";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
+import axios from "axios";
 
 export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuccess, onClose }) {
 
@@ -16,6 +17,7 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
   });
 
   const [loadingSubmit, setLoadingSubmit] = useState(false);
+  const [users, setUsers] = useState([]);
 
   const handleChange = (e) => {
     setForm({
@@ -23,7 +25,34 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
       [e.target.name]: e.target.value,
     });
   };
+   useEffect(() => {
+    if (!projectId) return;
 
+    const loadData = async () => {
+      try {
+        const token = localStorage.getItem("token");
+
+    const axiosConfig = {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    };
+        const [ usersRes] = await Promise.all([
+          
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+            axiosConfig,
+          ),
+        ]);
+      
+        setUsers(usersRes.data || []);
+      } catch (err) {
+        showStatusToast("Failed to load epics or users", "error");
+      }
+    };
+
+    loadData();
+  }, [projectId]);
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -37,6 +66,7 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
       name: form.name,
       status: form.status,
       description: form.description || null,
+      executedBy: form.executedBy ? Number(form.executedBy) : null,
     };
 
     try {
@@ -131,14 +161,20 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
             <label className="block text-sm font-medium mb-1">
               Executed By (User ID)
             </label>
-            <input
-              type="number"
-              name="executedBy"
-              value={form.executedBy}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-lg"
-              placeholder="Enter executor user ID (optional)"
-            />
+            <select
+  name="executedBy"
+  value={form.executedBy || ""}
+  onChange={handleChange}
+  className="w-full p-2 border rounded-lg"
+>
+  <option value="">Select Executor</option>
+
+  {users.map((user) => (
+    <option key={user.id} value={user.id}>
+      {user.name}
+    </option>
+  ))}
+</select>
           </div>
 
           {/* Executed At */}

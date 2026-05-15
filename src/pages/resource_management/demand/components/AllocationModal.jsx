@@ -89,7 +89,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                     setResources(resourceList);
                 } catch (error) {
                     console.error("Failed to fetch resources", error);
-                    toast.error("Failed to load resources");
+                    toast.error("Failed To Load Resources");
                 } finally {
                     setIsLoadingResources(false);
                 }

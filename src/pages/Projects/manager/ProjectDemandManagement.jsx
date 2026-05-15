@@ -181,11 +181,11 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
         setDeleteLoading(true);
         try {
             const response = await demandService.deleteDemandByPM(id, deletingDemand);
-            showStatusToast(response?.message || "Demand deleted successfully", "success");
+            showStatusToast(response?.message || "Demand Deleted Successfully", "success");
             setDeletingDemand(null);
             await fetchContext();
         } catch (error) {
-            showStatusToast(getDemandActionErrorMessage(error, "Failed to delete demand"), "error");
+            showStatusToast(getDemandActionErrorMessage(error, "Failed To Delete Demand"), "error");
         } finally {
             setDeleteLoading(false);
         }
@@ -216,7 +216,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
             setKpiData(kpis);
         } catch (err) {
             console.error("Failed to fetch project context", err);
-            showStatusToast("Failed to load project details for demand creation", "error");
+            showStatusToast("Failed To Load Project Details For Demand Creation", "error");
         } finally {
             setLoadingProject(false);
         }
@@ -557,8 +557,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                             <h3 className="text-sm font-bold text-slate-900">
                                 Project Demand Pipeline
                             </h3>
-                            <span className="text-[11px] text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
-                                {totalElements} records
+                                {totalElements} Records
                             </span>
                         </div>
 
@@ -569,7 +568,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search project demands..."
+                                    placeholder="Search Project Demands..."
                                     className="w-72 pl-10 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 shadow-sm transition-all placeholder:text-slate-400"
                                 />
                             </div>
@@ -601,20 +600,21 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                     <Tabs
                         value={activeTab}
                         onValueChange={setActiveTab}
-                        className="border-b -mx-4 px-4 pt-2"
+                        className="border-b -mx-4"
                     >
-                        <TabsList className="!inline-flex !h-auto !bg-transparent !p-0 !rounded-none items-center justify-start gap-1 w-full">
+                        <TabsList className="!flex !h-auto !w-full !justify-start !bg-transparent !p-0 !pl-4 !rounded-none items-center gap-1">
                             {[
                                 { id: 'all', label: 'All Demands' },
                                 { id: 'active', label: 'Active & Approved' },
                                 { id: 'fulfilled', label: 'Fulfilled' },
                                 { id: 'soft', label: 'Soft Demands' }
-                            ].map((tab) => (
+                            ].map((tab, index) => (
                                 <TabsTrigger
                                     key={tab.id}
                                     value={tab.id}
                                     className={cn(
-                                        "px-6 py-3 text-xs font-bold transition-all border-b-2 relative -mb-px flex-shrink-0 !rounded-none !bg-transparent !shadow-none",
+                                        "py-3 pr-6 text-xs font-bold transition-all border-b-2 relative -mb-px flex-shrink-0 !rounded-none !bg-transparent !shadow-none",
+                                        index === 0 ? "pl-0" : "pl-6",
                                         "data-[state=active]:!text-indigo-600 data-[state=active]:!border-indigo-600 data-[state=active]:!bg-indigo-50/30",
                                         "data-[state=inactive]:text-slate-400 data-[state=inactive]:border-transparent hover:text-slate-700 hover:!bg-slate-50/50"
                                     )}
@@ -754,7 +754,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                                                                 ? "Cannot edit approved demand"
                                                                 : (isPMView && !canPMEditDemand)
                                                                     ? PM_EDITABLE_DEMAND_MESSAGE
-                                                                    : "Edit demand"
+                                                                    : "Edit Demand"
                                                 }
                                                 onClick={() => handleEdit(demand)}
                                                 disabled={isEditDisabled}
@@ -770,7 +770,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                                             {canDeleteDemand && (
                                                 <button
                                                     type="button"
-                                                    title="Delete requested demand"
+                                                    title="Delete Requested Demand"
                                                     onClick={() => handleDelete(demand)}
                                                     className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
                                                 >

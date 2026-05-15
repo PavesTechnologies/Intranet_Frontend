@@ -192,7 +192,7 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
                       }}
                       className="px-2 text-blue-600 hover:text-blue-800 transition"
                     >
-                      <Pencil size={14} />
+                      <EditIcon size={14} />
                     </button>
                     <button
                       title="Delete Compliance"
@@ -202,7 +202,7 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
                       }}
                       className="p-1 text-red-600 hover:text-red-800 transition"
                     >
-                      <Trash2 size={14} />
+                      <DeleteIcon size={14} />
                     </button>
                   </>
                 ) : (

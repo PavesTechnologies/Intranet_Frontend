@@ -58,7 +58,7 @@ const EscalationForm = ({ formData, setFormData, onSave, onClose, loading, showB
           </label>
           <FilterListbox
             options={[
-              { value: "", label: "SELECT ROLE" },
+              { value: "", label: "Select Role" },
               ...CONTACT_ROLES.map((role) => ({
                 value: role,
                 label: role.replace(/_/g, " ").toUpperCase(),
@@ -124,7 +124,7 @@ const EscalationForm = ({ formData, setFormData, onSave, onClose, loading, showB
           </label>
           <FilterListbox
             options={[
-              { value: "", label: "SELECT LEVEL" },
+              { value: "", label: "Select Level" },
               ...ESCALATION_LEVELS.map((level) => ({
                 value: level,
                 label: level.replace(/_/g, " ").toUpperCase(),
@@ -138,7 +138,7 @@ const EscalationForm = ({ formData, setFormData, onSave, onClose, loading, showB
         </div>
 
         {/* Status */}
-        <div className="pb-2">
+        <div className="pb-2 pt-7">
           <label htmlFor="activeFlag" className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"

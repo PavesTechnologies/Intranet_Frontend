@@ -15,9 +15,13 @@ import ConfirmationModal from "../../../components/confirmation_modal/Confirmati
 import { useAuth } from "../../../contexts/AuthContext";
 import CompanyEscalationContactModal from "./client_configuration/CompanyEscalationModal";
 import GenericTable from "../../../components/Table/table";
+import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 
 const CompanyEscalation = () => {
   const { user } = useAuth();
+  const { getEnumValues } = useEnums();
+  const ESCALATION_LEVELS = getEnumValues("EscalationLevel");
+
   const { companyId } = useParams();
   const permissions = user?.permissions || [];
   const roles = user?.roles || [];
@@ -62,12 +66,20 @@ const CompanyEscalation = () => {
       const res = await getCompanyContactsByCompanyId(companyId);
       const data = res.data || [];
 
-      setContactList(
-        data.map((item) => ({
-          ...item,
-          activeFlag: item.activeFlag ?? false,
-        })),
-      );
+      const normalized = data.map((item) => ({
+        ...item,
+        activeFlag: item.activeFlag ?? false,
+      }));
+
+      // Sort by Escalation Level dynamic order (case-insensitive & format-resilient)
+      const normalize = (s) => s?.toString().toUpperCase().replace(/[- ]/g, "_") || "";
+      const sortedData = [...normalized].sort((a, b) => {
+        const indexA = ESCALATION_LEVELS.findIndex(lvl => normalize(lvl) === normalize(a.escalationLevel));
+        const indexB = ESCALATION_LEVELS.findIndex(lvl => normalize(lvl) === normalize(b.escalationLevel));
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      });
+
+      setContactList(sortedData);
 
       setCurrentPage(1);
     } catch (error) {
@@ -118,7 +130,7 @@ const CompanyEscalation = () => {
     setDeleteLoading(true);
     try {
       await deleteCompanyContact(selectedContactId);
-      toast.success("Escalation contact deleted successfully");
+      toast.success("Escalation Contact Deleted Successfully");
       fetchContact();
     } catch (error) {
       toast.error(
