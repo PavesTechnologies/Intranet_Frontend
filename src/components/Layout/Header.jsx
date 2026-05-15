@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, LogOut, User, Menu, X, Eye, KeyRound, ChevronDown, } from "lucide-react";
+import { Bell, LogOut, User, Menu, X, Eye,EyeOff, KeyRound, ChevronDown, } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
@@ -27,6 +27,8 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
 
   const name = user?.name || user?.email || "User";
   const firstName = name.split(" ")[0];
+  //  const role = user?.roles?.join(", ") || "User";
+
 
   const iconVariants = {
     hidden: { rotate: -15, opacity: 1, scale: 0.5 },
@@ -284,7 +286,7 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
 
               <div className="hidden md:block text-left max-w-[180px]">
                 <p className="text-sm font-medium text-gray-900 leading-tight truncate">{name}</p>
-                <p className="text-xs text-gray-500 line-clamp-1">{role}</p>
+                {/* <p className="text-xs text-gray-500 line-clamp-1">{role}</p> */}
               </div>
 
           {/* New Password */}
