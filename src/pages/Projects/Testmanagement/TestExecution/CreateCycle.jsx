@@ -104,13 +104,13 @@ export default function CreateTestCycleForm({
       setLoading(true);
       if (isEditMode) {
         await axiosInstance.put(
-          `/test-execution/test-cycles/${editingCycle.id}`, // ✅ correct
+          `/api/test-execution/test-cycles/${editingCycle.id}`, // ✅ correct
           payload
         );
         showStatusToast("Test Cycle Updated Successfully!", "success");
       } else {
         await axiosInstance.post(
-          `/test-execution/test-cycles`, // ✅ correct
+          `/api/test-execution/test-cycles`, // ✅ correct
           payload
         );
         showStatusToast("Test Cycle Created Successfully!", "success");
