@@ -319,8 +319,8 @@ export default function OnboardingSummary() {
           </Button>
           <Button
             onClick={handleExport}
+            variant="primary"
             size="medium"
-            className="bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200"
           >
             Export Report
           </Button>
