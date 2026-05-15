@@ -6,6 +6,7 @@ import {
     ErrorIcon, SuccessIcon, SpinnerIcon, CloseIcon, ProjectsIcon, UserIcon,
     CheckIcon, EditIcon, DeleteIcon, PendingIcon
 } from "@/components/icons";
+import Button from '../../../../components/Button/Button';
 import GenericTable from '../../../../components/Table/table';
 import { PriorityBadge, StateBadge, SLABadge, DemandTypeBadge } from '../components/FormalBadges';
 import { cn } from "@/lib/utils";
@@ -116,14 +117,16 @@ const DecisionModal = ({
                                 {helperText}
                             </p>
                         </div>
-                        <button
+                        <Button
                             type="button"
                             onClick={onClose}
                             disabled={loading}
-                            className="rounded-full border border-slate-200 p-2 text-slate-400 transition hover:border-slate-300 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 rounded-full border-slate-200 p-0 text-slate-400 shadow-none hover:border-slate-300 hover:text-slate-600"
                         >
                             <CloseIcon className="h-4 w-4" />
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -180,23 +183,26 @@ const DecisionModal = ({
                 </div>
 
                 <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
-                    <button
+                    <Button
                         type="button"
                         onClick={onClose}
                         disabled={loading}
-                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        variant="outline"
+                        size="small"
+                        className="rounded-xl border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 shadow-none hover:border-slate-300"
                     >
                         Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
                         onClick={onSubmit}
                         disabled={loading}
-                        className={cn("inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60", primaryButtonClass)}
+                        size="small"
+                        className={cn("rounded-xl px-4 py-2 text-sm font-semibold text-white", primaryButtonClass)}
                     >
                         {loading ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
                         {buttonLabel}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>,
@@ -224,14 +230,16 @@ const DeleteDemandModal = ({ demand, loading, onClose, onSubmit }) => {
                                 This Will Cancel The Requested Demand And Remove It From The Active Pipeline.
                             </p>
                         </div>
-                        <button
+                        <Button
                             type="button"
                             onClick={onClose}
                             disabled={loading}
-                            className="rounded-full border border-slate-200 p-2 text-slate-400 transition hover:border-slate-300 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 rounded-full border-slate-200 p-0 text-slate-400 shadow-none hover:border-slate-300 hover:text-slate-600"
                         >
                             <CloseIcon className="h-4 w-4" />
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -248,23 +256,27 @@ const DeleteDemandModal = ({ demand, loading, onClose, onSubmit }) => {
                 </div>
 
                 <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
-                    <button
+                    <Button
                         type="button"
                         onClick={onClose}
                         disabled={loading}
-                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        variant="outline"
+                        size="small"
+                        className="rounded-xl border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 shadow-none hover:border-slate-300"
                     >
                         Keep Demand
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
                         onClick={onSubmit}
                         disabled={loading}
-                        className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-rose-200 transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        variant="danger"
+                        size="small"
+                        className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-rose-200 hover:bg-rose-700"
                     >
                         {loading ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
                         Delete Demand
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>,
@@ -661,11 +673,13 @@ const DemandWorkspacePage = () => {
                                         { id: 'fulfilled', label: 'Fulfilled', icon: SuccessIcon, color: 'text-emerald-600' },
                                         { id: 'rejected', label: 'Rejected', icon: ErrorIcon, color: 'text-rose-600' }
                                     ].map(tab => (
-                                        <button
+                                        <Button
                                             key={tab.id}
                                             onClick={() => setActiveTab(tab.id)}
+                                            variant="ghost"
+                                            size="small"
                                             className={cn(
-                                                "flex items-center gap-1 px-3 py-1 text-[10px] font-bold rounded-md transition-all",
+                                                "flex items-center gap-1 rounded-md px-3 py-1 text-[10px] font-bold shadow-none",
                                                 activeTab === tab.id
                                                     ? "bg-white text-slate-900 shadow-sm"
                                                     : "text-slate-400 hover:text-slate-600"
@@ -673,7 +687,7 @@ const DemandWorkspacePage = () => {
                                         >
                                             <tab.icon className={cn("h-3 w-3", activeTab === tab.id ? tab.color : "opacity-40")} />
                                             {tab.label}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             </div>
@@ -831,44 +845,54 @@ const DemandWorkspacePage = () => {
                                         <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
                                             {canQuickDecision ? (
                                                 <div className="flex items-center gap-2">
-                                                    <button
+                                                    <Button
                                                         onClick={() => openApproveModal(demand)}
                                                         disabled={isApproving || isRejecting}
-                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        title="Approve"
+                                                        className="h-7 w-7 rounded-md p-0 text-emerald-600 shadow-none hover:bg-emerald-50"
                                                     >
                                                         {isApproving ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon className="h-4 w-4" />}
-                                                    </button>
-                                                    <button
+                                                    </Button>
+                                                    <Button
                                                         onClick={() => openRejectModal(demand)}
                                                         disabled={isApproving || isRejecting}
-                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        title="Reject"
+                                                        className="h-7 w-7 rounded-md p-0 text-rose-600 shadow-none hover:bg-rose-50"
                                                     >
-                                                        {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
-                                                    </button>
+                                                        {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CloseIcon className="h-4 w-4" />}
+                                                    </Button>
                                                 </div>
                                             ) : canRMAction ? (
                                                 <div className="flex items-center justify-center">
-                                                    <button
+                                                    <Button
                                                         onClick={() => openRMRejectModal(demand)}
                                                         disabled={isRejecting}
                                                         title="Reject Demand"
-                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 rounded-md p-0 text-rose-600 shadow-none hover:bg-rose-50"
                                                     >
-                                                        {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
-                                                    </button>
+                                                        {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CloseIcon className="h-4 w-4" />}
+                                                    </Button>
                                                 </div>
                                             ) : canDMRevertApprovedDemand ? (
-                                                <button
-                                                    title="Reject Approved Demand"
+                                                <Button
+                                                    title="Reject approved demand"
                                                     onClick={() => openRejectModal(demand)}
                                                     disabled={isRejecting}
-                                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 rounded-md p-0 text-rose-600 shadow-none hover:bg-rose-50"
                                                 >
-                                                    {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
-                                                </button>
+                                                    {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CloseIcon className="h-4 w-4" />}
+                                                </Button>
                                             ) : (
                                                 <div className="flex items-center gap-2">
-                                                    <button
+                                                    <Button
                                                         onClick={() => {
                                                             if (isPMView && !canProjectManagerEditDemand(demand)) {
                                                                 toast.error(PM_EDITABLE_DEMAND_MESSAGE);
@@ -878,17 +902,21 @@ const DemandWorkspacePage = () => {
                                                             setEditModalOpen(true);
                                                         }}
                                                         disabled={isEditDisabled}
-                                                        className={cn("p-1.5 rounded-lg transition-colors", isEditDisabled ? "text-slate-300" : "text-blue-600 hover:bg-blue-50")}
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className={cn("h-8 w-8 rounded-lg p-0 shadow-none", isEditDisabled ? "text-slate-300" : "text-blue-600 hover:bg-blue-50")}
                                                     >
                                                         <EditIcon className="h-4 w-4" />
-                                                    </button>
+                                                    </Button>
                                                     {canDeleteDemand && (
-                                                        <button
+                                                        <Button
                                                             onClick={() => openDeleteModal(demand)}
-                                                            className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 rounded-lg p-0 text-rose-600 shadow-none hover:bg-rose-50"
                                                         >
                                                             <DeleteIcon className="h-4 w-4" />
-                                                        </button>
+                                                        </Button>
                                                     )}
                                                 </div>
                                             )}
