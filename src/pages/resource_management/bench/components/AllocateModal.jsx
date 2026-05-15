@@ -76,6 +76,7 @@ const AllocateModal = ({ open, resources = [], onClose, onSubmit }) => {
                 min="1"
                 max="100"
                 value={form.allocation}
+                onWheel={(e) => e.target.blur()}
                 onChange={(event) => setForm((prev) => ({ ...prev, allocation: event.target.value }))}
                 className="mt-1.5 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
               />

@@ -9,6 +9,21 @@ import {
   Trash2     // ⭐ ADDED IMPORT
 } from "lucide-react";
 import Button from "../../../../../components/Button/Button";
+import{jwtDecode} from "jwt-decode";
+const token = localStorage.getItem("token");
+  
+  let canCreateTest = false;
+  
+  if (token) {
+    const decoded = jwtDecode(token);
+  
+    const roles = decoded?.roles || [];
+  
+    canCreateTest =
+      roles.includes("Tester") ||
+      roles.includes("Project_Manager");
+  }
+
 
 export default function ScenarioPanel({
   selectedScenario,
@@ -68,9 +83,11 @@ export default function ScenarioPanel({
             </p>
           </div>
 
-          <Button variant="primary" size="small" onClick={() => onAddCase(selectedScenario)}>
-            <Plus size={16} /> Add Test Case
-          </Button>
+          {canCreateTest && (
+            <Button variant="primary" size="small" onClick={() => onAddCase(selectedScenario)}>
+              <Plus size={16} /> Add Test Case
+            </Button>
+          )}
         </div>
       </div>
 
@@ -88,9 +105,11 @@ export default function ScenarioPanel({
           {!selectedScenario.cases || selectedScenario.cases.length === 0 ? (
             <div className="text-center p-6 border border-dashed border-gray-200 rounded-xl bg-gray-50">
               <p className="text-sm text-gray-500 mb-3">No test cases created yet.</p>
-              <Button variant="link" size="small" onClick={() => onAddCase(selectedScenario)}>
-                + Create the first case
-              </Button>
+              {canCreateTest && (
+                <Button variant="link" size="small" onClick={() => onAddCase(selectedScenario)}>
+                  + Create the first case
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
@@ -114,6 +133,8 @@ export default function ScenarioPanel({
                       
                       {/* ⭐ ACTION BUTTONS ADDED HERE ⭐ */}
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {canCreateTest && (
++                        <>
                         <button
                           onClick={(e) => {
                             e.stopPropagation(); // Prevents row click
@@ -142,6 +163,8 @@ export default function ScenarioPanel({
                         >
                           <Trash2 size={14} />
                         </button>
+                        </>
+                        )}
                       </div>
                       {/* ⭐ END ACTION BUTTONS ⭐ */}
 
@@ -183,10 +206,12 @@ export default function ScenarioPanel({
                   <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedCase.title}</h3>
                   <p className="text-sm text-gray-500">Execution Steps</p>
                 </div>
-                
+                {canCreateTest && (
+                  
                 <Button variant="secondary" size="small" onClick={() => onAddSteps(selectedCase)}>
                   <Plus size={14} /> Add Step
                 </Button>
+                )}
               </div>
 
               {/* Steps List */}

@@ -1,19 +1,24 @@
 import React from "react";
-import { Briefcase, ShieldAlert, Sparkles, Users } from "lucide-react";
 import { KPICard } from "../../../../components/kpi/KPI";
+import {
+  ProjectsIcon,
+  SecurityAlertIcon,
+  TeamIcon,
+  ZapIcon,
+} from "@/components/icons";
 
 const ICONS = {
-  "Bench Resources": Briefcase,
-  "Ready Now": Sparkles,
-  "Internal Pool": Users,
-  "Cost / Risk Watch": ShieldAlert,
+  "Bench Resources": ProjectsIcon,
+  "Ready Now": ZapIcon,
+  "Internal Pool": TeamIcon,
+  "Cost / Risk Watch": SecurityAlertIcon,
 };
 
 const BenchKPI = ({ items = [] }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {items.map((item) => {
-        const Icon = ICONS[item.label] || Briefcase;
+        const Icon = ICONS[item.label] || ProjectsIcon;
         return (
           <KPICard
             key={item.label}

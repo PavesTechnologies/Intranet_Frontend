@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { FiEye, FiEyeOff } from "react-icons/fi"; // import icons
 import PhoneInput from "react-phone-input-2";
@@ -30,7 +30,7 @@ export default function Register() {
           ? form.contact
           : `+${form.contact.replace(/\D/g, "")}`,
       };
-      await axios.post(
+      await api.post(
         `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/register`,
         payload,
       );

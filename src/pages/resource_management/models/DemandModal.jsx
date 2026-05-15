@@ -12,6 +12,10 @@ import { getRoleExpectations } from "../services/workforceService";
 import { fetchResourcesByProjectId } from "../services/resource";
 import * as demandService from "../services/demandService";
 import { toast } from "react-toastify";
+import {
+  canProjectManagerEditDemand,
+  PM_EDITABLE_DEMAND_MESSAGE,
+} from "../demand/utils/demandPermissions";
 
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 
@@ -206,17 +210,17 @@ const emptyForm = {
   projectId: "",
   demandName: "",
   deliveryRole: "",
-  demandType: "NET_NEW",
+  demandType: "",
   outgoingResourceId: "",
   demandStartDate: "",
   demandEndDate: "",
   allocationPercentage: "",
-  resourcesRequired: 1,
+  resourcesRequired: "",
   minExp: "",
   deliveryModel: "",
-  demandStatus: "DRAFT",
-  demandPriority: "MEDIUM",
-  demandCommitment: "CONFIRMED",
+  demandStatus: "",
+  demandPriority: "",
+  demandCommitment: "",
   requiresAdditionalApproval: false,
   demandJustification: "",
   rejectionReason: "",
@@ -507,13 +511,13 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
           allocationPercentage: isNaN(allocation) ? "" : Math.round(allocation),
           deliveryRole: resolvedRoleId || roleValueFromData || "",
           deliveryRoleName: roleNameFromData,
-          demandStatus: String(getVal(['demandStatus', 'lifecycleState', 'status', 'LifecycleState', 'demand_status'], "DRAFT")).toUpperCase().trim(),
-          demandType: String(getVal(['demandType', 'type', 'type_of_demand', 'DemandType', 'demand_type'], "NET_NEW")).toUpperCase().replace(/ /g, "_"),
-          demandPriority: String(getVal(['demandPriority', 'priority', 'Priority', 'demand_priority'], "MEDIUM")).toUpperCase().trim(),
-          demandCommitment: String(getVal(['demandCommitment', 'commitment', 'Commitment', 'demand_commitment'], "CONFIRMED")).toUpperCase().trim(),
-          resourcesRequired: parseInt(getVal(['resourcesRequired', 'resourceRequired', 'resource_required', 'requiredResources', 'ResourcesRequired'], 1)),
+          demandStatus: String(getVal(['demandStatus', 'lifecycleState', 'status', 'LifecycleState', 'demand_status'])).toUpperCase().trim(),
+          demandType: String(getVal(['demandType', 'type', 'type_of_demand', 'DemandType', 'demand_type'])).toUpperCase().replace(/ /g, "_"),
+          demandPriority: String(getVal(['demandPriority', 'priority', 'Priority', 'demand_priority'])).toUpperCase().trim(),
+          demandCommitment: String(getVal(['demandCommitment', 'commitment', 'Commitment', 'demand_commitment'])).toUpperCase().trim(),
+          resourcesRequired: getVal(['resourcesRequired', 'resourceRequired', 'resource_required', 'requiredResources', 'ResourcesRequired']),
           minExp: getVal(['minExp', 'experience', 'minimumExperience', 'min_experience', 'MinExperience', 'experience_required', 'min_experience', 'MinExp']),
-          deliveryModel: String(getVal(['deliveryModel', 'model', 'DeliveryModel', 'delivery_model', 'Delivery_Model'], "OFFSHORE")).toUpperCase().trim(),
+          deliveryModel: String(getVal(['deliveryModel', 'model', 'DeliveryModel', 'delivery_model', 'Delivery_Model'])).toUpperCase().trim(),
           demandJustification: getVal(['demandJustification', 'justification', 'Justification', 'demand_justification', 'reason', 'demandJustification', 'DemandJustification']),
           requiresAdditionalApproval: !!getVal(['requiresAdditionalApproval', 'additionalApproval', 'RequiresAdditionalApproval', 'additional_approval', 'AdditionalApproval'], false),
           outgoingResourceId: getVal(['outgoingResourceId', 'outgoing_resource_id', 'replaced_resource_id', 'replacedResourceId', 'OutgoingResourceId']) || initialData?.outgoingResource?.resourceId || "",
@@ -665,6 +669,11 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
           ...form,
           deliveryRole: resolveRoleId(form.deliveryRole, roles),
         };
+
+        if (isManagerOrPM && !canProjectManagerEditDemand(initialData || form)) {
+          toast.error(PM_EDITABLE_DEMAND_MESSAGE);
+          return;
+        }
 
         if (normalizedRole === "DELIVERYMANAGER") {
           const dmPayload = {
@@ -852,7 +861,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("demandType", v)}
                       options={DEMAND_TYPES}
                       error={errors.demandType}
-                      placeholder="Select Type"
+                      placeholder="Select demand type"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
@@ -911,6 +920,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                           placeholder="1 - 100"
                           value={form.allocationPercentage}
                           onChange={(e) => update("allocationPercentage", e.target.value)}
+                          onWheel={(e) => e.currentTarget.blur()}
                           disabled={mode === "edit" && !isManagerOrPM}
                           className={`w-full rounded-lg border py-2 px-3 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${errors.allocationPercentage ? "border-red-500 bg-red-50/30" : "border-slate-200 hover:border-slate-300"} ${mode === "edit" && !isManagerOrPM ? "bg-slate-50 cursor-not-allowed text-slate-500" : ""}`}
                         />
@@ -923,9 +933,10 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       <input
                         type="number"
                         min="1"
-                        placeholder="min 1"
+                        placeholder="Enter resources required"
                         value={form.resourcesRequired}
                         onChange={(e) => update("resourcesRequired", e.target.value)}
+                        onWheel={(e) => e.target.blur()}
                         disabled={mode === "edit" && !isManagerOrPM}
                         className={`w-full rounded-lg border py-2 px-3 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${errors.resourcesRequired ? "border-red-500 bg-red-50/30" : "border-slate-200 hover:border-slate-300"} ${mode === "edit" && !isManagerOrPM ? "bg-slate-50 cursor-not-allowed text-slate-500" : ""}`}
                       />
@@ -939,6 +950,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                         placeholder="e.g. 5"
                         value={form.minExp}
                         onChange={(e) => update("minExp", e.target.value)}
+                        onWheel={(e) => e.target.blur()}
                         disabled={mode === "edit" && !isManagerOrPM}
                         className={`w-full rounded-lg border py-2 px-3 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${errors.minExp ? "border-red-500 bg-red-50/30" : "border-slate-200 hover:border-slate-300"} ${mode === "edit" && !isManagerOrPM ? "bg-slate-50 cursor-not-allowed text-slate-500" : ""}`}
                       />
@@ -952,7 +964,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("deliveryModel", v)}
                       options={DELIVERY_MODELS}
                       error={errors.deliveryModel}
-                      placeholder="Select Model"
+                      placeholder="Select delivery model"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
@@ -965,7 +977,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("demandStatus", v)}
                       options={mode === "edit" ? computedEditStatuses : normalizeStatusOptions(activeStatuses)}
                       error={errors.demandStatus}
-                      placeholder="Select Status"
+                      placeholder="Select demand status"
                       required
                     />
 
@@ -990,7 +1002,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("demandPriority", v)}
                       options={PRIORITIES}
                       error={errors.demandPriority}
-                      placeholder="Select Priority"
+                      placeholder="Select priority"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
@@ -1003,7 +1015,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       options={COMMITMENT_TYPES}
                       error={errors.demandCommitment}
                       note={form.demandCommitment === "SOFT" ? "Note: This Demand will expire in 30 days" : ""}
-                      placeholder="Select Commitment"
+                      placeholder="Select commitment"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
