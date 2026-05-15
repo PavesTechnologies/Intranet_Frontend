@@ -1281,42 +1281,6 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                     <p className="text-sm font-black text-slate-900">{demand.allocation || 0}%</p>
                                 </div>
                             </div>
-
-                            {(canPMEditDemand || canPMDeleteDemand) && (
-                                <div className="flex items-center gap-3 pr-4">
-                                    {canPMEditDemand && (
-                                        <button
-                                            onClick={() => {
-                                                if (!canProjectManagerEditDemand(demand)) {
-                                                    showStatusToast(PM_EDITABLE_DEMAND_MESSAGE, "error");
-                                                    return;
-                                                }
-                                                setEditModalOpen(true);
-                                            }}
-                                            className="text-blue-600 hover:text-blue-700 transition-all active:scale-90"
-                                            title="Edit Demand"
-                                        >
-                                            <Pencil className="h-4 w-4" />
-                                        </button>
-                                    )}
-                                    {canPMDeleteDemand && (
-                                        <button
-                                            onClick={() => {
-                                                if (!canProjectManagerMutateDemand(demand)) {
-                                                    showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
-                                                    return;
-                                                }
-                                                setDeleteModalOpen(true);
-                                            }}
-                                            className="text-rose-600 hover:text-rose-700 transition-all active:scale-90"
-                                            title="Delete Demand"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-
                             {isRM && (
                                 <button
                                     onClick={() => setIsAllocationModalOpen(true)}

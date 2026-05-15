@@ -134,7 +134,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                 deliveryModel: updatedDemand.deliveryModel || demand.deliveryModel,
                 deliveryRoleId: updatedDemand.deliveryRoleId || updatedDemand.deliveryRole || demand.deliveryRoleId,
                 deliveryRole: updatedDemand.deliveryRoleId || demand.deliveryRole,
-deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
+                deliveryRoleName: updatedDemand.deliveryRoleName || demand.deliveryRoleName,
                 allocationPercentage: updatedDemand.allocationPercentage ?? demand.allocationPercentage,
                 resourcesRequired: updatedDemand.resourcesRequired ?? updatedDemand.resourceRequired ?? demand.resourcesRequired,
                 resourceRequired: updatedDemand.resourceRequired ?? updatedDemand.resourcesRequired ?? demand.resourceRequired,

@@ -131,10 +131,14 @@ const isCancelledOrClosedDemand = (demand = {}) =>
 
 const isRejectedDemand = (demand = {}) => getDemandStatus(demand) === "REJECTED";
 
+const isBreachedDemand = (demand = {}) => demand.slaBreached === true;
+
 const isAtRiskDemand = (demand = {}) =>
+    !isBreachedDemand(demand) &&
     !isFulfilledDemand(demand) &&
-    Number(demand.remainingDays) >= 0 &&
-    Number(demand.remainingDays) <= 5;
+    demand.remainingDays !== undefined &&
+    demand.warningThresholdDays !== undefined &&
+    Number(demand.remainingDays) < Number(demand.warningThresholdDays);
 
 const getDemandRoleOptions = (roles = []) => {
     if (!Array.isArray(roles) || roles.length === 0) return [];
@@ -227,17 +231,16 @@ export function useDemand(projectId = null) {
 
         // Tab Filtering (Segmented Logic)
         if (activeTab === 'breached') {
-            list = list.filter(d => !isFulfilledDemand(d) && Number(d.remainingDays) < 0);
+            list = list.filter(isBreachedDemand);
         } else if (activeTab === 'at_risk') {
             list = list.filter(isAtRiskDemand);
         } else if (activeTab === 'active') {
-            list = list.filter(d => ['APPROVED', 'OPEN', 'ACTIVE', 'REQUESTED', 'IN_PROGRESS', 'IN PROGRESS', 'DRAFT'].includes(getDemandStatus(d)));
+            list = list.filter(d => getDemandStatus(d) === 'APPROVED');
         } else if (activeTab === 'soft') {
             list = list.filter(isSoftDemand);
         } else if (activeTab === 'rejected') {
             list = list.filter(isRejectedDemand);
-        }
-        else if (activeTab === 'fulfilled') {
+        } else if (activeTab === 'fulfilled') {
             list = list.filter(isFulfilledDemand);
         }
         // 'all' fallthrough shows everything minus cancelled/closed if we want to be strict, 
@@ -351,19 +354,17 @@ export function useDemand(projectId = null) {
             const status = getDemandStatus(d);
             const commitment = getDemandCommitment(d);
             const isActiveSLA = ['REQUESTED', 'PENDING', 'DRAFT'].includes(status);
-            
+
             if (['APPROVED', 'OPEN', 'ACTIVE'].includes(status)) counts.approved++;
             if (['REQUESTED', 'PENDING', 'DRAFT'].includes(status)) counts.pending++;
             if (['APPROVED', 'OPEN', 'ACTIVE', 'REQUESTED', 'PENDING', 'DRAFT', 'IN_PROGRESS', 'IN PROGRESS'].includes(status)) counts.active++;
-            
+
             if (commitment === 'SOFT' || status === 'SOFT') counts.soft++;
-            
-            if (isActiveSLA) {
-                if (d.remainingDays < 0) {
-                    counts.breached++;
-                } else if (isAtRiskDemand(d)) {
-                    counts.atRisk++;
-                }
+
+            if (isBreachedDemand(d)) {
+                counts.breached++;
+            } else if (isAtRiskDemand(d)) {
+                counts.atRisk++;
             }
         });
 

@@ -79,23 +79,23 @@ const DecisionModal = ({
         ? "border-rose-200 bg-rose-50 text-rose-600"
         : isFulfill
             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-        : "border-emerald-200 bg-emerald-50 text-emerald-700";
+            : "border-emerald-200 bg-emerald-50 text-emerald-700";
     const headerBg = isReject
         ? "bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_55%,#fef2f2_100%)]"
         : isFulfill
             ? "bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#f8fafc_100%)]"
-        : "bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#eff6ff_100%)]";
+            : "bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#eff6ff_100%)]";
     const primaryButtonClass = isReject
         ? "bg-rose-600 shadow-rose-200 hover:bg-rose-700"
         : isFulfill
             ? "bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700"
-        : "bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700";
+            : "bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700";
     const title = isReject ? "Share the rejection reason" : isFulfill ? "Fulfill this demand" : "Approve this demand";
     const helperText = isReject
         ? "Add a short reason and submit your decision."
         : isFulfill
             ? "Confirm that staffing is complete and close this demand."
-        : "Confirm the demand and move it to the next step.";
+            : "Confirm the demand and move it to the next step.";
     const buttonLabel = isReject ? "Submit Rejection" : isFulfill ? "Mark Fulfilled" : "Confirm Approval";
     const Icon = isReject ? ErrorIcon : SuccessIcon;
 
@@ -126,7 +126,7 @@ const DecisionModal = ({
                         </button>
                     </div>
                 </div>
-                
+
 
                 <div className="flex flex-1 flex-col justify-between gap-5 px-6 py-5">
                     <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
@@ -341,7 +341,7 @@ const DemandWorkspacePage = () => {
         const normalizedRole = normalizeRole(effectiveRole);
         const isRM = normalizedRole === "RESOURCEMANAGER";
         const isPM = normalizedRole === "PROJECTMANAGER" || normalizedRole === "MANAGER";
-        
+
         if ((isPM || isRM) && !canProjectManagerMutateDemand(demand)) {
             toast.error("Only REQUESTED demands can be deleted.");
             return;
@@ -658,9 +658,7 @@ const DemandWorkspacePage = () => {
                                         { id: 'at_risk', label: 'At Risk', icon: WarningIcon, color: 'text-orange-600' },
                                         { id: 'active', label: 'Approved', icon: ActivityIcon, color: 'text-indigo-600' },
                                         { id: 'soft', label: 'Soft', icon: ZapIcon, color: 'text-slate-600' },
-                                        ...(isRMView
-                                            ? [{ id: 'fulfilled', label: 'Fulfilled', icon: SuccessIcon, color: 'text-emerald-600' }]
-                                            : []),
+                                        { id: 'fulfilled', label: 'Fulfilled', icon: SuccessIcon, color: 'text-emerald-600' },
                                         { id: 'rejected', label: 'Rejected', icon: ErrorIcon, color: 'text-rose-600' }
                                     ].map(tab => (
                                         <button
@@ -681,6 +679,7 @@ const DemandWorkspacePage = () => {
                             </div>
 
                             <div className="flex items-center gap-2">
+                                
                                 <div className="relative">
                                     <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                                     <input
@@ -738,15 +737,15 @@ const DemandWorkspacePage = () => {
                                 const isFulfilled = status === 'FULFILLED';
                                 const isRejected = status === 'REJECTED';
                                 const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditDemand);
-                                
+
                                 const isApproving = decisionState?.demandId === demand.id && decisionState?.action === "approve";
                                 const isRejecting = decisionState?.demandId === demand.id && decisionState?.action === "reject";
                                 const isFulfilling = decisionState?.demandId === demand.id && decisionState?.action === "fulfill";
 
                                 return {
                                     ...demand,
-                                    onRowClick: () => navigate(`/resource-management/demand/${demand.id}`, { 
-                                        state: { clientName: demand.clientName || demand.client } 
+                                    onRowClick: () => navigate(`/resource-management/demand/${demand.id}`, {
+                                        state: { clientName: demand.clientName || demand.client }
                                     }),
                                     rowClass: "group",
                                     demand_details: (
