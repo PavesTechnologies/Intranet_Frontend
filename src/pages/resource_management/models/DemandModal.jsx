@@ -9,7 +9,7 @@ import {
 import { createDemand, updateDemandStatus } from "../services/projectService";
 import { handleDMDecision, handleRMDecision } from "../services/demandService";
 import { getRoleExpectations } from "../services/workforceService";
-import { fetchResourcesByProjectId } from "../services/resource";
+
 import * as demandService from "../services/demandService";
 import { toast } from "react-toastify";
 import {
@@ -211,7 +211,6 @@ const emptyForm = {
   demandName: "",
   deliveryRole: "",
   demandType: "",
-  outgoingResourceId: "",
   demandStartDate: "",
   demandEndDate: "",
   allocationPercentage: "",
@@ -225,6 +224,7 @@ const emptyForm = {
   demandJustification: "",
   rejectionReason: "",
 };
+
 
 const toDateInputValue = (date) => {
   if (!date) return "";
@@ -297,8 +297,8 @@ const buildUpdateDemandPayload = (form, id) => {
     demandType: form.demandType,
     demandName: form.demandName,
     minExp,
-    outgoingResourceId: toLongOrNull(form.outgoingResourceId),
     deliveryRole: form.deliveryRole,
+
     demandJustification: form.demandJustification,
     demandStartDate: form.demandStartDate || null,
     demandEndDate: form.demandEndDate || null,
@@ -306,12 +306,15 @@ const buildUpdateDemandPayload = (form, id) => {
     deliveryModel: form.deliveryModel,
     demandPriority: form.demandPriority,
     demandStatus: form.demandStatus,
+    lifecycleState: form.demandStatus,
+    status: form.demandStatus,
     demandCommitment: form.demandCommitment,
     requiresAdditionalApproval: Boolean(form.requiresAdditionalApproval),
     resourcesRequired,
     modifiedBy: form.modifiedBy || null,
   };
 };
+
 
 const buildCreateDemandPayload = (form, id) => {
   const payload = {
@@ -339,9 +342,8 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const [fetchingResources, setFetchingResources] = useState(false);
-  const [projectResources, setProjectResources] = useState([]);
   const startDateRef = useRef(null);
+
   const scrollRef = useRef(null);
 
   const [roles, setRoles] = useState([]);
@@ -350,13 +352,19 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   // Memoized Master Data
   const DEMAND_TYPES = useMemo(() => {
     const vals = getEnumValues("DemandType");
-    return vals.length > 0 ? normalizeStatusOptions(vals) : [
-      { label: "Net New", value: "NET_NEW" },
-      { label: "Replacement", value: "REPLACEMENT" }
-    ];
+    const statuses = normalizeStatusOptions(vals);
+    const filtered = statuses.filter(s => s.value !== "REPLACEMENT");
+    return filtered.length > 0 ? filtered : [{ label: "Net New", value: "NET_NEW" }];
   }, [getEnumValues]);
 
-  const DEMAND_STATUSES = useMemo(() => normalizeStatusOptions(getEnumValues("DemandStatus")), [getEnumValues]);
+
+
+  const DEMAND_STATUSES = useMemo(() => {
+    const vals = getEnumValues("DemandStatus");
+    const statuses = normalizeStatusOptions(vals);
+    return statuses.filter(s => s.value !== "CANCELLED");
+  }, [getEnumValues]);
+
 
   const PRIORITIES = useMemo(() => {
     const vals = getEnumValues("PriorityLevel");
@@ -387,7 +395,10 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
     ];
   }, [getEnumValues]);
 
-  const activeStatuses = DEMAND_STATUSES.length > 0 ? DEMAND_STATUSES : fallbackStatuses;
+  const activeStatuses = DEMAND_STATUSES.length > 0 ? DEMAND_STATUSES : [
+    { label: "Draft", value: "DRAFT" },
+    { label: "Requested", value: "REQUESTED" }
+  ];
 
   const normalizedRole = String(userRole || "")
     .toUpperCase()
@@ -396,7 +407,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   const isManagerOrPM = ["PROJECTMANAGER", "MANAGER"].includes(normalizedRole);
 
 
-  const computedEditStatuses = (() => {
+  const computedEditStatuses = useMemo(() => {
     if (normalizedRole === "DELIVERYMANAGER") {
       return [
         { label: "Accepted", value: "APPROVED" },
@@ -416,10 +427,11 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
       ];
     }
     return [
-      { label: "FULFILLED", value: "FULFILLED" },
-      { label: "REJECTED", value: "REJECTED" }
+      { label: "Fulfilled", value: "FULFILLED" },
+      { label: "Rejected", value: "REJECTED" }
     ];
-  })();
+  }, [normalizedRole, isManagerOrPM]);
+
 
   const fetchRoles = async () => {
     try {
@@ -430,21 +442,8 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
     }
   };
 
-  const getAllResources = async (pId) => {
-    if (!pId) return;
-    setFetchingResources(true);
-    try {
-      const res = await fetchResourcesByProjectId(pId);
-      setProjectResources(res.data || []);
-    } catch (err) {
-      console.error("Failed to fetch resources for project", err);
-      setProjectResources([]);
-    } finally {
-      setFetchingResources(false);
-    }
-  };
-
   const formatDate = (date) => {
+
     return toDateInputValue(date);
   };
 
@@ -453,108 +452,108 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   useEffect(() => {
     if (!open) return;
     fetchRoles();
-    const pId = projectDetails?.pmsProjectId || projectDetails?.projectId || projectDetails?._id || initialData?.projectId || initialData?.ProjectId || initialData?.pmsProjectId || "";
-    if (pId) {
-      getAllResources(pId);
-    }
   }, [open, projectDetails, initialData]);
 
+
+  const isInitialized = useRef(false);
+
   useEffect(() => {
-    if (open) {
-      const isEdit = mode === "edit";
+    if (!open) {
+      isInitialized.current = false;
+      return;
+    }
+    if (isInitialized.current) return;
 
-      const pId = projectDetails?.pmsProjectId || projectDetails?.projectId || projectDetails?._id || initialData?.projectId || initialData?.ProjectId || initialData?.pmsProjectId || "";
-      const sDate = (isEdit && initialData?.demandStartDate)
-        ? toDateInputValue(initialData.demandStartDate)
-        : (projectDetails?.startDate ? toDateInputValue(projectDetails.startDate) : (initialData?.demandStartDate ? toDateInputValue(initialData.demandStartDate) : (initialData?.slaCreatedAt ? toDateInputValue(initialData.slaCreatedAt) : "")));
-      const eDate = (isEdit && initialData?.demandEndDate)
-        ? toDateInputValue(initialData.demandEndDate)
-        : (projectDetails?.endDate ? toDateInputValue(projectDetails.endDate) : (initialData?.demandEndDate ? toDateInputValue(initialData.demandEndDate) : (initialData?.slaDueAt ? toDateInputValue(initialData.slaDueAt) : "")));
+    const isEdit = mode === "edit";
 
-      if (isEdit && initialData) {
-        console.log("[DemandModal] Edit Mode Prefilling with:", initialData);
+    const pId = projectDetails?.pmsProjectId || projectDetails?.projectId || projectDetails?._id || initialData?.projectId || initialData?.ProjectId || initialData?.pmsProjectId || "";
+    const sDate = (isEdit && initialData?.demandStartDate)
+      ? toDateInputValue(initialData.demandStartDate)
+      : (projectDetails?.startDate ? toDateInputValue(projectDetails.startDate) : (initialData?.demandStartDate ? toDateInputValue(initialData.demandStartDate) : (initialData?.slaCreatedAt ? toDateInputValue(initialData.slaCreatedAt) : "")));
+    const eDate = (isEdit && initialData?.demandEndDate)
+      ? toDateInputValue(initialData.demandEndDate)
+      : (projectDetails?.endDate ? toDateInputValue(projectDetails.endDate) : (initialData?.demandEndDate ? toDateInputValue(initialData.demandEndDate) : (initialData?.slaDueAt ? toDateInputValue(initialData.slaDueAt) : "")));
 
-        const getVal = (paths, fallback = "") => {
-          for (const key of paths) {
-            const val = initialData[key];
-            if (val !== undefined && val !== null) return val;
-          }
-          return fallback;
-        };
+    if (isEdit && initialData) {
+      console.log("[DemandModal] Edit Mode Prefilling with:", initialData);
 
-        const rawAlloc = getVal(['allocationPercentage', 'Allocation', 'allocation_percentage'], initialData.allocation?.percentage || initialData.allocation || "");
-        let allocation = parseFloat(rawAlloc);
-        if (!isNaN(allocation) && allocation > 0 && allocation <= 1) {
-          allocation = allocation * 100; // Convert decimal to percentage
+      const getVal = (paths, fallback = "") => {
+        for (const key of paths) {
+          const val = initialData[key];
+          if (val !== undefined && val !== null) return val;
         }
+        return fallback;
+      };
 
-        const getRoleValue = () => {
-          const rawRole = initialData.deliveryRole || initialData.role || initialData.demandRole || initialData.deliveryRoleName || initialData.roleName || "";
-          if (rawRole && typeof rawRole === 'object') {
-            return getRoleId(rawRole) || getRoleName(rawRole) || "";
-          }
-          return getVal(['deliveryRoleId', 'dev_role_id', 'roleId', 'role_id', 'RoleID', 'delivery_role_id', 'delivery_role_uuid', 'deliveryRole', 'roleName', 'role_name', 'role']);
-        };
-
-        const roleValueFromData = getRoleValue();
-        const roleNameFromData = (typeof initialData.deliveryRole === 'object') ? getRoleName(initialData.deliveryRole) : getVal(['deliveryRoleName', 'deliveryRole', 'roleName', 'role_name', 'role']);
-        const resolvedRoleId = resolveRoleId(roleValueFromData, roles);
-
-        const mappedData = {
-          ...emptyForm,
-          id: getVal(['id', 'demandId', 'demand_id']),
-          demandId: getVal(['demandId', 'id', 'demand_id']),
-          projectId: pId,
-          demandName: getVal(['demandName', 'role', 'demand_name', 'Name', 'demandRole', 'roleName']),
-          demandStartDate: sDate || toDateInputValue(getVal(['demandStartDate', 'startDate', 'start_date', 'demand_start_date', 'slaCreatedAt'])),
-          demandEndDate: eDate || toDateInputValue(getVal(['demandEndDate', 'endDate', 'end_date', 'demand_end_date', 'slaDueAt'])),
-          allocationPercentage: isNaN(allocation) ? "" : Math.round(allocation),
-          deliveryRole: resolvedRoleId || roleValueFromData || "",
-          deliveryRoleName: roleNameFromData,
-          demandStatus: String(getVal(['demandStatus', 'lifecycleState', 'status', 'LifecycleState', 'demand_status'])).toUpperCase().trim(),
-          demandType: String(getVal(['demandType', 'type', 'type_of_demand', 'DemandType', 'demand_type'])).toUpperCase().replace(/ /g, "_"),
-          demandPriority: String(getVal(['demandPriority', 'priority', 'Priority', 'demand_priority'])).toUpperCase().trim(),
-          demandCommitment: String(getVal(['demandCommitment', 'commitment', 'Commitment', 'demand_commitment'])).toUpperCase().trim(),
-          resourcesRequired: getVal(['resourcesRequired', 'resourceRequired', 'resource_required', 'requiredResources', 'ResourcesRequired']),
-          minExp: getVal(['minExp', 'experience', 'minimumExperience', 'min_experience', 'MinExperience', 'experience_required', 'min_experience', 'MinExp']),
-          deliveryModel: String(getVal(['deliveryModel', 'model', 'DeliveryModel', 'delivery_model', 'Delivery_Model'])).toUpperCase().trim(),
-          demandJustification: getVal(['demandJustification', 'justification', 'Justification', 'demand_justification', 'reason', 'demandJustification', 'DemandJustification']),
-          requiresAdditionalApproval: !!getVal(['requiresAdditionalApproval', 'additionalApproval', 'RequiresAdditionalApproval', 'additional_approval', 'AdditionalApproval'], false),
-          outgoingResourceId: getVal(['outgoingResourceId', 'outgoing_resource_id', 'replaced_resource_id', 'replacedResourceId', 'OutgoingResourceId']) || initialData?.outgoingResource?.resourceId || "",
-        };
-
-        setForm(mappedData);
-      } else {
-        // Merge initialData but normalize common keys for pre-fill
-        const baseData = {
-          ...emptyForm,
-          projectId: pId,
-          demandStartDate: sDate,
-          demandEndDate: eDate,
-        };
-
-        if (initialData) {
-          Object.keys(initialData).forEach(key => {
-            const lowerKey = key.toLowerCase();
-            if (lowerKey === 'priority' || lowerKey === 'demandpriority') baseData.demandPriority = String(initialData[key]).toUpperCase();
-            if (lowerKey === 'status' || lowerKey === 'lifecyclestate' || lowerKey === 'demandstatus') baseData.demandStatus = String(initialData[key]).toUpperCase();
-            if (lowerKey === 'role' || lowerKey === 'deliveryrole' || lowerKey === 'demandname') baseData.demandName = initialData[key];
-          });
-        }
-
-        setForm({ ...baseData, ...initialData });
+      const rawAlloc = getVal(['allocationPercentage', 'Allocation', 'allocation_percentage'], initialData.allocation?.percentage || initialData.allocation || "");
+      let allocation = parseFloat(rawAlloc);
+      if (!isNaN(allocation) && allocation > 0 && allocation <= 1) {
+        allocation = allocation * 100; // Convert decimal to percentage
       }
 
-      setErrors({});
-    }
-  }, [open, initialData, projectDetails, mode, roles]);
+      const getRoleValue = () => {
+        const rawRole = initialData.deliveryRole || initialData.role || initialData.demandRole || initialData.deliveryRoleName || initialData.roleName || "";
+        if (rawRole && typeof rawRole === 'object') {
+          return getRoleId(rawRole) || getRoleName(rawRole) || "";
+        }
+        return getVal(['deliveryRoleId', 'dev_role_id', 'roleId', 'role_id', 'RoleID', 'delivery_role_id', 'delivery_role_uuid', 'deliveryRole', 'roleName', 'role_name', 'role']);
+      };
 
-  // Conditional Logic Reset
-  useEffect(() => {
-    if (form.demandType !== "REPLACEMENT") {
-      setForm(p => ({ ...p, outgoingResourceId: "" }));
+      const roleValueFromData = getRoleValue();
+      const roleNameFromData = (typeof initialData.deliveryRole === 'object') ? getRoleName(initialData.deliveryRole) : getVal(['deliveryRoleName', 'deliveryRole', 'roleName', 'role_name', 'role']);
+      const resolvedRoleId = resolveRoleId(roleValueFromData, roles);
+
+      const mappedData = {
+        ...emptyForm,
+        id: getVal(['id', 'demandId', 'demand_id']),
+        demandId: getVal(['demandId', 'id', 'demand_id']),
+        projectId: pId,
+        demandName: getVal(['demandName', 'role', 'demand_name', 'Name', 'demandRole', 'roleName']),
+        demandStartDate: sDate || toDateInputValue(getVal(['demandStartDate', 'startDate', 'start_date', 'demand_start_date', 'slaCreatedAt'])),
+        demandEndDate: eDate || toDateInputValue(getVal(['demandEndDate', 'endDate', 'end_date', 'demand_end_date', 'slaDueAt'])),
+        allocationPercentage: isNaN(allocation) ? "" : Math.round(allocation),
+        deliveryRole: resolvedRoleId || roleValueFromData || "",
+        deliveryRoleName: roleNameFromData,
+        demandStatus: String(getVal(['demandStatus', 'lifecycleState', 'status', 'LifecycleState', 'demand_status'])).toUpperCase().trim(),
+        demandType: String(getVal(['demandType', 'type', 'type_of_demand', 'DemandType', 'demand_type'])).toUpperCase().replace(/ /g, "_"),
+        demandPriority: String(getVal(['demandPriority', 'priority', 'Priority', 'demand_priority'])).toUpperCase().trim(),
+        demandCommitment: String(getVal(['demandCommitment', 'commitment', 'Commitment', 'demand_commitment'])).toUpperCase().trim(),
+        resourcesRequired: getVal(['resourcesRequired', 'resourceRequired', 'resource_required', 'requiredResources', 'ResourcesRequired']),
+        minExp: getVal(['minExp', 'experience', 'minimumExperience', 'min_experience', 'MinExperience', 'experience_required', 'min_experience', 'MinExp']),
+        deliveryModel: String(getVal(['deliveryModel', 'model', 'DeliveryModel', 'delivery_model', 'Delivery_Model'])).toUpperCase().trim(),
+        demandJustification: getVal(['demandJustification', 'justification', 'Justification', 'demand_justification', 'reason', 'demandJustification', 'DemandJustification']),
+        requiresAdditionalApproval: !!getVal(['requiresAdditionalApproval', 'additionalApproval', 'RequiresAdditionalApproval', 'additional_approval', 'AdditionalApproval'], false),
+      };
+
+
+      setForm(mappedData);
+    } else {
+      // Merge initialData but normalize common keys for pre-fill
+      const baseData = {
+        ...emptyForm,
+        projectId: pId,
+        demandStartDate: sDate,
+        demandEndDate: eDate,
+      };
+
+      if (initialData) {
+        Object.keys(initialData).forEach(key => {
+          const lowerKey = key.toLowerCase();
+          if (lowerKey === 'priority' || lowerKey === 'demandpriority') baseData.demandPriority = String(initialData[key]).toUpperCase();
+          if (lowerKey === 'status' || lowerKey === 'lifecyclestate' || lowerKey === 'demandstatus') baseData.demandStatus = String(initialData[key]).toUpperCase();
+          if (lowerKey === 'role' || lowerKey === 'deliveryrole' || lowerKey === 'demandname') baseData.demandName = initialData[key];
+        });
+      }
+
+      setForm({ ...baseData, ...initialData });
     }
-  }, [form.demandType]);
+
+    setErrors({});
+    isInitialized.current = true;
+  }, [open, initialData, projectDetails, mode]);
+
+
+
 
   useEffect(() => {
   if (!open || mode !== "edit" || roles.length === 0 || !initialData) return;
@@ -614,9 +613,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
     if (!form.deliveryRole) e.deliveryRole = "Role is required";
     if (!form.demandType) e.demandType = "Demand type is required";
 
-    if (mode !== "edit" && form.demandType === "REPLACEMENT" && !form.outgoingResourceId) {
-      e.outgoingResourceId = "Outgoing resource is required";
-    }
+
 
     if (!form.demandStartDate) e.demandStartDate = "Start date is required";
     if (!form.demandEndDate) e.demandEndDate = "End date is required";
@@ -866,23 +863,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
 
-                    {/* Conditional: Outgoing Resource (for REPLACEMENT) */}
-                    {form.demandType === "REPLACEMENT" && (
-                      <div className="md:col-span-2">
-                        <SearchableListboxField
-                          id="field-outgoingResourceId"
-                          label="Outgoing Resource"
-                          value={form.outgoingResourceId}
-                          onChange={(v) => update("outgoingResourceId", v)}
-                          options={projectResources.map((r) => ({ label: `${r.resourceName} (${r.resourceRole})`, value: r.resourceId }))}
-                          error={errors.outgoingResourceId}
-                          placeholder={fetchingResources ? "Loading resources..." : "Search and select resource to replace"}
-                          required={mode !== "edit"}
-                          disabled={fetchingResources || (mode === "edit" && !isManagerOrPM)}
-                          emptyMessage="No Resources Allocated to the Project."
-                        />
-                      </div>
-                    )}
+
 
                     {/* Start Date -> Demand Start Date */}
                     <FormField id="field-demandStartDate" label="Demand Start Date" error={errors.demandStartDate} required>
@@ -975,7 +956,8 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       label="Demand Status"
                       value={form.demandStatus}
                       onChange={(v) => update("demandStatus", v)}
-                      options={mode === "edit" ? computedEditStatuses : normalizeStatusOptions(activeStatuses)}
+                      options={computedEditStatuses || normalizeStatusOptions(activeStatuses)}
+
                       error={errors.demandStatus}
                       placeholder="Select demand status"
                       required

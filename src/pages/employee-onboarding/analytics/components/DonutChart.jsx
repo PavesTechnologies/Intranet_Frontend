@@ -1,6 +1,13 @@
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 
-export default function DonutChart({ data, total, colors }) {
+export default function DonutChart({
+  data,
+  total,
+  colors,
+  size = 270,
+  innerRadius = 62,
+  outerRadius = 118,
+}) {
   const RADIAN = Math.PI / 180;
 
   // fallback if no colors passed
@@ -35,7 +42,7 @@ export default function DonutChart({ data, total, colors }) {
   };
 
   return (
-    <PieChart width={240} height={240}>
+    <PieChart width={size} height={size}>
       {/* Hover Tooltip */}
       <Tooltip
         formatter={(value, name, props) => [
@@ -50,8 +57,8 @@ export default function DonutChart({ data, total, colors }) {
         nameKey="label"
         cx="50%"
         cy="50%"
-        innerRadius={55}
-        outerRadius={110}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius}
         paddingAngle={3}
         labelLine={false}
         label={renderPercentLabel}
@@ -71,7 +78,7 @@ export default function DonutChart({ data, total, colors }) {
         textAnchor="middle"
         dominantBaseline="middle"
         style={{
-          fontSize: 18,
+          fontSize: 20,
           fontWeight: "bold",
           fill: "#1f2d3d",
         }}

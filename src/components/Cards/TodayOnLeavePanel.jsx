@@ -85,7 +85,7 @@ export default function TodayOnLeavePanel() {
           <LoadingSpinner text="Loading..." />
         </div>
       ) : employees.length === 0 ? (
-        <div className="flex items-center gap-2 py-1">
+        <div className="flex items-center gap-2 py-1 justify-center">
           {/* <User size={15} className="text-gray-400" strokeWidth={2.5} /> */}
           <p className="text-xs text-gray-400 italic font-semibold">No one is on leave today</p>
           <img src={Working} alt="working" width={100} height={10} />
