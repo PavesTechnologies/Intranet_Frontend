@@ -154,8 +154,15 @@ const AssetList = () => {
     if (!assetName) {
       errors.asset_name = "Asset name is required";
     }
-    if (!isQuantityLocked && (!form.quantity.value || quantity < 1)) {
-      errors.quantity = "Quantity must be at least 1";
+    if (!form.quantity.value || quantity < 1) {
+      // Always require quantity for new assets, or for existing assets where it's not locked
+      if (!editingAsset || !isQuantityLocked) {
+        errors.quantity = "Quantity must be at least 1";
+      }
+    }
+
+    if (!editingAsset && !serialFile) {
+      errors.serialFile = "Serial numbers file is required for new assets";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -411,6 +418,7 @@ const AssetList = () => {
                     defaultValue={editingAsset?.assetName}
                     placeholder="e.g. MacBook Pro M1"
                     error={validationErrors.asset_name}
+                    required
                   />
 
                   {/* Quantity – locked when serial numbers are present */}
@@ -426,6 +434,7 @@ const AssetList = () => {
                       error={validationErrors.quantity}
                       disabled={isQuantityLocked}
                       locked={isQuantityLocked}
+                      required
                     />
                     {/* Tooltip shown only when locked */}
                     {isQuantityLocked && (
@@ -481,8 +490,8 @@ const AssetList = () => {
 
                 {/* ROW 4: Serial Number Upload */}
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Asset Serial Numbers (Excel)
+                  <label className={`text-xs font-bold uppercase tracking-wide ${validationErrors.serialFile ? "text-red-500" : "text-gray-500"}`}>
+                    Asset Serial Numbers (Excel) {!editingAsset && <span className="text-red-500">*</span>}
                   </label>
 
                   <div className="relative group">
@@ -490,15 +499,16 @@ const AssetList = () => {
                       type="file"
                       accept=".xlsx,.xls"
                       onChange={(e) => setSerialFile(e.target.files[0] || null)}
-                      className="block w-full text-sm text-gray-600
+                      className={`block w-full text-sm text-gray-600
                         file:mr-4 file:py-2.5 file:px-4
                         file:rounded-xl file:border-0
                         file:text-sm file:font-semibold
                         file:bg-indigo-600 file:text-white
                         hover:file:bg-indigo-700
                         file:cursor-pointer file:transition-colors
-                        cursor-pointer bg-white border border-dashed border-gray-300 rounded-xl p-2
-                      "
+                        cursor-pointer bg-white border border-dashed rounded-xl p-2
+                        ${validationErrors.serialFile ? "border-red-500 bg-red-50/10" : "border-gray-300"}
+                      `}
                     />
                     {serialFile && (
                       <p className="mt-2 text-xs text-indigo-600 font-medium flex items-center gap-1">
@@ -506,6 +516,11 @@ const AssetList = () => {
                         <span className="ml-1 text-amber-600 flex items-center gap-0.5">
                           <Lock size={11} /> Quantity locked
                         </span>
+                      </p>
+                    )}
+                    {validationErrors.serialFile && (
+                      <p className="mt-2 text-xs text-red-500 font-medium flex items-center gap-1 animate-in fade-in slide-in-from-top-1">
+                        <AlertTriangle size={14} /> {validationErrors.serialFile}
                       </p>
                     )}
                   </div>
@@ -647,14 +662,14 @@ const Modal = ({ title, children, onClose }) => (
   </div>
 );
 
-const Input = ({ label, error, locked, disabled, ...props }) => (
+const Input = ({ label, error, locked, disabled, required, ...props }) => (
   <div className="flex flex-col gap-1.5">
     <div className="flex justify-between items-center">
       <label
         className={`text-xs font-bold uppercase tracking-wide ${error ? "text-red-500" : locked ? "text-amber-600" : "text-gray-500"
           }`}
       >
-        {label}
+        {label} {required && <span className="text-red-500">*</span>}
       </label>
       {locked && (
         <span className="flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
