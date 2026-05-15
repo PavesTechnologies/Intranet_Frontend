@@ -1,7 +1,7 @@
 import React from 'react';
 import { DemandTypeBadge, PriorityBadge, StateBadge, SLABadge } from './FormalBadges';
 import { Pencil, Trash2 } from "lucide-react";
-import { ProjectsIcon, UserIcon, PendingIcon, CheckIcon, SpinnerIcon, ErrorIcon, SuccessIcon } from "@/components/icons";
+import { ProjectsIcon, UserIcon, PendingIcon, CheckIcon, SpinnerIcon, ErrorIcon, SuccessIcon ,EditIcon} from "@/components/icons";
 import { cn } from "@/lib/utils";
 import {
     canProjectManagerEditDemand,
