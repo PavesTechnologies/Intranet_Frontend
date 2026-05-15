@@ -215,7 +215,9 @@ export const demandService = {
   getProjectKPIs: async (projectId) => {
     try {
       const response = await axios.get(`${BASE_URL}/api/demand/pm/kpi`, {
-        ...getAuthHeader(),
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
         params: { projectId },
       });
       if (response.data && response.data.success) {
@@ -236,7 +238,11 @@ export const demandService = {
     try {
       const response = await axios.get(
         `${BASE_URL}/api/demand/project/${projectId}`,
-        getAuthHeader(),
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
       );
       if (response.data && response.data.success) {
         return response.data.data;
