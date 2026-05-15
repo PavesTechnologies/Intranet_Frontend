@@ -221,7 +221,7 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                                         : "text-blue-600 hover:text-blue-700"
                                 )}
                             >
-                                <Pencil className="h-4 w-4" />
+                                <EditIcon size={16} />
                             </button>
                             {canPMDeleteRequestedDemand && (
                                 <button
@@ -232,7 +232,7 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                                     }}
                                     className="inline-flex h-8 w-8 items-center justify-center text-rose-600 transition-all hover:text-rose-700 active:scale-90"
                                 >
-                                    <Trash2 className="h-4 w-4" />
+                                    <DeleteIcon size={16} />
                                 </button>
                             )}
                         </div>
