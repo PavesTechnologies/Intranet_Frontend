@@ -1130,9 +1130,9 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
     const TABS = [
         { id: 'overview', label: 'Overview', icon: DashboardIcon },
         { id: 'resource', label: 'Resources', icon: TeamIcon },
-        { id: 'roleInfo', label: 'Delivery Role Info', icon: CodeIcon },
+        { id: 'roleInfo', label: 'DeliveryRoleInfo', icon: CodeIcon },
         ...(isRM ? [{ id: 'skillGap', label: 'Skill Gap Analysis', icon: GitCompareIcon }] : []),
-        { id: 'approvalFlow', label: 'Approval Flow', icon: ShieldIcon },
+        { id: 'approvalFlow', label: 'ApprovalFlow', icon: ShieldIcon },
         ...(!isSoft && slaId ? [{ id: 'slaInsights', label: 'SLA Insights', icon: PendingIcon }] : []),
         ...(isRM && allocationResults ? [{ id: 'allocationResults', label: 'Allocation Results', icon: ActivityIcon }] : [])
     ];
@@ -1141,7 +1141,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
         <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans selection:bg-indigo-100 overflow-hidden">
 
             {/* --- TOP HEADER (Slimmed Down) --- */}
-            <header className="bg-white border-b border-slate-100 sticky top-0">
+            <header className="mt-1 bg-white border-b border-slate-100 sticky top-4 z-30">
                 <div className="max-w-[1600px] mx-auto px-3 py-1.5">
                     <div className="flex items-center justify-between">
 
@@ -1241,7 +1241,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
                                         className={cn(
-                                            "flex items-center gap-2 py-3 text-[10px] font-black transition-all border-b-2 relative tracking-widest uppercase",
+                                            "flex items-center gap-2 py-3 text-xs font-black transition-all border-b-2 relative tracking-normal",
                                             isActive
                                                 ? "text-indigo-600 border-indigo-600"
                                                 : "text-slate-400 border-transparent hover:text-slate-600"

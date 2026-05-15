@@ -1840,7 +1840,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
                 {/* CENTER - SEARCH */}
                 <div className="flex flex-1 justify-end">
-                  <div className="flex w-full max-w-md items-center gap-1">
+                  <div className="flex w-full max-w-sm items-center gap-1">
                     <div className="relative flex-1">
                       <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                       <input
@@ -1858,7 +1858,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                         <button
                           type="button"
                           onClick={() => setFilterPanelCollapsed((prev) => !prev)}
-                          className={`inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors ${filterPanelCollapsed
+                          className={`inline-flex h-10 min-w-[120px] items-center justify-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors ${filterPanelCollapsed
                             ? "border-gray-300 bg-white text-gray-600 hover:border-gray-400 hover:text-[#081534]"
                             : "border-[#081534] bg-[#081534] text-white hover:bg-[#10214f]"
                             }`}
@@ -1888,30 +1888,34 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                 {/* RIGHT - FILTERS */}
                 {mode === "pm" ? (
                   <div className="flex items-center gap-3 shrink-0">
-                    <FilterListbox
-                      options={[
-                        { value: "", label: "Impact" },
-                        { value: "Low", label: "Low" },
-                        { value: "Medium", label: "Medium" },
-                        { value: "High", label: "High" },
-                      ]}
-                      value={filters.impact}
-                      onChange={(val) => setFilters((prev) => ({ ...prev, impact: val }))}
-                    />
+                    <div className="w-44">
+                      <FilterListbox
+                        options={[
+                          { value: "", label: "Impact" },
+                          { value: "Low", label: "Low" },
+                          { value: "Medium", label: "Medium" },
+                          { value: "High", label: "High" },
+                        ]}
+                        value={filters.impact}
+                        onChange={(val) => setFilters((prev) => ({ ...prev, impact: val }))}
+                      />
+                    </div>
 
-                    <FilterListbox
-                      options={[
-                        { value: "", label: "Reason" },
-                        { value: "Project Completion", label: "Project Completion" },
-                        { value: "Client Ramp Down", label: "Client Ramp Down" },
-                        { value: "Performance Issue", label: "Performance Issue" },
-                        { value: "Budget Realignment", label: "Budget Realignment" },
-                        { value: "Critical Dependency", label: "Critical Dependency" },
-                        { value: "Emergency Transition", label: "Emergency Transition" },
-                      ]}
-                      value={filters.reason}
-                      onChange={(val) => setFilters((prev) => ({ ...prev, reason: val }))}
-                    />
+                    <div className="w-56">
+                      <FilterListbox
+                        options={[
+                          { value: "", label: "Reason" },
+                          { value: "Project Completion", label: "Project Completion" },
+                          { value: "Client Ramp Down", label: "Client Ramp Down" },
+                          { value: "Performance Issue", label: "Performance Issue" },
+                          { value: "Budget Realignment", label: "Budget Realignment" },
+                          { value: "Critical Dependency", label: "Critical Dependency" },
+                          { value: "Emergency Transition", label: "Emergency Transition" },
+                        ]}
+                        value={filters.reason}
+                        onChange={(val) => setFilters((prev) => ({ ...prev, reason: val }))}
+                      />
+                    </div>
                   </div>
                 ) : null}
 

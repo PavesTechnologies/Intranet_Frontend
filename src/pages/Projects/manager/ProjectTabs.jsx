@@ -37,8 +37,8 @@ const TabSkeleton = () => (
 
 // ─── Resource Management Dropdown ───────────────────────────────────────────
 const RESOURCE_TABS = [
-  { name: "Demand",         tab: "demand-management" },
-  { name: "RoleOff",        tab: "roleoff-management" },
+  { name: "DemandManagement", tab: "demand-management" },
+  { name: "RoleOffManagement", tab: "roleoff-management" },
   { name: "Configurations", tab: "configurations" },
 ];
 
@@ -95,7 +95,7 @@ const ResourceDropdown = ({ selectedTab, onSelect }) => {
             : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}
         `}
       >
-        Resource
+        ResourceManagement
         <ChevronDown
           className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           strokeWidth={2.5}
@@ -108,7 +108,7 @@ const ResourceDropdown = ({ selectedTab, onSelect }) => {
         onMouseEnter={scheduleOpen}
         onMouseLeave={scheduleClose}
         className={`
-          absolute top-full left-0 mt-1.5 w-44 bg-white border border-slate-200
+          absolute top-full left-0 mt-1.5 w-56 bg-white border border-slate-200
           rounded-lg shadow-lg shadow-slate-200/60 overflow-hidden z-50
           transition-all duration-150 origin-top
           ${open
@@ -250,8 +250,8 @@ const ProjectTabs = () => {
     { name: "Summary", tab: "summary" },
     { name: "Backlog",  tab: "backlog" },
     { name: "Board",    tab: "board" },
-    { name: "Risk",     tab: "risk-management" },
-    { name: "Test",     tab: "test-management" },
+    { name: "RiskManagement", tab: "risk-management" },
+    { name: "TestManagement", tab: "test-management" },
   ];
 
   // ─── Guards ──────────────────────────────────────────────────────────────
