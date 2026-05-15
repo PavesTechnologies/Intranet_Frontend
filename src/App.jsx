@@ -344,27 +344,20 @@ const AppRoutes = () => {
           <Route path="/profile/edit" element={<EditProfile />} />
           {/* Projects */}
           {/* <Route path="/projects/dashboard" element={<AdminDashboard />} /> */}
-          <Route path="/projects/developer" element={<ReadOnlyDashboard />} />
+          
           <Route
             path="/projects"
             element={
-              // <ProtectedRoute allowedRoles={["Manager"]}>
+             
               <ProjectDashboard />
-              // </ProtectedRoute>
+            
             }
           />
 
           <Route path="/projects" element={<ProjectManager />} />
           <Route path="/projects/:projectId" element={<ProjectTabs />} />
           <Route path="/projects/list" element={<ProjectList />} />
-          {/* <Route
-  path="/projects/:projectId/issuetracker"
-  element={
-    <ProtectedRoute allowedRoles={["General", "Manager"]}>
-      <IssueTracker />
-    </ProtectedRoute>
-  }
-/> */}
+          
           <Route
             path="/projects/:projectId/issuetracker"
             element={<IssueTracker />}
@@ -373,30 +366,16 @@ const AppRoutes = () => {
             path="/projects/:projectId/cycles/runs/:runId/test-runs"
             element={<AddCasesFromProjectModal />}
           />
-          <Route
-            path="/projects/performance"
-            element={<EmployeePerformance />}
-          />
+          
           <Route
             path="/projects/:projectId/cycles/:cycleId/runs"
             element={<CycleRunsPage />}
           />
-          <Route path="/projects/user/myprofile" element={<Userprofile />} />
-          <Route path="/projects/userlist" element={<UserProjectList />} />
-          {/* <Route path="/projects/user/:userId" element={<UserProjectDashboard />} /> */}
-          <Route
-            path="/projects/userbacklog/:projectId"
-            element={<UserBacklog />}
-          />
+         
+          
           <Route path="/projects/admin" element={<ProjectManager />} />
-          <Route
-            path="/projects/user/:projectId"
-            element={<UserProjectTabs />}
-          />
-          <Route
-            path="/projects/:projectId/user/userissuetracker"
-            element={<UserIssueTracker />}
-          />
+          
+          
           <Route
             path="/projects/:projectId/issues/:type/:id/view"
             element={<ViewSheet />}
