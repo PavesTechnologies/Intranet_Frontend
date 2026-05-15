@@ -3,12 +3,7 @@ import AppCard from "./AppCard";
 import LoadingSpinner from "../LoadingSpinner";
 import { User } from "lucide-react";
 import Working from "../icons/working.svg";
-
-const MOCK_EMPLOYEES = [
-  { id: 1, name: "Riya Sharma", leaveType: "Earned Leave", duration: "Full day" },
-  { id: 2, name: "Arjun Mehta", leaveType: "Sick Leave", duration: "Full day" },
-  { id: 3, name: "Priya Nair", leaveType: "Comp Off", duration: "Half day" },
-];
+import { todayOnLeave } from "../../services/dashboard";
 
 const AVATAR_COLORS = [
   "bg-teal-400", "bg-rose-400", "bg-blue-400", "bg-violet-400",
@@ -31,16 +26,15 @@ function getColor(name) {
 }
 
 function EmployeeCard({ employee }) {
-  const initials = getInitials(employee.name);
-  const color = getColor(employee.name);
-  const firstName = employee.name.trim().split(/\s+/)[0];
+  const initials = getInitials(employee.employeeName);
+  const color = getColor(employee.employeeName);
 
   return (
     <div className="group relative flex flex-col items-center gap-1.5 transition-all duration-200 hover:-translate-y-1">
       {/* Tooltip */}
-      {employee.duration && (
+      {employee.session && (
         <div className="absolute -top-9 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-gray-900/90 text-white text-[10px] px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap z-20 pointer-events-none translate-y-2 group-hover:translate-y-0">
-          {employee.duration}
+          {employee.session}
           <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-gray-900/90" />
         </div>
       )}
@@ -50,9 +44,9 @@ function EmployeeCard({ employee }) {
         {initials}
       </div>
 
-      {/* First name */}
-      <span className="text-[10px] font-semibold text-gray-600 max-w-[52px] truncate text-center leading-tight">
-        {firstName}
+      {/* Name */}
+      <span className="text-[10px] font-semibold text-gray-600 w-[50px] line-clamp-2 text-center leading-tight">
+        {employee.employeeName}
       </span>
     </div>
   );
@@ -63,10 +57,10 @@ export default function TodayOnLeavePanel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: replace with real API call when endpoint is ready
-    // const res = await todayOnLeave(); setEmployees(res?.data ?? res ?? []);
-    setEmployees(MOCK_EMPLOYEES);
-    setLoading(false);
+    todayOnLeave()
+      .then((res) => setEmployees(res?.data ?? []))
+      .catch(() => setEmployees([]))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -91,7 +85,7 @@ export default function TodayOnLeavePanel() {
           <LoadingSpinner text="Loading..." />
         </div>
       ) : employees.length === 0 ? (
-        <div className="flex items-center gap-2 py-1">
+        <div className="flex items-center gap-2 py-1 justify-center">
           {/* <User size={15} className="text-gray-400" strokeWidth={2.5} /> */}
           <p className="text-xs text-gray-400 italic font-semibold">No one is on leave today</p>
           <img src={Working} alt="working" width={100} height={10} />

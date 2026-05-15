@@ -200,7 +200,7 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
                       }}
                       className="p-1 text-blue-600 hover:text-blue-800 transition"
                     >
-                      <Pencil size={16} />
+                      <EditIcon size={16} />
                     </button>
                     <button
                       title="Delete SLA"
@@ -210,7 +210,7 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
                       }}
                       className="p-1 text-red-600 hover:text-red-800 transition"
                     >
-                      <Trash2 size={16} />
+                      <DeleteIcon size={16} />
                     </button>
                   </>
                 ) : (

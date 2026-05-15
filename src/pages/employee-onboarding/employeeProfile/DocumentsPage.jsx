@@ -894,7 +894,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
               placeholder="Search documents..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-8 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-8 text-sm outline-none focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 bg-white"
             />
             {searchQuery && (
               <button
@@ -907,10 +907,10 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
           </div>
 
           {/* Folders */}
-          <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md border border-indigo-100 overflow-hidden">
-            <div className="px-4 py-3 border-b border-indigo-100 bg-indigo-50/60">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Folders
+          <div className="bg-white rounded-xl border border-[#e4e8f2] overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(8,21,52,0.06)" }}>
+            <div className="px-4 py-3 border-b border-[#f4f6fc]">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Document Folders
               </span>
             </div>
             <div className="p-2 space-y-0.5">
@@ -918,15 +918,15 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                 <button
                   key={folder.key}
                   onClick={() => setActiveFolder(folder.key)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentFolderKey === folder.key
-                    ? "bg-indigo-50 text-indigo-700 font-semibold"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-800"
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${currentFolderKey === folder.key
+                    ? "bg-[#263383] text-white font-semibold shadow-sm"
+                    : "text-gray-600 hover:bg-[#f4f6fc] hover:text-[#263383]"
                     }`}
                 >
                   <span
                     className={
                       currentFolderKey === folder.key
-                        ? "text-indigo-500"
+                        ? "text-white/70"
                         : "text-gray-400"
                     }
                   >
@@ -934,9 +934,9 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                   </span>
                   <span className="flex-1 text-left">{folder.label}</span>
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${currentFolderKey === folder.key
-                      ? "bg-indigo-100 text-indigo-600"
-                      : "bg-gray-100 text-gray-500"
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${currentFolderKey === folder.key
+                      ? "bg-white/25 text-white"
+                      : "bg-[#f4f6fc] text-gray-500"
                       }`}
                   >
                     {folder.count}
@@ -1253,7 +1253,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
             {/* Header */}
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-white shrink-0">
               <div className="flex items-center gap-3">
-                <FileText size={18} className="text-indigo-600" />
+                <FileText size={18} className="text-[#263383]" />
                 <h3 className="text-base font-semibold text-gray-900">
                   {previewModal.title}
                 </h3>
@@ -1261,7 +1261,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => openInNewTab(previewModal.url)}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#263383] bg-[#263383]/5 rounded-lg hover:bg-[#263383]/10 transition-colors"
                 >
                   <ExternalLink size={14} />
                   Open in New Tab
@@ -1314,7 +1314,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                   </p>
                   <button
                     onClick={() => openInNewTab(previewModal.url)}
-                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-white bg-[#263383] rounded-xl hover:bg-[#081534] transition-colors"
                   >
                     Open in New Tab
                   </button>
@@ -1332,7 +1332,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
             {/* Header */}
             <div className="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 bg-white shrink-0">
               <div className="flex items-center gap-3">
-                <Upload size={18} className="text-indigo-600" />
+                <Upload size={18} className="text-[#263383]" />
                 <h3 className="text-base font-semibold text-gray-900">
                   {uploadModal.docId ? "Update Document" : "Add New Document"}{" "}
                   <span className="text-gray-400 font-normal text-sm">
@@ -1658,8 +1658,8 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       onDrop={handleDrop}
                       onDragOver={handleDragOver}
                       className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${uploadFile
-                        ? "border-indigo-300 bg-indigo-50/50"
-                        : "border-gray-200 bg-gray-50/50 hover:border-indigo-300 hover:bg-indigo-50/30"
+                        ? "border-[#263383]/30 bg-[#263383]/5"
+                        : "border-gray-200 bg-gray-50/50 hover:border-[#263383]/30 hover:bg-[#263383]/5"
                         }`}
                     >
                       <input
@@ -1674,7 +1674,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                         <div className="space-y-2">
                           <FileText
                             size={28}
-                            className="text-indigo-500 mx-auto"
+                            className="text-[#263383] mx-auto"
                           />
                           <p className="text-sm font-medium text-gray-800">
                             {uploadFile.name}
@@ -1721,7 +1721,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                 <button
                   onClick={handleUpload}
                   disabled={uploading}
-                  className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
+                  className="px-5 py-2.5 text-sm font-medium text-white bg-[#263383] rounded-xl hover:bg-[#081534] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
                 >
                   {uploading ? (
                     <span className="flex items-center gap-2">
@@ -1820,7 +1820,7 @@ const FolderContent = ({
       {onUpload && (
         <button
           onClick={onUpload}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm transition-all shrink-0 w-full sm:w-auto justify-center sm:justify-start"
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[#263383] rounded-xl hover:bg-[#081534] shadow-sm transition-all shrink-0 w-full sm:w-auto justify-center sm:justify-start"
         >
           <Upload size={16} />
           Add New Document
@@ -1846,13 +1846,11 @@ const DocumentCard = ({
   deleting,
   children,
 }) => {
-  /* Helper: format doc_type to readable name */
   const formatDocType = (docType) => {
     if (!docType) return "Document";
     return docType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
-  /* Helper: extract filename from file_path */
   const getFileName = (filePath) => {
     if (!filePath) return "Unknown File";
     const parts = filePath.split("/");
@@ -1860,39 +1858,46 @@ const DocumentCard = ({
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md border border-indigo-100 overflow-hidden">
+    <div className="bg-white rounded-xl border border-[#e4e8f2] overflow-hidden"
+      style={{ boxShadow: "0 1px 4px rgba(8,21,52,0.06)", borderLeft: "3px solid #263383" }}>
       {/* Card Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-indigo-100 bg-indigo-50/60">
-        <div className="flex items-center gap-3 min-w-0">
-          <FileText size={16} className="text-indigo-600 shrink-0" />
-          <h4 className="text-sm font-semibold text-indigo-800 truncate">
-            {title}
-          </h4>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[#f4f6fc]">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: "#eff6ff" }}>
+            <FileText size={13} className="text-[#263383]" />
+          </div>
+          <h4 className="text-sm font-semibold text-[#081534] truncate">{title}</h4>
+          {hasFile && (
+            <span className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 flex-shrink-0">
+              <CheckCircle size={9} /> Uploaded
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {onUpload && (
             <button
               onClick={onUpload}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-gray-600 bg-white border border-[#e4e8f2] rounded-lg hover:bg-[#f4f6fc] transition-colors"
             >
-              <Upload size={14} />
-              {hasFile ? "Re-upload" : "Upload"}
+              <Upload size={11} />
+              {hasFile ? "Replace" : "Upload"}
             </button>
           )}
           {onDelete && (
             <button
               onClick={onDelete}
               disabled={deleting}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-red-500 bg-white border border-red-100 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
             >
               {deleting ? (
                 <>
-                  <div className="h-3.5 w-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-                  Deleting...
+                  <div className="h-3 w-3 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                  Deleting…
                 </>
               ) : (
                 <>
-                  <Trash2 size={14} />
+                  <Trash2 size={11} />
                   Delete
                 </>
               )}
@@ -1902,30 +1907,30 @@ const DocumentCard = ({
       </div>
 
       {/* Card Body */}
-      <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4">
+      <div className="px-4 py-4 space-y-3">
         {children}
 
         {/* Attached Documents List */}
         {documents.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-              Attached Documents ({documents.length})
+          <div className="pt-3 border-t border-[#f4f6fc]">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Attached Files ({documents.length})
             </p>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {documents.map((file, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5 bg-gray-50/80 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group"
+                  className="flex items-center justify-between gap-3 px-3 py-2 bg-[#fafbfd] rounded-lg border border-[#f0f2f8] hover:border-[#263383]/20 transition-all"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
-                      <FileText size={14} className="text-indigo-600" />
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-6 h-6 rounded-md bg-[#263383]/10 flex items-center justify-center flex-shrink-0">
+                      <FileText size={11} className="text-[#263383]" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">
+                      <p className="text-xs font-semibold text-gray-700 truncate">
                         {formatDocType(file.doc_type)}
                       </p>
-                      <p className="text-[11px] text-gray-400 truncate">
+                      <p className="text-[10px] text-gray-400 truncate">
                         {getFileName(file.file_path)}
                       </p>
                     </div>
@@ -1938,16 +1943,16 @@ const DocumentCard = ({
                       )
                     }
                     disabled={loading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50 shrink-0"
+                    className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#263383] bg-white border border-[#263383]/20 rounded-lg hover:bg-[#263383]/5 transition-colors disabled:opacity-50 flex-shrink-0"
                   >
                     {loading ? (
                       <>
-                        <div className="h-3.5 w-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                        Loading...
+                        <div className="h-3 w-3 border-2 border-[#263383] border-t-transparent rounded-full animate-spin" />
+                        Loading…
                       </>
                     ) : (
                       <>
-                        <Eye size={14} />
+                        <Eye size={11} />
                         View
                       </>
                     )}
@@ -1974,15 +1979,19 @@ const DocField = ({ label, value }) => (
 
 /* ---- Empty State ---- */
 const EmptyState = ({ message, onUpload }) => (
-  <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md border border-indigo-100 p-10 text-center">
-    <FileText size={32} className="text-gray-300 mx-auto mb-3" />
-    <p className="text-sm text-gray-400 mb-4">{message}</p>
+  <div className="flex flex-col items-center justify-center py-14 border-2 border-dashed border-[#e4e8f2] rounded-xl bg-[#fafbfd] text-center">
+    <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+      style={{ background: "linear-gradient(135deg, #f4f6fc 0%, #e8ecf8 100%)" }}>
+      <FileText size={24} className="text-gray-300" />
+    </div>
+    <p className="text-sm font-semibold text-gray-500 mb-1">{message}</p>
+    <p className="text-xs text-gray-400 mb-4">Upload your documents to get started</p>
     {onUpload && (
       <button
         onClick={onUpload}
-        className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm transition-all"
+        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#263383] border border-[#263383]/20 hover:bg-[#263383]/5 rounded-xl transition-all"
       >
-        <Upload size={16} />
+        <Upload size={14} />
         Upload Document
       </button>
     )}
@@ -2006,7 +2015,7 @@ const UploadField = ({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 bg-white placeholder-gray-400 hover:border-gray-400 transition-all"
+      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 bg-white placeholder-gray-400 hover:border-gray-400 transition-all"
     />
   </div>
 );

@@ -43,7 +43,7 @@ export default function WorkforceAvailability() {
 
   // Navigate to Resource Intelligence page instead of opening a modal
   const handleResourceClick = (resource) => {
-    const id = resource.id || resource.resourceId;
+    const id = resource.employeeId || resource.resourceId || resource.userId || resource.id;
     if (!id) {
       console.warn("Resource has no id or resourceId:", resource);
       return;

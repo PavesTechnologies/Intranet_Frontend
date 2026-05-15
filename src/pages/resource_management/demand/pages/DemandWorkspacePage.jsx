@@ -14,7 +14,6 @@ import DemandFilters from '../components/DemandFilters';
 import { useDemand } from '../hooks/useDemand';
 import DemandModal from '../../models/DemandModal';
 import { handleDMDecision, handleRMDecision, deleteDemandByPM } from '../../services/demandService';
-import { updateDemandStatus } from '../../services/projectService';
 import {
     Select,
     SelectContent,
@@ -24,6 +23,12 @@ import {
 } from "@/components/ui/select";
 import Pagination from '../../../../components/Pagination/pagination';
 import { toast } from 'react-toastify';
+import {
+    canProjectManagerEditDemand,
+    canProjectManagerMutateDemand,
+    PM_EDITABLE_DEMAND_MESSAGE,
+    PM_REQUESTED_DEMAND_ONLY_MESSAGE,
+} from '../utils/demandPermissions';
 
 const getActionErrorMessage = (error, fallback) =>
     error?.response?.data?.message ||
@@ -31,6 +36,7 @@ const getActionErrorMessage = (error, fallback) =>
     fallback;
 
 const DM_PENDING_STATUSES = ['REQUESTED', 'DRAFT', 'SOFT', 'PROPOSED', 'PENDING', 'OPEN', 'IN_PROGRESS', 'IN PROGRESS'];
+const DM_REJECTABLE_STATUSES = [...DM_PENDING_STATUSES, 'APPROVED'];
 
 const normalizeRole = (role = "") =>
     String(role)
@@ -52,6 +58,8 @@ const getDemandType = (demand = {}) =>
     demand.demand_type ||
     demand.type_of_demand ||
     "";
+
+const getDemandId = (demand = {}) => demand.demandId || demand.id;
 
 const DecisionModal = ({
     type,
@@ -118,6 +126,7 @@ const DecisionModal = ({
                         </button>
                     </div>
                 </div>
+                
 
                 <div className="flex flex-1 flex-col justify-between gap-5 px-6 py-5">
                     <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
@@ -306,7 +315,7 @@ const DemandWorkspacePage = () => {
     const [rejectReasonError, setRejectReasonError] = useState("");
     const [rmRejectReason, setRmRejectReason] = useState("");
     const [rmRejectReasonError, setRmRejectReasonError] = useState("");
-    const isRMView = effectiveRole === "Resource_Manager";
+    const isRMView = normalizeRole(effectiveRole) === "RESOURCEMANAGER";
 
     const openApproveModal = (demand) => {
         setApprovingDemand(demand);
@@ -329,6 +338,14 @@ const DemandWorkspacePage = () => {
     };
 
     const openDeleteModal = (demand) => {
+        const normalizedRole = normalizeRole(effectiveRole);
+        const isRM = normalizedRole === "RESOURCEMANAGER";
+        const isPM = normalizedRole === "PROJECTMANAGER" || normalizedRole === "MANAGER";
+        
+        if ((isPM || isRM) && !canProjectManagerMutateDemand(demand)) {
+            toast.error("Only REQUESTED demands can be deleted.");
+            return;
+        }
         setDeletingDemand(demand);
     };
 
@@ -383,22 +400,29 @@ const DemandWorkspacePage = () => {
 
     const handleQuickReject = async () => {
         const cleanedReason = rejectReason.trim();
+        const currentStatus = String(rejectingDemand?.lifecycleState || rejectingDemand?.demandStatus || "").toUpperCase();
 
         if (!cleanedReason) {
             setRejectReasonError("Please enter a rejection reason.");
             return;
         }
 
-        if (!rejectingDemand?.id) return;
+        const demandId = getDemandId(rejectingDemand);
+        if (!demandId) return;
 
-        setDecisionState({ demandId: rejectingDemand.id, action: "reject" });
+        if (!DM_REJECTABLE_STATUSES.includes(currentStatus)) {
+            toast.error("Only pending or approved demands can be rejected by DM.");
+            return;
+        }
+
+        setDecisionState({ demandId, action: "reject" });
         try {
             const response = await handleDMDecision({
-                demandId: rejectingDemand.id,
+                demandId,
                 decision: "REJECTED",
                 rejectionReason: cleanedReason
             });
-            toast.success(response?.message || "Demand rejected successfully");
+            toast.success(response?.message || (currentStatus === "APPROVED" ? "Approved demand rejected successfully" : "Demand rejected successfully"));
             setRejectingDemand(null);
             setRejectReason("");
             setRejectReasonError("");
@@ -463,9 +487,18 @@ const DemandWorkspacePage = () => {
         const id = deletingDemand?.demandId || deletingDemand?.id;
         if (!id) return;
 
+        const normalizedRole = normalizeRole(effectiveRole);
+        const isRM = normalizedRole === "RESOURCEMANAGER";
+        const isPM = normalizedRole === "PROJECTMANAGER" || normalizedRole === "MANAGER";
+
+        if ((isPM || isRM) && !canProjectManagerMutateDemand(deletingDemand)) {
+            toast.error("Only REQUESTED demands can be deleted.");
+            return;
+        }
+
         setDecisionState({ demandId: id, action: "delete" });
         try {
-            const response = await deleteDemandByPM(id);
+            const response = await deleteDemandByPM(id, deletingDemand);
             toast.success(response?.message || "Demand deleted successfully");
             setDeletingDemand(null);
             await refreshData();
@@ -475,6 +508,7 @@ const DemandWorkspacePage = () => {
             setDecisionState({ demandId: null, action: null });
         }
     };
+
 
     // Sync draft with global filters when they change externally (like Reset)
     useEffect(() => {
@@ -697,12 +731,13 @@ const DemandWorkspacePage = () => {
                                 const isRMView = normalizedViewerRole === "RESOURCEMANAGER";
                                 const isPMView = normalizedViewerRole === "PROJECTMANAGER" || normalizedViewerRole === "MANAGER";
                                 const canQuickDecision = isDMView && DM_PENDING_STATUSES.includes(status);
-                                const canRMCloseDemand = isRMView && status === 'APPROVED';
-                                const canPMEditRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
-                                const canPMDeleteRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
+                                const canDMRevertApprovedDemand = isDMView && status === 'APPROVED';
+                                const canRMAction = isRMView && (status === 'APPROVED' || status === 'REQUESTED');
+                                const canPMEditDemand = isPMView && canProjectManagerEditDemand(demand);
+                                const canDeleteDemand = (isPMView || isRMView) && canProjectManagerMutateDemand(demand);
                                 const isFulfilled = status === 'FULFILLED';
                                 const isRejected = status === 'REJECTED';
-                                const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditRequestedDemand);
+                                const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditDemand);
                                 
                                 const isApproving = decisionState?.demandId === demand.id && decisionState?.action === "approve";
                                 const isRejecting = decisionState?.demandId === demand.id && decisionState?.action === "reject";
@@ -812,27 +847,34 @@ const DemandWorkspacePage = () => {
                                                         {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
                                                     </button>
                                                 </div>
-                                            ) : canRMCloseDemand ? (
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => openFulfillModal(demand)}
-                                                        disabled={isFulfilling || isRejecting}
-                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
-                                                    >
-                                                        {isFulfilling ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <SuccessIcon className="h-4 w-4" />}
-                                                    </button>
+                                            ) : canRMAction ? (
+                                                <div className="flex items-center justify-center">
                                                     <button
                                                         onClick={() => openRMRejectModal(demand)}
-                                                        disabled={isFulfilling || isRejecting}
+                                                        disabled={isRejecting}
+                                                        title="Reject Demand"
                                                         className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
                                                     >
                                                         {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
                                                     </button>
                                                 </div>
+                                            ) : canDMRevertApprovedDemand ? (
+                                                <button
+                                                    title="Reject approved demand"
+                                                    onClick={() => openRejectModal(demand)}
+                                                    disabled={isRejecting}
+                                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                                                >
+                                                    {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
+                                                </button>
                                             ) : (
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={() => {
+                                                            if (isPMView && !canProjectManagerEditDemand(demand)) {
+                                                                toast.error(PM_EDITABLE_DEMAND_MESSAGE);
+                                                                return;
+                                                            }
                                                             setEditingDemand(demand);
                                                             setEditModalOpen(true);
                                                         }}
@@ -841,7 +883,7 @@ const DemandWorkspacePage = () => {
                                                     >
                                                         <EditIcon className="h-4 w-4" />
                                                     </button>
-                                                    {canPMDeleteRequestedDemand && (
+                                                    {canDeleteDemand && (
                                                         <button
                                                             onClick={() => openDeleteModal(demand)}
                                                             className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"

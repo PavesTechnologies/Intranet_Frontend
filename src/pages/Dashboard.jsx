@@ -9,7 +9,7 @@ import RequestLeaveModal from "../pages/leave_management/models/RequestLeaveModa
 import { KPICard } from "../components/kpi/KPI";
 import { timesheet, pmsSummary, leaveBalance } from "../services/dashboard";
 import { useAuth } from "../contexts/AuthContext";
-import { CalendarPlus, Clock } from "lucide-react";
+import { CalendarPlus, Clock, ArrowRight } from "lucide-react";
 import Button from "../components/Button/Button";
 
 // ── Data ────────────────────────────────────────────────────────────────────
@@ -428,7 +428,7 @@ export default function Dashboard() {
                       <span className="text-sm font-semibold text-gray-800">Leave Balance Overview</span>
                     </div>
                     <button onClick={() => navigate("/leave-management")}
-                      className="text-xs text-blue-600 hover:text-blue-800">View Details</button>
+                      className="text-xs text-blue-600 hover:text-blue-800 flex gap-1 items-center">Explore <ArrowRight size={10} strokeWidth={3} /></button>
                   </div>
                 )}
               >
@@ -443,19 +443,19 @@ export default function Dashboard() {
                       <>
                         <DonutChart
                           label="Earned Leave"
-                          used={earned.totalBalance - earned.remainingBalance}
+                          used={earned.usedLeaves}
                           remaining={earned.remainingBalance}
                           color="#10b981"
                         />
                         <DonutChart
                           label="Sick Leave"
-                          used={sick.totalBalance - sick.remainingBalance}
+                          used={sick.usedLeaves}
                           remaining={sick.remainingBalance}
                           color="#f43f5e"
                         />
                         <DonutChart
                           label="Comp Off"
-                          used={comp.totalBalance - comp.remainingBalance}
+                          used={comp.usedLeaves}
                           remaining={comp.remainingBalance}
                           color="#3b82f6"
                         />

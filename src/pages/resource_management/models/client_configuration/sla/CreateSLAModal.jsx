@@ -78,6 +78,7 @@ const CreateSLAModal = ({ open, onClose }) => {
               type="number"
               name="sla_duration_days"
               value={formData.sla_duration_days}
+              onWheel={(e) => e.target.blur()}
               onChange={handleChange}
               placeholder="e.g. 15"
               className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
@@ -93,6 +94,7 @@ const CreateSLAModal = ({ open, onClose }) => {
               type="number"
               name="warning_threshold_days"
               value={formData.warning_threshold_days}
+              onWheel={(e) => e.target.blur()}
               onChange={handleChange}
               placeholder="e.g. 5"
               className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
