@@ -303,9 +303,13 @@ export default function RequestLeaveModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    document.body.style.overflow = "hidden";
     const handler = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handler);
+    };
   }, [isOpen, onClose]);
 
   const shouldShowDriveLink = () => {

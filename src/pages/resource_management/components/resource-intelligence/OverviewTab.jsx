@@ -119,10 +119,17 @@ function MiniInfoRow({ label, value, icon: Icon }) {
 function UtilizationChart({ data }) {
     const list = Array.isArray(data) ? data : (data?.data && Array.isArray(data.data) ? data.data : []);
 
+<<<<<<< HEAD
     if (list.length === 0) {
         return <div className="flex items-center justify-center h-full text-[10px] text-slate-400 font-medium font-sans">No Trend Data Available</div>;
     }
 
+=======
+    if (!list || list.length === 0) {
+        return <div className="flex items-center justify-center h-full text-[10px] text-slate-400 font-medium font-sans">No Trend Data Available</div>;
+    }
+    
+>>>>>>> c9757338ffcabaea132531d71c7cf8a7091aba18
     const maxVal = Math.max(...list.map(d => (d.billable || 0) + (d.nonBillable || 0)), 1);
 
     return (
