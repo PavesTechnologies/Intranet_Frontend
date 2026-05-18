@@ -27,8 +27,7 @@ import {
   deleteClientAsset,
   getAssetDashboardByClient,
 } from "../services/clientservice";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { notify } from "../utils/notify";
 
 /* ---------------- MAIN COMPONENT ---------------- */
 
@@ -63,7 +62,7 @@ const AssetList = () => {
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed To Load Assets");
+      notify.error(err, "Failed To Load Assets");
     }
   };
 
@@ -211,14 +210,14 @@ const AssetList = () => {
         closeModal();
         await fetchAssets();
         await fetchKpi();
-        toast.success(res.message || "Operation Successful!");
+        notify.success(res.message || "Operation Successful!");
       } else {
-        toast.error(res.message || "Something Went Wrong");
+        notify.error(res.message || "Something Went Wrong");
         setIsSaving(false);
       }
     } catch (err) {
       console.error(err);
-      toast.error(
+      notify.error(
         err.response?.data?.message || "Server Connection Failed. Please Try Again.",
       );
       setIsSaving(false);
@@ -231,16 +230,16 @@ const AssetList = () => {
     try {
       const res = await deleteClientAsset(deleteTarget.assetId);
       if (res.success) {
-        toast.success(res.message || "Asset Deleted Successfully");
+        notify.success(res.message || "Asset Deleted Successfully");
         setDeleteTarget(null);
         await fetchAssets();
         await fetchKpi();
       } else {
-        toast.error(res.message || "Failed To Delete Asset");
+        notify.error(res.message || "Failed To Delete Asset");
       }
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || "Failed To Delete Asset");
+      notify.error(err, "Failed To Delete Asset");
     }
   };
 
@@ -600,19 +599,6 @@ const AssetList = () => {
           </Modal>
         )}
       </div>
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-        style={{ zIndex: 10001 }}
-      />
     </div>
   );
 };

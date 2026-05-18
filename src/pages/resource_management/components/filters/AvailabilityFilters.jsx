@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Filter, X, ChevronDown, Check } from "lucide-react";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
@@ -188,7 +188,7 @@ export function FilterPanel({
       setFiltersRes(res.data);
     } catch (err) {
       console.error("Failed to load filters", err);
-      toast.error(err.response?.data?.message || "Failed to load filters");
+      notify.error(err, "Failed to load filters");
     } finally {
       setLoadingFilters(false);
     }
