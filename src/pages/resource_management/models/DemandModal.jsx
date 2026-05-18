@@ -9,9 +9,13 @@ import {
 import { createDemand, updateDemandStatus } from "../services/projectService";
 import { handleDMDecision, handleRMDecision } from "../services/demandService";
 import { getRoleExpectations } from "../services/workforceService";
-import { fetchResourcesByProjectId } from "../services/resource";
+
 import * as demandService from "../services/demandService";
 import { toast } from "react-toastify";
+import {
+  canProjectManagerEditDemand,
+  PM_EDITABLE_DEMAND_MESSAGE,
+} from "../demand/utils/demandPermissions";
 
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 
@@ -43,7 +47,7 @@ const FormField = ({ id, label, error, note, required, children, className = "" 
   </div>
 );
 
-const SearchableListboxField = ({ id, label, value, onChange, options, error, required = true, placeholder = "Search and select...", disabled = false, emptyMessage = "Nothing found." }) => {
+const SearchableListboxField = ({ id, label, value, onChange, options, error, required = true, placeholder = "Search And Select...", disabled = false, emptyMessage = "Nothing Found." }) => {
   const [query, setQuery] = useState("");
 
   const filteredOptions = query === ""
@@ -90,7 +94,7 @@ const SearchableListboxField = ({ id, label, value, onChange, options, error, re
             <Combobox.Options className="absolute z-[100] mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm border border-slate-100">
               {filteredOptions.length === 0 ? (
                 <div className="relative cursor-default select-none py-2 px-4 text-gray-700 italic">
-                  {query !== "" ? "Nothing found." : emptyMessage}
+                  {query !== "" ? "Nothing Found." : emptyMessage}
                 </div>
               ) : (
                 filteredOptions.map((opt, idx) => {
@@ -163,7 +167,7 @@ const ListboxField = ({ id, label, value, onChange, options, error, note, requir
             <Listbox.Options className="absolute z-[60] mt-1 w-full rounded-lg bg-white shadow-xl border border-slate-200 max-h-60 overflow-auto focus:outline-none py-1">
               {options.length === 0 ? (
                 <div className="px-3 py-2 text-xs text-slate-400 text-center italic">
-                  No options available
+                  No Options Available
                 </div>
               ) : (
                 options.map((opt, idx) => {
@@ -206,21 +210,21 @@ const emptyForm = {
   projectId: "",
   demandName: "",
   deliveryRole: "",
-  demandType: "NET_NEW",
-  outgoingResourceId: "",
+  demandType: "",
   demandStartDate: "",
   demandEndDate: "",
   allocationPercentage: "",
-  resourcesRequired: 1,
+  resourcesRequired: "",
   minExp: "",
   deliveryModel: "",
-  demandStatus: "DRAFT",
-  demandPriority: "MEDIUM",
-  demandCommitment: "CONFIRMED",
+  demandStatus: "",
+  demandPriority: "",
+  demandCommitment: "",
   requiresAdditionalApproval: false,
   demandJustification: "",
   rejectionReason: "",
 };
+
 
 const toDateInputValue = (date) => {
   if (!date) return "";
@@ -293,8 +297,8 @@ const buildUpdateDemandPayload = (form, id) => {
     demandType: form.demandType,
     demandName: form.demandName,
     minExp,
-    outgoingResourceId: toLongOrNull(form.outgoingResourceId),
     deliveryRole: form.deliveryRole,
+
     demandJustification: form.demandJustification,
     demandStartDate: form.demandStartDate || null,
     demandEndDate: form.demandEndDate || null,
@@ -302,12 +306,15 @@ const buildUpdateDemandPayload = (form, id) => {
     deliveryModel: form.deliveryModel,
     demandPriority: form.demandPriority,
     demandStatus: form.demandStatus,
+    lifecycleState: form.demandStatus,
+    status: form.demandStatus,
     demandCommitment: form.demandCommitment,
     requiresAdditionalApproval: Boolean(form.requiresAdditionalApproval),
     resourcesRequired,
     modifiedBy: form.modifiedBy || null,
   };
 };
+
 
 const buildCreateDemandPayload = (form, id) => {
   const payload = {
@@ -335,9 +342,8 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const [fetchingResources, setFetchingResources] = useState(false);
-  const [projectResources, setProjectResources] = useState([]);
   const startDateRef = useRef(null);
+
   const scrollRef = useRef(null);
 
   const [roles, setRoles] = useState([]);
@@ -346,13 +352,19 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   // Memoized Master Data
   const DEMAND_TYPES = useMemo(() => {
     const vals = getEnumValues("DemandType");
-    return vals.length > 0 ? normalizeStatusOptions(vals) : [
-      { label: "Net New", value: "NET_NEW" },
-      { label: "Replacement", value: "REPLACEMENT" }
-    ];
+    const statuses = normalizeStatusOptions(vals);
+    const filtered = statuses.filter(s => s.value !== "REPLACEMENT");
+    return filtered.length > 0 ? filtered : [{ label: "Net New", value: "NET_NEW" }];
   }, [getEnumValues]);
 
-  const DEMAND_STATUSES = useMemo(() => normalizeStatusOptions(getEnumValues("DemandStatus")), [getEnumValues]);
+
+
+  const DEMAND_STATUSES = useMemo(() => {
+    const vals = getEnumValues("DemandStatus");
+    const statuses = normalizeStatusOptions(vals);
+    return statuses.filter(s => s.value !== "CANCELLED");
+  }, [getEnumValues]);
+
 
   const PRIORITIES = useMemo(() => {
     const vals = getEnumValues("PriorityLevel");
@@ -383,7 +395,10 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
     ];
   }, [getEnumValues]);
 
-  const activeStatuses = DEMAND_STATUSES.length > 0 ? DEMAND_STATUSES : fallbackStatuses;
+  const activeStatuses = DEMAND_STATUSES.length > 0 ? DEMAND_STATUSES : [
+    { label: "Draft", value: "DRAFT" },
+    { label: "Requested", value: "REQUESTED" }
+  ];
 
   const normalizedRole = String(userRole || "")
     .toUpperCase()
@@ -392,7 +407,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   const isManagerOrPM = ["PROJECTMANAGER", "MANAGER"].includes(normalizedRole);
 
 
-  const computedEditStatuses = (() => {
+  const computedEditStatuses = useMemo(() => {
     if (normalizedRole === "DELIVERYMANAGER") {
       return [
         { label: "Accepted", value: "APPROVED" },
@@ -412,10 +427,11 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
       ];
     }
     return [
-      { label: "FULFILLED", value: "FULFILLED" },
-      { label: "REJECTED", value: "REJECTED" }
+      { label: "Fulfilled", value: "FULFILLED" },
+      { label: "Rejected", value: "REJECTED" }
     ];
-  })();
+  }, [normalizedRole, isManagerOrPM]);
+
 
   const fetchRoles = async () => {
     try {
@@ -426,21 +442,8 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
     }
   };
 
-  const getAllResources = async (pId) => {
-    if (!pId) return;
-    setFetchingResources(true);
-    try {
-      const res = await fetchResourcesByProjectId(pId);
-      setProjectResources(res.data || []);
-    } catch (err) {
-      console.error("Failed to fetch resources for project", err);
-      setProjectResources([]);
-    } finally {
-      setFetchingResources(false);
-    }
-  };
-
   const formatDate = (date) => {
+
     return toDateInputValue(date);
   };
 
@@ -449,108 +452,108 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   useEffect(() => {
     if (!open) return;
     fetchRoles();
-    const pId = projectDetails?.pmsProjectId || projectDetails?.projectId || projectDetails?._id || initialData?.projectId || initialData?.ProjectId || initialData?.pmsProjectId || "";
-    if (pId) {
-      getAllResources(pId);
-    }
   }, [open, projectDetails, initialData]);
 
+
+  const isInitialized = useRef(false);
+
   useEffect(() => {
-    if (open) {
-      const isEdit = mode === "edit";
+    if (!open) {
+      isInitialized.current = false;
+      return;
+    }
+    if (isInitialized.current) return;
 
-      const pId = projectDetails?.pmsProjectId || projectDetails?.projectId || projectDetails?._id || initialData?.projectId || initialData?.ProjectId || initialData?.pmsProjectId || "";
-      const sDate = (isEdit && initialData?.demandStartDate)
-        ? toDateInputValue(initialData.demandStartDate)
-        : (projectDetails?.startDate ? toDateInputValue(projectDetails.startDate) : (initialData?.demandStartDate ? toDateInputValue(initialData.demandStartDate) : (initialData?.slaCreatedAt ? toDateInputValue(initialData.slaCreatedAt) : "")));
-      const eDate = (isEdit && initialData?.demandEndDate)
-        ? toDateInputValue(initialData.demandEndDate)
-        : (projectDetails?.endDate ? toDateInputValue(projectDetails.endDate) : (initialData?.demandEndDate ? toDateInputValue(initialData.demandEndDate) : (initialData?.slaDueAt ? toDateInputValue(initialData.slaDueAt) : "")));
+    const isEdit = mode === "edit";
 
-      if (isEdit && initialData) {
-        console.log("[DemandModal] Edit Mode Prefilling with:", initialData);
+    const pId = projectDetails?.pmsProjectId || projectDetails?.projectId || projectDetails?._id || initialData?.projectId || initialData?.ProjectId || initialData?.pmsProjectId || "";
+    const sDate = (isEdit && initialData?.demandStartDate)
+      ? toDateInputValue(initialData.demandStartDate)
+      : (projectDetails?.startDate ? toDateInputValue(projectDetails.startDate) : (initialData?.demandStartDate ? toDateInputValue(initialData.demandStartDate) : (initialData?.slaCreatedAt ? toDateInputValue(initialData.slaCreatedAt) : "")));
+    const eDate = (isEdit && initialData?.demandEndDate)
+      ? toDateInputValue(initialData.demandEndDate)
+      : (projectDetails?.endDate ? toDateInputValue(projectDetails.endDate) : (initialData?.demandEndDate ? toDateInputValue(initialData.demandEndDate) : (initialData?.slaDueAt ? toDateInputValue(initialData.slaDueAt) : "")));
 
-        const getVal = (paths, fallback = "") => {
-          for (const key of paths) {
-            const val = initialData[key];
-            if (val !== undefined && val !== null) return val;
-          }
-          return fallback;
-        };
+    if (isEdit && initialData) {
+      console.log("[DemandModal] Edit Mode Prefilling with:", initialData);
 
-        const rawAlloc = getVal(['allocationPercentage', 'Allocation', 'allocation_percentage'], initialData.allocation?.percentage || initialData.allocation || "");
-        let allocation = parseFloat(rawAlloc);
-        if (!isNaN(allocation) && allocation > 0 && allocation <= 1) {
-          allocation = allocation * 100; // Convert decimal to percentage
+      const getVal = (paths, fallback = "") => {
+        for (const key of paths) {
+          const val = initialData[key];
+          if (val !== undefined && val !== null) return val;
         }
+        return fallback;
+      };
 
-        const getRoleValue = () => {
-          const rawRole = initialData.deliveryRole || initialData.role || initialData.demandRole || initialData.deliveryRoleName || initialData.roleName || "";
-          if (rawRole && typeof rawRole === 'object') {
-            return getRoleId(rawRole) || getRoleName(rawRole) || "";
-          }
-          return getVal(['deliveryRoleId', 'dev_role_id', 'roleId', 'role_id', 'RoleID', 'delivery_role_id', 'delivery_role_uuid', 'deliveryRole', 'roleName', 'role_name', 'role']);
-        };
-
-        const roleValueFromData = getRoleValue();
-        const roleNameFromData = (typeof initialData.deliveryRole === 'object') ? getRoleName(initialData.deliveryRole) : getVal(['deliveryRoleName', 'deliveryRole', 'roleName', 'role_name', 'role']);
-        const resolvedRoleId = resolveRoleId(roleValueFromData, roles);
-
-        const mappedData = {
-          ...emptyForm,
-          id: getVal(['id', 'demandId', 'demand_id']),
-          demandId: getVal(['demandId', 'id', 'demand_id']),
-          projectId: pId,
-          demandName: getVal(['demandName', 'role', 'demand_name', 'Name', 'demandRole', 'roleName']),
-          demandStartDate: sDate || toDateInputValue(getVal(['demandStartDate', 'startDate', 'start_date', 'demand_start_date', 'slaCreatedAt'])),
-          demandEndDate: eDate || toDateInputValue(getVal(['demandEndDate', 'endDate', 'end_date', 'demand_end_date', 'slaDueAt'])),
-          allocationPercentage: isNaN(allocation) ? "" : Math.round(allocation),
-          deliveryRole: resolvedRoleId || roleValueFromData || "",
-          deliveryRoleName: roleNameFromData,
-          demandStatus: String(getVal(['demandStatus', 'lifecycleState', 'status', 'LifecycleState', 'demand_status'], "DRAFT")).toUpperCase().trim(),
-          demandType: String(getVal(['demandType', 'type', 'type_of_demand', 'DemandType', 'demand_type'], "NET_NEW")).toUpperCase().replace(/ /g, "_"),
-          demandPriority: String(getVal(['demandPriority', 'priority', 'Priority', 'demand_priority'], "MEDIUM")).toUpperCase().trim(),
-          demandCommitment: String(getVal(['demandCommitment', 'commitment', 'Commitment', 'demand_commitment'], "CONFIRMED")).toUpperCase().trim(),
-          resourcesRequired: parseInt(getVal(['resourcesRequired', 'resourceRequired', 'resource_required', 'requiredResources', 'ResourcesRequired'], 1)),
-          minExp: getVal(['minExp', 'experience', 'minimumExperience', 'min_experience', 'MinExperience', 'experience_required', 'min_experience', 'MinExp']),
-          deliveryModel: String(getVal(['deliveryModel', 'model', 'DeliveryModel', 'delivery_model', 'Delivery_Model'], "OFFSHORE")).toUpperCase().trim(),
-          demandJustification: getVal(['demandJustification', 'justification', 'Justification', 'demand_justification', 'reason', 'demandJustification', 'DemandJustification']),
-          requiresAdditionalApproval: !!getVal(['requiresAdditionalApproval', 'additionalApproval', 'RequiresAdditionalApproval', 'additional_approval', 'AdditionalApproval'], false),
-          outgoingResourceId: getVal(['outgoingResourceId', 'outgoing_resource_id', 'replaced_resource_id', 'replacedResourceId', 'OutgoingResourceId']) || initialData?.outgoingResource?.resourceId || "",
-        };
-
-        setForm(mappedData);
-      } else {
-        // Merge initialData but normalize common keys for pre-fill
-        const baseData = {
-          ...emptyForm,
-          projectId: pId,
-          demandStartDate: sDate,
-          demandEndDate: eDate,
-        };
-
-        if (initialData) {
-          Object.keys(initialData).forEach(key => {
-            const lowerKey = key.toLowerCase();
-            if (lowerKey === 'priority' || lowerKey === 'demandpriority') baseData.demandPriority = String(initialData[key]).toUpperCase();
-            if (lowerKey === 'status' || lowerKey === 'lifecyclestate' || lowerKey === 'demandstatus') baseData.demandStatus = String(initialData[key]).toUpperCase();
-            if (lowerKey === 'role' || lowerKey === 'deliveryrole' || lowerKey === 'demandname') baseData.demandName = initialData[key];
-          });
-        }
-
-        setForm({ ...baseData, ...initialData });
+      const rawAlloc = getVal(['allocationPercentage', 'Allocation', 'allocation_percentage'], initialData.allocation?.percentage || initialData.allocation || "");
+      let allocation = parseFloat(rawAlloc);
+      if (!isNaN(allocation) && allocation > 0 && allocation <= 1) {
+        allocation = allocation * 100; // Convert decimal to percentage
       }
 
-      setErrors({});
-    }
-  }, [open, initialData, projectDetails, mode, roles]);
+      const getRoleValue = () => {
+        const rawRole = initialData.deliveryRole || initialData.role || initialData.demandRole || initialData.deliveryRoleName || initialData.roleName || "";
+        if (rawRole && typeof rawRole === 'object') {
+          return getRoleId(rawRole) || getRoleName(rawRole) || "";
+        }
+        return getVal(['deliveryRoleId', 'dev_role_id', 'roleId', 'role_id', 'RoleID', 'delivery_role_id', 'delivery_role_uuid', 'deliveryRole', 'roleName', 'role_name', 'role']);
+      };
 
-  // Conditional Logic Reset
-  useEffect(() => {
-    if (form.demandType !== "REPLACEMENT") {
-      setForm(p => ({ ...p, outgoingResourceId: "" }));
+      const roleValueFromData = getRoleValue();
+      const roleNameFromData = (typeof initialData.deliveryRole === 'object') ? getRoleName(initialData.deliveryRole) : getVal(['deliveryRoleName', 'deliveryRole', 'roleName', 'role_name', 'role']);
+      const resolvedRoleId = resolveRoleId(roleValueFromData, roles);
+
+      const mappedData = {
+        ...emptyForm,
+        id: getVal(['id', 'demandId', 'demand_id']),
+        demandId: getVal(['demandId', 'id', 'demand_id']),
+        projectId: pId,
+        demandName: getVal(['demandName', 'role', 'demand_name', 'Name', 'demandRole', 'roleName']),
+        demandStartDate: sDate || toDateInputValue(getVal(['demandStartDate', 'startDate', 'start_date', 'demand_start_date', 'slaCreatedAt'])),
+        demandEndDate: eDate || toDateInputValue(getVal(['demandEndDate', 'endDate', 'end_date', 'demand_end_date', 'slaDueAt'])),
+        allocationPercentage: isNaN(allocation) ? "" : Math.round(allocation),
+        deliveryRole: resolvedRoleId || roleValueFromData || "",
+        deliveryRoleName: roleNameFromData,
+        demandStatus: String(getVal(['demandStatus', 'lifecycleState', 'status', 'LifecycleState', 'demand_status'])).toUpperCase().trim(),
+        demandType: String(getVal(['demandType', 'type', 'type_of_demand', 'DemandType', 'demand_type'])).toUpperCase().replace(/ /g, "_"),
+        demandPriority: String(getVal(['demandPriority', 'priority', 'Priority', 'demand_priority'])).toUpperCase().trim(),
+        demandCommitment: String(getVal(['demandCommitment', 'commitment', 'Commitment', 'demand_commitment'])).toUpperCase().trim(),
+        resourcesRequired: getVal(['resourcesRequired', 'resourceRequired', 'resource_required', 'requiredResources', 'ResourcesRequired']),
+        minExp: getVal(['minExp', 'experience', 'minimumExperience', 'min_experience', 'MinExperience', 'experience_required', 'min_experience', 'MinExp']),
+        deliveryModel: String(getVal(['deliveryModel', 'model', 'DeliveryModel', 'delivery_model', 'Delivery_Model'])).toUpperCase().trim(),
+        demandJustification: getVal(['demandJustification', 'justification', 'Justification', 'demand_justification', 'reason', 'demandJustification', 'DemandJustification']),
+        requiresAdditionalApproval: !!getVal(['requiresAdditionalApproval', 'additionalApproval', 'RequiresAdditionalApproval', 'additional_approval', 'AdditionalApproval'], false),
+      };
+
+
+      setForm(mappedData);
+    } else {
+      // Merge initialData but normalize common keys for pre-fill
+      const baseData = {
+        ...emptyForm,
+        projectId: pId,
+        demandStartDate: sDate,
+        demandEndDate: eDate,
+      };
+
+      if (initialData) {
+        Object.keys(initialData).forEach(key => {
+          const lowerKey = key.toLowerCase();
+          if (lowerKey === 'priority' || lowerKey === 'demandpriority') baseData.demandPriority = String(initialData[key]).toUpperCase();
+          if (lowerKey === 'status' || lowerKey === 'lifecyclestate' || lowerKey === 'demandstatus') baseData.demandStatus = String(initialData[key]).toUpperCase();
+          if (lowerKey === 'role' || lowerKey === 'deliveryrole' || lowerKey === 'demandname') baseData.demandName = initialData[key];
+        });
+      }
+
+      setForm({ ...baseData, ...initialData });
     }
-  }, [form.demandType]);
+
+    setErrors({});
+    isInitialized.current = true;
+  }, [open, initialData, projectDetails, mode]);
+
+
+
 
   useEffect(() => {
   if (!open || mode !== "edit" || roles.length === 0 || !initialData) return;
@@ -593,50 +596,48 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
       const allowedEditStatuses = computedEditStatuses.map((s) => String(s.value).toUpperCase());
       const selectedStatus = String(form.demandStatus || "").toUpperCase();
       if (!selectedStatus) {
-        e.demandStatus = "Status is required";
+        e.demandStatus = "Status Is Required";
       } else if (!allowedEditStatuses.includes(selectedStatus)) {
-        e.demandStatus = "Select a valid status";
+        e.demandStatus = "Select A Valid Status";
       }
 
       if ((normalizedRole === "DELIVERYMANAGER" || normalizedRole === "RESOURCEMANAGER") && selectedStatus === "REJECTED" && !form.rejectionReason?.trim()) {
-        e.rejectionReason = "Reason for rejection is required";
+        e.rejectionReason = "Reason For Rejection Is Required";
       }
       // In edit mode for non-managers, we only validate the status and rejection reason as other fields are read-only
       return e;
     }
 
-    if (!form.projectId) e.projectId = "Project selection is required";
-    if (!form.demandName?.trim()) e.demandName = "Demand name is required";
-    if (!form.deliveryRole) e.deliveryRole = "Role is required";
-    if (!form.demandType) e.demandType = "Demand type is required";
+    if (!form.projectId) e.projectId = "Project Selection Is Required";
+    if (!form.demandName?.trim()) e.demandName = "Demand Name Is Required";
+    if (!form.deliveryRole) e.deliveryRole = "Role Is Required";
+    if (!form.demandType) e.demandType = "Demand Type Is Required";
 
-    if (mode !== "edit" && form.demandType === "REPLACEMENT" && !form.outgoingResourceId) {
-      e.outgoingResourceId = "Outgoing resource is required";
-    }
 
-    if (!form.demandStartDate) e.demandStartDate = "Start date is required";
-    if (!form.demandEndDate) e.demandEndDate = "End date is required";
+
+    if (!form.demandStartDate) e.demandStartDate = "Start Date Is Required";
+    if (!form.demandEndDate) e.demandEndDate = "End Date Is Required";
     if (form.demandStartDate && form.demandEndDate && form.demandEndDate < form.demandStartDate) {
-      e.demandEndDate = "End date cannot be before start date";
+      e.demandEndDate = "End Date Cannot Be Before Start Date";
     }
 
     const alloc = parseFloat(form.allocationPercentage);
     if (isNaN(alloc) || alloc < 1 || alloc > 100) {
-      e.allocationPercentage = "Allocation must be 1-100";
+      e.allocationPercentage = "Allocation Must Be 1-100";
     }
 
     const resReq = parseInt(form.resourcesRequired);
     if (isNaN(resReq) || resReq < 1) {
-      e.resourcesRequired = "At least 1 resource is required";
+      e.resourcesRequired = "At Least 1 Resource Is Required";
     }
 
-    if (!form.minExp) e.minExp = "Minimum experience is required";
-    if (!form.deliveryModel) e.deliveryModel = "Delivery model is required";
-    if (!form.demandStatus) e.demandStatus = "Status is required";
-    if (!form.demandPriority) e.demandPriority = "Priority is required";
-    if (!form.demandCommitment) e.demandCommitment = "Commitment type is required";
+    if (!form.minExp) e.minExp = "Minimum Experience Is Required";
+    if (!form.deliveryModel) e.deliveryModel = "Delivery Model Is Required";
+    if (!form.demandStatus) e.demandStatus = "Status Is Required";
+    if (!form.demandPriority) e.demandPriority = "Priority Is Required";
+    if (!form.demandCommitment) e.demandCommitment = "Commitment Type Is Required";
 
-    if (!form.demandJustification?.trim()) e.demandJustification = "Justification is required";
+    if (!form.demandJustification?.trim()) e.demandJustification = "Justification Is Required";
 
     return e;
   };
@@ -647,7 +648,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      toast.warning("Please correct the errors in the form");
+      toast.warning("Please Correct The Errors In The Form");
 
       const firstErrorKey = Object.keys(validationErrors)[0];
       const errorElement = document.getElementById(`field-${firstErrorKey}`);
@@ -666,6 +667,11 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
           deliveryRole: resolveRoleId(form.deliveryRole, roles),
         };
 
+        if (isManagerOrPM && !canProjectManagerEditDemand(initialData || form)) {
+          toast.error(PM_EDITABLE_DEMAND_MESSAGE);
+          return;
+        }
+
         if (normalizedRole === "DELIVERYMANAGER") {
           const dmPayload = {
             demandId: id,
@@ -675,7 +681,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
               : null
           };
           const res = await handleDMDecision(dmPayload);
-          toast.success(res?.message || "Decision submitted successfully");
+          toast.success(res?.message || "Decision Submitted Successfully");
           if (onSuccess) await onSuccess(res, dmPayload);
           onClose();
           return;
@@ -690,7 +696,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
               : null
           };
           const res = await handleRMDecision(rmPayload);
-          toast.success(res?.message || "Decision submitted successfully");
+          toast.success(res?.message || "Decision Submitted Successfully");
           if (onSuccess) await onSuccess(res, rmPayload);
           onClose();
           return;
@@ -698,7 +704,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
 
         const submissionData = buildUpdateDemandPayload(normalizedForm, id);
         const res = await updateDemandStatus(submissionData);
-        toast.success(res.message || "Demand updated successfully");
+        toast.success(res.message || "Demand Updated Successfully");
         if (onSuccess) await onSuccess(res, submissionData);
         onClose();
         return;
@@ -711,11 +717,11 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
       const submissionData = buildCreateDemandPayload(normalizedForm, form.demandId || form.id || undefined);
 
       const res = await createDemand(submissionData);
-      toast.success(res.message || "Demand saved successfully");
+      toast.success(res.message || "Demand Saved Successfully");
       if (onSuccess) await onSuccess(res, submissionData);
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to save demand");
+      toast.error(err.response?.data?.message || "Failed To Save Demand");
     } finally {
       setLoading(false);
     }
@@ -768,7 +774,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       {mode === "edit" || initialData ? "Update Demand" : "Create New Demand"}
                     </Dialog.Title>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Configure staffing requirements for your project
+                      Configure Staffing Requirements For Your Project
                     </p>
                   </div>
 
@@ -823,7 +829,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                     <FormField id="field-demandName" label="Demand Name" error={errors.demandName} required>
                       <input
                         type="text"
-                        placeholder="e.g. Senior Frontend Dev"
+                        placeholder="E.g. Senior Frontend Dev"
                         value={form.demandName}
                         onChange={(e) => update("demandName", e.target.value)}
                         disabled={mode === "edit" && !isManagerOrPM}
@@ -839,7 +845,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("deliveryRole", v)}
                       options={roles.map((r) => ({ label: getRoleName(r), value: getRoleId(r) }))}
                       error={errors.deliveryRole}
-                      placeholder="Search and Select Role"
+                      placeholder="Search And Select Role"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
@@ -852,28 +858,12 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("demandType", v)}
                       options={DEMAND_TYPES}
                       error={errors.demandType}
-                      placeholder="Select Type"
+                      placeholder="Select Demand Type"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
 
-                    {/* Conditional: Outgoing Resource (for REPLACEMENT) */}
-                    {form.demandType === "REPLACEMENT" && (
-                      <div className="md:col-span-2">
-                        <SearchableListboxField
-                          id="field-outgoingResourceId"
-                          label="Outgoing Resource"
-                          value={form.outgoingResourceId}
-                          onChange={(v) => update("outgoingResourceId", v)}
-                          options={projectResources.map((r) => ({ label: `${r.resourceName} (${r.resourceRole})`, value: r.resourceId }))}
-                          error={errors.outgoingResourceId}
-                          placeholder={fetchingResources ? "Loading resources..." : "Search and select resource to replace"}
-                          required={mode !== "edit"}
-                          disabled={fetchingResources || (mode === "edit" && !isManagerOrPM)}
-                          emptyMessage="No Resources Allocated to the Project."
-                        />
-                      </div>
-                    )}
+
 
                     {/* Start Date -> Demand Start Date */}
                     <FormField id="field-demandStartDate" label="Demand Start Date" error={errors.demandStartDate} required>
@@ -911,6 +901,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                           placeholder="1 - 100"
                           value={form.allocationPercentage}
                           onChange={(e) => update("allocationPercentage", e.target.value)}
+                          onWheel={(e) => e.currentTarget.blur()}
                           disabled={mode === "edit" && !isManagerOrPM}
                           className={`w-full rounded-lg border py-2 px-3 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${errors.allocationPercentage ? "border-red-500 bg-red-50/30" : "border-slate-200 hover:border-slate-300"} ${mode === "edit" && !isManagerOrPM ? "bg-slate-50 cursor-not-allowed text-slate-500" : ""}`}
                         />
@@ -923,9 +914,10 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       <input
                         type="number"
                         min="1"
-                        placeholder="min 1"
+                        placeholder="Enter Resources Required"
                         value={form.resourcesRequired}
                         onChange={(e) => update("resourcesRequired", e.target.value)}
+                        onWheel={(e) => e.target.blur()}
                         disabled={mode === "edit" && !isManagerOrPM}
                         className={`w-full rounded-lg border py-2 px-3 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${errors.resourcesRequired ? "border-red-500 bg-red-50/30" : "border-slate-200 hover:border-slate-300"} ${mode === "edit" && !isManagerOrPM ? "bg-slate-50 cursor-not-allowed text-slate-500" : ""}`}
                       />
@@ -936,9 +928,10 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       <input
                         type="number"
                         step="0.5"
-                        placeholder="e.g. 5"
+                        placeholder="E.g. 5"
                         value={form.minExp}
                         onChange={(e) => update("minExp", e.target.value)}
+                        onWheel={(e) => e.target.blur()}
                         disabled={mode === "edit" && !isManagerOrPM}
                         className={`w-full rounded-lg border py-2 px-3 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${errors.minExp ? "border-red-500 bg-red-50/30" : "border-slate-200 hover:border-slate-300"} ${mode === "edit" && !isManagerOrPM ? "bg-slate-50 cursor-not-allowed text-slate-500" : ""}`}
                       />
@@ -952,7 +945,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("deliveryModel", v)}
                       options={DELIVERY_MODELS}
                       error={errors.deliveryModel}
-                      placeholder="Select Model"
+                      placeholder="Select Delivery Model"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
@@ -963,9 +956,10 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       label="Demand Status"
                       value={form.demandStatus}
                       onChange={(v) => update("demandStatus", v)}
-                      options={mode === "edit" ? computedEditStatuses : normalizeStatusOptions(activeStatuses)}
+                      options={computedEditStatuses || normalizeStatusOptions(activeStatuses)}
+
                       error={errors.demandStatus}
-                      placeholder="Select Status"
+                      placeholder="Select Demand Status"
                       required
                     />
 
@@ -974,7 +968,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       <FormField id="field-rejectionReason" label="Rejection Reason" error={errors.rejectionReason} required className="md:col-span-2">
                         <textarea
                           rows={2}
-                          placeholder="Explain why this demand is being rejected..."
+                          placeholder="Explain Why This Demand Is Being Rejected..."
                           value={form.rejectionReason}
                           onChange={(e) => update("rejectionReason", e.target.value)}
                           className={`w-full rounded-lg border py-2 px-3 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${errors.rejectionReason ? "border-red-500 bg-red-50/30" : "border-slate-200 hover:border-slate-300"}`}
@@ -1002,7 +996,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       onChange={(v) => update("demandCommitment", v)}
                       options={COMMITMENT_TYPES}
                       error={errors.demandCommitment}
-                      note={form.demandCommitment === "SOFT" ? "Note: This Demand will expire in 30 days" : ""}
+                      note={form.demandCommitment === "SOFT" ? "Note: This Demand Will Expire In 30 Days" : ""}
                       placeholder="Select Commitment"
                       required
                       disabled={mode === "edit" && !isManagerOrPM}
@@ -1033,7 +1027,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                     <FormField id="field-demandJustification" label="Demand Justification" error={errors.demandJustification} required className="md:col-span-2">
                       <textarea
                         rows={3}
-                        placeholder="Explain why this resource is needed..."
+                        placeholder="Explain Why This Resource Is Needed..."
                         value={form.demandJustification}
                         onChange={(e) => update("demandJustification", e.target.value)}
                         disabled={mode === "edit" && !isManagerOrPM}

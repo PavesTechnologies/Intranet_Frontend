@@ -13,9 +13,13 @@ import EscalationForm from "./client_configuration/forms/EscalationForm";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { useAuth } from "../../../contexts/AuthContext";
 import GenericTable from "../../../components/Table/table";
+import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 
 const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
   const { user } = useAuth();
+  const { getEnumValues } = useEnums();
+  const ESCALATION_LEVELS = getEnumValues("EscalationLevel");
+
   const permissions = user?.permissions || [];
   const roles = user?.roles || [];
   const canEditConfig = roles.includes("Admin"); // permissions.includes("EDIT_CLIENT_CONFIG");
@@ -58,7 +62,15 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
         activeFlag: sla.activeFlag ?? false,
       }));
 
-      setContactList(normalized);
+      // Sort by Escalation Level dynamic order (case-insensitive & format-resilient)
+      const normalize = (s) => s?.toString().toUpperCase().replace(/[- ]/g, "_") || "";
+      const sortedData = [...normalized].sort((a, b) => {
+        const indexA = ESCALATION_LEVELS.findIndex(lvl => normalize(lvl) === normalize(a.escalationLevel));
+        const indexB = ESCALATION_LEVELS.findIndex(lvl => normalize(lvl) === normalize(b.escalationLevel));
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      });
+
+      setContactList(sortedData);
       setCurrentPage(1);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to fetch SLA");
@@ -159,7 +171,7 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
                       }}
                       className="px-2 text-blue-600 hover:text-blue-800 transition"
                     >
-                      <Pencil size={14} />
+                       <EditIcon size={16} />
                     </button>
                     <button
                       onClick={() => {
@@ -168,7 +180,7 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
                       }}
                       className="p-1 text-red-600 hover:text-red-800 transition"
                     >
-                      <Trash2 size={14} />
+                      <DeleteIcon size={16} />
                     </button>
                   </>
                 ) : (

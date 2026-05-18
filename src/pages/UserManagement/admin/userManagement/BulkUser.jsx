@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { UploadCloud, FileSpreadsheet } from "lucide-react";
 
@@ -12,23 +12,7 @@ const BulkUserUpload = ({ onClose, onSuccess }) => {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const axiosInstance = useMemo(() => {
-    const instance = axios.create({
-      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-    });
-
-    instance.interceptors.request.use((config) => {
-      const latestToken = localStorage.getItem("token");
-
-      if (latestToken) {
-        config.headers.Authorization = `Bearer ${latestToken}`;
-      }
-
-      return config;
-    });
-
-    return instance;
-  }, []);
+  const axiosInstance = useMemo(() => api, []);
 
   const handleFileChange = (e) => {
     setFile(e.target.files?.[0] || null);

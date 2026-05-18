@@ -24,15 +24,15 @@ const AllocateModal = ({ open, resources = [], onClose, onSubmit }) => {
   const handleSubmit = () => {
     const allocation = Number(form.allocation);
     if (!form.project.trim()) {
-      setError("Project is required.");
+      setError("Project Is Required.");
       return;
     }
     if (!allocation || allocation <= 0 || allocation > 100) {
-      setError("Allocation must be between 1 and 100.");
+      setError("Allocation Must Be Between 1 And 100.");
       return;
     }
     if (!form.startDate) {
-      setError("Start date is required.");
+      setError("Start Date Is Required.");
       return;
     }
 
@@ -63,7 +63,7 @@ const AllocateModal = ({ open, resources = [], onClose, onSubmit }) => {
               type="text"
               value={form.project}
               onChange={(event) => setForm((prev) => ({ ...prev, project: event.target.value }))}
-              placeholder="Enter project name"
+              placeholder="Enter Project Name"
               className="mt-1.5 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
             />
           </div>
@@ -76,6 +76,7 @@ const AllocateModal = ({ open, resources = [], onClose, onSubmit }) => {
                 min="1"
                 max="100"
                 value={form.allocation}
+                onWheel={(e) => e.target.blur()}
                 onChange={(event) => setForm((prev) => ({ ...prev, allocation: event.target.value }))}
                 className="mt-1.5 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
               />

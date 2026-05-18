@@ -260,7 +260,7 @@ const RMSProjectDetails = () => {
           },
         );
         fetchProjectSLAs();
-        toast.success("SLA configuration deleted successfully.");
+        toast.success("SLA Configuration Deleted Successfully.");
       }
 
       if (deleteType === "compliance") {
@@ -273,7 +273,7 @@ const RMSProjectDetails = () => {
           },
         );
         fetchProjectCompliance();
-        toast.success("Compliance configuration deleted successfully.");
+        toast.success("Compliance Configuration Deleted Successfully.");
       }
 
       if (deleteType === "escalation") {
@@ -286,7 +286,7 @@ const RMSProjectDetails = () => {
           },
         );
         fetchProjectEscalations();
-        toast.success("Escalation deleted successfully.");
+        toast.success("Escalation Deleted Successfully.");
       }
 
       setOpenConfirmModal(false);

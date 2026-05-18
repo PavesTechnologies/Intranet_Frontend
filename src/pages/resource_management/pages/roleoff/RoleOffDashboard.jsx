@@ -179,7 +179,7 @@ const RoleOffDashboard = () => {
       setData(response);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to fetch role-off report data");
+      toast.error("Failed To Fetch Role-Off Report Data");
     } finally {
       setIsLoading(false);
     }
@@ -205,10 +205,10 @@ const RoleOffDashboard = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success("Export successful");
+      toast.success("Export Successful");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to export data");
+      toast.error("Failed To Export Data");
     } finally {
       setIsExporting(false);
     }

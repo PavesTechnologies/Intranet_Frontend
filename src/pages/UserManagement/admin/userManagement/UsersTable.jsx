@@ -6,7 +6,7 @@ import React, {
   Suspense,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { Pencil, UserX, UserCheck, Plus, Upload } from "lucide-react";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 
@@ -66,7 +66,7 @@ export default function UsersTable() {
     try {
       setLoading(true);
 
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users`,
         {
           params: {

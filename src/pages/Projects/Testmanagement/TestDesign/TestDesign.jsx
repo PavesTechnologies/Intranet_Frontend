@@ -19,6 +19,7 @@ import AddScenarioModal from "./modals/AddScenarioModal";
 import AddCaseModal from "./modals/AddCaseModal";
 import AddStepsModal from "./modals/AddStepsModal";
 import AddTestStoryModal from "./modals/AddTestStoriesModal";
+import {jwtDecode} from "jwt-decode";
 
 export default function TestDesign() {
   const { projectId } = useParams();
@@ -46,6 +47,21 @@ export default function TestDesign() {
   // ---------------------------------------------------------
   // FETCH TEST STORIES
   // ---------------------------------------------------------
+  
+  
+  const token = localStorage.getItem("token");
+  
+  let canCreateTest = false;
+  
+  if (token) {
+    const decoded = jwtDecode(token);
+  
+    const roles = decoded?.roles || [];
+  
+    canCreateTest =
+      roles.includes("Tester") ||
+      roles.includes("Project_Manager");
+  }
   const fetchTestStories = async () => {
     try {
       const res = await axiosInstance.get(
@@ -369,6 +385,7 @@ export default function TestDesign() {
               Test Stories
             </h3>
           </div>
+          {canCreateTest && (
           <button
             className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
             onClick={() => {
@@ -379,6 +396,7 @@ export default function TestDesign() {
           >
             <Plus size={18} />
           </button>
+          )}
         </div>
 
         {/* STORY LIST */}
@@ -418,6 +436,8 @@ export default function TestDesign() {
 
                     {/* Action Buttons (Visible on hover) */}
                     <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                      {canCreateTest && (
+                       <>
                       <button
                         className="p-1 hover:bg-indigo-100 hover:text-indigo-600 rounded text-slate-400 transition-colors"
                         onClick={(e) => {
@@ -448,6 +468,8 @@ export default function TestDesign() {
                       >
                         <Plus size={14} />
                       </button>
+                      </>
+                      )}
                     </div>
                   </div>
 
@@ -487,6 +509,8 @@ export default function TestDesign() {
 
                               {/* Action Buttons (Visible on hover) */}
                               <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity ml-2 shrink-0">
+                                {canCreateTest && (
+                                  <>
                                 <button
                                   className="p-1 hover:bg-indigo-200 hover:text-indigo-800 rounded text-slate-400 transition-colors"
                                   onClick={(e) => {
@@ -518,6 +542,8 @@ export default function TestDesign() {
                                 >
                                   <Plus size={12} />
                                 </button>
+                                </>
+                                )}
                               </div>
                             </div>
                           );

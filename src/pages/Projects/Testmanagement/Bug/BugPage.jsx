@@ -15,6 +15,21 @@ import Select from "react-select";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Modal from "../../../../components/Modal/modal";
 
+import {jwtDecode} from "jwt-decode";
+
+const token = localStorage.getItem("token");
+
+let canCreateTestPlan = false;
+
+if (token) {
+  const decoded = jwtDecode(token);
+
+  const roles = decoded?.roles || [];
+
+  canCreateTestPlan =
+    roles.includes("Tester") ||
+    roles.includes("Project_Manager");
+}
 const severityColors = {
   LOW:      "bg-emerald-50 text-emerald-700",
   MEDIUM:   "bg-amber-50 text-amber-700",
@@ -190,7 +205,7 @@ const BugPage = () => {
             <table className="min-w-full divide-y divide-slate-100">
               <thead className="bg-slate-50">
                 <tr>
-                  {["Title", "Priority", "Severity", "Status", "Assigned To", "Details"].map((col) => (
+                  {["Title", "Priority", "Severity", "Raised By", "Status", "Assigned To", "Details"].map((col) => (
                     <th
                       key={col}
                       className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
@@ -203,13 +218,13 @@ const BugPage = () => {
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center">
+                    <td colSpan={7} className="px-4 py-8 text-center">
                       <LoadingSpinner text="Loading bugs..." />
                     </td>
                   </tr>
                 ) : bugs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-slate-400 text-sm">
+                    <td colSpan={7} className="px-4 py-10 text-center text-slate-400 text-sm">
                       No bugs found.
                     </td>
                   </tr>
@@ -229,24 +244,39 @@ const BugPage = () => {
                           {bug.severity}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <FilterListbox
-                          options={STATUS_OPTIONS}
-                          value={bug.status}
-                          onChange={(val) => handleStatusChange(bug.id, val)}
-                        />
+                      <td className="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
+                        {employees.find((e) => e.id === bug.reporterId)?.name || "—"}
                       </td>
                       <td className="px-4 py-3">
-                        <Select
-                          styles={selectStyles}
-                          options={employeeOptions}
-                          placeholder="Assign..."
-                          isSearchable
-                          onChange={(selected) => addAssignee(bug.id, selected.value)}
-                          value={employeeOptions.find((o) => o.value === bug.assignedTo) || null}
-                          isDisabled={assignLoading}
-                          menuPortalTarget={document.body}
-                        />
+                        {canCreateTestPlan ? (
+                          <FilterListbox
+                            options={STATUS_OPTIONS}
+                            value={bug.status}
+                            onChange={(val) => handleStatusChange(bug.id, val)}
+                          />
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded font-medium bg-slate-100 text-slate-700">
+                            {bug.status}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {canCreateTestPlan ? (
+                          <Select
+                            styles={selectStyles}
+                            options={employeeOptions}
+                            placeholder="Assign..."
+                            isSearchable
+                            onChange={(selected) => addAssignee(bug.id, selected.value)}
+                            value={employeeOptions.find((o) => o.value === bug.assignedTo) || null}
+                            isDisabled={assignLoading}
+                            menuPortalTarget={document.body}
+                          />
+                        ) : (
+                          <span className="text-sm text-slate-700">
+                            {employeeOptions.find((o) => o.value === bug.assignedTo)?.label || "—"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <button

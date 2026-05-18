@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { showStatusToast } from "../../../components/toastfy/toast.jsx";
+import Button from "../../../components/Button/Button";
+import Modal from "../../../components/ui/Modal";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import {
   Users,
   CheckCircle,
@@ -10,14 +13,8 @@ import {
   FileText,
   ShieldCheck,
   Calendar,
-  Filter,
-  Search,
-  ChevronDown,
   Activity,
-  Briefcase,
   RefreshCw,
-  Loader2,
-  X,
   XCircle,
 } from "lucide-react";
 import {
@@ -28,11 +25,7 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
-  AreaChart,
-  Area,
 } from "recharts";
 import { KPICard } from "../../../components/kpi/KPI";
 
@@ -130,9 +123,9 @@ export default function OnboardingSummary() {
             Unauthorized: Only users with Admin or HR roles can access the
             onboarding summary dashboard.
           </p>
-          <button className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors">
+          <Button size="medium">
             Return to Home
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -312,25 +305,30 @@ export default function OnboardingSummary() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          <Button
             onClick={fetchSummaryData}
             disabled={loading}
-            className="flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 shadow-sm"
+            loading={loading}
+            loadingText="Refreshing..."
+            variant="outline"
+            size="medium"
+            className="border-slate-200 text-slate-700"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            {!loading && <RefreshCw className="w-4 h-4" />}
             <span>Refresh</span>
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleExport}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm shadow-indigo-200"
+            variant="primary"
+            size="medium"
           >
             Export Report
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* 1. Overview Section - Column Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4 mb-8">
         {overviewMetrics.map((metric, i) => (
           <KPICard
             key={i}
@@ -377,166 +375,255 @@ export default function OnboardingSummary() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
         {/* 3. Pipeline Funnel */}
-        <div className="xl:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-indigo-500" />
-              Onboarding Pipeline
-            </h3>
-            <div className="flex gap-2">
-              <button className="text-xs font-semibold px-2 py-1 bg-slate-100 text-slate-600 rounded-md">
-                Weekly
-              </button>
-              <button className="text-xs font-semibold px-2 py-1 text-slate-400">
-                Monthly
-              </button>
-            </div>
-          </div>
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                layout="vertical"
-                data={pipelineData}
-                margin={{ top: 0, right: 30, left: 40, bottom: 0 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  horizontal={false}
-                  stroke="#F1F5F9"
-                />
-                <XAxis type="number" hide />
-                <YAxis
-                  dataKey="stage"
-                  type="category"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#64748B", fontSize: 13, fontWeight: 500 }}
-                  width={100}
-                />
-                <RechartsTooltip
-                  content={<CustomTooltip />}
-                  cursor={{ fill: "#F8FAFC" }}
-                />
-                <Bar
-                  dataKey="count"
-                  fill="#4F46E5"
-                  radius={[0, 8, 8, 0]}
-                  barSize={34}
+        <PageCard className="xl:col-span-2 rounded-2xl border-slate-200">
+          <PageCardContent className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-indigo-500" />
+                Onboarding Pipeline
+              </h3>
+              <div className="flex gap-2">
+                <Button
+                  size="small"
+                  variant="outline"
+                  className="border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-100"
                 >
-                  {pipelineData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fillOpacity={1 - index * 0.15}
-                      fill="#4F46E5"
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+                  Weekly
+                </Button>
+                <Button
+                  size="small"
+                  variant="ghost"
+                  className="border-transparent text-slate-400 shadow-none hover:bg-transparent hover:text-slate-500"
+                >
+                  Monthly
+                </Button>
+              </div>
+            </div>
+            <div className="h-[320px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  layout="vertical"
+                  data={pipelineData}
+                  margin={{ top: 0, right: 30, left: 40, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    horizontal={false}
+                    stroke="#F1F5F9"
+                  />
+                  <XAxis type="number" hide />
+                  <YAxis
+                    dataKey="stage"
+                    type="category"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#64748B", fontSize: 13, fontWeight: 500 }}
+                    width={100}
+                  />
+                  <RechartsTooltip
+                    content={<CustomTooltip />}
+                    cursor={{ fill: "#F8FAFC" }}
+                  />
+                  <Bar
+                    dataKey="count"
+                    fill="#4F46E5"
+                    radius={[0, 8, 8, 0]}
+                    barSize={34}
+                  >
+                    {pipelineData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fillOpacity={1 - index * 0.15}
+                        fill="#4F46E5"
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </PageCardContent>
+        </PageCard>
 
         {/* 4. Aging & Recent Activity Column */}
         <div className="space-y-6">
           {/* Aging Card */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-amber-500" />
-              Pending Status Duration
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              {agingData.map((age, i) => (
-                <KPICard
-                  key={i}
-                  label={age.label}
-                  value={age.count}
-                  suffix=" Candidates"
-                  icon={<age.icon className="h-5 w-5" />}
-                  color={`${age.bg} ${age.color}`}
-                  className="border-slate-100 bg-white"
-                />
-              ))}
-            </div>
-          </div>
+          <PageCard className="rounded-2xl border-slate-200">
+            <PageCardContent className="p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-500" />
+                Pending Status Duration
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                {agingData.map((age, i) => (
+                  <div
+                    key={i}
+                    className="rounded-2xl border border-slate-100 bg-white p-5 min-w-0"
+                  >
+                    <div className="flex flex-col gap-4 min-w-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${age.bg} ${age.color}`}
+                        >
+                          <age.icon className="h-5 w-5" />
+                        </div>
+                        <p className="min-w-0 text-right text-sm font-medium text-slate-500 break-words">
+                          {age.label}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-2xl md:text-3xl font-bold leading-none text-slate-900 tabular-nums">
+                          {age.count}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-slate-600 break-words">
+                          Candidates
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </PageCardContent>
+          </PageCard>
 
           {/* Pending Verification Summary */}
-          <div className="bg-indigo-900 rounded-2xl p-6 text-white shadow-lg shadow-indigo-200">
-            <h3 className="text-indigo-200 text-sm font-bold uppercase tracking-widest mb-4">
-              Urgent Actions
-            </h3>
-            <div className="space-y-4">
-              {pending_actions.map((item, i) => (
-                <div
-                  key={i}
-                  className="flex justify-between items-center border-b border-indigo-800 pb-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-indigo-400"></div>
-                    <span className="text-sm font-medium">{item.action}</span>
+          <PageCard className="rounded-2xl border-0 !bg-indigo-900 !text-white shadow-lg shadow-indigo-200">
+            <PageCardContent className="p-6">
+              <h3 className="text-indigo-200 text-sm font-bold uppercase tracking-widest mb-4">
+                Urgent Actions
+              </h3>
+              <div className="space-y-4">
+                {pending_actions.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between items-center border-b border-indigo-800 pb-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-indigo-400"></div>
+                      <span className="text-sm font-medium">{item.action}</span>
+                    </div>
+                    <span className="text-lg font-bold">{item.count}</span>
                   </div>
-                  <span className="text-lg font-bold">{item.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
+            </PageCardContent>
+          </PageCard>
         </div>
       </div>
 
       {/* Row 3 - Documents & Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* 5. Document Completion Status */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 overflow-hidden">
-          <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-emerald-500" />
-            Document Completion
-          </h3>
-          <div className="space-y-6">
-            {docProgressData.map((doc, i) => {
-              const percentage = Math.round((doc.completed / doc.total) * 100);
-              return (
-                <div key={i}>
-                  <div className="flex justify-between items-end mb-2">
-                    <div>
-                      <span className="text-sm font-bold text-slate-700">
-                        {doc.name}
+        <PageCard className="rounded-2xl border-slate-200 overflow-hidden">
+          <PageCardContent className="p-6">
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-500" />
+              Document Completion
+            </h3>
+            <div className="space-y-6 mt-6">
+              {docProgressData.map((doc, i) => {
+                const percentage = Math.round((doc.completed / doc.total) * 100);
+                return (
+                  <div key={i}>
+                    <div className="flex justify-between items-end mb-2">
+                      <div>
+                        <span className="text-sm font-bold text-slate-700">
+                          {doc.name}
+                        </span>
+                        <p className="text-xs text-slate-400 font-medium">
+                          {doc.completed} of {doc.total} verified
+                        </p>
+                      </div>
+                      <span className="text-sm font-black text-slate-600">
+                        {percentage}%
                       </span>
-                      <p className="text-xs text-slate-400 font-medium">
-                        {doc.completed} of {doc.total} verified
-                      </p>
                     </div>
-                    <span className="text-sm font-black text-slate-600">
-                      {percentage}%
-                    </span>
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-1000"
+                        style={{
+                          width: `${percentage}%`,
+                          backgroundColor: doc.color,
+                        }}
+                      ></div>
+                    </div>
                   </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-1000"
-                      style={{
-                        width: `${percentage}%`,
-                        backgroundColor: doc.color,
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                );
+              })}
+            </div>
+          </PageCardContent>
+        </PageCard>
 
         {/* 6. Recent Activity */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-indigo-500" />
-            Recent Activity
-          </h3>
-          <div className="space-y-1">
+        <PageCard className="lg:col-span-2 rounded-2xl border-slate-200">
+          <PageCardContent className="p-6">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-indigo-500" />
+                Recent Activity
+              </h3>
+              <Button
+                size="small"
+                variant="outline"
+                className="border-slate-200 text-slate-700"
+                onClick={() => setIsActivityModalOpen(true)}
+              >
+                View All
+              </Button>
+            </div>
+            <div className="space-y-1">
+              {(summaryData?.recent_activity || []).map((activity, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-4 hover:bg-slate-50 rounded-xl transition-colors group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center font-bold text-indigo-600 group-hover:bg-indigo-100">
+                      {activity?.name ? activity.name.charAt(0) : "U"}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">
+                        {activity?.name || "Unknown Candidate"}
+                      </h4>
+                      <p className="text-xs text-slate-500 font-medium">
+                        {" "}
+                        Action:{" "}
+                        <span className="text-indigo-600 font-semibold">
+                          {activity?.action || "Performed an action"}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">
+                      <Clock className="w-3 h-3" />{" "}
+                      {activity?.timestamp
+                        ? new Date(activity.timestamp).toLocaleString()
+                        : "Just now"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </PageCardContent>
+        </PageCard>
+      </div>
+
+      {/* Activity Logs Modal */}
+      <Modal
+        isOpen={isActivityModalOpen}
+        onClose={() => setIsActivityModalOpen(false)}
+        title="All Activity Logs"
+        width="min(800px, calc(100vw - 2rem))"
+      >
+        <div className="max-h-[70vh] overflow-y-auto pr-1">
+          <div className="space-y-4">
             {(summaryData?.recent_activity || []).map((activity, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between p-4 hover:bg-slate-50 rounded-xl transition-colors group"
+                className="flex items-center justify-between p-4 bg-slate-50 rounded-xl"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center font-bold text-indigo-600 group-hover:bg-indigo-100">
+                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center font-bold text-indigo-600 border border-slate-100">
                     {activity?.name ? activity.name.charAt(0) : "U"}
                   </div>
                   <div>
@@ -553,7 +640,7 @@ export default function OnboardingSummary() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">
+                  <span className="text-xs text-slate-400 flex items-center gap-1 font-medium italic">
                     <Clock className="w-3 h-3" />{" "}
                     {activity?.timestamp
                       ? new Date(activity.timestamp).toLocaleString()
@@ -562,79 +649,25 @@ export default function OnboardingSummary() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Activity Logs Modal */}
-      {isActivityModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <Activity className="w-6 h-6 text-indigo-500" />
-                All Activity Logs
-              </h3>
-              <button
-                onClick={() => setIsActivityModalOpen(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <XCircle className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="space-y-4">
-                {(summaryData?.recent_activity || []).map((activity, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between p-4 bg-slate-50 rounded-xl"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center font-bold text-indigo-600 border border-slate-100">
-                        {activity?.name ? activity.name.charAt(0) : "U"}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800">
-                          {activity?.name || "Unknown Candidate"}
-                        </h4>
-                        <p className="text-xs text-slate-500 font-medium">
-                          {" "}
-                          Action:{" "}
-                          <span className="text-indigo-600 font-semibold">
-                            {activity?.action || "Performed an action"}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs text-slate-400 flex items-center gap-1 font-medium italic">
-                        <Clock className="w-3 h-3" />{" "}
-                        {activity?.timestamp
-                          ? new Date(activity.timestamp).toLocaleString()
-                          : "Just now"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {(!summaryData?.recent_activity ||
-                  summaryData.recent_activity.length === 0) && (
-                  <div className="text-center py-12 text-slate-400">
-                    No activity logs found.
-                  </div>
-                )}
+            {(!summaryData?.recent_activity ||
+              summaryData.recent_activity.length === 0) && (
+              <div className="text-center py-12 text-slate-400">
+                No activity logs found.
               </div>
-            </div>
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
-              <button
-                onClick={() => setIsActivityModalOpen(false)}
-                className="px-6 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                Close
-              </button>
-            </div>
+            )}
           </div>
         </div>
-      )}
+        <div className="mt-6 flex justify-end">
+          <Button
+            onClick={() => setIsActivityModalOpen(false)}
+            variant="outline"
+            size="medium"
+            className="border-slate-200 text-slate-700"
+          >
+            Close
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

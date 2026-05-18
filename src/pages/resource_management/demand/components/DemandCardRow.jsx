@@ -1,13 +1,20 @@
 import React from 'react';
 import { DemandTypeBadge, PriorityBadge, StateBadge, SLABadge } from './FormalBadges';
-import { EditIcon, ProjectsIcon, UserIcon, PendingIcon, CheckIcon, SpinnerIcon, ErrorIcon, SuccessIcon, DeleteIcon } from "@/components/icons";
+import { Pencil, Trash2} from "lucide-react";
+import { ProjectsIcon, UserIcon, PendingIcon, CheckIcon, SpinnerIcon, ErrorIcon, SuccessIcon ,EditIcon} from "@/components/icons";
 import { cn } from "@/lib/utils";
+import {
+    canProjectManagerEditDemand,
+    canProjectManagerMutateDemand,
+    PM_EDITABLE_DEMAND_MESSAGE,
+} from '../utils/demandPermissions';
 
 /**
  * DemandCardRow: Informative Workforce View
  * Redesigned for maximum clarity and logical information grouping.
  */
 const DM_PENDING_STATUSES = ['REQUESTED', 'DRAFT', 'SOFT', 'PROPOSED', 'PENDING', 'OPEN', 'IN_PROGRESS', 'IN PROGRESS'];
+const DM_REJECTABLE_STATUSES = [...DM_PENDING_STATUSES, 'APPROVED'];
 
 const normalizeRole = (role = "") =>
     String(role)
@@ -38,12 +45,13 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
     const isRMView = normalizedViewerRole === "RESOURCEMANAGER";
     const isPMView = normalizedViewerRole === "PROJECTMANAGER" || normalizedViewerRole === "MANAGER";
     const canQuickDecision = isDMView && DM_PENDING_STATUSES.includes(status);
+    const canDMRejectDemand = isDMView && DM_REJECTABLE_STATUSES.includes(status);
     const canRMCloseDemand = isRMView && status === 'APPROVED';
-    const canPMEditRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
-    const canPMDeleteRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
+    const canPMEditDemand = isPMView && canProjectManagerEditDemand(demand);
+    const canPMDeleteRequestedDemand = isPMView && canProjectManagerMutateDemand(demand);
     const isFulfilled = status === 'FULFILLED';
     const isRejected = status === 'REJECTED';
-    const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditRequestedDemand);
+    const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditDemand);
     const isApproving = decisionState?.demandId === demand.id && decisionState?.action === "approve";
     const isRejecting = decisionState?.demandId === demand.id && decisionState?.action === "reject";
     const isFulfilling = decisionState?.demandId === demand.id && decisionState?.action === "fulfill";
@@ -82,8 +90,8 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                 </div>
 
                 {/* 2. Priority Score */}
-                <div className="col-span-1 flex justify-start">
-                    <div className="text-left">
+                <div className="col-span-1 flex justify-center">
+                    <div className="text-center">
                         <span className="text-base font-black text-slate-900 tracking-tighter leading-none">
                             {demand.priorityScore || 0}
                         </span>
@@ -170,19 +178,20 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                                 {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-[14px] w-[14px] stroke-[2.4]" />}
                             </button>
                         </div>
+                    ) : canDMRejectDemand ? (
+                        <button
+                            title="Reject approved demand"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onReject) onReject(demand);
+                            }}
+                            disabled={isRejecting}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50/70 text-rose-600 shadow-[0_5px_14px_rgba(244,63,94,0.10)] transition hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-100 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-[14px] w-[14px] stroke-[2.4]" />}
+                        </button>
                     ) : canRMCloseDemand ? (
                         <div className="flex items-center gap-2">
-                            <button
-                                title="Fulfill demand"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (onFulfill) onFulfill(demand);
-                                }}
-                                disabled={isFulfilling || isRejecting}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-[0_5px_14px_rgba(16,185,129,0.12)] transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                {isFulfilling ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <SuccessIcon className="h-[15px] w-[15px] stroke-[2.4]" />}
-                            </button>
                             <button
                                 title="Reject demand"
                                 onClick={(e) => {
@@ -205,8 +214,8 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                                             ? 'Cannot edit rejected demand'
                                             : (isDMView && status === 'APPROVED')
                                                 ? 'Cannot edit approved demand'
-                                                : (isPMView && !canPMEditRequestedDemand)
-                                                    ? 'PM can edit only requested or draft demands'
+                                                : (isPMView && !canPMEditDemand)
+                                                    ? PM_EDITABLE_DEMAND_MESSAGE
                                                     : 'Edit demand'
                                 }
                                 onClick={(e) => {
@@ -221,7 +230,7 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                                         : "text-blue-600 hover:text-blue-700"
                                 )}
                             >
-                                <Pencil className="h-4 w-4" />
+                                <EditIcon size={16} />
                             </button>
                             {canPMDeleteRequestedDemand && (
                                 <button
@@ -232,7 +241,7 @@ const DemandCardRow = ({ demand, onView, onEdit, onDelete, onApprove, onReject, 
                                     }}
                                     className="inline-flex h-8 w-8 items-center justify-center text-rose-600 transition-all hover:text-rose-700 active:scale-90"
                                 >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 size={16} />
                                 </button>
                             )}
                         </div>

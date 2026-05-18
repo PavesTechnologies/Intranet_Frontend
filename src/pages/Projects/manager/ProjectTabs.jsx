@@ -11,6 +11,7 @@ import Navbar from "../../../components/Navbar/Navbar";
 import TestManagement from "../Testmanagement/TestManagementHome";
 import RiskRegisterPage from "./riskManagement/RiskRegisterPage";
 import RiskHealthModal from "./riskManagement/RiskHealthModal.jsx";
+import RoleExpectations from "../../resource_management/models/RoleExpectations.jsx";
 
 const ProjectDemandManagement = lazy(() => import("./ProjectDemandManagement"));
 const ProjectConfigurations = lazy(() => import("./project/ProjectConfigurations"));
@@ -37,16 +38,17 @@ const TabSkeleton = () => (
 
 // ─── Resource Management Dropdown ───────────────────────────────────────────
 const RESOURCE_TABS = [
-  { name: "Demand",         tab: "demand-management" },
-  { name: "RoleOff",        tab: "roleoff-management" },
+  { name: "Delivery Role", tab: "delivery-role" },
   { name: "Configurations", tab: "configurations" },
+  { name: "Demand", tab: "demand-management" },
+  { name: "RoleOff", tab: "roleoff-management" },
 ];
 
 const ResourceDropdown = ({ selectedTab, onSelect }) => {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef(null);
-  const openTimer  = useRef(null);
-  const menuRef    = useRef(null);
+  const openTimer = useRef(null);
+  const menuRef = useRef(null);
 
   const isActive = RESOURCE_TABS.some((t) => t.tab === selectedTab);
   const activeChild = RESOURCE_TABS.find((t) => t.tab === selectedTab);
@@ -95,7 +97,7 @@ const ResourceDropdown = ({ selectedTab, onSelect }) => {
             : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}
         `}
       >
-        Resource
+        ResourceManagement
         <ChevronDown
           className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           strokeWidth={2.5}
@@ -108,7 +110,7 @@ const ResourceDropdown = ({ selectedTab, onSelect }) => {
         onMouseEnter={scheduleOpen}
         onMouseLeave={scheduleClose}
         className={`
-          absolute top-full left-0 mt-1.5 w-44 bg-white border border-slate-200
+          absolute top-full left-0 mt-1.5 w-56 bg-white border border-slate-200
           rounded-lg shadow-lg shadow-slate-200/60 overflow-hidden z-50
           transition-all duration-150 origin-top
           ${open
@@ -158,12 +160,12 @@ const ResourceDropdown = ({ selectedTab, onSelect }) => {
 // ─── Main Component ──────────────────────────────────────────────────────────
 const ProjectTabs = () => {
   const { projectId } = useParams();
-  const location      = useLocation();
-  const navigate      = useNavigate();
-  const token         = localStorage.getItem("token");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const token = localStorage.getItem("token");
 
   const [projectName, setProjectName] = useState("");
-  const [notFound,    setNotFound]    = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const [showRiskModal, setShowRiskModal] = useState(false);
 
   const getSelectedTabFromLocation = useCallback(() => {
@@ -199,10 +201,10 @@ const ProjectTabs = () => {
   // Risk modal: only show once per 24 h per project
   useEffect(() => {
     if (!projectId) return;
-    const key       = `risk_modal_seen_${projectId}`;
-    const lastSeen  = localStorage.getItem(key);
-    const now       = Date.now();
-    const ONE_DAY   = 24 * 60 * 60 * 1000;
+    const key = `risk_modal_seen_${projectId}`;
+    const lastSeen = localStorage.getItem(key);
+    const now = Date.now();
+    const ONE_DAY = 24 * 60 * 60 * 1000;
 
     if (!lastSeen || now - parseInt(lastSeen, 10) > ONE_DAY) {
       setShowRiskModal(true);
@@ -217,9 +219,9 @@ const ProjectTabs = () => {
     if (!projectId) return null;
     const pid = parseInt(projectId, 10);
 
-    if (selectedTab === "summary")         return <Summary projectId={pid} projectName={projectName} />;
-    if (selectedTab === "backlog")         return <BacklogAndSprints projectId={pid} projectName={projectName} />;
-    if (selectedTab === "board")           return <Board projectId={pid} projectName={projectName} />;
+    if (selectedTab === "summary") return <Summary projectId={pid} projectName={projectName} />;
+    if (selectedTab === "backlog") return <BacklogAndSprints projectId={pid} projectName={projectName} />;
+    if (selectedTab === "board") return <Board projectId={pid} projectName={projectName} />;
     if (selectedTab === "risk-management") return <RiskRegisterPage projectId={pid} />;
     if (selectedTab.startsWith("test-management")) return <TestManagement projectId={pid} />;
 
@@ -241,6 +243,12 @@ const ProjectTabs = () => {
           <ProjectConfigurations projectId={pid} />
         </Suspense>
       );
+    if (selectedTab === "delivery-role")
+      return (
+        <Suspense fallback={<TabSkeleton />}>
+          <RoleExpectations projectId={pid} />
+        </Suspense>
+      );
 
     return null;
   };
@@ -248,15 +256,15 @@ const ProjectTabs = () => {
   // ─── Primary tabs ────────────────────────────────────────────────────────
   const PRIMARY_TABS = [
     { name: "Summary", tab: "summary" },
-    { name: "Backlog",  tab: "backlog" },
-    { name: "Board",    tab: "board" },
-    { name: "Risk",     tab: "risk-management" },
-    { name: "Test",     tab: "test-management" },
+    { name: "Backlog", tab: "backlog" },
+    { name: "Board", tab: "board" },
+    { name: "Risk", tab: "risk-management" },
+    { name: "Test", tab: "test-management" },
   ];
 
   // ─── Guards ──────────────────────────────────────────────────────────────
   if (!projectId) return <div className="p-6 text-slate-400">No project selected.</div>;
-  if (notFound)   return <div className="p-6 text-red-500">Project not found.</div>;
+  if (notFound) return <div className="p-6 text-red-500">Project not found.</div>;
 
   const isResourceTab = RESOURCE_TABS.some((t) => t.tab === selectedTab);
 

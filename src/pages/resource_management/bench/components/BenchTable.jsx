@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlertTriangle, Eye, Edit2, Check, X } from "lucide-react";
+import { CloseIcon, EditIcon, ViewIcon, WarningIcon } from "@/components/icons";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { CATEGORY_OPTIONS } from "../constants/benchConstants";
 import { getAgingTone } from "../models/benchModel";
@@ -81,11 +81,11 @@ const BenchTable = ({
 
   const handleSaveStatus = async () => {
     if (!editStatus) {
-      toast.error("Please select a status");
+      toast.error("Please Select A Status");
       return;
     }
     if (!editReason.trim()) {
-      toast.error("Please provide a reason");
+      toast.error("Please Provide A Reason");
       return;
     }
 
@@ -97,12 +97,12 @@ const BenchTable = ({
         reason: editReason
         // If stateType is needed, it can be passed here or handled on backend
       });
-      toast.success("Status updated successfully");
+      toast.success("Status Updated Successfully");
       setEditingRow(null);
 
       onRefresh?.();
     } catch (error) {
-      toast.error("Failed to update status");
+      toast.error("Failed To Update Status");
     } finally {
       setIsSaving(false);
     }
@@ -116,10 +116,15 @@ const BenchTable = ({
   return (
     <>
       <div className="overflow-x-auto no-scrollbar">
-        <GenericTable
-          headers={["Consultant Details", "Core Expertise", "Status", "Availability", "Aging", "Daily Exposure", "Actions"]}
-          columns={["consultant_info", "expertise_info", "status_info", "availability_info", "aging_info", "cost_info", "actions"]}
-          rows={rows.map((row) => {
+        {loading ? (
+          <div className="rounded-xl border border-slate-100 bg-white py-8 shadow-sm">
+            <LoadingSpinner text="Loading Data..." />
+          </div>
+        ) : (
+          <GenericTable
+            headers={["Consultant Details", "Core Expertise", "Status", "Availability", "Aging", "Daily Exposure", "Actions"]}
+            columns={["consultant_info", "expertise_info", "status_info", "availability_info", "aging_info", "cost_info", "actions"]}
+            rows={rows.map((row) => {
             const agingTone = getAgingTone(row.agingDays);
             const isEditing = editingRow?.id === row.id;
 
@@ -136,7 +141,7 @@ const BenchTable = ({
               expertise_info: (
                 <div className={`flex flex-col gap-1 ${isEditing ? "opacity-50 pointer-events-none" : ""}`}>
                   {row.topSkills.length === 0 ? (
-                    <span className="text-[10px] text-slate-300 italic">No expertise logged</span>
+                    <span className="text-[10px] text-slate-300 italic">No Expertise Logged</span>
                   ) : (
                     <>
                       <div className="flex flex-wrap gap-1">
@@ -179,7 +184,7 @@ const BenchTable = ({
                   )}
                   {(row.warnings.missingSkills || row.missingSkills.length > 0) && (
                     <div className="mt-1.5 flex gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                      <AlertTriangle className="h-3 w-3 text-rose-500 mt-0.5" />
+                      <WarningIcon className="h-3 w-3 text-rose-500 mt-0.5" />
                       <span className="text-[9px] font-bold text-rose-600 capitalize">Skill Gaps Detected</span>
                     </div>
                   )}
@@ -252,7 +257,7 @@ const BenchTable = ({
                     title="View Details"
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700"
                   >
-                    <Eye className="h-4 w-4" />
+                    <ViewIcon className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
@@ -260,26 +265,26 @@ const BenchTable = ({
                     title="Edit Status"
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-blue-600 transition-all hover:bg-blue-50 hover:text-blue-700"
                   >
-                    <Edit2 className="h-4 w-4" />
+                    <EditIcon className="h-4 w-4" />
                   </button>
                 </div>
               )
             };
-          })}
-          loading={loading}
-        />
+            })}
+          />
+        )}
       </div>
 
       {editingRow && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-visible animate-in zoom-in-95 duration-200">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h3 className="text-[13px] font-bold text-slate-800 uppercase tracking-widest">Update Substate</h3>
               <button 
                 onClick={handleCancelEdit}
                 className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
               >
-                <X className="h-4 w-4" />
+                <CloseIcon className="h-4 w-4" />
               </button>
             </div>
             
@@ -288,7 +293,7 @@ const BenchTable = ({
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Consultant</p>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <p className="text-sm font-bold text-slate-900 leading-tight">{editingRow.name}</p>
-                  <p className="text-[11px] font-medium text-slate-500 mt-0.5">Current state: <span className="font-bold text-slate-700">{editingRow.category?.replace(/_/g, " ")}</span></p>
+                  <p className="text-[11px] font-medium text-slate-500 mt-0.5">Current State: <span className="font-bold text-slate-700">{editingRow.category?.replace(/_/g, " ")}</span></p>
                 </div>
               </div>
 
@@ -296,7 +301,7 @@ const BenchTable = ({
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">New Target State</label>
                 <div className="relative">
                   <FilterListbox
-                    options={[{value:"",label:"Select a substate"},...validStates.map((status) => ({ value: status, label: status.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') }))]}
+                    options={[{value:"",label:"Select A Substate"},...validStates.map((status) => ({ value: status, label: status.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') }))]}
                     value={editStatus}
                     onChange={setEditStatus}
                   />
@@ -308,7 +313,7 @@ const BenchTable = ({
                 <textarea
                   value={editReason}
                   onChange={(e) => setEditReason(e.target.value)}
-                  placeholder="Provide context for this change..."
+                  placeholder="Provide Context For This Change..."
                   disabled={isSaving}
                   className="h-20 w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-[13px] font-medium text-slate-600 outline-none transition-all placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60"
                 />
@@ -322,7 +327,7 @@ const BenchTable = ({
                 onClick={handleCancelEdit}
                 disabled={isSaving}
               >
-                CANCEL
+                Cancel
               </button>
               <button
                 type="button"
@@ -336,10 +341,10 @@ const BenchTable = ({
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    SAVING...
+                    Saving...
                   </>
                 ) : (
-                  <>APPLY STRATEGY</>
+                  <>Apply Strategy</>
                 )}
               </button>
             </div>

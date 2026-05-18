@@ -1,4 +1,8 @@
 import axios from "axios";
+import {
+  canProjectManagerMutateDemand,
+  PM_REQUESTED_DEMAND_ONLY_MESSAGE,
+} from "../demand/utils/demandPermissions";
 
 const BASE_URL = window.__APP_CONFIG__?.RMS_BASE_URL;
 
@@ -36,7 +40,11 @@ export const handleRMDecision = async (rmDemandDecision) => {
   }
 };
 
-export const deleteDemandByPM = async (demandId) => {
+export const deleteDemandByPM = async (demandId, demand = null) => {
+  if (demand && !canProjectManagerMutateDemand(demand)) {
+    throw new Error(PM_REQUESTED_DEMAND_ONLY_MESSAGE);
+  }
+
   try {
     const response = await axios.delete(
       `${BASE_URL}/api/demand/delete/pm/${demandId}`,

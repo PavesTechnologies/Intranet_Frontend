@@ -89,7 +89,7 @@ export default function SkillsTab({ resource }) {
             <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-slate-100 rounded-3xl font-sans">
                 <Code2 className="h-12 w-12 text-slate-200 mb-3" />
                 <p className="text-sm font-bold text-slate-400">Inventory Empty</p>
-                <p className="text-xs text-slate-300 mt-1">No skill profiles detected for this resource</p>
+                <p className="text-xs text-slate-300 mt-1">No Skill Profiles Detected For This Resource</p>
             </div>
         );
     }
@@ -101,7 +101,7 @@ export default function SkillsTab({ resource }) {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                     <input
                         type="text"
-                        placeholder="Search skills inventory..."
+                        placeholder="Search Skills Inventory..."
                         value={search}
                         onChange={e => { setSearch(e.target.value); setPage(1); }}
                         className="w-full h-9 pl-10 pr-4 text-xs font-medium border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm font-sans"

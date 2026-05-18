@@ -262,56 +262,60 @@ const RMSProjectList = () => {
           />
         </div>
       </div> */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-row items-center gap-4">
-        {/* Search Bar Container - using flex-1 to grow and fill available space */}
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-col lg:flex-row lg:items-center gap-4">
+        <div className="relative w-full lg:w-[320px] shrink-0">
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search project / client..."
+            placeholder="Search Project / Client..."
             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
-        {/* Filters Container - now set to flex-nowrap to prevent stacking */}
-        <div className="flex flex-row flex-nowrap gap-3 shrink-0">
-          <FilterListbox
-            options={[
-              { value: "", label: "All Readiness" },
-              ...READINESS_STATUSES.map(val => ({
-                value: val,
-                label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
-              }))
-            ]}
-            value={filters.readinessStatus}
-            onChange={(val) => handleFilterChange("readinessStatus", val)}
-          />
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 flex-1">
+          <div className="w-full sm:w-[14rem]">
+            <FilterListbox
+              options={[
+                { value: "", label: "All Readiness" },
+                ...READINESS_STATUSES.map(val => ({
+                  value: val,
+                  label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
+                }))
+              ]}
+              value={filters.readinessStatus}
+              onChange={(val) => handleFilterChange("readinessStatus", val)}
+            />
+          </div>
 
-          <FilterListbox
-            options={[
-              { value: "", label: "All Status" },
-              ...PROJECT_STATUSES.map(val => ({
-                value: val,
-                label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
-              }))
-            ]}
-            value={filters.projectStatus}
-            onChange={(val) => handleFilterChange("projectStatus", val)}
-          />
+          <div className="w-full sm:w-[14rem]">
+            <FilterListbox
+              options={[
+                { value: "", label: "All Status" },
+                ...PROJECT_STATUSES.map(val => ({
+                  value: val,
+                  label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
+                }))
+              ]}
+              value={filters.projectStatus}
+              onChange={(val) => handleFilterChange("projectStatus", val)}
+            />
+          </div>
 
-          <FilterListbox
-            options={[
-              { value: "", label: "All Risk" },
-              ...RISK_LEVELS.map(val => ({
-                value: val,
-                label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
-              }))
-            ]}
-            value={filters.riskLevel}
-            onChange={(val) => handleFilterChange("riskLevel", val)}
-          />
+          <div className="w-full sm:w-[14rem]">
+            <FilterListbox
+              options={[
+                { value: "", label: "All Risk" },
+                ...RISK_LEVELS.map(val => ({
+                  value: val,
+                  label: val.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())
+                }))
+              ]}
+              value={filters.riskLevel}
+              onChange={(val) => handleFilterChange("riskLevel", val)}
+            />
+          </div>
         </div>
       </div>
 
@@ -433,10 +437,10 @@ const RMSProjectList = () => {
                   <WarningIcon className="h-8 w-8 text-amber-500" />
                 </div> */}
                   <p className="text-gray-600 font-medium text-lg">{errorMsg}</p>
-                  <p className="text-gray-400 text-sm mt-1">Try adjusting your filters or search criteria.</p>
+                  <p className="text-gray-400 text-sm mt-1">Try Adjusting Your Filters Or Search Criteria.</p>
                 </>
               ) : (
-                <p className="text-gray-500">No projects available.</p>
+                <p className="text-gray-500">No Projects Available.</p>
               )}
             </div>
           )}

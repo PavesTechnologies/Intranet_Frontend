@@ -65,7 +65,7 @@ const TaskCard = ({ task, taskProvided, taskSnapshot, openTaskPanel }) => {
       {...taskProvided.draggableProps}
       {...taskProvided.dragHandleProps}
       onClick={() => openTaskPanel(task)}
-      className={`bg-white border border-gray-200 rounded-lg p-2 mb-1.5 cursor-pointer hover:shadow-sm hover:border-indigo-200 transition-all ${
+      className={`bg-white border border-gray-200 rounded-lg p-3 mb-2.5 cursor-pointer hover:shadow-sm hover:border-indigo-200 transition-all ${
         taskSnapshot.isDragging ? "opacity-80 shadow-lg rotate-1" : ""
       }`}
     >
@@ -99,13 +99,13 @@ const TaskCard = ({ task, taskProvided, taskSnapshot, openTaskPanel }) => {
 
       {/* Row 2 — story/module name (optional) */}
       {story && (
-        <div className="text-[10px] text-gray-400 mt-0.5 ml-[52px] truncate leading-tight">
+        <div className="text-[10px] text-gray-400 mt-1 ml-[52px] truncate leading-tight">
           {story}
         </div>
       )}
 
       {/* Row 3 — assignee avatar + due date */}
-      <div className="flex items-center justify-between mt-1.5">
+      <div className="flex items-center justify-between mt-2">
         <Avatar name={assignee} />
         <span className="text-[10px] text-gray-400 leading-tight">
           {task.dueDate

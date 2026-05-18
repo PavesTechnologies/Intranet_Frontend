@@ -6,6 +6,7 @@ import {
     ErrorIcon, SuccessIcon, SpinnerIcon, CloseIcon, ProjectsIcon, UserIcon,
     CheckIcon, EditIcon, DeleteIcon, PendingIcon
 } from "@/components/icons";
+import Button from '../../../../components/Button/Button';
 import GenericTable from '../../../../components/Table/table';
 import { PriorityBadge, StateBadge, SLABadge, DemandTypeBadge } from '../components/FormalBadges';
 import { cn } from "@/lib/utils";
@@ -14,7 +15,6 @@ import DemandFilters from '../components/DemandFilters';
 import { useDemand } from '../hooks/useDemand';
 import DemandModal from '../../models/DemandModal';
 import { handleDMDecision, handleRMDecision, deleteDemandByPM } from '../../services/demandService';
-import { updateDemandStatus } from '../../services/projectService';
 import {
     Select,
     SelectContent,
@@ -24,6 +24,12 @@ import {
 } from "@/components/ui/select";
 import Pagination from '../../../../components/Pagination/pagination';
 import { toast } from 'react-toastify';
+import {
+    canProjectManagerEditDemand,
+    canProjectManagerMutateDemand,
+    PM_EDITABLE_DEMAND_MESSAGE,
+    PM_REQUESTED_DEMAND_ONLY_MESSAGE,
+} from '../utils/demandPermissions';
 
 const getActionErrorMessage = (error, fallback) =>
     error?.response?.data?.message ||
@@ -31,6 +37,7 @@ const getActionErrorMessage = (error, fallback) =>
     fallback;
 
 const DM_PENDING_STATUSES = ['REQUESTED', 'DRAFT', 'SOFT', 'PROPOSED', 'PENDING', 'OPEN', 'IN_PROGRESS', 'IN PROGRESS'];
+const DM_REJECTABLE_STATUSES = [...DM_PENDING_STATUSES, 'APPROVED'];
 
 const normalizeRole = (role = "") =>
     String(role)
@@ -53,6 +60,8 @@ const getDemandType = (demand = {}) =>
     demand.type_of_demand ||
     "";
 
+const getDemandId = (demand = {}) => demand.demandId || demand.id;
+
 const DecisionModal = ({
     type,
     demand,
@@ -71,23 +80,23 @@ const DecisionModal = ({
         ? "border-rose-200 bg-rose-50 text-rose-600"
         : isFulfill
             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-        : "border-emerald-200 bg-emerald-50 text-emerald-700";
+            : "border-emerald-200 bg-emerald-50 text-emerald-700";
     const headerBg = isReject
         ? "bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_55%,#fef2f2_100%)]"
         : isFulfill
             ? "bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#f8fafc_100%)]"
-        : "bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#eff6ff_100%)]";
+            : "bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#eff6ff_100%)]";
     const primaryButtonClass = isReject
         ? "bg-rose-600 shadow-rose-200 hover:bg-rose-700"
         : isFulfill
             ? "bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700"
-        : "bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700";
-    const title = isReject ? "Share the rejection reason" : isFulfill ? "Fulfill this demand" : "Approve this demand";
+            : "bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700";
+    const title = isReject ? "Share The Rejection Reason" : isFulfill ? "Fulfill This Demand" : "Approve This Demand";
     const helperText = isReject
-        ? "Add a short reason and submit your decision."
+        ? "Add A Short Reason And Submit Your Decision."
         : isFulfill
-            ? "Confirm that staffing is complete and close this demand."
-        : "Confirm the demand and move it to the next step.";
+            ? "Confirm That Staffing Is Complete And Close This Demand."
+            : "Confirm The Demand And Move It To The Next Step.";
     const buttonLabel = isReject ? "Submit Rejection" : isFulfill ? "Mark Fulfilled" : "Confirm Approval";
     const Icon = isReject ? ErrorIcon : SuccessIcon;
 
@@ -108,16 +117,19 @@ const DecisionModal = ({
                                 {helperText}
                             </p>
                         </div>
-                        <button
+                        <Button
                             type="button"
                             onClick={onClose}
                             disabled={loading}
-                            className="rounded-full border border-slate-200 p-2 text-slate-400 transition hover:border-slate-300 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 rounded-full border-slate-200 p-0 text-slate-400 shadow-none hover:border-slate-300 hover:text-slate-600"
                         >
                             <CloseIcon className="h-4 w-4" />
-                        </button>
+                        </Button>
                     </div>
                 </div>
+
 
                 <div className="flex flex-1 flex-col justify-between gap-5 px-6 py-5">
                     <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
@@ -141,7 +153,7 @@ const DecisionModal = ({
                                 value={reason}
                                 onChange={(e) => onReasonChange(e.target.value)}
                                 rows={4}
-                                placeholder="Explain briefly why this demand is being rejected."
+                                placeholder="Explain Briefly Why This Demand Is Being Rejected."
                                 className={cn(
                                     "w-full rounded-2xl border bg-white px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-350",
                                     error
@@ -151,7 +163,7 @@ const DecisionModal = ({
                             />
                             <div className="mt-2 flex items-center justify-between">
                                 <p className={cn("text-xs", error ? "text-rose-600" : "text-slate-400")}>
-                                    {error || "A reason is required when rejecting a demand."}
+                                    {error || "A Reason Is Required When Rejecting A Demand."}
                                 </p>
                                 <p className="text-[11px] text-slate-400">{reason.trim().length}/250</p>
                             </div>
@@ -160,34 +172,37 @@ const DecisionModal = ({
                         <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
                             <p className="text-sm font-semibold text-slate-800">
                                 {isFulfill
-                                    ? "The demand will be marked as fulfilled immediately after confirmation."
-                                    : "The demand will be approved immediately after confirmation."}
+                                    ? "The Demand Will Be Marked As Fulfilled Immediately After Confirmation."
+                                    : "The Demand Will Be Approved Immediately After Confirmation."}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
-                                No extra form update is needed.
+                                No Extra Form Update Is Needed.
                             </p>
                         </div>
                     )}
                 </div>
 
                 <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
-                    <button
+                    <Button
                         type="button"
                         onClick={onClose}
                         disabled={loading}
-                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        variant="outline"
+                        size="small"
+                        className="rounded-xl border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 shadow-none hover:border-slate-300"
                     >
                         Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
                         onClick={onSubmit}
                         disabled={loading}
-                        className={cn("inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60", primaryButtonClass)}
+                        size="small"
+                        className={cn("rounded-xl px-4 py-2 text-sm font-semibold text-white", primaryButtonClass)}
                     >
                         {loading ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
                         {buttonLabel}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>,
@@ -209,20 +224,22 @@ const DeleteDemandModal = ({ demand, loading, onClose, onSubmit }) => {
                                 Delete
                             </div>
                             <h3 className="mt-3 text-lg font-bold text-slate-900">
-                                Delete requested demand?
+                                Delete Requested Demand?
                             </h3>
                             <p className="mt-1 text-sm text-slate-500">
-                                This will cancel the requested demand and remove it from the active pipeline.
+                                This Will Cancel The Requested Demand And Remove It From The Active Pipeline.
                             </p>
                         </div>
-                        <button
+                        <Button
                             type="button"
                             onClick={onClose}
                             disabled={loading}
-                            className="rounded-full border border-slate-200 p-2 text-slate-400 transition hover:border-slate-300 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 rounded-full border-slate-200 p-0 text-slate-400 shadow-none hover:border-slate-300 hover:text-slate-600"
                         >
                             <CloseIcon className="h-4 w-4" />
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -239,23 +256,27 @@ const DeleteDemandModal = ({ demand, loading, onClose, onSubmit }) => {
                 </div>
 
                 <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
-                    <button
+                    <Button
                         type="button"
                         onClick={onClose}
                         disabled={loading}
-                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        variant="outline"
+                        size="small"
+                        className="rounded-xl border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 shadow-none hover:border-slate-300"
                     >
                         Keep Demand
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
                         onClick={onSubmit}
                         disabled={loading}
-                        className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-rose-200 transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        variant="danger"
+                        size="small"
+                        className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-rose-200 hover:bg-rose-700"
                     >
                         {loading ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
                         Delete Demand
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>,
@@ -306,7 +327,7 @@ const DemandWorkspacePage = () => {
     const [rejectReasonError, setRejectReasonError] = useState("");
     const [rmRejectReason, setRmRejectReason] = useState("");
     const [rmRejectReasonError, setRmRejectReasonError] = useState("");
-    const isRMView = effectiveRole === "Resource_Manager";
+    const isRMView = normalizeRole(effectiveRole) === "RESOURCEMANAGER";
 
     const openApproveModal = (demand) => {
         setApprovingDemand(demand);
@@ -329,6 +350,14 @@ const DemandWorkspacePage = () => {
     };
 
     const openDeleteModal = (demand) => {
+        const normalizedRole = normalizeRole(effectiveRole);
+        const isRM = normalizedRole === "RESOURCEMANAGER";
+        const isPM = normalizedRole === "PROJECTMANAGER" || normalizedRole === "MANAGER";
+
+        if ((isPM || isRM) && !canProjectManagerMutateDemand(demand)) {
+            toast.error("Only Requested Demands Can Be Deleted.");
+            return;
+        }
         setDeletingDemand(demand);
     };
 
@@ -371,11 +400,11 @@ const DemandWorkspacePage = () => {
                 decision: "APPROVED",
                 rejectionReason: null
             });
-            toast.success(response?.message || "Demand approved successfully");
+            toast.success(response?.message || "Demand Approved Successfully");
             setApprovingDemand(null);
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand approval failed"));
+            toast.error(getActionErrorMessage(error, "Demand Approval Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -383,28 +412,35 @@ const DemandWorkspacePage = () => {
 
     const handleQuickReject = async () => {
         const cleanedReason = rejectReason.trim();
+        const currentStatus = String(rejectingDemand?.lifecycleState || rejectingDemand?.demandStatus || "").toUpperCase();
 
         if (!cleanedReason) {
-            setRejectReasonError("Please enter a rejection reason.");
+            setRejectReasonError("Please Enter A Rejection Reason.");
             return;
         }
 
-        if (!rejectingDemand?.id) return;
+        const demandId = getDemandId(rejectingDemand);
+        if (!demandId) return;
 
-        setDecisionState({ demandId: rejectingDemand.id, action: "reject" });
+        if (!DM_REJECTABLE_STATUSES.includes(currentStatus)) {
+            toast.error("Only Pending Or Approved Demands Can Be Rejected By Dm.");
+            return;
+        }
+
+        setDecisionState({ demandId, action: "reject" });
         try {
             const response = await handleDMDecision({
-                demandId: rejectingDemand.id,
+                demandId,
                 decision: "REJECTED",
                 rejectionReason: cleanedReason
             });
-            toast.success(response?.message || "Demand rejected successfully");
+            toast.success(response?.message || (currentStatus === "APPROVED" ? "Approved Demand Rejected Successfully" : "Demand Rejected Successfully"));
             setRejectingDemand(null);
             setRejectReason("");
             setRejectReasonError("");
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand rejection failed"));
+            toast.error(getActionErrorMessage(error, "Demand Rejection Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -420,11 +456,11 @@ const DemandWorkspacePage = () => {
                 decision: "FULFILLED",
                 rejectionReason: null
             });
-            toast.success(response?.message || "Demand fulfilled successfully");
+            toast.success(response?.message || "Demand Fulfilled Successfully");
             setFulfillingDemand(null);
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand fulfillment failed"));
+            toast.error(getActionErrorMessage(error, "Demand Fulfillment Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -434,7 +470,7 @@ const DemandWorkspacePage = () => {
         const cleanedReason = rmRejectReason.trim();
 
         if (!cleanedReason) {
-            setRmRejectReasonError("Please enter a rejection reason.");
+            setRmRejectReasonError("Please Enter A Rejection Reason.");
             return;
         }
 
@@ -447,13 +483,13 @@ const DemandWorkspacePage = () => {
                 decision: "REJECTED",
                 rejectionReason: cleanedReason
             });
-            toast.success(response?.message || "Demand rejected successfully");
+            toast.success(response?.message || "Demand Rejected Successfully");
             setRmRejectingDemand(null);
             setRmRejectReason("");
             setRmRejectReasonError("");
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand rejection failed"));
+            toast.error(getActionErrorMessage(error, "Demand Rejection Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -463,18 +499,28 @@ const DemandWorkspacePage = () => {
         const id = deletingDemand?.demandId || deletingDemand?.id;
         if (!id) return;
 
+        const normalizedRole = normalizeRole(effectiveRole);
+        const isRM = normalizedRole === "RESOURCEMANAGER";
+        const isPM = normalizedRole === "PROJECTMANAGER" || normalizedRole === "MANAGER";
+
+        if ((isPM || isRM) && !canProjectManagerMutateDemand(deletingDemand)) {
+            toast.error("Only Requested Demands Can Be Deleted.");
+            return;
+        }
+
         setDecisionState({ demandId: id, action: "delete" });
         try {
-            const response = await deleteDemandByPM(id);
-            toast.success(response?.message || "Demand deleted successfully");
+            const response = await deleteDemandByPM(id, deletingDemand);
+            toast.success(response?.message || "Demand Deleted Successfully");
             setDeletingDemand(null);
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Failed to delete demand"));
+            toast.error(getActionErrorMessage(error, "Failed To Delete Demand"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
     };
+
 
     // Sync draft with global filters when they change externally (like Reset)
     useEffect(() => {
@@ -573,7 +619,7 @@ const DemandWorkspacePage = () => {
                                 Demand Pipeline Management
                             </h1>
                             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                                A real-time snapshot of resource mandates, SLA compliance, and fulfillment status across the enterprise.
+                                A Real-Time Snapshot Of Resource Mandates, Sla Compliance, And Fulfillment Status Across The Enterprise.
                             </p>
                         </div>
                         {demandRoleOptions.length > 1 && (
@@ -624,16 +670,16 @@ const DemandWorkspacePage = () => {
                                         { id: 'at_risk', label: 'At Risk', icon: WarningIcon, color: 'text-orange-600' },
                                         { id: 'active', label: 'Approved', icon: ActivityIcon, color: 'text-indigo-600' },
                                         { id: 'soft', label: 'Soft', icon: ZapIcon, color: 'text-slate-600' },
-                                        ...(isRMView
-                                            ? [{ id: 'fulfilled', label: 'Fulfilled', icon: SuccessIcon, color: 'text-emerald-600' }]
-                                            : []),
+                                        { id: 'fulfilled', label: 'Fulfilled', icon: SuccessIcon, color: 'text-emerald-600' },
                                         { id: 'rejected', label: 'Rejected', icon: ErrorIcon, color: 'text-rose-600' }
                                     ].map(tab => (
-                                        <button
+                                        <Button
                                             key={tab.id}
                                             onClick={() => setActiveTab(tab.id)}
+                                            variant="ghost"
+                                            size="small"
                                             className={cn(
-                                                "flex items-center gap-1 px-3 py-1 text-[10px] font-bold rounded-md transition-all",
+                                                "flex items-center gap-1 rounded-md px-3 py-1 text-[10px] font-bold shadow-none",
                                                 activeTab === tab.id
                                                     ? "bg-white text-slate-900 shadow-sm"
                                                     : "text-slate-400 hover:text-slate-600"
@@ -641,17 +687,18 @@ const DemandWorkspacePage = () => {
                                         >
                                             <tab.icon className={cn("h-3 w-3", activeTab === tab.id ? tab.color : "opacity-40")} />
                                             {tab.label}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             </div>
 
                             <div className="flex items-center gap-2">
+                                
                                 <div className="relative">
                                     <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                                     <input
                                         type="text"
-                                        placeholder="Search pipeline..."
+                                        placeholder="Search Pipeline..."
                                         value={filters.search}
                                         onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                                         className="h-8 w-[240px] pl-9 pr-4 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all placeholder:text-slate-400"
@@ -697,21 +744,22 @@ const DemandWorkspacePage = () => {
                                 const isRMView = normalizedViewerRole === "RESOURCEMANAGER";
                                 const isPMView = normalizedViewerRole === "PROJECTMANAGER" || normalizedViewerRole === "MANAGER";
                                 const canQuickDecision = isDMView && DM_PENDING_STATUSES.includes(status);
-                                const canRMCloseDemand = isRMView && status === 'APPROVED';
-                                const canPMEditRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
-                                const canPMDeleteRequestedDemand = isPMView && ['REQUESTED', 'DRAFT'].includes(status);
+                                const canDMRevertApprovedDemand = isDMView && status === 'APPROVED';
+                                const canRMAction = isRMView && (status === 'APPROVED' || status === 'REQUESTED');
+                                const canPMEditDemand = isPMView && canProjectManagerEditDemand(demand);
+                                const canDeleteDemand = (isPMView || isRMView) && canProjectManagerMutateDemand(demand);
                                 const isFulfilled = status === 'FULFILLED';
                                 const isRejected = status === 'REJECTED';
-                                const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditRequestedDemand);
-                                
+                                const isEditDisabled = isFulfilled || isRejected || (isDMView && status === 'APPROVED') || (isPMView && !canPMEditDemand);
+
                                 const isApproving = decisionState?.demandId === demand.id && decisionState?.action === "approve";
                                 const isRejecting = decisionState?.demandId === demand.id && decisionState?.action === "reject";
                                 const isFulfilling = decisionState?.demandId === demand.id && decisionState?.action === "fulfill";
 
                                 return {
                                     ...demand,
-                                    onRowClick: () => navigate(`/resource-management/demand/${demand.id}`, { 
-                                        state: { clientName: demand.clientName || demand.client } 
+                                    onRowClick: () => navigate(`/resource-management/demand/${demand.id}`, {
+                                        state: { clientName: demand.clientName || demand.client }
                                     }),
                                     rowClass: "group",
                                     demand_details: (
@@ -763,7 +811,7 @@ const DemandWorkspacePage = () => {
                                                             "{demand.rmRejectionReason || demand.dmRejectionReason || demand.rejectionReason}"
                                                         </span>
                                                     ) : (
-                                                        <span className="text-[10px] text-slate-400 italic font-bold">No reason specified</span>
+                                                        <span className="text-[10px] text-slate-400 italic font-bold">No Reason Specified</span>
                                                     )}
                                                 </div>
                                             ) : (demand.demandSlaId || demand.slaId) ? (
@@ -797,57 +845,78 @@ const DemandWorkspacePage = () => {
                                         <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
                                             {canQuickDecision ? (
                                                 <div className="flex items-center gap-2">
-                                                    <button
+                                                    <Button
                                                         onClick={() => openApproveModal(demand)}
                                                         disabled={isApproving || isRejecting}
-                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        title="Approve"
+                                                        className="h-7 w-7 rounded-md p-0 text-emerald-600 shadow-none hover:bg-emerald-50"
                                                     >
                                                         {isApproving ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon className="h-4 w-4" />}
-                                                    </button>
-                                                    <button
+                                                    </Button>
+                                                    <Button
                                                         onClick={() => openRejectModal(demand)}
                                                         disabled={isApproving || isRejecting}
-                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        title="Reject"
+                                                        className="h-7 w-7 rounded-md p-0 text-rose-600 shadow-none hover:bg-rose-50"
                                                     >
-                                                        {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
-                                                    </button>
+                                                        {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CloseIcon className="h-4 w-4" />}
+                                                    </Button>
                                                 </div>
-                                            ) : canRMCloseDemand ? (
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => openFulfillModal(demand)}
-                                                        disabled={isFulfilling || isRejecting}
-                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
-                                                    >
-                                                        {isFulfilling ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <SuccessIcon className="h-4 w-4" />}
-                                                    </button>
-                                                    <button
+                                            ) : canRMAction ? (
+                                                <div className="flex items-center justify-center">
+                                                    <Button
                                                         onClick={() => openRMRejectModal(demand)}
-                                                        disabled={isFulfilling || isRejecting}
-                                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                                                        disabled={isRejecting}
+                                                        title="Reject Demand"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 rounded-md p-0 text-rose-600 shadow-none hover:bg-rose-50"
                                                     >
-                                                        {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <ErrorIcon className="h-4 w-4" />}
-                                                    </button>
+                                                        {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CloseIcon className="h-4 w-4" />}
+                                                    </Button>
                                                 </div>
+                                            ) : canDMRevertApprovedDemand ? (
+                                                <Button
+                                                    title="Reject approved demand"
+                                                    onClick={() => openRejectModal(demand)}
+                                                    disabled={isRejecting}
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 rounded-md p-0 text-rose-600 shadow-none hover:bg-rose-50"
+                                                >
+                                                    {isRejecting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <CloseIcon className="h-4 w-4" />}
+                                                </Button>
                                             ) : (
                                                 <div className="flex items-center gap-2">
-                                                    <button
+                                                    <Button
                                                         onClick={() => {
+                                                            if (isPMView && !canProjectManagerEditDemand(demand)) {
+                                                                toast.error(PM_EDITABLE_DEMAND_MESSAGE);
+                                                                return;
+                                                            }
                                                             setEditingDemand(demand);
                                                             setEditModalOpen(true);
                                                         }}
                                                         disabled={isEditDisabled}
-                                                        className={cn("p-1.5 rounded-lg transition-colors", isEditDisabled ? "text-slate-300" : "text-blue-600 hover:bg-blue-50")}
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className={cn("h-8 w-8 rounded-lg p-0 shadow-none", isEditDisabled ? "text-slate-300" : "text-blue-600 hover:bg-blue-50")}
                                                     >
                                                         <EditIcon className="h-4 w-4" />
-                                                    </button>
-                                                    {canPMDeleteRequestedDemand && (
-                                                        <button
+                                                    </Button>
+                                                    {canDeleteDemand && (
+                                                        <Button
                                                             onClick={() => openDeleteModal(demand)}
-                                                            className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 rounded-lg p-0 text-rose-600 shadow-none hover:bg-rose-50"
                                                         >
                                                             <DeleteIcon className="h-4 w-4" />
-                                                        </button>
+                                                        </Button>
                                                     )}
                                                 </div>
                                             )}
