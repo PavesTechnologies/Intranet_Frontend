@@ -25,7 +25,7 @@ import {
   updateCategory,
 } from "../models/benchModel";
 import { getBenchResources, getPoolResources, getBenchKPIs } from "../services/benchService";
-import { toast } from "react-hot-toast";
+import { notify } from "../../utils/notify";
 
 const getStoredState = () => {
   if (typeof window === "undefined") return null;
@@ -166,7 +166,7 @@ const BenchPage = () => {
     } catch (error) {
       if (!isActive) return;
       console.error("Resource Supply Data Load Error", error);
-      toast.error("Failed To Load Bench Or Pool Data");
+      notify.error(error, "Failed To Load Bench Or Pool Data");
     } finally {
       setLoading(false);
     }

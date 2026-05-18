@@ -11,7 +11,7 @@ import { CalendarDays, Table2, GanttChart } from "lucide-react";
 import { RESOURCES, getKPIData } from "../../services/availabilityService";
 import { getWorkforceKPI } from "../../services/workforceService";
 import { useAvailability } from "../../hooks/useAvailability";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
 
@@ -63,7 +63,7 @@ export default function WorkforceAvailability() {
       setKpiData(res.data);
     } catch (err) {
       console.error("Failed to load KPI data", err);
-      toast.error(err.response?.data?.message || "Failed to load KPI data");
+      notify.error(err, "Failed to load KPI data");
     } finally {
       setKpiLoading(false);
     }

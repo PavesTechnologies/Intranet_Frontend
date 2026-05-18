@@ -30,7 +30,7 @@ import {
   deleteClientAssignment,
   getProjectsByClient,
 } from "../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { Listbox, Transition } from "@headlessui/react";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
@@ -196,7 +196,7 @@ const AssetDetail = () => {
       setProjectResources(res?.data || []);
     } catch (err) {
       console.error("Failed to load project resources", err);
-      toast.error(err.response?.data?.message || "Failed to load project resources");
+      notify.error(err, "Failed to load project resources");
     } finally {
       setProjectResourcesLoading(false);
     }
@@ -224,7 +224,7 @@ const AssetDetail = () => {
       setAvailableSerials(filtered);
     } catch (err) {
       console.error("Failed to fetch serial numbers", err);
-      toast.error("Failed To Load Available Serial Numbers");
+      notify.error("Failed To Load Available Serial Numbers");
     } finally {
       setSerialLoading(false);
     }
@@ -279,7 +279,7 @@ const AssetDetail = () => {
         }
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to load asset details");
+      notify.error(err, "Failed to load asset details");
     } finally {
       setLoading(false);
     }
@@ -297,7 +297,7 @@ const AssetDetail = () => {
       const res = await getAssignmentKPI(assetId);
       setKPIData(res.data);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to load KPI data");
+      notify.error(err, "Failed to load KPI data");
     } finally {
       setKPILoading(false);
     }
@@ -396,15 +396,15 @@ const AssetDetail = () => {
         const res = await assignClientAsset(payload);
       }
       if (editingAssignment) {
-        toast.success("Assignment Updated Successfully");
+        notify.success("Assignment Updated Successfully");
       } else {
-        toast.success("Assignment Created Successfully");
+        notify.success("Assignment Created Successfully");
       }
       await fetchData();
       fetchKPI();
       closeModal();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to save record");
+      notify.error(err, "Failed to save record");
     } finally {
       setUpdateLoading(false);
     }
@@ -413,7 +413,7 @@ const AssetDetail = () => {
   const handleReturnSubmit = async (e) => {
     e.preventDefault();
     if (!returnData.conditionOnReturn) {
-      toast.warning("Please select the condition on return.");
+      notify.warning("Please select the condition on return.");
       return;
     }
     setReturnLoading(true);
@@ -423,13 +423,13 @@ const AssetDetail = () => {
         today,
         returnData.returnNotes,
       );
-      toast.success(res.message || "Asset marked as returned");
+      notify.success(res.message || "Asset marked as returned");
       await fetchData();
       fetchKPI();
       setReturnModal(false);
       setReturnItem(null);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to return asset");
+      notify.error(err, "Failed to return asset");
     } finally {
       setReturnLoading(false);
     }
@@ -439,11 +439,11 @@ const AssetDetail = () => {
     setDeleteLoading(true);
     try {
       const res = await deleteClientAssignment(deleteTarget.assignmentId);
-      toast.success(res.message || "Record deleted");
+      notify.success(res.message || "Record deleted");
       await fetchData();
     } catch (err) {
       console.log(err);
-      toast.error(err.response?.data || "Failed to delete record");
+      notify.error(err, "Failed to delete record");
     } finally {
       setDeleteLoading(false);
       setDeleteTarget(null);

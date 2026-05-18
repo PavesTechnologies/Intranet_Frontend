@@ -37,7 +37,7 @@ import Modal from "../../../components/Modal/modal";
 import CreateClient from "./CreateClient";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import {
   getClientById,
   deleteClient,
@@ -366,9 +366,9 @@ const ClientPage = () => {
         ...payload,
         clientId, // VERY IMPORTANT
       });
-      toast.success(res.message || "Escalation contact created");
+      notify.success(res.message || "Escalation contact created");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to create contact");
+      notify.error(error, "Failed to create contact");
     } finally {
       setLoading(false);
     }
@@ -452,7 +452,7 @@ const ClientPage = () => {
       const data = await getClientById(clientId);
       setClientDetails(data.data);
     } catch (error) {
-      toast.error("Failed To Fetch Client Details.");
+      notify.error("Failed To Fetch Client Details.");
     } finally {
       setLoading(false);
     }
@@ -541,11 +541,11 @@ const ClientPage = () => {
     setLoading(true);
     try {
       const res = await deleteClient(clientId);
-      toast.success(res.message || "Client deleted successfully.");
+      notify.success(res.message || "Client deleted successfully.");
       setOpenDeleteClient(false);
       navigate(-1);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to delete client.");
+      notify.error(error, "Failed to delete client.");
     } finally {
       setLoading(false);
     }
@@ -555,10 +555,10 @@ const ClientPage = () => {
     setLoading(true);
     try {
       const res = await createClientSLA(data);
-      toast.success(res.message || "SLA created successfully");
+      notify.success(res.message || "SLA created successfully");
       setSLARefetchKey((prev) => prev + 1);
-    } catch (res) {
-      toast.error(res.response?.data?.message || "Failed to create SLA");
+    } catch (error) {
+      notify.error(error, "Failed to create SLA");
     } finally {
       setLoading(false);
     }
@@ -569,10 +569,10 @@ const ClientPage = () => {
     console.log("Creating compliance with data:", data);
     try {
       const res = await createClientCompliance(data);
-      toast.success(res.message || "Compliance created successfully");
+      notify.success(res.message || "Compliance created successfully");
       setComplianceRefetchKey((prev) => prev + 1);
-    } catch (res) {
-      toast.error(res.response?.data?.message || "Failed to create Compliance");
+    } catch (error) {
+      notify.error(error, "Failed to create Compliance");
     } finally {
       setLoading(false);
     }
@@ -582,10 +582,10 @@ const ClientPage = () => {
     setLoading(true);
     try {
       const res = await createClientEscalation(data);
-      toast.success(res.message || "Escalation created successfully");
+      notify.success(res.message || "Escalation created successfully");
       setEscalationRefetchKey((prev) => prev + 1);
-    } catch (res) {
-      toast.error(res.response?.data?.message || "Failed to create Escalation");
+    } catch (error) {
+      notify.error(error, "Failed to create Escalation");
     } finally {
       setLoading(false);
     }
@@ -599,7 +599,7 @@ const ClientPage = () => {
     } else if (type === "escalations") {
       await handleEscalationCreate(data);
     } else {
-      toast.error("Unknown configuration type");
+      notify.error("Unknown configuration type");
     }
     setOpenConfigModal(false);
   };

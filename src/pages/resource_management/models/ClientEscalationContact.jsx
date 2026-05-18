@@ -4,7 +4,7 @@ import {
   updateClientContact,
   deleteClientContact,
 } from "../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
 import { MoreHorizontalIcon, EditIcon, DeleteIcon } from "@/components/icons";
@@ -73,7 +73,7 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
       setContactList(sortedData);
       setCurrentPage(1);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to fetch SLA");
+      notify.error(error, "Failed to fetch SLA");
     } finally {
       setLoading(false);
     }
@@ -83,11 +83,11 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
     setUpdateLoading(true);
     try {
       const res = await updateClientContact(formData);
-      toast.success(res.message || "Contact updated successfully.");
+      notify.success(res.message || "Contact updated successfully.");
       setOpenUpdateContact(false);
       fetchContact();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to update Contact.");
+      notify.error(error, "Failed to update Contact.");
     } finally {
       setUpdateLoading(false);
     }
@@ -103,10 +103,10 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
           item.contactId === updated.contactId ? { ...item, ...updated } : item,
         ),
       );
-      toast.success(res.message || "Contact deleted successfully.");
+      notify.success(res.message || "Contact deleted successfully.");
       // fetchContact();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to delete Contact.");
+      notify.error(error, "Failed to delete Contact.");
     } finally {
       setDeleteLoading(false);
       setSelectedContactId(null);
