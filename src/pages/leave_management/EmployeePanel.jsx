@@ -45,7 +45,7 @@ const EmployeePanel = () => {
 
   const handleViewChange = (view) => {
     if (view === 'admin' && !isManager) return;
-    if (view === 'hr' && !isHR) return;
+    if (view === 'HR' && !isHR) return;
     if (view === 'hr-admin' && !isHRAdministrator) return;
     setActiveView(view);
   };
