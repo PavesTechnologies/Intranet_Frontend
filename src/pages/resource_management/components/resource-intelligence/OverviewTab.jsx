@@ -122,7 +122,7 @@ function UtilizationChart({ data }) {
     if (!list || list.length === 0) {
         return <div className="flex items-center justify-center h-full text-[10px] text-slate-400 font-medium font-sans">No Trend Data Available</div>;
     }
-    
+
     const maxVal = Math.max(...list.map(d => (d.billable || 0) + (d.nonBillable || 0)), 1);
 
     return (
@@ -570,4 +570,4 @@ export default function OverviewTab({ resource }) {
             </div>
         </div>
     );
-}
+};

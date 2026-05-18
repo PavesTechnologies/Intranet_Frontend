@@ -31,24 +31,24 @@ const HR_MANAGEMENT    = [ROLES.HR, ROLES.REPORTING_MANAGER];
  */
 export const EO_SUBMENU = [
   {
-    label: "Onboarding Dashboard",
+    label: "Insights & Analytics",
     to: "/employee-onboarding/onboarding-summary",
     allowedRoles: HR_MANAGEMENT,
     children: [
-      { label: "Summary",   to: "/employee-onboarding/onboarding-summary" },
-      { label: "Analytics", to: "/employee-onboarding/analytics" },
+      { label: "Executive Summary",   to: "/employee-onboarding/onboarding-summary" },
+      { label: "Operational Metrics", to: "/employee-onboarding/analytics" },
     ],
   },
   {
-    label: "Onboarding Task",
+    label: "Onboarding Management",
     to: "/employee-onboarding/",
     allowedRoles: MANAGEMENT_ROLES,
     children: [
-      { label: "Task Dashboard",   to: "/employee-onboarding" },
-      { label: "Create Offer",     to: "/employee-onboarding/create",           allowedRoles: [ROLES.HR] },
-      { label: "BulkUpload",       to: "/employee-onboarding/bulk-upload",      allowedRoles: [ROLES.HR] },
-      { label: "Add task",         to: "/employee-onboarding/onboarding-task",  allowedRoles: HR_ADMIN },
-      { label: "HR Configuration", to: "/employee-onboarding/hr-configuration", allowedRoles: HR_ADMIN },
+      { label: "Workflow Overview",   to: "/employee-onboarding" },
+      { label: "Offer Management",     to: "/employee-onboarding/create",           allowedRoles: [ROLES.HR] },
+      { label: "Data Import",       to: "/employee-onboarding/bulk-upload",      allowedRoles: [ROLES.HR] },
+      { label: "Task Configuration",         to: "/employee-onboarding/onboarding-task",  allowedRoles: HR_ADMIN },
+      { label: "System Settings", to: "/employee-onboarding/hr-configuration", allowedRoles: HR_ADMIN },
     ],
   },
   {
@@ -57,32 +57,40 @@ export const EO_SUBMENU = [
     // no allowedRoles → visible to all authenticated users
     children: [
       { label: "Employee Directory", to: "/employee-onboarding/employee-directory" },
-      { label: "Employee List",      to: "/employee-onboarding/employeelist",       allowedRoles: HR_MANAGEMENT },
-      { label: "Organization Tree",  to: "/employee-onboarding/organization-tree" },
+      { label: "Member Records",      to: "/employee-onboarding/employeelist",       allowedRoles: HR_MANAGEMENT },
+      { label: "Org Chart",  to: "/employee-onboarding/organization-tree" },
     ],
   },
-  {
-    label: "Employee Verification",
-    to: "/employee-onboarding/hr",
-    allowedRoles: MANAGEMENT_ROLES,
-    children: [
-      { label: "Employee Verification",  to: "/employee-onboarding/hr",                         allowedRoles: [ROLES.HR] },
-      { label: "Admin Approval Dashboard", to: "/employee-onboarding/admin/approval-dashboard", allowedRoles: MANAGEMENT_ROLES },
-      { label: "Employee Credentials",   to: "/employee-onboarding/employee-credentials",       allowedRoles: HR_ADMIN },
-    ],
-  },
-  {
-    label: "Employee Documents ",
+   {
+    label: "Document Center ",
     to: "/employee-onboarding/employeedocuments",
     allowedRoles: MANAGEMENT_ROLES,
     children: [
-      { label: "Employee Documents",      to: "/employee-onboarding/employeedocuments" },
-      { label: "Document Template",       to: "/employee-onboarding/documents-template",     allowedRoles: [ROLES.HR] },
-      { label: "Organization Documents",  to: "/employee-onboarding/organization-documents", allowedRoles: [ROLES.HR] },
+      { label: "Personal Files",      to: "/employee-onboarding/employeedocuments" },
+      { label: "e-Form Template",       to: "/employee-onboarding/documents-template",     allowedRoles: [ROLES.HR] },
+      { label: "Corporate Policies",  to: "/employee-onboarding/organization-documents", allowedRoles: [ROLES.HR] },
     ],
   },
   {
-    label: "Employee Exit Process",
+    label: "Workforce Reports ",
+    to: "/employee-onboarding/weekly-joining-report-dashboard",
+    allowedRoles: MANAGEMENT_ROLES,
+    // children: [
+    //   { label: "Reporting Dashboard",      to: "/employee-onboarding/weekly-joining-report-dashboard" },
+    // ],
+  },
+  {
+    label: "Compliance & Verification",
+    to: "/employee-onboarding/hr",
+    allowedRoles: MANAGEMENT_ROLES,
+    children: [
+      { label: "Internal Audit",  to: "/employee-onboarding/hr",                         allowedRoles: [ROLES.HR] },
+      { label: "BGC Screening", to: "/employee-onboarding/admin/approval-dashboard", allowedRoles: MANAGEMENT_ROLES },
+      { label: "Profile Hub",   to: "/employee-onboarding/employee-credentials",       allowedRoles: HR_ADMIN },
+    ],
+  },
+  {
+    label: "Off-Boarding",
     to: "/employee-exit",
     allowedRoles: MANAGEMENT_ROLES,
   },
