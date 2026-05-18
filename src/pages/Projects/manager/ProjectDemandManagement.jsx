@@ -557,6 +557,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                             <h3 className="text-sm font-bold text-slate-900">
                                 Project Demand Pipeline
                             </h3>
+                            <span>
                                 {totalElements} Records
                             </span>
                         </div>
