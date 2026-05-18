@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import Button from "../../../components/Button/Button";
 
 export default function AllHolidaysGrid({ holidays, onClose }) {
   const today = new Date();
@@ -54,7 +55,7 @@ export default function AllHolidaysGrid({ holidays, onClose }) {
               </span>
             </div>
           </div>
-          <button
+          <Button
             onClick={onClose}
             className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all"
           >
@@ -69,7 +70,7 @@ export default function AllHolidaysGrid({ holidays, onClose }) {
             >
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         {/* Scrollable Grid */}
