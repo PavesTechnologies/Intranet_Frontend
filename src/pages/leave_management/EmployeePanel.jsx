@@ -24,8 +24,8 @@ const EmployeePanel = () => {
 
   const employeeId = employee.user?.user_id;
 
-  const isManager = roles.includes('reporting_manager') || (employee?.roles || '').toLowerCase() === 'super admin';
-  const isHR = roles.includes('hr');
+  const isManager = roles.includes('Reporting_Manager') || (employee?.roles || '').toLowerCase() === 'super admin';
+  const isHR = roles.includes('HR');
   const isHRAdministrator = roles.includes('Hr_Manager');
   
   // Default view logic remains the same
@@ -45,7 +45,7 @@ const EmployeePanel = () => {
 
   const handleViewChange = (view) => {
     if (view === 'admin' && !isManager) return;
-    if (view === 'hr' && !isHR) return;
+    if (view === 'HR' && !isHR) return;
     if (view === 'hr-admin' && !isHRAdministrator) return;
     setActiveView(view);
   };

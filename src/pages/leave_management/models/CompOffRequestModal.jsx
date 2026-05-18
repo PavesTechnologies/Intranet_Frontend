@@ -43,9 +43,13 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
   });
 
   useEffect(() => {
+    document.body.style.overflow = "hidden";
     const handler = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handler);
+    };
   }, [onClose]);
 
   const formatDate = (date) => {
@@ -98,7 +102,9 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
   const handleHalfDayModeChange = (isCustom) => {
     setShowCustomHalfDay(isCustom);
     setHalfDayConfig(
-      isCustom ? { start: "fullday", end: "fullday" } : { start: "none", end: "none" }
+      isCustom
+        ? { start: "fullday", end: "fullday" }
+        : { start: "none", end: "none" },
     );
   };
 
@@ -128,12 +134,15 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Request Comp-Off</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Submit compensatory leave request</p>
+            <h2 className="text-lg font-bold text-gray-900">
+              Request Comp-Off
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Submit compensatory leave request
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -147,7 +156,6 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
 
         {/* Body */}
         <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
-
           {/* Date Range */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -180,7 +188,8 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
             <SectionLabel icon={Clock}>Duration Type</SectionLabel>
             <div className="p-1 inline-flex items-center bg-gray-100 rounded-lg w-full">
               {["Full days", "Custom"].map((label, i) => {
-                const isActive = i === 0 ? !showCustomHalfDay : showCustomHalfDay;
+                const isActive =
+                  i === 0 ? !showCustomHalfDay : showCustomHalfDay;
                 return (
                   <button
                     key={label}
@@ -211,13 +220,17 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
                       { value: "second", label: "Second Half" },
                     ]}
                     value={halfDayConfig.start}
-                    onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                    onChange={(val) =>
+                      setHalfDayConfig((p) => ({ ...p, start: val }))
+                    }
                   />
                 </div>
 
                 {isMultiDay && (
                   <>
-                    <div className="pt-8 text-gray-400 font-light text-lg select-none">→</div>
+                    <div className="pt-8 text-gray-400 font-light text-lg select-none">
+                      →
+                    </div>
                     <div className="flex-1 space-y-1.5">
                       <p className="text-xs font-semibold text-indigo-600">
                         To {formatDateForDisplay(endDate)}
@@ -229,7 +242,9 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
                           { value: "second", label: "Second Half" },
                         ]}
                         value={halfDayConfig.end}
-                        onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                        onChange={(val) =>
+                          setHalfDayConfig((p) => ({ ...p, end: val }))
+                        }
                       />
                     </div>
                   </>
@@ -241,7 +256,9 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
           {/* Duration Badge */}
           {startDate && (
             <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
-              <span className="text-sm text-gray-500 font-medium">Total Duration</span>
+              <span className="text-sm text-gray-500 font-medium">
+                Total Duration
+              </span>
               <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
                 {days} {days === 1 ? "day" : "days"}
               </span>
@@ -259,7 +276,9 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
               onChange={(e) => setNote(e.target.value)}
               placeholder="Add a reason or note..."
             />
-            <p className="text-right text-xs text-gray-400 mt-1">{note.length}/100</p>
+            <p className="text-right text-xs text-gray-400 mt-1">
+              {note.length}/100
+            </p>
           </div>
         </div>
 
