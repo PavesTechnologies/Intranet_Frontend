@@ -4,10 +4,8 @@ import {
   CreditCard,
   GraduationCap,
   Link2,
-  FileText,
 } from "lucide-react";
-
-
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 
 export default function HrConfiguration() {
   const navigate = useNavigate();
@@ -43,8 +41,6 @@ export default function HrConfiguration() {
       icon: <Link2 />,
       path: "/employee-onboarding/hr-configuration/departments",
     },
-
-   
   ];
 
   return (
@@ -58,27 +54,33 @@ export default function HrConfiguration() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {cards.map((card) => (
-          <div
+          <PageCard
             key={card.title}
-            onClick={() => !card.disabled && navigate(card.path)}
-            className={`rounded-xl shadow p-6 border transition ${
+            className={`transition h-full ${
               card.disabled
                 ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                : "bg-white cursor-pointer hover:shadow-lg"
+                : "cursor-pointer hover:shadow-lg"
             }`}
           >
-            <div className="flex items-center gap-3 mb-2 text-blue-900">
-              {card.icon}
-              <h2 className="text-lg font-semibold">{card.title}</h2>
+            <div
+              onClick={() => !card.disabled && navigate(card.path)}
+              className="h-full flex flex-col"
+            >
+              <PageCardContent className="flex-1">
+                <div className="flex items-center gap-3 mb-2 text-blue-900">
+                  {card.icon}
+                  <h2 className="text-lg font-semibold">{card.title}</h2>
+                </div>
+                <p className="text-sm">{card.description}</p>
+    
+                {card.disabled && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Coming soon
+                  </p>
+                )}
+              </PageCardContent>
             </div>
-            <p className="text-sm">{card.description}</p>
-
-            {card.disabled && (
-              <p className="text-xs text-gray-500 mt-2">
-                Coming soon
-              </p>
-            )}
-          </div>
+          </PageCard>
         ))}
       </div>
     </div>

@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../../../../../contexts/AuthContext";
 import FilterListbox from "../../../../../components/filter/FilterListbox";
-
-
-
+import Button from "../../../../../components/Button/Button";
+import GenericTable from "../../../../../components/Table/table";
+import { PageCard } from "../../../../../components/Cards/PageCard";
 
 export default function CountryEducationMapping() {
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
@@ -42,13 +42,14 @@ export default function CountryEducationMapping() {
       .then((res) => setCountries(res.data || []))
       .catch(() => setError("Failed to load countries"));
   }, [canView]);
+
   if (!canView) {
-  return (
-    <div className="p-6 text-center text-red-600">
-      You are not authorized to view Country Education Mapping
-    </div>
-  );
-}
+    return (
+      <div className="p-6 text-center text-red-600">
+        You are not authorized to view Country Education Mapping
+      </div>
+    );
+  }
 
   /* ================= LOAD MAPPINGS ================= */
   const loadMappings = async (countryUuid) => {
@@ -83,7 +84,7 @@ export default function CountryEducationMapping() {
         axios.get(`${BASE}/masters/education-level`, 
           {
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+          }
         ),
         axios.get(`${BASE}/education/education-document`, 
           {
@@ -101,6 +102,7 @@ export default function CountryEducationMapping() {
       setLoadingFormData(false);
     }
   };
+
   /* ================= ADD NEW MAPPING ================= */
   const addMapping = async () => {
     if (!selectedLevel || !selectedDocument || !selectedCountry) return;
@@ -131,6 +133,7 @@ export default function CountryEducationMapping() {
       };
 
       setMappings((prev) => [...prev, newMapping]);
+      if (window.showSuccess) window.showSuccess("Mapping created successfully");
 
       setSelectedLevel("");
       setSelectedDocument("");
@@ -142,6 +145,15 @@ export default function CountryEducationMapping() {
       setSubmitting(false);
     }
   };
+
+  const tableHeaders = ["Education", "Document", "Mandatory"];
+  const tableColumns = ["education", "document", "mandatory"];
+  const tableRows = mappings.map((m) => ({
+    education: m.education_name,
+    document: m.document_name,
+    mandatory: m.is_mandatory ? "Yes" : "No",
+  }));
+
   /* ================= UI ================= */
   return (
     <div className="max-w-6xl mx-auto mt-8">
@@ -150,7 +162,7 @@ export default function CountryEducationMapping() {
         Configure education document requirements per country
       </p>
 
-      <div className="bg-white shadow rounded p-6">
+      <PageCard className="p-6">
         {error && <div className="mb-4 text-red-600 text-sm">{error}</div>}
 
         {/* Country Selection */}
@@ -167,53 +179,29 @@ export default function CountryEducationMapping() {
 
         {/* Existing Mappings */}
         {selectedCountry && (
-          <>
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-lg font-medium">
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-medium text-gray-900">
                 Existing Mappings
               </h2>
               {canView && (
-              <button
-                onClick={loadFormData}
-                className="bg-blue-600 text-white px-4 py-2 rounded"
-                disabled={loadingFormData}
-              >
-                {loadingFormData ? "Loading..." : "+ Add Mapping"}
-              </button>
+                <Button
+                  onClick={loadFormData}
+                  variant="primary"
+                  disabled={loadingFormData}
+                >
+                  {loadingFormData ? "Loading..." : "+ Add Mapping"}
+                </Button>
               )}
             </div>
 
-            {loadingMappings ? (
-              <div className="text-gray-500 py-4">Loading mappings...</div>
-            ) : (
-              <table className="w-full border">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="p-3 text-left">Education</th>
-                    <th className="p-3 text-left">Document</th>
-                    <th className="p-3 text-left">Mandatory</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mappings.length === 0 ? (
-                    <tr>
-                      <td colSpan="3" className="text-center p-4 text-gray-500">
-                        No mappings found
-                      </td>
-                    </tr>
-                  ) : (
-                    mappings.map((m) => (
-                      <tr key={m.mapping_uuid} className="border-t">
-                        <td className="p-3">{m.education_name}</td>
-                        <td className="p-3">{m.document_name}</td>
-                        <td className="p-3">{m.is_mandatory ? "Yes" : "No"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            )}
-          </>
+            <GenericTable
+              headers={tableHeaders}
+              columns={tableColumns}
+              rows={tableRows}
+              loading={loadingMappings}
+            />
+          </div>
         )}
 
         {/* Add Mapping Form */}
@@ -221,9 +209,9 @@ export default function CountryEducationMapping() {
           <div className="mt-6 border-t pt-6">
             <h3 className="text-lg font-medium mb-4">Add New Mapping</h3>
 
-            <div className="flex items-end gap-4">
+            <div className="flex items-end gap-6 flex-wrap">
               <div>
-                <label className="block text-sm mb-1">Education Level</label>
+                <label className="block text-sm font-medium mb-1">Education Level</label>
                 <FilterListbox
                   options={[{value:"",label:"Select Level"}, ...levels.map((l) => ({value: l.education_uuid, label: l.education_name}))]}
                   value={selectedLevel}
@@ -232,7 +220,7 @@ export default function CountryEducationMapping() {
               </div>
 
               <div>
-                <label className="block text-sm mb-1">Document</label>
+                <label className="block text-sm font-medium mb-1">Document</label>
                 <FilterListbox
                   options={[{value:"",label:"Select Document"}, ...documents.map((d) => ({value: d.education_document_uuid, label: d.document_name}))]}
                   value={selectedDocument}
@@ -240,26 +228,28 @@ export default function CountryEducationMapping() {
                 />
               </div>
 
-              <label className="flex items-center gap-2 mb-1">
+              <label className="flex items-center gap-2 mb-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={mandatory}
                   onChange={() => setMandatory(!mandatory)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                Mandatory
+                <span className="text-sm font-medium text-gray-700">Mandatory</span>
               </label>
 
-              <button
+              <Button
                 onClick={addMapping}
                 disabled={submitting}
-                className="bg-green-600 text-white px-4 py-2 rounded"
+                loading={submitting}
+                variant="success"
               >
-                {submitting ? "Saving..." : "Save"}
-              </button>
+                Save
+              </Button>
             </div>
           </div>
         )}
-      </div>
+      </PageCard>
     </div>
   );
 }

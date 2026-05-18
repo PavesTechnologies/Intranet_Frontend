@@ -142,7 +142,7 @@ function UtilizationChart({ data }) {
             ))}
         </div>
     );
-}
+
 
 // ── Timeline Bar ───────────────────────────────────────────────────────────
 function TimelineBar({ resource }) {

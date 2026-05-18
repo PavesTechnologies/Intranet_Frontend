@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
-
 import { useAuth } from "../../../../../contexts/AuthContext";
+import Button from "../../../../../components/Button/Button";
+import GenericTable from "../../../../../components/Table/table";
+import Modal from "../../../../../components/Modal/modal";
+import StatusBadge from "../../../../../components/status/statusbadge";
+import { PageCard } from "../../../../../components/Cards/PageCard";
 
 export default function EducationLevelManagement() {
   const { user } = useAuth();
@@ -25,24 +28,26 @@ export default function EducationLevelManagement() {
       });
       setLevels(res.data);
     } catch {
-      toast.error("Failed to load education levels");
+      if (window.showError) window.showError("Failed to load education levels");
     } finally {
       setLoading(false);
     }
   };
 
- useEffect(() => {
-  if (canView) {
-    fetchLevels();
+  useEffect(() => {
+    if (canView) {
+      fetchLevels();
+    }
+  }, [canView]);
+
+  if (!canView) {
+    return (
+      <div className="p-6 text-center text-red-600">
+        You are not authorized to view Education Levels
+      </div>
+    );
   }
-}, [canView]);
- if (!canView) {
-  return (
-    <div className="p-6 text-center text-red-600">
-      You are not authorized to view Education Levels
-    </div>
-  );
-}
+
   /* -------------------- DELETE -------------------- */
   const deleteLevel = async (uuid) => {
     if (!window.confirm("Delete education level?")) return;
@@ -52,12 +57,45 @@ export default function EducationLevelManagement() {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setLevels((prev) => prev.filter((l) => l.education_uuid !== uuid));
-      toast.success("Education level deleted");
+      if (window.showSuccess) window.showSuccess("Education level deleted");
     } catch {
-      toast.error("Failed to delete education level");
+      if (window.showError) window.showError("Failed to delete education level");
     }
   };
-   
+
+  const tableHeaders = ["Education Name", "Description", "Status", "Action"];
+  const tableColumns = ["education_name", "description", "status_badge", "actions"];
+  const tableRows = levels.map((l) => ({
+    education_name: l.education_name,
+    description: l.description || "—",
+    status_badge: <StatusBadge label={l.is_active ? "Active" : "Inactive"} size="sm" />,
+    actions: (
+      <div className="flex justify-end items-center gap-4">
+        {(roles.includes("ADMIN") || roles.includes("HR")) && (
+          <Button
+            variant="link"
+            size="small"
+            onClick={() => {
+              setEditData(l);
+              setShowModal(true);
+            }}
+          >
+            Edit
+          </Button>
+        )}
+        {(roles.includes("ADMIN") || roles.includes("HR")) && (
+          <Button
+            variant="link"
+            size="small"
+            className="!text-red-600 hover:!underline"
+            onClick={() => deleteLevel(l.education_uuid)}
+          >
+            Delete
+          </Button>
+        )}
+      </div>
+    ),
+  }));
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -71,94 +109,28 @@ export default function EducationLevelManagement() {
             Manage education levels used in onboarding
           </p>
         </div>
-        {(roles.includes("ADMIN") || roles.includes("HR"))&& (
-        <button
-          onClick={() => {
-            setEditData(null);
-            setShowModal(true);
-          }}
-          className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg"
-        >
-          + Add Education Level
-        </button>
+        {(roles.includes("ADMIN") || roles.includes("HR")) && (
+          <Button
+            onClick={() => {
+              setEditData(null);
+              setShowModal(true);
+            }}
+            variant="primary"
+          >
+            + Add Education Level
+          </Button>
         )}
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-        {loading ? (
-          <div className="p-6 text-center text-gray-600">
-            Loading education levels...
-          </div>
-        ) : (
-          <table className="w-full border-collapse">
-            <thead className="bg-blue-900 text-white">
-              <tr>
-                <th className="px-6 py-3 text-left">Education Name</th>
-                <th className="px-6 py-3 text-left">Description</th>
-                <th className="px-6 py-3 text-left">Status</th>
-                <th className="px-6 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {levels.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan="4"
-                    className="px-6 py-6 text-center text-gray-500"
-                  >
-                    No education levels found
-                  </td>
-                </tr>
-              ) : (
-                levels.map((l) => (
-                  <tr
-                    key={l.education_uuid}
-                    className="border-b hover:bg-gray-50"
-                  >
-                    <td className="px-6 py-3">{l.education_name}</td>
-                    <td className="px-6 py-3">{l.description || "—"}</td>
-                    <td className="px-6 py-3">
-                      <span
-                        className={`px-2 py-1 rounded text-sm font-medium ${
-                          l.is_active
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {l.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-right space-x-4">
-                      {(roles.includes("ADMIN") || roles.includes("HR"))&& (
-
-                      <button
-                        className="text-blue-700 hover:underline"
-                        onClick={() => {
-                          setEditData(l);
-                          setShowModal(true);
-                        }}
-                      >
-                        Edit
-                      </button>
-                      )}
-                        {(roles.includes("ADMIN") || roles.includes("HR")) && (
-                      <button
-                        className="text-red-600 hover:underline"
-                        onClick={() => deleteLevel(l.education_uuid)}
-                      >
-                        Delete
-                      </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <PageCard>
+        <GenericTable
+          headers={tableHeaders}
+          columns={tableColumns}
+          rows={tableRows}
+          loading={loading}
+        />
+      </PageCard>
 
       {/* Modal */}
       {showModal && (
@@ -197,7 +169,7 @@ function LevelModal({ editData, onClose, onSuccess }) {
 
   const save = async () => {
     if (!name.trim()) {
-      toast.error("Education name is required");
+      if (window.showError) window.showError("Education name is required");
       return;
     }
 
@@ -207,7 +179,7 @@ function LevelModal({ editData, onClose, onSuccess }) {
       const payload = {
         education_name: name,
         description: desc,
-        is_active: isActive, // ✅ ALWAYS SENT
+        is_active: isActive,
       };
 
       let res;
@@ -228,7 +200,7 @@ function LevelModal({ editData, onClose, onSuccess }) {
         });
       }
 
-      toast.success(
+      if (window.showSuccess) window.showSuccess(
         `Education level ${editData ? "updated" : "created"} successfully`,
       );
 
@@ -239,65 +211,64 @@ function LevelModal({ editData, onClose, onSuccess }) {
 
       onClose();
     } catch {
-      toast.error("Failed to save education level");
+      if (window.showError) window.showError("Failed to save education level");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
-        <h2 className="text-xl font-semibold mb-4">
-          {editData ? "Edit" : "Add"} Education Level
-        </h2>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={`${editData ? "Edit" : "Add"} Education Level`}
+      size="md"
+      footer={
+        <div className="flex justify-end gap-3 w-full">
+          <Button onClick={onClose} variant="outline" disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            onClick={save}
+            variant="primary"
+            disabled={saving}
+            loading={saving}
+          >
+            Save
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Education Name</label>
+          <input
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
 
-        <label className="block text-sm font-medium mb-1">Education Name</label>
-        <input
-          className="w-full border rounded-lg px-3 py-2 mb-3"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+        <div>
+          <label className="block text-sm font-medium mb-1">Description</label>
+          <textarea
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            rows={3}
+          />
+        </div>
 
-        <label className="block text-sm font-medium mb-1">Description</label>
-        <textarea
-          className="w-full border rounded-lg px-3 py-2 mb-3"
-          value={desc}
-          onChange={(e) => setDesc(e.target.value)}
-        />
-
-        <label className="flex items-center gap-2 mb-4">
+        <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
             checked={isActive}
             onChange={(e) => setIsActive(e.target.checked)}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          Active
+          <span className="text-sm font-medium text-gray-700">Active</span>
         </label>
-
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 bg-gray-200 rounded-lg transition-all duration-100 ease-in-out
-        active:translate-y-[1px]
-        disabled:opacity-60 disabled:cursor-not-allowed
-        flex items-center justify-center gap-2"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-all duration-100 ease-in-out
-        active:translate-y-[1px]
-        disabled:opacity-60 disabled:cursor-not-allowed
-        flex items-center justify-center gap-2"
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
