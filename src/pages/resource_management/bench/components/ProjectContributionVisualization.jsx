@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
+import GenericTable from "../../../../components/Table/table";
 Chart.register(...registerables);
 
 const utilizationClass = (u) => {
@@ -141,61 +142,48 @@ const ProjectContributionVisualization = ({ projects }) => {
 
       {/* Table */}
       <div className="border border-slate-100 rounded-xl overflow-hidden">
-        <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-          <thead>
-            <tr className="bg-slate-50">
-              {[
-                { label: 'Project', align: 'left', width: '38%' },
-                { label: 'Bill.', align: 'right', width: '16%' },
-                { label: 'Non-bill.', align: 'right', width: '18%' },
-                { label: 'Util.', align: 'right', width: '28%' },
-              ].map(h => (
-                <th
-                  key={h.label}
-                  className="px-3 py-2 text-[10px] font-semibold text-slate-400 capitalize tracking-wider"
-                  style={{ textAlign: h.align, width: h.width }}
-                >
-                  {h.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((p, idx) => {
-              const u = p.utilizationPercentage;
-              const { bg, color, bar } = utilizationClass(u);
-              return (
-                <tr key={idx} className="border-t border-slate-100 hover:bg-slate-50/70 transition-colors">
-                  <td className="px-3 py-2 text-[11px] font-medium text-slate-700 truncate">
-                    {p.projectName}
-                  </td>
-                  <td className="px-3 py-2 text-[11px] text-slate-500 text-right">
-                    {p.billableHours}h
-                  </td>
-                  <td className="px-3 py-2 text-[11px] text-slate-500 text-right">
-                    {p.nonBillableHours}h
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <div className="w-8 h-1 rounded-full bg-slate-100 overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${u}%`, background: bar }}
-                        />
-                      </div>
-                      <span
-                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                        style={{ background: bg, color }}
-                      >
-                        {u}%
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <GenericTable
+          headers={["Project", "Bill.", "Non-bill.", "Util."]}
+          columns={["project_info", "bill_info", "non_bill_info", "util_info"]}
+          rows={projects.map((p, idx) => {
+            const u = p.utilizationPercentage;
+            const { bg, color, bar } = utilizationClass(u);
+            return {
+              ...p,
+              project_info: (
+                <div className="text-[11px] font-medium text-slate-700 truncate text-left">
+                  {p.projectName}
+                </div>
+              ),
+              bill_info: (
+                <div className="text-[11px] text-slate-500 text-right">
+                  {p.billableHours}h
+                </div>
+              ),
+              non_bill_info: (
+                <div className="text-[11px] text-slate-500 text-right">
+                  {p.nonBillableHours}h
+                </div>
+              ),
+              util_info: (
+                <div className="flex items-center justify-end gap-1.5">
+                  <div className="w-8 h-1 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${u}%`, background: bar }}
+                    />
+                  </div>
+                  <span
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                    style={{ background: bg, color }}
+                  >
+                    {u}%
+                  </span>
+                </div>
+              )
+            };
+          })}
+        />
       </div>
 
     </div>

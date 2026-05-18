@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import GenericTable from "@/components/Table/table"
 
 function getResourceMeta(resource) {
   const parts = [resource.location, resource.role].filter(Boolean)
@@ -25,21 +26,18 @@ function StatusBadge({ status }) {
 }
 
 function AllocationBar({ value }) {
-  let color = "bg-status-available"
-  if (value > 70) color = "bg-status-allocated"
-  else if (value > 20) color = "bg-status-partial"
+  let colorClass = "text-emerald-600"
+  if (value > 80) colorClass = "text-rose-600"
+  else if (value > 50) colorClass = "text-amber-600"
 
   return (
-    <div className="flex items-center justify-center gap-2 min-w-[100px]">
-      <div className="relative h-1.5 flex-1 rounded-full bg-secondary overflow-hidden">
-        <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${value}%` }} />
-      </div>
-      <span className="text-xs tabular-nums text-muted-foreground w-8 text-right">{value}%</span>
-    </div>
+    <span className={cn("text-xs font-bold tabular-nums", colorClass)}>
+      {value}%
+    </span>
   )
 }
 
-export function ResourceTable({ resources, onResourceClick }) {
+export function ResourceTable({ resources, onResourceClick, loading = false }) {
   const [sortKey, setSortKey] = useState("name")
   const [sortDir, setSortDir] = useState("asc")
 
@@ -86,99 +84,113 @@ export function ResourceTable({ resources, onResourceClick }) {
 
   return (
     <div className="rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b px-4 py-3">
+      <div className="flex items-center justify-between border-b px-3 py-1">
         <h3 className="text-sm font-heading font-bold text-card-foreground">Resources</h3>
-        <span className="text-xs text-muted-foreground">{resources.length} resources</span>
+        <span className="text-xs text-muted-foreground">{resources.length} Resources</span>
       </div>
 
       <div className="overflow-x-auto no-scrollbar">
-        <table className="w-full min-w-[800px]">
-          <thead>
-            <tr className="border-b bg-muted/30">
-              <th className="text-center px-4 py-2">
-                <SortHeader label="Resource" sortKeyName="name" />
-              </th>
-              <th className="text-center px-4 py-2">
-                <span className="text-xs font-sans font-semibold text-muted-foreground tracking-wider whitespace-nowrap">Skills</span>
-              </th>
-              <th className="text-center px-4 py-2">
-                <SortHeader label="Allocation" sortKeyName="currentAllocation" />
-              </th>
-              <th className="text-center px-4 py-2 hidden lg:table-cell">
-                <SortHeader label="Available From" sortKeyName="availableFrom" />
-              </th>
-              <th className="text-center px-4 py-2 hidden md:table-cell">
-                <span className="text-xs font-sans font-semibold text-muted-foreground tracking-wider">Project</span>
-              </th>
-              <th className="text-center px-4 py-2">
-                <SortHeader label="Status" sortKeyName="status" />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((resource) => (
-              <tr
-                key={resource.id}
-                className="border-b last:border-b-0 hover:bg-muted/40 cursor-pointer transition-colors"
-                onClick={() => onResourceClick(resource)}
-              >
-                <td className="px-4 py-3 text-center">
-                  <div className="flex items-center justify-center gap-3">
-                    <Avatar className="h-8 w-8 border">
-                      <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
-                        {resource.avatar}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <p className="text-sm font-heading font-bold text-card-foreground truncate min-w-0 flex-1">{resource.name}</p>
-                        {resource.noticeInfo?.isNoticePeriod && (
-                          <span className="text-[10px] font-bold text-red-500 whitespace-nowrap px-1.5 py-0.5 bg-red-50 rounded shrink-0">
-                            On Notice
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground hidden sm:block">{getResourceMeta(resource)}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3 max-w-[200px] text-center">
-                  <div className="flex flex-wrap items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap">
-                    {resource.skills.slice(0, 3).map((skill) => (
-                      <Badge key={skill} variant="secondary" className="text-[10px] px-1.5 h-4.5 bg-slate-100 text-slate-600 border-none truncate max-w-[80px]">
-                        {skill}
-                      </Badge>
-                    ))}
-                    {resource.skills.length > 3 && (
-                      <span className="text-[10px] text-muted-foreground font-bold shrink-0">+{resource.skills.length - 3}</span>
+        <GenericTable
+          headers={[
+            <div className="flex justify-start w-full px-2">Resource</div>,
+            <div className="flex justify-start w-full px-2">Skills</div>,
+            <div className="flex justify-center">Allocation</div>,
+            <div className="flex justify-center">Available From</div>,
+            <div className="flex justify-center">Project</div>,
+            <div className="flex justify-center">Status</div>,
+          ]}
+          columns={[
+            "resource_info",
+            "skills_info",
+            "allocation_info",
+            "available_from",
+            "project_info",
+            "status_info",
+          ]}
+          rows={sorted.map((resource) => ({
+            ...resource,
+
+            resource_info: (
+              <div className="flex items-center justify-start gap-3 px-1 py-0.5 w-full">
+                <Avatar className="h-9 w-9 border-2 border-white shadow-sm shrink-0">
+                  <AvatarFallback className="text-[11px] font-bold bg-primary/10 text-primary">
+                    {resource.avatar}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="flex flex-col min-w-0 flex-1 text-left">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="text-sm font-bold text-slate-900 truncate min-w-0 flex-1 hover:text-indigo-600 cursor-pointer transition-colors"
+                      onClick={() => onResourceClick(resource)}
+                      title={resource.name}
+                    >
+                      {resource.name}
+                    </span>
+
+                    {resource.noticeInfo?.isNoticePeriod && (
+                      <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-100 whitespace-nowrap px-1.5 py-0.5 rounded shrink-0">
+                        On Notice
+                      </span>
                     )}
                   </div>
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <AllocationBar value={resource.currentAllocation} />
-                </td>
-                <td className="px-4 py-3 hidden lg:table-cell text-center">
-                  <span className="text-xs text-muted-foreground">
-                    {resource.availableFrom}
+
+                  <span
+                    className="text-[11px] leading-relaxed text-slate-500 truncate max-w-[180px] cursor-pointer hover:text-slate-700 transition-colors"
+                    title={getResourceMeta(resource)}
+                  >
+                    {getResourceMeta(resource)}
                   </span>
-                </td>
-                <td className="px-4 py-3 hidden md:table-cell text-center">
-                  <span className="text-xs text-card-foreground truncate max-w-[120px] mx-auto block">{resource.currentProject || "No Project"}</span>
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <StatusBadge status={resource.status} />
-                </td>
-              </tr>
-            ))}
-            {sorted.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  No resources match the current filters.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                </div>
+              </div>
+            ),
+
+            skills_info: (
+              <div className="flex justify-start w-full px-1">
+                <div
+                  className="max-w-[200px] truncate overflow-hidden whitespace-nowrap cursor-pointer text-left"
+                  title={resource.skills.join(", ")}
+                >
+                  <span className="text-xs text-slate-600 font-medium">
+                    {resource.skills.join(", ")}
+                  </span>
+                </div>
+              </div>
+            ),
+
+            allocation_info: (
+              <div className="flex justify-center">
+                <AllocationBar value={resource.currentAllocation} />
+              </div>
+            ),
+
+            available_from: (
+              <div className="flex justify-center">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {resource.availableFrom}
+                </span>
+              </div>
+            ),
+
+            project_info: (
+              <div className="flex justify-center">
+                <span
+                  className="text-xs text-card-foreground truncate overflow-hidden whitespace-nowrap cursor-pointer hover:text-slate-700 transition-colors block max-w-[200px] text-center"
+                  title={resource.currentProject || "No Project"}
+                >
+                  {resource.currentProject || "No Project"}
+                </span>
+              </div>
+            ),
+
+            status_info: (
+              <div className="flex justify-center">
+                <StatusBadge status={resource.status} />
+              </div>
+            ),
+          }))}
+          loading={loading}
+        />
       </div>
     </div>
   )

@@ -8,6 +8,7 @@ import BenchDrawer from "../components/BenchDrawer";
 import AllocationModal from "../../demand/components/AllocationModal";
 import MoveToPoolModal from "../components/MoveToPoolModal";
 import { getBenchMatches } from "../services/benchService";
+import Pagination from "../../../../components/Pagination/pagination";
 import { createPortal } from "react-dom";
 import {
   BENCH_STORAGE_KEY,
@@ -71,6 +72,10 @@ const BenchPage = () => {
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  
   const updatePosition = () => {
     if (filterButtonRef.current) {
       const rect = filterButtonRef.current.getBoundingClientRect();
@@ -161,7 +166,7 @@ const BenchPage = () => {
     } catch (error) {
       if (!isActive) return;
       console.error("Resource Supply Data Load Error", error);
-      toast.error("Failed to load bench or pool data");
+      toast.error("Failed To Load Bench Or Pool Data");
     } finally {
       setLoading(false);
     }
@@ -185,12 +190,20 @@ const BenchPage = () => {
         filters,
       }),
     );
+    setCurrentPage(1); // Reset pagination on search/filter/tab change
   }, [search, activeTab, filters]);
 
   const visibleRows = useMemo(
     () => filterResources(resources, search, filters, activeTab),
     [resources, search, filters, activeTab],
   );
+
+  // Pagination calculations
+  const totalPages = Math.ceil(visibleRows.length / itemsPerPage);
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return visibleRows.slice(start, start + itemsPerPage);
+  }, [visibleRows, currentPage, itemsPerPage]);
   const selectedResource = useMemo(
     () => resources.find((item) => item.id === selectedResourceId) || null,
     [resources, selectedResourceId],
@@ -303,8 +316,8 @@ const BenchPage = () => {
   };
 
   const emptyState = baseVisibleCount === 0
-    ? "No bench records available."
-    : "No results match the current search and filters.";
+    ? "No Bench Records Available."
+    : "No Results Match The Current Search And Filters.";
 
   return (
     <div className="min-h-screen bg-slate-50/50 p-4 sm:p-6 lg:p-8 font-sans select-none">
@@ -313,7 +326,7 @@ const BenchPage = () => {
           <div className="flex-1">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 leading-none capitalize">Bench Management Workspace</h1>
             <p className="mt-2 text-xs sm:text-sm font-medium text-slate-500">
-              Strategic tracking of available resource supply and internal pool movements
+              Strategic Tracking Of Available Resource Supply And Internal Pool Movements
             </p>
           </div>
         </div>
@@ -380,7 +393,7 @@ const BenchPage = () => {
                   type="text"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search name, role, skill or location..."
+                  placeholder="Search Name, Role, Skill Or Location..."
                   className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/30 pl-9 pr-4 text-[13px] font-medium text-slate-600 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500 shadow-inner"
                 />
               </div>
@@ -441,7 +454,7 @@ const BenchPage = () => {
 
         <div className="p-4">
           <BenchTable
-            rows={visibleRows}
+            rows={paginatedRows}
             selectedRows={selectedRows}
             activeRowId={selectedResourceId}
             emptyState={emptyState}
@@ -454,6 +467,16 @@ const BenchPage = () => {
             loading={loading}
             activeTab={activeTab}
           />
+          {totalPages > 1 && (
+            <div className="mt-4">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              />
+            </div>
+          )}
         </div>
       </div>
 

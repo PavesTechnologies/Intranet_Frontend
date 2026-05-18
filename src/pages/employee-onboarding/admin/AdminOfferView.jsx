@@ -62,7 +62,6 @@ export default function AdminOfferView() {
   const { user_uuid } = useParams();
   const navigate = useNavigate();
 
-  const token = localStorage.getItem("token");
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const [offer, setOffer] = useState(null);
@@ -83,7 +82,7 @@ export default function AdminOfferView() {
   /* ---------------- FETCH OFFER ---------------- */
   const fetchOffer = async () => {
     const res = await axios.get(`${BASE}/offerletters/offer/${user_uuid}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
     setOffer(getOfferWithJoiningStatus(res.data));
   };
@@ -92,7 +91,7 @@ export default function AdminOfferView() {
   /* ---------------- FETCH APPROVAL ---------------- */
   const fetchApproval = async () => {
     const res = await axios.get(`${BASE}/offer-approval/my-actions`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
     console.log("ADMIN APPROVAL API RAW:", res.data);
     const found = res.data.find((i) => i.user_uuid === user_uuid);
@@ -143,7 +142,7 @@ export default function AdminOfferView() {
                 "Kept on hold by admin"
           ),
         },
-        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" } }
       );
       toast.success(
         action === "APPROVED" ? "Offer approved" :
@@ -169,7 +168,7 @@ export default function AdminOfferView() {
     try {
       const res = await axios.get(
         `${BASE}/offerletters/${user_uuid}/generate-preview`,
-        { headers: { Authorization: `Bearer ${token}` }, responseType: "blob" }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }, responseType: "blob" }
       );
       const file = new Blob([res.data], { type: "application/pdf" });
       window.open(URL.createObjectURL(file), "_blank");
@@ -184,7 +183,7 @@ export default function AdminOfferView() {
     try {
       setActing(true);
       await axios.delete(`${BASE}/offer-approval-requests/request/delete`, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" },
         data: [{ user_uuid }],
       });
       toast.success("Approval request deleted successfully");

@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
+import GenericTable from "../../../../components/Table/table";
 import { getOperationalProjectDetail } from "../services/operationalProjectsService";
 
 const ITEMS_PER_PAGE = 4;
@@ -464,80 +465,64 @@ const OperationalProjectDetailPage = () => {
                   <input
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search resources..."
+                    placeholder="Search Resources..."
                     className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-11 pr-4 text-[12px] font-bold text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] text-left">
-                <thead>
-                  <tr className="border-b border-slate-50 bg-slate-50/50">
-                    <th className="px-8 py-5 text-[10px] font-black capitalize tracking-widest text-slate-400">Resource Profile</th>
-                    <th className="px-8 py-5 text-[10px] font-black capitalize tracking-widest text-slate-400 text-center">Billable Contribution</th>
-                    <th className="px-8 py-5 text-[10px] font-black capitalize tracking-widest text-slate-400 text-center">Non-Billable Log</th>
-                    <th className="px-8 py-5 text-[10px] font-black capitalize tracking-widest text-slate-400 text-right">Intensity</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {paginatedResources.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" className="px-8 py-20 text-center">
-                        <div className="flex flex-col items-center justify-center">
-                          <EmployeeIcon className="text-slate-200 mb-4" size={40} />
-                          <p className="text-sm font-bold text-slate-400 capitalize tracking-widest">No matching resource found</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedResources.map((resource, index) => {
-                      const bHours = getNumber(getBillableHours(resource));
-                      const nbHours = getNumber(getNonBillableHours(resource));
-                      const total = bHours + nbHours;
-                      const intensity = total > 0 ? Math.min(100, (total / 40) * 100) : 0; // Relative to 40h week for intensity measure
+            <div className="overflow-x-auto no-scrollbar">
+              <GenericTable
+                headers={["Resource Profile", "Billable Contribution", "Non-Billable Log", "Intensity"]}
+                columns={["profile_info", "billable_info", "non_billable_info", "intensity_info"]}
+                rows={paginatedResources.map((resource, index) => {
+                  const bHours = getNumber(getBillableHours(resource));
+                  const nbHours = getNumber(getNonBillableHours(resource));
+                  const total = bHours + nbHours;
+                  const intensity = total > 0 ? Math.min(100, (total / 40) * 100) : 0;
 
-                      return (
-                        <tr key={resource.resourceId || resource.id || index} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-8 py-5">
-                            <div className="flex items-center gap-4">
-                              <div className="h-10 w-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-xs shadow-sm group-hover:scale-110 transition-transform">
-                                {getResourceName(resource).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                              </div>
-                              <div>
-                                <p className="text-sm font-black text-[#081534] group-hover:text-indigo-600 transition-colors">{getResourceName(resource)}</p>
-                                <p className="text-[11px] font-bold text-slate-400">{getResourceEmail(resource)}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-8 py-5 text-center">
-                            <span className="inline-flex items-center justify-center h-8 min-w-[60px] rounded-lg bg-emerald-50 text-emerald-600 text-[12px] font-black border border-emerald-100">
-                              {formatMetric(bHours, "h")}
-                            </span>
-                          </td>
-                          <td className="px-8 py-5 text-center">
-                            <span className="inline-flex items-center justify-center h-8 min-w-[60px] rounded-lg bg-slate-50 text-slate-500 text-[12px] font-black border border-slate-100">
-                              {formatMetric(nbHours, "h")}
-                            </span>
-                          </td>
-                          <td className="px-8 py-5">
-                            <div className="flex flex-col items-end gap-2">
-                              <div className="w-24 h-1.5 rounded-full bg-slate-100 overflow-hidden shadow-inner">
-                                <div
-                                  className={`h-full transition-all duration-700 ${intensity > 90 ? 'bg-rose-500' : intensity > 70 ? 'bg-amber-500' : 'bg-indigo-500'}`}
-                                  style={{ width: `${intensity}%` }}
-                                />
-                              </div>
-                              <span className="text-[10px] font-black text-slate-400 capitalize tracking-widest">{formatMetric(total, "h")} logged</span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                  return {
+                    ...resource,
+                    profile_info: (
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-xs shadow-sm group-hover:scale-110 transition-transform">
+                          {getResourceName(resource).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-black text-[#081534] group-hover:text-indigo-600 transition-colors">{getResourceName(resource)}</p>
+                          <p className="text-[11px] font-bold text-slate-400">{getResourceEmail(resource)}</p>
+                        </div>
+                      </div>
+                    ),
+                    billable_info: (
+                      <div className="text-center">
+                        <span className="inline-flex items-center justify-center h-8 min-w-[60px] rounded-lg bg-emerald-50 text-emerald-600 text-[12px] font-black border border-emerald-100">
+                          {formatMetric(bHours, "h")}
+                        </span>
+                      </div>
+                    ),
+                    non_billable_info: (
+                      <div className="text-center">
+                        <span className="inline-flex items-center justify-center h-8 min-w-[60px] rounded-lg bg-slate-50 text-slate-500 text-[12px] font-black border border-slate-100">
+                          {formatMetric(nbHours, "h")}
+                        </span>
+                      </div>
+                    ),
+                    intensity_info: (
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="w-24 h-1.5 rounded-full bg-slate-100 overflow-hidden shadow-inner">
+                          <div
+                            className={`h-full transition-all duration-700 ${intensity > 90 ? 'bg-rose-500' : intensity > 70 ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                            style={{ width: `${intensity}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-black text-slate-400 capitalize tracking-widest">{formatMetric(total, "h")} logged</span>
+                      </div>
+                    )
+                  };
+                })}
+              />
             </div>
 
             {totalPages > 1 && (

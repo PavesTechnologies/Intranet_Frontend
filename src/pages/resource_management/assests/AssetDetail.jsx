@@ -35,6 +35,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import { Listbox, Transition } from "@headlessui/react";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import Pagination from "../../../components/Pagination/pagination";
+import GenericTable from "../../../components/Table/table";
 
 /* ---------------- CONSTANTS & STYLES ---------------- */
 
@@ -223,7 +224,7 @@ const AssetDetail = () => {
       setAvailableSerials(filtered);
     } catch (err) {
       console.error("Failed to fetch serial numbers", err);
-      toast.error("Failed to load available serial numbers");
+      toast.error("Failed To Load Available Serial Numbers");
     } finally {
       setSerialLoading(false);
     }
@@ -395,9 +396,9 @@ const AssetDetail = () => {
         const res = await assignClientAsset(payload);
       }
       if (editingAssignment) {
-        toast.success("Assignment updated successfully");
+        toast.success("Assignment Updated Successfully");
       } else {
-        toast.success("Assignment created successfully");
+        toast.success("Assignment Created Successfully");
       }
       await fetchData();
       fetchKPI();
@@ -605,131 +606,93 @@ const AssetDetail = () => {
       </div>
 
       {/* TABLE */}
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-gray-500 border-b bg-gray-50/50">
-              <tr>
-                <th className="py-3 px-4 text-center w-[15%]">Resource</th>
-                <th className="py-3 px-4 text-center w-[15%]">Project</th>
-                <th className="py-3 px-4 text-center w-[15%]">Serial</th>
-                <th className="py-3 px-4 text-center w-[15%]">Location</th>
-                <th className="py-3 px-4 text-center w-[15%]">Assigned</th>
-                {activeTab === "HISTORY" && (
-                  <th className="py-3 px-4 text-center w-[15%]">Returned</th>
+      <div className="bg-white border rounded-xl shadow-sm overflow-hidden no-scrollbar">
+        <GenericTable
+          headers={[
+            "Resource",
+            "Project",
+            "Serial",
+            "Location",
+            "Assigned",
+            ...(activeTab === "HISTORY" ? ["Returned"] : []),
+            "Status",
+            "Actions",
+          ]}
+          columns={[
+            "resourceName",
+            "projectName",
+            "serial_info",
+            "location_info",
+            "assigned_info",
+            ...(activeTab === "HISTORY" ? ["returned_info"] : []),
+            "status_info",
+            "actions",
+          ]}
+          rows={paginatedAssignments.map((a) => ({
+            ...a,
+            serial_info: <div className="text-xs font-mono text-slate-500 text-center">{a.serialNumber || "-"}</div>,
+            location_info: <div className="text-slate-600 text-center">{a.locationDetails || "-"}</div>,
+            assigned_info: (
+              <div className="text-slate-600 text-center">
+                {new Date(a.assignedDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </div>
+            ),
+            returned_info: a.actualReturnDate ? (
+              <div className="text-slate-600 text-center">
+                {new Date(a.actualReturnDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </div>
+            ) : "-",
+            status_info: (
+              <div className="text-center">
+                <span
+                  className={`inline-flex items-center justify-center min-w-[80px] py-1 px-2 rounded-full text-[10px] font-bold uppercase tracking-wide ${STATUS_COLORS[a.assignmentStatus] || "bg-gray-100 text-gray-600"}`}
+                >
+                  {a.assignmentStatus}
+                </span>
+              </div>
+            ),
+            actions: (
+              <div className="text-center">
+                {activeTab === "ACTIVE" ? (
+                  <div className="flex justify-center gap-2">
+                    <button
+                      onClick={() => openEditModal(a)}
+                      className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setReturnData({
+                          conditionOnReturn: "",
+                          returnNotes: "",
+                        });
+                        setReturnItem(a);
+                        setReturnModal(true);
+                      }}
+                      className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      title="Return"
+                    >
+                      <Undo2 size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400 italic">Read Only</span>
                 )}
-                <th className="py-3 px-4 text-center w-[10%]">Status</th>
-                <th className="py-3 px-4 text-center w-[15%]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan="7" className="py-8 text-center text-gray-400">
-                    Loading data...
-                  </td>
-                </tr>
-              ) : paginatedAssignments.length > 0 ? (
-                paginatedAssignments.map((a) => (
-                  <tr
-                    key={a.assignmentId}
-                    className="hover:bg-slate-50/80 transition-colors"
-                  >
-                    <td className="py-3 px-4 font-medium text-slate-700">
-                      {a.resourceName}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      {a.projectName}
-                    </td>
-                    <td className="py-3 px-4 text-xs font-mono text-slate-500 text-center">
-                      {a.serialNumber || "-"}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {a.locationDetails || "-"}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 text-center">
-                      {new Date(a.assignedDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </td>
-                    {activeTab === "HISTORY" && (
-                      <td className="py-3 px-4 text-slate-600 text-center">
-                        {new Date(a.actualReturnDate).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          },
-                        )}
-                      </td>
-                    )}
-                    <td className="py-3 px-4 text-center">
-                      <span
-                        className={`inline-flex items-center justify-center min-w-[80px] py-1 px-2 rounded-full text-[10px] font-bold uppercase tracking-wide ${STATUS_COLORS[a.assignmentStatus] || "bg-gray-100 text-gray-600"}`}
-                      >
-                        {a.assignmentStatus}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      {activeTab === "ACTIVE" ? (
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={() => openEditModal(a)}
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setReturnData({
-                                conditionOnReturn: "",
-                                returnNotes: "",
-                              });
-                              setReturnItem(a);
-                              setReturnModal(true);
-                            }}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Return"
-                          >
-                            <Undo2 size={16} />
-                          </button>
-                          {/* <button
-                            onClick={() => setDeleteTarget(a)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 size={16} />
-                          </button> */}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">
-                          Read Only
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="py-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-400 gap-3">
-                      <div className="bg-slate-50 p-3 rounded-full">
-                        <Box size={24} className="opacity-40" />
-                      </div>
-                      <p className="text-sm">No assignments found.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </div>
+            )
+          }))}
+          loading={loading}
+        />
       </div>
 
       {/* PAGINATION */}

@@ -1,7 +1,7 @@
 // src/pages/EditUserHr.jsx
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 export default function EditUserHr() {
   const { user_id } = useParams();
@@ -9,16 +9,16 @@ export default function EditUserHr() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
 
-    axios
+
+    api
       .get(
         `${
           window.__APP_CONFIG__.USER_MANAGEMENT_URL
         }/general_user/edit-user/${user_id}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       )
@@ -35,7 +35,7 @@ export default function EditUserHr() {
   };
 
   const handleSubmit = async () => {
-    const token = localStorage.getItem("token");
+
 
     try {
       await axios.put(
@@ -45,7 +45,7 @@ export default function EditUserHr() {
         form,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );

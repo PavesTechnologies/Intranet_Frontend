@@ -8,7 +8,6 @@ export default function DepartmentManagement() {
   const [editData, setEditData] = useState(null);
 
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
 
   /* -------------------- FETCH -------------------- */
   const fetchDepartments = async () => {
@@ -19,7 +18,7 @@ export default function DepartmentManagement() {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
@@ -47,7 +46,7 @@ export default function DepartmentManagement() {
       const res = await fetch(`${BASE}/masters/departments/${uuid}`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
@@ -190,7 +189,6 @@ function DepartmentModal({ editData, onClose, onSuccess }) {
   const [saving, setSaving] = useState(false);
 
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
 
   const save = async () => {
     if (!name.trim()) {
@@ -216,7 +214,7 @@ function DepartmentModal({ editData, onClose, onSuccess }) {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
             body: JSON.stringify(payload),
           },
@@ -226,7 +224,7 @@ function DepartmentModal({ editData, onClose, onSuccess }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
         });

@@ -4,6 +4,7 @@ import {
   getCompanyContactsByCompanyId,
   updateCompanyContact,
   deleteCompanyContact,
+  createCompanyContact,
 } from "../services/clientservice";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -13,9 +14,14 @@ import Modal from "../../../components/Modal/modal";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { useAuth } from "../../../contexts/AuthContext";
 import CompanyEscalationContactModal from "./client_configuration/CompanyEscalationModal";
+import GenericTable from "../../../components/Table/table";
+import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 
 const CompanyEscalation = () => {
   const { user } = useAuth();
+  const { getEnumValues } = useEnums();
+  const ESCALATION_LEVELS = getEnumValues("EscalationLevel");
+
   const { companyId } = useParams();
   const permissions = user?.permissions || [];
   const roles = user?.roles || [];
@@ -60,12 +66,20 @@ const CompanyEscalation = () => {
       const res = await getCompanyContactsByCompanyId(companyId);
       const data = res.data || [];
 
-      setContactList(
-        data.map((item) => ({
-          ...item,
-          activeFlag: item.activeFlag ?? false,
-        })),
-      );
+      const normalized = data.map((item) => ({
+        ...item,
+        activeFlag: item.activeFlag ?? false,
+      }));
+
+      // Sort by Escalation Level dynamic order (case-insensitive & format-resilient)
+      const normalize = (s) => s?.toString().toUpperCase().replace(/[- ]/g, "_") || "";
+      const sortedData = [...normalized].sort((a, b) => {
+        const indexA = ESCALATION_LEVELS.findIndex(lvl => normalize(lvl) === normalize(a.escalationLevel));
+        const indexB = ESCALATION_LEVELS.findIndex(lvl => normalize(lvl) === normalize(b.escalationLevel));
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      });
+
+      setContactList(sortedData);
 
       setCurrentPage(1);
     } catch (error) {
@@ -116,7 +130,7 @@ const CompanyEscalation = () => {
     setDeleteLoading(true);
     try {
       await deleteCompanyContact(selectedContactId);
-      toast.success("Escalation contact deleted successfully");
+      toast.success("Escalation Contact Deleted Successfully");
       fetchContact();
     } catch (error) {
       toast.error(
@@ -156,82 +170,47 @@ const CompanyEscalation = () => {
           No escalation contacts available.
         </p>
       ) : (
-        <div className="bg-white border rounded-xl shadow-sm overflow-x-auto">
-          <table className="min-w-max w-full text-sm text-center">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                {[
-                  "Name",
-                  "Role",
-                  "Email",
-                  "Phone",
-                  "Level",
-                  "Status",
-                  "Actions",
-                ]
-                  .filter((h) => (h === "Actions" ? canEditConfig : true))
-                  .map((h) => (
-                    <th
-                      key={h}
-                      className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase"
-                    >
-                      {h}
-                    </th>
-                  ))}
-              </tr>
-            </thead>
-
-            <tbody className="divide-y">
-              {paginatedData.map((item) => (
-                <tr key={item.contactId} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-semibold">
-                    {item.contactName}
-                  </td>
-                  <td className="px-6 py-4">{item.contactRole}</td>
-                  <td className="px-6 py-4">{item.email}</td>
-                  <td className="px-6 py-4">{item.phone}</td>
-                  <td className="px-6 py-4">{item.escalationLevel}</td>
-
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full ${item.activeFlag
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-600"
-                        }`}
-                    >
-                      {item.activeFlag ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-
-                  {canEditConfig && (
-                    <td className="px-6 py-4">
-                      <div className="flex justify-center gap-4">
-                        <button
-                          onClick={() => {
-                            setSelectedContact(item);
-                            setOpenUpdateContact(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          <EditIcon size={14} />
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setSelectedContactId(item.contactId);
-                            setOpenConfirmModal(true);
-                          }}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <DeleteIcon size={14} />
-                        </button>
-                      </div>
-                    </td>
+        <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+          <GenericTable
+            headers={["Name", "Role", "Email", "Phone", "Level", "Status", "Actions"]}
+            columns={["contactName", "contactRole", "email", "phone", "escalationLevel", "status_info", "actions"]}
+            rows={paginatedData.map((item) => ({
+              ...item,
+              status_info: (
+                <span className={`px-2 py-1 text-xs rounded-full ${item.activeFlag ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                  {item.activeFlag ? "Active" : "Inactive"}
+                </span>
+              ),
+              actions: (
+                <div className="flex justify-center gap-4">
+                  {canEditConfig ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          setSelectedContact(item);
+                          setOpenUpdateContact(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                      >
+                        <EditIcon size={14} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedContactId(item.contactId);
+                          setOpenConfirmModal(true);
+                        }}
+                        className="text-red-600 hover:text-red-800 transition-colors"
+                      >
+                        <DeleteIcon size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-gray-400 italic text-xs">No permission</span>
                   )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                </div>
+              )
+            }))}
+          />
         </div>
       )}
 
@@ -253,6 +232,8 @@ const CompanyEscalation = () => {
           setOpenUpdateContact(false);
           setSelectedContact(null);
         }}
+        bodyClassName="p-5 overflow-y-auto max-h-[60vh]"
+        scrollable={true}
       >
         <CompanyEscalationContactModal
           initialData={selectedContact}

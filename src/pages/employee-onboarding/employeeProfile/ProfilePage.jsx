@@ -190,11 +190,10 @@ export default function ProfilePage({
     const fetchSocialLinks = async () => {
       try {
         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-        const token = localStorage.getItem("token");
         const res = await fetch(
           `${BASE_URL}/employee-details/social-links/${user_uuid}`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
         if (res.ok) {
@@ -534,35 +533,38 @@ export default function ProfilePage({
 /* ---------------- COMMON UI COMPONENTS ---------------- */
 
 const Section = ({ title, children, onEdit }) => (
-  <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md border border-indigo-100 overflow-hidden">
-    <div className="flex justify-between items-center px-6 py-4 border-b border-indigo-100 bg-indigo-50/60">
-      <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+  <div className="bg-white rounded-xl border border-[#e4e8f2] overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(8,21,52,0.06)" }}>
+    <div className="flex justify-between items-center px-5 py-3">
+      <div className="flex items-center gap-2">
+        <div className="w-[3px] h-4 rounded-full bg-[#263383] flex-shrink-0" />
+        <h3 className="text-[11px] font-bold text-[#081534] uppercase tracking-[0.06em]">{title}</h3>
+      </div>
       <button
         onClick={onEdit}
-        className="flex items-center gap-1 text-xs text-indigo-600"
+        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg text-[#263383] hover:bg-[#f4f6fc] border border-transparent hover:border-[#e4e8f2] transition-all"
       >
-        <Pencil size={14} /> Edit
+        <Pencil size={11} /> Edit
       </button>
     </div>
-    <div className="p-5 space-y-3">{children}</div>
+    <div className="border-t border-[#f4f6fc] px-5 pb-4 pt-3">{children}</div>
   </div>
 );
 
 const Row = ({ label, value, isLink = false }) => (
-  <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 text-sm min-w-0">
-    <span className="text-gray-500 shrink-0">{label}</span>
-    <span className="text-gray-900 font-medium sm:text-right break-words min-w-0">
+  <div className="grid grid-cols-[42%_1fr] gap-3 items-baseline py-2 border-b border-[#f4f6fc] last:border-0">
+    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.05em]">{label}</span>
+    <span className="text-[13px] font-medium text-[#1e293b] break-words">
       {isLink && value && value !== "NA" ? (
         <a
           href={value.startsWith("http") ? value : `https://${value}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-indigo-600 hover:underline inline-flex items-center gap-1"
+          className="text-[#263383] hover:underline inline-flex items-center gap-1"
         >
           {value}
         </a>
       ) : (
-        value
+        value || <span className="text-gray-300">—</span>
       )}
     </span>
   </div>
@@ -592,7 +594,7 @@ const Input = ({
       disabled={disabled}
       required={required}
       placeholder={`Enter ${label.toLowerCase()}`}
-      className={`w-full border-gray-300 border rounded-xl px-4 py-2.5 text-sm outline-none transition-all placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 
+      className={`w-full border-gray-300 border rounded-xl px-4 py-2.5 text-sm outline-none transition-all placeholder-gray-400 focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 
       ${disabled ? "bg-gray-50 text-gray-400 cursor-not-allowed" : "bg-white hover:border-gray-400"}`}
     />
   </div>
@@ -621,7 +623,7 @@ const AddressInput = ({
       onChange={onChange}
       disabled={disabled}
       required={required}
-      className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 
+      className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none transition-all focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 
       ${disabled ? "bg-gray-50 text-gray-400 cursor-not-allowed" : "bg-white hover:border-gray-400"}`}
     />
   </div>
@@ -649,7 +651,7 @@ const Select = ({
       onChange={onChange}
       disabled={disabled}
       required={required}
-      className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+      className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none transition-all focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10
       ${disabled ? "bg-gray-50 text-gray-400 cursor-not-allowed" : "bg-white hover:border-gray-400 cursor-pointer text-gray-900"}`}
     >
       <option value="" disabled className="text-gray-400">
@@ -698,17 +700,17 @@ const ModalWrapper = ({
         <button
           type="button"
           onClick={onClose}
-          className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+          className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#263383] transition-all"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={saving}
-          className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all focus:ring-offset-1 ${
+          className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#263383] shadow-sm transition-all focus:ring-offset-1 ${
             saving
-              ? "bg-indigo-400 cursor-not-allowed"
-              : "bg-indigo-600 hover:bg-indigo-700"
+              ? "bg-[#263383]/50 cursor-not-allowed"
+              : "bg-[#263383] hover:bg-[#081534]"
           }`}
         >
           {saving ? "Saving..." : "Save Changes"}
@@ -746,7 +748,6 @@ const PrimaryModal = ({
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const personal = hrData?.personal_details || {};
       const core = hrData?.offer || {}; // Actually coreData is passed to ProfilePage
 
@@ -770,7 +771,7 @@ const PrimaryModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(personalPayload),
         },
@@ -801,7 +802,7 @@ const PrimaryModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(corePayload),
         },
@@ -919,7 +920,6 @@ const ContactModal = ({
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const personal = hrData?.personal_details || {};
       const offer = hrData?.offer || {};
 
@@ -949,7 +949,7 @@ const ContactModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(corePayload),
         },
@@ -975,7 +975,7 @@ const ContactModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(personalPayload),
         },
@@ -1099,7 +1099,6 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
 
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
 
       const updateAddress = async (addr, type) => {
         if (!addr.address_uuid) return;
@@ -1123,7 +1122,7 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
             body: JSON.stringify(payload),
           },
@@ -1294,7 +1293,7 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
                   type="checkbox"
                   checked={localData.sameAsCurrent}
                   onChange={toggleSameAsCurrent}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  className="w-4 h-4 text-[#263383] border-gray-300 rounded focus:ring-[#263383]"
                 />
                 <span className="text-sm font-medium">
                   Same as Current Address
@@ -1307,17 +1306,17 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#263383] transition-all"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all focus:ring-offset-1 ${
+            className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#263383] shadow-sm transition-all focus:ring-offset-1 ${
               saving
-                ? "bg-indigo-400 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-700"
+                ? "bg-[#263383]/50 cursor-not-allowed"
+                : "bg-[#263383] hover:bg-[#081534]"
             }`}
           >
             {saving ? "Saving..." : "Save Changes"}
@@ -1389,7 +1388,6 @@ const RelationsModal = ({
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const personal = hrData?.personal_details || {};
 
       // Identify the emergency contact (e.g., the first one or a specific one)
@@ -1413,7 +1411,7 @@ const RelationsModal = ({
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify(payload),
       });
@@ -1464,7 +1462,7 @@ const RelationsModal = ({
                 onClick={() => setSelectedIndex(idx)}
                 className={`p-5 rounded-md border relative cursor-pointer transition-all ${
                   selectedIndex === idx
-                    ? "bg-[#f8f6fb] border-indigo-100 shadow-sm"
+                    ? "bg-[#f4f6fc] border-[#263383]/20 shadow-sm"
                     : "bg-white border-gray-100 hover:border-gray-200"
                 }`}
               >
@@ -1494,7 +1492,7 @@ const RelationsModal = ({
             <button
               type="button"
               onClick={handleAdd}
-              className="text-indigo-600 text-sm font-medium hover:underline mt-2 inline-block px-1 tracking-wide"
+              className="text-[#263383] text-sm font-medium hover:underline mt-2 inline-block px-1 tracking-wide"
             >
               + Add new relation
             </button>
@@ -1574,17 +1572,17 @@ const RelationsModal = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#263383] transition-all"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all focus:ring-offset-1 ${
+            className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#263383] shadow-sm transition-all focus:ring-offset-1 ${
               saving
-                ? "bg-indigo-400 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-700"
+                ? "bg-[#263383]/50 cursor-not-allowed"
+                : "bg-[#263383] hover:bg-[#081534]"
             }`}
           >
             {saving ? "Saving..." : "Save Changes"}
@@ -1686,12 +1684,11 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
     if (linkToDelete.social_link_uuid) {
       try {
         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-        const token = localStorage.getItem("token");
         const res = await fetch(
           `${BASE_URL}/employee-details/social-links/${linkToDelete.social_link_uuid}`,
           {
             method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
         if (!res.ok) throw new Error("Failed to delete link");
@@ -1719,10 +1716,9 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const headers = {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
       };
 
       const tasks = [];
@@ -1832,7 +1828,7 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
                         updateLink(idx, "platform_name", e.target.value)
                       }
                       placeholder="e.g. GitHub"
-                      className="w-full bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                      className="w-full bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 outline-none transition-all"
                     />
                   </div>
                   <div className="flex-[2] space-y-1.5 w-full">
@@ -1843,7 +1839,7 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
                       value={link.url}
                       onChange={(e) => updateLink(idx, "url", e.target.value)}
                       placeholder="https://..."
-                      className="w-full bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                      className="w-full bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 outline-none transition-all"
                     />
                   </div>
                   <button
@@ -1867,7 +1863,7 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
           <button
             type="button"
             onClick={handleAdd}
-            className="flex items-center gap-2 text-indigo-600 text-sm font-semibold hover:bg-indigo-50 px-4 py-2.5 rounded-xl transition-all"
+            className="flex items-center gap-2 text-[#263383] text-sm font-semibold hover:bg-[#263383]/5 px-4 py-2.5 rounded-xl transition-all"
           >
             + Add Another Platform
           </button>
@@ -1886,8 +1882,8 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
             disabled={saving}
             className={`px-8 py-2.5 text-sm font-semibold text-white rounded-xl shadow-md transition-all ${
               saving
-                ? "bg-indigo-400 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-700 hover:scale-[1.02]"
+                ? "bg-[#263383]/50 cursor-not-allowed"
+                : "bg-[#263383] hover:bg-[#081534] hover:scale-[1.02]"
             }`}
           >
             {saving ? "Saving..." : "Save Links"}

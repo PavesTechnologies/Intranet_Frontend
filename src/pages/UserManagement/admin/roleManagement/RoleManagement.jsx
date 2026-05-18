@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
-import axios from "axios";
+import { useEffect, useState, useCallback} from "react";
+import api from "../../../../api/axiosInstance";
 
 import RoleForm from "./RoleForm";
 import PermissionManagement from "./PermissionManagement";
@@ -15,32 +15,11 @@ export default function RoleManagement() {
   const [activeTab, setActiveTab] = useState("roles");
   const [loadingRoles, setLoadingRoles] = useState(false);
 
-  const axiosInstance = useMemo(() => {
-    const instance = axios.create({
-      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    instance.interceptors.request.use((config) => {
-      const latestToken = localStorage.getItem("token");
-
-      if (latestToken) {
-        config.headers.Authorization = `Bearer ${latestToken}`;
-      }
-
-      return config;
-    });
-
-    return instance;
-  }, []);
-
   const fetchRoles = useCallback(async () => {
     try {
       setLoadingRoles(true);
 
-      const res = await axiosInstance.get("/admin/roles");
+      const res = await api.get("/admin/roles");
 
       setRoles(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
@@ -54,7 +33,7 @@ export default function RoleManagement() {
     } finally {
       setLoadingRoles(false);
     }
-  }, [axiosInstance]);
+  }, []);
 
   useEffect(() => {
     fetchRoles();
@@ -96,15 +75,15 @@ export default function RoleManagement() {
       </div>
 
       <main className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 lg:px-8">
-        <div className="mb-4">
+        {/* <div className="mb-4">
           <h2 className={Fonts.heading3}>Role Management</h2>
           <p className={Fonts.paragraphMuted}>
             Manage roles, permissions, and permission groups.
           </p>
-        </div>
+        </div> */}
 
         <section className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-          <div className="mb-5 border-b border-gray-100 pb-4">
+          {/* <div className="mb-5 border-b border-gray-100 pb-4">
             <h3 className={Fonts.heading4}>{activeTabInfo?.label}</h3>
 
             {activeTab === "roles" && (
@@ -124,7 +103,7 @@ export default function RoleManagement() {
                 Manage permission groups for roles.
               </p>
             )}
-          </div>
+          </div> */}
 
           {loadingRoles ? (
             <div className="rounded-xl border border-gray-200 bg-white py-16">

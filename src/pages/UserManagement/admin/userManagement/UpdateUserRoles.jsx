@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { ArrowLeft, Pencil } from "lucide-react";
 
 import { showStatusToast } from "../../../../components/toastfy/toast";
@@ -38,26 +38,26 @@ export default function UpdateUserRole() {
 
   const totalPages = Math.max(1, Math.ceil(totalUsers / ITEMS_PER_PAGE));
 
-  const axiosInstance = useMemo(() => {
-    const instance = axios.create({
-      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+  // const axiosInstance = useMemo(() => {
+  //   const instance = axios.create({
+  //     baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
+  //     headers: {
+  //       "Content-Type": "application/json",
+  //     },
+  //   });
 
-    instance.interceptors.request.use((config) => {
-      const latestToken = localStorage.getItem("token");
+  //   instance.interceptors.request.use((config) => {
+  //     const latestToken = localStorage.getItem("token");
 
-      if (latestToken) {
-        config.headers.Authorization = `Bearer ${latestToken}`;
-      }
+  //     if (latestToken) {
+  //       config.headers.Authorization = `Bearer ${latestToken}`;
+  //     }
 
-      return config;
-    });
+  //     return config;
+  //   });
 
-    return instance;
-  }, []);
+  //   return instance;
+  // }, []);
 
   useEffect(() => {
     if (!localStorage.getItem("token")) {
@@ -70,7 +70,7 @@ export default function UpdateUserRole() {
     setLoading(true);
 
     try {
-      const res = await axiosInstance.get("/admin/users/roles", {
+      const res = await api.get("/admin/users/roles", {
         params: {
           page: currentPage,
           limit: ITEMS_PER_PAGE,
@@ -91,13 +91,13 @@ export default function UpdateUserRole() {
 
       showStatusToast(msg, "error");
 
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        navigate("/dashboard");
-      }
+      // if (err.response?.status === 401 || err.response?.status === 403) {
+      //   navigate("/dashboard");
+      // }
     } finally {
       setLoading(false);
     }
-  }, [axiosInstance, currentPage, searchTerm, navigate]);
+  }, [currentPage, searchTerm, navigate]);
 
   useEffect(() => {
     fetchUsers();
@@ -267,7 +267,6 @@ export default function UpdateUserRole() {
             setIsModalOpen(false);
             setSelectedUser_uuId(null);
           }}
-          axiosInstance={axiosInstance}
           onSaved={(updatedRoleNames) =>
             handleRolesSaved(selectedUser_uuId, updatedRoleNames)
           }
@@ -277,7 +276,7 @@ export default function UpdateUserRole() {
   );
 }
 
-function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
+function EditUserRoleModal({ user_uuId, onClose, onSaved }) {
   const [user, setUser] = useState(null);
   const [roles, setRoles] = useState([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState([]);
@@ -298,9 +297,9 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
 
       try {
         const [userRes, rolesRes, assignedRes] = await Promise.all([
-          axiosInstance.get(`/admin/users/uuid/${user_uuId}`),
-          axiosInstance.get(`/admin/roles`),
-          axiosInstance.get(`/admin/users/uuid/${user_uuId}/roles`),
+          api.get(`/admin/users/uuid/${user_uuId}`),
+          api.get(`/admin/roles`),
+          api.get(`/admin/users/uuid/${user_uuId}/roles`),
         ]);
 
         if (!mounted) return;
@@ -339,7 +338,7 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
     return () => {
       mounted = false;
     };
-  }, [user_uuId, axiosInstance]);
+  }, [user_uuId]);
 
   const handleRoleSearch = useCallback((value) => {
     const nextSearch = value || "";
@@ -404,7 +403,7 @@ function EditUserRoleModal({ user_uuId, onClose, axiosInstance, onSaved }) {
     setSaving(true);
 
     try {
-      const response = await axiosInstance.put(
+      const response = await api.put(
         `/admin/users/uuid/${user_uuId}/role`,
         {
           role_ids: selectedRoleIds,

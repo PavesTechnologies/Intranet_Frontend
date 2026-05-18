@@ -4,7 +4,7 @@ import { useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-export default function AddCountryModal({ onClose, onSuccess, BASE_URL, token }) {
+export default function AddCountryModal({ onClose, onSuccess, BASE_URL }) {
   const [callingCode, setCallingCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -22,13 +22,13 @@ export default function AddCountryModal({ onClose, onSuccess, BASE_URL, token })
         null,
         {
           params: { calling_code: callingCode },
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
       );
 
       // Fetch the newly added country
       const countriesRes = await axios.get(`${BASE_URL}/masters/country`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const newCountry = countriesRes.data.find(
         (c) => c.calling_code === callingCode

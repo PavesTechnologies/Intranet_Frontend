@@ -8,6 +8,7 @@ import utilizationService from '../../../../services/utilizationService';
 import UtilizationNavbar from '../components/UtilizationNavbar';
 import LoadingSpinner from '../../../../components/LoadingSpinner';
 import Pagination from '../../../../components/Pagination/pagination';
+import GenericTable from "../../../../components/Table/table";
 
 const UtilizationResourceDashboard = () => {
    const [loading, setLoading] = useState(true);
@@ -71,7 +72,7 @@ const UtilizationResourceDashboard = () => {
                      <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                      <input 
                         type="text" 
-                        placeholder="Search resource or role..."
+                        placeholder="Search Resource Or Role..."
                         className="pl-12 pr-6 py-2.5 bg-white border border-slate-200 rounded-2xl text-[12px] font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all w-64 shadow-sm"
                         value={searchQuery}
                         onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
@@ -89,82 +90,73 @@ const UtilizationResourceDashboard = () => {
             {/* TABLE */}
             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
                <div className="overflow-x-auto no-scrollbar">
-                  <table className="w-full text-left">
-                     <thead>
-                        <tr className="bg-slate-50/50 border-b border-slate-100">
-                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] w-[25%]">Resource Profile</th>
-                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em]">Workload Util</th>
-                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Billable Ratio</th>
-                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-center">Trend Signal</th>
-                           <th className="px-8 py-5 text-[11px] font-black text-slate-400 capitalize tracking-[0.2em] text-right">Activity</th>
-                        </tr>
-                     </thead>
-                     <tbody className="divide-y divide-slate-50">
-                        {paginatedResources.map((res, idx) => (
-                           <tr 
-                              key={idx} 
-                              className="hover:bg-slate-50/80 transition-all group cursor-pointer"
-                              onClick={() => openDrawer(res)}
-                           >
-                              <td className="px-8 py-5">
-                                 <div className="flex items-center gap-4">
-                                    <div className="h-12 w-12 rounded-2xl bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center text-slate-500 font-black text-sm capitalize group-hover:scale-110 transition-transform duration-500">
-                                       {res.userName?.charAt(0)}
-                                    </div>
-                                    <div className="flex flex-col gap-0.5">
-                                       <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{res.userName}</span>
-                                       <span className="text-[11px] font-bold text-slate-400 opacity-80">{res.role}</span>
-                                    </div>
-                                 </div>
-                              </td>
-                              <td className="px-8 py-5">
-                                 <div className="flex flex-col gap-1.5 min-w-[180px]">
-                                    <div className="flex items-center justify-between">
-                                       <span className={`text-[11px] font-black capitalize tracking-tight ${res.billablePercentage > 100 ? 'text-rose-600' : 'text-indigo-600'}`}>
-                                          {res.billablePercentage}% Utilized
-                                       </span>
-                                       <span className="text-[10px] font-bold text-slate-400 italic">{res.billableHours}h Actual</span>
-                                    </div>
-                                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                                       <div 
-                                          className={`h-full rounded-full transition-all duration-1000 ${res.billablePercentage > 100 ? 'bg-rose-500' : 'bg-indigo-500'}`}
-                                          style={{ width: `${Math.min(res.billablePercentage, 100)}%` }}
-                                       />
-                                    </div>
-                                 </div>
-                              </td>
-                              <td className="px-8 py-5 text-center">
-                                 <div className="inline-flex flex-col items-center gap-1 px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-100 shadow-sm">
-                                    <span className="text-[14px] font-black text-emerald-700 tracking-tight">82.5%</span>
-                                    <span className="text-[8px] font-black text-emerald-600 capitalize tracking-widest leading-none">Billable</span>
-                                 </div>
-                              </td>
-                              <td className="px-8 py-5 text-center">
-                                 <div className="h-12 w-24 mx-auto flex items-center justify-center">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                       <AreaChart data={[
-                                          { v: 40 }, { v: 55 }, { v: 48 }, { v: 70 }, { v: 62 }, { v: 85 }
-                                       ]}>
-                                          <defs>
-                                             <linearGradient id="miniGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                                             </linearGradient>
-                                          </defs>
-                                          <Area type="monotone" dataKey="v" stroke="#6366f1" strokeWidth={2} fill="url(#miniGradient)" />
-                                       </AreaChart>
-                                    </ResponsiveContainer>
-                                 </div>
-                              </td>
-                              <td className="px-8 py-5 text-right">
-                                 <button className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all flex items-center justify-center mx-auto lg:ml-auto lg:mr-0 border border-slate-100">
-                                    <ChevronRightIcon size={18} />
-                                 </button>
-                              </td>
-                           </tr>
-                        ))}
-                     </tbody>
-                  </table>
+                  <GenericTable
+                     headers={["Resource Profile", "Workload Util", "Billable Ratio", "Trend Signal", "Activity"]}
+                     columns={["profile_info", "utilization_info", "ratio_info", "trend_info", "actions_info"]}
+                     rows={paginatedResources.map((res, idx) => ({
+                        ...res,
+                        profile_info: (
+                           <div className="flex items-center gap-4 text-left">
+                              <div className="h-12 w-12 rounded-2xl bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center text-slate-500 font-black text-sm capitalize group-hover:scale-110 transition-transform duration-500">
+                                 {res.userName?.charAt(0)}
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                 <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{res.userName}</span>
+                                 <span className="text-[11px] font-bold text-slate-400 opacity-80">{res.role}</span>
+                              </div>
+                           </div>
+                        ),
+                        utilization_info: (
+                           <div className="flex flex-col gap-1.5 min-w-[180px] text-left">
+                              <div className="flex items-center justify-between">
+                                 <span className={`text-[11px] font-black capitalize tracking-tight ${res.billablePercentage > 100 ? 'text-rose-600' : 'text-indigo-600'}`}>
+                                    {res.billablePercentage}% Utilized
+                                 </span>
+                                 <span className="text-[10px] font-bold text-slate-400 italic">{res.billableHours}h Actual</span>
+                              </div>
+                              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                                 <div 
+                                    className={`h-full rounded-full transition-all duration-1000 ${res.billablePercentage > 100 ? 'bg-rose-500' : 'bg-indigo-500'}`}
+                                    style={{ width: `${Math.min(res.billablePercentage, 100)}%` }}
+                                 />
+                              </div>
+                           </div>
+                        ),
+                        ratio_info: (
+                           <div className="text-center">
+                              <div className="inline-flex flex-col items-center gap-1 px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-100 shadow-sm">
+                                 <span className="text-[14px] font-black text-emerald-700 tracking-tight">82.5%</span>
+                                 <span className="text-[8px] font-black text-emerald-600 capitalize tracking-widest leading-none">Billable</span>
+                              </div>
+                           </div>
+                        ),
+                        trend_info: (
+                           <div className="h-12 w-24 mx-auto flex items-center justify-center">
+                              <ResponsiveContainer width="100%" height="100%">
+                                 <AreaChart data={[
+                                    { v: 40 }, { v: 55 }, { v: 48 }, { v: 70 }, { v: 62 }, { v: 85 }
+                                 ]}>
+                                    <defs>
+                                       <linearGradient id={`miniGradient-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                       </linearGradient>
+                                    </defs>
+                                    <Area type="monotone" dataKey="v" stroke="#6366f1" strokeWidth={2} fill={`url(#miniGradient-${idx})`} />
+                                 </AreaChart>
+                              </ResponsiveContainer>
+                           </div>
+                        ),
+                        actions_info: (
+                           <div className="flex justify-end">
+                              <button className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all flex items-center justify-center border border-slate-100">
+                                 <ChevronRight size={18} />
+                              </button>
+                           </div>
+                        ),
+                        onClick: () => openDrawer(res)
+                     }))}
+                  />
                </div>
                
                {/* PAGINATION */}

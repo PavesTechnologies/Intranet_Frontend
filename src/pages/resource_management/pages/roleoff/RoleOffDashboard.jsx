@@ -12,6 +12,8 @@ import { getFilteredRoleOffs, exportRoleOffsCsv } from "../../services/roleOffSe
 import { searchClients } from "../../services/clientservice";
 import { getProjects } from "../../services/projectService";
 import Modal from "../../../../components/Modal/modal";
+import Pagination from "../../../../components/Pagination/pagination";
+import GenericTable from "../../../../components/Table/table";
 
 const COLORS = ['#4f46e5', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4'];
 
@@ -63,6 +65,10 @@ const RoleOffDashboard = () => {
   const [trendMode, setTrendMode] = useState('month');
   const [dropdownPos, setDropdownPos] = useState(null);
   const filterButtonRef = useRef(null);
+
+  // Pagination state for Event Log
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
   
   const [clientsList, setClientsList] = useState([]);
   const [projectsList, setProjectsList] = useState([]);
@@ -135,6 +141,7 @@ const RoleOffDashboard = () => {
 
   useEffect(() => {
     fetchData();
+    setCurrentPage(1); // Reset pagination on filter change
   }, [filters]);
 
   const fetchDropdownData = async () => {
@@ -172,7 +179,7 @@ const RoleOffDashboard = () => {
       setData(response);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to fetch role-off report data");
+      toast.error("Failed To Fetch Role-Off Report Data");
     } finally {
       setIsLoading(false);
     }
@@ -198,10 +205,10 @@ const RoleOffDashboard = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success("Export successful");
+      toast.success("Export Successful");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to export data");
+      toast.error("Failed To Export Data");
     } finally {
       setIsExporting(false);
     }
@@ -364,6 +371,14 @@ const RoleOffDashboard = () => {
     filters.client !== "",
     filters.reason !== ""
   ].filter(Boolean).length;
+
+  // Pagination calculations
+  const totalEvents = displayedEvents.length;
+  const totalPages = Math.ceil(totalEvents / itemsPerPage);
+  const paginatedEvents = displayedEvents.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 font-sans">
@@ -793,73 +808,56 @@ const RoleOffDashboard = () => {
 
       {activeTab === 'events' && (
         <div className="rounded-xl border border-slate-100 bg-white p-0 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+          <div className="px-3 py-1.5 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
             <h3 className="text-[10px] font-bold text-[#081534] uppercase tracking-widest opacity-60">Event History</h3>
             <div className="flex items-center gap-3">
               <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">{displayedEvents.length} Totals</span>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-[11px] text-left">
-              <thead className="bg-slate-50/50 text-slate-500 uppercase font-bold tracking-wider">
-                <tr>
-                  <th className="px-5 py-3 whitespace-nowrap">Date</th>
-                  <th className="px-5 py-3 whitespace-nowrap">Resource</th>
-                  <th className="px-5 py-3 whitespace-nowrap">Project</th>
-                  <th className="px-5 py-3 whitespace-nowrap">Performance</th>
-                  <th className="px-5 py-3 whitespace-nowrap">Reason</th>
-                  <th className="px-5 py-3 whitespace-nowrap text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {isLoading ? (
-                  <tr><td colSpan="6" className="p-10 text-center text-slate-500">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#081534]"></div>
-                      <span>Syncing...</span>
-                    </div>
-                  </td></tr>
-                ) : displayedEvents.length === 0 ? (
-                  <tr><td colSpan="6" className="p-10 text-center text-slate-500">No events matched.</td></tr>
-                ) : (
-                  displayedEvents.slice(0, 15).map((row, i) => (
-                    <tr key={i} className="hover:bg-slate-50/50 bg-white transition-colors">
-                      <td className="px-5 py-2.5 whitespace-nowrap text-slate-500">
-                        {row.effectiveRoleOffDate ? new Date(row.effectiveRoleOffDate).toLocaleDateString() : '-'}
-                      </td>
-                      <td className="px-5 py-2.5 whitespace-nowrap font-bold text-[#081534]">
-                        {row.resourceName || '-'}
-                      </td>
-                      <td className="px-5 py-2.5 whitespace-nowrap text-slate-600">
-                        {row.projectName || '-'}
-                      </td>
-                      <td className="px-5 py-2.5 whitespace-nowrap font-medium">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
-                          !row.resourcePerformance ? 'bg-slate-50 text-slate-400' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
-                        }`}>
-                          {row.resourcePerformance || '—'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-2.5 whitespace-nowrap">
-                        <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-semibold">
-                          {row.roleOffReason?.replace(/_/g, ' ') || '-'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-2.5 whitespace-nowrap text-right font-medium">
-                        <button
-                          onClick={() => setSelectedEvent(row)}
-                          className="text-[#081534] bg-slate-100 px-3 py-1 rounded-md text-[10px] font-bold hover:bg-[#081534] hover:text-white transition-all"
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="overflow-x-auto no-scrollbar">
+            <GenericTable
+              headers={["Date", "Resource", "Project", "Performance", "Reason", "Action"]}
+              columns={["date_info", "resourceName", "projectName", "performance_info", "reason_info", "actions"]}
+              rows={paginatedEvents.map((row) => ({
+                ...row,
+                date_info: row.effectiveRoleOffDate ? new Date(row.effectiveRoleOffDate).toLocaleDateString() : '-',
+                performance_info: (
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
+                    !row.resourcePerformance ? 'bg-slate-50 text-slate-400' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                  }`}>
+                    {row.resourcePerformance || '—'}
+                  </span>
+                ),
+                reason_info: (
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-semibold">
+                    {row.roleOffReason?.replace(/_/g, ' ') || '-'}
+                  </span>
+                ),
+                actions: (
+                  <div className="text-right">
+                    <button
+                      onClick={() => setSelectedEvent(row)}
+                      className="text-[#081534] bg-slate-100 px-3 py-1 rounded-md text-[10px] font-bold hover:bg-[#081534] hover:text-white transition-all"
+                    >
+                      View
+                    </button>
+                  </div>
+                )
+              }))}
+              loading={isLoading}
+            />
           </div>
+          {totalPages > 1 && (
+            <div className="border-t border-slate-100 px-5 py-3 bg-slate-50/30">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              />
+            </div>
+          )}
         </div>
       )}
 

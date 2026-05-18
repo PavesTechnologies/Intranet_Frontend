@@ -27,39 +27,58 @@ import { skillService } from "../../../services/skillService";
 const EPV3_STYLES = `
   @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&family=Dancing+Script:wght@700&display=swap");
 
-  .epv3         { font-family: "Inter", system-ui, sans-serif; background: #f4f6fc; min-height: 100vh; }
+.epv3 {
+  font-family: "Inter", system-ui, sans-serif;
+  background: #f4f6fc;
+  min-height: 100vh;
+
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
   .epv3-display { font-family: "Poppins", system-ui, sans-serif; }
+.epv3-hero-wrap {
+  position: relative;
+  overflow: hidden;
 
-  /* ─── Hero wrapper ─── */
-  .epv3-hero-wrap {
-    position: relative;
-    overflow: hidden;
-    border-radius: 32px;
-    background: #ffffff;
-    min-height: 115px;
-    display: flex;
-    box-shadow:
-      0 20px 60px rgba(15,23,42,0.08),
-      0 4px 20px rgba(15,23,42,0.04);
-  }
+  background: #ffffff;
 
+  min-height: 72px;
+
+  display: flex;
+
+  width: 100%;
+
+  margin: 0;
+
+  box-shadow: none;
+
+  border: none;
+}
   /* ─── Left dark panel — diagonal slant divider ─── */
-  .epv3-hero-left {
-    position: relative;
-    width: 44%;
-    min-width: 360px;
-    padding: 10px 70px 10px 24px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    overflow: hidden;
-    z-index: 2;
-    background:
-      radial-gradient(circle at 20% 30%, rgba(72,98,255,0.28), transparent 40%),
-      radial-gradient(circle at 80% 80%, rgba(255,61,114,0.14), transparent 35%),
-      linear-gradient(145deg, #020817 0%, #04153c 35%, #081d58 70%, #132766 100%);
-    clip-path: polygon(0 0, 100% 0, 80% 100%, 0 100%);
-  }
+ .epv3-hero-left {
+  position: relative;
+
+  width: 38%;
+  min-width: 300px;
+
+  padding: 0 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  overflow: hidden;
+
+  z-index: 2;
+
+  background:
+    radial-gradient(circle at 20% 30%, rgba(72,98,255,0.28), transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(255,61,114,0.14), transparent 35%),
+    linear-gradient(145deg, #020817 0%, #04153c 35%, #081d58 70%, #132766 100%);
+
+  clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%);
+}
   .epv3-hero-left::after {
     content: "";
     position: absolute;
@@ -92,7 +111,7 @@ const EPV3_STYLES = `
   /* ─── Avatar ring ─── */
   .epv3-av-ring {
     position: relative;
-    width: 90px; height: 90px;
+    width: 72px; height: 72px;
     border-radius: 999px;
     border: 5px solid rgba(255,255,255,0.95);
     display: flex; align-items: center; justify-content: center;
@@ -102,19 +121,6 @@ const EPV3_STYLES = `
     z-index: 2;
     flex-shrink: 0;
   }
-  // /* Pink floating dot attached to ring */
-  // .epv3-av-ring::after {
-  //   content: "";
-  //   position: absolute;
-  //   right: 8px; bottom: 12px;
-  //   width: 24px; height: 24px;
-  //   border-radius: 999px;
-  //   background: linear-gradient(145deg, #ff6b98, #ff2d72);
-  //   border: 3px solid #081534;
-  //   box-shadow: 0 0 20px rgba(255,61,114,0.75);
-  //   z-index: 3;
-  // }
-
   /* ─── Avatar ─── */
   .epv3-av {
     width: 90px; height: 90px;
@@ -420,7 +426,7 @@ const EPV3_STYLES = `
   /* ── Generic card ── */
   .epv3-card {
     background: #fff;
-    border-radius: 16px;
+    border-radius: 0px;
     border: 1px solid #e4e8f2;
     box-shadow: 0 1px 4px rgba(8,21,52,0.04), 0 4px 16px rgba(8,21,52,0.03);
     overflow: hidden;
@@ -452,7 +458,7 @@ const EPV3_STYLES = `
 
   /* ── Quick-nav mini cards ── */
   .epv3-nav-card {
-    background: #fff; border-radius: 14px;
+    background: #fff; border-radius: 0px;
     border: 1px solid #e4e8f2;
     box-shadow: 0 1px 4px rgba(8,21,52,0.04);
     padding: 14px; cursor: pointer;
@@ -472,7 +478,7 @@ const EPV3_STYLES = `
 
   /* ── Skill tiles ── */
   .epv3-skill-tile {
-    background: #fff; border: 1px solid #e4e8f4; border-radius: 14px;
+    background: #fff; border: 1px solid #e4e8f4; border-radius: 0px;
     transition: all 0.2s ease; overflow: hidden;
   }
   .epv3-skill-tile:hover { border-color: #adb5d9; box-shadow: 0 4px 16px rgba(38,51,131,0.09); }
@@ -486,7 +492,7 @@ const EPV3_STYLES = `
 
   /* ── Pill tabs ── */
   .epv3-tabs {
-    display: flex; gap: 2px; background: #e8ecf5; border-radius: 12px; padding: 3px;
+    display: flex; gap: 0px; background: #e8ecf5; border-radius: 0px; padding: 0px width: 100%;
   }
   .epv3-tab {
     display: flex; align-items: center; gap: 6px;
@@ -719,10 +725,9 @@ export default function EmployeeProfileView() {
     try {
       const targetId = empId || employee?.employee_id;
       if (!targetId) return;
-      const token = localStorage.getItem("token");
       const RMSURL = window.__APP_CONFIG__.RMS_BASE_URL;
       const res = await fetch(`${RMSURL}/api/resource-certificates/resource/${targetId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const result = await res.json();
       setRawCertifications(result.data || []);
@@ -769,9 +774,8 @@ export default function EmployeeProfileView() {
 
   const fetchAboutData = async () => {
     try {
-      const token = localStorage.getItem("token");
       const res = await fetch(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       if (res.ok) {
         const responseData = await res.json();
@@ -802,7 +806,6 @@ export default function EmployeeProfileView() {
     const updatedAbout = { ...about, [key]: newContent };
     setSavingAbout(true);
     try {
-      const token = localStorage.getItem("token");
       const method = aboutUuid ? "PUT" : "POST";
       const url = aboutUuid
         ? `${BASE_URL}/employee-details/about/${employee_uuid}`
@@ -816,7 +819,7 @@ export default function EmployeeProfileView() {
       };
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
@@ -849,11 +852,10 @@ export default function EmployeeProfileView() {
     if (!fieldToDelete) return;
     setIsDeleting(true);
     try {
-      const token = localStorage.getItem("token");
       const updatedAbout = { ...about, [fieldToDelete]: "" };
       const res = await fetch(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({
           employee_uuid,
           ...(aboutUuid ? { employee_about_uuid: aboutUuid } : {}),
@@ -1025,12 +1027,12 @@ export default function EmployeeProfileView() {
      RENDER
   ════════════════════════════════════════════════ */
   return (
-    <div className="epv3">
+    <div className="epv3 w-full m-0 p-0">
 
       {/* ╔══════════════════════════════════════════════════════════╗
           ║  HERO  —  split left-dark / right-info                  ║
           ╚══════════════════════════════════════════════════════════╝ */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-4">
+      <div className="w-full m-0 p-0">
         <div className="epv3-hero-wrap epv3-anim">
 
           {/* ── LEFT DARK PANEL ── */}
@@ -1114,14 +1116,18 @@ export default function EmployeeProfileView() {
       {/* ╔══════════════════════════════════════════════════════════╗
           ║  TABS + CONTENT                                          ║
           ╚══════════════════════════════════════════════════════════╝ */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-14">
+      <div className="w-full px-0 pt-0 pb-10">
 
-        {/* Tab navigation */}
-        <div className="epv3-anim mb-5 overflow-x-auto epv3-noscroll" style={{ animationDelay: "80ms" }}>
-          <div className="epv3-tabs min-w-max sm:min-w-0">
+        {/* Tab navigation — underline style */}
+        <div className="bg-white overflow-x-auto epv3-noscroll mb-4" style={{ borderBottom: "1px solid #e4e8f2" }}>
+          <div className="flex min-w-max sm:min-w-0 px-4">
             {TABS.map(({ key, label, icon }) => (
               <button key={key} onClick={() => handleTabChange(key)}
-                className={`epv3-tab ${activeTab === key ? "epv3-tab-on" : ""}`}>
+                className={`flex items-center gap-1.5 px-4 py-3.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
+                  activeTab === key
+                    ? "border-[#263383] text-[#263383]"
+                    : "border-transparent text-gray-500 hover:text-[#263383] hover:border-[#263383]/30"
+                }`}>
                 {icon}{label}
               </button>
             ))}

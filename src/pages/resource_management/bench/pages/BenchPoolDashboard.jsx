@@ -10,6 +10,8 @@ import { getBenchPoolReport, exportBenchPoolReport } from "../services/benchServ
 import { toast } from "react-toastify";
 import BenchFilters from "../components/BenchFilters";
 import { FILTER_DEFAULTS, CATEGORY_OPTIONS } from "../constants/benchConstants";
+import Pagination from "../../../../components/Pagination/pagination";
+import GenericTable from "../../../../components/Table/table";
 
 const COLORS = ['#4f46e5', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#06b6d4'];
 const RISK_COLORS = {
@@ -33,10 +35,18 @@ const BenchPoolDashboard = () => {
   const filterButtonRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
+  // Pagination state for Log Tab
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  
   useEffect(() => {
     fetchReportData();
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1); // Reset pagination on filter change
+  }, [filters]);
+  
   const updatePosition = () => {
     if (filterButtonRef.current) {
       const rect = filterButtonRef.current.getBoundingClientRect();
@@ -98,7 +108,7 @@ const BenchPoolDashboard = () => {
       const res = await getBenchPoolReport();
       setData(res?.data || {});
     } catch (err) {
-      toast.error("Failed to fetch bench report");
+      toast.error("Failed To Fetch Bench Report");
     } finally {
       setIsLoading(false);
     }
@@ -115,9 +125,9 @@ const BenchPoolDashboard = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success("Export successful");
+      toast.success("Export Successful");
     } catch (err) {
-      toast.error("Failed to generate export");
+      toast.error("Failed To Generate Export");
     } finally {
       setIsExporting(false);
     }
@@ -476,50 +486,71 @@ const BenchPoolDashboard = () => {
               <h3 className="text-[11px] font-bold text-slate-800 capitalize tracking-widest leading-none">Bench Inventory Summary</h3>
               <span className="text-[10px] font-bold bg-white border border-slate-200 px-2.5 py-1 rounded-full text-slate-600">{filteredContent.length} Units</span>
             </div>
-            <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full text-left">
-                <thead>
-                   <tr className="bg-slate-50/30 border-b border-slate-50">
-                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500">Resource / Expertise</th>
-                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500">Aging Period</th>
-                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500">Risk Profile</th>
-                    <th className="px-6 py-4 text-[10px] font-bold capitalize tracking-widest text-slate-500">Action Context</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredContent.map((row) => (
-                    <tr key={row.resourceId} className="hover:bg-slate-50/40 transition-colors group cursor-pointer">
-                       <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-[13px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{row.name}</span>
-                          <span className="text-[10px] font-medium text-slate-400 mt-1 capitalize tracking-wider">{row.role} | {row.region}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className={`text-[12px] font-bold ${row.benchDays > 30 ? 'text-rose-600' : 'text-slate-900'}`}>{row.benchDays} Days</span>
-                          <span className="text-[9px] font-medium text-slate-400 italic">Impact: ₹{Math.round((row.cost || 0) * (row.benchDays || 0)).toLocaleString()}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex rounded-md border px-2.5 py-1 text-[9px] font-bold capitalize tracking-tighter ${
-                          row.riskLevel === 'HIGH' ? 'bg-rose-50 text-rose-700 border-rose-100' : 
-                          row.riskLevel === 'MEDIUM' ? 'bg-amber-50 text-amber-700 border-amber-100' : 
-                          'bg-emerald-50 text-emerald-700 border-emerald-100'
-                        }`}>
-                          {row.riskLevel?.toLowerCase().charAt(0).toUpperCase() + row.riskLevel?.toLowerCase().slice(1)} Level
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-[11px] font-medium text-slate-600 italic border-l-2 border-indigo-200 pl-2">
-                           {row.recommendedAction || "Monitor allocation status"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            
+            {/* Pagination calculations */}
+            {(() => {
+              const totalItems = filteredContent.length;
+              const totalPages = Math.ceil(totalItems / itemsPerPage);
+              const paginatedContent = filteredContent.slice(
+                (currentPage - 1) * itemsPerPage,
+                currentPage * itemsPerPage
+              );
+              
+              return (
+                <>
+                  <div className="overflow-x-auto no-scrollbar">
+                    <GenericTable
+                      headers={["Resource / Expertise", "Aging Period", "Risk Profile", "Action Context"]}
+                      columns={["resource_info", "aging_info", "risk_info", "action_info"]}
+                      rows={paginatedContent.map((row) => ({
+                        ...row,
+                        resource_info: (
+                          <div className="flex flex-col text-left">
+                            <span className="text-[13px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{row.name}</span>
+                            <span className="text-[10px] font-medium text-slate-400 mt-1 capitalize tracking-wider">{row.role} | {row.region}</span>
+                          </div>
+                        ),
+                        aging_info: (
+                          <div className="flex flex-col text-left">
+                            <span className={`text-[12px] font-bold ${row.benchDays > 30 ? 'text-rose-600' : 'text-slate-900'}`}>{row.benchDays} Days</span>
+                            <span className="text-[9px] font-medium text-slate-400 italic">Impact: ₹{Math.round((row.cost || 0) * (row.benchDays || 0)).toLocaleString()}</span>
+                          </div>
+                        ),
+                        risk_info: (
+                          <div className="text-center">
+                            <span className={`inline-flex rounded-md border px-2.5 py-1 text-[9px] font-bold capitalize tracking-tighter ${
+                              row.riskLevel === 'HIGH' ? 'bg-rose-50 text-rose-700 border-rose-100' : 
+                              row.riskLevel === 'MEDIUM' ? 'bg-amber-50 text-amber-700 border-amber-100' : 
+                              'bg-emerald-50 text-emerald-700 border-emerald-100'
+                            }`}>
+                              {row.riskLevel?.toLowerCase().charAt(0).toUpperCase() + row.riskLevel?.toLowerCase().slice(1)} Level
+                            </span>
+                          </div>
+                        ),
+                        action_info: (
+                          <div className="text-left">
+                            <span className="text-[11px] font-medium text-slate-600 italic border-l-2 border-indigo-200 pl-2">
+                               {row.recommendedAction || "Monitor allocation status"}
+                            </span>
+                          </div>
+                        )
+                      }))}
+                    />
+                  </div>
+                  
+                  {totalPages > 1 && (
+                    <div className="border-t border-slate-100 px-3 py-1.5 bg-slate-50/30">
+                      <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      />
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </div>

@@ -46,6 +46,8 @@ import {
   createClientCompliance,
   createClientEscalation,
 } from "../services/clientservice";
+import GenericTable from "../../../components/Table/table";
+import StatusBadge from "../../../components/status/statusbadge";
 
 /* ---------------- SUB COMPONENTS ---------------- */
 
@@ -94,78 +96,36 @@ const ProjectSLA = ({ data, loading }) => {
         subtitle="Contractual obligations and metrics."
       />
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
-        <div className="px-6 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b min-w-max">
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-blue-50 border-b">
           <p className="text-sm font-semibold text-gray-700">SLA Definitions</p>
         </div>
 
-        <table className="w-full text-sm min-w-[600px]">
-          {/* TABLE HEADER */}
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
-                SLA Type
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
-                Duration
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
-                Warning Threshold
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">
-                Status
-              </th>
-            </tr>
-          </thead>
-
-          {/* TABLE BODY */}
-          <tbody className="divide-y divide-gray-100">
-            {data.map((sla) => (
-              <tr
-                key={sla.projectSlaId}
-                className="hover:bg-gray-50 transition"
-              >
-                {/* SLA TYPE */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${getSlaTypeColor(
-                      sla.slaType,
-                    )}`}
-                  >
-                    {sla.slaType.replaceAll("_", " ")}
-                  </span>
-                </td>
-
-                {/* DURATION */}
-                <td className="px-6 py-4">
-                  <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
-                    {sla.slaDurationDays} days
-                  </span>
-                </td>
-
-                {/* WARNING */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${getWarningColor(
-                      sla.warningThresholdDays,
-                    )}`}
-                  >
-                    {sla.warningThresholdDays} days
-                  </span>
-                </td>
-
-                {/* STATUS */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${sla.activeFlag ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
-                  >
-                    {sla.activeFlag ? "Active" : "Inactive"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <GenericTable
+          headers={["SLA Type", "Duration", "Warning Threshold", "Status"]}
+          columns={["slaType_info", "duration_info", "warning_info", "status_info"]}
+          rows={data.map((sla) => ({
+            ...sla,
+            slaType_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getSlaTypeColor(sla.slaType)}`}>
+                {sla.slaType.replaceAll("_", " ")}
+              </span>
+            ),
+            duration_info: (
+              <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                {sla.slaDurationDays} days
+              </span>
+            ),
+            warning_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getWarningColor(sla.warningThresholdDays)}`}>
+                {sla.warningThresholdDays} days
+              </span>
+            ),
+            status_info: (
+              <StatusBadge label={sla.activeFlag ? "ACTIVE" : "INACTIVE"} size="sm" />
+            )
+          }))}
+        />
       </div>
     </div>
   );
@@ -191,88 +151,27 @@ const ProjectCompliance = ({ data, loading }) => {
         subtitle="Required certifications and audit status."
       />
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
-        <table className="w-full text-sm text-left min-w-[800px]">
-          {/* HEADER */}
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Requirement
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Type
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Mandatory
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Source
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                Status
-              </th>
-            </tr>
-          </thead>
-
-          {/* BODY */}
-          <tbody className="divide-y divide-gray-100">
-            {data.map((item) => (
-              <tr key={item.projectComplianceId} className="hover:bg-gray-50">
-                {/* REQUIREMENT */}
-                <td className="px-6 py-4 font-semibold text-gray-900">
-                  {item.requirementName}
-                </td>
-
-                {/* TYPE */}
-                <td className="px-6 py-4 text-gray-700">
-                  {item.requirementType}
-                </td>
-
-                {/* MANDATORY */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${item.mandatoryFlag
-                        ? "bg-red-100 text-red-700"
-                        : "bg-gray-100 text-gray-600"
-                      }
-                    `}
-                  >
-                    {item.mandatoryFlag ? "Mandatory" : "Optional"}
-                  </span>
-                </td>
-
-                {/* SOURCE */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${item.isInherited
-                        ? "bg-indigo-100 text-indigo-700"
-                        : "bg-purple-100 text-purple-700"
-                      }
-                    `}
-                  >
-                    {item.isInherited ? "Inherited" : "Project"}
-                  </span>
-                </td>
-
-                {/* STATUS */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${item.activeFlag
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
-                      }
-                    `}
-                  >
-                    {item.activeFlag ? "Active" : "Inactive"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+        <GenericTable
+          headers={["Requirement", "Type", "Mandatory", "Source", "Status"]}
+          columns={["requirementName", "requirementType", "mandatory_info", "source_info", "status_info"]}
+          rows={data.map((item) => ({
+            ...item,
+            mandatory_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${item.mandatoryFlag ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+                {item.mandatoryFlag ? "Mandatory" : "Optional"}
+              </span>
+            ),
+            source_info: (
+              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${item.isInherited ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"}`}>
+                {item.isInherited ? "Inherited" : "Project"}
+              </span>
+            ),
+            status_info: (
+              <StatusBadge label={item.activeFlag ? "ACTIVE" : "INACTIVE"} size="sm" />
+            )
+          }))}
+        />
       </div>
     </div>
   );
@@ -298,57 +197,20 @@ const ProjectAssets = ({ assets, loading }) => {
         subtitle="Hardware and licenses allocated to this project."
       />
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
-        <table className="w-full text-sm text-left min-w-[600px]">
-          {/* HEADER */}
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Asset Name
-              </th>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Serial / ID
-              </th>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Assigned User
-              </th>
-              <th className="px-6 py-3 font-semibold text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-            </tr>
-          </thead>
-
-          {/* BODY */}
-          <tbody className="divide-y divide-gray-100">
-            {assets.map((asset, index) => (
-              <tr key={index} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4 font-medium text-gray-900">
-                  {asset.asset?.assetName || asset.assetName || "—"}
-                </td>
-
-                <td className="px-6 py-4 font-mono text-gray-600">
-                  {asset.serialNumber || asset.serial || "—"}
-                </td>
-
-                <td className="px-6 py-4 text-gray-700">
-                  {asset.assignedBy || asset.assignedTo || "—"}
-                </td>
-
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full
-                      ${(asset.asset?.status || asset.status) === "ACTIVE"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
-                      }`}
-                  >
-                    {asset.asset?.status || asset.status || "UNKNOWN"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <GenericTable
+          headers={["Asset Name", "Serial / ID", "Assigned User", "Status"]}
+          columns={["asset_info", "serial_info", "assigned_info", "status_info"]}
+          rows={assets.map((asset, index) => ({
+            ...asset,
+            asset_info: <span>{asset.asset?.assetName || asset.assetName || "—"}</span>,
+            serial_info: <span className="font-mono text-gray-600">{asset.serialNumber || asset.serial || "—"}</span>,
+            assigned_info: <span>{asset.assignedBy || asset.assignedTo || "—"}</span>,
+            status_info: (
+              <StatusBadge label={asset.asset?.status || asset.status || "UNKNOWN"} size="sm" />
+            )
+          }))}
+        />
       </div>
     </div>
   );
@@ -482,6 +344,7 @@ const ClientPage = () => {
   const navigate = useNavigate();
 
   // State declarations - ALL hooks inside component
+  const getProjectId = (project) => project?.projectId || project?.pmsProjectId;
   const [selectedProject, setSelectedProject] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [openConfigModal, setOpenConfigModal] = useState(false);
@@ -519,11 +382,12 @@ const ClientPage = () => {
   const [loadingAssets, setLoadingAssets] = useState(false);
   useEffect(() => {
     const fetchAssetsByProject = async () => {
+      const pid = getProjectId(selectedProject);
+      if (!pid) return;
+
       try {
         setLoadingAssets(true);
-
-        const res = await getAssetsByProjectId(selectedProject?.pmsProjectId);
-
+        const res = await getAssetsByProjectId(pid);
         setClientAssets(res.data || []);
       } catch (err) {
         setClientAssets([]);
@@ -532,10 +396,8 @@ const ClientPage = () => {
       }
     };
 
-    if (selectedProject?.pmsProjectId) {
-      fetchAssetsByProject();
-    }
-  }, [selectedProject?.pmsProjectId]);
+    fetchAssetsByProject();
+  }, [getProjectId(selectedProject)]);
 
   // ✅ ADD HERE — Pagination
   const PROJECTS_PER_PAGE = 3;
@@ -563,7 +425,7 @@ const ClientPage = () => {
     overallHealth: "UNKNOWN",
   });
 
-  const getProjectId = (project) => project?.pmsProjectId;
+
 
   // useEffect(() => {
   //   const pid = getProjectId(selectedProject);
@@ -590,7 +452,7 @@ const ClientPage = () => {
       const data = await getClientById(clientId);
       setClientDetails(data.data);
     } catch (error) {
-      toast.error("Failed to fetch client details.");
+      toast.error("Failed To Fetch Client Details.");
     } finally {
       setLoading(false);
     }
@@ -630,7 +492,11 @@ const ClientPage = () => {
       const res = await getProjectSLA(projectId);
       setProjectSLA(res.data || res);
     } catch (error) {
-      console.error("Failed to fetch project SLA", error);
+      if (error.response?.status === 403) {
+        console.warn(`Access denied (403): Cannot view SLA for project ${projectId}`);
+      } else {
+        console.error("Failed to fetch project SLA", error);
+      }
       setProjectSLA(null);
     } finally {
       setLoadingSLA(false);
@@ -643,7 +509,11 @@ const ClientPage = () => {
       const res = await getProjectCompliance(projectId);
       setProjectCompliance(res.data || res || []);
     } catch (error) {
-      console.error("Failed to fetch compliance", error);
+      if (error.response?.status === 403) {
+        console.warn(`Access denied (403): Cannot view compliance for project ${projectId}`);
+      } else {
+        console.error("Failed to fetch compliance", error);
+      }
       setProjectCompliance([]);
     } finally {
       setLoadingCompliance(false);
@@ -656,7 +526,11 @@ const ClientPage = () => {
       const res = await getProjectEscalations(projectId);
       setProjectEscalations(res.data || res || []);
     } catch (error) {
-      console.error("Failed to fetch escalations", error);
+      if (error.response?.status === 403) {
+        console.warn(`Access denied (403): Cannot view escalations for project ${projectId}`);
+      } else {
+        console.error("Failed to fetch escalations", error);
+      }
       setProjectEscalations([]);
     } finally {
       setLoadingEscalations(false);
@@ -762,7 +636,7 @@ const ClientPage = () => {
     } else {
       setProjectSLA(null);
     }
-  }, [selectedProject?.pmsProjectId, slaRefetchKey]);
+  }, [getProjectId(selectedProject), slaRefetchKey]);
 
   // Fetch project compliance when selected project changes
   useEffect(() => {
@@ -770,7 +644,7 @@ const ClientPage = () => {
     if (pid) {
       fetchProjectCompliance(pid);
     }
-  }, [selectedProject]);
+  }, [getProjectId(selectedProject)]);
 
   // Fetch project escalations when selected project changes
   useEffect(() => {
@@ -778,7 +652,7 @@ const ClientPage = () => {
     if (pid) {
       fetchProjectEscalations(pid);
     }
-  }, [selectedProject]);
+  }, [getProjectId(selectedProject)]);
 
   // Tab icon helper
   const ActivityIcon = SuccessIcon;
@@ -978,7 +852,7 @@ const ClientPage = () => {
             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{projects.length} Total</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar min-h-[300px] lg:min-h-0">
+          <div className="space-y-3 pr-1">
             {/* Project Cards */}
             {loadingProjects ? (
               <div className="text-sm text-gray-400">Loading projects...</div>
@@ -987,7 +861,7 @@ const ClientPage = () => {
             ) : (
               paginatedProjects.map((project) => (
                 <div
-                  key={project.pmsProjectId}
+                  key={project.projectId || project.pmsProjectId}
                   onClick={() => {
                     setSelectedProject(project);
                     setActiveTab("sla");
@@ -1015,14 +889,7 @@ const ClientPage = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500">Status</span>
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${project.projectStatus === "ACTIVE"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-600"
-                          }`}
-                      >
-                        {project.projectStatus}
-                      </span>
+                      <StatusBadge label={project.projectStatus || "UNKNOWN"} size="sm" />
                     </div>
 
                     <div className="flex items-center justify-between text-sm">

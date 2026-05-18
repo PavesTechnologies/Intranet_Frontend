@@ -18,22 +18,6 @@ export default function EmployeeListPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 8;
 
-  /* 🔎 Filter + Search Logic */
-  // const filteredData = useMemo(() => {
-  //   return (employees || []).filter((emp) => {
-  //     const matchSearch =
-  //       emp.name.toLowerCase().includes(search.toLowerCase()) ||
-  //       emp.email.toLowerCase().includes(search.toLowerCase()) ||
-  //       emp.id.includes(search) ||
-  //       emp.username.toLowerCase().includes(search.toLowerCase());
-
-  //     const matchDept = department ? emp.department.toLowerCase().includes(department.toLowerCase()) === department : true;
-  //     const matchStatus = status ? emp.emailStatus === status : true;
-  //     const matchLocation = location ? emp.location === location : true;
-
-  //     return matchSearch && matchDept && matchStatus && matchLocation;
-  //   });
-  // }, [search, department, status, location]);
   const filteredData = useMemo(() => {
     return (employees || []).filter((emp) => {
       const matchSearch =
@@ -67,13 +51,12 @@ export default function EmployeeListPage() {
     return Array.from(unique);
   }, [employees]);
   const loadDepartments = async () => {
-    const token = localStorage.getItem("token");
 
     const res = await fetch(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       },
     );
@@ -90,13 +73,12 @@ export default function EmployeeListPage() {
   };
   const loadDesignations = async () => {
     try {
-      const token = localStorage.getItem("token");
 
       const res = await fetch(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );

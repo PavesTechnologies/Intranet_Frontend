@@ -89,7 +89,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                     setResources(resourceList);
                 } catch (error) {
                     console.error("Failed to fetch resources", error);
-                    toast.error("Failed to load resources");
+                    toast.error("Failed To Load Resources");
                 } finally {
                     setIsLoadingResources(false);
                 }
@@ -469,6 +469,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                                 min="1"
                                 {...(!formData.skipValidation ? { max: '100' } : {})}
                                 value={formData.allocationPercentage}
+                                onWheel={(e) => e.target.blur()}
                                 onChange={(e) => setFormData({ ...formData, allocationPercentage: parseInt(e.target.value) || 0 })}
                                 className={cn(
                                     "h-10 rounded-xl border-slate-200 font-bold text-slate-900 pr-8 text-xs transition-all",
