@@ -18,7 +18,6 @@ import AllocationModificationTab from '../components/AllocationModificationTab';
 import demandService from '../services/demandService';
 import DemandModal from "../../models/DemandModal";
 import DeleteDemandModal from "../components/DeleteDemandModal";
-import { showStatusToast } from "../../../../components/toastfy/toast";
 import { useAuth } from '../../../../contexts/AuthContext';
 import { PriorityBadge, StateBadge } from '../components/FormalBadges';
 import { Button } from "@/components/ui/button";
@@ -31,6 +30,7 @@ import {
     PM_EDITABLE_DEMAND_MESSAGE,
     PM_REQUESTED_DEMAND_ONLY_MESSAGE,
 } from '../utils/demandPermissions';
+import { notify } from "../../utils/notify";
 
 
 /**
@@ -875,6 +875,7 @@ const DemandResourcesTable = ({ demandId }) => {
             } catch (err) {
                 console.error("Error fetching demand resources:", err);
                 setError("An error occurred while fetching resources");
+                notify.error(err, "Failed to load demand resources");
             } finally {
                 setLoading(false);
             }
@@ -1043,7 +1044,9 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                     setData(mergeDemandDetail(null, passedDemand));
                     setError(null);
                 } else {
-                    setError(err.message);
+                    const message = err?.message || "Failed to load demand details";
+                    setError(message);
+                    notify.error(err, "Failed to load demand details");
                 }
             } finally {
                 setIsLoading(false);
@@ -1057,15 +1060,16 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
         try {
             const result = await demandService.getDemandById(demandId);
             setData(mergeDemandDetail(result, passedDemand));
-            showStatusToast("Demand updated successfully", "success");
+            notify.success("Demand updated successfully");
         } catch (err) {
             console.error("Error refreshing demand:", err);
+            notify.error(err, "Demand updated but failed to refresh details");
         }
     };
 
     const handleDelete = async () => {
         if (isPM && !canProjectManagerMutateDemand(data)) {
-            showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+            notify.error(PM_REQUESTED_DEMAND_ONLY_MESSAGE);
             setDeleteModalOpen(false);
             return;
         }
@@ -1073,13 +1077,13 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
         setIsDeleting(true);
         try {
             await demandService.deleteDemandByPM(demandId, demand);
-            showStatusToast("Demand deleted successfully", "success");
+            notify.success("Demand deleted successfully");
             setDeleteModalOpen(false);
             if (propOnBack) propOnBack();
             else navigate('/resource-management/demand');
         } catch (err) {
             console.error("Error deleting demand:", err);
-            showStatusToast(err.response?.data?.message || "Failed to delete demand", "error");
+            notify.error(err, "Failed to delete demand");
         } finally {
             setIsDeleting(false);
         }
@@ -1188,7 +1192,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                         <button
                                             onClick={() => {
                                                 if (!canProjectManagerEditDemand(demand)) {
-                                                    showStatusToast(PM_EDITABLE_DEMAND_MESSAGE, "error");
+                                                    notify.error(PM_EDITABLE_DEMAND_MESSAGE);
                                                     return;
                                                 }
                                                 setEditModalOpen(true);
@@ -1203,7 +1207,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                                         <button
                                             onClick={() => {
                                                 if (!canProjectManagerMutateDemand(demand)) {
-                                                    showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+                                                    notify.error(PM_REQUESTED_DEMAND_ONLY_MESSAGE);
                                                     return;
                                                 }
                                                 setDeleteModalOpen(true);

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getSkills, getCertificates } from "../../../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../../../utils/notify";
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 import FilterListbox from "../../../../../components/filter/FilterListbox";
 
@@ -18,7 +18,7 @@ const ComplianceForm = ({ formData, setFormData }) => {
       const res = await getSkills();
       setSkills(res.data);
     } catch (error) {
-      toast.error("Failed To Fetch Skills");
+      notify.error("Failed To Fetch Skills");
     } finally {
       setLoading(false);
     }
@@ -30,7 +30,7 @@ const ComplianceForm = ({ formData, setFormData }) => {
       const res = await getCertificates();
       setCertificates(res.data);
     } catch (err) {
-      toast.error("Failed To Fetch Certificates");
+      notify.error("Failed To Fetch Certificates");
     } finally {
       setLoading(false);
     }

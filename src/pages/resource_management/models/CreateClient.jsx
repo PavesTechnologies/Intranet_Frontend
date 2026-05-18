@@ -4,7 +4,7 @@ import { Listbox, Combobox, Transition } from "@headlessui/react";
 import { ChevronDownIcon, CheckIcon } from "@/components/icons";
 import ct from "countries-and-timezones";
 import { createClient, updateClient, getProjectsByClient } from "../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import Button from "../../../components/Button/Button";
 
 // Updated CustomListbox to accept an 'error' prop
@@ -278,7 +278,7 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
 
     if (newErrors.length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill in all mandatory fields.");
+      notify.error("Please fill in all mandatory fields.");
       return;
     }
 
@@ -311,7 +311,7 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
         mode === "create"
           ? await createClient(formData)
           : await updateClient(formData);
-      toast.success(
+      notify.success(
         clientCreation.message ||
         (mode === "create"
           ? "Client created successfully."
@@ -319,7 +319,7 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
       );
       onSuccess?.();
     } catch (error) {
-      toast.error(
+      notify.error(
         error.response?.data?.message ||
         (mode === "create"
           ? "Failed to create client."

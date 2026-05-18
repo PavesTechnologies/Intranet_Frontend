@@ -11,7 +11,7 @@ import { handleDMDecision, handleRMDecision } from "../services/demandService";
 import { getRoleExpectations } from "../services/workforceService";
 
 import * as demandService from "../services/demandService";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import {
   canProjectManagerEditDemand,
   PM_EDITABLE_DEMAND_MESSAGE,
@@ -648,7 +648,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      toast.warning("Please Correct The Errors In The Form");
+      notify.warning("Please Correct The Errors In The Form");
 
       const firstErrorKey = Object.keys(validationErrors)[0];
       const errorElement = document.getElementById(`field-${firstErrorKey}`);
@@ -668,7 +668,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
         };
 
         if (isManagerOrPM && !canProjectManagerEditDemand(initialData || form)) {
-          toast.error(PM_EDITABLE_DEMAND_MESSAGE);
+          notify.error(PM_EDITABLE_DEMAND_MESSAGE);
           return;
         }
 
@@ -681,7 +681,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
               : null
           };
           const res = await handleDMDecision(dmPayload);
-          toast.success(res?.message || "Decision Submitted Successfully");
+          notify.success(res?.message || "Decision Submitted Successfully");
           if (onSuccess) await onSuccess(res, dmPayload);
           onClose();
           return;
@@ -696,7 +696,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
               : null
           };
           const res = await handleRMDecision(rmPayload);
-          toast.success(res?.message || "Decision Submitted Successfully");
+          notify.success(res?.message || "Decision Submitted Successfully");
           if (onSuccess) await onSuccess(res, rmPayload);
           onClose();
           return;
@@ -704,7 +704,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
 
         const submissionData = buildUpdateDemandPayload(normalizedForm, id);
         const res = await updateDemandStatus(submissionData);
-        toast.success(res.message || "Demand Updated Successfully");
+        notify.success(res.message || "Demand Updated Successfully");
         if (onSuccess) await onSuccess(res, submissionData);
         onClose();
         return;
@@ -717,11 +717,11 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
       const submissionData = buildCreateDemandPayload(normalizedForm, form.demandId || form.id || undefined);
 
       const res = await createDemand(submissionData);
-      toast.success(res.message || "Demand Saved Successfully");
+      notify.success(res.message || "Demand Saved Successfully");
       if (onSuccess) await onSuccess(res, submissionData);
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed To Save Demand");
+      notify.error(err, "Failed To Save Demand");
     } finally {
       setLoading(false);
     }
