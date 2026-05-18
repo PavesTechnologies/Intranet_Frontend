@@ -175,12 +175,14 @@ export const bulkRmReject = async (ids, rejectionReason) => {
 };
 
 // ✅ DL ACTION (FULFILL / REJECT)
-export const dlFulfill = async (id) => {
+export const dlFulfill = async (id, acknowledgementType) => {
   try {
+    const payload = acknowledgementType ? { acknowledgementType } : null;
     const response = await axios.post(
       `${BASE_URL}/api/role-off/${id}/dl-fulfill`,
-      null,
+      payload,
       {
+        params: acknowledgementType ? { acknowledgementType } : undefined,
         headers: getAuthHeaders(),
       },
     );

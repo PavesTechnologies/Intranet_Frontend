@@ -81,11 +81,11 @@ const BenchTable = ({
 
   const handleSaveStatus = async () => {
     if (!editStatus) {
-      toast.error("Please select a status");
+      toast.error("Please Select A Status");
       return;
     }
     if (!editReason.trim()) {
-      toast.error("Please provide a reason");
+      toast.error("Please Provide A Reason");
       return;
     }
 
@@ -97,12 +97,12 @@ const BenchTable = ({
         reason: editReason
         // If stateType is needed, it can be passed here or handled on backend
       });
-      toast.success("Status updated successfully");
+      toast.success("Status Updated Successfully");
       setEditingRow(null);
 
       onRefresh?.();
     } catch (error) {
-      toast.error("Failed to update status");
+      toast.error("Failed To Update Status");
     } finally {
       setIsSaving(false);
     }
@@ -118,7 +118,7 @@ const BenchTable = ({
       <div className="overflow-x-auto no-scrollbar">
         {loading ? (
           <div className="rounded-xl border border-slate-100 bg-white py-8 shadow-sm">
-            <LoadingSpinner text="Loading data..." />
+            <LoadingSpinner text="Loading Data..." />
           </div>
         ) : (
           <GenericTable
@@ -141,7 +141,7 @@ const BenchTable = ({
               expertise_info: (
                 <div className={`flex flex-col gap-1 ${isEditing ? "opacity-50 pointer-events-none" : ""}`}>
                   {row.topSkills.length === 0 ? (
-                    <span className="text-[10px] text-slate-300 italic">No expertise logged</span>
+                    <span className="text-[10px] text-slate-300 italic">No Expertise Logged</span>
                   ) : (
                     <>
                       <div className="flex flex-wrap gap-1">
@@ -293,7 +293,7 @@ const BenchTable = ({
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Consultant</p>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <p className="text-sm font-bold text-slate-900 leading-tight">{editingRow.name}</p>
-                  <p className="text-[11px] font-medium text-slate-500 mt-0.5">Current state: <span className="font-bold text-slate-700">{editingRow.category?.replace(/_/g, " ")}</span></p>
+                  <p className="text-[11px] font-medium text-slate-500 mt-0.5">Current State: <span className="font-bold text-slate-700">{editingRow.category?.replace(/_/g, " ")}</span></p>
                 </div>
               </div>
 
@@ -301,7 +301,7 @@ const BenchTable = ({
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">New Target State</label>
                 <div className="relative">
                   <FilterListbox
-                    options={[{value:"",label:"Select a substate"},...validStates.map((status) => ({ value: status, label: status.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') }))]}
+                    options={[{value:"",label:"Select A Substate"},...validStates.map((status) => ({ value: status, label: status.replace("_", " ").toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') }))]}
                     value={editStatus}
                     onChange={setEditStatus}
                   />
@@ -313,7 +313,7 @@ const BenchTable = ({
                 <textarea
                   value={editReason}
                   onChange={(e) => setEditReason(e.target.value)}
-                  placeholder="Provide context for this change..."
+                  placeholder="Provide Context For This Change..."
                   disabled={isSaving}
                   className="h-20 w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-[13px] font-medium text-slate-600 outline-none transition-all placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60"
                 />
@@ -327,7 +327,7 @@ const BenchTable = ({
                 onClick={handleCancelEdit}
                 disabled={isSaving}
               >
-                CANCEL
+                Cancel
               </button>
               <button
                 type="button"
@@ -341,10 +341,10 @@ const BenchTable = ({
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    SAVING...
+                    Saving...
                   </>
                 ) : (
-                  <>APPLY STRATEGY</>
+                  <>Apply Strategy</>
                 )}
               </button>
             </div>

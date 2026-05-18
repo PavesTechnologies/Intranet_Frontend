@@ -46,11 +46,11 @@ const ProjectResourcesTable = ({ projectId, resources = null }) => {
                 if (response.success) {
                     setAllocations(response.data || []);
                 } else {
-                    setError(response.message || "Failed to fetch resources");
+                    setError(response.message || "Failed To Fetch Resources");
                 }
             } catch (err) {
                 console.error("Error fetching project resources:", err);
-                setError("An error occurred while fetching resources");
+                setError("An Error Occurred While Fetching Resources");
             } finally {
                 setLoading(false);
             }
@@ -88,7 +88,7 @@ const ProjectResourcesTable = ({ projectId, resources = null }) => {
         return (
             <div className="flex flex-col items-center justify-center p-12 space-y-4">
                 <LoadingSpinner />
-                <p className="text-sm text-gray-400 font-medium animate-pulse">Loading assigned resources...</p>
+                <p className="text-sm text-gray-400 font-medium animate-pulse">Loading Assigned Resources...</p>
             </div>
         );
     }
@@ -114,7 +114,7 @@ const ProjectResourcesTable = ({ projectId, resources = null }) => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
                         type="text"
-                        placeholder="Search resources..."
+                        placeholder="Search Resources..."
                         className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -127,17 +127,17 @@ const ProjectResourcesTable = ({ projectId, resources = null }) => {
                     <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
                         <Users className="text-gray-300 h-8 w-8" />
                     </div>
-                    <h4 className="text-base font-bold text-gray-900">No Resources Allocated to the Project.</h4>
+                    <h4 className="text-base font-bold text-gray-900">No Resources Allocated To The Project.</h4>
                     <p className="text-sm text-gray-500 max-w-[280px] mt-1 leading-relaxed">
-                        There are currently no resources assigned to this project.
+                        There Are Currently No Resources Assigned To This Project.
                     </p>
                 </div>
             ) : (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                     <div className="overflow-x-auto no-scrollbar">
                         <GenericTable
-                            headers={["Resource", "Allocation", "Billable Hours", "Non-Billable Hours", "Demand", "Period", "Status", "Created By"]}
-                            columns={["resource_info", "allocation_info", "billable_info", "non_billable_info", "demand_info", "period_info", "status_info", "created_by_info"]}
+                            headers={["Resource", "Allocation", "Demand", "Period", "Status", "Created By"]}
+                            columns={["resource_info", "allocation_info","demand_info", "period_info", "status_info", "created_by_info"]}
                             rows={paginatedAllocations.map((item) => ({
                                 ...item,
                                 resource_info: (
@@ -168,20 +168,20 @@ const ProjectResourcesTable = ({ projectId, resources = null }) => {
                                         </div>
                                     </div>
                                 ),
-                                billable_info: (
-                                    <div className="text-center">
-                                        <span className="text-xs font-bold text-indigo-700">
-                                            {getBillableHours(item) ?? "--"}
-                                        </span>
-                                    </div>
-                                ),
-                                non_billable_info: (
-                                    <div className="text-center">
-                                        <span className="text-xs font-bold text-slate-700">
-                                            {getNonBillableHours(item) ?? "--"}
-                                        </span>
-                                    </div>
-                                ),
+                                // billable_info: (
+                                //     <div className="text-center">
+                                //         <span className="text-xs font-bold text-indigo-700">
+                                //             {getBillableHours(item) ?? "--"}
+                                //         </span>
+                                //     </div>
+                                // ),
+                                // non_billable_info: (
+                                //     <div className="text-center">
+                                //         <span className="text-xs font-bold text-slate-700">
+                                //             {getNonBillableHours(item) ?? "--"}
+                                //         </span>
+                                //     </div>
+                                // ),
                                 demand_info: (
                                     <div className="text-center">
                                         {item.demandName ? (
@@ -241,7 +241,7 @@ const ProjectResourcesTable = ({ projectId, resources = null }) => {
 
                     {filteredAllocations.length === 0 && searchTerm && (
                         <div className="p-8 text-center text-gray-500 italic border-t border-gray-100">
-                            No resources matching "{searchTerm}"
+                            No Resources Matching "{searchTerm}"
                         </div>
                     )}
                 </div>

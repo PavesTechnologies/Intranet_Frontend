@@ -1,11 +1,19 @@
+
 import React from "react";
 import { Mail, MoreHorizontalIcon } from "lucide-react";
 import { useState } from "react";
 import EmployeeProfileModal from "./EmployeeProfileModal";
+import React, { useState } from "react";
+import { Eye, Mail } from "lucide-react";
+
 import { useNavigate } from "react-router-dom";
 import { ViewIcon } from "../../../components/icons/ActionIcons";
 import Button from "../../../components/Button/Button";
 
+import Button from "../../../components/Button/Button";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import { Fonts } from "../../../components/Fonts/Fonts";
+import EmployeeProfileModal from "./EmployeeProfileModal";
 
 const colors = [
   "bg-teal-400",
@@ -20,11 +28,10 @@ const colors = [
 const getSafeColor = (index) => {
   if (index === 0) return colors[0];
 
-  const prevColor = colors[(index - 1) % colors.length];
+  const previousColor = colors[(index - 1) % colors.length];
   let currentColor = colors[index % colors.length];
 
-  // If same as previous → shift by 1
-  if (currentColor === prevColor) {
+  if (currentColor === previousColor) {
     currentColor = colors[(index + 1) % colors.length];
   }
 
@@ -59,15 +66,10 @@ const EmployeeCard = ({ employee, index }) => {
         <ViewIcon className="w-5 h-5 text-gray-700" />
         </button>
 
-      {/* Avatar */}
-      <div className="flex justify-center">
-        <div className="relative">
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-semibold ${bgColor}`}>
-            {getInitials(employee.name)}
-        </div>
-          <span className="absolute bottom-1 right-1 w-3 h-3 bg-green-600 border-2 border-white rounded-full"></span>
-        </div>
-      </div>
+          <div className="mt-4 text-center">
+            <h3 className={Fonts.heading4}>{employee.name}</h3>
+            <p className="mt-1 font-medium text-indigo-800">{employee.role}</p>
+          </div>
 
       {/* Name & Role */}
       <div className="text-center mt-3">
@@ -135,5 +137,18 @@ const EmployeeCard = ({ employee, index }) => {
 </>
   );
 };
+
+function InfoRow({ label, value, breakAll = false }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-3">
+      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </div>
+      <div className={`text-sm font-medium text-slate-800 ${breakAll ? "break-all" : ""}`}>
+        {value || "N/A"}
+      </div>
+    </div>
+  );
+}
 
 export default EmployeeCard;

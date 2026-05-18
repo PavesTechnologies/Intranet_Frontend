@@ -1,27 +1,32 @@
 import React from "react";
+import Button from "../../../../components/Button/Button";
+import { PageCard } from "../../../../components/Cards/PageCard";
 
 const columnStyles = {
   todo: {
-    accent: "#f97316",
-    background: "#fff7ed",
-    border: "#fdba74",
+    accent: "bg-orange-500",
+    background: "bg-orange-50",
+    border: "border-orange-200",
+    badgeText: "text-orange-600",
   },
   progress: {
-    accent: "#2563eb",
-    background: "#eff6ff",
-    border: "#93c5fd",
+    accent: "bg-blue-500",
+    background: "bg-blue-50",
+    border: "border-blue-200",
+    badgeText: "text-blue-600",
   },
   completed: {
-    accent: "#059669",
-    background: "#ecfdf5",
-    border: "#86efac",
+    accent: "bg-emerald-500",
+    background: "bg-emerald-50",
+    border: "border-emerald-200",
+    badgeText: "text-emerald-600",
   },
 };
 
 const priorityStyles = {
-  high: { background: "#fee2e2", color: "#b91c1c" },
-  medium: { background: "#fef3c7", color: "#b45309" },
-  low: { background: "#e2e8f0", color: "#475569" },
+  high: "bg-red-50 text-red-700",
+  medium: "bg-amber-50 text-amber-700",
+  low: "bg-slate-100 text-slate-600",
 };
 
 const formatLabel = (value) => {
@@ -32,271 +37,118 @@ const formatLabel = (value) => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
-export default function TaskBoard({ tasks, onCardClick, onDelete }) {
+export default function TaskBoard({ tasks, loading = false, onCardClick, onDelete }) {
   const columns = [
     { key: "todo", title: "To Do", subtitle: "Ready to start" },
     { key: "progress", title: "In Progress", subtitle: "Actively moving" },
     { key: "completed", title: "Completed", subtitle: "Finished tasks" },
   ];
 
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm font-medium text-slate-500">
+        Loading tasks...
+      </div>
+    );
+  }
+
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-        gap: 18,
-        alignItems: "start",
-      }}
-    >
-      {columns.map((col) => {
-        const style = columnStyles[col.key];
-        const list = tasks?.[col.key] || [];
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+      {columns.map((column) => {
+        const style = columnStyles[column.key];
+        const list = tasks?.[column.key] || [];
 
         return (
-          <div
-            key={col.key}
-            style={{
-              background: "#ffffff",
-              borderRadius: 20,
-              border: "1px solid #dbe5f1",
-              boxShadow: "0 18px 40px rgba(15,23,42,0.08)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                background: style.background,
-                borderBottom: `1px solid ${style.border}`,
-                padding: 18,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                }}
-              >
-                <div>
-                  <h3 style={{ margin: 0, color: "#0f172a", fontSize: 18 }}>
-                    {col.title}
-                  </h3>
-                  <p style={{ margin: "6px 0 0", color: "#475569", fontSize: 13 }}>
-                    {col.subtitle}
-                  </p>
+          <PageCard key={column.key} className="overflow-hidden border-slate-200">
+            <div className={`border-b px-5 py-4 ${style.background} ${style.border}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${style.accent}`} />
+                    <h3 className="text-base font-semibold text-slate-900">{column.title}</h3>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">{column.subtitle}</p>
                 </div>
 
                 <div
-                  style={{
-                    minWidth: 34,
-                    height: 34,
-                    borderRadius: 999,
-                    background: "#fff",
-                    color: style.accent,
-                    display: "grid",
-                    placeItems: "center",
-                    fontWeight: 700,
-                    border: `1px solid ${style.border}`,
-                  }}
+                  className={`flex h-9 min-w-9 items-center justify-center rounded-full border bg-white px-3 text-sm font-bold ${style.border} ${style.badgeText}`}
                 >
                   {list.length}
                 </div>
               </div>
             </div>
 
-            <div style={{ padding: 16, minHeight: 360 }}>
+            <div className="space-y-4 p-4 min-h-[360px]">
               {list.length === 0 ? (
-                <div
-                  style={{
-                    border: "1px dashed #cbd5e1",
-                    borderRadius: 16,
-                    padding: 24,
-                    textAlign: "center",
-                    color: "#64748b",
-                    background: "#f8fafc",
-                  }}
-                >
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
                   No tasks in this stage.
                 </div>
               ) : (
-                list.map((task) => {
-                  const priorityStyle =
-                    priorityStyles[task.priority] || priorityStyles.low;
-
-                  return (
-                    <div
-                      key={task.task_uuid}
-                      style={{
-                        background: "#fff",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: 18,
-                        padding: 16,
-                        marginBottom: 14,
-                        boxShadow: "0 10px 22px rgba(15,23,42,0.05)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          gap: 12,
-                          marginBottom: 10,
-                        }}
-                      >
-                        <div>
-                          <h4
-                            style={{
-                              margin: 0,
-                              fontSize: 16,
-                              color: "#0f172a",
-                              lineHeight: 1.35,
-                            }}
-                          >
-                            {task.title}
-                          </h4>
-                          <p
-                            style={{
-                              margin: "6px 0 0",
-                              fontSize: 13,
-                              color: "#64748b",
-                            }}
-                          >
-                            {task.description || "No description added yet."}
-                          </p>
-                        </div>
-
-                        <span
-                          style={{
-                            ...priorityStyle,
-                            padding: "5px 10px",
-                            borderRadius: 999,
-                            fontSize: 12,
-                            fontWeight: 700,
-                            textTransform: "capitalize",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {task.priority}
-                        </span>
+                list.map((task) => (
+                  <div
+                    key={task.task_uuid}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h4 className="text-base font-semibold leading-6 text-slate-900">
+                          {task.title}
+                        </h4>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {task.description || "No description added yet."}
+                        </p>
                       </div>
 
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                          gap: 10,
-                          marginBottom: 14,
-                        }}
+                      <span
+                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold capitalize ${
+                          priorityStyles[task.priority] || priorityStyles.low
+                        }`}
                       >
-                        <div
-                          style={{
-                            background: "#f8fafc",
-                            borderRadius: 12,
-                            padding: 10,
-                          }}
-                        >
-                          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
-                            Employee
-                          </div>
-                          <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
-                            {task.employee || "Unknown Employee"}
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            background: "#f8fafc",
-                            borderRadius: 12,
-                            padding: 10,
-                          }}
-                        >
-                          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
-                            Assigned To
-                          </div>
-                          <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
-                            {task.assignedTo || "Unassigned"}
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            background: "#f8fafc",
-                            borderRadius: 12,
-                            padding: 10,
-                          }}
-                        >
-                          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
-                            Due Date
-                          </div>
-                          <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
-                            {task.dueDate || "Not scheduled"}
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            background: "#f8fafc",
-                            borderRadius: 12,
-                            padding: 10,
-                          }}
-                        >
-                          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
-                            Status
-                          </div>
-                          <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
-                            {formatLabel(task.status)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "flex-start",
-                          gap: 10,
-                        }}
-                      >
-                        <button
-                          onClick={() => onCardClick?.(task)}
-                          style={{
-                            border: "none",
-                            background: "#3b82f6",
-                            color: "#ffffff",
-                            padding: "5px 9px",
-                            borderRadius: 10,
-                            cursor: "pointer",
-                            fontWeight: 600,
-                            minWidth: 96,
-                          }}
-                        >
-                          Edit Task
-                        </button>
-
-                        <button
-                          onClick={() => onDelete(task.task_uuid)}
-                          style={{
-                            border: "none",
-                            background: "#ef4444",
-                            color: "#fff",
-                            padding: "10px 14px",
-                            borderRadius: 10,
-                            cursor: "pointer",
-                            fontWeight: 600,
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                        {task.priority}
+                      </span>
                     </div>
-                  );
-                })
+
+                    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <InfoTile label="Employee" value={task.employee || "Unknown Employee"} />
+                      <InfoTile label="Assigned To" value={task.assignedTo || "Unassigned"} />
+                      <InfoTile label="Due Date" value={task.dueDate || "Not scheduled"} />
+                      <InfoTile label="Status" value={formatLabel(task.status)} />
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => onCardClick?.(task)}
+                        variant="primary"
+                        size="small"
+                      >
+                        Edit Task
+                      </Button>
+                      <Button
+                        onClick={() => onDelete?.(task)}
+                        variant="danger"
+                        size="small"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
-          </div>
+          </PageCard>
         );
       })}
+    </div>
+  );
+}
+
+function InfoTile({ label, value }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-3">
+      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </div>
+      <div className="text-sm font-medium text-slate-800">{value}</div>
     </div>
   );
 }

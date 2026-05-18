@@ -153,10 +153,12 @@ const ProjectConfigurations = ({ projectId }) => {
         },
       );
       const existingTypes = projectSlas.map((ps) => ps.slaType);
-      const validatedSlas = (res.data.data || []).map((sla) => ({
-        ...sla,
-        isAlreadyMapped: existingTypes.includes(sla.slaType),
-      }));
+      const validatedSlas = (res.data.data || [])
+        .filter((sla) => isActiveRecord(sla))
+        .map((sla) => ({
+          ...sla,
+          isAlreadyMapped: existingTypes.includes(sla.slaType),
+        }));
       setClientSlas(validatedSlas);
       setInheritMode(true);
     } catch (err) {
@@ -268,13 +270,15 @@ const ProjectConfigurations = ({ projectId }) => {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
       );
-      const inheritedTypes = latestProjectCompliance
-        .filter((pc) => pc.isInherited === true)
-        .map((pc) => pc.requirementType);
-      const validatedCompliance = (clientRes.data.data || []).map((comp) => ({
-        ...comp,
-        isAlreadyMapped: inheritedTypes.includes(comp.requirementType),
-      }));
+      const existingTypes = latestProjectCompliance.map(
+        (pc) => pc.requirementType,
+      );
+      const validatedCompliance = (clientRes.data.data || [])
+        .filter((comp) => isActiveRecord(comp))
+        .map((comp) => ({
+          ...comp,
+          isAlreadyMapped: existingTypes.includes(comp.requirementType),
+        }));
       setProjectCompliance(latestProjectCompliance);
       setClientCompliance(validatedCompliance);
       setSelectedClientCompliance([]);
@@ -382,10 +386,12 @@ const ProjectConfigurations = ({ projectId }) => {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
       );
-      const validated = (clientRes.data.data || []).map((contact) => ({
-        ...contact,
-        isAlreadyMapped: existingContactIds.includes(contact.contactId),
-      }));
+      const validated = (clientRes.data.data || [])
+        .filter((contact) => isActiveRecord(contact))
+        .map((contact) => ({
+          ...contact,
+          isAlreadyMapped: existingContactIds.includes(contact.contactId),
+        }));
       setClientEscalations(validated);
       setSelectedClientEscalations([]);
       setInheritMode(true);
@@ -497,6 +503,9 @@ const ProjectConfigurations = ({ projectId }) => {
       return `L${level.split("-")[1]}`;
     return level;
   };
+
+  const isActiveRecord = (record) =>
+    (record?.activeFlag ?? record?.active_flag ?? true) === true;
 
   // ---------------------------------------------------------
   // 5. DELETE CONFIRMATION
@@ -706,6 +715,24 @@ const ProjectConfigurations = ({ projectId }) => {
     ),
   }));
 
+  const formatLabel = (value) =>
+    value ? String(value).replace(/_/g, " ").toUpperCase() : "-";
+
+  const mappedBadge = (isAlreadyMapped) => (
+    <span
+      className={`px-2 py-1 rounded text-[10px] font-bold ${
+        isAlreadyMapped
+          ? "bg-slate-100 text-slate-500"
+          : "bg-blue-50 text-blue-700"
+      }`}
+    >
+      {isAlreadyMapped ? "MAPPED" : "AVAILABLE"}
+    </span>
+  );
+
+  const inheritCheckboxClass =
+    "h-4 w-4 rounded border-gray-300 text-[#263383] focus:ring-[#263383] disabled:cursor-not-allowed disabled:opacity-40";
+
   const clientSlaRows = clientSlas.map((sla) => ({
     ...sla,
     selection: (
@@ -714,6 +741,7 @@ const ProjectConfigurations = ({ projectId }) => {
           type="checkbox"
           disabled={sla.isAlreadyMapped}
           checked={selectedClientSlas.includes(sla.slaType)}
+          className={inheritCheckboxClass}
           onChange={(e) =>
             setSelectedClientSlas((prev) =>
               e.target.checked
@@ -724,8 +752,9 @@ const ProjectConfigurations = ({ projectId }) => {
         />
       </div>
     ),
-    type: sla.slaType,
+    type: formatLabel(sla.slaType),
     duration: `${sla.slaDurationDays}d / ${sla.warningThresholdDays}d`,
+    mapping: mappedBadge(sla.isAlreadyMapped),
     rowClass: sla.isAlreadyMapped ? "opacity-60" : "",
   }));
 
@@ -737,6 +766,7 @@ const ProjectConfigurations = ({ projectId }) => {
           type="checkbox"
           disabled={comp.isAlreadyMapped}
           checked={selectedClientCompliance.includes(comp.requirementType)}
+          className={inheritCheckboxClass}
           onChange={(e) =>
             setSelectedClientCompliance((prev) =>
               e.target.checked
@@ -747,7 +777,9 @@ const ProjectConfigurations = ({ projectId }) => {
         />
       </div>
     ),
-    requirement_name: comp.requirementName,
+    requirement_name: comp.requirementName || "-",
+    requirement_type: formatLabel(comp.requirementType),
+    mapping: mappedBadge(comp.isAlreadyMapped),
     rowClass: comp.isAlreadyMapped ? "opacity-60" : "",
   }));
 
@@ -759,6 +791,7 @@ const ProjectConfigurations = ({ projectId }) => {
           type="checkbox"
           disabled={esc.isAlreadyMapped}
           checked={selectedClientEscalations.includes(esc.contactId)}
+          className={inheritCheckboxClass}
           onChange={(e) =>
             setSelectedClientEscalations((prev) =>
               e.target.checked
@@ -769,7 +802,9 @@ const ProjectConfigurations = ({ projectId }) => {
         />
       </div>
     ),
-    contact: `${esc.contactName} (${esc.contactRole})`,
+    level: formatLevel(esc.escalationLevel || esc.escalation_level),
+    contact: `${esc.contactName || "-"} (${formatLabel(esc.contactRole)})`,
+    mapping: mappedBadge(esc.isAlreadyMapped),
     rowClass: esc.isAlreadyMapped ? "opacity-60" : "",
   }));
 
@@ -941,8 +976,8 @@ const ProjectConfigurations = ({ projectId }) => {
               <p className="text-sm">Select client SLAs to map:</p>
               <div className="overflow-x-auto">
                 <GenericTable
-                  headers={["Select", "Type", "Duration / Warning"]}
-                  columns={["selection", "type", "duration"]}
+                  headers={["Select", "Type", "Duration / Warning", "Mapping"]}
+                  columns={["selection", "type", "duration", "mapping"]}
                   rows={clientSlaRows}
                 />
               </div>
@@ -979,8 +1014,8 @@ const ProjectConfigurations = ({ projectId }) => {
             <div className="space-y-4">
               <div className="overflow-x-auto">
                 <GenericTable
-                  headers={["Select", "Requirement Name"]}
-                  columns={["selection", "requirement_name"]}
+                  headers={["Select", "Requirement Type", "Requirement Name", "Mapping"]}
+                  columns={["selection", "requirement_type", "requirement_name", "mapping"]}
                   rows={clientComplianceRows}
                 />
               </div>
@@ -1017,8 +1052,8 @@ const ProjectConfigurations = ({ projectId }) => {
             <div className="space-y-4">
               <div className="overflow-x-auto">
                 <GenericTable
-                  headers={["Select", "Contact"]}
-                  columns={["selection", "contact"]}
+                  headers={["Select", "Level", "Contact", "Mapping"]}
+                  columns={["selection", "level", "contact", "mapping"]}
                   rows={clientEscalationRows}
                 />
               </div>

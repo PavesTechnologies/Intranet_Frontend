@@ -224,7 +224,7 @@ const AssetDetail = () => {
       setAvailableSerials(filtered);
     } catch (err) {
       console.error("Failed to fetch serial numbers", err);
-      toast.error("Failed to load available serial numbers");
+      toast.error("Failed To Load Available Serial Numbers");
     } finally {
       setSerialLoading(false);
     }
@@ -396,9 +396,9 @@ const AssetDetail = () => {
         const res = await assignClientAsset(payload);
       }
       if (editingAssignment) {
-        toast.success("Assignment updated successfully");
+        toast.success("Assignment Updated Successfully");
       } else {
-        toast.success("Assignment created successfully");
+        toast.success("Assignment Created Successfully");
       }
       await fetchData();
       fetchKPI();

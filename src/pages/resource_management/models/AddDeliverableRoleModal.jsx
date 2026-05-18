@@ -211,13 +211,13 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
         subSkills: [...existingSkill.subSkills, ...newSubSkills]
       };
       setDraftRole(prev => ({ ...prev, skills: updatedSkills }));
-      toast.success("Skill updated in draft");
+      toast.success("Skill Updated In Draft");
     } else {
       setDraftRole(prev => ({
         ...prev,
         skills: [...prev.skills, { ...formState, skillName, proficiencyName, id: Date.now() }]
       }));
-      toast.success("Skill added to draft");
+      toast.success("Skill Added To Draft");
     }
 
     setFormState({
@@ -249,7 +249,7 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
       ...prev,
       skills: prev.skills.filter(s => s.skillId !== skillId)
     }));
-    toast.success("Skill removed from draft");
+    toast.success("Skill Removed From Draft");
   };
 
   const handleFinalize = async () => {
