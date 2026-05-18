@@ -1,8 +1,10 @@
-import React, { use } from "react";
+import React from "react";
 import { Mail, MoreHorizontalIcon } from "lucide-react";
 import { useState } from "react";
 import EmployeeProfileModal from "./EmployeeProfileModal";
 import { useNavigate } from "react-router-dom";
+import { ViewIcon } from "../../../components/icons/ActionIcons";
+import Button from "../../../components/Button/Button";
 
 
 const colors = [
@@ -38,15 +40,13 @@ const getInitials = (name) => {
 
 const EmployeeCard = ({ employee, index }) => {
     const [open,setOpen] = useState(false);
-    const navigation = useNavigate();
      const bgColor = getSafeColor(index);
   return (
     <>
-    <div className=" relative bg-white rounded-2xl shadow-md border border-gray-200 p-6 w-[350px]
-    transition-all duration-300 ease-in-out
-    hover:shadow-2xl hover:-translate-y-1 hover:scale-[1.02]
-    active:scale-[0.98] active:shadow-lg
-    cursor-pointer">
+   <div className="relative w-full max-w-[360px] mx-auto bg-white rounded-2xl shadow-md border border-gray-200 p-5
+      transition-all duration-300 ease-in-out
+      hover:shadow-2xl hover:-translate-y-1 hover:scale-[1.02]
+      active:scale-[0.98] active:shadow-lg">
 
       {/*3Dots Menu */} 
         <button
@@ -56,7 +56,7 @@ const EmployeeCard = ({ employee, index }) => {
         }}
         className="absolute top-3 right-3 p-1.5 rounded-md bg-gray-100 hover:bg-gray-200 opacity-100">
         
-        <MoreHorizontalIcon className="w-5 h-5 text-gray-700" />
+        <ViewIcon className="w-5 h-5 text-gray-700" />
         </button>
 
       {/* Avatar */}
@@ -70,7 +70,7 @@ const EmployeeCard = ({ employee, index }) => {
       </div>
 
       {/* Name & Role */}
-      <div className="text-center mt-4">
+      <div className="text-center mt-3">
         <h3 className="text-lg font-semibold text-gray-900">
           {employee.name}
         </h3>
@@ -79,7 +79,7 @@ const EmployeeCard = ({ employee, index }) => {
         </p>
       </div>
 
-      <hr className="my-4" />
+      <hr className="my-3" />
 
       {/* Details */}
       <div className="text-sm text-gray-800 space-y-2">
@@ -91,22 +91,38 @@ const EmployeeCard = ({ employee, index }) => {
           <span className="text-gray-600 text-sm ">Location :</span>{" "}
           {employee.location}
         </p>
-          <p className="break-all">
+        <div className="flex items-start gap-1 text-sm">
+            <span className="text-gray-600 shrink-0">
+              Email :
+            </span>
+
+            <p
+              title={employee.email}
+              className="truncate overflow-hidden whitespace-nowrap text-gray-800 flex-1 cursor-pointer"
+            >
+              {employee.email}
+            </p>
+          </div>
+          {/* <p className="break-all">
           <span className="text-gray-600 text-sm ">Email :</span>{" "}
           {employee.email}
-        </p>
+        </p> */}
       </div>
 
       {/* Actions */}
-      <div className="mt-5 flex items-center gap-3">
-        <button className="flex-1 bg-blue-800 hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition"
-        onClick={() => navigation(`/employee-onboarding/employeeProfile/${employee.employee_uuid}`)}>
+        <div className="mt-4 flex items-center gap-2 w-full">
+        <Button
+          onClick={() => setOpen(true)}
+          variant="primary"
+          size="medium"
+          className="flex-1 py-2"
+        >
           View Profile
-        </button>
+        </Button>
 
         <a
           href={`mailto:${employee.email}`}
-          className="p-2 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition"
+          className="shrink-0 p-2.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition"
         >
           <Mail className="h-4 w-4 text-indigo-800" />
         </a>
