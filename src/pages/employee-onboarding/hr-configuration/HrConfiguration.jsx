@@ -6,6 +6,21 @@ import {
   Link2,
 } from "lucide-react";
 import AppCard from "../../../components/Cards/AppCard";
+import { Fonts } from "../../../components/Fonts/Fonts";
+
+function SectionHeaderCard({ title, description }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
+      <div className="flex items-start gap-4">
+        <span className="mt-0.5 h-14 w-1.5 shrink-0 rounded-full bg-indigo-600" />
+        <div className="min-w-0">
+          <h1 className={Fonts.heading3}>{title}</h1>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function HrConfiguration() {
   const navigate = useNavigate();
@@ -44,13 +59,11 @@ export default function HrConfiguration() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto p-6 font-sans">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-2">
-        HR Configuration
-      </h1>
-      <p className="text-sm text-gray-600 mb-8">
-        Manage onboarding masters and compliance rules
-      </p>
+    <div className="max-w-6xl mx-auto p-6 font-sans space-y-6">
+      <SectionHeaderCard
+        title="HR Configuration"
+        description="Manage onboarding masters and compliance rules"
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {cards.map((card) => (
