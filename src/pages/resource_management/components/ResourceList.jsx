@@ -24,7 +24,7 @@ const ResourceList = ({ allocations }) => {
       
       {allocations.length === 0 ? (
         <div className="p-8 text-center text-gray-500">
-            No resources currently allocated to this project.
+            No Resources Currently Allocated To This Project.
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -56,7 +56,7 @@ const ResourceList = ({ allocations }) => {
                 duration_info: (
                   <div className="flex flex-col">
                     <span>{res.start}</span>
-                    <span className="text-center italic text-[10px]">to</span>
+                    <span className="text-center italic text-[10px]">To</span>
                     <span>{res.end}</span>
                   </div>
                 ),

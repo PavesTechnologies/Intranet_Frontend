@@ -424,9 +424,16 @@ export default function EditLeaveModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (e) => { if (e.key === "Escape") handleClose(); };
+    const handler = (e) => {
+      if (e.key === "Escape") handleClose();
+    };
+    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handler);
+    };
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUpdate = async (e) => {
@@ -447,7 +454,7 @@ export default function EditLeaveModal({
       driveLink,
       startSession: halfDayConfig.start,
       endSession: isMultiDay ? halfDayConfig.end : halfDayConfig.start,
-      year: year
+      year: year,
     };
 
     try {
@@ -620,7 +627,7 @@ export default function EditLeaveModal({
               ) : null}
             </div>
 
-             {/* Half day toggle */}
+            {/* Half day toggle */}
             {selectedLeaveType?.allowHalfDay && !isMaternityLeave && (
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block">
@@ -664,7 +671,9 @@ export default function EditLeaveModal({
                           { value: "second", label: "Second Half" },
                         ]}
                         value={halfDayConfig.start}
-                        onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                        onChange={(val) =>
+                          setHalfDayConfig((p) => ({ ...p, start: val }))
+                        }
                       />
                     </div>
                     {isMultiDay && (
@@ -681,7 +690,9 @@ export default function EditLeaveModal({
                               { value: "second", label: "Second Half" },
                             ]}
                             value={halfDayConfig.end}
-                            onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                            onChange={(val) =>
+                              setHalfDayConfig((p) => ({ ...p, end: val }))
+                            }
                           />
                         </div>
                       </>

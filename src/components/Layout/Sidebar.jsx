@@ -62,9 +62,30 @@ const Sidebar = ({ isCollapsed }) => {
   const { user, hasRole } = useAuth();
 
   // Filter main navigation based on allowedRoles
-  const filteredNavigation = navigation.filter(
-    (item) => !item.allowedRoles || hasRole(item.allowedRoles)
-  );
+  const filteredNavigation = navigation.filter((item) => {
+    if (!item.allowedRoles) return true;
+
+    // Standard check
+    const isAllowed = hasRole(item.allowedRoles);
+    if (!isAllowed) return false;
+
+    // Special logic for Projects to handle the "General" role commonality
+    if (item.name === "Projects") {
+      const userRoles = user?.roles?.map((r) => r.toUpperCase()) || [];
+      // Roles that should not see Projects by default
+      const forbiddenRoles = ["ADMIN", "SUPER ADMIN", "HR", "HR_MANAGER", "RESOURCE_MANAGER", "DELIVERY_MANAGER", "REPORTING_MANAGER"];
+      // Roles that override the forbidden roles
+      const strongRoles = ["PROJECT_MANAGER", "TESTER"];
+
+      // If user has a professional project role, always show it
+      if (userRoles.some((r) => strongRoles.includes(r))) return true;
+
+      // If user has any forbidden role (and no strong role), hide it
+      if (userRoles.some((r) => forbiddenRoles.includes(r))) return false;
+    }
+
+    return true;
+  });
 
   // Role-filtered EO submenu — recomputed whenever the component re-renders with a new user
   const filteredEoSubmenu = filterMenuByRole(EO_SUBMENU, hasRole);

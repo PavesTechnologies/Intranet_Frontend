@@ -452,7 +452,7 @@ const ClientPage = () => {
       const data = await getClientById(clientId);
       setClientDetails(data.data);
     } catch (error) {
-      toast.error("Failed to fetch client details.");
+      toast.error("Failed To Fetch Client Details.");
     } finally {
       setLoading(false);
     }
@@ -852,7 +852,7 @@ const ClientPage = () => {
             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{projects.length} Total</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar min-h-[300px] lg:min-h-0">
+          <div className="space-y-3 pr-1">
             {/* Project Cards */}
             {loadingProjects ? (
               <div className="text-sm text-gray-400">Loading projects...</div>

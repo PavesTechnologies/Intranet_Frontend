@@ -315,7 +315,7 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
                   <select
                     value={type}
                     onChange={(e) => setType(e.target.value)}
-                    className="w-full p-2 pl-10 border rounded-lg"
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white appearance-none"
                   >
                     <option value="NATIONAL">National</option>
                     <option value="REGIONAL">Regional</option>
@@ -378,13 +378,14 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
             </div>
 
             <div className="flex justify-end pt-1">
-              <button
+              <Button
+                // loading={loading}
                 onClick={handleAddHoliday}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+                variant="primary"
               >
                 <Plus className="w-4 h-4" />
                 Add to List
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -469,13 +470,13 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
               ? "No holidays queued yet"
               : `${holidays.length} holiday(s) ready to submit`}
           </p>
-          <button
+          <Button
             onClick={handleSubmit}
             disabled={submitting || holidays.length === 0}
-            className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            variant="primary"
           >
             {submitting ? "Submitting..." : `Submit ${holidays.length > 0 ? `(${holidays.length})` : ""}`}
-          </button>
+          </Button>
         </div>
       </div>
 
