@@ -18,11 +18,11 @@ const StatusBadge = ({ label, size = "md" }) => {
     bgColor = "bg-blue-100";
     textColor = "text-blue-700";
   } else if (
+    normalized === "active" ||
     normalized === "done" ||
     normalized.includes("approve") ||
     normalized.includes("complete") ||
-    normalized.includes("release") ||
-    normalized.includes("active")
+    normalized.includes("release")
   ) {
     bgColor = "bg-green-100";
     textColor = "text-green-700";
