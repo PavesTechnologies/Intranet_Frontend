@@ -29,7 +29,12 @@ const EmployeeDirectory = () => {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("All");
+
   const [departmentsList, setDepartmentsList] = useState([]);
+<<<<<<< HEAD
+  const [designationsList, setDesignationsList] = useState([]);
+=======
+>>>>>>> 0f9e6ae5b6436a0475c3eb21d66ce5cec74f7591
 
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
@@ -40,25 +45,56 @@ const EmployeeDirectory = () => {
 
         const [empRes, deptRes, desigRes] = await Promise.all([
           axios.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }),
+
           axios.get(`${BASE_URL}/masters/departments/`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }),
+
           axios.get(`${BASE_URL}/masters/designations/`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }),
         ]);
 
+<<<<<<< HEAD
+        const depts = Array.isArray(deptRes.data)
+          ? deptRes.data
+          : deptRes.data.data || [];
+
+        const desigs = Array.isArray(desigRes.data)
+          ? desigRes.data
+          : desigRes.data.data || [];
+=======
         const depts = Array.isArray(deptRes.data) ? deptRes.data : deptRes.data.data || [];
         const desigs = Array.isArray(desigRes.data) ? desigRes.data : desigRes.data.data || [];
+>>>>>>> 0f9e6ae5b6436a0475c3eb21d66ce5cec74f7591
 
         setDepartmentsList(depts);
 
         const deptMap = Object.fromEntries(
+<<<<<<< HEAD
+          depts.map((d) => [d.department_uuid, d.department_name])
+=======
           depts.map((dept) => [dept.department_uuid, dept.department_name])
+>>>>>>> 0f9e6ae5b6436a0475c3eb21d66ce5cec74f7591
         );
+
         const desigMap = Object.fromEntries(
+<<<<<<< HEAD
+          desigs.map((d) => [d.designation_uuid, d.designation_name])
+        );
+
+        const employeeData = Array.isArray(empRes.data)
+        ? empRes.data
+        : empRes.data.data || [];
+=======
           desigs.map((designation) => [designation.designation_uuid, designation.designation_name])
         );
 
@@ -78,12 +114,69 @@ const EmployeeDirectory = () => {
             reportingManager: employee.reporting_manager || "N/A",
           })
         );
+>>>>>>> 0f9e6ae5b6436a0475c3eb21d66ce5cec74f7591
 
+      const employeeMap = Object.fromEntries(
+        employeeData.map((employee) => [
+          String(employee.employee_id),
+          `${employee.first_name || ""} ${employee.last_name || ""}`.trim(),
+        ])
+      );
+
+      const mappedEmployees = employeeData.map((emp) => {
+
+  console.log("Raw Employee Data:", emp);
+
+  return {
+    ...emp,
+
+    // Employee Card Data
+    name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
+
+    email: emp.work_email || emp.email || "N/A",
+
+    contact: emp.contact_number || emp.contact || "N/A",
+
+    role:
+      desigMap[emp.designation_uuid] ||
+      emp.role ||
+      "N/A",
+
+    department:
+      deptMap[emp.department_uuid] ||
+      emp.department ||
+      "N/A",
+
+    location: emp.location || "Hyderabad Office",
+
+    initials: (
+      (emp.first_name?.[0] || "") +
+      (emp.last_name?.[0] || "")
+    ).toUpperCase(),
+
+    // Profile Modal Fields
+    employeeId: emp.employee_id || "N/A",
+
+    gender: emp.gender || "N/A",
+
+    employeeType: emp.employment_status || "Full-Time",
+
+    dateOfJoining: emp.joining_date || "N/A",
+
+    // Reporting Manager Name Mapping
+    reportingManager:
+      employeeMap[String(emp.reporting_manager_uuid)] || "N/A",
+  };
+});
+        
         setEmployees(mappedEmployees);
         setError(null);
       } catch (err) {
         console.error("Error fetching employee directory data:", err);
-        setError("Failed to load employee directory. Please try again later.");
+
+        setError(
+          "Failed to load employee directory. Please try again later."
+        );
       } finally {
         setLoading(false);
       }
@@ -92,6 +185,25 @@ const EmployeeDirectory = () => {
     fetchData();
   }, [BASE_URL]);
 
+<<<<<<< HEAD
+  // Department Dropdown
+  const departments = [
+    "All",
+    ...departmentsList.map((d) => d.department_name),
+  ];
+
+  // Filter Logic
+  const filteredEmployees = employees.filter((emp) => {
+    const searchValue = search.toLowerCase();
+
+    const matchesSearch =
+      emp.name.toLowerCase().includes(searchValue) ||
+      emp.role.toLowerCase().includes(searchValue);
+
+    const matchesDepartment =
+      department === "All" ||
+      emp.department === department;
+=======
   const departments = ["All", ...departmentsList.map((dept) => dept.department_name)];
 
   const filteredEmployees = employees.filter((employee) => {
@@ -101,6 +213,7 @@ const EmployeeDirectory = () => {
       employee.role.toLowerCase().includes(searchValue);
 
     const matchesDepartment = department === "All" || employee.department === department;
+>>>>>>> 0f9e6ae5b6436a0475c3eb21d66ce5cec74f7591
 
     return matchesSearch && matchesDepartment;
   });
@@ -109,11 +222,55 @@ const EmployeeDirectory = () => {
     <div className="p-6">
       <PageCard className="border-slate-200">
         <PageCardContent className="space-y-6 p-6 md:p-8">
+<<<<<<< HEAD
+
+          {/* Header */}
+=======
+>>>>>>> 0f9e6ae5b6436a0475c3eb21d66ce5cec74f7591
           <SectionHeaderCard
             title="Employee Directory"
             description="Manage and browse organizational talent across the onboarding workflow."
           />
 
+<<<<<<< HEAD
+          {/* Search + Filters */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-end">
+
+            {/* Search */}
+            <div className="relative w-full">
+              <label
+                htmlFor="employeeDirectorySearch"
+                className={`${Fonts.label} mb-1 block`}
+              >
+                Search
+              </label>
+
+              <Search className="pointer-events-none absolute left-5 top-[calc(50%+12px)] h-5 w-5 -translate-y-1/2 text-gray-400" />
+
+              <input
+                id="employeeDirectorySearch"
+                type="text"
+                placeholder="Search by name or role..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 py-2 pr-4 pl-12 text-sm shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
+              />
+            </div>
+
+            {/* Department Filter */}
+            <div className="w-full">
+              <label className={`${Fonts.label} mb-1 block`}>
+                Department
+              </label>
+
+              <FilterListbox
+                options={departments.map((dept) => ({
+                  value: dept,
+                  label:
+                    dept === "All"
+                      ? "All Departments"
+                      : dept,
+=======
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-end">
             <div className="relative w-full">
               <label htmlFor="employeeDirectorySearch" className={`${Fonts.label} mb-1 block`}>
@@ -136,10 +293,62 @@ const EmployeeDirectory = () => {
                 options={departments.map((dept) => ({
                   value: dept,
                   label: dept === "All" ? "All Departments" : dept,
+>>>>>>> 0f9e6ae5b6436a0475c3eb21d66ce5cec74f7591
                 }))}
                 value={department}
                 onChange={setDepartment}
               />
+<<<<<<< HEAD
+          </div>
+          </div>
+
+          {/* Employee Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 w-full">
+
+            {loading ? (
+              <div className="col-span-full rounded-2xl border border-slate-200 bg-slate-50 py-20">
+                <LoadingSpinner text="Loading employees..." />
+              </div>
+
+            ) : error ? (
+
+              <div className="col-span-full rounded-2xl border border-red-100 bg-red-50 px-6 py-16 text-center">
+                <p className="font-medium text-red-600">
+                  {error}
+                </p>
+
+                <Button
+                  onClick={() => window.location.reload()}
+                  variant="outline"
+                  size="medium"
+                  className="mt-4"
+                >
+                  Try Again
+                </Button>
+              </div>
+
+            ) : filteredEmployees.length > 0 ? (
+
+              filteredEmployees.map((emp, index) => (
+                <EmployeeCard
+                  key={
+                    emp.employee_uuid ||
+                    emp.employeeId ||
+                    index
+                  }
+                  employee={emp}
+                  index={index}
+                />
+              ))
+
+            ) : (
+
+              <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-20 text-center text-slate-500">
+                No employees found.
+              </div>
+            )}
+          </div>
+=======
             </div>
           </div>
 
@@ -174,6 +383,7 @@ const EmployeeDirectory = () => {
               </div>
             )}
           </div>
+>>>>>>> 0f9e6ae5b6436a0475c3eb21d66ce5cec74f7591
         </PageCardContent>
       </PageCard>
     </div>

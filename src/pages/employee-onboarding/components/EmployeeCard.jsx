@@ -1,6 +1,14 @@
+
+import React from "react";
+import { Mail, MoreHorizontalIcon } from "lucide-react";
+import { useState } from "react";
+import EmployeeProfileModal from "./EmployeeProfileModal";
 import React, { useState } from "react";
 import { Eye, Mail } from "lucide-react";
+
 import { useNavigate } from "react-router-dom";
+import { ViewIcon } from "../../../components/icons/ActionIcons";
+import Button from "../../../components/Button/Button";
 
 import Button from "../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -38,74 +46,95 @@ const getInitials = (name) => {
 };
 
 const EmployeeCard = ({ employee, index }) => {
-  const [open, setOpen] = useState(false);
-  const navigation = useNavigate();
-  const bgColor = getSafeColor(index);
-
+    const [open,setOpen] = useState(false);
+     const bgColor = getSafeColor(index);
   return (
     <>
-      <PageCard className="relative h-full border-slate-200 transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-lg">
-        <PageCardContent className="flex h-full flex-col p-6">
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(true);
-            }}
-            className="absolute right-3 top-3"
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 rounded-xl bg-gray-100 hover:bg-gray-200"
-              aria-label={`View ${employee.name}`}
-            >
-              <Eye className="h-5 w-5 text-gray-700" />
-            </Button>
-          </div>
+   <div className="relative w-full max-w-[360px] mx-auto bg-white rounded-2xl shadow-md border border-gray-200 p-5
+      transition-all duration-300 ease-in-out
+      hover:shadow-2xl hover:-translate-y-1 hover:scale-[1.02]
+      active:scale-[0.98] active:shadow-lg">
 
-          <div className="flex justify-center">
-            <div className="relative">
-              <div className={`flex h-16 w-16 items-center justify-center rounded-full text-2xl font-semibold text-white ${bgColor}`}>
-                {getInitials(employee.name)}
-              </div>
-              <span className="absolute bottom-1 right-1 h-3 w-3 rounded-full border-2 border-white bg-green-600" />
-            </div>
-          </div>
+      {/*3Dots Menu */} 
+        <button
+        onClick={(e) => {
+            e.stopPropagation();
+            setOpen(true);
+        }}
+        className="absolute top-3 right-3 p-1.5 rounded-md bg-gray-100 hover:bg-gray-200 opacity-100">
+        
+        <ViewIcon className="w-5 h-5 text-gray-700" />
+        </button>
 
           <div className="mt-4 text-center">
             <h3 className={Fonts.heading4}>{employee.name}</h3>
             <p className="mt-1 font-medium text-indigo-800">{employee.role}</p>
           </div>
 
-          <div className="my-5 h-px bg-slate-200" />
+      {/* Name & Role */}
+      <div className="text-center mt-3">
+        <h3 className="text-lg font-semibold text-gray-900">
+          {employee.name}
+        </h3>
+        <p className="text-indigo-800 font-medium">
+          {employee.role}
+        </p>
+      </div>
 
-          <div className="grid gap-3 text-sm text-gray-800">
-            <InfoRow label="Department" value={employee.department} />
-            <InfoRow label="Location" value={employee.location} />
-            <InfoRow label="Email" value={employee.email} breakAll />
-          </div>
+      <hr className="my-3" />
 
-          <div className="mt-6 flex items-center gap-3">
-            <Button
-              className="flex-1"
-              onClick={() => navigation(`/employee-onboarding/employeeProfile/${employee.employee_uuid}`)}
+      {/* Details */}
+      <div className="text-sm text-gray-800 space-y-2">
+        <p>
+          <span className="text-gray-600 text-sm">Department :</span>{" "}
+          {employee.department}
+        </p>
+        <p>
+          <span className="text-gray-600 text-sm ">Location :</span>{" "}
+          {employee.location}
+        </p>
+        <div className="flex items-start gap-1 text-sm">
+            <span className="text-gray-600 shrink-0">
+              Email :
+            </span>
+
+            <p
+              title={employee.email}
+              className="truncate overflow-hidden whitespace-nowrap text-gray-800 flex-1 cursor-pointer"
             >
-              View Profile
-            </Button>
-
-            <a
-              href={`mailto:${employee.email}`}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-indigo-50 text-indigo-800 transition hover:bg-indigo-100"
-              aria-label={`Email ${employee.name}`}
-            >
-              <Mail className="h-4 w-4" />
-            </a>
+              {employee.email}
+            </p>
           </div>
-        </PageCardContent>
-      </PageCard>
+          {/* <p className="break-all">
+          <span className="text-gray-600 text-sm ">Email :</span>{" "}
+          {employee.email}
+        </p> */}
+      </div>
 
-      {open && <EmployeeProfileModal employee={employee} onClose={() => setOpen(false)} />}
-    </>
+      {/* Actions */}
+        <div className="mt-4 flex items-center gap-2 w-full">
+        <Button
+          onClick={() => setOpen(true)}
+          variant="primary"
+          size="medium"
+          className="flex-1 py-2"
+        >
+          View Profile
+        </Button>
+
+        <a
+          href={`mailto:${employee.email}`}
+          className="shrink-0 p-2.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition"
+        >
+          <Mail className="h-4 w-4 text-indigo-800" />
+        </a>
+      </div>
+    </div>
+    {open && (
+        <EmployeeProfileModal 
+        employee={employee} 
+        onClose={() => setOpen(false)} />)}
+</>
   );
 };
 
