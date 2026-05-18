@@ -284,7 +284,7 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
 
               <div className="hidden md:block text-left max-w-[180px]">
                 <p className="text-sm font-medium text-gray-900 leading-tight truncate">{name}</p>
-                <p className="text-xs text-gray-500 line-clamp-1">{role}</p>
+                {/* <p className="text-xs text-gray-500 line-clamp-1">{role}</p> */}
               </div>
 
           {/* New Password */}
