@@ -78,32 +78,18 @@ const EmployeeDirectory = () => {
           desigs.map((designation) => [designation.designation_uuid, designation.designation_name])
         );
 
-        const mappedEmployees = (Array.isArray(empRes.data) ? empRes.data : empRes.data.data || []).map(
-          (employee) => ({
-            ...employee,
-            name: `${employee.first_name || ""} ${employee.last_name || ""}`.trim(),
-            email: employee.work_email || employee.email || "N/A",
-            contact: employee.contact_number || employee.contact || "N/A",
-            role: desigMap[employee.designation_uuid] || employee.role || "N/A",
-            department: deptMap[employee.department_uuid] || employee.department || "N/A",
-            location: employee.location || "Hyderabad Office",
-            employeeId: employee.employee_id || "N/A",
-            gender: employee.gender || "N/A",
-            employeeType: employee.employment_status || "Full-Time",
-            dateOfJoining: employee.joining_date || "N/A",
-            reportingManager: employee.reporting_manager || "N/A",
-          })
-        );
+     const employeeData = Array.isArray(empRes.data)
+  ? empRes.data
+  : empRes.data.data || [];
 
-      const employeeMap = Object.fromEntries(
-        employeeData.map((employee) => [
-          String(employee.employee_id),
-          `${employee.first_name || ""} ${employee.last_name || ""}`.trim(),
-        ])
-      );
+const employeeMap = Object.fromEntries(
+  employeeData.map((employee) => [
+    String(employee.employee_id),
+    `${employee.first_name || ""} ${employee.last_name || ""}`.trim(),
+  ])
+);
 
-      const mappedEmployees = employeeData.map((emp) => {
-
+const mappedEmployees = employeeData.map((emp) => {
   console.log("Raw Employee Data:", emp);
 
   return {
@@ -147,6 +133,8 @@ const EmployeeDirectory = () => {
       employeeMap[String(emp.reporting_manager_uuid)] || "N/A",
   };
 });
+
+
         
         setEmployees(mappedEmployees);
         setError(null);
