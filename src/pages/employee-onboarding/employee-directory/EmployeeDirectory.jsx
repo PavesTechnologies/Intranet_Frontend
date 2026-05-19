@@ -29,7 +29,9 @@ const EmployeeDirectory = () => {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("All");
+
   const [departmentsList, setDepartmentsList] = useState([]);
+  const [designationsList, setDesignationsList] = useState([]);
 
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
@@ -40,50 +42,108 @@ const EmployeeDirectory = () => {
 
         const [empRes, deptRes, desigRes] = await Promise.all([
           axios.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }),
+
           axios.get(`${BASE_URL}/masters/departments/`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }),
+
           axios.get(`${BASE_URL}/masters/designations/`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }),
         ]);
 
-        const depts = Array.isArray(deptRes.data) ? deptRes.data : deptRes.data.data || [];
-        const desigs = Array.isArray(desigRes.data) ? desigRes.data : desigRes.data.data || [];
+        const depts = Array.isArray(deptRes.data)
+          ? deptRes.data
+          : deptRes.data.data || [];
+
+        const desigs = Array.isArray(desigRes.data)
+          ? desigRes.data
+          : desigRes.data.data || [];
 
         setDepartmentsList(depts);
 
         const deptMap = Object.fromEntries(
-          depts.map((dept) => [dept.department_uuid, dept.department_name])
+          depts.map((d) => [d.department_uuid, d.department_name])
         );
+
         const desigMap = Object.fromEntries(
           desigs.map((designation) => [designation.designation_uuid, designation.designation_name])
         );
 
-        const mappedEmployees = (Array.isArray(empRes.data) ? empRes.data : empRes.data.data || []).map(
-          (employee) => ({
-            ...employee,
-            name: `${employee.first_name || ""} ${employee.last_name || ""}`.trim(),
-            email: employee.work_email || employee.email || "N/A",
-            contact: employee.contact_number || employee.contact || "N/A",
-            role: desigMap[employee.designation_uuid] || employee.role || "N/A",
-            department: deptMap[employee.department_uuid] || employee.department || "N/A",
-            location: employee.location || "Hyderabad Office",
-            employeeId: employee.employee_id || "N/A",
-            gender: employee.gender || "N/A",
-            employeeType: employee.employment_status || "Full-Time",
-            dateOfJoining: employee.joining_date || "N/A",
-            reportingManager: employee.reporting_manager || "N/A",
-          })
-        );
+     const employeeData = Array.isArray(empRes.data)
+  ? empRes.data
+  : empRes.data.data || [];
 
+const employeeMap = Object.fromEntries(
+  employeeData.map((employee) => [
+    String(employee.employee_id),
+    `${employee.first_name || ""} ${employee.last_name || ""}`.trim(),
+  ])
+);
+
+const mappedEmployees = employeeData.map((emp) => {
+  console.log("Raw Employee Data:", emp);
+
+  return {
+    ...emp,
+
+    // Employee Card Data
+    name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
+
+    email: emp.work_email || emp.email || "N/A",
+
+    contact: emp.contact_number || emp.contact || "N/A",
+
+    role:
+      desigMap[emp.designation_uuid] ||
+      emp.role ||
+      "N/A",
+
+    department:
+      deptMap[emp.department_uuid] ||
+      emp.department ||
+      "N/A",
+
+    location: emp.location || "Hyderabad Office",
+
+    initials: (
+      (emp.first_name?.[0] || "") +
+      (emp.last_name?.[0] || "")
+    ).toUpperCase(),
+
+    // Profile Modal Fields
+    employeeId: emp.employee_id || "N/A",
+
+    gender: emp.gender || "N/A",
+
+    employeeType: emp.employment_status || "Full-Time",
+
+    dateOfJoining: emp.joining_date || "N/A",
+
+    // Reporting Manager Name Mapping
+    reportingManager:
+      employeeMap[String(emp.reporting_manager_uuid)] || "N/A",
+  };
+});
+
+
+        
         setEmployees(mappedEmployees);
         setError(null);
       } catch (err) {
         console.error("Error fetching employee directory data:", err);
-        setError("Failed to load employee directory. Please try again later.");
+
+        setError(
+          "Failed to load employee directory. Please try again later."
+        );
       } finally {
         setLoading(false);
       }

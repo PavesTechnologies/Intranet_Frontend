@@ -23,7 +23,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import Pagination from '../../../../components/Pagination/pagination';
-import { toast } from 'react-toastify';
+import { notify } from "../../utils/notify";
 import {
     canProjectManagerEditDemand,
     canProjectManagerMutateDemand,
@@ -355,7 +355,7 @@ const DemandWorkspacePage = () => {
         const isPM = normalizedRole === "PROJECTMANAGER" || normalizedRole === "MANAGER";
 
         if ((isPM || isRM) && !canProjectManagerMutateDemand(demand)) {
-            toast.error("Only Requested Demands Can Be Deleted.");
+            notify.error("Only Requested Demands Can Be Deleted.");
             return;
         }
         setDeletingDemand(demand);
@@ -400,11 +400,11 @@ const DemandWorkspacePage = () => {
                 decision: "APPROVED",
                 rejectionReason: null
             });
-            toast.success(response?.message || "Demand Approved Successfully");
+            notify.success(response?.message || "Demand Approved Successfully");
             setApprovingDemand(null);
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand Approval Failed"));
+            notify.error(getActionErrorMessage(error, "Demand Approval Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -423,7 +423,7 @@ const DemandWorkspacePage = () => {
         if (!demandId) return;
 
         if (!DM_REJECTABLE_STATUSES.includes(currentStatus)) {
-            toast.error("Only Pending Or Approved Demands Can Be Rejected By Dm.");
+            notify.error("Only Pending Or Approved Demands Can Be Rejected By Dm.");
             return;
         }
 
@@ -434,13 +434,13 @@ const DemandWorkspacePage = () => {
                 decision: "REJECTED",
                 rejectionReason: cleanedReason
             });
-            toast.success(response?.message || (currentStatus === "APPROVED" ? "Approved Demand Rejected Successfully" : "Demand Rejected Successfully"));
+            notify.success(response?.message || (currentStatus === "APPROVED" ? "Approved Demand Rejected Successfully" : "Demand Rejected Successfully"));
             setRejectingDemand(null);
             setRejectReason("");
             setRejectReasonError("");
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand Rejection Failed"));
+            notify.error(getActionErrorMessage(error, "Demand Rejection Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -456,11 +456,11 @@ const DemandWorkspacePage = () => {
                 decision: "FULFILLED",
                 rejectionReason: null
             });
-            toast.success(response?.message || "Demand Fulfilled Successfully");
+            notify.success(response?.message || "Demand Fulfilled Successfully");
             setFulfillingDemand(null);
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand Fulfillment Failed"));
+            notify.error(getActionErrorMessage(error, "Demand Fulfillment Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -483,13 +483,13 @@ const DemandWorkspacePage = () => {
                 decision: "REJECTED",
                 rejectionReason: cleanedReason
             });
-            toast.success(response?.message || "Demand Rejected Successfully");
+            notify.success(response?.message || "Demand Rejected Successfully");
             setRmRejectingDemand(null);
             setRmRejectReason("");
             setRmRejectReasonError("");
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Demand Rejection Failed"));
+            notify.error(getActionErrorMessage(error, "Demand Rejection Failed"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -504,18 +504,18 @@ const DemandWorkspacePage = () => {
         const isPM = normalizedRole === "PROJECTMANAGER" || normalizedRole === "MANAGER";
 
         if ((isPM || isRM) && !canProjectManagerMutateDemand(deletingDemand)) {
-            toast.error("Only Requested Demands Can Be Deleted.");
+            notify.error("Only Requested Demands Can Be Deleted.");
             return;
         }
 
         setDecisionState({ demandId: id, action: "delete" });
         try {
             const response = await deleteDemandByPM(id, deletingDemand);
-            toast.success(response?.message || "Demand Deleted Successfully");
+            notify.success(response?.message || "Demand Deleted Successfully");
             setDeletingDemand(null);
             await refreshData();
         } catch (error) {
-            toast.error(getActionErrorMessage(error, "Failed To Delete Demand"));
+            notify.error(getActionErrorMessage(error, "Failed To Delete Demand"));
         } finally {
             setDecisionState({ demandId: null, action: null });
         }
@@ -896,7 +896,7 @@ const DemandWorkspacePage = () => {
                                                     <Button
                                                         onClick={() => {
                                                             if (isPMView && !canProjectManagerEditDemand(demand)) {
-                                                                toast.error(PM_EDITABLE_DEMAND_MESSAGE);
+                                                                notify.error(PM_EDITABLE_DEMAND_MESSAGE);
                                                                 return;
                                                             }
                                                             setEditingDemand(demand);

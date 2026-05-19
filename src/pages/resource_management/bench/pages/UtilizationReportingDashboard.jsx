@@ -1,13 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { useNavigate } from 'react-router-dom';
+import Pagination from "../../../../components/Pagination/pagination";
+import { KPICard } from '../../../../components/kpi/KPI';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart
 } from 'recharts';
 import { DownloadIcon, FilterIcon, SearchIcon, EmployeeIcon, ActivityIcon, ProjectsIcon, DocumentIcon, ChevronRightIcon, TrendingUpIcon, WarningIcon, RefreshIcon, DesktopIcon, SuccessIcon, PendingIcon, AwardIcon, SecurityAlertIcon, TrendUpIcon, TrendDownIcon, ZapIcon, PrevIcon, DateRangeIcon, BarChartIcon, CloseIcon } from "@/components/icons";
 import { utilizationService } from '../../services/utilizationService';
-import toast from 'react-hot-toast';
 import GenericTable from "../../../../components/Table/table";
+import { getResourceManagementErrorMessage, notify } from "../../utils/notify";
 
 const MOCK_REPORT_DATA = {
   totalHours: 12450.5,
@@ -69,16 +71,64 @@ const UtilizationReportingDashboard = () => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('ANOMALIES');
 
+  const [currentPageAnomalies, setCurrentPageAnomalies] = useState(1);
+  const [currentPageResource, setCurrentPageResource] = useState(1);
+  const [currentPageProject, setCurrentPageProject] = useState(1);
+  const [currentPageRole, setCurrentPageRole] = useState(1);
+  const [currentPageClient, setCurrentPageClient] = useState(1);
+
+  const ITEMS_PER_PAGE = 5;
+
+  const anomaliesList = useMemo(() => reportData?.alerts || [], [reportData]);
+  const totalAnomaliesPages = useMemo(() => Math.ceil(anomaliesList.length / ITEMS_PER_PAGE), [anomaliesList]);
+  const paginatedAnomalies = useMemo(() => {
+    const start = (currentPageAnomalies - 1) * ITEMS_PER_PAGE;
+    return anomaliesList.slice(start, start + ITEMS_PER_PAGE);
+  }, [anomaliesList, currentPageAnomalies]);
+
+  const resourceList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.resourceUtilizations || [], [reportData]);
+  const totalResourcePages = useMemo(() => Math.ceil(resourceList.length / ITEMS_PER_PAGE), [resourceList]);
+  const paginatedResource = useMemo(() => {
+    const start = (currentPageResource - 1) * ITEMS_PER_PAGE;
+    return resourceList.slice(start, start + ITEMS_PER_PAGE);
+  }, [resourceList, currentPageResource]);
+
+  const projectList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.projectUtilizations || [], [reportData]);
+  const totalProjectPages = useMemo(() => Math.ceil(projectList.length / ITEMS_PER_PAGE), [projectList]);
+  const paginatedProject = useMemo(() => {
+    const start = (currentPageProject - 1) * ITEMS_PER_PAGE;
+    return projectList.slice(start, start + ITEMS_PER_PAGE);
+  }, [projectList, currentPageProject]);
+
+  const roleList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.roleUtilizations || [], [reportData]);
+  const totalRolePages = useMemo(() => Math.ceil(roleList.length / ITEMS_PER_PAGE), [roleList]);
+  const paginatedRole = useMemo(() => {
+    const start = (currentPageRole - 1) * ITEMS_PER_PAGE;
+    return roleList.slice(start, start + ITEMS_PER_PAGE);
+  }, [roleList, currentPageRole]);
+
+  const clientList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.clientUtilizations || [], [reportData]);
+  const totalClientPages = useMemo(() => Math.ceil(clientList.length / ITEMS_PER_PAGE), [clientList]);
+  const paginatedClient = useMemo(() => {
+    const start = (currentPageClient - 1) * ITEMS_PER_PAGE;
+    return clientList.slice(start, start + ITEMS_PER_PAGE);
+  }, [clientList, currentPageClient]);
+
   const handleGenerateReport = async () => {
     setIsGenerating(true);
     setError(null);
     try {
       const data = await utilizationService.generateUtilizationReport(reportParams);
       setReportData(data);
+      setCurrentPageAnomalies(1);
+      setCurrentPageResource(1);
+      setCurrentPageProject(1);
+      setCurrentPageRole(1);
+      setCurrentPageClient(1);
     } catch (err) {
       console.error(err);
       setError('Failed to generate report. Please try again.');
-      toast.error('Failed to generate report');
+      notify.error(err, 'Failed to generate report');
     } finally {
       setIsGenerating(false);
     }
@@ -88,11 +138,15 @@ const UtilizationReportingDashboard = () => {
   const handleExportCSV = async () => {
     setIsExportingCSV(true);
     try {
-      toast.loading('Exporting CSV...', { id: 'csv-export' });
+      notify.loading('Exporting CSV...', 'csv-export');
       await utilizationService.exportUtilizationCSV(reportParams);
-      toast.success('Export successful', { id: 'csv-export' });
+      notify.complete('csv-export', 'Export successful', 'success');
     } catch (err) {
-      toast.error('Export failed', { id: 'csv-export' });
+      notify.complete(
+        'csv-export',
+        getResourceManagementErrorMessage(err, 'Export failed'),
+        'error',
+      );
     } finally {
       setIsExportingCSV(false);
     }
@@ -101,11 +155,15 @@ const UtilizationReportingDashboard = () => {
   const handleExportExcel = async () => {
     setIsExportingExcel(true);
     try {
-      toast.loading('Exporting Excel...', { id: 'excel-export' });
+      notify.loading('Exporting Excel...', 'excel-export');
       await utilizationService.exportUtilizationExcel(reportParams);
-      toast.success('Export successful', { id: 'excel-export' });
+      notify.complete('excel-export', 'Export successful', 'success');
     } catch (err) {
-      toast.error('Export failed', { id: 'excel-export' });
+      notify.complete(
+        'excel-export',
+        getResourceManagementErrorMessage(err, 'Export failed'),
+        'error',
+      );
     } finally {
       setIsExportingExcel(false);
     }
@@ -257,20 +315,18 @@ const UtilizationReportingDashboard = () => {
           {/* Top KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: 'Total Actual Hours', value: reportData.totalHours, icon: <PendingIcon />, color: 'text-indigo-600' },
-              { label: 'Utilization %', value: `${reportData.utilizationPercentage}%`, icon: <TrendingUpIcon />, color: 'text-emerald-600' },
-              { label: 'Total Resources', value: reportData.totalResources, icon: <EmployeeIcon />, color: 'text-blue-600' },
-              { label: 'Confidence Score', value: `${reportData.confidenceScore}%`, icon: <SuccessIcon />, color: 'text-amber-600' }
+              { label: 'Total Actual Hours', value: reportData.totalHours, icon: <PendingIcon />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+              { label: 'Utilization %', value: `${reportData.utilizationPercentage}%`, icon: <TrendingUpIcon />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+              { label: 'Total Resources', value: reportData.totalResources, icon: <EmployeeIcon />, color: 'text-blue-600', bg: 'bg-blue-50' },
+              { label: 'Confidence Score', value: `${reportData.confidenceScore}%`, icon: <SuccessIcon />, color: 'text-amber-600', bg: 'bg-amber-50' }
             ].map((kpi) => (
-              <div key={kpi.label} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-                <div className={`h-11 w-11 rounded-xl bg-slate-50 border border-slate-100 shadow-inner flex items-center justify-center ${kpi.color}`}>
-                  {React.cloneElement(kpi.icon, { size: 20, strokeWidth: 2.5 })}
-                </div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 capitalize tracking-[0.2em] mb-0.5">{kpi.label}</p>
-                  <p className="text-xl font-black text-slate-900 tracking-tight">{kpi.value}</p>
-                </div>
-              </div>
+              <KPICard
+                key={kpi.label}
+                label={kpi.label}
+                value={kpi.value}
+                icon={React.cloneElement(kpi.icon, { size: 20, strokeWidth: 2.5 })}
+                color={`${kpi.bg} ${kpi.color}`}
+              />
             ))}
           </div>
 
@@ -301,7 +357,7 @@ const UtilizationReportingDashboard = () => {
                 </div>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-                {(reportData.alerts || []).map((alert, idx) => (
+                {paginatedAnomalies.map((alert, idx) => (
                   <div key={idx} className="p-5 bg-slate-50/30 rounded-2xl border border-slate-100 flex flex-col gap-3">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[12px] font-black text-slate-900 capitalize">{alert.resourceName}</span>
@@ -312,6 +368,16 @@ const UtilizationReportingDashboard = () => {
                   </div>
                 ))}
               </div>
+              {totalAnomaliesPages > 1 && (
+                <div className="py-4 border-t border-slate-100">
+                  <Pagination
+                    currentPage={currentPageAnomalies}
+                    totalPages={totalAnomaliesPages}
+                    onPrevious={() => setCurrentPageAnomalies((p) => Math.max(1, p - 1))}
+                    onNext={() => setCurrentPageAnomalies((p) => Math.min(totalAnomaliesPages, p + 1))}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -326,7 +392,7 @@ const UtilizationReportingDashboard = () => {
                   <GenericTable
                     headers={["Resource", "Hours", "Billable %", "Utilization", "Status", "Trend"]}
                     columns={["resource_info", "hours_info", "billable_info", "utilization_info", "status_info", "trend_info"]}
-                    rows={(Array.isArray(reportData) ? reportData : reportData.resourceUtilizations || []).map((res) => ({
+                    rows={paginatedResource.map((res) => ({
                       ...res,
                       resource_info: (
                         <div className="flex flex-col text-left">
@@ -354,18 +420,28 @@ const UtilizationReportingDashboard = () => {
                       ),
                       trend_info: (
                         <div className="text-center">
-                           {res.trendSignal === 'UP' ? <ArrowUpRight className="inline text-emerald-500" size={16} /> : res.trendSignal === 'DOWN' ? <ArrowDownRight className="inline text-rose-500" size={16} /> : <span className="text-slate-400 font-bold">-</span>}
+                           {res.trendSignal === 'UP' ? <TrendUpIcon className="inline text-emerald-500" size={16} /> : res.trendSignal === 'DOWN' ? <TrendDownIcon className="inline text-rose-500" size={16} /> : <span className="text-slate-400 font-bold">-</span>}
                         </div>
                       )
                     }))}
                   />
                </div>
+               {totalResourcePages > 1 && (
+                 <div className="py-4 border-t border-slate-100">
+                   <Pagination
+                     currentPage={currentPageResource}
+                     totalPages={totalResourcePages}
+                     onPrevious={() => setCurrentPageResource((p) => Math.max(1, p - 1))}
+                     onNext={() => setCurrentPageResource((p) => Math.min(totalResourcePages, p + 1))}
+                   />
+                 </div>
+               )}
             </div>
           )}
 
            {/* Project Breakdown */}
            {activeTab === 'PROJECT' && (
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mt-6">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
                   <DesktopIcon className="text-blue-600" />
                   <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Project Utilization Report</h4>
@@ -374,7 +450,7 @@ const UtilizationReportingDashboard = () => {
                   <GenericTable
                     headers={["Project", "Client", "Resources", "Hours", "Utilization", "Status"]}
                     columns={["project_name", "client_name_info", "resources_info", "hours_info", "utilization_info", "status_info"]}
-                    rows={(Array.isArray(reportData) ? reportData : reportData.projectUtilizations || []).map((proj) => ({
+                    rows={paginatedProject.map((proj) => ({
                       ...proj,
                       project_name: <div className="text-left font-black text-[13px] text-slate-900">{proj.projectName}</div>,
                       client_name_info: <div className="text-center text-[12px] text-slate-600">{proj.clientName}</div>,
@@ -399,12 +475,22 @@ const UtilizationReportingDashboard = () => {
                     }))}
                   />
                </div>
+               {totalProjectPages > 1 && (
+                 <div className="py-4 border-t border-slate-100">
+                   <Pagination
+                     currentPage={currentPageProject}
+                     totalPages={totalProjectPages}
+                     onPrevious={() => setCurrentPageProject((p) => Math.max(1, p - 1))}
+                     onNext={() => setCurrentPageProject((p) => Math.min(totalProjectPages, p + 1))}
+                   />
+                 </div>
+               )}
             </div>
           )}
 
            {/* Role Breakdown */}
            {activeTab === 'ROLE' && (
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mt-6">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
                   <AwardIcon className="text-amber-600" />
                   <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Role Utilization Report</h4>
@@ -413,7 +499,7 @@ const UtilizationReportingDashboard = () => {
                   <GenericTable
                     headers={["Role", "Resources", "Hours", "Utilization", "Status"]}
                     columns={["role_name", "resources_info", "hours_info", "utilization_info", "status_info"]}
-                    rows={(Array.isArray(reportData) ? reportData : reportData.roleUtilizations || []).map((role) => ({
+                    rows={paginatedRole.map((role) => ({
                       ...role,
                       role_name: <div className="text-left font-black text-[13px] text-slate-900">{role.roleName}</div>,
                       resources_info: <div className="text-center text-[12px] text-slate-600">{role.uniqueResources}</div>,
@@ -437,12 +523,22 @@ const UtilizationReportingDashboard = () => {
                     }))}
                   />
                </div>
+               {totalRolePages > 1 && (
+                 <div className="py-4 border-t border-slate-100">
+                   <Pagination
+                     currentPage={currentPageRole}
+                     totalPages={totalRolePages}
+                     onPrevious={() => setCurrentPageRole((p) => Math.max(1, p - 1))}
+                     onNext={() => setCurrentPageRole((p) => Math.min(totalRolePages, p + 1))}
+                   />
+                 </div>
+               )}
             </div>
           )}
 
            {/* Client Breakdown */}
            {activeTab === 'CLIENT' && (
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mt-6">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
                   <ProjectsIcon className="text-purple-600" />
                   <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Client Utilization Report</h4>
@@ -451,7 +547,7 @@ const UtilizationReportingDashboard = () => {
                   <GenericTable
                     headers={["Client", "Active Projects", "Hours", "Utilization", "Status"]}
                     columns={["client_name_label", "projects_info", "hours_info", "utilization_info", "status_info"]}
-                    rows={(Array.isArray(reportData) ? reportData : reportData.clientUtilizations || []).map((client) => ({
+                    rows={paginatedClient.map((client) => ({
                       ...client,
                       client_name_label: <div className="text-left font-black text-[13px] text-slate-900">{client.clientName}</div>,
                       projects_info: <div className="text-center text-[12px] text-slate-600">{client.uniqueProjects}</div>,
@@ -475,6 +571,16 @@ const UtilizationReportingDashboard = () => {
                     }))}
                   />
                </div>
+               {totalClientPages > 1 && (
+                 <div className="py-4 border-t border-slate-100">
+                   <Pagination
+                     currentPage={currentPageClient}
+                     totalPages={totalClientPages}
+                     onPrevious={() => setCurrentPageClient((p) => Math.max(1, p - 1))}
+                     onNext={() => setCurrentPageClient((p) => Math.min(totalClientPages, p + 1))}
+                   />
+                 </div>
+               )}
             </div>
           )}
 

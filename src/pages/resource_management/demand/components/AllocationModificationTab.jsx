@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { WarningIcon, SuccessIcon } from "@/components/icons";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import Button from "../../../../components/Button/Button";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import { fetchResourcesByDemandId, fetchResourcesByProjectId } from "../../services/resource";
@@ -244,12 +244,12 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
 
     try {
       const response = await allocationModificationApi.createModification(payload);
-      toast.success(response?.message || "Allocation modification created successfully");
+      notify.success(response?.message || "Allocation modification created successfully");
       setIsCreateOpen(false);
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to create allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to create allocation modification");
+      notify.error(requestError, "Failed to create allocation modification");
     } finally {
       setProcessingAction("");
     }
@@ -263,11 +263,11 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         decision: "APPROVE",
         comments: "Approved due to project priority",
       });
-      toast.success(response?.message || "Allocation modification approved");
+      notify.success(response?.message || "Allocation modification approved");
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to approve allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to approve allocation modification");
+      notify.error(requestError, "Failed to approve allocation modification");
     } finally {
       setProcessingAction("");
     }
@@ -283,12 +283,12 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         decision: "REJECT",
         comments: reason,
       });
-      toast.success(response?.message || "Allocation modification rejected");
+      notify.success(response?.message || "Allocation modification rejected");
       setRejectTarget(null);
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to reject allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to reject allocation modification");
+      notify.error(requestError, "Failed to reject allocation modification");
     } finally {
       setProcessingAction("");
     }
@@ -301,12 +301,12 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
 
     try {
       const response = await allocationModificationApi.cancelModification(cancelTarget.id);
-      toast.success(response?.message || "Allocation modification cancelled");
+      notify.success(response?.message || "Allocation modification cancelled");
       setCancelTarget(null);
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to cancel allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to cancel allocation modification");
+      notify.error(requestError, "Failed to cancel allocation modification");
     } finally {
       setProcessingAction("");
     }

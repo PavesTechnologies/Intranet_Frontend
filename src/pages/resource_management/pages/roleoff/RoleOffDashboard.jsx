@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell, LineChart, Line, Legend, Sector
 } from 'recharts';
 import { DownloadIcon, WarningIcon, ZapIcon, TrendingUpIcon, ActivityIcon, SearchIcon, PrevIcon, FilterIcon, CloseIcon } from "@/components/icons";
-import { toast } from 'react-toastify';
+import { notify } from "../../utils/notify";
 import { getFilteredRoleOffs, exportRoleOffsCsv } from "../../services/roleOffService";
 import { searchClients } from "../../services/clientservice";
 import { getProjects } from "../../services/projectService";
@@ -179,7 +179,7 @@ const RoleOffDashboard = () => {
       setData(response);
     } catch (err) {
       console.error(err);
-      toast.error("Failed To Fetch Role-Off Report Data");
+      notify.error(error, "Failed To Fetch Role-Off Report Data");
     } finally {
       setIsLoading(false);
     }
@@ -205,10 +205,10 @@ const RoleOffDashboard = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success("Export Successful");
+      notify.success("Export Successful");
     } catch (err) {
       console.error(err);
-      toast.error("Failed To Export Data");
+      notify.error(error, "Failed To Export Data");
     } finally {
       setIsExporting(false);
     }

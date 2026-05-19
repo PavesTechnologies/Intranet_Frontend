@@ -12,7 +12,7 @@ import {
   CalendarIcon,
   TargetIcon,
 } from "@/components/icons";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import { getProjects, getProjectKPIs } from "../../services/projectService";
 import ProjectKPIs from "../../components/ProjectKPIs";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -140,7 +140,7 @@ const RMSProjectList = () => {
 
       // Only show toast if it's a real error, not just "no projects found"
       if (err.response?.status !== 400 || !message.includes("No Projects Found")) {
-        toast.error(message);
+        notify.error(message);
       }
     } finally {
       setLoading(false);

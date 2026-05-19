@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import demandService from "../services/demandService";
 import { useAuth } from "../../../../contexts/AuthContext";
+import { notify } from "../../utils/notify";
 
 
 export const defaultFilters = {
@@ -19,7 +20,7 @@ const ROLE_PRIORITY = [
     "Project_Manager",
     "MANAGER",
     "Admin",
-    "SUPER ADMIN",
+    "Super_Admin",
     "SUPER-ADMIN",
     "GENERAL"
 ];
@@ -198,31 +199,51 @@ export function useDemand(projectId = null) {
 
     // Fetch master demands and kpis
     const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            let demandsData, kpis;
-            if (projectId) {
-                [demandsData, kpis] = await Promise.all([
-                    demandService.getProjectDemands(projectId),
-                    demandService.getProjectKPIs(projectId)
-                ]);
-            } else {
-                [demandsData, kpis] = await Promise.all([
-                    demandService.getRoleScopedDemands(effectiveRole),
-                    demandService.getRoleScopedKPISummary(effectiveRole)
-                ]);
-            }
-            setDemands(demandsData || []);
-            setKpiData(kpis);
-        } catch (error) {
-            console.error("Demand Hook Fetch Error:", error);
-        } finally {
-            setIsLoading(false);
+        let demandsData, kpis;
+        if (projectId) {
+            [demandsData, kpis] = await Promise.all([
+                demandService.getProjectDemands(projectId),
+                demandService.getProjectKPIs(projectId)
+            ]);
+        } else {
+            [demandsData, kpis] = await Promise.all([
+                demandService.getRoleScopedDemands(effectiveRole),
+                demandService.getRoleScopedKPISummary(effectiveRole)
+            ]);
         }
+
+        return {
+            demandsData: demandsData || [],
+            kpis: kpis || null,
+        };
     }, [effectiveRole, projectId]);
 
     useEffect(() => {
-        fetchData();
+        let isActive = true;
+
+        const loadData = async () => {
+            setIsLoading(true);
+            try {
+                const { demandsData, kpis } = await fetchData();
+                if (!isActive) return;
+                setDemands(demandsData);
+                setKpiData(kpis);
+            } catch (error) {
+                if (!isActive) return;
+                console.error("Demand Hook Fetch Error:", error);
+                notify.error(error, "Failed to load demand data");
+            } finally {
+                if (isActive) {
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        loadData();
+
+        return () => {
+            isActive = false;
+        };
     }, [fetchData]);
 
     const filteredDemands = useMemo(() => {

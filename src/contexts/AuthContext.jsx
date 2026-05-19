@@ -103,36 +103,36 @@ export const AuthProvider = ({ children }) => {
   // also sets expiry timer (interceptor handles actual refresh)
   useEffect(() => {
     const token = localStorage.getItem("token");
+
     if (!token) return;
 
     try {
       const decoded = jwtDecode(token);
 
-      // validate token can be decoded before loading user
       loadUser(token);
 
       if (decoded.exp) {
         const timeLeft = decoded.exp - Date.now() / 1000;
 
+        // IMPORTANT:
+        // Do NOT logout immediately if token expired.
+        // Axios interceptor will silently refresh token.
         if (timeLeft <= 0) {
-          // already expired — interceptor will try refresh on next API call
-          // if no refresh token, will reject and user stays on page
-          // optionally show toast
-          showStatusToast("Session expired. Please login again.");
-          setTimeout(() => logout(true), 1000);
-        } else {
-          // show toast when access token expires (interceptor handles refresh silently)
-          const timer = setTimeout(() => {
-            // showStatusToast("Session refreshing...");
-          }, timeLeft * 1000);
-          return () => clearTimeout(timer);
+          return;
         }
+
+        const timer = setTimeout(() => {
+          console.log("Access token expired.");
+        }, timeLeft * 1000);
+
+        return () => clearTimeout(timer);
       }
+
     } catch {
       showStatusToast("Invalid token detected. Please login again.");
       logout(true);
     }
-  }, []); // ✅ empty deps — runs once on mount only
+  }, []);
 
   const getUserRoles = () => {
     if (!user) return [];

@@ -4,7 +4,7 @@
  * so casing here is for readability only.
  */
 export const ROLES = {
-  SUPER_ADMIN:       "Super Admin",
+  SUPER_ADMIN:       "Super_Admin",
   ADMIN:             "Admin",
   HR:                "HR",
   GENERAL:           "General",

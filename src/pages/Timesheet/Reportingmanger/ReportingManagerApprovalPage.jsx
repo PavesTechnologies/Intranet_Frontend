@@ -75,6 +75,12 @@ const ReportingManagerApprovalPage = () => {
     let filtered = [...groupedTimesheets];
 
     filtered = filtered.filter((user) => {
+      // 🔹 0️⃣ Hide users with no actionable weeks — every week is APPROVED
+      const hasActionableWeek = user.weeklySummary?.some(
+        (w) => w.weeklyStatus?.toUpperCase() !== "APPROVED",
+      );
+      if (!hasActionableWeek) return false;
+
       // 🔹 1️⃣ User Filter
       if (
         userFilter &&

@@ -245,28 +245,26 @@ export default function EmployeeDocumentsPage() {
         );
 
         const formattedEmployees = documentsData
-          .filter((emp) => allowedUserUuids.has(emp.user_uuid) && emp.emp_id)
-          .map((emp) => ({
-            id: emp.user_uuid,
-            empId: emp.emp_id,
-            name: emp.name,
-            department: emp.department,
-            documents: emp.documents.map((doc, index) => {
-              const category = getDocumentCategory(doc);
-              const type = "Uploaded";
-              const status = "Signed";
+  .filter((emp) => emp.emp_id && emp.documents?.length > 0)
+  .map((emp) => ({
+    id: emp.user_uuid,
+    empId: emp.emp_id,
+    name: emp.name,
+    department: emp.department,
+    documents: emp.documents.map((doc, index) => {
+      const category = getDocumentCategory(doc);
 
-              return {
-                id: `${emp.emp_id}-${index}`,
-                docName: getDocumentName(doc, category),
-                fileUrl: doc.file_path,
-                category,
-                type,
-                status,
-                updated: "Recently",
-              };
-            }),
-          }));
+      return {
+        id: `${emp.emp_id}-${index}`,
+        docName: getDocumentName(doc, category),
+        fileUrl: doc.file_path,
+        category,
+        type: "Uploaded",
+        status: "Signed",
+        updated: "Recently",
+      };
+    }),
+  }));
 
         setEmployees(formattedEmployees);
       } catch (err) {

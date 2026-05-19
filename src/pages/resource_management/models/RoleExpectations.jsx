@@ -31,20 +31,70 @@ const PROFICIENCY_CONFIG = {
   },
 };
 
-// Map getRoleExpectations shape → initialData shape expected by AddDeliverableRoleModal
-const buildInitialData = (role) => ({
-  roleId: role.dev_role_id,
-  roleName: role.role,
-  skills: role.skills.map((skillEntry, idx) => ({
-    id: Date.now() + idx,
-    skillId: "",
-    skillName: skillEntry.skill,
-    proficiencyId: "",
-    proficiencyName: skillEntry.requirements[0]?.proficiency ?? "",
-    mandatoryFlag: skillEntry.requirements[0]?.mandatoryFlag ?? false,
-    subSkills: [],
-  })),
-});
+// Map getRoleExpectations shape → initialData shape expected by AddDeliverableRoleModal.
+// Resolves skill/proficiency names → IDs using the categories tree and proficiency list.
+const buildInitialData = (role, categories, proficiencyLevels) => {
+  const findProficiencyId = (name) => {
+    if (!name) return "";
+    const match = proficiencyLevels.find(
+      (p) => (p.name || p.proficiencyName)?.toUpperCase() === name.toUpperCase(),
+    );
+    return match?.id || match?.proficiencyId || "";
+  };
+
+  const findProficiencyName = (name) => {
+    if (!name) return "";
+    const match = proficiencyLevels.find(
+      (p) => (p.name || p.proficiencyName)?.toUpperCase() === name.toUpperCase(),
+    );
+    return match?.name || match?.proficiencyName || name;
+  };
+
+  return {
+    roleId: role.dev_role_id,
+    roleName: role.role,
+    skills: role.skills.map((skillEntry, idx) => {
+      let skillId = "";
+      let subSkillDefs = [];
+
+      for (const cat of categories) {
+        const sk = cat.skills?.find(
+          (s) => s.name?.toLowerCase() === skillEntry.skill?.toLowerCase(),
+        );
+        if (sk) {
+          skillId = sk.id;
+          subSkillDefs = sk.subSkills || [];
+          break;
+        }
+      }
+
+      const validSubSkills =
+        skillEntry.subSkills?.filter((s) => s.subSkill !== null) ?? [];
+
+      return {
+        id: Date.now() + idx,
+        skillId,
+        skillName: skillEntry.skill,
+        proficiencyId: findProficiencyId(skillEntry.proficiency),
+        proficiencyName: findProficiencyName(skillEntry.proficiency),
+        mandatoryFlag: skillEntry.mandatoryFlag ?? false,
+        subSkills: validSubSkills.map((s, ssIdx) => {
+          const subSkillObj = subSkillDefs.find(
+            (ss) => ss.name?.toLowerCase() === s.subSkill?.toLowerCase(),
+          );
+          return {
+            id: Date.now() + idx * 1000 + ssIdx,
+            subSkillId: subSkillObj?.id || "",
+            subSkillName: s.subSkill,
+            proficiencyId: findProficiencyId(s.proficiency),
+            proficiencyName: findProficiencyName(s.proficiency),
+            mandatoryFlag: s.mandatoryFlag ?? false,
+          };
+        }),
+      };
+    }),
+  };
+};
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -73,25 +123,16 @@ export default function RoleExpectations() {
 
   useEffect(() => {
     fetchRoles();
+    getSkillCategoriesTree()
+      .then((res) => setCategories(res.data || []))
+      .catch(() => {});
+    getProficiencyLevels()
+      .then((res) => setProficiencyLevels(res.data.data || []))
+      .catch(() => {});
   }, []);
 
-  // Lazy-load categories and proficiency levels when the edit modal opens
-  useEffect(() => {
-    if (!editModalOpen) return;
-    if (categories.length === 0) {
-      getSkillCategoriesTree()
-        .then((res) => setCategories(res.data || []))
-        .catch(() => {});
-    }
-    if (proficiencyLevels.length === 0) {
-      getProficiencyLevels()
-        .then((res) => setProficiencyLevels(res.data.data || []))
-        .catch(() => {});
-    }
-  }, [editModalOpen]);
-
   const handleEditClick = (role) => {
-    setEditingRole(buildInitialData(role));
+    setEditingRole(buildInitialData(role, categories, proficiencyLevels));
     setEditModalOpen(true);
   };
 
@@ -189,9 +230,16 @@ function RoleCard({ role, onEdit, onDelete }) {
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
           <Briefcase className="h-4 w-4 text-primary" />
         </div>
-        <h2 className="flex-1 text-sm font-semibold leading-tight text-card-foreground">
-          {role.role}
-        </h2>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold leading-tight text-card-foreground truncate">
+            {role.role}
+          </h2>
+          {role.category && (
+            <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
+              {role.category}
+            </p>
+          )}
+        </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => onEdit?.(role)}
@@ -228,53 +276,48 @@ function RoleCard({ role, onEdit, onDelete }) {
 // ─── Skill Row ────────────────────────────────────────────────────────────────
 
 function SkillRow({ skillEntry }) {
+  const config = PROFICIENCY_CONFIG[skillEntry.proficiency] ?? {
+    label: skillEntry.proficiency ?? "—",
+    className: "border-gray-200 bg-gray-50 text-gray-600",
+  };
+
+  const validSubSkills =
+    skillEntry.subSkills?.filter((s) => s.subSkill !== null) ?? [];
+
   return (
     <div className="py-2.5">
-      <div className="mb-1.5 flex items-center gap-1.5">
+      <div className="mb-1 flex flex-wrap items-center gap-1.5">
         <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <span className="text-sm font-medium text-foreground">
           {skillEntry.skill}
         </span>
-        {skillEntry.subSkill && (
-          <span className="text-xs text-muted-foreground">
-            &mdash; {skillEntry.subSkill}
+        {skillEntry.proficiency && (
+          <span
+            className={cn(
+              "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+              config.className,
+            )}
+          >
+            {config.label}
           </span>
         )}
-      </div>
-      <div className="ml-5 flex flex-wrap gap-1.5">
-        {skillEntry.requirements.map((req, idx) => (
-          <RequirementTag key={idx} requirement={req} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function RequirementTag({ requirement }) {
-  const config = PROFICIENCY_CONFIG[requirement.proficiency] ?? {
-    label: requirement.proficiency ?? "—",
-    className: "border-gray-200 bg-gray-50 text-gray-600",
-  };
-
-  return (
-    <div className="flex items-center gap-1">
-      <span
-        className={cn(
-          "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
-          config.className,
+        {skillEntry.mandatoryFlag && (
+          <Badge className="rounded-full border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 hover:bg-red-50">
+            Required
+          </Badge>
         )}
-      >
-        {config.label}
-      </span>
-      {requirement.subSkill && (
-        <span className="text-[11px] text-muted-foreground">
-          ({requirement.subSkill})
-        </span>
-      )}
-      {requirement.mandatoryFlag && (
-        <Badge className="rounded-full border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 hover:bg-red-50">
-          Required
-        </Badge>
+      </div>
+      {validSubSkills.length > 0 && (
+        <div className="ml-5 flex flex-wrap gap-1.5">
+          {validSubSkills.map((s, idx) => (
+            <span
+              key={idx}
+              className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+            >
+              {s.subSkill}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );

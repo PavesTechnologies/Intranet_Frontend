@@ -5,7 +5,7 @@ import { CATEGORY_OPTIONS } from "../constants/benchConstants";
 import { getAgingTone } from "../models/benchModel";
 import { updateStatusResource } from "../services/benchService";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import GenericTable from "../../../../components/Table/table";
 
 const BENCH_STATES = [
@@ -81,11 +81,11 @@ const BenchTable = ({
 
   const handleSaveStatus = async () => {
     if (!editStatus) {
-      toast.error("Please Select A Status");
+      notify.error("Please Select A Status");
       return;
     }
     if (!editReason.trim()) {
-      toast.error("Please Provide A Reason");
+      notify.error("Please Provide A Reason");
       return;
     }
 
@@ -97,12 +97,12 @@ const BenchTable = ({
         reason: editReason
         // If stateType is needed, it can be passed here or handled on backend
       });
-      toast.success("Status Updated Successfully");
+      notify.success("Status Updated Successfully");
       setEditingRow(null);
 
       onRefresh?.();
     } catch (error) {
-      toast.error("Failed To Update Status");
+      notify.error("Failed To Update Status");
     } finally {
       setIsSaving(false);
     }

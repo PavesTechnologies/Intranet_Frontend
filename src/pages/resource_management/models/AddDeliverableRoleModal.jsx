@@ -1,8 +1,9 @@
 import React, { useState, useEffect, Fragment } from "react";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import { CloseIcon, AddIcon, DeleteIcon, EditIcon, ChevronDownIcon, SearchIcon, CheckIcon } from "@/components/icons";
 import { Combobox, Transition } from "@headlessui/react";
-import { createRoleExpectation, updateRoleExpectation } from "../services/workforceService";
+import { createRoleExpectation } from "../services/workforceService";
+import { updateRoleExpectationById } from "../services/demandService";
 
 /* ===================== SEARCHABLE SELECT COMPONENT ===================== */
 
@@ -162,7 +163,7 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
 
   const handleAddSubSkillToStaging = () => {
     if (!stagingSubSkill.subSkillId || !stagingSubSkill.proficiencyId) {
-      return toast.error("Select subskill and proficiency");
+      return notify.error("Select subskill and proficiency");
     }
 
     const subSkillName = availableSubSkills.find(s => String(s.id) === String(stagingSubSkill.subSkillId))?.name;
@@ -184,10 +185,10 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
 
   const handleAddSkillToDraft = () => {
     if (!draftRole.roleName || draftRole.roleName.length < 3) {
-      return toast.error("Role Name must be at least 3 characters");
+      return notify.error("Role Name must be at least 3 characters");
     }
     if (!formState.skillId || !formState.proficiencyId) {
-      return toast.error("Select skill and proficiency");
+      return notify.error("Select skill and proficiency");
     }
 
     const skillName = availableSkills.find(s => String(s.id) === String(formState.skillId))?.name;
@@ -211,13 +212,13 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
         subSkills: [...existingSkill.subSkills, ...newSubSkills]
       };
       setDraftRole(prev => ({ ...prev, skills: updatedSkills }));
-      toast.success("Skill Updated In Draft");
+      notify.success("Skill Updated In Draft");
     } else {
       setDraftRole(prev => ({
         ...prev,
         skills: [...prev.skills, { ...formState, skillName, proficiencyName, id: Date.now() }]
       }));
-      toast.success("Skill Added To Draft");
+      notify.success("Skill Added To Draft");
     }
 
     setFormState({
@@ -249,12 +250,12 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
       ...prev,
       skills: prev.skills.filter(s => s.skillId !== skillId)
     }));
-    toast.success("Skill Removed From Draft");
+    notify.success("Skill Removed From Draft");
   };
 
   const handleFinalize = async () => {
-    if (!draftRole.roleName) return toast.error("Role name required");
-    if (draftRole.skills.length === 0) return toast.error("At least one skill required");
+    if (!draftRole.roleName) return notify.error("Role name required");
+    if (draftRole.skills.length === 0) return notify.error("At least one skill required");
 
     const payload = {
       roleName: draftRole.roleName,
@@ -272,19 +273,21 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
     setLoading(true);
     try {
       if (draftRole.roleId) {
-        // Update case: PUT /api/admin/role-expectations/{roleId}
-        const res = await updateRoleExpectation(draftRole.roleId, payload);
+        const res = await updateRoleExpectationById(draftRole.roleId, payload);
         toast.success(res.message || "Role updated successfully");
       } else {
         // Create case: POST /api/admin/role-expectations
         const res = await createRoleExpectation(payload);
-        toast.success(res.message || "Role created successfully");
+        notify.success(res.message || "Role created successfully");
       }
       onClose();
       // Reset state
       setDraftRole({ roleName: "", skills: [] });
     } catch (err) {
-      toast.error(err.response?.data?.message || draftRole.roleId ? "Failed to update role" : "Failed to create role");
+      notify.error(
+        err.response?.data?.message ||
+          (draftRole.roleId ? "Failed to update role" : "Failed to create role"),
+      );
     } finally {
       setLoading(false);
     }
@@ -532,4 +535,3 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
 };
 
 export default AddDeliverableRoleModal;
-
