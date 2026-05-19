@@ -22,7 +22,7 @@ const MoveToPoolModal = ({ open, resources = [], onClose, onSubmit }) => {
 
   const handleSubmit = () => {
     if (!form.reason.trim()) {
-      setError("Reason is required.");
+      setError("Reason Is Required.");
       return;
     }
     onSubmit({
@@ -62,7 +62,7 @@ const MoveToPoolModal = ({ open, resources = [], onClose, onSubmit }) => {
               rows={4}
               value={form.reason}
               onChange={(event) => setForm((prev) => ({ ...prev, reason: event.target.value }))}
-              placeholder="Provide business context for this horizontal move..."
+              placeholder="Provide Business Context For This Horizontal Move..."
               className="mt-2 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] font-medium text-slate-700 outline-none transition-all placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:bg-indigo-50/30 focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>

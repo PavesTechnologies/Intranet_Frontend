@@ -6,8 +6,8 @@ import {
 } from 'recharts';
 import { DownloadIcon, FilterIcon, SearchIcon, EmployeeIcon, ActivityIcon, ProjectsIcon, DocumentIcon, ChevronRightIcon, TrendingUpIcon, WarningIcon, RefreshIcon, DesktopIcon, SuccessIcon, PendingIcon, AwardIcon, SecurityAlertIcon, TrendUpIcon, TrendDownIcon, ZapIcon, PrevIcon, DateRangeIcon, BarChartIcon, CloseIcon } from "@/components/icons";
 import { utilizationService } from '../../services/utilizationService';
-import toast from 'react-hot-toast';
 import GenericTable from "../../../../components/Table/table";
+import { getResourceManagementErrorMessage, notify } from "../../utils/notify";
 
 const MOCK_REPORT_DATA = {
   totalHours: 12450.5,
@@ -78,7 +78,7 @@ const UtilizationReportingDashboard = () => {
     } catch (err) {
       console.error(err);
       setError('Failed to generate report. Please try again.');
-      toast.error('Failed to generate report');
+      notify.error(err, 'Failed to generate report');
     } finally {
       setIsGenerating(false);
     }
@@ -88,11 +88,15 @@ const UtilizationReportingDashboard = () => {
   const handleExportCSV = async () => {
     setIsExportingCSV(true);
     try {
-      toast.loading('Exporting CSV...', { id: 'csv-export' });
+      notify.loading('Exporting CSV...', 'csv-export');
       await utilizationService.exportUtilizationCSV(reportParams);
-      toast.success('Export successful', { id: 'csv-export' });
+      notify.complete('csv-export', 'Export successful', 'success');
     } catch (err) {
-      toast.error('Export failed', { id: 'csv-export' });
+      notify.complete(
+        'csv-export',
+        getResourceManagementErrorMessage(err, 'Export failed'),
+        'error',
+      );
     } finally {
       setIsExportingCSV(false);
     }
@@ -101,11 +105,15 @@ const UtilizationReportingDashboard = () => {
   const handleExportExcel = async () => {
     setIsExportingExcel(true);
     try {
-      toast.loading('Exporting Excel...', { id: 'excel-export' });
+      notify.loading('Exporting Excel...', 'excel-export');
       await utilizationService.exportUtilizationExcel(reportParams);
-      toast.success('Export successful', { id: 'excel-export' });
+      notify.complete('excel-export', 'Export successful', 'success');
     } catch (err) {
-      toast.error('Export failed', { id: 'excel-export' });
+      notify.complete(
+        'excel-export',
+        getResourceManagementErrorMessage(err, 'Export failed'),
+        'error',
+      );
     } finally {
       setIsExportingExcel(false);
     }

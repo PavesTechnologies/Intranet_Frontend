@@ -1,5 +1,8 @@
 import React, { useState } from "react";
-import { X, Mail, ExternalLink } from "lucide-react";
+import { Mail } from "lucide-react";
+
+import { Fonts } from "../../../components/Fonts/Fonts";
+import Modal from "../../../components/Modal/modal";
 
 const EmployeeProfileModal = ({ employee, onClose }) => {
   const [activeTab, setActiveTab] = useState("profile");
@@ -12,136 +15,88 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/20 flex items-start justify-center pt-20 z-50">
-      
-      {/* Modal */}
-      <div className="bg-white w-[620px] min-h-[400px] max-h-[60vh] rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-400 flex items-center justify-center text-white font-semibold">
-              {getInitials(employee.name)}
-            </div>
-            <h2 className="font-semibold text-lg text-gray-800">
-              {employee.name}
-            </h2>
+    <Modal
+      isOpen={Boolean(employee)}
+      onClose={onClose}
+      size="2xl"
+      position="top"
+      maxHeight="max-h-[75vh]"
+      title=""
+      showHeader={false}
+      bodyClassName="p-0"
+      panelClassName="overflow-hidden"
+    >
+      <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-400 font-semibold text-white">
+            {getInitials(employee.name)}
           </div>
-
-          <div className="flex items-center gap-4 text-gray-500">
-            {/* <ExternalLink className="w-5 h-5 cursor-pointer hover:text-gray-700" /> */}
-            <X
-              className="w-5 h-5 cursor-pointer hover:text-gray-700"
-              onClick={onClose}
-            />
+          <div>
+            <h2 className={Fonts.heading4}>{employee.name}</h2>
+            <p className="mt-0.5 text-sm text-slate-500">{employee.role}</p>
           </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex border-b">
-          <button
-            className={`px-6 py-2 text-sm font-medium ${
-              activeTab === "profile"
-                ? "border-b-2 border-blue-600 text-blue-600"
-                : "text-gray-600"
-            }`}
-            onClick={() => setActiveTab("profile")}
-          >
-            Profile
-          </button>
-
-          <button
-            className={`px-6 py-2 text-sm font-medium ${
-              activeTab === "job"
-                ? "border-b-2 border-blue-600 text-blue-600"
-                : "text-gray-600"
-            }`}
-            onClick={() => setActiveTab("job")}
-          >
-            Job
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="p-6 space-y-6">
-
-          {/* PROFILE TAB */}
-          {activeTab === "profile" && (
-            <div className="grid grid-cols-2 gap-8">
-
-            <div>
-                <p className="text-xs text-gray-500 uppercase">EmployeeID</p>
-                <p className="text-gray-800">{employee.employeeId}</p>
-            </div>  
-
-            <div>
-                <p className="text-gray-500  mb-1 uppercase text-sm">Email</p>
-                <p className="flex items-center gap-3 text-gray-600 text-sm mb-1">
-                  <Mail className="w-5 h-5 text-gray-600 uppercase" />
-                  <p className="text-gray-800">{employee.email}</p>
-                </p>
-            </div>
-
-             <div>
-                <p className="text-xs text-gray-500 uppercase">Contact</p>
-                <p className="text-gray-800">{employee.contact}</p>
-              </div> 
-
-            <div>
-               <p className="text-gray-500  mb-1 uppercase text-sm">Gender</p>
-                <p className="text-gray-800">{employee.gender}</p>
-            </div>
- 
-            <div>
-               <p className="text-gray-500  mb-1 uppercase text-sm">
-                    Department
-                </p>
-                <p className="text-gray-800">{employee.department}</p>
-            </div>
-           </div>  
-            
-          )}
-
-          {/* JOB TAB */}
-          {activeTab === "job" && (
-            <div className="grid grid-cols-2 gap-8">
-
-              
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Job Title</p>
-                <p className="text-gray-800">{employee.role}</p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Department</p>
-                <p className="text-gray-800">{employee.department}</p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Employee Type</p>
-                <p className="text-gray-800">{employee.employeeType}</p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Location</p>
-                <p className="text-gray-800">{employee.location}</p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 uppercase">DateOfJoining</p>
-                <p className="text-gray-800">{employee.dateOfJoining}</p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Reporting Manager</p>
-                <p className="text-gray-800">{employee.reportingManager}</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
-    </div>
+
+      <div className="flex border-b border-slate-200">
+        {["profile", "job"].map((tab) => (
+          <button
+            key={tab}
+            className={`px-6 py-3 text-sm font-medium transition ${
+              activeTab === tab
+                ? "border-b-2 border-blue-600 text-blue-600"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab === "profile" ? "Profile" : "Job"}
+          </button>
+        ))}
+      </div>
+
+      <div className="p-6">
+        {activeTab === "profile" && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <DetailTile label="Employee ID" value={employee.employeeId} />
+            <DetailTile
+              label="Email"
+              value={
+                <span className="flex items-center gap-2 break-all text-slate-800">
+                  <Mail className="h-4 w-4 shrink-0 text-slate-500" />
+                  <span>{employee.email}</span>
+                </span>
+              }
+            />
+            <DetailTile label="Contact" value={employee.contact} />
+            <DetailTile label="Gender" value={employee.gender} />
+            <DetailTile label="Department" value={employee.department} />
+          </div>
+        )}
+
+        {activeTab === "job" && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <DetailTile label="Job Title" value={employee.role} />
+            <DetailTile label="Department" value={employee.department} />
+            <DetailTile label="Employee Type" value={employee.employeeType} />
+            <DetailTile label="Location" value={employee.location} />
+            <DetailTile label="Date Of Joining" value={employee.dateOfJoining} />
+            <DetailTile label="Reporting Manager" value={employee.reportingManager} />
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 };
+
+function DetailTile({ label, value }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-4 py-4">
+      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </div>
+      <div className="text-sm font-medium text-slate-800">{value || "N/A"}</div>
+    </div>
+  );
+}
 
 export default EmployeeProfileModal;

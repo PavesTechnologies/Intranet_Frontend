@@ -86,7 +86,7 @@ export function ResourceTable({ resources, onResourceClick, loading = false }) {
     <div className="rounded-lg border bg-card">
       <div className="flex items-center justify-between border-b px-3 py-1">
         <h3 className="text-sm font-heading font-bold text-card-foreground">Resources</h3>
-        <span className="text-xs text-muted-foreground">{resources.length} resources</span>
+        <span className="text-xs text-muted-foreground">{resources.length} Resources</span>
       </div>
 
       <div className="overflow-x-auto no-scrollbar">

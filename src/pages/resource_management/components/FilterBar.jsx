@@ -29,7 +29,7 @@ const CountryCombobox = ({ value, onChange, options }) => {
           className="w-full border rounded-md py-1 px-2 pr-6 text-[11px] outline-none focus:border-indigo-500 bg-white placeholder:text-gray-400 text-gray-700"
           displayValue={(o) => o || ""}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search country..."
+          placeholder="Search Country..."
         />
         <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-1 cursor-pointer">
           <ChevronUpDownIcon className="h-3.5 w-3.5 text-gray-400" />
@@ -54,7 +54,7 @@ const CountryCombobox = ({ value, onChange, options }) => {
             </Combobox.Option>
             {filtered.length === 0 && query !== "" ? (
               <div className="relative cursor-default select-none px-2 py-1.5 text-gray-500">
-                Nothing found.
+                Nothing Found.
               </div>
             ) : (
               filtered.map((o) => (
@@ -265,19 +265,17 @@ const FilterBar = ({ filters, onUpdate }) => {
     setOpen(false);
   };
 
+  // Prevent background scrolling when filter modal is open
   useEffect(() => {
-    const handler = (e) => {
-      if (buttonRef.current && buttonRef.current.contains(e.target)) return;
-      const portal = document.getElementById('client-filter-portal');
-      if (portal && !portal.contains(e.target)) {
-        setOpen(false);
-      }
-    };
     if (open) {
-      document.addEventListener("mousedown", handler);
+      const original = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = original;
+      };
     }
-    return () => document.removeEventListener("mousedown", handler);
   }, [open]);
+
 
   return (
     <div className="flex items-center gap-2 font-sans">
@@ -287,7 +285,7 @@ const FilterBar = ({ filters, onUpdate }) => {
         <input
           value={filters.search}
           onChange={(e) => onUpdate({ ...filters, search: e.target.value })}
-          placeholder="Search client names..."
+          placeholder="Search Client Names..."
           className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-sm transition-all placeholder:text-gray-400"
         />
       </div>
@@ -360,7 +358,7 @@ const FilterBar = ({ filters, onUpdate }) => {
               </button>
             </div>
 
-            <div className="p-3 space-y-3">
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-0.5">

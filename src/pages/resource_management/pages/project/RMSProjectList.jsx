@@ -12,7 +12,7 @@ import {
   CalendarIcon,
   TargetIcon,
 } from "@/components/icons";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import { getProjects, getProjectKPIs } from "../../services/projectService";
 import ProjectKPIs from "../../components/ProjectKPIs";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -140,7 +140,7 @@ const RMSProjectList = () => {
 
       // Only show toast if it's a real error, not just "no projects found"
       if (err.response?.status !== 400 || !message.includes("No Projects Found")) {
-        toast.error(message);
+        notify.error(message);
       }
     } finally {
       setLoading(false);
@@ -267,7 +267,7 @@ const RMSProjectList = () => {
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search project / client..."
+            placeholder="Search Project / Client..."
             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -437,10 +437,10 @@ const RMSProjectList = () => {
                   <WarningIcon className="h-8 w-8 text-amber-500" />
                 </div> */}
                   <p className="text-gray-600 font-medium text-lg">{errorMsg}</p>
-                  <p className="text-gray-400 text-sm mt-1">Try adjusting your filters or search criteria.</p>
+                  <p className="text-gray-400 text-sm mt-1">Try Adjusting Your Filters Or Search Criteria.</p>
                 </>
               ) : (
-                <p className="text-gray-500">No projects available.</p>
+                <p className="text-gray-500">No Projects Available.</p>
               )}
             </div>
           )}

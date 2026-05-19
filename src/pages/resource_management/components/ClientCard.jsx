@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { updateClientStatus } from '../services/clientservice';
 import ClientStatusBadge from './ClientStatusBadge';
-import { toast } from 'react-toastify';
+import { notify } from "../utils/notify";
 
 const ClientCard = ({ client, onStatusUpdate, onClick }) => {
     const [showActions, setShowActions] = useState(false);
@@ -18,13 +18,13 @@ const ClientCard = ({ client, onStatusUpdate, onClick }) => {
 
             if (result.success) {
                 onStatusUpdate(client.clientId, newStatus);
-                toast.success(`Client status changed to ${newStatus}`);
+                notify.success(`Client status changed to ${newStatus}`);
                 setShowActions(false);
             } else {
-                toast.error(result.message || 'Failed to update status');
+                notify.error(result.message || 'Failed to update status');
             }
         } catch (error) {
-            toast.error('Failed to update client status');
+            notify.error('Failed to update client status');
         } finally {
             setLoading(false);
         }

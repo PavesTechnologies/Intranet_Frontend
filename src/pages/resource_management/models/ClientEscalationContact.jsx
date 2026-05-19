@@ -4,7 +4,7 @@ import {
   updateClientContact,
   deleteClientContact,
 } from "../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
 import { MoreHorizontalIcon, EditIcon, DeleteIcon } from "@/components/icons";
@@ -13,9 +13,13 @@ import EscalationForm from "./client_configuration/forms/EscalationForm";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { useAuth } from "../../../contexts/AuthContext";
 import GenericTable from "../../../components/Table/table";
+import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 
 const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
   const { user } = useAuth();
+  const { getEnumValues } = useEnums();
+  const ESCALATION_LEVELS = getEnumValues("EscalationLevel");
+
   const permissions = user?.permissions || [];
   const roles = user?.roles || [];
   const canEditConfig = roles.includes("Admin"); // permissions.includes("EDIT_CLIENT_CONFIG");
@@ -58,10 +62,18 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
         activeFlag: sla.activeFlag ?? false,
       }));
 
-      setContactList(normalized);
+      // Sort by Escalation Level dynamic order (case-insensitive & format-resilient)
+      const normalize = (s) => s?.toString().toUpperCase().replace(/[- ]/g, "_") || "";
+      const sortedData = [...normalized].sort((a, b) => {
+        const indexA = ESCALATION_LEVELS.findIndex(lvl => normalize(lvl) === normalize(a.escalationLevel));
+        const indexB = ESCALATION_LEVELS.findIndex(lvl => normalize(lvl) === normalize(b.escalationLevel));
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      });
+
+      setContactList(sortedData);
       setCurrentPage(1);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to fetch SLA");
+      notify.error(error, "Failed to fetch SLA");
     } finally {
       setLoading(false);
     }
@@ -71,11 +83,11 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
     setUpdateLoading(true);
     try {
       const res = await updateClientContact(formData);
-      toast.success(res.message || "Contact updated successfully.");
+      notify.success(res.message || "Contact updated successfully.");
       setOpenUpdateContact(false);
       fetchContact();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to update Contact.");
+      notify.error(error, "Failed to update Contact.");
     } finally {
       setUpdateLoading(false);
     }
@@ -91,10 +103,10 @@ const ClientEscalationContact = ({ clientId, escalationRefetchKey }) => {
           item.contactId === updated.contactId ? { ...item, ...updated } : item,
         ),
       );
-      toast.success(res.message || "Contact deleted successfully.");
+      notify.success(res.message || "Contact deleted successfully.");
       // fetchContact();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to delete Contact.");
+      notify.error(error, "Failed to delete Contact.");
     } finally {
       setDeleteLoading(false);
       setSelectedContactId(null);

@@ -1,63 +1,55 @@
 "use client";
-import { useAuth } from '../../../contexts/AuthContext'; // Ensure this path matches your project structure
 
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
-import { Download } from "lucide-react";
+import { Download, FileSpreadsheet, UploadCloud } from "lucide-react";
+import { useAuth } from "../../../contexts/AuthContext";
+import Button from "../../../components/Button/Button";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 export default function BulkUpload() {
-  const navigate = useNavigate();
-  // --- ADD THIS LINE ---
-  const { user } = useAuth(); 
+  const { user } = useAuth();
 
-  // --- ADD THIS ROLE LOGIC ---
   const rawRoles = user?.roles || "";
-  const userRoles = Array.isArray(rawRoles) 
-    ? rawRoles 
-    : rawRoles.split(',').map(r => r.trim());
+  const userRoles = Array.isArray(rawRoles)
+    ? rawRoles
+    : rawRoles.split(",").map((r) => r.trim());
 
   const isHR = userRoles.includes("HR");
-  // const isAdmin = userRoles.includes("Admin");
-  const canUpload = isHR; // Only HR or Admin can perform this action
-  // -------------------------
+  const canUpload = isHR;
 
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState(null);
   const [previewData, setPreviewData] = useState(null);
 
-  // ---------------------------
-  // File Select Handler
-  // ---------------------------
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
-
     if (!selected) return;
 
     const validExtensions = ["xlsx", "xls", "csv"];
     const ext = selected.name.split(".").pop().toLowerCase();
 
     if (!validExtensions.includes(ext)) {
-      toast.error("❌ Invalid file format. Upload .xlsx / .xls / .csv only.");
+      toast.error("Invalid file format. Upload .xlsx / .xls / .csv only.");
       return;
     }
 
     setFile(selected);
 
-    // Parse for preview
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = (event) => {
       try {
-        const data = new Uint8Array(e.target.result);
+        const data = new Uint8Array(event.target.result);
         const workbook = XLSX.read(data, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
         setPreviewData(jsonRows);
-        setResult(null); // Clear any previous result
+        setResult(null);
       } catch (err) {
         toast.error("Failed to read file for preview");
       }
@@ -65,16 +57,12 @@ export default function BulkUpload() {
     reader.readAsArrayBuffer(selected);
   };
 
-  // ---------------------------
-  // Submit File to API (Client-side translation)
-  // ---------------------------
   const handleUpload = async () => {
-    // --- ADD THIS SECURITY CHECK ---
-  if (!canUpload) {
-    toast.error("You do not have the required role to perform bulk uploads.");
-    return;
-  }
-  // -------------------------------
+    if (!canUpload) {
+      toast.error("You do not have the required role to perform bulk uploads.");
+      return;
+    }
+
     if (!previewData || previewData.length === 0) {
       toast.error("No valid data found in file to upload");
       return;
@@ -90,7 +78,6 @@ export default function BulkUpload() {
     for (let i = 0; i < previewData.length; i++) {
       const row = previewData[i];
 
-      // 1. All unknown columns are treated as Compensation Components
       const standardColumns = new Set([
         "First Name",
         "Middle Name",
@@ -109,13 +96,11 @@ export default function BulkUpload() {
       for (const key of Object.keys(row)) {
         if (!standardColumns.has(key)) {
           const val = row[key];
-          // Only process if they entered a valid number
           if (val !== "" && val !== null && !isNaN(Number(val))) {
             let cName = key.trim();
             let cType = "Fixed";
             let cFreq = "Monthly";
 
-            // Support advanced syntax like "Bonus (Variable, Yearly)"
             const match = cName.match(/^(.*?)\s*\((.*?),\s*(.*?)\)$/i);
             if (match) {
               cName = match[1].trim();
@@ -133,7 +118,6 @@ export default function BulkUpload() {
         }
       }
 
-      // Validate Employee Type before hitting the backend
       const empType = row["Employee Type"] || "Full-Time";
       const validTypes = ["Full-Time", "Part-Time", "Contractor", "Intern"];
       if (!validTypes.includes(empType)) {
@@ -145,16 +129,13 @@ export default function BulkUpload() {
         continue;
       }
 
-      // 2. Build the exact payload schema that /offerletters/create expects
       const payload = {
         first_name: row["First Name"] || "",
         middle_name: row["Middle Name"] || "",
         last_name: row["Last Name"] || "",
         mail: row["Email"] || "",
         country_code: row["Country Code"] ? String(row["Country Code"]) : "+91",
-        contact_number: row["Contact Number"]
-          ? String(row["Contact Number"])
-          : "",
+        contact_number: row["Contact Number"] ? String(row["Contact Number"]) : "",
         designation: row["Designation"] || "",
         employee_type: empType,
         cc_mails: row["CC Mails"]
@@ -164,7 +145,7 @@ export default function BulkUpload() {
               .filter(Boolean)
           : [],
         total_ctc: Number(row["Annual CTC"] || 0),
-        compensation_components: compensation_components,
+        compensation_components,
       };
 
       try {
@@ -187,7 +168,6 @@ export default function BulkUpload() {
           "Failed to create";
         if (typeof rawError !== "string") rawError = JSON.stringify(rawError);
 
-        // User-friendly error translations
         let friendlyError = rawError;
         if (rawError.includes("Data truncated for column 'employee_type'")) {
           friendlyError =
@@ -202,10 +182,11 @@ export default function BulkUpload() {
             "A required field is missing. Please ensure all mandatory fields are filled.";
         } else if (rawError.includes("Data truncated for column")) {
           const fieldMatch = rawError.match(/column '(.+?)'/);
-          friendlyError = `The text entered for '${fieldMatch ? fieldMatch[1] : "a field"}' is too long or invalid.`;
+          friendlyError = `The text entered for '${
+            fieldMatch ? fieldMatch[1] : "a field"
+          }' is too long or invalid.`;
         } else if (rawError.includes("FOREIGN KEY constraint failed")) {
-          friendlyError =
-            "Invalid reference. Please check fields like Country Code.";
+          friendlyError = "Invalid reference. Please check fields like Country Code.";
         }
 
         failedOffers.push({
@@ -232,7 +213,7 @@ export default function BulkUpload() {
         autoClose: 2500,
       });
     } else {
-      toast.success("✔ Bulk upload completed successfully!", {
+      toast.success("Bulk upload completed successfully!", {
         autoClose: 1500,
       });
     }
@@ -264,8 +245,6 @@ export default function BulkUpload() {
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
-
-    // Add some styling or adjust column widths to make it readable
     worksheet["!cols"] = [
       { wch: 15 },
       { wch: 15 },
@@ -286,163 +265,164 @@ export default function BulkUpload() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto bg-white shadow-lg rounded-xl p-8">
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold mb-2">
-            Bulk Upload Offer Letters
-          </h1>
-          <p className="text-gray-600">
-            Upload an Excel file (.xlsx / .xls / .csv) to create multiple offers
-            at once.
-          </p>
-        </div>
-        <button
-          onClick={downloadTemplate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-sm font-medium transition-colors border border-blue-200"
-        >
-          <Download size={16} />
-          Download Template
-        </button>
-      </div>
-
-      {/* File Upload Box */}
-      <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
-        <input
-          type="file"
-          accept=".xlsx, .xls"
-          onChange={handleFileChange}
-          className="hidden"
-          id="fileUpload"
-        />
-
-        <label
-          htmlFor="fileUpload"
-          className="cursor-pointer text-blue-600 hover:underline"
-        >
-          {file ? (
-            <span className="text-green-600 font-semibold">{file.name}</span>
-          ) : (
-            "Click to choose an Excel file"
-          )}
-        </label>
-      </div>
-
-      {/* Preview Table */}
-      {previewData && previewData.length > 0 && (
-        <div className="mt-6 border rounded-xl overflow-x-auto shadow-sm">
-          <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
-            <h3 className="font-medium text-gray-700">
-              Previewing {previewData.length} Records
-            </h3>
-          </div>
-          <table className="w-full text-sm text-left text-gray-600">
-            <thead className="text-xs text-gray-500 uppercase bg-gray-100 border-b">
-              <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Designation</th>
-                <th className="px-4 py-3 text-right">Annual CTC</th>
-              </tr>
-            </thead>
-            <tbody>
-              {previewData.slice(0, 5).map((row, idx) => (
-                <tr key={idx} className="bg-white border-b hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium text-gray-900">
-                    {row["First Name"] || "-"} {row["Last Name"] || ""}
-                  </td>
-                  <td className="px-4 py-2">{row["Email"] || "-"}</td>
-                  <td className="px-4 py-2">{row["Designation"] || "-"}</td>
-                  <td className="px-4 py-2 text-right">
-                    ₹ {Number(row["Annual CTC"] || 0).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-              {previewData.length > 5 && (
-                <tr className="bg-gray-50">
-                  <td
-                    colSpan="4"
-                    className="px-4 py-3 text-center text-gray-500 text-xs font-medium"
-                  >
-                    + {previewData.length - 5} more records ready for upload
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Buttons */}
-      <div className="flex justify-end gap-3 mt-6">
-        <button
-          onClick={resetForm}
-          className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300  active:translate-y-[1px]
-        disabled:opacity-60 disabled:cursor-not-allowed
-        flex items-center justify-center gap-2"
-        >
-          Reset
-        </button>
-
-       {canUpload ? (
-    <button
-      onClick={handleUpload}
-      disabled={uploading}
-      className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 active:translate-y-[1px] flex items-center justify-center gap-2"
-    >
-      {uploading ? "Uploading..." : "Upload"}
-    </button>
-  ) : (
-    <div className="text-sm text-red-500 bg-red-50 p-2 rounded border border-red-200">
-      ⚠️ Access Restricted: Only HR can perform bulk uploads.
-    </div>
-  )}
-  </div>
-
-      {/* Results Summary */}
-      {result && (
-        <div className="mt-8 p-6 bg-gray-50 rounded-xl border">
-          <h2 className="text-xl font-semibold mb-3">Upload Summary</h2>
-
-          <div className="grid grid-cols-2 gap-4 text-gray-800">
-            <p>
-              Total Rows: <strong>{result.total_rows}</strong>
-            </p>
-            <p>
-              Processed Rows: <strong>{result.processed_rows}</strong>
-            </p>
-            <p>
-              Success Count:{" "}
-              <strong className="text-green-600">
-                {result.successful_count}
-              </strong>
-            </p>
-            <p>
-              Failed Count:{" "}
-              <strong className="text-red-600">{result.failed_count}</strong>
-            </p>
-            <p>
-              Skipped Rows: <strong>{result.skipped_rows}</strong>
+    <PageCard className="mx-auto max-w-4xl border-slate-200">
+      <PageCardContent className="p-6 md:p-8 space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 className={Fonts.heading3}>Bulk Upload Offer Letters</h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Upload an Excel file (`.xlsx`, `.xls`, `.csv`) to create multiple offers at once.
             </p>
           </div>
+          <Button onClick={downloadTemplate} variant="outline" size="small">
+            <Download size={16} />
+            Download Template
+          </Button>
+        </div>
 
-          {/* Failed List */}
-          {result.failed_offers?.length > 0 && (
-            <div className="mt-4">
-              <h3 className="font-semibold text-red-600 mb-2">
-                Failed Entries
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center">
+          <input
+            type="file"
+            accept=".xlsx, .xls, .csv"
+            onChange={handleFileChange}
+            className="hidden"
+            id="fileUpload"
+          />
+
+          <label htmlFor="fileUpload" className="block cursor-pointer">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+              {file ? <FileSpreadsheet size={24} /> : <UploadCloud size={24} />}
+            </div>
+            <p className="text-sm font-semibold text-slate-900">
+              {file ? file.name : "Click to choose an Excel file"}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Drag-and-drop is not enabled here. Use the file picker to select your sheet.
+            </p>
+          </label>
+        </div>
+
+        {previewData && previewData.length > 0 && (
+          <PageCard className="overflow-hidden border-slate-200">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+              <h3 className="text-sm font-semibold text-slate-900">
+                Previewing {previewData.length} Records
               </h3>
-              <ul className="text-sm text-gray-700 bg-white p-3 rounded-lg border max-h-40 overflow-auto">
-                {result.failed_offers.map((fail, idx) => (
-                  <li key={idx} className="py-1 border-b last:border-0">
-                    Row {fail.row}: {fail.error}
-                  </li>
-                ))}
-              </ul>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-200 bg-white text-left">
+                  <tr className="text-slate-500">
+                    <th className="px-4 py-3 font-semibold">Name</th>
+                    <th className="px-4 py-3 font-semibold">Email</th>
+                    <th className="px-4 py-3 font-semibold">Designation</th>
+                    <th className="px-4 py-3 text-right font-semibold">Annual CTC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewData.slice(0, 5).map((row, idx) => (
+                    <tr
+                      key={idx}
+                      className={idx !== Math.min(previewData.length, 5) - 1 ? "border-b border-slate-100" : ""}
+                    >
+                      <td className="px-4 py-3 font-medium text-slate-900">
+                        {row["First Name"] || "-"} {row["Last Name"] || ""}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{row["Email"] || "-"}</td>
+                      <td className="px-4 py-3 text-slate-600">{row["Designation"] || "-"}</td>
+                      <td className="px-4 py-3 text-right font-medium text-slate-900">
+                        Rs {Number(row["Annual CTC"] || 0).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {previewData.length > 5 && (
+                    <tr className="bg-slate-50/70">
+                      <td
+                        colSpan="4"
+                        className="px-4 py-3 text-center text-xs font-medium text-slate-500"
+                      >
+                        + {previewData.length - 5} more records ready for upload
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </PageCard>
+        )}
+
+        <div className="flex flex-wrap justify-end gap-3">
+          <Button onClick={resetForm} variant="outline" size="medium">
+            Reset
+          </Button>
+
+          {canUpload ? (
+            <Button
+              onClick={handleUpload}
+              variant="primary"
+              size="medium"
+              disabled={uploading}
+              loading={uploading}
+              loadingText="Uploading..."
+            >
+              Upload
+            </Button>
+          ) : (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-500">
+              Access Restricted: Only HR can perform bulk uploads.
             </div>
           )}
         </div>
-      )}
-    </div>
+
+        {result && (
+          <PageCard className="border-slate-200 bg-slate-50/70">
+            <PageCardContent className="p-6">
+              <h2 className="text-xl font-semibold text-slate-900">Upload Summary</h2>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 text-sm text-slate-700 md:grid-cols-2">
+                <p>
+                  Total Rows: <strong>{result.total_rows}</strong>
+                </p>
+                <p>
+                  Processed Rows: <strong>{result.processed_rows}</strong>
+                </p>
+                <p>
+                  Success Count: <strong className="text-green-600">{result.successful_count}</strong>
+                </p>
+                <p>
+                  Failed Count: <strong className="text-red-600">{result.failed_count}</strong>
+                </p>
+                <p>
+                  Skipped Rows: <strong>{result.skipped_rows}</strong>
+                </p>
+              </div>
+
+              {result.failed_offers?.length > 0 && (
+                <div className="mt-5">
+                  <h3 className="mb-2 font-semibold text-red-600">Failed Entries</h3>
+                  <div className="max-h-48 overflow-auto rounded-xl border border-slate-200 bg-white">
+                    <ul className="text-sm text-slate-700">
+                      {result.failed_offers.map((fail, idx) => (
+                        <li
+                          key={idx}
+                          className={`px-4 py-3 ${
+                            idx !== result.failed_offers.length - 1
+                              ? "border-b border-slate-100"
+                              : ""
+                          }`}
+                        >
+                          Row {fail.row}: {fail.error}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </PageCardContent>
+          </PageCard>
+        )}
+      </PageCardContent>
+    </PageCard>
   );
 }

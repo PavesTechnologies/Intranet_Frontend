@@ -18,14 +18,14 @@ export default function FilterListbox({ options, value, onChange, disabled = fal
     <Listbox value={selected} onChange={(opt) => onChange(opt.value)} disabled={disabled}>
       <div className="relative w-full" ref={containerRef}>
         <Listbox.Button
-          className="w-full cursor-default rounded-xl border border-gray-200 bg-gray-50/50 py-2 pl-4 pr-10 text-left text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          className="w-full cursor-default rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 text-left text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           onClick={checkPosition}
         >
-          <span className="block truncate font-medium text-gray-700">
+          <span className="block truncate text-gray-700">
             {selected?.label || "SELECT AN OPTION"}
           </span>
           <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-            <ChevronUpDownIcon className="h-4 w-4 text-gray-400" />
+            <ChevronUpDownIcon className="h-4 w-4 text-gray-500" />
           </span>
         </Listbox.Button>
         <Transition
@@ -35,7 +35,7 @@ export default function FilterListbox({ options, value, onChange, disabled = fal
           leaveTo="opacity-0"
         >
           <Listbox.Options
-            className={`absolute z-[100] w-full rounded-xl bg-white py-1.5 shadow-2xl ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm ${
+            className={`absolute z-[100] min-w-full w-max max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm ${
               openUpward ? "bottom-full mb-2" : "mt-2"
             }`}
           >
@@ -44,14 +44,18 @@ export default function FilterListbox({ options, value, onChange, disabled = fal
                 key={idx}
                 value={option}
                 className={({ active }) =>
-                  `relative cursor-default select-none py-2 pl-4 pr-10 transition-colors ${
+                  `relative cursor-default select-none py-2 px-4 transition-colors ${
                     active ? "bg-blue-50 text-blue-900" : "text-gray-700"
                   }`
                 }
               >
                 {({ selected }) => (
                   <>
-                    <span className={`block truncate ${selected ? "font-semibold" : "font-normal"}`}>
+                    <span
+                      className={`block truncate ${
+                        selected ? "font-medium text-blue-700" : "font-normal"
+                      }`}
+                    >
                       {option.label}
                     </span>
                     {selected && (

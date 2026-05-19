@@ -25,7 +25,7 @@ import {
   updateCategory,
 } from "../models/benchModel";
 import { getBenchResources, getPoolResources, getBenchKPIs } from "../services/benchService";
-import { toast } from "react-hot-toast";
+import { notify } from "../../utils/notify";
 
 const getStoredState = () => {
   if (typeof window === "undefined") return null;
@@ -166,7 +166,7 @@ const BenchPage = () => {
     } catch (error) {
       if (!isActive) return;
       console.error("Resource Supply Data Load Error", error);
-      toast.error("Failed to load bench or pool data");
+      notify.error(error, "Failed To Load Bench Or Pool Data");
     } finally {
       setLoading(false);
     }
@@ -316,8 +316,8 @@ const BenchPage = () => {
   };
 
   const emptyState = baseVisibleCount === 0
-    ? "No bench records available."
-    : "No results match the current search and filters.";
+    ? "No Bench Records Available."
+    : "No Results Match The Current Search And Filters.";
 
   return (
     <div className="min-h-screen bg-slate-50/50 p-4 sm:p-6 lg:p-8 font-sans select-none">
@@ -326,7 +326,7 @@ const BenchPage = () => {
           <div className="flex-1">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 leading-none capitalize">Bench Management Workspace</h1>
             <p className="mt-2 text-xs sm:text-sm font-medium text-slate-500">
-              Strategic tracking of available resource supply and internal pool movements
+              Strategic Tracking Of Available Resource Supply And Internal Pool Movements
             </p>
           </div>
         </div>
@@ -393,7 +393,7 @@ const BenchPage = () => {
                   type="text"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search name, role, skill or location..."
+                  placeholder="Search Name, Role, Skill Or Location..."
                   className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/30 pl-9 pr-4 text-[13px] font-medium text-slate-600 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500 shadow-inner"
                 />
               </div>

@@ -36,9 +36,9 @@ import {
   getProficiencyLevels,
 } from "../../services/workforceService";
 
-import { toast } from "react-toastify";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
+import { notify } from "../../utils/notify";
 
 const RMSProjectDetails = () => {
   const { getEnumValues } = useEnums();
@@ -126,6 +126,7 @@ const RMSProjectDetails = () => {
       setInheritMode(true);
     } catch (err) {
       console.error("Failed to fetch client SLAs", err);
+      notify.error(err, "Failed to fetch client SLAs");
     }
   };
   const fetchProjectSLAs = async () => {
@@ -139,6 +140,7 @@ const RMSProjectDetails = () => {
       setProjectSlas(res.data.data || []);
     } catch (err) {
       console.error("Failed to fetch project SLAs", err);
+      notify.error(err, "Failed to fetch project SLAs");
     }
   };
   //2 save inherited SLAs to project
@@ -146,7 +148,7 @@ const RMSProjectDetails = () => {
     try {
       // Prevent saving if the total would exceed 3
       if (projectSlas.length + selectedClientSlas.length > 3) {
-        alert(
+        notify.warning(
           "Adding these would exceed the limit of 3 SLAs for this project.",
         );
         return;
@@ -171,6 +173,7 @@ const RMSProjectDetails = () => {
       // fetchDetail(); // Refresh project data
     } catch (err) {
       console.error("Error inheriting SLAs", err);
+      notify.error(err, "Failed to inherit SLAs");
     }
   };
 
@@ -182,7 +185,7 @@ const RMSProjectDetails = () => {
       if (!isEditing) {
         // ONLY check max limit if creating a NEW SLA
         if (projectSlas.length >= 3) {
-          alert("Maximum of 3 SLA configurations allowed per project.");
+          notify.warning("Maximum of 3 SLA configurations allowed per project.");
           return;
         }
 
@@ -191,7 +194,7 @@ const RMSProjectDetails = () => {
           (sla) => sla.slaType === formData.slaType,
         );
         if (isDuplicate) {
-          alert(`The SLA type "${formData.slaType}" is already configured.`);
+          notify.warning(`The SLA type "${formData.slaType}" is already configured.`);
           return;
         }
       }
@@ -208,9 +211,10 @@ const RMSProjectDetails = () => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE); // Reset form after save
       fetchProjectSLAs(); // Refresh table
+      notify.success("SLA configuration saved successfully.");
     } catch (err) {
       console.error("Error saving project SLA", err);
-      alert(err.response?.data?.message || "Failed to save SLA configuration");
+      notify.error(err, "Failed to save SLA configuration");
     }
   };
 
@@ -260,7 +264,7 @@ const RMSProjectDetails = () => {
           },
         );
         fetchProjectSLAs();
-        toast.success("SLA configuration deleted successfully.");
+        notify.success("SLA Configuration Deleted Successfully.");
       }
 
       if (deleteType === "compliance") {
@@ -273,7 +277,7 @@ const RMSProjectDetails = () => {
           },
         );
         fetchProjectCompliance();
-        toast.success("Compliance configuration deleted successfully.");
+        notify.success("Compliance Configuration Deleted Successfully.");
       }
 
       if (deleteType === "escalation") {
@@ -286,14 +290,14 @@ const RMSProjectDetails = () => {
           },
         );
         fetchProjectEscalations();
-        toast.success("Escalation deleted successfully.");
+        notify.success("Escalation Deleted Successfully.");
       }
 
       setOpenConfirmModal(false);
       setDeleteMessage("");
       setDeleteType(null);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Delete failed.");
+      notify.error(err, "Delete failed.");
     } finally {
       setDeleteLoading(false);
     }
@@ -327,6 +331,7 @@ const RMSProjectDetails = () => {
       setProjectCompliance(res.data.data || []);
     } catch (err) {
       console.error("Failed to fetch project compliance", err);
+      notify.error(err, "Failed to fetch project compliance");
     }
   };
 
@@ -368,6 +373,7 @@ const RMSProjectDetails = () => {
       setInheritMode(true);
     } catch (err) {
       console.error("Failed to fetch compliance", err);
+      notify.error(err, "Failed to fetch client compliance");
     }
   };
 
@@ -396,9 +402,13 @@ const RMSProjectDetails = () => {
       setInheritMode(false);
       setSelectedClientCompliance([]);
       fetchProjectCompliance(); // Refresh the main UI table
+      notify.success("Compliance inherited successfully.");
     } catch (err) {
       console.error("Error inheriting compliance", err);
-      alert("Internal Server Error: Ensure Enum types match backend exactly.");
+      notify.error(
+        err,
+        "Failed to inherit compliance. Ensure the selected types match backend enums.",
+      );
     }
   };
 
@@ -413,7 +423,7 @@ const RMSProjectDetails = () => {
       );
 
       if (isDuplicate && !formData.projectComplianceId) {
-        alert(
+        notify.warning(
           `The compliance requirement "${formData.requirementType}" is already configured for this project.`,
         );
         return; // Stop the execution here
@@ -432,10 +442,10 @@ const RMSProjectDetails = () => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectCompliance();
+      notify.success("Compliance configuration saved successfully.");
     } catch (err) {
       console.error("Error saving project compliance", err);
-      // This will display "Serial number already exists" if the local check missed something
-      alert(err.response?.data?.message || "An error occurred during save.");
+      notify.error(err, "Failed to save project compliance");
     }
   };
 
@@ -475,9 +485,10 @@ const RMSProjectDetails = () => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectEscalations(); // when you create this
+      notify.success("Escalation saved successfully.");
     } catch (err) {
       console.error("Error saving escalation", err);
-      alert(err.response?.data?.message || "Failed to save escalation");
+      notify.error(err, "Failed to save escalation");
     }
   };
 
@@ -491,6 +502,7 @@ const RMSProjectDetails = () => {
       setProficiencyLevels(res.data.data);
     } catch (err) {
       console.error("Failed to load proficiency levels", err);
+      notify.error(err, "Failed to load proficiency levels");
     }
   };
 
@@ -508,6 +520,7 @@ const RMSProjectDetails = () => {
       setProjectEscalations(res.data.data || []);
     } catch (err) {
       console.error("Failed to fetch escalations", err);
+      notify.error(err, "Failed to fetch project escalations");
     }
   };
 
@@ -518,6 +531,7 @@ const RMSProjectDetails = () => {
       setCategories(res.data || []);
     } catch (err) {
       console.error("Failed to fetch skill categories", err);
+      notify.error(err, "Failed to fetch skill categories");
     }
   };
 
@@ -556,6 +570,7 @@ const RMSProjectDetails = () => {
       setInheritMode(true);
     } catch (err) {
       console.error("Failed to fetch client escalation contacts", err);
+      notify.error(err, "Failed to fetch client escalation contacts");
     }
   };
 
@@ -599,16 +614,17 @@ const RMSProjectDetails = () => {
       setInheritMode(false);
       setSelectedClientEscalations([]);
       fetchProjectEscalations();
+      notify.success("Escalations inherited successfully.");
     } catch (err) {
       console.error("Error inheriting escalation", err);
-      alert(err.response?.data?.message || "Failed to inherit escalation");
+      notify.error(err, "Failed to inherit escalation");
     }
   };
 
   const handleEscalationUpdate = async () => {
     try {
       if (!formData.projectEscalationId) {
-        alert("Escalation ID missing for update.");
+        notify.error("Escalation ID missing for update.");
         return;
       }
 
@@ -634,9 +650,10 @@ const RMSProjectDetails = () => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectEscalations();
+      notify.success("Escalation updated successfully.");
     } catch (err) {
       console.error("Error updating escalation", err);
-      alert(err.response?.data?.message || "Failed to update escalation");
+      notify.error(err, "Failed to update escalation");
     }
   };
 
@@ -663,9 +680,7 @@ const RMSProjectDetails = () => {
       setProject(res.data);
     } catch (err) {
       console.error("Failed to fetch project details", err);
-      toast.error(
-        err.response?.data?.message || "Failed to fetch project details.",
-      );
+      notify.error(err, "Failed to fetch project details.");
     } finally {
       setLoading(false);
     }
@@ -678,9 +693,7 @@ const RMSProjectDetails = () => {
       setDemandResponse(res.data);
     } catch (err) {
       console.error("Failed to check demand creation", err);
-      toast.error(
-        err.response?.data?.message || "Failed to check demand creation.",
-      );
+      notify.error(err, "Failed to check demand creation.");
     } finally {
       setLoadingDemand(false);
     }

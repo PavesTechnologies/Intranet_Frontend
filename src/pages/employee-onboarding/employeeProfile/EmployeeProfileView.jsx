@@ -426,7 +426,7 @@ const EPV3_STYLES = `
   /* ── Generic card ── */
   .epv3-card {
     background: #fff;
-    border-radius: 0px;
+    border-radius: 12px;
     border: 1px solid #e4e8f2;
     box-shadow: 0 1px 4px rgba(8,21,52,0.04), 0 4px 16px rgba(8,21,52,0.03);
     overflow: hidden;
@@ -458,7 +458,7 @@ const EPV3_STYLES = `
 
   /* ── Quick-nav mini cards ── */
   .epv3-nav-card {
-    background: #fff; border-radius: 0px;
+    background: #fff; border-radius: 12px;
     border: 1px solid #e4e8f2;
     box-shadow: 0 1px 4px rgba(8,21,52,0.04);
     padding: 14px; cursor: pointer;
@@ -478,7 +478,7 @@ const EPV3_STYLES = `
 
   /* ── Skill tiles ── */
   .epv3-skill-tile {
-    background: #fff; border: 1px solid #e4e8f4; border-radius: 0px;
+    background: #fff; border: 1px solid #e4e8f4; border-radius: 12px;
     transition: all 0.2s ease; overflow: hidden;
   }
   .epv3-skill-tile:hover { border-color: #adb5d9; box-shadow: 0 4px 16px rgba(38,51,131,0.09); }

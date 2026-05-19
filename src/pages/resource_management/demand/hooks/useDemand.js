@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import demandService from "../services/demandService";
 import { useAuth } from "../../../../contexts/AuthContext";
+import { notify } from "../../utils/notify";
 
 
 export const defaultFilters = {
@@ -131,10 +132,14 @@ const isCancelledOrClosedDemand = (demand = {}) =>
 
 const isRejectedDemand = (demand = {}) => getDemandStatus(demand) === "REJECTED";
 
+const isBreachedDemand = (demand = {}) => demand.slaBreached === true;
+
 const isAtRiskDemand = (demand = {}) =>
+    !isBreachedDemand(demand) &&
     !isFulfilledDemand(demand) &&
-    Number(demand.remainingDays) >= 0 &&
-    Number(demand.remainingDays) <= 5;
+    demand.remainingDays !== undefined &&
+    demand.warningThresholdDays !== undefined &&
+    Number(demand.remainingDays) < Number(demand.warningThresholdDays);
 
 const getDemandRoleOptions = (roles = []) => {
     if (!Array.isArray(roles) || roles.length === 0) return [];
@@ -183,31 +188,51 @@ export function useDemand(projectId = null) {
 
     // Fetch master demands and kpis
     const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            let demandsData, kpis;
-            if (projectId) {
-                [demandsData, kpis] = await Promise.all([
-                    demandService.getProjectDemands(projectId),
-                    demandService.getProjectKPIs(projectId)
-                ]);
-            } else {
-                [demandsData, kpis] = await Promise.all([
-                    demandService.getRoleScopedDemands(effectiveRole),
-                    demandService.getRoleScopedKPISummary(effectiveRole)
-                ]);
-            }
-            setDemands(demandsData || []);
-            setKpiData(kpis);
-        } catch (error) {
-            console.error("Demand Hook Fetch Error:", error);
-        } finally {
-            setIsLoading(false);
+        let demandsData, kpis;
+        if (projectId) {
+            [demandsData, kpis] = await Promise.all([
+                demandService.getProjectDemands(projectId),
+                demandService.getProjectKPIs(projectId)
+            ]);
+        } else {
+            [demandsData, kpis] = await Promise.all([
+                demandService.getRoleScopedDemands(effectiveRole),
+                demandService.getRoleScopedKPISummary(effectiveRole)
+            ]);
         }
+
+        return {
+            demandsData: demandsData || [],
+            kpis: kpis || null,
+        };
     }, [effectiveRole, projectId]);
 
     useEffect(() => {
-        fetchData();
+        let isActive = true;
+
+        const loadData = async () => {
+            setIsLoading(true);
+            try {
+                const { demandsData, kpis } = await fetchData();
+                if (!isActive) return;
+                setDemands(demandsData);
+                setKpiData(kpis);
+            } catch (error) {
+                if (!isActive) return;
+                console.error("Demand Hook Fetch Error:", error);
+                notify.error(error, "Failed to load demand data");
+            } finally {
+                if (isActive) {
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        loadData();
+
+        return () => {
+            isActive = false;
+        };
     }, [fetchData]);
 
     const filteredDemands = useMemo(() => {
@@ -227,17 +252,16 @@ export function useDemand(projectId = null) {
 
         // Tab Filtering (Segmented Logic)
         if (activeTab === 'breached') {
-            list = list.filter(d => !isFulfilledDemand(d) && Number(d.remainingDays) < 0);
+            list = list.filter(isBreachedDemand);
         } else if (activeTab === 'at_risk') {
             list = list.filter(isAtRiskDemand);
         } else if (activeTab === 'active') {
-            list = list.filter(d => ['APPROVED', 'OPEN', 'ACTIVE', 'REQUESTED', 'IN_PROGRESS', 'IN PROGRESS', 'DRAFT'].includes(getDemandStatus(d)));
+            list = list.filter(d => getDemandStatus(d) === 'APPROVED');
         } else if (activeTab === 'soft') {
             list = list.filter(isSoftDemand);
         } else if (activeTab === 'rejected') {
             list = list.filter(isRejectedDemand);
-        }
-        else if (activeTab === 'fulfilled') {
+        } else if (activeTab === 'fulfilled') {
             list = list.filter(isFulfilledDemand);
         }
         // 'all' fallthrough shows everything minus cancelled/closed if we want to be strict, 
@@ -351,19 +375,17 @@ export function useDemand(projectId = null) {
             const status = getDemandStatus(d);
             const commitment = getDemandCommitment(d);
             const isActiveSLA = ['REQUESTED', 'PENDING', 'DRAFT'].includes(status);
-            
+
             if (['APPROVED', 'OPEN', 'ACTIVE'].includes(status)) counts.approved++;
             if (['REQUESTED', 'PENDING', 'DRAFT'].includes(status)) counts.pending++;
             if (['APPROVED', 'OPEN', 'ACTIVE', 'REQUESTED', 'PENDING', 'DRAFT', 'IN_PROGRESS', 'IN PROGRESS'].includes(status)) counts.active++;
-            
+
             if (commitment === 'SOFT' || status === 'SOFT') counts.soft++;
-            
-            if (isActiveSLA) {
-                if (d.remainingDays < 0) {
-                    counts.breached++;
-                } else if (isAtRiskDemand(d)) {
-                    counts.atRisk++;
-                }
+
+            if (isBreachedDemand(d)) {
+                counts.breached++;
+            } else if (isAtRiskDemand(d)) {
+                counts.atRisk++;
             }
         });
 

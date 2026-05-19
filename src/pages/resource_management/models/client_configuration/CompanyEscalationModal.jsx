@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import FilterListbox from "../../../../components/filter/FilterListbox";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import "react-phone-input-2/lib/style.css";
 import PhoneInput from "react-phone-input-2";
+import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 
 const CompanyEscalationContactModal = ({
   initialData,
@@ -11,6 +12,8 @@ const CompanyEscalationContactModal = ({
   loading,
   showButtons = true,
 }) => {
+  const { getEnumValues } = useEnums();
+  const ESCALATION_LEVELS = getEnumValues("EscalationLevel");
   const isEditMode = Boolean(initialData);
 
   const [formData, setFormData] = useState({
@@ -18,7 +21,7 @@ const CompanyEscalationContactModal = ({
     contactRole: "",
     email: "",
     phone: "",
-    escalationLevel: "Level-1",
+    escalationLevel: ESCALATION_LEVELS[0] || "",
     activeFlag: true,
   });
 
@@ -30,7 +33,7 @@ const CompanyEscalationContactModal = ({
         contactRole: initialData.contactRole || "",
         email: initialData.email || "",
         phone: initialData.phone || "",
-        escalationLevel: initialData.escalationLevel || "Level-1",
+        escalationLevel: initialData.escalationLevel || ESCALATION_LEVELS[0] || "",
         activeFlag:
           initialData.activeFlag !== undefined ? initialData.activeFlag : true,
       });
@@ -46,7 +49,7 @@ const CompanyEscalationContactModal = ({
 
   const handleSubmit = () => {
     if (!formData.contactName || !formData.contactRole || !formData.email) {
-      toast.warning("Contact Name, Role and Email are mandatory");
+      notify.warning("Contact Name, Role and Email are mandatory");
       return;
     }
     if (isEditMode) {
@@ -143,9 +146,11 @@ const CompanyEscalationContactModal = ({
           </label>
           <FilterListbox
             options={[
-              { value: "Level-1", label: "LEVEL 1" },
-              { value: "Level-2", label: "LEVEL 2" },
-              { value: "Level-3", label: "LEVEL 3" },
+              { value: "", label: "SELECT LEVEL" },
+              ...ESCALATION_LEVELS.map((level) => ({
+                value: level,
+                label: level.replace(/_/g, " ").toUpperCase(),
+              })),
             ]}
             value={formData.escalationLevel}
             onChange={(val) => handleChange("escalationLevel", val)}

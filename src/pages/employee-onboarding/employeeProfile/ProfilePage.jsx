@@ -4,6 +4,10 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Pencil, X, Trash2, AlertTriangle } from "lucide-react";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import Button from "../../../components/Button/Button";
+import DynamicCardGrid from "../../../components/Cards/DynamicCardGrid";
+import { PageCard } from "../../../components/Cards/PageCard";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 export default function ProfilePage({
   activeTab,
@@ -216,37 +220,33 @@ export default function ProfilePage({
     setLoading(false);
   }, [coreData, hrData]);
 
-  if (loading) return <div>Loading profile...</div>;
+  if (loading) return <LoadingSpinner text="Loading profile..." />;
 
-  return (
-    <div className="space-y-6">
-      {/* ROW 1 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <Section
-          title="Primary Details"
-          onEdit={() => setEditSection("primary")}
-        >
+  const profileSections = [
+    {
+      key: "primary",
+      title: "Primary Details",
+      onEdit: () => setEditSection("primary"),
+      content: (
+        <>
           <Row label="First Name" value={primaryData?.first_name || ""} />
           <Row label="Last Name" value={primaryData?.last_name || ""} />
           <Row label="Gender" value={primaryData?.gender || ""} />
           <Row label="Date of Birth" value={primaryData?.dob || ""} />
           <Row label="Blood Group" value={primaryData?.blood_group || ""} />
-          <Row
-            label="Marital Status"
-            value={primaryData?.marital_status || ""}
-          />
+          <Row label="Marital Status" value={primaryData?.marital_status || ""} />
           <Row label="Nationality" value={primaryData?.nationality || ""} />
-        </Section>
-
-        <Section
-          title="Contact Details"
-          onEdit={() => setEditSection("contact")}
-        >
+        </>
+      ),
+    },
+    {
+      key: "contact",
+      title: "Contact Details",
+      onEdit: () => setEditSection("contact"),
+      content: (
+        <>
           <Row label="Work Email" value={contactData?.work_email || ""} />
-          <Row
-            label="Personal Email"
-            value={contactData?.personal_email || ""}
-          />
+          <Row label="Personal Email" value={contactData?.personal_email || ""} />
           <Row
             label="Mobile Number"
             value={`${contactData?.country_code} ${contactData?.mobile_number || ""}`}
@@ -255,198 +255,132 @@ export default function ProfilePage({
             label="Emergency Number"
             value={`${contactData?.country_code} ${contactData?.emergency_number || ""}`}
           />
-        </Section>
-      </div>
-
-      {/* ROW 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <Section title="Addresses" onEdit={() => setEditSection("address")}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
-            {/* CURRENT ADDRESS */}
-            <div className="flex flex-col">
-              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-1.5">
-                Current Address
+        </>
+      ),
+    },
+    {
+      key: "address",
+      title: "Addresses",
+      onEdit: () => setEditSection("address"),
+      content: (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
+          <AddressBlock title="Current Address" address={addressData?.current} />
+          <AddressBlock title="Permanent Address" address={addressData?.permanent} />
+        </div>
+      ),
+    },
+    {
+      key: "relations",
+      title: "Relations",
+      onEdit: () => setEditSection("relations"),
+      content: Array.isArray(relationData) && relationData.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
+          {relationData.map((rel, idx) => (
+            <div key={rel.id || idx} className="flex flex-col">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1">
+                {rel.relation || "Relation"}
               </span>
-              {addressData?.current?.line1 ? (
-                <>
-                  <span className="text-[14px] text-gray-800 leading-relaxed">
-                    {addressData.current.line1}
-                  </span>
-                  {addressData.current.line2 && (
-                    <span className="text-[14px] text-gray-800 leading-relaxed">
-                      {addressData.current.line2}
-                    </span>
-                  )}
-                  <span className="text-[14px] text-gray-800 leading-relaxed">
-                    {[
-                      addressData.current.city,
-                      addressData.current.state,
-                      addressData.current.country,
-                      addressData.current.pincode,
-                    ]
-                      .filter(Boolean)
-                      .join("  ")}
-                  </span>
-                </>
-              ) : (
-                <span className="text-sm text-gray-400">No address added</span>
-              )}
-            </div>
-
-            {/* PERMANENT ADDRESS */}
-            <div className="flex flex-col">
-              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-1.5">
-                Permanent Address
+              <span className="text-[14px] text-gray-800">{rel.full_name || "-"}</span>
+              <span className="text-[14px] text-gray-800 mt-0.5">
+                <span className="font-medium text-gray-900">Mobile:</span>{" "}
+                {rel.mobile || "-"}
               </span>
-              {addressData?.permanent?.line1 ? (
-                <>
-                  <span className="text-[14px] text-gray-800 leading-relaxed">
-                    {addressData.permanent.line1}
-                  </span>
-                  {addressData.permanent.line2 && (
-                    <span className="text-[14px] text-gray-800 leading-relaxed">
-                      {addressData.permanent.line2}
-                    </span>
-                  )}
-                  <span className="text-[14px] text-gray-800 leading-relaxed">
-                    {[
-                      addressData.permanent.city,
-                      addressData.permanent.state,
-                      addressData.permanent.country,
-                      addressData.permanent.pincode,
-                    ]
-                      .filter(Boolean)
-                      .join("  ")}
-                  </span>
-                </>
-              ) : (
-                <span className="text-sm text-gray-400">No address added</span>
-              )}
+              <span className="text-[14px] text-gray-800 mt-0.5">
+                <span className="font-medium text-gray-900">Gender:</span>{" "}
+                {rel.gender || "-"}
+              </span>
             </div>
-          </div>
-        </Section>
-
-        <Section title="Relations" onEdit={() => setEditSection("relations")}>
-          {Array.isArray(relationData) && relationData.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
-              {relationData.map((rel, idx) => (
-                <div key={rel.id || idx} className="flex flex-col">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1">
-                    {rel.relation || "Relation"}
-                  </span>
-                  <span className="text-[14px] text-gray-800">
-                    {rel.full_name || "-"}
-                  </span>
-                  <span className="text-[14px] text-gray-800 mt-0.5">
-                    <span className="font-medium text-gray-900">Mobile:</span>{" "}
-                    {rel.mobile || "-"}
-                  </span>
-                  <span className="text-[14px] text-gray-800 mt-0.5">
-                    <span className="font-medium text-gray-900">Gender:</span>{" "}
-                    {rel.gender || "-"}
-                  </span>
-                </div>
-              ))}
+          ))}
+        </div>
+      ) : (
+        <div className="text-gray-400 text-sm">No relations added</div>
+      ),
+    },
+    {
+      key: "education",
+      title: "Education",
+      onEdit: () => onTabChange("documents", { folder: "education", search: "" }),
+      content: educationData.length > 0 ? (
+        <div className="space-y-4">
+          {educationData.map((edu, idx) => (
+            <div key={edu.id || idx} className={idx > 0 ? "pt-4 border-t border-gray-100" : ""}>
+              <Row label="Degree" value={edu.degree || ""} />
+              <Row label="Specialization" value={edu.specialization || ""} />
+              <Row label="Institution/College" value={edu.institution || ""} />
+              <Row label="Year" value={edu.year || ""} />
             </div>
-          ) : (
-            <div className="text-gray-400 text-sm">No relations added</div>
-          )}
-        </Section>
-      </div>
-
-      {/* ROW 3 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <Section
-          title="Education"
-          onEdit={() =>
-            onTabChange("documents", { folder: "education", search: "" })
-          }
-        >
-          {educationData.length > 0 ? (
-            <div className="space-y-4">
-              {educationData.map((edu, idx) => (
-                <div
-                  key={edu.id || idx}
-                  className={idx > 0 ? "pt-4 border-t border-gray-100" : ""}
-                >
-                  <Row label="Degree" value={edu.degree || ""} />
-                  <Row
-                    label="Specialization"
-                    value={edu.specialization || ""}
-                  />
-                  <Row
-                    label="Institution/College"
-                    value={edu.institution || ""}
-                  />
-                  <Row label="Year" value={edu.year || ""} />
-                </div>
-              ))}
+          ))}
+        </div>
+      ) : (
+        <div className="text-gray-400 text-sm">No education records added</div>
+      ),
+    },
+    {
+      key: "experience",
+      title: "Experience",
+      onEdit: () => onTabChange("documents", { folder: "experience", search: "" }),
+      content: experienceData.length > 0 ? (
+        <div className="space-y-4">
+          {experienceData.map((exp, idx) => (
+            <div key={exp.id || idx} className={idx > 0 ? "pt-4 border-t border-gray-100" : ""}>
+              <Row label="Company" value={exp.company || ""} />
+              <Row label="Role" value={exp.role || ""} />
+              <Row label="Duration" value={exp.duration || ""} />
             </div>
-          ) : (
-            <div className="text-gray-400 text-sm">
-              No education records added
-            </div>
-          )}
-        </Section>
-
-        <Section
-          title="Experience"
-          onEdit={() =>
-            onTabChange("documents", { folder: "experience", search: "" })
-          }
-        >
-          {experienceData.length > 0 ? (
-            <div className="space-y-4">
-              {experienceData.map((exp, idx) => (
-                <div
-                  key={exp.id || idx}
-                  className={idx > 0 ? "pt-4 border-t border-gray-100" : ""}
-                >
-                  <Row label="Company" value={exp.company || ""} />
-                  <Row label="Role" value={exp.role || ""} />
-                  <Row label="Duration" value={exp.duration || ""} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-gray-400 text-sm">
-              No experience records added
-            </div>
-          )}
-        </Section>
-      </div>
-
-      {/* ROW 4 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <Section
-          title="Identity Information"
-          onEdit={() =>
-            onTabChange("documents", { folder: "identity", search: "" })
-          }
-        >
+          ))}
+        </div>
+      ) : (
+        <div className="text-gray-400 text-sm">No experience records added</div>
+      ),
+    },
+    {
+      key: "identity",
+      title: "Identity Information",
+      onEdit: () => onTabChange("documents", { folder: "identity", search: "" }),
+      content: (
+        <>
           <Row label="Aadhaar" value={identityData?.aadhaar || ""} />
           <Row label="PAN" value={identityData?.pan || ""} />
-        </Section>
+        </>
+      ),
+    },
+    {
+      key: "social",
+      title: "Social Media",
+      onEdit: () => setEditSection("social"),
+      content: socialData.length > 0 ? (
+        <div className="space-y-3">
+          {socialData.map((link, idx) => (
+            <Row
+              key={idx}
+              label={link.platform_name || "Link"}
+              value={link.url || ""}
+              isLink
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-gray-400 text-sm">No social media links added</div>
+      ),
+    },
+  ];
 
-        <Section title="Social Media" onEdit={() => setEditSection("social")}>
-          {socialData.length > 0 ? (
-            <div className="space-y-3">
-              {socialData.map((link, idx) => (
-                <Row
-                  key={idx}
-                  label={link.platform_name || "Link"}
-                  value={link.url || ""}
-                  isLink
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-gray-400 text-sm">
-              No social media links added
-            </div>
-          )}
-        </Section>
-      </div>
+  return (
+    <div className="space-y-6">
+      <DynamicCardGrid
+        data={profileSections}
+        getKey={(section) => section.key}
+        renderCard={(section) => (
+          <Section title={section.title} onEdit={section.onEdit}>
+            {section.content}
+          </Section>
+        )}
+        cardsPerRow={2}
+        cardsPerPage={profileSections.length}
+        showPagination={false}
+        gapClassName="gap-6"
+        gridClassName="min-w-0"
+      />
 
       {/* MODALS */}
       {editSection === "primary" && (
@@ -533,27 +467,29 @@ export default function ProfilePage({
 /* ---------------- COMMON UI COMPONENTS ---------------- */
 
 const Section = ({ title, children, onEdit }) => (
-  <div className="bg-white rounded-xl border border-[#e4e8f2] overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(8,21,52,0.06)" }}>
-    <div className="flex justify-between items-center px-5 py-3">
+  <PageCard className="h-full min-h-[292px] overflow-hidden rounded-2xl border-[#dfe6f3] shadow-[0_8px_24px_rgba(15,23,42,0.07)]">
+    <div className="flex justify-between items-center px-6 py-5">
       <div className="flex items-center gap-2">
-        <div className="w-[3px] h-4 rounded-full bg-[#263383] flex-shrink-0" />
-        <h3 className="text-[11px] font-bold text-[#081534] uppercase tracking-[0.06em]">{title}</h3>
+        <div className="w-1 h-6 rounded-full bg-[#263383] flex-shrink-0" />
+        <h3 className="text-[13px] font-bold text-[#081534] uppercase tracking-[0.08em]">{title}</h3>
       </div>
-      <button
+      <Button
         onClick={onEdit}
-        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg text-[#263383] hover:bg-[#f4f6fc] border border-transparent hover:border-[#e4e8f2] transition-all"
+        variant="ghost"
+        size="small"
+        className="text-[#263383] hover:bg-[#f4f6fc] shadow-none"
       >
         <Pencil size={11} /> Edit
-      </button>
+      </Button>
     </div>
-    <div className="border-t border-[#f4f6fc] px-5 pb-4 pt-3">{children}</div>
-  </div>
+    <div className="border-t border-[#eef2f8] px-6 pb-7 pt-6">{children}</div>
+  </PageCard>
 );
 
 const Row = ({ label, value, isLink = false }) => (
-  <div className="grid grid-cols-[42%_1fr] gap-3 items-baseline py-2 border-b border-[#f4f6fc] last:border-0">
-    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.05em]">{label}</span>
-    <span className="text-[13px] font-medium text-[#1e293b] break-words">
+  <div className="grid grid-cols-[42%_1fr] gap-3 items-baseline py-3 border-b border-[#eef2f8] last:border-0">
+    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.08em]">{label}</span>
+    <span className="text-[15px] font-semibold text-[#081534] break-words">
       {isLink && value && value !== "NA" ? (
         <a
           href={value.startsWith("http") ? value : `https://${value}`}
@@ -567,6 +503,33 @@ const Row = ({ label, value, isLink = false }) => (
         value || <span className="text-gray-300">—</span>
       )}
     </span>
+  </div>
+);
+
+const AddressBlock = ({ title, address }) => (
+  <div className="flex flex-col">
+    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-3">
+      {title}
+    </span>
+    {address?.line1 ? (
+      <>
+        <span className="text-[15px] font-medium text-[#081534] leading-relaxed">
+          {address.line1}
+        </span>
+        {address.line2 && (
+          <span className="text-[15px] font-medium text-[#081534] leading-relaxed">
+            {address.line2}
+          </span>
+        )}
+        <span className="text-[15px] font-medium text-[#081534] leading-relaxed">
+          {[address.city, address.state, address.country, address.pincode]
+            .filter(Boolean)
+            .join("  ")}
+        </span>
+      </>
+    ) : (
+      <span className="text-base text-slate-400">No address added</span>
+    )}
   </div>
 );
 

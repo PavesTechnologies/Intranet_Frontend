@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Combobox, Transition } from "@headlessui/react";
 import { fetchDemands, getSkillGapAnalysis } from "../../services/workforceService";
 import { fetchResources } from "../../services/resource";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import Pagination from "../../../../components/Pagination/pagination";
 import GenericTable from "../../../../components/Table/table";
 
@@ -115,10 +115,10 @@ export default function SkillGapTab({ resource, demand }) {
 
             const data = await getSkillGapAnalysis(dId, rId);
             setAnalysis(data);
-            toast.success("Intelligence analysis completed successfully.");
+            notify.success("Intelligence Analysis Completed Successfully.");
         } catch (err) {
-            setAnalysisError(err.message || "Analysis failed");
-            toast.error(err.message || "Skill gap analysis failed.");
+            setAnalysisError(err.message || "Analysis Failed");
+            notify.error(err, "Skill Gap Analysis Failed.");
         }
         finally { setAnalysisLoading(false); }
     };
@@ -152,7 +152,7 @@ export default function SkillGapTab({ resource, demand }) {
                                                 className="w-full border-none py-3 pl-4 pr-10 text-xs font-bold text-slate-900 bg-transparent focus:ring-0 outline-none placeholder:text-slate-400 font-sans"
                                                 displayValue={(item) => item ? (item.demandName || item.name || item.resourceName) : ""}
                                                 onChange={(e) => setQuery(e.target.value)}
-                                                placeholder={resource ? "Search demand..." : "Search resource..."}
+                                                placeholder={resource ? "Search Demand..." : "Search Resource..."}
                                             />
                                             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                                                 <ChevronsUpDown className="h-4 w-4 text-slate-400" />
@@ -164,7 +164,7 @@ export default function SkillGapTab({ resource, demand }) {
                                             {loading ? (
                                                 <div className="p-5 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-indigo-500" /></div>
                                             ) : filteredItems.length === 0 ? (
-                                                <div className="p-5 text-center text-slate-400 font-medium font-sans">No matches found</div>
+                                                <div className="p-5 text-center text-slate-400 font-medium font-sans">No Matches Found</div>
                                             ) : (
                                                 filteredItems.map((item) => (
                                                     <Combobox.Option key={item.demandId || item.id || item.resourceId} className={({ active }) => cn("px-4 py-2.5 cursor-pointer transition-colors", active ? "bg-indigo-50" : "bg-white")} value={item}>
@@ -201,7 +201,7 @@ export default function SkillGapTab({ resource, demand }) {
                         colorClass={analysis.riskLevel === 'HIGH' ? "bg-rose-50 text-rose-500" : analysis.riskLevel === 'MEDIUM' ? "bg-amber-50 text-amber-500" : "bg-emerald-50 text-emerald-500"}>
                         <div className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black uppercase border whitespace-nowrap shrink-0",
                             analysis.allocationAllowed ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100")}>
-                            {analysis.allocationAllowed ? "Clear to Deploy" : "Deployment Restricted"}
+                            {analysis.allocationAllowed ? "Clear To Deploy" : "Deployment Restricted"}
                         </div>
                     </KPICard>
 
@@ -305,7 +305,7 @@ export default function SkillGapTab({ resource, demand }) {
                             <div className="flex flex-col items-center justify-center py-40 opacity-40">
                                 <FileText className="h-16 w-16 text-slate-200 mb-4" />
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Workbench Empty</p>
-                                <p className="text-[10px] text-slate-300 mt-1">Initialize analysis to populate comparison matrix.</p>
+                                <p className="text-[10px] text-slate-300 mt-1">Initialize Analysis To Populate Comparison Matrix.</p>
                             </div>
                         )}
                     </div>
@@ -328,7 +328,7 @@ export default function SkillGapTab({ resource, demand }) {
                                     <div>
                                         <p className="text-xs font-bold text-rose-700">Notice Period Active</p>
                                         <p className="text-[10px] text-rose-600 font-medium mt-1 leading-relaxed">
-                                            Resource matches demand but availability is terminal. Permanent allocation restricted.
+                                            Resource Matches Demand But Availability Is Terminal. Permanent Allocation Restricted.
                                         </p>
                                     </div>
                                 </div>
@@ -384,7 +384,7 @@ export default function SkillGapTab({ resource, demand }) {
                         <div className="pt-4 mt-auto border-t border-slate-50 flex items-start gap-4">
                             <Info className="h-4 w-4 text-indigo-400 shrink-0" />
                             <p className="text-[9px] font-medium text-slate-400 leading-relaxed italic">
-                                Scores reflect a weighted delta between resource proficiency and mandatory demand requirements.
+                                Scores Reflect A Weighted Delta Between Resource Proficiency And Mandatory Demand Requirements.
                             </p>
                         </div>
                     </div>

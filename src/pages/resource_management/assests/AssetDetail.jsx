@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, Fragment } from "react";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { jwtDecode } from "jwt-decode";
+import { KPICard } from "../../../components/kpi/KPI";
 
 import { useNavigate, useParams } from "react-router-dom";
 import { getAssetsByClient } from "../services/clientservice";
@@ -30,7 +31,7 @@ import {
   deleteClientAssignment,
   getProjectsByClient,
 } from "../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { Listbox, Transition } from "@headlessui/react";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
@@ -47,51 +48,7 @@ const STATUS_COLORS = {
   LOST: "bg-red-100 text-red-700",
 };
 
-const COLOR_STYLES = {
-  indigo: {
-    bg: "bg-indigo-50",
-    text: "text-indigo-600",
-    border: "border-indigo-100",
-  },
-  emerald: {
-    bg: "bg-emerald-50",
-    text: "text-emerald-600",
-    border: "border-emerald-100",
-  },
-  amber: {
-    bg: "bg-amber-50",
-    text: "text-amber-600",
-    border: "border-amber-100",
-  },
-  blue: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-100" },
-  rose: { bg: "bg-rose-50", text: "text-rose-600", border: "border-rose-100" },
-  yellow: {
-    bg: "bg-yellow-50",
-    text: "text-yellow-600",
-    border: "border-yellow-100",
-  },
-};
-
 /* ---------------- SUB-COMPONENTS ---------------- */
-
-const Stat = ({ title, value, icon: Icon, color = "indigo" }) => {
-  const theme = COLOR_STYLES[color] || COLOR_STYLES.indigo;
-  return (
-    <div
-      className={`bg-white border rounded-xl p-5 shadow-sm flex justify-between items-center transition-all hover:shadow-md ${theme.border}`}
-    >
-      <div>
-        <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">
-          {title}
-        </p>
-        <p className={`text-2xl font-bold mt-1 ${theme.text}`}>{value}</p>
-      </div>
-      <div className={`${theme.bg} p-3 rounded-lg`}>
-        <Icon className={theme.text} size={22} />
-      </div>
-    </div>
-  );
-};
 
 const Modal = ({ title, children, onClose }) => (
   <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 md:p-10">
@@ -196,7 +153,7 @@ const AssetDetail = () => {
       setProjectResources(res?.data || []);
     } catch (err) {
       console.error("Failed to load project resources", err);
-      toast.error(err.response?.data?.message || "Failed to load project resources");
+      notify.error(err, "Failed to load project resources");
     } finally {
       setProjectResourcesLoading(false);
     }
@@ -224,7 +181,7 @@ const AssetDetail = () => {
       setAvailableSerials(filtered);
     } catch (err) {
       console.error("Failed to fetch serial numbers", err);
-      toast.error("Failed to load available serial numbers");
+      notify.error("Failed To Load Available Serial Numbers");
     } finally {
       setSerialLoading(false);
     }
@@ -279,7 +236,7 @@ const AssetDetail = () => {
         }
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to load asset details");
+      notify.error(err, "Failed to load asset details");
     } finally {
       setLoading(false);
     }
@@ -297,7 +254,7 @@ const AssetDetail = () => {
       const res = await getAssignmentKPI(assetId);
       setKPIData(res.data);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to load KPI data");
+      notify.error(err, "Failed to load KPI data");
     } finally {
       setKPILoading(false);
     }
@@ -317,9 +274,15 @@ const AssetDetail = () => {
   const utilization = kpiData?.utilization;
 
   const getUtilizationColor = (rate) => {
-    if (rate >= 80) return "emerald";
-    if (rate >= 50) return "yellow";
-    return "rose";
+    if (rate >= 80) return "bg-emerald-100 text-emerald-600";
+    if (rate >= 50) return "bg-amber-100 text-amber-600";
+    return "bg-rose-100 text-rose-600";
+  };
+
+  const getUtilizationIconColor = (rate) => {
+    if (rate >= 80) return "text-emerald-600";
+    if (rate >= 50) return "text-amber-600";
+    return "text-rose-600";
   };
 
   const filteredAssignments = useMemo(() => {
@@ -396,15 +359,15 @@ const AssetDetail = () => {
         const res = await assignClientAsset(payload);
       }
       if (editingAssignment) {
-        toast.success("Assignment updated successfully");
+        notify.success("Assignment Updated Successfully");
       } else {
-        toast.success("Assignment created successfully");
+        notify.success("Assignment Created Successfully");
       }
       await fetchData();
       fetchKPI();
       closeModal();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to save record");
+      notify.error(err, "Failed to save record");
     } finally {
       setUpdateLoading(false);
     }
@@ -413,7 +376,7 @@ const AssetDetail = () => {
   const handleReturnSubmit = async (e) => {
     e.preventDefault();
     if (!returnData.conditionOnReturn) {
-      toast.warning("Please select the condition on return.");
+      notify.warning("Please select the condition on return.");
       return;
     }
     setReturnLoading(true);
@@ -423,13 +386,13 @@ const AssetDetail = () => {
         today,
         returnData.returnNotes,
       );
-      toast.success(res.message || "Asset marked as returned");
+      notify.success(res.message || "Asset marked as returned");
       await fetchData();
       fetchKPI();
       setReturnModal(false);
       setReturnItem(null);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to return asset");
+      notify.error(err, "Failed to return asset");
     } finally {
       setReturnLoading(false);
     }
@@ -439,11 +402,11 @@ const AssetDetail = () => {
     setDeleteLoading(true);
     try {
       const res = await deleteClientAssignment(deleteTarget.assignmentId);
-      toast.success(res.message || "Record deleted");
+      notify.success(res.message || "Record deleted");
       await fetchData();
     } catch (err) {
       console.log(err);
-      toast.error(err.response?.data || "Failed to delete record");
+      notify.error(err, "Failed to delete record");
     } finally {
       setDeleteLoading(false);
       setDeleteTarget(null);
@@ -542,28 +505,28 @@ const AssetDetail = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Stat
-            title="Total Stock"
+          <KPICard
+            label="Total Stock"
             value={totalStock}
-            icon={Box}
-            color="blue"
+            icon={<Box className="w-5 h-5 text-blue-600" />}
+            color="bg-blue-100 text-blue-600"
           />
-          <Stat
-            title="Active Assignments"
+          <KPICard
+            label="Active Assignments"
             value={assignedCount}
-            icon={Users}
-            color="emerald"
+            icon={<Users className="w-5 h-5 text-emerald-600" />}
+            color="bg-emerald-100 text-emerald-600"
           />
-          <Stat
-            title="Available"
+          <KPICard
+            label="Available"
             value={availableCount}
-            icon={Laptop}
-            color="amber"
+            icon={<Laptop className="w-5 h-5 text-amber-600" />}
+            color="bg-amber-100 text-amber-600"
           />
-          <Stat
-            title="Utilization"
+          <KPICard
+            label="Utilization"
             value={`${utilization}%`}
-            icon={Percent}
+            icon={<Percent className={`w-5 h-5 ${getUtilizationIconColor(utilization)}`} />}
             color={getUtilizationColor(utilization)}
           />
         </div>
