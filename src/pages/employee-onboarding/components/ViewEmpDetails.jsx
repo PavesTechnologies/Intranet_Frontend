@@ -406,7 +406,7 @@ export default function ViewEmpDetails() {
             <ArrowLeft size={16} />
             Back to Offers
           </button>
-          <span className="text-xs text-slate-400 font-mono">{user_uuid}</span>
+          {/* <span className="text-xs text-slate-400 font-mono">{user_uuid}</span> */}
         </div>
       </div>
 
