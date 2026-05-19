@@ -43,7 +43,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
         allocationStartDate: getAllocationStartDate(demand?.demandStartDate),
         allocationEndDate: toDateInputValue(demand?.demandEndDate),
         allocationPercentage: demand?.allocation || demand?.allocationPercentage || 100,
-        allocationStatus: 'ACTIVE',
+        allocationStatus: '',
         skipValidation: false
     });
 
@@ -103,7 +103,8 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                 allocationEndDate: toDateInputValue(demand?.demandEndDate),
                 resourceId: initialResourceIds,
                 skipValidation: false,
-                allocationPercentage: 100 // Default or driven by demand if available later
+                allocationPercentage: 100, // Default or driven by demand if available later
+                allocationStatus: ''
             }));
             
             if (isBenchMode && !demand && initialResourceIds.length > 0) {
@@ -507,6 +508,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                         <div className="relative">
                             <FilterListbox
                                 options={[
+                                    { value: "", label: "Select status..." },
                                     { value: "ACTIVE", label: "ACTIVE" },
                                     { value: "PLANNED", label: "PLANNED" }
                                 ]}
