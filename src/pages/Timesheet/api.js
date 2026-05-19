@@ -628,6 +628,62 @@ export const handleBulkReviewAdmin = async (
   }
 };
 
+export const handleMixedReview = async ({
+  path,
+  userId,
+  approvedIds = [],
+  rejectedIds = [],
+  comments = "",
+  multiUserWrap = false,
+}) => {
+  const payload = {
+    userId,
+    approvedTimesheetIds: approvedIds,
+    rejectedTimesheetIds: rejectedIds,
+    comments,
+  };
+
+  try {
+    const response = await fetch(
+      `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}${path}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(multiUserWrap ? [payload] : payload),
+      },
+    );
+
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (_) {
+      data = { message: text };
+    }
+
+    if (!response.ok) {
+      const message = data?.message || "Failed to review timesheets";
+      throw new Error(message);
+    }
+
+    const message =
+      data?.message ||
+      `${approvedIds.length} day(s) approved, ${rejectedIds.length} day(s) rejected.`;
+    showStatusToast(message, "success");
+    return true;
+  } catch (err) {
+    console.error("❌ Error reviewing timesheets:", err);
+    showStatusToast(
+      err.message || "Failed to update timesheet status",
+      "error",
+    );
+    return false;
+  }
+};
+
 export const getActiveHourSettings = async () => {
   try {
     const res = await fetch(`${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/timesheet-settings/active`, {

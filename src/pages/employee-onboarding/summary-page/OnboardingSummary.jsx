@@ -63,6 +63,36 @@ export default function OnboardingSummary() {
 
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
+  const normalizedCounts = {};
+  if (summaryData?.status_counts) {
+    Object.entries(summaryData.status_counts).forEach(([key, val]) => {
+      normalizedCounts[key.toLowerCase().replace(/\s+/g, "_")] = val;
+    });
+  }
+
+  const statusToFieldMap = {
+    total_candidates:"total_candidates",
+    created: "offers_created",
+    offered: "offers_offered",
+    accepted: "offers_accepted",
+    submitted: "offers_submitted",
+    verified: "offers_verified",
+    completed: "offers_completed",
+    rescheduled: "offers_rescheduled",
+    joining_pending: "offers_joining_pending",
+    joining: "offers_joining",
+    rejected: "offers_rejected",
+  };
+
+  const totalCandidates = summaryData?.overview?.total_candidates || 0;
+  const completedCandidates = (normalizedCounts["completed"] !== undefined)
+    ? normalizedCounts["completed"]
+    : (summaryData?.overview?.offers_completed !== undefined ? summaryData.overview.offers_completed : 0);
+
+  const computedCompletionRate = totalCandidates > 0
+    ? `${((completedCandidates / totalCandidates) * 100).toFixed(1)}%`
+    : "0%";
+
   const fetchSummaryData = async () => {
     try {
       setLoading(true);
@@ -87,7 +117,7 @@ export default function OnboardingSummary() {
       ["Offers Offered", summaryData.overview?.offers_offered],
       ["Offers Accepted", summaryData.overview?.offers_accepted],
       ["Acceptance Rate", summaryData.metrics?.acceptance_rate],
-      ["Completion Rate", summaryData.metrics?.completion_rate],
+      ["Completion Rate", computedCompletionRate],
     ];
 
     const csvContent = [headers, ...rows].map((e) => e.join(",")).join("\n");
@@ -141,57 +171,100 @@ export default function OnboardingSummary() {
 
   if (!summaryData) return null;
 
-  const overviewMetrics = [
-    {
-      title: "Total Candidates",
-      value: summaryData?.overview?.total_candidates || 0,
+  const statusOrder = [
+    "total_candidates",
+    "Created",
+    "Offered",
+    "Accepted",
+    "Submitted",
+    "Verified",
+    "Completed",
+    "Rescheduled",
+    "Joining Pending",
+    "Joining",
+    "Rejected",
+  ];
+
+  const statusConfig = {
+    total_candidates: {
       icon: Users,
-      color: "text-slate-600",
-      bg: "bg-slate-100",
+      color: "text-blue-600",
+      bg: "bg-blue-100",
     },
-    {
-      title: "Created",
-      value: summaryData?.overview?.offers_created || 0,
+    created: {
       icon: FileText,
       color: "text-blue-600",
       bg: "bg-blue-100",
     },
-    {
-      title: "Offered",
-      value: summaryData?.overview?.offers_offered || 0,
+    offered: {
       icon: Activity,
       color: "text-indigo-600",
       bg: "bg-indigo-100",
     },
-    {
-      title: "Accepted",
-      value: summaryData?.overview?.offers_accepted || 0,
+    accepted: {
       icon: CheckCircle,
       color: "text-emerald-600",
       bg: "bg-emerald-100",
     },
-    {
-      title: "Submitted",
-      value: summaryData?.overview?.offers_submitted || 0,
+    submitted: {
       icon: FileText,
       color: "text-amber-600",
       bg: "bg-amber-100",
     },
-    {
-      title: "Verified",
-      value: summaryData?.overview?.offers_verified || 0,
+    verified: {
       icon: ShieldCheck,
       color: "text-purple-600",
       bg: "bg-purple-100",
     },
-    {
-      title: "Rejected",
-      value: summaryData?.overview?.offers_rejected || 0,
-      icon: AlertCircle,
+    completed: {
+      icon: CheckCircle,
+      color: "text-teal-600",
+      bg: "bg-teal-100",
+    },
+    rescheduled: {
+      icon: RefreshCw,
+      color: "text-sky-600",
+      bg: "bg-sky-100",
+    },
+    joining_pending: {
+      icon: Clock,
+      color: "text-amber-600",
+      bg: "bg-amber-100",
+    },
+    joining: {
+      icon: Calendar,
+      color: "text-emerald-600",
+      bg: "bg-emerald-100",
+    },
+    rejected: {
+      icon: XCircle,
       color: "text-rose-600",
       bg: "bg-rose-100",
     },
-  ];
+  };
+
+  const kpiCardsData = statusOrder.map((status) => {
+    const normalizedKey = status.toLowerCase().replace(/\s+/g, "_");
+    const fieldKey = statusToFieldMap[normalizedKey] || `offers_${normalizedKey}`;
+    
+    const count = (normalizedCounts[normalizedKey] !== undefined)
+      ? normalizedCounts[normalizedKey]
+      : (summaryData?.overview?.[fieldKey] !== undefined ? summaryData.overview[fieldKey] : 0);
+
+    const config = statusConfig[normalizedKey] || {
+      icon: Users,
+      color: "text-slate-600",
+      bg: "bg-slate-100",
+    };
+    return {
+      title: status,
+      value: count,
+      icon: config.icon,
+      color: config.color,
+      bg: config.bg,
+    };
+  });
+
 
   const pending_actions = [
     {
@@ -231,7 +304,7 @@ export default function OnboardingSummary() {
     },
     {
       label: "Completion Rate",
-      value: summaryData?.metrics?.completion_rate || "0%",
+      value: computedCompletionRate,
       trend: "+0%",
       color: "text-blue-600",
       bg: "bg-blue-50",
@@ -329,7 +402,7 @@ export default function OnboardingSummary() {
 
       {/* 1. Overview Section - Column Grid */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4 mb-8">
-        {overviewMetrics.map((metric, i) => (
+        {kpiCardsData.map((metric, i) => (
           <KPICard
             key={i}
             label={metric.title}
@@ -651,10 +724,10 @@ export default function OnboardingSummary() {
             ))}
             {(!summaryData?.recent_activity ||
               summaryData.recent_activity.length === 0) && (
-              <div className="text-center py-12 text-slate-400">
-                No activity logs found.
-              </div>
-            )}
+                <div className="text-center py-12 text-slate-400">
+                  No activity logs found.
+                </div>
+              )}
           </div>
         </div>
         <div className="mt-6 flex justify-end">

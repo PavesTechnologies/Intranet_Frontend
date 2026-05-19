@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { reviewTimesheet, handleBulkReview } from "../api";
+import { reviewTimesheet, handleBulkReview, handleMixedReview } from "../api";
 import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
@@ -10,6 +10,7 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 import { MoreVertical, X, ChevronDown, ChevronUp } from "lucide-react";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 import ConfirmationModal from "../../leave_management/models/ConfirmationModal";
+import RejectWithSelectionModal from "../RejectWithSelectionModal";
 import { set } from "date-fns";
 
 const ManagerApprovalTable = ({
@@ -561,37 +562,39 @@ const ManagerApprovalTable = ({
               </div>
             </div>
           )} */}
-          <CancellationModal
-            title="Reject All"
-            subtitle="Are you sure you want to Reject all Timesheets?"
+          <RejectWithSelectionModal
             isOpen={cancellationModal}
+            week={{
+              startDate: week.startDate,
+              endDate: week.endDate,
+              timesheets: pendingTimesheets,
+            }}
+            isLoading={actionLoading}
             onCancel={handleRejectAllCancelModal}
-            onConfirm={async (reason) => {
+            onConfirm={async ({ approvedIds, rejectedIds, comment }) => {
+              setWeekLevelLoading((prev) => ({
+                ...prev,
+                [`${user.userId}-${week.weekId}`]: true,
+              }));
               setActionLoading(true);
               try {
-                const timesheetIds = pendingTimesheets.map((t) => t.timesheetId);
-                const comment = reason || "Rejected by manager";
-                await handleBulkReview(
-                  user.userId,
-                  timesheetIds,
-                  "REJECTED",
-                  comment,
-                );
-                // setShowCommentBox((prev) => ({
-                //   ...prev,
-                //   [user.userId]: null,
-                // }));
-                onRefresh?.();
-              } catch (err) {
-                console.error("Error rejecting timesheets:", err);
-                showStatusToast("Failed to reject timesheets", "error");
+                const ok = await handleMixedReview({
+                  path: "/timesheets/review",
+                  userId: user.userId,
+                  approvedIds,
+                  rejectedIds,
+                  comments: comment,
+                });
+                if (ok) onRefresh?.();
               } finally {
                 setActionLoading(false);
+                setWeekLevelLoading((prev) => ({
+                  ...prev,
+                  [`${user.userId}-${week.weekId}`]: false,
+                }));
                 handleRejectAllCancelModal();
               }
             }}
-            isLoading={actionLoading}
-            confirmText="Confirm"
           />
           <ConfirmationModal
             title="Approve All"
