@@ -2,11 +2,12 @@ import React, { useMemo, useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { reviewTimesheet, handleBulkReviewAdmin } from "../api";
+import { reviewTimesheet, handleBulkReviewAdmin, handleMixedReview } from "../api";
 import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
 import CancellationModal from "../../leave_management/models/CancellationModal";
+import RejectWithSelectionModal from "../RejectWithSelectionModal";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 const ReportingManagerApprovalTable = ({
@@ -365,13 +366,20 @@ const ReportingManagerApprovalTable = ({
           statusFilter === "All" ||
           week.weeklyStatus?.toUpperCase() === statusFilter.toUpperCase(),
       )
-      .map((week) => (
+      .map((week) => {
+        const pendingTimesheets = (week.timesheets || []).filter(
+          (t) => (t.status || "").toUpperCase() === "SUBMITTED",
+        );
+        const isActionable =
+          week.weeklyStatus === "SUBMITTED" ||
+          week.weeklyStatus === "PARTIALLY_APPROVED";
+        return (
         <div
           key={week.weekId}
           className="bg-white border rounded-xl shadow-sm mb-6 overflow-hidden"
         >
           {/* Manager actions */}
-          {week.weeklyStatus === "SUBMITTED" && (
+          {isActionable && pendingTimesheets.length > 0 && (
             <div className="p-4 border-t flex gap-3 justify-end items-center">
               {weekLevelLoading?.[`${user.userId}-${week.weekId}`] ? (
                 <LoadingSpinner text="Processing..." />
@@ -389,7 +397,7 @@ const ReportingManagerApprovalTable = ({
                         [`${user.userId}-${week.weekId}`]: true,
                       }));
                       try {
-                        const timesheetIds = week.timesheets.map(
+                        const timesheetIds = pendingTimesheets.map(
                           (t) => t.timesheetId,
                         );
                         await handleBulkReviewAdmin(
@@ -458,72 +466,51 @@ const ReportingManagerApprovalTable = ({
             projectInfo={projectInfo}
           />
 
-          {showCommentBox[user.userId] === week.weekId && (
-            <div className="p-4 bg-red-50 border-t">
-              <textarea
-                className="border p-2 w-full rounded"
-                rows="2"
-                placeholder="Enter rejection reason"
-                value={rejectionComments[week.weekId] || ""}
-                onChange={(e) =>
-                  setRejectionComments((prev) => ({
-                    ...prev,
-                    [week.weekId]: e.target.value,
-                  }))
-                }
-              />
-              <div className="flex gap-2 mt-2 justify-end">
-                <Button
-                  variant="danger"
-                  size="small"
-                  disabled={actionLoading}
-                  onClick={async () => {
-                    setActionLoading(true);
-                    try {
-                      const timesheetIds = week.timesheets.map(
-                        (t) => t.timesheetId,
-                      );
-                      const comment = rejectionComments[week.weekId] || "";
-                      await handleBulkReviewAdmin(
-                        user.userId,
-                        timesheetIds,
-                        "REJECTED",
-                        comment,
-                      );
-                      setShowCommentBox((prev) => ({
-                        ...prev,
-                        [user.userId]: null,
-                      }));
-                      onRefresh?.();
-                    } catch (err) {
-                      console.error("Error rejecting timesheets:", err);
-                      showStatusToast("Failed to reject timesheets", "error");
-                    } finally {
-                      setActionLoading(false);
-                    }
-                  }}
-                >
-                  Confirm Reject
-                </Button>
-
-                <Button
-                  variant="secondary"
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowCommentBox((prev) => ({
-                      ...prev,
-                      [user.userId]: null,
-                    }));
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
+          <RejectWithSelectionModal
+            isOpen={showCommentBox[user.userId] === week.weekId}
+            week={{
+              startDate: week.startDate,
+              endDate: week.endDate,
+              timesheets: pendingTimesheets,
+            }}
+            isLoading={actionLoading}
+            onCancel={() =>
+              setShowCommentBox((prev) => ({
+                ...prev,
+                [user.userId]: null,
+              }))
+            }
+            onConfirm={async ({ approvedIds, rejectedIds, comment }) => {
+              setWeekLevelLoading((prev) => ({
+                ...prev,
+                [`${user.userId}-${week.weekId}`]: true,
+              }));
+              setActionLoading(true);
+              try {
+                const ok = await handleMixedReview({
+                  path: "/timesheets/review/internal",
+                  userId: user.userId,
+                  approvedIds,
+                  rejectedIds,
+                  comments: comment,
+                });
+                if (ok) onRefresh?.();
+              } finally {
+                setActionLoading(false);
+                setWeekLevelLoading((prev) => ({
+                  ...prev,
+                  [`${user.userId}-${week.weekId}`]: false,
+                }));
+                setShowCommentBox((prev) => ({
+                  ...prev,
+                  [user.userId]: null,
+                }));
+              }
+            }}
+          />
         </div>
-      ));
+        );
+      });
 
   // -----------------------------
   // Main Render
