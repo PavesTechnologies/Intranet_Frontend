@@ -15,8 +15,8 @@ export const defaultFilters = {
 };
 
 const ROLE_PRIORITY = [
-    "Resource_Manager",
     "Delivery_Manager",
+    "Resource_Manager",
     "Project_Manager",
     "MANAGER",
     "Admin",
@@ -279,6 +279,8 @@ export function useDemand(projectId = null) {
             });
         } else if (activeTab === 'active') {
             list = list.filter(d => getDemandStatus(d) === 'APPROVED');
+        } else if (activeTab === 'requested') {
+            list = list.filter(d => getDemandStatus(d) === 'REQUESTED');
         } else if (activeTab === 'soft') {
             list = list.filter(isSoftDemand);
         } else if (activeTab === 'rejected') {

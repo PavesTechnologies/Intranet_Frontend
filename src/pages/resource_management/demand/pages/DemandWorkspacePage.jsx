@@ -609,6 +609,11 @@ const DemandWorkspacePage = () => {
         filters.deliveryModel !== 'ALL'
     ].filter(Boolean).length;
 
+    const hasRM = demandRoleOptions.some(option => option.value === "Resource_Manager");
+    const hasDM = demandRoleOptions.some(option => option.value === "Delivery_Manager");
+    const showRoleDropdown = hasRM && hasDM;
+    const displayedRoleOptions = demandRoleOptions.filter(option => option.value === "Resource_Manager" || option.value === "Delivery_Manager");
+
     return (
         <div className="min-h-screen bg-slate-50/50">
             <main className="w-full px-4 py-4 md:px-6 md:py-6">
@@ -622,7 +627,7 @@ const DemandWorkspacePage = () => {
                                 A Real-Time Snapshot Of Resource Mandates, Sla Compliance, And Fulfillment Status Across The Enterprise.
                             </p>
                         </div>
-                        {demandRoleOptions.length > 1 && (
+                        {showRoleDropdown && (
                             <div className="flex items-center gap-2 flex-nowrap shrink-0">
                                 <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">View As:</span>
                                 <Select
@@ -633,7 +638,7 @@ const DemandWorkspacePage = () => {
                                         <SelectValue placeholder="View As" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {demandRoleOptions.map((option) => (
+                                        {displayedRoleOptions.map((option) => (
                                             <SelectItem
                                                 key={option.value}
                                                 value={option.value}
@@ -654,47 +659,16 @@ const DemandWorkspacePage = () => {
                 </div>
 
                 <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-                    <div className="px-5 py-3 border-b border-slate-100 bg-white">
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                            <div className="flex items-center gap-5">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-[12px] font-bold text-slate-900 tracking-tight">Pipeline View</h3>
-                                    <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-bold text-slate-500">
-                                        {totalElements}
-                                    </span>
-                                </div>
-
-                                <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60">
-                                    {[
-                                        { id: 'breached', label: 'Breached', icon: SecurityAlertIcon, color: 'text-rose-600' },
-                                        { id: 'at_risk', label: 'At Risk', icon: WarningIcon, color: 'text-orange-600' },
-                                        { id: 'pending', label: 'Pending', icon: PendingIcon, color: 'text-amber-600' },
-                                        { id: 'active', label: 'Approved', icon: ActivityIcon, color: 'text-indigo-600' },
-                                        { id: 'soft', label: 'Soft', icon: ZapIcon, color: 'text-slate-600' },
-                                        { id: 'fulfilled', label: 'Fulfilled', icon: SuccessIcon, color: 'text-emerald-600' },
-                                        { id: 'rejected', label: 'Rejected', icon: ErrorIcon, color: 'text-rose-600' }
-                                    ].map(tab => (
-                                        <Button
-                                            key={tab.id}
-                                            onClick={() => setActiveTab(tab.id)}
-                                            variant="ghost"
-                                            size="small"
-                                            className={cn(
-                                                "flex items-center gap-1 rounded-md px-3 py-1 text-[10px] font-bold shadow-none",
-                                                activeTab === tab.id
-                                                    ? "bg-white text-slate-900 shadow-sm"
-                                                    : "text-slate-400 hover:text-slate-600"
-                                            )}
-                                        >
-                                            <tab.icon className={cn("h-3 w-3", activeTab === tab.id ? tab.color : "opacity-40")} />
-                                            {tab.label}
-                                        </Button>
-                                    ))}
-                                </div>
+                    <div className="border-b border-slate-100 bg-white">
+                        <div className="px-5 pt-3 pb-0 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-[12px] font-bold text-slate-900 tracking-tight">Pipeline View</h3>
+                                <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-bold text-slate-500">
+                                    {totalElements}
+                                </span>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                
+                            <div className="flex items-center gap-2 pb-2 lg:pb-0">
                                 <div className="relative">
                                     <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                                     <input
@@ -722,6 +696,34 @@ const DemandWorkspacePage = () => {
                                     )}
                                 </button>
                             </div>
+                        </div>
+
+                        <div className="px-5 flex items-center gap-6 overflow-x-auto scrollbar-hide">
+                            {[
+                                { id: 'breached', label: 'Breached', color: 'text-rose-600' },
+                                { id: 'at_risk', label: 'At Risk', color: 'text-orange-600' },
+                                ...(normalizeRole(effectiveRole) === 'DELIVERYMANAGER' ? [{ id: 'requested', label: 'Requested', color: 'text-blue-600' }] : []),
+                                { id: 'active', label: 'Approved', color: 'text-indigo-600' },
+                                { id: 'soft', label: 'Soft', color: 'text-slate-600' },
+                                { id: 'fulfilled', label: 'Fulfilled', color: 'text-emerald-600' },
+                                { id: 'rejected', label: 'Rejected', color: 'text-rose-600' }
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={cn(
+                                        "relative py-3 text-[11px] font-bold transition-colors whitespace-nowrap outline-none",
+                                        activeTab === tab.id
+                                            ? "text-indigo-600"
+                                            : "text-slate-500 hover:text-slate-800"
+                                    )}
+                                >
+                                    {tab.label}
+                                    {activeTab === tab.id && (
+                                        <span className="absolute bottom-0 left-0 w-full h-[2px] rounded-t-full bg-indigo-600" />
+                                    )}
+                                </button>
+                            ))}
                         </div>
                     </div>
 

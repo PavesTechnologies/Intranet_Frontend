@@ -50,6 +50,25 @@ const STATUS_COLORS = {
 
 /* ---------------- SUB-COMPONENTS ---------------- */
 
+const Stat = ({ title, value, icon: Icon, color = "indigo" }) => {
+  const theme = COLOR_STYLES[color] || COLOR_STYLES.indigo;
+  return (
+    <div
+      className={`bg-white border rounded-xl p-5 shadow-sm flex justify-between items-center transition-all hover:shadow-md ${theme.border}`}
+    >
+      <div>
+        <p className="text-xs text-gray-400 font-bold tracking-wider">
+          {title}
+        </p>
+        <p className={`text-2xl font-bold mt-1 ${theme.text}`}>{value}</p>
+      </div>
+      <div className={`${theme.bg} p-3 rounded-lg`}>
+        <Icon className={theme.text} size={22} />
+      </div>
+    </div>
+  );
+};
+
 const Modal = ({ title, children, onClose }) => (
   <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 md:p-10">
     {/* Backdrop */}
