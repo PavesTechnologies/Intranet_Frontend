@@ -237,7 +237,6 @@ export default function AdminOfferView() {
             <ArrowLeft size={16} />
             Back
           </button>
-          <span className="text-xs text-slate-400 font-mono">{user_uuid}</span>
         </div>
       </div>
 
