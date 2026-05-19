@@ -141,6 +141,11 @@ const isAtRiskDemand = (demand = {}) =>
     demand.warningThresholdDays !== undefined &&
     Number(demand.remainingDays) < Number(demand.warningThresholdDays);
 
+const toNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 const getDemandRoleOptions = (roles = []) => {
     if (!Array.isArray(roles) || roles.length === 0) return [];
     const normalized = roles.map(normalizeRoleKey);
@@ -218,11 +223,29 @@ export function useDemand(projectId = null) {
         };
     }, [effectiveRole, projectId]);
 
+    const loadData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const { demandsData, kpis } = await fetchData();
+            setDemands(demandsData);
+            setKpiData(kpis);
+            return { demandsData, kpis };
+        } catch (error) {
+            console.error("Demand Hook Fetch Error:", error);
+            notify.error(error, "Failed to load demand data");
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    }, [fetchData]);
+
     useEffect(() => {
         let isActive = true;
 
-        const loadData = async () => {
-            setIsLoading(true);
+        const syncData = async () => {
+            if (isActive) {
+                setIsLoading(true);
+            }
             try {
                 const { demandsData, kpis } = await fetchData();
                 if (!isActive) return;
@@ -239,7 +262,7 @@ export function useDemand(projectId = null) {
             }
         };
 
-        loadData();
+        syncData();
 
         return () => {
             isActive = false;
@@ -389,6 +412,7 @@ export function useDemand(projectId = null) {
         const counts = {
             active: 0,
             approved: 0,
+            fulfilled: 0,
             pending: 0,
             soft: 0,
             atRisk: 0,
@@ -417,6 +441,7 @@ export function useDemand(projectId = null) {
             }
 
             if (isApprovedDemand || ['OPEN', 'ACTIVE'].includes(status)) counts.approved++;
+            if (status === 'FULFILLED') counts.fulfilled++;
             if (isPendingDemand) counts.pending++;
             if (['APPROVED', 'OPEN', 'ACTIVE', 'REQUESTED', 'PENDING', 'DRAFT', 'IN_PROGRESS', 'IN PROGRESS'].includes(status)) counts.active++;
 
@@ -429,6 +454,39 @@ export function useDemand(projectId = null) {
             }
         });
 
+        if (kpiData) {
+            if (isRM) {
+                return [
+                    { label: "Approved", count: toNumber(kpiData.active, counts.approved) },
+                    { label: "Fulfilled", count: toNumber(kpiData.approved, counts.fulfilled) },
+                    { label: "Pending", count: toNumber(kpiData.pending, counts.pending) },
+                    { label: "Soft", count: toNumber(kpiData.soft, counts.soft) },
+                    { label: "SLA At Risk", count: toNumber(kpiData.slaAtRisk, counts.atRisk) },
+                    { label: "SLA Breached", count: toNumber(kpiData.slaBreached, counts.breached) }
+                ];
+            }
+
+            return [
+                { label: "Active", count: toNumber(kpiData.active, counts.active) },
+                { label: "Approved", count: toNumber(kpiData.approved, counts.approved) },
+                { label: "Pending", count: toNumber(kpiData.pending, counts.pending) },
+                { label: "Soft", count: toNumber(kpiData.soft, counts.soft) },
+                { label: "SLA At Risk", count: toNumber(kpiData.slaAtRisk, counts.atRisk) },
+                { label: "SLA Breached", count: toNumber(kpiData.slaBreached, counts.breached) }
+            ];
+        }
+
+        if (isRM) {
+            return [
+                { label: "Approved", count: counts.approved },
+                { label: "Fulfilled", count: counts.fulfilled },
+                { label: "Pending", count: counts.pending },
+                { label: "Soft", count: counts.soft },
+                { label: "SLA At Risk", count: counts.atRisk },
+                { label: "SLA Breached", count: counts.breached }
+            ];
+        }
+
         return [
             { label: "Active", count: counts.active },
             { label: "Approved", count: counts.approved },
@@ -437,7 +495,7 @@ export function useDemand(projectId = null) {
             { label: "SLA At Risk", count: counts.atRisk },
             { label: "SLA Breached", count: counts.breached }
         ];
-    }, [demands, effectiveRole, user]);
+    }, [demands, effectiveRole, kpiData, user]);
 
     const availableClients = useMemo(() => {
         const clients = new Set(demands.map(d => d.clientName || d.client).filter(Boolean));
@@ -490,7 +548,7 @@ export function useDemand(projectId = null) {
         selectedRole,
         setSelectedRole,
         effectiveRole,
-        refreshData: fetchData,
+        refreshData: loadData,
         page,
         setPage,
         pageSize,
