@@ -319,6 +319,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                                 ]}
                                 value={formData.demandId}
                                 onChange={(val) => handleDemandChange({ target: { value: val } })}
+                                optionsClassName="w-full"
                             />
                         </div>
                     ) : (
@@ -434,6 +435,22 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
 
                 {/* Dates Row */}
                 <div className="grid grid-cols-2 gap-4">
+                    {formData.allocationStatus === 'PLANNED' && (
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                <CalendarIcon className="h-3 w-3 text-indigo-500" /> Start Date
+                            </label>
+                            <Input
+                                type="date"
+                                value={formData.allocationStartDate}
+                                min={minStart}
+                                max={formData.allocationEndDate || maxEnd}
+                                onChange={(e) => setFormData({ ...formData, allocationStartDate: e.target.value })}
+                                className={cn("h-10 rounded-xl border-slate-200 font-bold text-slate-900 text-xs", errors.allocationStartDate && "border-rose-500")}
+                            />
+                            {errors.allocationStartDate && <p className="text-[9px] font-bold text-rose-500 mt-0.5">{errors.allocationStartDate}</p>}
+                        </div>
+                    )}
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                             <CalendarIcon className="h-3 w-3 text-indigo-500" /> End Date
@@ -490,13 +507,12 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                         <div className="relative">
                             <FilterListbox
                                 options={[
-                                    { value: "PLANNED", label: "PLANNED" },
                                     { value: "ACTIVE", label: "ACTIVE" },
-                                    { value: "ENDED", label: "ENDED" },
-                                    { value: "CANCELLED", label: "CANCELLED" },
+                                    { value: "PLANNED", label: "PLANNED" }
                                 ]}
                                 value={formData.allocationStatus}
                                 onChange={(val) => setFormData({ ...formData, allocationStatus: val })}
+                                optionsClassName="w-full"
                             />
                         </div>
                         {errors.allocationStatus && <p className="text-[9px] font-bold text-rose-500 mt-1">{errors.allocationStatus}</p>}
