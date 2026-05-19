@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { KeyRound, Layers } from "lucide-react";
 
 import AppCard from "../../../../components/Cards/AppCard";
@@ -27,26 +27,14 @@ export default function GroupDetails() {
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const token = localStorage.getItem("token");
-
   useEffect(() => {
     const fetchGroup = async () => {
       try {
         setLoading(true);
 
-        const authConfig = {
-          headers: { Authorization: `Bearer ${token}` },
-        };
-
         const [groupRes, permissionRes] = await Promise.all([
-          axios.get(
-            `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/groups/${groupId}`,
-            authConfig
-          ),
-          axios.get(
-            `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/groups/${groupId}/permissions`,
-            authConfig
-          ),
+          api.get(`/admin/groups/${groupId}`),
+          api.get(`/admin/groups/${groupId}/permissions`),
         ]);
 
         setGroup(groupRes.data);
@@ -64,7 +52,7 @@ export default function GroupDetails() {
     if (groupId) {
       fetchGroup();
     }
-  }, [groupId, token]);
+  }, [groupId]);
 
   if (loading) {
     return (

@@ -18,16 +18,16 @@ const EmployeePanel = () => {
   if (!Array.isArray(roles)) {
     roles = roles.split(',').map((r) => r.trim());
   }
-  roles = roles.map((r) => r.toLowerCase().replace('hr-manager', 'hr-administrator'));
+  // roles = roles.map((r) => r.replace('Hr_Manager', 'hr-administrator'));
 
   console.log("EmployeePanel Roles:", roles);
 
   const employeeId = employee.user?.user_id;
 
-  const isManager = roles.includes('reporting_manager') || (employee?.roles || '').toLowerCase() === 'super admin';
-  const isHR = roles.includes('hr');
-  const isHRAdministrator = roles.includes('hr-administrator');
-  
+  const isManager = roles.includes('Reporting_Manager') || (employee?.roles || '').toLowerCase() === 'Super_Admin';
+  const isHR = roles.includes('HR') || (employee?.roles || '').toLowerCase() === 'Super_Admin';
+  const isHRAdministrator = roles.includes('Hr_Manager') || (employee?.roles || '').toLowerCase() === 'Super_Admin';
+
   // Default view logic remains the same
   useEffect(() => {
     if (isHRAdministrator && !isManager) {
@@ -45,7 +45,7 @@ const EmployeePanel = () => {
 
   const handleViewChange = (view) => {
     if (view === 'admin' && !isManager) return;
-    if (view === 'hr' && !isHR) return;
+    if (view === 'HR' && !isHR) return;
     if (view === 'hr-admin' && !isHRAdministrator) return;
     setActiveView(view);
   };
@@ -58,18 +58,16 @@ const EmployeePanel = () => {
           <div className="inline-flex bg-gray-200 rounded-lg p-1 shadow-inner">
             <button
               onClick={() => handleViewChange('employee')}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                activeView === 'employee' ? 'bg-indigo-600 text-white shadow' : 'text-gray-700 hover:bg-white'
-              }`}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${activeView === 'employee' ? 'bg-indigo-600 text-white shadow' : 'text-gray-700 hover:bg-white'
+                }`}
             >
               Employee View
             </button>
             {isManager && (
               <button
                 onClick={() => handleViewChange('admin')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                  activeView === 'admin' ? 'bg-indigo-600 text-white shadow' : 'text-gray-700 hover:bg-white'
-                }`}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${activeView === 'admin' ? 'bg-indigo-600 text-white shadow' : 'text-gray-700 hover:bg-white'
+                  }`}
               >
                 Manager View
               </button>
@@ -77,9 +75,8 @@ const EmployeePanel = () => {
             {isHRAdministrator && (
               <button
                 onClick={() => handleViewChange('hr-admin')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                  activeView === 'hr-admin' ? 'bg-indigo-600 text-white shadow' : 'text-gray-700 hover:bg-white'
-                }`}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${activeView === 'hr-admin' ? 'bg-indigo-600 text-white shadow' : 'text-gray-700 hover:bg-white'
+                  }`}
               >
                 HR-Admin View
               </button>
@@ -87,9 +84,8 @@ const EmployeePanel = () => {
             {isHR && (
               <button
                 onClick={() => handleViewChange('hr')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                  activeView === 'hr' ? 'bg-purple-600 text-white shadow' : 'text-gray-700 hover:bg-white'
-                }`}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${activeView === 'hr' ? 'bg-purple-600 text-white shadow' : 'text-gray-700 hover:bg-white'
+                  }`}
               >
                 HR Tools
               </button>

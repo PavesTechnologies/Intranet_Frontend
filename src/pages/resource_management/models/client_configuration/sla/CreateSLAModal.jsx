@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X } from "lucide-react";
+import { CloseIcon } from "@/components/icons";
 import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 const CreateSLAModal = ({ open, onClose }) => {
@@ -45,7 +45,7 @@ const CreateSLAModal = ({ open, onClose }) => {
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 
@@ -78,6 +78,7 @@ const CreateSLAModal = ({ open, onClose }) => {
               type="number"
               name="sla_duration_days"
               value={formData.sla_duration_days}
+              onWheel={(e) => e.target.blur()}
               onChange={handleChange}
               placeholder="e.g. 15"
               className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
@@ -93,6 +94,7 @@ const CreateSLAModal = ({ open, onClose }) => {
               type="number"
               name="warning_threshold_days"
               value={formData.warning_threshold_days}
+              onWheel={(e) => e.target.blur()}
               onChange={handleChange}
               placeholder="e.g. 5"
               className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"

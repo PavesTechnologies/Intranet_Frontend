@@ -344,27 +344,20 @@ const AppRoutes = () => {
           <Route path="/profile/edit" element={<EditProfile />} />
           {/* Projects */}
           {/* <Route path="/projects/dashboard" element={<AdminDashboard />} /> */}
-          <Route path="/projects/developer" element={<ReadOnlyDashboard />} />
+          
           <Route
             path="/projects"
             element={
-              // <ProtectedRoute allowedRoles={["Manager"]}>
+             
               <ProjectDashboard />
-              // </ProtectedRoute>
+            
             }
           />
 
           <Route path="/projects" element={<ProjectManager />} />
           <Route path="/projects/:projectId" element={<ProjectTabs />} />
           <Route path="/projects/list" element={<ProjectList />} />
-          {/* <Route
-  path="/projects/:projectId/issuetracker"
-  element={
-    <ProtectedRoute allowedRoles={["General", "Manager"]}>
-      <IssueTracker />
-    </ProtectedRoute>
-  }
-/> */}
+          
           <Route
             path="/projects/:projectId/issuetracker"
             element={<IssueTracker />}
@@ -373,30 +366,16 @@ const AppRoutes = () => {
             path="/projects/:projectId/cycles/runs/:runId/test-runs"
             element={<AddCasesFromProjectModal />}
           />
-          <Route
-            path="/projects/performance"
-            element={<EmployeePerformance />}
-          />
+          
           <Route
             path="/projects/:projectId/cycles/:cycleId/runs"
             element={<CycleRunsPage />}
           />
-          <Route path="/projects/user/myprofile" element={<Userprofile />} />
-          <Route path="/projects/userlist" element={<UserProjectList />} />
-          {/* <Route path="/projects/user/:userId" element={<UserProjectDashboard />} /> */}
-          <Route
-            path="/projects/userbacklog/:projectId"
-            element={<UserBacklog />}
-          />
+         
+          
           <Route path="/projects/admin" element={<ProjectManager />} />
-          <Route
-            path="/projects/user/:projectId"
-            element={<UserProjectTabs />}
-          />
-          <Route
-            path="/projects/:projectId/user/userissuetracker"
-            element={<UserIssueTracker />}
-          />
+          
+          
           <Route
             path="/projects/:projectId/issues/:type/:id/view"
             element={<ViewSheet />}
@@ -571,7 +550,7 @@ const AppRoutes = () => {
           {/* <Route
             path="/user-management/users"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <UsersTable />
               </ProtectedRoute>
             }
@@ -579,7 +558,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/users/create"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <CreateUser />
               </ProtectedRoute>
             }
@@ -587,7 +566,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/users/edit/:id"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <EditUser />
               </ProtectedRoute>
             }
@@ -595,7 +574,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/users/roles"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <UpdateUserRoles />
               </ProtectedRoute>
             }
@@ -603,7 +582,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/roles/edit-role/:userId"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <EditUserRoleForm />
               </ProtectedRoute>
             }
@@ -611,7 +590,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/roles"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <RoleManagement />
               </ProtectedRoute>
             }
@@ -619,7 +598,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/permissions"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <PermissionManagement />
               </ProtectedRoute>
             }
@@ -627,7 +606,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/groups"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <PermissionGroupManagement />
               </ProtectedRoute>
             }
@@ -635,7 +614,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/groups/:groupId"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <GroupDetails />
               </ProtectedRoute>
             }
@@ -643,7 +622,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/access-points"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <AccessPointManagement />
               </ProtectedRoute>
             }
@@ -651,7 +630,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/access-points/create"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <AccessPointForm />
               </ProtectedRoute>
             }
@@ -659,7 +638,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/access-points/:access_id"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <AccessPointDetails />
               </ProtectedRoute>
             }
@@ -667,7 +646,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/access-points/edit/:access_id"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <AccessPointEdit />
               </ProtectedRoute>
             }
@@ -675,7 +654,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/access-points/admin/access-point-mapping"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <AccessPointMapping />
               </ProtectedRoute>
             }
@@ -881,7 +860,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/demand"
             element={
-              <ProtectedRoute allowedRoles={["Resource_Manager", "Delivery_Manager", "Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Resource_Manager", "Delivery_Manager", "Admin", "Super_Admin"]}>
                 <DemandWorkspacePage />
               </ProtectedRoute>
             }
@@ -889,7 +868,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/demand/:demandId"
             element={
-              <ProtectedRoute allowedRoles={["Resource_Manager", "Delivery_Manager", "Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Resource_Manager", "Delivery_Manager", "Admin", "Super_Admin"]}>
                 <DemandDetailPage />
               </ProtectedRoute>
             }
@@ -897,7 +876,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff"
             element={
-              <ProtectedRoute allowedRoles={["Project_Manager", "Resource_Manager", "Delivery_Manager", "Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Project_Manager", "Resource_Manager", "Delivery_Manager", "Admin", "Super_Admin"]}>
                 <RoleOffEntry />
               </ProtectedRoute>
             }

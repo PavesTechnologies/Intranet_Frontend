@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import FilterListbox from "../../../../components/filter/FilterListbox";
-import { AlertTriangle, Calendar, CheckCircle2, Percent, User, X } from "lucide-react";
+import { WarningIcon, CalendarIcon, SuccessIcon, PercentIcon, UserIcon, CloseIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -104,7 +104,7 @@ const CreateModificationModal = ({
     setForm((currentForm) => ({
       ...currentForm,
       currentAllocationPercentage: String(currentAllocation),
-      requestedAllocationPercentage: String(Math.max(Number(currentAllocation), 0)),
+      requestedAllocationPercentage: "",
       effectiveDate: "",
       overrideEndDate: "",
       reason: "",
@@ -131,8 +131,7 @@ const CreateModificationModal = ({
       allocationId: nextAllocationId,
       currentAllocationPercentage:
         nextCurrentAllocation === "" ? "" : String(nextCurrentAllocation),
-      requestedAllocationPercentage:
-        nextCurrentAllocation === "" ? "" : String(nextCurrentAllocation),
+      requestedAllocationPercentage: "",
       overrideEndDate: "",
     }));
   };
@@ -226,7 +225,7 @@ const CreateModificationModal = ({
         <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600/10 text-indigo-600">
-              <CheckCircle2 className="h-4 w-4 text-white" />
+              <SuccessIcon className="h-4 w-4 text-white" />
             </div>
             <div>
               <h2 className="text-base font-semibold text-slate-900">Create Modification</h2>
@@ -240,11 +239,11 @@ const CreateModificationModal = ({
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
           >
-            <X className="h-4 w-4" />
+            <CloseIcon className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overflow-x-hidden p-6">
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1">
@@ -258,7 +257,7 @@ const CreateModificationModal = ({
 
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-[11px] font-medium text-slate-600">
-                  <User className="h-3.5 w-3.5 text-slate-400" />
+                  <UserIcon className="h-3.5 w-3.5 text-slate-400" />
                   Resource
                 </label>
                 <FilterListbox
@@ -273,6 +272,7 @@ const CreateModificationModal = ({
                   ]}
                   value={form.allocationId}
                   onChange={(val) => handleResourceChange({ target: { value: val } })}
+                  optionsClassName="w-full"
                 />
                 {errors.allocationId && (
                   <p className="text-[11px] text-rose-600">{errors.allocationId}</p>
@@ -307,13 +307,14 @@ const CreateModificationModal = ({
 
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-[11px] font-medium text-slate-600">
-                  <Percent className="h-3.5 w-3.5 text-slate-400" />
+                  <PercentIcon className="h-3.5 w-3.5 text-slate-400" />
                   Requested Allocation %
                 </label>
                 <Input
                   type="number"
                   min="0"
                   value={form.requestedAllocationPercentage}
+                  onWheel={(e) => e.target.blur()}
                   onChange={handleRequestedAllocationChange}
                   className={cn(
                     "h-10 rounded-lg border text-sm text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-500/15",
@@ -329,7 +330,7 @@ const CreateModificationModal = ({
 
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-[11px] font-medium text-slate-600">
-                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  <CalendarIcon className="h-3.5 w-3.5 text-slate-400" />
                   Effective Date
                 </label>
                 <Input

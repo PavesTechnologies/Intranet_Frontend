@@ -5,6 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import StatusBadge from "../../../components/status/statusbadge";
 import {
   ArrowLeft,
@@ -61,7 +62,6 @@ export default function AdminOfferView() {
   const { user_uuid } = useParams();
   const navigate = useNavigate();
 
-  const token = localStorage.getItem("token");
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const [offer, setOffer] = useState(null);
@@ -82,7 +82,7 @@ export default function AdminOfferView() {
   /* ---------------- FETCH OFFER ---------------- */
   const fetchOffer = async () => {
     const res = await axios.get(`${BASE}/offerletters/offer/${user_uuid}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
     setOffer(getOfferWithJoiningStatus(res.data));
   };
@@ -91,7 +91,7 @@ export default function AdminOfferView() {
   /* ---------------- FETCH APPROVAL ---------------- */
   const fetchApproval = async () => {
     const res = await axios.get(`${BASE}/offer-approval/my-actions`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
     console.log("ADMIN APPROVAL API RAW:", res.data);
     const found = res.data.find((i) => i.user_uuid === user_uuid);
@@ -142,7 +142,7 @@ export default function AdminOfferView() {
                 "Kept on hold by admin"
           ),
         },
-        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" } }
       );
       toast.success(
         action === "APPROVED" ? "Offer approved" :
@@ -168,7 +168,7 @@ export default function AdminOfferView() {
     try {
       const res = await axios.get(
         `${BASE}/offerletters/${user_uuid}/generate-preview`,
-        { headers: { Authorization: `Bearer ${token}` }, responseType: "blob" }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }, responseType: "blob" }
       );
       const file = new Blob([res.data], { type: "application/pdf" });
       window.open(URL.createObjectURL(file), "_blank");
@@ -183,7 +183,7 @@ export default function AdminOfferView() {
     try {
       setActing(true);
       await axios.delete(`${BASE}/offer-approval-requests/request/delete`, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" },
         data: [{ user_uuid }],
       });
       toast.success("Approval request deleted successfully");
@@ -199,11 +199,8 @@ export default function AdminOfferView() {
   /* ── Loading / Not found ── */
   if (loading)
     return (
-      <div className="emp-page min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin" />
-          <p className="text-slate-500 text-sm">Loading offer details…</p>
-        </div>
+      <div className="emp-page min-h-screen bg-slate-50">
+        <LoadingSpinner text="Loading offer details..." />
       </div>
     );
 
@@ -240,7 +237,6 @@ export default function AdminOfferView() {
             <ArrowLeft size={16} />
             Back
           </button>
-          <span className="text-xs text-slate-400 font-mono">{user_uuid}</span>
         </div>
       </div>
 
@@ -335,19 +331,19 @@ export default function AdminOfferView() {
                 { icon: <IndianRupee size={16} />, label: "CTC", value: `${offer.total_ctc} ${offer.currency}`, delay: 240 },
                 { icon: <UserCheck size={16} />, label: "Employee Type", value: offer.employee_type, delay: 300 },
                 {
-  icon: <Mail size={16} />,
-  label: "CC Emails",
-  value: Array.isArray(offer?.cc_emails)
-    ? offer.cc_emails.join(", ")
-    : typeof offer?.cc_emails === "string"
-      ? offer.cc_emails
-          .split(",")
-          .map((e) => e.trim())
-          .filter(Boolean)
-          .join(", ")
-      : "—",
-  delay: 360,
-},
+                  icon: <Mail size={16} />,
+                  label: "CC Emails",
+                  value: Array.isArray(offer?.cc_emails)
+                    ? offer.cc_emails.join(", ")
+                    : typeof offer?.cc_emails === "string"
+                      ? offer.cc_emails
+                        .split(",")
+                        .map((e) => e.trim())
+                        .filter(Boolean)
+                        .join(", ")
+                      : "—",
+                  delay: 360,
+                },
               ].map(({ icon, label, value, delay }) => (
                 <GhostCard key={label} icon={icon} label={label} value={value} delay={delay} />
               ))}

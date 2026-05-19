@@ -8,6 +8,7 @@ import TestPlans from "./TestPlans";
 import TestDesign from "./TestDesign/TestDesign";
 import TestExecution from "./TestExecution/TestExecution";
 import BugPage from "./Bug/BugPage";
+import DevDashboard from "./Bug/DevDashboard";
 
 import { useEffect, useState } from "react";
 
@@ -43,15 +44,21 @@ export default function TestManagement() {
       case "test-management/test-bugs":
         return <BugPage projectId={projectId} />;
 
+      case "test-management/dev-dashboard":
+        return <DevDashboard />;
+
       default:
         return <TestPlans  projectId={projectId} />;
     }
   };
 
   return (
-    <div className="w-full">
+    <div
+      className="flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden"
+      style={{ height: "calc(100vh - 64px)" }}
+    >
       <TopTabs selectedTab={selectedTab} projectId={projectId} />
-      <div>{renderTabContent()}</div>
+      <div className="flex-1 min-h-0 overflow-hidden">{renderTabContent()}</div>
     </div>
   );
 }

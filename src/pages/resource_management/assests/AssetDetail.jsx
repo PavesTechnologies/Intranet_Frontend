@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, Fragment } from "react";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { jwtDecode } from "jwt-decode";
+import { KPICard } from "../../../components/kpi/KPI";
 
 import { useNavigate, useParams } from "react-router-dom";
 import { getAssetsByClient } from "../services/clientservice";
@@ -30,11 +31,12 @@ import {
   deleteClientAssignment,
   getProjectsByClient,
 } from "../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { Listbox, Transition } from "@headlessui/react";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import Pagination from "../../../components/Pagination/pagination";
+import GenericTable from "../../../components/Table/table";
 
 /* ---------------- CONSTANTS & STYLES ---------------- */
 
@@ -46,31 +48,6 @@ const STATUS_COLORS = {
   LOST: "bg-red-100 text-red-700",
 };
 
-const COLOR_STYLES = {
-  indigo: {
-    bg: "bg-indigo-50",
-    text: "text-indigo-600",
-    border: "border-indigo-100",
-  },
-  emerald: {
-    bg: "bg-emerald-50",
-    text: "text-emerald-600",
-    border: "border-emerald-100",
-  },
-  amber: {
-    bg: "bg-amber-50",
-    text: "text-amber-600",
-    border: "border-amber-100",
-  },
-  blue: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-100" },
-  rose: { bg: "bg-rose-50", text: "text-rose-600", border: "border-rose-100" },
-  yellow: {
-    bg: "bg-yellow-50",
-    text: "text-yellow-600",
-    border: "border-yellow-100",
-  },
-};
-
 /* ---------------- SUB-COMPONENTS ---------------- */
 
 const Stat = ({ title, value, icon: Icon, color = "indigo" }) => {
@@ -80,7 +57,7 @@ const Stat = ({ title, value, icon: Icon, color = "indigo" }) => {
       className={`bg-white border rounded-xl p-5 shadow-sm flex justify-between items-center transition-all hover:shadow-md ${theme.border}`}
     >
       <div>
-        <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">
+        <p className="text-xs text-gray-400 font-bold tracking-wider">
           {title}
         </p>
         <p className={`text-2xl font-bold mt-1 ${theme.text}`}>{value}</p>
@@ -195,7 +172,7 @@ const AssetDetail = () => {
       setProjectResources(res?.data || []);
     } catch (err) {
       console.error("Failed to load project resources", err);
-      toast.error(err.response?.data?.message || "Failed to load project resources");
+      notify.error(err, "Failed to load project resources");
     } finally {
       setProjectResourcesLoading(false);
     }
@@ -223,7 +200,7 @@ const AssetDetail = () => {
       setAvailableSerials(filtered);
     } catch (err) {
       console.error("Failed to fetch serial numbers", err);
-      toast.error("Failed to load available serial numbers");
+      notify.error("Failed To Load Available Serial Numbers");
     } finally {
       setSerialLoading(false);
     }
@@ -278,7 +255,7 @@ const AssetDetail = () => {
         }
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to load asset details");
+      notify.error(err, "Failed to load asset details");
     } finally {
       setLoading(false);
     }
@@ -296,7 +273,7 @@ const AssetDetail = () => {
       const res = await getAssignmentKPI(assetId);
       setKPIData(res.data);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to load KPI data");
+      notify.error(err, "Failed to load KPI data");
     } finally {
       setKPILoading(false);
     }
@@ -316,9 +293,15 @@ const AssetDetail = () => {
   const utilization = kpiData?.utilization;
 
   const getUtilizationColor = (rate) => {
-    if (rate >= 80) return "emerald";
-    if (rate >= 50) return "yellow";
-    return "rose";
+    if (rate >= 80) return "bg-emerald-100 text-emerald-600";
+    if (rate >= 50) return "bg-amber-100 text-amber-600";
+    return "bg-rose-100 text-rose-600";
+  };
+
+  const getUtilizationIconColor = (rate) => {
+    if (rate >= 80) return "text-emerald-600";
+    if (rate >= 50) return "text-amber-600";
+    return "text-rose-600";
   };
 
   const filteredAssignments = useMemo(() => {
@@ -395,15 +378,15 @@ const AssetDetail = () => {
         const res = await assignClientAsset(payload);
       }
       if (editingAssignment) {
-        toast.success("Assignment updated successfully");
+        notify.success("Assignment Updated Successfully");
       } else {
-        toast.success("Assignment created successfully");
+        notify.success("Assignment Created Successfully");
       }
       await fetchData();
       fetchKPI();
       closeModal();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to save record");
+      notify.error(err, "Failed to save record");
     } finally {
       setUpdateLoading(false);
     }
@@ -412,7 +395,7 @@ const AssetDetail = () => {
   const handleReturnSubmit = async (e) => {
     e.preventDefault();
     if (!returnData.conditionOnReturn) {
-      toast.warning("Please select the condition on return.");
+      notify.warning("Please select the condition on return.");
       return;
     }
     setReturnLoading(true);
@@ -422,13 +405,13 @@ const AssetDetail = () => {
         today,
         returnData.returnNotes,
       );
-      toast.success(res.message || "Asset marked as returned");
+      notify.success(res.message || "Asset marked as returned");
       await fetchData();
       fetchKPI();
       setReturnModal(false);
       setReturnItem(null);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to return asset");
+      notify.error(err, "Failed to return asset");
     } finally {
       setReturnLoading(false);
     }
@@ -438,11 +421,11 @@ const AssetDetail = () => {
     setDeleteLoading(true);
     try {
       const res = await deleteClientAssignment(deleteTarget.assignmentId);
-      toast.success(res.message || "Record deleted");
+      notify.success(res.message || "Record deleted");
       await fetchData();
     } catch (err) {
       console.log(err);
-      toast.error(err.response?.data || "Failed to delete record");
+      notify.error(err, "Failed to delete record");
     } finally {
       setDeleteLoading(false);
       setDeleteTarget(null);
@@ -541,28 +524,28 @@ const AssetDetail = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Stat
-            title="Total Stock"
+          <KPICard
+            label="Total Stock"
             value={totalStock}
-            icon={Box}
-            color="blue"
+            icon={<Box className="w-5 h-5 text-blue-600" />}
+            color="bg-blue-100 text-blue-600"
           />
-          <Stat
-            title="Active Assignments"
+          <KPICard
+            label="Active Assignments"
             value={assignedCount}
-            icon={Users}
-            color="emerald"
+            icon={<Users className="w-5 h-5 text-emerald-600" />}
+            color="bg-emerald-100 text-emerald-600"
           />
-          <Stat
-            title="Available"
+          <KPICard
+            label="Available"
             value={availableCount}
-            icon={Laptop}
-            color="amber"
+            icon={<Laptop className="w-5 h-5 text-amber-600" />}
+            color="bg-amber-100 text-amber-600"
           />
-          <Stat
-            title="Utilization"
+          <KPICard
+            label="Utilization"
             value={`${utilization}%`}
-            icon={Percent}
+            icon={<Percent className={`w-5 h-5 ${getUtilizationIconColor(utilization)}`} />}
             color={getUtilizationColor(utilization)}
           />
         </div>
@@ -605,131 +588,93 @@ const AssetDetail = () => {
       </div>
 
       {/* TABLE */}
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-gray-500 border-b bg-gray-50/50">
-              <tr>
-                <th className="py-3 px-4 text-center w-[15%]">Resource</th>
-                <th className="py-3 px-4 text-center w-[15%]">Project</th>
-                <th className="py-3 px-4 text-center w-[15%]">Serial</th>
-                <th className="py-3 px-4 text-center w-[15%]">Location</th>
-                <th className="py-3 px-4 text-center w-[15%]">Assigned</th>
-                {activeTab === "HISTORY" && (
-                  <th className="py-3 px-4 text-center w-[15%]">Returned</th>
+      <div className="bg-white border rounded-xl shadow-sm overflow-hidden no-scrollbar">
+        <GenericTable
+          headers={[
+            "Resource",
+            "Project",
+            "Serial",
+            "Location",
+            "Assigned",
+            ...(activeTab === "HISTORY" ? ["Returned"] : []),
+            "Status",
+            "Actions",
+          ]}
+          columns={[
+            "resourceName",
+            "projectName",
+            "serial_info",
+            "location_info",
+            "assigned_info",
+            ...(activeTab === "HISTORY" ? ["returned_info"] : []),
+            "status_info",
+            "actions",
+          ]}
+          rows={paginatedAssignments.map((a) => ({
+            ...a,
+            serial_info: <div className="text-xs font-mono text-slate-500 text-center">{a.serialNumber || "-"}</div>,
+            location_info: <div className="text-slate-600 text-center">{a.locationDetails || "-"}</div>,
+            assigned_info: (
+              <div className="text-slate-600 text-center">
+                {new Date(a.assignedDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </div>
+            ),
+            returned_info: a.actualReturnDate ? (
+              <div className="text-slate-600 text-center">
+                {new Date(a.actualReturnDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </div>
+            ) : "-",
+            status_info: (
+              <div className="text-center">
+                <span
+                  className={`inline-flex items-center justify-center min-w-[80px] py-1 px-2 rounded-full text-[10px] font-bold uppercase tracking-wide ${STATUS_COLORS[a.assignmentStatus] || "bg-gray-100 text-gray-600"}`}
+                >
+                  {a.assignmentStatus}
+                </span>
+              </div>
+            ),
+            actions: (
+              <div className="text-center">
+                {activeTab === "ACTIVE" ? (
+                  <div className="flex justify-center gap-2">
+                    <button
+                      onClick={() => openEditModal(a)}
+                      className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setReturnData({
+                          conditionOnReturn: "",
+                          returnNotes: "",
+                        });
+                        setReturnItem(a);
+                        setReturnModal(true);
+                      }}
+                      className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      title="Return"
+                    >
+                      <Undo2 size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400 italic">Read Only</span>
                 )}
-                <th className="py-3 px-4 text-center w-[10%]">Status</th>
-                <th className="py-3 px-4 text-center w-[15%]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan="7" className="py-8 text-center text-gray-400">
-                    Loading data...
-                  </td>
-                </tr>
-              ) : paginatedAssignments.length > 0 ? (
-                paginatedAssignments.map((a) => (
-                  <tr
-                    key={a.assignmentId}
-                    className="hover:bg-slate-50/80 transition-colors"
-                  >
-                    <td className="py-3 px-4 font-medium text-slate-700">
-                      {a.resourceName}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      {a.projectName}
-                    </td>
-                    <td className="py-3 px-4 text-xs font-mono text-slate-500 text-center">
-                      {a.serialNumber || "-"}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {a.locationDetails || "-"}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 text-center">
-                      {new Date(a.assignedDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </td>
-                    {activeTab === "HISTORY" && (
-                      <td className="py-3 px-4 text-slate-600 text-center">
-                        {new Date(a.actualReturnDate).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          },
-                        )}
-                      </td>
-                    )}
-                    <td className="py-3 px-4 text-center">
-                      <span
-                        className={`inline-flex items-center justify-center min-w-[80px] py-1 px-2 rounded-full text-[10px] font-bold uppercase tracking-wide ${STATUS_COLORS[a.assignmentStatus] || "bg-gray-100 text-gray-600"}`}
-                      >
-                        {a.assignmentStatus}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      {activeTab === "ACTIVE" ? (
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={() => openEditModal(a)}
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setReturnData({
-                                conditionOnReturn: "",
-                                returnNotes: "",
-                              });
-                              setReturnItem(a);
-                              setReturnModal(true);
-                            }}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Return"
-                          >
-                            <Undo2 size={16} />
-                          </button>
-                          {/* <button
-                            onClick={() => setDeleteTarget(a)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 size={16} />
-                          </button> */}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">
-                          Read Only
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="py-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-400 gap-3">
-                      <div className="bg-slate-50 p-3 rounded-full">
-                        <Box size={24} className="opacity-40" />
-                      </div>
-                      <p className="text-sm">No assignments found.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </div>
+            )
+          }))}
+          loading={loading}
+        />
       </div>
 
       {/* PAGINATION */}

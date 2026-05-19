@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import {
   Pencil,
@@ -199,11 +199,6 @@ export default function PermissionGroupManagement() {
 
   const token = localStorage.getItem("token");
 
-  const axiosInstance = axios.create({
-    baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
   const showUniqueToast = (message, type) => {
     toast.dismiss();
     showStatusToast(message, type);
@@ -215,7 +210,7 @@ export default function PermissionGroupManagement() {
     setLoading(true);
 
     try {
-      const res = await axiosInstance.get("/admin/groups");
+      const res = await api.get("/admin/groups");
       setGroups(res.data || []);
     } catch (err) {
       showUniqueToast(`Failed to fetch groups: ${err.message}`, "error");
@@ -226,7 +221,7 @@ export default function PermissionGroupManagement() {
 
   const fetchAllPermissions = async () => {
     try {
-      const res = await axiosInstance.get("/admin/permissions/");
+      const res = await api.get("/admin/permissions/");
       setAllPermissions(res.data || []);
     } catch (err) {
       showUniqueToast(
@@ -240,7 +235,7 @@ export default function PermissionGroupManagement() {
     setLoadingPermissions(true);
 
     try {
-      const res = await axiosInstance.get(
+      const res = await api.get(
         `/admin/groups/${groupId}/permissions`,
       );
       setGroupPermissions(res.data || []);
@@ -419,7 +414,7 @@ export default function PermissionGroupManagement() {
       const permissionIds = selectedPermissions.map((p) => p.permission_uuid);
 
       if (activeAction === "add") {
-        await axiosInstance.post(
+        await api.post(
           `/admin/groups/${selectedGroup.group_uuid}/permissions`,
           permissionIds,
         );
@@ -429,7 +424,7 @@ export default function PermissionGroupManagement() {
           "success",
         );
       } else {
-        await axiosInstance.delete(
+        await api.delete(
           `/admin/groups/${selectedGroup.group_uuid}/permissions`,
           { data: permissionIds },
         );
@@ -469,7 +464,7 @@ export default function PermissionGroupManagement() {
     setCreating(true);
 
     try {
-      await axiosInstance.post("/admin/groups", {
+      await api.post("/admin/groups", {
         group_name: newGroupName.trim(),
       });
 
@@ -510,7 +505,7 @@ export default function PermissionGroupManagement() {
     setUpdating(true);
 
     try {
-      await axiosInstance.put(`/admin/groups/${editingGroup.group_uuid}`, {
+      await api.put(`/admin/groups/${editingGroup.group_uuid}`, {
         group_name: editGroupName.trim(),
       });
 
@@ -565,7 +560,7 @@ export default function PermissionGroupManagement() {
     setBulkDeletingGroups(true);
 
     try {
-      await axiosInstance.delete("/admin/groups/bulk-delete", {
+      await api.delete("/admin/groups/bulk-delete", {
         data: { group_uuids: selectedGroupUuids },
       });
 

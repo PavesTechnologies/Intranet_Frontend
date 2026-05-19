@@ -5,7 +5,6 @@ const EmployeeDocumentsTemplate = () => {
 
   const [loading, setLoading] = useState(false);
 
-  const token = localStorage.getItem("token");
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const downloadBulkTemplate = async () => {
@@ -18,7 +17,7 @@ const EmployeeDocumentsTemplate = () => {
         {
           responseType: "blob",
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${localStorage.getItem("token")}`
           }
         }
       );

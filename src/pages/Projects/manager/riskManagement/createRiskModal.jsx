@@ -171,9 +171,10 @@ const CreateRiskModal = ({
   onSuccess,
   onCreate,
   risk = null,
+  onEdit = false,
 }) => {
   const isEditMode = Boolean(risk?.id);
-
+  // {console.log("Risk data in modal:", risk)}; // Debug log
   const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
   const token = localStorage.getItem("token");
 
@@ -213,7 +214,7 @@ const CreateRiskModal = ({
 
     setLoadingMeta(true);
 
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
     Promise.all([
       axios.get(`${BASE_URL}/api/projects/${projectId}/members-with-owner`, {
@@ -345,7 +346,7 @@ const CreateRiskModal = ({
 
     axios
       .get(`${BASE_URL}/api/projects/${projectId}/${apiType}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       .then((res) => {
         const list = res.data || [];
@@ -440,82 +441,87 @@ const CreateRiskModal = ({
   /* =========================
      Submit
   ========================= */
-  const handleSubmit = async () => {
-    const allErrors = {
-      ...validateStep(0),
-      ...validateStep(1),
-      ...validateStep(2),
-      ...validateStep(3),
+ const handleSubmit = async () => {
+  const allErrors = {
+    ...validateStep(0),
+    ...validateStep(1),
+    ...validateStep(2),
+    ...validateStep(3),
+  };
+
+  if (Object.keys(allErrors).length) {
+    setErrors(allErrors);
+    showStatusToast("Please fill all required fields", "error");
+    return;
+  }
+
+  setSubmitting(true);
+
+  try {
+    const payload = {
+      projectId,
+      title: form.title,
+      description: form.description,
+      probability: form.probability?.value,
+      impact: form.impact?.value,
+      triggers: form.triggers,
+      statusId: form.statusId,
+      ownerId: form.owner.value,
+      reporterId: form.reporter.value,
+      categoryId: form.category.value,
     };
 
-    if (Object.keys(allErrors).length) {
-      setErrors(allErrors);
-      showStatusToast("Please fill all required fields", "error");
-      return;
+    let riskId = risk?.id;
+
+    if (isEditMode) {
+      await axios.put(`${BASE_URL}/api/risks/${riskId}`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+    } else {
+      const res = await axios.post(`${BASE_URL}/api/risks`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+
+      riskId = res.data.id;
     }
 
-    setSubmitting(true);
-
-    try {
-      const payload = {
-        projectId,
-        title: form.title,
-        description: form.description,
-        probability: form.probability?.value,
-        impact: form.impact?.value,
-        triggers: form.triggers,
-        statusId: form.statusId,
-        ownerId: form.owner.value,
-        reporterId: form.reporter.value,
-        categoryId: form.category.value,
+    if (form.linkedType && form.linkedIssue) {
+      const linkPayload = {
+        riskId,
+        linkedType: form.linkedType.value,
+        linkedId: form.linkedIssue.value,
       };
 
-      let riskId = risk?.id;
-
-      if (isEditMode) {
-        await axios.put(`${BASE_URL}/api/risks/${riskId}`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } else {
-        const res = await axios.post(`${BASE_URL}/api/risks`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        riskId = res.data.id;
-      }
-
-      /*
-        Using current endpoint only.
-        This is same endpoint you already had.
-        Backend should handle duplicate prevention if editing existing link.
-      */
-      if (form.linkedType && form.linkedIssue) {
-        await axios.post(
-          `${BASE_URL}/api/risk-links`,
+      if (isEditMode && risk?.riskLinkId) {
+        await axios.patch(
+          `${BASE_URL}/api/risk-links/${risk.riskLinkId}`,
+          linkPayload,
           {
-            riskId,
-            linkedType: form.linkedType.value,
-            linkedId: form.linkedIssue.value,
-          },
-          { headers: { Authorization: `Bearer ${token}` } },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          }
         );
+      } else {
+        await axios.post(`${BASE_URL}/api/risk-links`, linkPayload, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
       }
-
-      showStatusToast(
-        isEditMode ? "Risk updated successfully" : "Risk created successfully",
-        "success",
-      );
-
-      onSuccess?.();
-      onCreate?.();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      showStatusToast("Operation failed", "error");
-    } finally {
-      setSubmitting(false);
     }
-  };
+
+    showStatusToast(
+      isEditMode ? "Risk updated successfully" : "Risk created successfully",
+      "success"
+    );
+
+    onSuccess?.();
+    onCreate?.();
+    onClose();
+  } catch (err) {
+    console.error(err);
+    showStatusToast("Operation failed", "error");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   /* =========================
      Options

@@ -19,6 +19,10 @@ const TimesheetTable = ({
   const [addingNewTimesheet, setAddingNewTimesheet] = useState(false);
   const [holidaysMap, setHolidaysMap] = useState({});
   const [holidayLoading, setHolidayLoading] = useState(false);
+  const [expandedWeeks, setExpandedWeeks] = useState({});
+
+  const toggleWeek = (key) =>
+    setExpandedWeeks((prev) => ({ ...prev, [key]: !prev[key] }));
 
   useEffect(() => {
     setHolidayLoading(true);
@@ -94,20 +98,25 @@ const TimesheetTable = ({
         </div>
       ) : (
         <>
-          {data.map((weekGroup) => (
-            weekGroup.timesheets.length > 0 && (
+          {data.map((weekGroup) => {
+            if (weekGroup.timesheets.length === 0) return null;
+            const weekKey = weekGroup.weekStart;
+            const isCollapsed = !expandedWeeks[weekKey];
+            return (
               <TimesheetGroup
                 weekGroup={weekGroup}
-                key={weekGroup.weekStart}
+                key={weekKey}
                 mapWorkType={mapWorkType}
                 refreshData={refreshData}
                 projectInfo={projectInfo}
                 approvers={weekGroup.actionStatus}
                 getWeeklyStatusColor={getWeeklyStatusColor}
-                holidaysMap={holidaysMap} // ✅ Pass holidays map here too
+                holidaysMap={holidaysMap}
+                isCollapsed={isCollapsed}
+                onToggleCollapse={() => toggleWeek(weekKey)}
               />
-            )
-          ))}
+            );
+          })}
 
           <Pagination
             currentPage={currentPage}

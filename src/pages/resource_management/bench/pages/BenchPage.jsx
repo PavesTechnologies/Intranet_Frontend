@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Download, Filter, Layers, Search, Users, ArrowLeft, BarChart2 } from "lucide-react";
+import { DownloadIcon, FilterIcon, LayersIcon, SearchIcon, EmployeeIcon, PrevIcon, AnalyticsIcon } from "@/components/icons";
 import { useNavigate } from "react-router-dom";
 import BenchKPI from "../components/BenchKPI";
 import BenchFilters from "../components/BenchFilters";
@@ -8,6 +8,7 @@ import BenchDrawer from "../components/BenchDrawer";
 import AllocationModal from "../../demand/components/AllocationModal";
 import MoveToPoolModal from "../components/MoveToPoolModal";
 import { getBenchMatches } from "../services/benchService";
+import Pagination from "../../../../components/Pagination/pagination";
 import { createPortal } from "react-dom";
 import {
   BENCH_STORAGE_KEY,
@@ -23,8 +24,8 @@ import {
   toCsv,
   updateCategory,
 } from "../models/benchModel";
-import { getBenchResources, getPoolResources, getBenchKPIs } from "../services/benchService";
-import { toast } from "react-hot-toast";
+import { getBenchResources, getPoolResources, getBenchKPIs, updateStatusResource } from "../services/benchService";
+import { notify } from "../../utils/notify";
 
 const getStoredState = () => {
   if (typeof window === "undefined") return null;
@@ -71,6 +72,10 @@ const BenchPage = () => {
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  
   const updatePosition = () => {
     if (filterButtonRef.current) {
       const rect = filterButtonRef.current.getBoundingClientRect();
@@ -154,14 +159,17 @@ const BenchPage = () => {
       // Unpack and tag resources
       const benchList = (benchRes?.data || (Array.isArray(benchRes) ? benchRes : [])).map(r => ({ ...r, _source: 'bench' }));
       const poolList = (poolRes?.data || (Array.isArray(poolRes) ? poolRes : [])).map(r => ({ ...r, _source: 'pool' }));
-      setResources(sanitizeResources([...benchList, ...poolList]));
+      
+      // Prioritize pool resources so that if a resource is returned in both endpoints,
+      // it retains the '_source: pool' tag and correctly appears in the Internal Pool tab.
+      setResources(sanitizeResources([...poolList, ...benchList]));
 
       // Set live KPI data
       setKpis(kpiRes?.data || kpiRes || null);
     } catch (error) {
       if (!isActive) return;
       console.error("Resource Supply Data Load Error", error);
-      toast.error("Failed to load bench or pool data");
+      notify.error(error, "Failed To Load Bench Or Pool Data");
     } finally {
       setLoading(false);
     }
@@ -185,12 +193,20 @@ const BenchPage = () => {
         filters,
       }),
     );
+    setCurrentPage(1); // Reset pagination on search/filter/tab change
   }, [search, activeTab, filters]);
 
   const visibleRows = useMemo(
     () => filterResources(resources, search, filters, activeTab),
     [resources, search, filters, activeTab],
   );
+
+  // Pagination calculations
+  const totalPages = Math.ceil(visibleRows.length / itemsPerPage);
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return visibleRows.slice(start, start + itemsPerPage);
+  }, [visibleRows, currentPage, itemsPerPage]);
   const selectedResource = useMemo(
     () => resources.find((item) => item.id === selectedResourceId) || null,
     [resources, selectedResourceId],
@@ -273,29 +289,37 @@ const BenchPage = () => {
     setMoveToPoolTargets(Array.isArray(targets) ? targets : [targets]);
   };
 
-  const applyMoveToPool = ({ poolType, reason }) => {
+  const applyMoveToPool = async ({ poolType, reason }) => {
     const ids = moveToPoolTargets.map((item) => item.id);
-    const poolCategory = poolType === "Training" ? "Training" : "Shadow";
+    
+    const getSubState = (type) => {
+      if (type === "CoE") return "COE";
+      if (type === "Training") return "TRAINING_POOL";
+      if (type === "R&D") return "RND";
+      return type.toUpperCase().replace(/ /g, "_");
+    };
 
-    setResources((prev) =>
-      prev.map((item) =>
-        ids.includes(item.id)
-          ? {
-            ...item,
-            poolType,
-            category: poolCategory,
-            transitionReason: reason,
-            lastProject: {
-              ...item.lastProject,
-              reason,
-            },
-          }
-          : item,
-      ),
-    );
+    try {
+      setLoading(true);
+      await Promise.all(
+        moveToPoolTargets.map((item) =>
+          updateStatusResource({
+            resourceId: item.id,
+            newSubState: getSubState(poolType),
+            reason,
+          })
+        )
+      );
 
-    setSelectedRows((prev) => prev.filter((id) => !ids.includes(id)));
-    setMoveToPoolTargets([]);
+      notify.success("Resources successfully moved to internal pool");
+      fetchData(true);
+    } catch (error) {
+      console.error("Failed to move resources", error);
+      notify.error("Failed to move resources to internal pool");
+    } finally {
+      setSelectedRows((prev) => prev.filter((id) => !ids.includes(id)));
+      setMoveToPoolTargets([]);
+    }
   };
 
   const handleExport = () => {
@@ -303,8 +327,8 @@ const BenchPage = () => {
   };
 
   const emptyState = baseVisibleCount === 0
-    ? "No bench records available."
-    : "No results match the current search and filters.";
+    ? "No Bench Records Available."
+    : "No Results Match The Current Search And Filters.";
 
   return (
     <div className="min-h-screen bg-slate-50/50 p-4 sm:p-6 lg:p-8 font-sans select-none">
@@ -313,7 +337,7 @@ const BenchPage = () => {
           <div className="flex-1">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 leading-none capitalize">Bench Management Workspace</h1>
             <p className="mt-2 text-xs sm:text-sm font-medium text-slate-500">
-              Strategic tracking of available resource supply and internal pool movements
+              Strategic Tracking Of Available Resource Supply And Internal Pool Movements
             </p>
           </div>
         </div>
@@ -323,7 +347,7 @@ const BenchPage = () => {
             onClick={() => navigate('/resource-management/bench/report')}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-[11px] font-black text-slate-700 hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm h-[42px] capitalize tracking-wider"
           >
-            <BarChart2 className="h-4 w-4 text-indigo-600" />
+            <AnalyticsIcon className="h-4 w-4 text-indigo-600" />
             Bench Analytics
           </button>
           <button
@@ -331,7 +355,7 @@ const BenchPage = () => {
             onClick={handleExport}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-[11px] font-black text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98] h-[42px] capitalize tracking-wider"
           >
-            <Download className="h-4 w-4" />
+            <DownloadIcon className="h-4 w-4" />
             Export Audit
           </button>
         </div>
@@ -345,7 +369,7 @@ const BenchPage = () => {
             <div className="flex items-center gap-6 overflow-x-auto no-scrollbar px-1">
               {BENCH_TABS.map((tab) => {
                 const isActive = activeTab === tab.id;
-                const Icon = tab.id === "bench" ? Users : Layers;
+                const Icon = tab.id === "bench" ? EmployeeIcon : LayersIcon;
 
                 return (
                   <button
@@ -375,12 +399,12 @@ const BenchPage = () => {
 
             <div className="flex items-center gap-3 flex-1 lg:flex-none lg:min-w-[450px] justify-end pb-2 lg:pb-0">
               <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search name, role, skill or location..."
+                  placeholder="Search Name, Role, Skill Or Location..."
                   className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/30 pl-9 pr-4 text-[13px] font-medium text-slate-600 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500 shadow-inner"
                 />
               </div>
@@ -395,7 +419,7 @@ const BenchPage = () => {
                     : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                 >
-                  <Filter className={`h-3.5 w-3.5 ${filterPanelOpen ? 'fill-current' : ''}`} />
+                  <FilterIcon className={`h-3.5 w-3.5 ${filterPanelOpen ? 'fill-current' : ''}`} />
                   <span className="text-[11px] font-black capitalize tracking-widest">Filters</span>
                   {Object.values(filters).filter(v => v !== "" && v !== "ALL").length > 0 && (
                     <span className={`ml-1 px-1.5 rounded-sm text-[10px] font-bold ${filterPanelOpen ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
@@ -441,7 +465,7 @@ const BenchPage = () => {
 
         <div className="p-4">
           <BenchTable
-            rows={visibleRows}
+            rows={paginatedRows}
             selectedRows={selectedRows}
             activeRowId={selectedResourceId}
             emptyState={emptyState}
@@ -454,6 +478,16 @@ const BenchPage = () => {
             loading={loading}
             activeTab={activeTab}
           />
+          {totalPages > 1 && (
+            <div className="mt-4">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              />
+            </div>
+          )}
         </div>
       </div>
 

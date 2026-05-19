@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import axios from "axios";
+import { useEffect, useRef, useState, useMemo } from "react";
+import api from "../../../../api/axiosInstance";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
@@ -11,8 +11,6 @@ import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
 export default function EditUserForm({ userId, onSuccess, onClose }) {
-  const token = localStorage.getItem("token");
-
   const [user, setUser] = useState({
     first_name: "",
     last_name: "",
@@ -26,6 +24,8 @@ export default function EditUserForm({ userId, onSuccess, onClose }) {
   const [loading, setLoading] = useState(false);
   const isSubmittingRef = useRef(false);
 
+  const axiosInstance = useMemo(() => api, []);
+
   useEffect(() => {
     const fetchUser = async () => {
       if (!userId) return;
@@ -33,12 +33,7 @@ export default function EditUserForm({ userId, onSuccess, onClose }) {
       try {
         setFetching(true);
 
-        const res = await axios.get(
-          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await axiosInstance.get(`/admin/users/uuid/${userId}`);
 
         const { password, contact, ...rest } = res.data || {};
 
@@ -58,7 +53,7 @@ export default function EditUserForm({ userId, onSuccess, onClose }) {
     };
 
     fetchUser();
-  }, [userId, token, onClose]);
+  }, [userId, axiosInstance, onClose]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -144,15 +139,9 @@ export default function EditUserForm({ userId, onSuccess, onClose }) {
         payload.password = user.password.trim();
       }
 
-      await axios.put(
-        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userId}`,
-        payload,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await axiosInstance.put(`/admin/users/uuid/${userId}`, payload);
 
-      showStatusToast("User updated successfully.", "success");
+      // showStatusToast("User updated successfully.", "success");
 
       if (typeof onSuccess === "function") {
         onSuccess();

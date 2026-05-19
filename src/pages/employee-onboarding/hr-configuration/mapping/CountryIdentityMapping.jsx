@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
 import AddCountryIdentityMappingModal from "./AddCountryIdentityMappingModal";
 import FilterListbox from "../../../../components/filter/FilterListbox";
+import Button from "../../../../components/Button/Button";
+import GenericTable from "../../../../components/Table/table";
+import Modal from "../../../../components/Modal/modal";
+import { PageCard } from "../../../../components/Cards/PageCard";
 
 export default function CountryIdentityMapping() {
   const [countries, setCountries] = useState([]);
@@ -26,17 +29,19 @@ export default function CountryIdentityMapping() {
   const [isMandatory, setIsMandatory] = useState(true);
 
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
-  const headers = { Authorization: `Bearer ${token}` };
 
   /* ---------------- FETCH DATA ---------------- */
   const fetchCountries = async () => {
-    const res = await axios.get(`${BASE_URL}/masters/country`, { headers });
+    const res = await axios.get(`${BASE_URL}/masters/country`, { headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    } });
     setCountries(res.data);
   };
 
   const fetchIdentityTypes = async () => {
-    const res = await axios.get(`${BASE_URL}/identity`, { headers });
+    const res = await axios.get(`${BASE_URL}/identity`, { headers : {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    } });
     setIdentityTypes(res.data);
   };
 
@@ -46,13 +51,14 @@ export default function CountryIdentityMapping() {
 
       const res = await axios.get(
         `${BASE_URL}/identity/country-mapping/identities/${countryUuid}`,
-        { headers },
+        { headers : {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        } },
       );
 
       // ✅ handle empty list
       if (!res.data || res.data.length === 0) {
         setMappings([]);
-        toast.info("No mappings found");
         return;
       }
 
@@ -61,9 +67,8 @@ export default function CountryIdentityMapping() {
       // ✅ handle "no mappings" from backend (404)
       if (err?.response?.status === 404) {
         setMappings([]);
-        toast.info("No mappings found");
       } else {
-        toast.error("Failed to load mappings");
+        if (window.showError) window.showError("Failed to load mappings");
       }
     } finally {
       setLoading(false);
@@ -73,7 +78,7 @@ export default function CountryIdentityMapping() {
   /* ---------------- ADD / UPDATE ---------------- */
   const submitMapping = async () => {
     if (!identityTypeUuid) {
-      toast.error("Select identity type");
+      if (window.showError) window.showError("Select identity type");
       return;
     }
 
@@ -88,7 +93,9 @@ export default function CountryIdentityMapping() {
             identity_type_uuid: identityTypeUuid,
             is_mandatory: isMandatory,
           },
-          { headers },
+          { headers : {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          } },
         );
 
         setMappings((prev) =>
@@ -107,7 +114,7 @@ export default function CountryIdentityMapping() {
           ),
         );
 
-        toast.success("Mapping updated");
+        if (window.showSuccess) window.showSuccess("Mapping updated");
       } else {
         const res = await axios.post(
           `${BASE_URL}/identity/country-mapping`,
@@ -116,7 +123,9 @@ export default function CountryIdentityMapping() {
             identity_type_uuid: identityTypeUuid,
             is_mandatory: isMandatory,
           },
-          { headers },
+          { headers : {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          } },
         );
 
         setMappings((prev) => [
@@ -132,12 +141,12 @@ export default function CountryIdentityMapping() {
           },
         ]);
 
-        toast.success("Mapping added");
+        if (window.showSuccess) window.showSuccess("Mapping added");
       }
 
       resetForm();
     } catch {
-      toast.error("Operation failed");
+      if (window.showError) window.showError("Operation failed");
     } finally {
       setFormLoading(false);
     }
@@ -150,14 +159,16 @@ export default function CountryIdentityMapping() {
 
       await axios.delete(
         `${BASE_URL}/identity/country-mapping/${confirmDelete.mapping_uuid}`,
-        { headers },
+        { headers : {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        } },
       );
 
       setMappings((prev) =>
         prev.filter((m) => m.mapping_uuid !== confirmDelete.mapping_uuid),
       );
 
-      toast.success("Mapping removed");
+      if (window.showSuccess) window.showSuccess("Mapping removed");
       setConfirmDelete(null);
     } catch (err) {
       const detail = err.response?.data?.detail;
@@ -166,7 +177,7 @@ export default function CountryIdentityMapping() {
       if (err.response?.status === 422 && detail?.employees) {
         setDeleteError(detail);
       } else {
-        toast.error(detail?.message || "Failed to delete mapping");
+        if (window.showError) window.showError(detail?.message || "Failed to delete mapping");
       }
     } finally {
       setDeleteLoading(false);
@@ -179,7 +190,9 @@ export default function CountryIdentityMapping() {
 
       await axios.delete(
         `${BASE_URL}/employee-details/identity/${document_uuid}`,
-        { headers },
+        { headers : {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        } },
       );
 
       // remove only this document from deleteError
@@ -190,9 +203,9 @@ export default function CountryIdentityMapping() {
         ),
       }));
 
-      toast.success("Document deleted");
+      if (window.showSuccess) window.showSuccess("Document deleted");
     } catch {
-      toast.error("Failed to delete document");
+      if (window.showError) window.showError("Failed to delete document");
     } finally {
       setDeletingDocUuid(null);
     }
@@ -223,6 +236,35 @@ export default function CountryIdentityMapping() {
     }
   }, [editingMapping]);
 
+  const tableHeaders = ["Identity Type", "Mandatory", "Action"];
+  const tableColumns = ["identity_type_name", "mandatory", "actions"];
+  const tableRows = mappings.map((item) => ({
+    identity_type_name: item.identity_type_name,
+    mandatory: item.is_mandatory ? "Yes" : "No",
+    actions: (
+      <div className="flex gap-4">
+        <Button
+          variant="link"
+          size="small"
+          onClick={() => {
+            setEditingMapping(item);
+            setShowForm(true);
+          }}
+        >
+          Edit
+        </Button>
+        <Button
+          variant="link"
+          size="small"
+          className="!text-red-600 hover:!underline"
+          onClick={() => setConfirmDelete(item)}
+        >
+          Remove
+        </Button>
+      </div>
+    ),
+  }));
+
   return (
     <div className="max-w-6xl mx-auto p-6">
       <h1 className="text-2xl font-semibold mb-2">Country Identity Mapping</h1>
@@ -231,131 +273,117 @@ export default function CountryIdentityMapping() {
       </p>
 
       {/* Country Selector */}
-      <FilterListbox
-        options={[{value:"",label:"Select Country"}, ...countries.map((c) => ({value: c.country_uuid, label: c.country_name}))]}
-        value={selectedCountry}
-        onChange={setSelectedCountry}
-      />
+      <div className="flex items-center gap-4 flex-wrap">
+        <FilterListbox
+          options={[{value:"",label:"Select Country"}, ...countries.map((c) => ({value: c.country_uuid, label: c.country_name}))]}
+          value={selectedCountry}
+          onChange={setSelectedCountry}
+        />
+
+        {selectedCountry && (
+          <Button
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+            variant="primary"
+          >
+            + Add Identity
+          </Button>
+        )}
+      </div>
+
       {showForm && (
         <AddCountryIdentityMappingModal
           countryUuid={selectedCountry}
           onClose={() => setShowForm(false)}
           onSuccess={(newMapping) => {
-            setMappings((prev) => [...prev, newMapping]); // ✅ AUTO UPDATE
+            setMappings((prev) => [...prev, newMapping]);
             setShowForm(false);
           }}
         />
       )}
 
-      {selectedCountry && (
-        <button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className="ml-4 px-5 py-2 bg-blue-700 text-white rounded-lg"
-        >
-          + Add Identity
-        </button>
-      )}
-
       {/* TABLE */}
-      <div className="mt-8 bg-white rounded-xl shadow overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center">Loading...</div>
-        ) : mappings.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            No identities mapped
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-blue-900 text-white">
-              <tr>
-                <th className="px-6 py-3 text-left">Identity Type</th>
-                <th className="px-6 py-3 text-left">Mandatory</th>
-                <th className="px-6 py-3 text-left">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mappings.map((item) => (
-                <tr key={item.mapping_uuid} className="border-b">
-                  <td className="px-6 py-3">{item.identity_type_name}</td>
-                  <td className="px-6 py-3">
-                    {item.is_mandatory ? "Yes" : "No"}
-                  </td>
-                  <td className="px-6 py-3 flex gap-4">
-                    <button
-                      onClick={() => {
-                        setEditingMapping(item);
-                        setShowForm(true);
-                      }}
-                      className="text-blue-700 hover:underline"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setConfirmDelete(item)}
-                      className="text-red-700 hover:underline"
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {selectedCountry && (
+        <div className="mt-8">
+          <PageCard>
+            <GenericTable
+              headers={tableHeaders}
+              columns={tableColumns}
+              rows={tableRows}
+              loading={loading}
+            />
+          </PageCard>
+        </div>
+      )}
 
       {/* DELETE CONFIRM MODAL */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl w-[380px]">
-            <h3 className="text-lg font-semibold mb-3">Confirm Delete</h3>
-            <p className="text-gray-600 mb-6">
-              Remove <strong>{confirmDelete.identity_type_name}</strong>?
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
+        <Modal
+          isOpen={true}
+          onClose={() => setConfirmDelete(null)}
+          title="Confirm Delete"
+          size="md"
+          footer={
+            <div className="flex justify-end gap-3 w-full">
+              <Button
                 onClick={() => setConfirmDelete(null)}
-                className="px-4 py-2 bg-gray-300 rounded-lg transition-all duration-100 ease-in-out
-        active:translate-y-[1px]
-        disabled:opacity-60 disabled:cursor-not-allowed
-        flex items-center justify-center gap-2"
+                variant="outline"
+                disabled={deleteLoading}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={confirmDeleteMapping}
+                variant="danger"
                 disabled={deleteLoading}
-                className="px-4 py-2 bg-red-700 text-white rounded-lg transition-all duration-100 ease-in-out
-        active:translate-y-[1px]
-        disabled:opacity-60 disabled:cursor-not-allowed
-        flex items-center justify-center gap-2"
+                loading={deleteLoading}
               >
-                {deleteLoading ? "Removing..." : "Delete"}
-              </button>
+                Delete
+              </Button>
             </div>
-          </div>
-        </div>
+          }
+        >
+          <p className="text-gray-600">
+            Remove <strong>{confirmDelete.identity_type_name}</strong>?
+          </p>
+        </Modal>
       )}
 
       {/* 🔴 DELETE ERROR MODAL */}
       {deleteError && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-[520px]">
-            <h3 className="text-lg font-semibold text-red-600 mb-2">
-              Cannot Delete Mapping
-            </h3>
-
-            <p className="text-gray-700 mb-4">{deleteError.message}</p>
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            setDeleteError(null);
+            setConfirmDelete(null);
+          }}
+          title="Cannot Delete Mapping"
+          size="lg"
+          footer={
+            <div className="flex justify-end w-full">
+              <Button
+                onClick={() => {
+                  setDeleteError(null);
+                  setConfirmDelete(null);
+                }}
+                variant="primary"
+              >
+                OK
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-gray-700">{deleteError.message}</p>
 
             <div className="border rounded-lg max-h-64 overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="px-3 py-2 text-left">Employee</th>
-                    <th className="px-3 py-2 text-left">Document UUID</th>
+                    <th className="px-3 py-2 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -365,40 +393,25 @@ export default function CountryIdentityMapping() {
                         {emp.first_name} {emp.last_name}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        <button
+                        <Button
                           onClick={() =>
                             deleteEmployeeDocument(emp.document_uuid)
                           }
                           disabled={deletingDocUuid === emp.document_uuid}
-                          className="px-3 py-1.5 bg-red-600 text-white rounded text-xs"
+                          variant="danger"
+                          size="small"
+                          loading={deletingDocUuid === emp.document_uuid}
                         >
-                          {deletingDocUuid === emp.document_uuid
-                            ? "Deleting..."
-                            : "Delete Document"}
-                        </button>
+                          Delete Document
+                        </Button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => {
-                  setDeleteError(null);
-                  setConfirmDelete(null);
-                }}
-                className="px-4 py-2 bg-blue-700 text-white rounded-lg transition-all duration-100 ease-in-out
-        active:translate-y-[1px]
-        disabled:opacity-60 disabled:cursor-not-allowed
-        flex items-center justify-center gap-2"
-              >
-                OK
-              </button>
-            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

@@ -1,55 +1,30 @@
 import React from "react";
 import {
-  AlertTriangle,
-  CheckCheck,
-  Layers,
-  UserRoundMinus,
-} from "lucide-react";
+  WarningIcon,
+  DoubleCheckIcon,
+  LayersIcon,
+  UserMinusIcon,
+} from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { KPICard } from "../../../components/kpi/KPI";
 
 const cardConfig = {
   "Active Allocations": {
-    icon: Layers,
+    icon: LayersIcon,
     colorClass: "bg-slate-100 text-slate-600",
   },
   "Pending Role-Offs": {
-    icon: UserRoundMinus,
+    icon: UserMinusIcon,
     colorClass: "bg-amber-100 text-amber-600",
   },
   "High Impact Allocations": {
-    icon: AlertTriangle,
+    icon: WarningIcon,
     colorClass: "bg-rose-100 text-rose-600",
   },
   "Total RoleOff": {
-    icon: CheckCheck,
+    icon: DoubleCheckIcon,
     colorClass: "bg-indigo-100 text-indigo-600",
   },
-};
-
-const KPICard = ({ label, count }) => {
-  const config = cardConfig[label] || cardConfig["Active Allocations"];
-  const Icon = config.icon;
-
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:border-slate-200 hover:shadow-md">
-      <div
-        className={cn(
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg shadow-sm",
-          config.colorClass,
-        )}
-      >
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="min-w-0">
-        <p className="mb-0.5 text-xs font-medium tracking-tight text-slate-500">
-          {label}
-        </p>
-        <p className="text-2xl font-bold tracking-tight text-slate-900">
-          {count}
-        </p>
-      </div>
-    </div>
-  );
 };
 
 const RoleOffSummaryCard = ({ title, description, metrics = [], action = null }) => {
@@ -70,9 +45,19 @@ const RoleOffSummaryCard = ({ title, description, metrics = [], action = null })
           metrics.length !== 4 && "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
         )}
       >
-        {metrics.map((metric) => (
-          <KPICard key={metric.label} label={metric.label} count={metric.count} />
-        ))}
+        {metrics.map((metric) => {
+          const config = cardConfig[metric.label] || cardConfig["Active Allocations"];
+          const Icon = config.icon;
+          return (
+            <KPICard
+              key={metric.label}
+              label={metric.label}
+              value={metric.count}
+              icon={<Icon className="h-5 w-5" />}
+              color={config.colorClass}
+            />
+          );
+        })}
       </div>
     </div>
   );

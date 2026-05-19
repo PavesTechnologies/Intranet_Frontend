@@ -15,7 +15,7 @@ export const STATIC_ENUMS = {
     "DemandCommitment": ["SOFT", "CONFIRMED"],
     "DemandStatus": ["DRAFT", "REQUESTED", "CANCELLED"],
     "DemandType": ["NET_NEW", "REPLACEMENT", "BACKFILL", "EMERGENCY"],
-    "EscalationLevel": ["LEVEL_1", "LEVEL_2", "EXECUTIVE"],
+    "EscalationLevel": ["LEVEL_1", "LEVEL_2", "LEVEL_3"],
     "EscalationSource": ["INHERITED", "MANUAL"],
     "EscalationTriggerType": ["SLA_BREACH", "COMPLIANCE_FAILURE", "DELIVERY_RISK", "SECURITY_INCIDENT", "FINANCIAL_RISK"],
     "ProjectDataStatus": ["COMPLETE", "INCOMPLETE", "PENDING", "ERROR"],

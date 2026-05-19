@@ -40,8 +40,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ✅ stores access token + refresh token
-  // refreshToken passed from LoginPage after login API response
-  const login = (token, isFirstLogin = false, refreshToken = null) => {
+  const login = (token, isFirstLogin = false) => {
     if (isFirstLogin) {
       localStorage.setItem("lastPath", "/change-password");
       setIsfirsttlogin(true);
@@ -53,11 +52,6 @@ export const AuthProvider = ({ children }) => {
     // store access token — axiosInstance reads this key
     localStorage.setItem("token", token);
 
-    // store refresh token — axiosInstance reads this key on 401
-    if (refreshToken) {
-      localStorage.setItem("refresh_token", refreshToken);
-    }
-
     loadUser(token);
   };
 
@@ -65,24 +59,26 @@ export const AuthProvider = ({ children }) => {
     if (isLoggingOut.current) return;
     isLoggingOut.current = true;
 
-    const token        = localStorage.getItem("token");
-    const refreshToken = localStorage.getItem("refresh_token");
+// blacklist both tokens on backend
+    if (localStorage.getItem("token")) {
 
-    // blacklist both tokens on backend
-    if (token) {
-      axios
-        .post(
-          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
-          { refresh_token: refreshToken },
-          { headers: { Authorization: `Bearer ${token}` } },
-        )
+      axios.post(
+      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
+      {},
+      {
+        withCredentials: true,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    )
         .then((res) => console.log("Logout:", res.data))
         .catch((err) => console.error("Logout failed:", err.response?.data || err.message));
     }
 
     // clear all auth keys
     localStorage.removeItem("token");
-    localStorage.removeItem("refresh_token");
+    // localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
     localStorage.removeItem("lastPath");
 
@@ -107,36 +103,36 @@ export const AuthProvider = ({ children }) => {
   // also sets expiry timer (interceptor handles actual refresh)
   useEffect(() => {
     const token = localStorage.getItem("token");
+
     if (!token) return;
 
     try {
       const decoded = jwtDecode(token);
 
-      // validate token can be decoded before loading user
       loadUser(token);
 
       if (decoded.exp) {
         const timeLeft = decoded.exp - Date.now() / 1000;
 
+        // IMPORTANT:
+        // Do NOT logout immediately if token expired.
+        // Axios interceptor will silently refresh token.
         if (timeLeft <= 0) {
-          // already expired — interceptor will try refresh on next API call
-          // if no refresh token, will reject and user stays on page
-          // optionally show toast
-          showStatusToast("Session expired. Please login again.");
-          setTimeout(() => logout(true), 1000);
-        } else {
-          // show toast when access token expires (interceptor handles refresh silently)
-          const timer = setTimeout(() => {
-            showStatusToast("Session refreshing...");
-          }, timeLeft * 1000);
-          return () => clearTimeout(timer);
+          return;
         }
+
+        const timer = setTimeout(() => {
+          console.log("Access token expired.");
+        }, timeLeft * 1000);
+
+        return () => clearTimeout(timer);
       }
+
     } catch {
       showStatusToast("Invalid token detected. Please login again.");
       logout(true);
     }
-  }, []); // ✅ empty deps — runs once on mount only
+  }, []);
 
   const getUserRoles = () => {
     if (!user) return [];

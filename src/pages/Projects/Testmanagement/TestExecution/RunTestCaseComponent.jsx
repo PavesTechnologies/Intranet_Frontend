@@ -4,35 +4,38 @@ import { showStatusToast } from "../../../../components/toastfy/toast";
 import BugReportModal from "./BugReportModal";
 
 export default function RunTestCaseComponent({ runId, runCaseId, testCaseId, onClose }) {
-  console.log("🎯 RunTestCaseComponent called with:", { runId, runCaseId, testCaseId });
   const [isLoading, setIsLoading] = useState(false);
-  const [testCase, setTestCase] = useState(null);
+  const [testCase, setTestCase] = useState({ title: `Test Case #${testCaseId || runCaseId}` });
   const [steps, setSteps] = useState([]);
   const [stepResults, setStepResults] = useState({});
   const [showBugModal, setShowBugModal] = useState(false);
   const [failingStep, setFailingStep] = useState(null);
+  const [failedStepId, setFailedStepId] = useState(null);
 
   // Load steps
   const fetchTestCaseExecution = async () => {
     try {
       setIsLoading(true);
-      console.log("🔍 Loading test case execution for runId:", runId, "testCaseId:", testCaseId);
       const res = await axiosInstance.get(
-        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/runs/${runId}/test-cases/${testCaseId}`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/run-cases/${runCaseId}/steps`,
       );
-      console.log("🔍 Test case execution data:", res.data);
-      setSteps(res.data.steps || []);
-      setTestCase(res.data.testCase || { title: `Executing Test Case ${testCaseId}` });
+      const stepsData = Array.isArray(res.data) ? res.data : res.data?.steps || [];
+      setSteps(stepsData);
+      if (res.data?.testCase?.title) {
+        setTestCase(res.data.testCase);
+      }
       setIsLoading(false);
     } catch (err) {
       console.error("Failed to load test case execution:", err);
       showStatusToast("Failed to load test case execution", "error");
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    if (!runCaseId) return;
     fetchTestCaseExecution();
-  }, []);
+  }, [runCaseId]);
 
   // -----------------------------------------------------
   // Single Step Update
@@ -44,14 +47,16 @@ export default function RunTestCaseComponent({ runId, runCaseId, testCaseId, onC
     if (action === "FAIL") {
       const stepObj = steps.find((s) => s.id === stepId);
       setFailingStep(stepObj);
+      setFailedStepId(stepId);
       setShowBugModal(true);
-      //   return;
     }
 
     try {
       await axiosInstance.post(
-        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/runs/${runId}/test-cases/${testCaseId}/steps/${stepId}/execute`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/steps/execute`,
         {
+          runCaseId,
+          stepId,
           status: apiStatus,
           actualResult: "",
         },
@@ -73,17 +78,25 @@ export default function RunTestCaseComponent({ runId, runCaseId, testCaseId, onC
   // SUBMIT RUN CASE RESULT
   // -----------------------------------------------------
   const submitRunCaseResult = async (action) => {
+    if (action === "FAIL" && !failedStepId) {
+      showStatusToast("Please mark the failing step before failing the test case.", "error");
+      return;
+    }
+
     try {
+      const url =
+        action === "PASS"
+          ? `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/cases/pass`
+          : action === "FAIL"
+            ? `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/cases/fail`
+            : `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/cases/block`;
+
+      const body = { runCaseId, notes: "" };
+      if (action === "FAIL") body.stepId = failedStepId;
+
+      await axiosInstance.post(url, body);
+
       const apiStatus = action === "PASS" ? "PASSED" : action === "FAIL" ? "FAILED" : "BLOCKED";
-
-      await axiosInstance.post(
-        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/runs/${runId}/test-cases/${testCaseId}/result`,
-        {
-          status: apiStatus,
-          notes: "",
-        },
-      );
-
       showStatusToast(`Test case marked as ${apiStatus}`, "success");
       if (onClose) onClose();
     } catch (err) {
@@ -91,8 +104,6 @@ export default function RunTestCaseComponent({ runId, runCaseId, testCaseId, onC
       showStatusToast("Failed to submit test result", "error");
     }
   };
-
-  if (!testCase) return null;
 
   return (
     <div className="fixed inset-0 bg-black/40 flex justify-center items-center p-4 z-50">

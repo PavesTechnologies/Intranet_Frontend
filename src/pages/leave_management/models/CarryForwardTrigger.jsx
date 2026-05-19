@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ConfirmationModal from "./ConfirmationModal";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -21,6 +21,14 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
     }
     setIsModalOpen(true);
   };
+
+  // useEffect(() => {
+  //   if (isModalOpen) {
+  //     document.body.style.overflow = "hidden";
+  //   } else {
+  //     document.body.style.overflow = "auto";
+  //   }
+  // }, [isModalOpen]);
 
   const handleCancel = () => {
     setIsModalOpen(false);
@@ -72,18 +80,11 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
         />
 
         <div className="flex justify-end gap-2">
-          <Button 
-          variant="secondary"
-          onClick={onClose}
-          size="medium">
+          <Button variant="secondary" onClick={onClose} size="medium">
             Close
           </Button>
 
-          <Button
-            onClick={handleConfirmClick}
-            variant="primary"
-            size="medium"
-          >
+          <Button onClick={handleConfirmClick} variant="primary" size="medium">
             Confirm
           </Button>
         </div>

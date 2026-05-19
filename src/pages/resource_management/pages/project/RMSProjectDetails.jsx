@@ -1,7 +1,6 @@
 // src/pages/resource_management/projects/ProjectDetails.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import ResourceList from "./RMSProjectList";
 import ProjectResourcesTable from "./ProjectResourcesTable";
 import axios from "axios";
 import SLAForm from "../../models/client_configuration/forms/SLAForm";
@@ -10,9 +9,10 @@ import EscalationForm from "../../models/client_configuration/forms/EscalationFo
 import DemandModal from "../../models/DemandModal";
 import ProjectFinancialsInline from "../../components/FinancialModal";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
-import { CheckSquare, Square } from "lucide-react";
+import { CheckSquare } from "lucide-react";
 import AddDeliverableRoleModal from "../../models/AddDeliverableRoleModal";
 import Pagination from "../../../../components/Pagination/pagination";
+import GenericTable from "../../../../components/Table/table";
 import { useAuth } from "@/contexts/AuthContext";
 
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
@@ -35,11 +35,10 @@ import {
   getSkillCategoriesTree,
   getProficiencyLevels,
 } from "../../services/workforceService";
-import { createRoleExpectation } from "../../services/workforceService";
 
-import { toast } from "react-toastify";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
+import { notify } from "../../utils/notify";
 
 const RMSProjectDetails = () => {
   const { getEnumValues } = useEnums();
@@ -47,18 +46,11 @@ const RMSProjectDetails = () => {
   const location = useLocation();
   const roles = user?.roles;
   const isRM = roles?.includes("Resource_Manager");
-  const PROJECT_STATUSES = getEnumValues("ProjectStatus");
-  const PRIORITY_LEVELS = getEnumValues("PriorityLevel");
-  const RISK_LEVELS = getEnumValues("RiskLevel");
-  const DELIVERY_MODELS = getEnumValues("DeliveryModel");
-  const SLA_TYPES = getEnumValues("SLAType");
 
   const { projectId } = useParams();
   const navigate = useNavigate();
   const [projectEscalations, setProjectEscalations] = useState([]);
   const [clientEscalations, setClientEscalations] = useState([]);
-  // const [draftDeliverableRoles, setDraftDeliverableRoles] = useState([]);
-  // const [selectedRoleIds, setSelectedRoleIds] = useState([]);
 
   const [selectedClientEscalations, setSelectedClientEscalations] = useState(
     [],
@@ -69,7 +61,7 @@ const RMSProjectDetails = () => {
   const [overlaps, setOverlaps] = useState([]);
   const [overlapsPage, setOverlapsPage] = useState(1);
   const OVERLAPS_PER_PAGE = 3;
-  const ITEMS_PER_PAGE = 5;
+  const ITEMS_PER_PAGE = 8;
   const [slaPage, setSlaPage] = useState(1);
   const [compliancePage, setCompliancePage] = useState(1);
   const [escalationPage, setEscalationPage] = useState(1);
@@ -134,6 +126,7 @@ const RMSProjectDetails = () => {
       setInheritMode(true);
     } catch (err) {
       console.error("Failed to fetch client SLAs", err);
+      notify.error(err, "Failed to fetch client SLAs");
     }
   };
   const fetchProjectSLAs = async () => {
@@ -147,6 +140,7 @@ const RMSProjectDetails = () => {
       setProjectSlas(res.data.data || []);
     } catch (err) {
       console.error("Failed to fetch project SLAs", err);
+      notify.error(err, "Failed to fetch project SLAs");
     }
   };
   //2 save inherited SLAs to project
@@ -154,7 +148,7 @@ const RMSProjectDetails = () => {
     try {
       // Prevent saving if the total would exceed 3
       if (projectSlas.length + selectedClientSlas.length > 3) {
-        alert(
+        notify.warning(
           "Adding these would exceed the limit of 3 SLAs for this project.",
         );
         return;
@@ -179,6 +173,7 @@ const RMSProjectDetails = () => {
       // fetchDetail(); // Refresh project data
     } catch (err) {
       console.error("Error inheriting SLAs", err);
+      notify.error(err, "Failed to inherit SLAs");
     }
   };
 
@@ -190,7 +185,7 @@ const RMSProjectDetails = () => {
       if (!isEditing) {
         // ONLY check max limit if creating a NEW SLA
         if (projectSlas.length >= 3) {
-          alert("Maximum of 3 SLA configurations allowed per project.");
+          notify.warning("Maximum of 3 SLA configurations allowed per project.");
           return;
         }
 
@@ -199,7 +194,7 @@ const RMSProjectDetails = () => {
           (sla) => sla.slaType === formData.slaType,
         );
         if (isDuplicate) {
-          alert(`The SLA type "${formData.slaType}" is already configured.`);
+          notify.warning(`The SLA type "${formData.slaType}" is already configured.`);
           return;
         }
       }
@@ -216,9 +211,10 @@ const RMSProjectDetails = () => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE); // Reset form after save
       fetchProjectSLAs(); // Refresh table
+      notify.success("SLA configuration saved successfully.");
     } catch (err) {
       console.error("Error saving project SLA", err);
-      alert(err.response?.data?.message || "Failed to save SLA configuration");
+      notify.error(err, "Failed to save SLA configuration");
     }
   };
 
@@ -268,7 +264,7 @@ const RMSProjectDetails = () => {
           },
         );
         fetchProjectSLAs();
-        toast.success("SLA configuration deleted successfully.");
+        notify.success("SLA Configuration Deleted Successfully.");
       }
 
       if (deleteType === "compliance") {
@@ -281,7 +277,7 @@ const RMSProjectDetails = () => {
           },
         );
         fetchProjectCompliance();
-        toast.success("Compliance configuration deleted successfully.");
+        notify.success("Compliance Configuration Deleted Successfully.");
       }
 
       if (deleteType === "escalation") {
@@ -294,14 +290,14 @@ const RMSProjectDetails = () => {
           },
         );
         fetchProjectEscalations();
-        toast.success("Escalation deleted successfully.");
+        notify.success("Escalation Deleted Successfully.");
       }
 
       setOpenConfirmModal(false);
       setDeleteMessage("");
       setDeleteType(null);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Delete failed.");
+      notify.error(err, "Delete failed.");
     } finally {
       setDeleteLoading(false);
     }
@@ -335,6 +331,7 @@ const RMSProjectDetails = () => {
       setProjectCompliance(res.data.data || []);
     } catch (err) {
       console.error("Failed to fetch project compliance", err);
+      notify.error(err, "Failed to fetch project compliance");
     }
   };
 
@@ -376,6 +373,7 @@ const RMSProjectDetails = () => {
       setInheritMode(true);
     } catch (err) {
       console.error("Failed to fetch compliance", err);
+      notify.error(err, "Failed to fetch client compliance");
     }
   };
 
@@ -404,9 +402,13 @@ const RMSProjectDetails = () => {
       setInheritMode(false);
       setSelectedClientCompliance([]);
       fetchProjectCompliance(); // Refresh the main UI table
+      notify.success("Compliance inherited successfully.");
     } catch (err) {
       console.error("Error inheriting compliance", err);
-      alert("Internal Server Error: Ensure Enum types match backend exactly.");
+      notify.error(
+        err,
+        "Failed to inherit compliance. Ensure the selected types match backend enums.",
+      );
     }
   };
 
@@ -421,7 +423,7 @@ const RMSProjectDetails = () => {
       );
 
       if (isDuplicate && !formData.projectComplianceId) {
-        alert(
+        notify.warning(
           `The compliance requirement "${formData.requirementType}" is already configured for this project.`,
         );
         return; // Stop the execution here
@@ -440,10 +442,10 @@ const RMSProjectDetails = () => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectCompliance();
+      notify.success("Compliance configuration saved successfully.");
     } catch (err) {
       console.error("Error saving project compliance", err);
-      // This will display "Serial number already exists" if the local check missed something
-      alert(err.response?.data?.message || "An error occurred during save.");
+      notify.error(err, "Failed to save project compliance");
     }
   };
 
@@ -483,9 +485,10 @@ const RMSProjectDetails = () => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectEscalations(); // when you create this
+      notify.success("Escalation saved successfully.");
     } catch (err) {
       console.error("Error saving escalation", err);
-      alert(err.response?.data?.message || "Failed to save escalation");
+      notify.error(err, "Failed to save escalation");
     }
   };
 
@@ -499,6 +502,7 @@ const RMSProjectDetails = () => {
       setProficiencyLevels(res.data.data);
     } catch (err) {
       console.error("Failed to load proficiency levels", err);
+      notify.error(err, "Failed to load proficiency levels");
     }
   };
 
@@ -516,6 +520,7 @@ const RMSProjectDetails = () => {
       setProjectEscalations(res.data.data || []);
     } catch (err) {
       console.error("Failed to fetch escalations", err);
+      notify.error(err, "Failed to fetch project escalations");
     }
   };
 
@@ -526,6 +531,7 @@ const RMSProjectDetails = () => {
       setCategories(res.data || []);
     } catch (err) {
       console.error("Failed to fetch skill categories", err);
+      notify.error(err, "Failed to fetch skill categories");
     }
   };
 
@@ -564,6 +570,7 @@ const RMSProjectDetails = () => {
       setInheritMode(true);
     } catch (err) {
       console.error("Failed to fetch client escalation contacts", err);
+      notify.error(err, "Failed to fetch client escalation contacts");
     }
   };
 
@@ -607,16 +614,17 @@ const RMSProjectDetails = () => {
       setInheritMode(false);
       setSelectedClientEscalations([]);
       fetchProjectEscalations();
+      notify.success("Escalations inherited successfully.");
     } catch (err) {
       console.error("Error inheriting escalation", err);
-      alert(err.response?.data?.message || "Failed to inherit escalation");
+      notify.error(err, "Failed to inherit escalation");
     }
   };
 
   const handleEscalationUpdate = async () => {
     try {
       if (!formData.projectEscalationId) {
-        alert("Escalation ID missing for update.");
+        notify.error("Escalation ID missing for update.");
         return;
       }
 
@@ -642,9 +650,10 @@ const RMSProjectDetails = () => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectEscalations();
+      notify.success("Escalation updated successfully.");
     } catch (err) {
       console.error("Error updating escalation", err);
-      alert(err.response?.data?.message || "Failed to update escalation");
+      notify.error(err, "Failed to update escalation");
     }
   };
 
@@ -671,9 +680,7 @@ const RMSProjectDetails = () => {
       setProject(res.data);
     } catch (err) {
       console.error("Failed to fetch project details", err);
-      toast.error(
-        err.response?.data?.message || "Failed to fetch project details.",
-      );
+      notify.error(err, "Failed to fetch project details.");
     } finally {
       setLoading(false);
     }
@@ -686,9 +693,7 @@ const RMSProjectDetails = () => {
       setDemandResponse(res.data);
     } catch (err) {
       console.error("Failed to check demand creation", err);
-      toast.error(
-        err.response?.data?.message || "Failed to check demand creation.",
-      );
+      notify.error(err, "Failed to check demand creation.");
     } finally {
       setLoadingDemand(false);
     }
@@ -1096,7 +1101,7 @@ const RMSProjectDetails = () => {
       )}
 
       {activeTab === "sla" && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-lg font-semibold">Project SLA Configuration</h3>
             {!isRM && (
@@ -1121,77 +1126,46 @@ const RMSProjectDetails = () => {
 
           {projectSlas.length > 0 ? (
             <>
-              <div className="overflow-x-auto border rounded-xl no-scrollbar">
-                <table className="w-full text-sm text-left min-w-[650px]">
-                  <thead className="bg-gray-50 text-gray-600 font-medium">
-                    <tr>
-                      <th className="p-4">Type</th>
-                      <th className="p-4 text-center">Duration (Days)</th>
-                      <th className="p-4 text-center">Warning (Days)</th>
-                      <th className="p-4 text-center">Status</th>
-                      <th className="p-4 text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {paginatedSlas.map((sla) => (
-                      <tr key={sla.projectSlaId} className="hover:bg-gray-50">
-                        <td className="p-4 font-semibold text-gray-700">
-                          {sla.slaType}
-                        </td>
-                        <td className="p-4 text-center">
-                          {sla.slaDurationDays}
-                        </td>
-                        <td className="p-4 text-center">
-                          {sla.warningThresholdDays}
-                        </td>
-                        <td className="p-4 text-center">
-                          <span
-                            className={`px-2 py-1 rounded text-[10px] font-bold ${sla.isInherited ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"}`}
-                          >
-                            {sla.isInherited ? "INHERITED" : "CUSTOM"}
-                          </span>
-                        </td>
-                        {/* Action Buttons with Conditional Disabling */}
-                        <td className="p-4 text-center">
-                          {isRM ? (
-                            <div><p className="italic font-medium text-gray-400 text-xs">No permission for actions</p></div>
-                          ) : (
-                            <div className="flex justify-center gap-3">
-                              {/* EDIT BUTTON */}
-                              <button
-                                onClick={() => {
-                                  if (sla.isInherited) return; // 🔒 Prevent inherited edit
-                                  handleEditSla(sla);
-                                }}
-                                className={`transition-colors ${sla.isInherited
-                                  ? "text-gray-300 cursor-not-allowed pointer-events-none"
-                                  : "text-blue-600 hover:text-blue-800"
-                                  }`}
-                                title={
-                                  sla.isInherited
-                                    ? "Cannot edit inherited SLAs"
-                                    : "Edit SLA"
-                                }
-                              >
-                                <Edit className="h-4 w-4" />
-                              </button>
-
-                              {/* DELETE BUTTON (Always allowed) */}
-                              <button
-                                onClick={() => handleDeleteSla(sla)}
-                                className="text-red-600 hover:text-red-800"
-                                title="Delete / Uninherit"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <GenericTable
+                headers={["Type", "Duration (Days)", "Warning (Days)", "Status", "Actions"]}
+                columns={["slaType", "slaDurationDays", "warningThresholdDays", "status", "actions"]}
+                rows={paginatedSlas.map((sla) => ({
+                  ...sla,
+                  status: (
+                    <span
+                      className={`px-2 py-1 rounded text-[10px] font-bold ${sla.isInherited ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"}`}
+                    >
+                      {sla.isInherited ? "INHERITED" : "CUSTOM"}
+                    </span>
+                  ),
+                  actions: isRM ? (
+                    <div><p className="italic font-medium text-gray-400 text-xs">No permission</p></div>
+                  ) : (
+                    <div className="flex justify-center gap-3">
+                      <button
+                        onClick={() => {
+                          if (sla.isInherited) return;
+                          handleEditSla(sla);
+                        }}
+                        className={`transition-colors ${sla.isInherited
+                          ? "text-gray-300 cursor-not-allowed pointer-events-none"
+                          : "text-blue-600 hover:text-blue-800"
+                          }`}
+                        title={sla.isInherited ? "Cannot edit inherited SLAs" : "Edit SLA"}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSla(sla)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Delete / Uninherit"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )
+                }))}
+              />
 
               {totalSlaPages > 1 && (
                 <Pagination
@@ -1216,7 +1190,7 @@ const RMSProjectDetails = () => {
       {activeTab === "financials" && <ProjectFinancialsInline />}
 
       {activeTab === "pre-requisites" && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-lg font-semibold">
               Project Pre-requisites Configuration
@@ -1237,96 +1211,57 @@ const RMSProjectDetails = () => {
 
           {projectCompliance.length > 0 ? (
             <>
-              <div className="overflow-x-auto border rounded-xl no-scrollbar">
-                <table className="w-full text-sm text-left min-w-[750px]">
-                  <thead className="bg-gray-50 text-gray-600 font-medium">
-                    <tr>
-                      <th className="p-4">Requirement Type</th>
-                      <th className="p-4">Requirement Name</th>
-                      <th className="p-4 text-center">Mandatory</th>
-                      <th className="p-4 text-center">Status</th>
-                      <th className="p-4 text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {paginatedCompliance.map((comp) => (
-                      <tr
-                        key={comp.projectComplianceId}
-                        className="hover:bg-gray-50"
+              <GenericTable
+                headers={["Requirement Type", "Requirement Name", "Mandatory", "Status", "Actions"]}
+                columns={["requirementType", "requirementName", "mandatory", "status", "actions"]}
+                rows={paginatedCompliance.map((comp) => ({
+                  ...comp,
+                  mandatory: comp.mandatoryFlag ? "Yes" : "No",
+                  status: (
+                    <div className="flex justify-center items-center gap-2">
+                      <span
+                        className={`px-2 py-1 rounded text-[10px] font-bold ${comp.activeFlag
+                          ? "bg-green-50 text-green-700"
+                          : "bg-red-50 text-red-700"
+                          }`}
                       >
-                        <td className="p-4 font-semibold text-gray-700">
-                          {comp.requirementType}
-                        </td>
-
-                        <td className="p-4 text-gray-600">
-                          {comp.requirementName}
-                        </td>
-
-                        <td className="p-4 text-center">
-                          {comp.mandatoryFlag ? "Yes" : "No"}
-                        </td>
-
-                        {/* STATUS WITH INHERITED BADGE */}
-                        <td className="p-4 text-center">
-                          <div className="flex justify-center items-center gap-2">
-                            <span
-                              className={`px-2 py-1 rounded text-[10px] font-bold ${comp.activeFlag
-                                ? "bg-green-50 text-green-700"
-                                : "bg-red-50 text-red-700"
-                                }`}
-                            >
-                              {comp.activeFlag ? "ACTIVE" : "INACTIVE"}
-                            </span>
-
-                            {comp.isInherited && (
-                              <span className="px-2 py-1 rounded text-[10px] font-bold bg-blue-50 text-blue-600">
-                                INHERITED
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* ACTIONS */}
-                        <td className="p-4 text-center">
-                          {isRM ? (
-                            <div><p className="italic font-medium text-gray-400 text-xs">No permission for actions</p></div>
-                          ) : (
-                            <div className="flex justify-center gap-3">
-                              {/* EDIT BUTTON */}
-                              <button
-                                onClick={() => {
-                                  if (comp.isInherited) return; // 🔒 Prevent inherited edit
-                                  handleEditCompliance(comp);
-                                }}
-                                className={`${comp.isInherited
-                                  ? "text-gray-300 cursor-not-allowed pointer-events-none"
-                                  : "text-blue-600 hover:text-blue-800"
-                                  }`}
-                                title={
-                                  comp.isInherited
-                                    ? "Cannot edit inherited compliance"
-                                    : "Edit Compliance"
-                                }
-                              >
-                                <Edit className="h-4 w-4" />
-                              </button>
-
-                              {/* DELETE BUTTON (Always allowed) */}
-                              <button
-                                onClick={() => handleDeleteCompliance(comp)}
-                                className="text-red-600 hover:text-red-800"
-                                title="Delete / Uninherit"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        {comp.activeFlag ? "ACTIVE" : "INACTIVE"}
+                      </span>
+                      {comp.isInherited && (
+                        <span className="px-2 py-1 rounded text-[10px] font-bold bg-blue-50 text-blue-600">
+                          INHERITED
+                        </span>
+                      )}
+                    </div>
+                  ),
+                  actions: isRM ? (
+                    <div><p className="italic font-medium text-gray-400 text-xs">No permission</p></div>
+                  ) : (
+                    <div className="flex justify-center gap-3">
+                      <button
+                        onClick={() => {
+                          if (comp.isInherited) return;
+                          handleEditCompliance(comp);
+                        }}
+                        className={`${comp.isInherited
+                          ? "text-gray-300 cursor-not-allowed pointer-events-none"
+                          : "text-blue-600 hover:text-blue-800"
+                          }`}
+                        title={comp.isInherited ? "Cannot edit inherited compliance" : "Edit Compliance"}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCompliance(comp)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Delete / Uninherit"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )
+                }))}
+              />
 
               {totalCompliancePages > 1 && (
                 <Pagination
@@ -1353,7 +1288,7 @@ const RMSProjectDetails = () => {
       )}
 
       {activeTab === "escalation" && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-lg font-semibold">Project Escalation Matrix</h3>
 
@@ -1372,93 +1307,57 @@ const RMSProjectDetails = () => {
 
           {projectEscalations.length > 0 ? (
             <>
-              <div className="overflow-x-auto border rounded-xl no-scrollbar">
-                <table className="w-full text-sm text-left min-w-[950px]">
-                  <thead className="bg-gray-50 text-gray-600 font-medium">
-                    <tr>
-                      <th className="p-4">Level</th>
-                      <th className="p-4">Name</th>
-                      <th className="p-4">Role</th>
-                      <th className="p-4">Email</th>
-                      <th className="p-4">Phone</th>
-                      <th className="p-4 text-center">Status</th>
-                      <th className="p-4 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {paginatedEscalations.map((esc) => (
-                      <tr
-                        key={esc.projectEscalationId}
-                        className="hover:bg-gray-50"
+              <GenericTable
+                headers={["Level", "Name", "Role", "Email", "Phone", "Status", "Action"]}
+                columns={["level", "contactName", "contactRole", "email", "phone", "status", "action"]}
+                rows={paginatedEscalations.map((esc) => ({
+                  ...esc,
+                  level: formatLevel(esc.escalationLevel),
+                  status: (
+                    <div className="flex justify-center items-center gap-2">
+                      <span
+                        className={`px-2 py-1 rounded text-[10px] font-bold ${esc.activeFlag
+                          ? "bg-green-50 text-green-700"
+                          : "bg-red-50 text-red-700"
+                          }`}
                       >
-                        <td className="p-4 font-semibold text-gray-700">
-                          {formatLevel(esc.escalationLevel)}
-                        </td>
-
-                        <td className="p-4 text-gray-700">{esc.contactName}</td>
-                        <td className="p-4 text-gray-600">{esc.contactRole}</td>
-                        <td className="p-4 text-gray-600">{esc.email}</td>
-                        <td className="p-4 text-gray-600">{esc.phone}</td>
-
-                        <td className="p-4 text-center">
-                          <span
-                            className={`px-2 py-1 rounded text-[10px] font-bold ${esc.activeFlag
-                              ? "bg-green-50 text-green-700"
-                              : "bg-red-50 text-red-700"
-                              }`}
-                          >
-                            {esc.activeFlag ? "ACTIVE" : "INACTIVE"}
-                          </span>
-
-                          {esc.source === "INHERITED" && (
-                            <span className="ml-2 px-2 py-1 rounded text-[10px] font-bold bg-blue-50 text-blue-700">
-                              INHERITED
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="p-4 text-center">
-                          {isRM ? (
-                            <div>
-                              <p className="text-gray-400 italic text-xs">No permission for actions</p>
-                            </div>
-                          ) : (
-                            <div className="flex justify-center gap-4">
-                              {/* EDIT */}
-                              <button
-                                onClick={() => {
-                                  if (esc.source === "INHERITED") return;
-                                  handleEditEscalation(esc);
-                                }}
-                                className={`${esc.source === "INHERITED"
-                                  ? "text-gray-300 cursor-not-allowed pointer-events-none"
-                                  : "text-blue-600 hover:text-blue-800"
-                                  }`}
-                                title={
-                                  esc.source === "INHERITED"
-                                    ? "Cannot edit inherited escalation"
-                                    : "Edit"
-                                }
-                              >
-                                <Edit className="h-4 w-4" />
-                              </button>
-
-                              {/* DELETE */}
-                              <button
-                                onClick={() => handleDeleteEscalation(esc)}
-                                className="text-red-600 hover:text-red-800"
-                                title="Delete / Uninherit"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        {esc.activeFlag ? "ACTIVE" : "INACTIVE"}
+                      </span>
+                      {esc.source === "INHERITED" && (
+                        <span className="px-2 py-1 rounded text-[10px] font-bold bg-blue-50 text-blue-700">
+                          INHERITED
+                        </span>
+                      )}
+                    </div>
+                  ),
+                  action: isRM ? (
+                    <div><p className="text-gray-400 italic text-xs">No permission</p></div>
+                  ) : (
+                    <div className="flex justify-center gap-4">
+                      <button
+                        onClick={() => {
+                          if (esc.source === "INHERITED") return;
+                          handleEditEscalation(esc);
+                        }}
+                        className={`${esc.source === "INHERITED"
+                          ? "text-gray-300 cursor-not-allowed pointer-events-none"
+                          : "text-blue-600 hover:text-blue-800"
+                          }`}
+                        title={esc.source === "INHERITED" ? "Cannot edit inherited escalation" : "Edit"}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteEscalation(esc)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Delete / Uninherit"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )
+                }))}
+              />
 
               {totalEscalationPages > 1 && (
                 <Pagination
@@ -1499,7 +1398,7 @@ const RMSProjectDetails = () => {
               ✕
             </button>
 
-            <div className="px-6 py-4 border-b flex justify-between items-center">
+            <div className="px-3 py-1.5 border-b flex justify-between items-center">
               <h2 className="text-lg font-semibold capitalize">
                 {inheritMode
                   ? `Inherit ${configType === "sla"
@@ -1511,7 +1410,7 @@ const RMSProjectDetails = () => {
                   : `Create ${configType} Configuration`}
               </h2>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-y-auto px-3 py-3">
               {configType === "pre-requisites" && (
                 <>
                   {!inheritMode ? (
@@ -1560,62 +1459,39 @@ const RMSProjectDetails = () => {
                         </p>
                       )}
 
-                      <div className="max-h-60 overflow-y-auto border rounded-xl no-scrollbar px-1">
-                        <table className="w-full text-sm text-left min-w-[500px]">
-                          <thead className="bg-gray-50 text-gray-600">
-                            <tr>
-                              <th className="p-3 w-10">Select</th>
-                              <th className="p-3">Requirement Name</th>
-                              <th className="p-3">Type</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {clientCompliance.map((comp) => (
-                              <tr
-                                key={comp.clientcomplianceId}
-                                className={`hover:bg-gray-50 ${comp.isAlreadyMapped ? "bg-gray-50/50" : ""}`}
-                              >
-                                <td className="p-3">
-                                  <input
-                                    type="checkbox"
-                                    className="h-4 w-4 accent-[#263383] disabled:opacity-50"
-                                    disabled={comp.isAlreadyMapped}
-                                    // CRITICAL: Bind to requirementType (Enum String)
-                                    checked={selectedClientCompliance.includes(
-                                      comp.requirementType,
-                                    )}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedClientCompliance([
-                                          ...selectedClientCompliance,
-                                          comp.requirementType,
-                                        ]);
-                                      } else {
-                                        setSelectedClientCompliance(
-                                          selectedClientCompliance.filter(
-                                            (t) => t !== comp.requirementType,
-                                          ),
-                                        );
-                                      }
-                                    }}
-                                  />
-                                </td>
-                                <td className="p-3 font-medium text-gray-700">
-                                  {comp.requirementName}
-                                  {comp.isAlreadyMapped && (
-                                    <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded uppercase font-bold">
-                                      Mapped
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="p-3 text-gray-500">
-                                  {comp.requirementType}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <GenericTable
+                        headers={["Select", "Requirement Name", "Type"]}
+                        columns={["selection", "requirementName", "requirementType"]}
+                        rows={clientCompliance.map((comp) => ({
+                          ...comp,
+                          selection: (
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-[#263383] disabled:opacity-50"
+                              disabled={comp.isAlreadyMapped}
+                              checked={selectedClientCompliance.includes(comp.requirementType)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedClientCompliance([...selectedClientCompliance, comp.requirementType]);
+                                } else {
+                                  setSelectedClientCompliance(selectedClientCompliance.filter((t) => t !== comp.requirementType));
+                                }
+                              }}
+                            />
+                          ),
+                          requirementName: (
+                            <div className="flex items-center gap-2">
+                              {comp.requirementName}
+                              {comp.isAlreadyMapped && (
+                                <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded uppercase font-bold">
+                                  Mapped
+                                </span>
+                              )}
+                            </div>
+                          ),
+                          rowClass: comp.isAlreadyMapped ? "bg-gray-50/50" : ""
+                        }))}
+                      />
 
                       <div className="flex justify-end gap-3 mt-6">
                         <button
@@ -1664,7 +1540,6 @@ const RMSProjectDetails = () => {
                   ) : (
                     /* INHERIT FROM CLIENT VIEW */
                     <div className="space-y-4">
-                      {/* --- PLACE THE EMPTY STATE / VALIDATION MESSAGE HERE --- */}
                       {clientSlas.length > 0 &&
                         clientSlas.every((sla) => sla.isAlreadyMapped) ? (
                         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
@@ -1679,75 +1554,41 @@ const RMSProjectDetails = () => {
                           Select default client SLAs to map to this project:
                         </p>
                       )}
-                      <div className="max-h-60 overflow-y-auto border rounded-xl no-scrollbar px-1">
-                        <table className="w-full text-sm text-left min-w-[500px]">
-                          <thead className="bg-gray-50 text-gray-600">
-                            <tr>
-                              <th className="p-3 w-10">Select</th>
-                              <th className="p-3">Type</th>
-                              <th className="p-3 text-center">Duration</th>
-                              <th className="p-3 text-center">Warning</th>
-                            </tr>
-                          </thead>
-                          {/* Replace the tbody inside your Inherit View with this: */}
-                          <tbody className="divide-y">
-                            {clientSlas.map((sla) => (
-                              <tr
-                                key={sla.slaId}
-                                className={`hover:bg-gray-50 ${sla.isAlreadyMapped ? "bg-gray-50/50" : ""}`}
-                              >
-                                <td className="p-3">
-                                  <input
-                                    type="checkbox"
-                                    className="h-4 w-4 accent-[#263383] disabled:opacity-50"
-                                    checked={selectedClientSlas.includes(
-                                      sla.slaType,
-                                    )}
-                                    disabled={sla.isAlreadyMapped} // Disable if already present
-                                    onChange={(e) => {
-                                      if (e.target.checked)
-                                        setSelectedClientSlas([
-                                          ...selectedClientSlas,
-                                          sla.slaType,
-                                        ]);
-                                      else
-                                        setSelectedClientSlas(
-                                          selectedClientSlas.filter(
-                                            (t) => t !== sla.slaType,
-                                          ),
-                                        );
-                                    }}
-                                  />
-                                </td>
-                                <td className="p-3 font-medium text-gray-700">
-                                  {sla.slaType}
-                                  {sla.isAlreadyMapped && (
-                                    <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
-                                      Already Inherited
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="p-3 text-center text-gray-500">
-                                  {sla.slaDurationDays} Days
-                                </td>
-                                <td className="p-3 text-center text-gray-500">
-                                  {sla.warningThresholdDays} Days
-                                </td>
-                              </tr>
-                            ))}
-                            {clientSlas.length === 0 && (
-                              <tr>
-                                <td
-                                  colSpan="4"
-                                  className="p-6 text-center text-gray-400"
-                                >
-                                  No client SLAs found to inherit.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                      <GenericTable
+                        headers={["Select", "Type", "Duration", "Warning"]}
+                        columns={["selection", "slaType", "slaDurationDays", "warningThresholdDays"]}
+                        rows={clientSlas.map((sla) => ({
+                          ...sla,
+                          selection: (
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-[#263383] disabled:opacity-50"
+                              checked={selectedClientSlas.includes(sla.slaType)}
+                              disabled={sla.isAlreadyMapped}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedClientSlas([...selectedClientSlas, sla.slaType]);
+                                } else {
+                                  setSelectedClientSlas(selectedClientSlas.filter((t) => t !== sla.slaType));
+                                }
+                              }}
+                            />
+                          ),
+                          slaType: (
+                            <div className="flex items-center gap-2">
+                              {sla.slaType}
+                              {sla.isAlreadyMapped && (
+                                <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                                  Already Inherited
+                                </span>
+                              )}
+                            </div>
+                          ),
+                          slaDurationDays: `${sla.slaDurationDays} Days`,
+                          warningThresholdDays: `${sla.warningThresholdDays} Days`,
+                          rowClass: sla.isAlreadyMapped ? "bg-gray-50/50" : ""
+                        }))}
+                      />
 
                       <div className="flex justify-end gap-3 mt-6">
                         <button
@@ -1814,78 +1655,40 @@ const RMSProjectDetails = () => {
                       </p>
 
                       <div className="max-h-60 overflow-y-auto border rounded-md">
-                        <table className="w-full text-sm text-left">
-                          <thead className="bg-gray-50 text-gray-600">
-                            <tr>
-                              <th className="p-3 w-10">Select</th>
-                              <th className="p-3">Level</th>
-                              <th className="p-3">Name</th>
-                              <th className="p-3">Role</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {clientEscalations.map((contact) => (
-                              <tr
-                                key={contact.contactId}
-                                className={`hover:bg-gray-50 ${contact.isAlreadyMapped ? "bg-gray-50/50" : ""
-                                  }`}
-                              >
-                                <td className="p-3">
-                                  <input
-                                    type="checkbox"
-                                    disabled={contact.isAlreadyMapped}
-                                    checked={selectedClientEscalations.includes(
-                                      contact.contactId,
-                                    )}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedClientEscalations([
-                                          ...selectedClientEscalations,
-                                          contact.contactId,
-                                        ]);
-                                      } else {
-                                        setSelectedClientEscalations(
-                                          selectedClientEscalations.filter(
-                                            (id) => id !== contact.contactId,
-                                          ),
-                                        );
-                                      }
-                                    }}
-                                  />
-                                </td>
-
-                                <td className="p-3">
-                                  {formatLevel(contact.escalationLevel)}
-                                </td>
-
-                                <td className="p-3 font-medium text-gray-700">
-                                  {contact.contactName}
-
-                                  {contact.isAlreadyMapped && (
-                                    <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded uppercase font-bold">
-                                      Mapped
-                                    </span>
-                                  )}
-                                </td>
-
-                                <td className="p-3 text-gray-500">
-                                  {contact.contactRole}
-                                </td>
-                              </tr>
-                            ))}
-
-                            {clientEscalations.length === 0 && (
-                              <tr>
-                                <td
-                                  colSpan="4"
-                                  className="p-6 text-center text-gray-400"
-                                >
-                                  No client escalation contacts found.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
+                      <GenericTable
+                        headers={["Select", "Level", "Name", "Role"]}
+                        columns={["selection", "level", "name", "contactRole"]}
+                        rows={clientEscalations.map((contact) => ({
+                          ...contact,
+                          selection: (
+                            <input
+                              type="checkbox"
+                              disabled={contact.isAlreadyMapped}
+                              checked={selectedClientEscalations.includes(contact.contactId)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedClientEscalations([...selectedClientEscalations, contact.contactId]);
+                                } else {
+                                  setSelectedClientEscalations(selectedClientEscalations.filter((id) => id !== contact.contactId));
+                                }
+                              }}
+                              className="h-4 w-4 accent-[#263383]"
+                            />
+                          ),
+                          level: formatLevel(contact.escalationLevel),
+                          name: (
+                            <div className="flex items-center gap-2">
+                              {contact.contactName}
+                              {contact.isAlreadyMapped && (
+                                <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded uppercase font-bold">
+                                  Mapped
+                                </span>
+                              )}
+                            </div>
+                          ),
+                          rowClass: contact.isAlreadyMapped ? "bg-gray-50/50" : ""
+                        }))}
+                      />
                       </div>
 
                       <div className="flex justify-end gap-3 mt-6">
@@ -1930,78 +1733,6 @@ const RMSProjectDetails = () => {
         categories={categories}
         proficiencyLevels={proficiencyLevels}
       />
-      {/* ================= Draft Deliverable Roles ================= */}
-      {/* {draftDeliverableRoles.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-semibold text-gray-800">
-              Draft Deliverable Roles
-            </h3>
-            <span className="text-xs text-gray-500">
-              {selectedRoleIds.length} selected / {draftDeliverableRoles.length}{" "}
-              total
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {draftDeliverableRoles.map((role) => (
-              <div
-                key={role.tempId}
-                className="flex justify-between items-start border rounded-md p-4 bg-gray-50"
-              >
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700">
-                    {role.deliveryName}
-                  </h4>
-                  <p className="text-xs text-gray-600">
-                    Skill: {role.skillId} | SubSkill: {role.subSkillId}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    Proficiency: {role.proficiencyId}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <input
-                    type="checkbox"
-                    className="accent-[#263383]"
-                    checked={selectedRoleIds.includes(role.tempId)}
-                    onChange={() =>
-                      setSelectedRoleIds((prev) =>
-                        prev.includes(role.tempId)
-                          ? prev.filter((id) => id !== role.tempId)
-                          : [...prev, role.tempId],
-                      )
-                    }
-                  />
-
-                  <button
-                    onClick={() =>
-                      setDraftDeliverableRoles((prev) =>
-                        prev.filter((r) => r.tempId !== role.tempId),
-                      )
-                    }
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* ===== FINALIZE BUTTON ===== */}
-      {/* <div className="flex justify-end mt-6">
-            <button
-              disabled={selectedRoleIds.length === 0}
-              onClick={finalizeDeliverableRoles}
-              className="bg-[#263383] text-white px-6 py-2 rounded-lg text-sm disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              Finalize Selected Roles
-            </button>
-          </div>
-        </div>
-      )} */}
 
       <ConfirmationModal
         isOpen={openConfirmModal}

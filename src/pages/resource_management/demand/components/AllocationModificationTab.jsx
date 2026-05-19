@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import { toast } from "react-toastify";
-import { Button } from "@/components/ui/button";
-import { fetchResourcesByDemandId } from "../../services/resource";
+import { WarningIcon, SuccessIcon } from "@/components/icons";
+import { notify } from "../../utils/notify";
+import Button from "../../../../components/Button/Button";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
+import { fetchResourcesByDemandId, fetchResourcesByProjectId } from "../../services/resource";
 import allocationModificationApi from "../services/allocationModificationApi";
 import CreateModificationModal from "./CreateModificationModal";
 import ModificationTable from "./ModificationTable";
@@ -72,41 +73,45 @@ const normalizeModification = (item, demand, fallbackProjectName) => {
   };
 };
 
-const ActionPromptModal = ({
-  isOpen,
-  title,
-  message,
-  confirmText,
-  confirmClassName,
-  isSubmitting,
-  onConfirm,
-  onCancel,
-}) => {
-  if (!isOpen) return null;
+const normalizeText = (value) => String(value || "").trim().toLowerCase();
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-5">
-          <h2 className="text-base font-black tracking-tight text-slate-900">{title}</h2>
-          <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">{message}</p>
-        </div>
-        <div className="flex gap-3 bg-slate-50/50 px-6 py-5">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            className="h-10 flex-1 rounded-xl border-slate-200 text-[10px] font-bold tracking-widest text-slate-500 hover:bg-white"
-          >
-            Keep Request
-          </Button>
-          <Button type="button" onClick={onConfirm} disabled={isSubmitting} className={confirmClassName}>
-            {isSubmitting ? "Processing..." : confirmText}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+const getAllocationDemandName = (allocation) =>
+  allocation?.demandName ||
+  allocation?.demand?.demandName ||
+  allocation?.demand?.name ||
+  allocation?.demand?.title ||
+  "";
+
+const allocationHasDemandReference = (allocation) =>
+  allocation?.demandId ||
+  allocation?.demand?.id ||
+  allocation?.demand?.demandId ||
+  getAllocationDemandName(allocation);
+
+const filterProjectAllocationsForDemand = (rows, demandId, demand) => {
+  if (!Array.isArray(rows)) return [];
+
+  const hasDemandReferences = rows.some(allocationHasDemandReference);
+
+  if (!hasDemandReferences) {
+    return rows;
+  }
+
+  const currentDemandName = normalizeText(demand?.demandName || demand?.name || demand?.title || "");
+
+  return rows.filter((allocation) => {
+    if (
+      String(allocation?.demandId || "") === String(demandId) ||
+      String(allocation?.demand?.id || "") === String(demandId) ||
+      String(allocation?.demand?.demandId || "") === String(demandId)
+    ) {
+      return true;
+    }
+
+    const allocationDemandName = normalizeText(getAllocationDemandName(allocation));
+
+    return Boolean(allocationDemandName && currentDemandName && allocationDemandName === currentDemandName);
+  });
 };
 
 const AllocationModificationTab = ({ demandId, demand, user }) => {
@@ -128,8 +133,42 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
     if (!demandId) return;
 
     try {
-      const response = await fetchResourcesByDemandId(demandId);
-      const rows = Array.isArray(response?.data) ? response.data : [];
+      let rows = [];
+      if (isRM) {
+        try {
+          const response = await fetchResourcesByDemandId(demandId);
+          rows = Array.isArray(response?.data) ? response.data : [];
+        } catch (err) {
+          if (err.response?.status === 403) {
+            const projectId = demand?.projectInfo?.projectId || demand?.projectInfo?.id || demand?.project?.id || demand?.project?.projectId || demand?.projectId;
+            if (projectId) {
+              try {
+                const projectResponse = await fetchResourcesByProjectId(projectId);
+                if (projectResponse.success && Array.isArray(projectResponse.data)) {
+                  rows = filterProjectAllocationsForDemand(projectResponse.data, demandId, demand);
+                }
+              } catch (fallbackErr) {
+                console.error("Fallback fetching project resources failed:", fallbackErr);
+              }
+            }
+          } else {
+            console.error("Failed to fetch demand allocations directly:", err);
+            throw err;
+          }
+        }
+      } else {
+        const projectId = demand?.projectInfo?.projectId || demand?.projectInfo?.id || demand?.project?.id || demand?.project?.projectId || demand?.projectId;
+        if (projectId) {
+          try {
+            const projectResponse = await fetchResourcesByProjectId(projectId);
+            if (projectResponse.success && Array.isArray(projectResponse.data)) {
+              rows = filterProjectAllocationsForDemand(projectResponse.data, demandId, demand);
+            }
+          } catch (fallbackErr) {
+            console.error("Fallback fetching project resources failed:", fallbackErr);
+          }
+        }
+      }
 
       setResourceOptions(
         rows.map((resource) => ({
@@ -151,7 +190,8 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
     } catch (allocationError) {
       console.error("Failed to fetch demand allocations for modifications", allocationError);
     }
-  }, [demandId, projectName]);
+  }, [demandId, projectName, demand, isRM]);
+
 
   const loadModifications = useCallback(async () => {
     if (!demandId || (!isPM && !isRM)) {
@@ -204,12 +244,12 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
 
     try {
       const response = await allocationModificationApi.createModification(payload);
-      toast.success(response?.message || "Allocation modification created successfully");
+      notify.success(response?.message || "Allocation modification created successfully");
       setIsCreateOpen(false);
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to create allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to create allocation modification");
+      notify.error(requestError, "Failed to create allocation modification");
     } finally {
       setProcessingAction("");
     }
@@ -223,11 +263,11 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         decision: "APPROVE",
         comments: "Approved due to project priority",
       });
-      toast.success(response?.message || "Allocation modification approved");
+      notify.success(response?.message || "Allocation modification approved");
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to approve allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to approve allocation modification");
+      notify.error(requestError, "Failed to approve allocation modification");
     } finally {
       setProcessingAction("");
     }
@@ -243,12 +283,12 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         decision: "REJECT",
         comments: reason,
       });
-      toast.success(response?.message || "Allocation modification rejected");
+      notify.success(response?.message || "Allocation modification rejected");
       setRejectTarget(null);
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to reject allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to reject allocation modification");
+      notify.error(requestError, "Failed to reject allocation modification");
     } finally {
       setProcessingAction("");
     }
@@ -261,12 +301,12 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
 
     try {
       const response = await allocationModificationApi.cancelModification(cancelTarget.id);
-      toast.success(response?.message || "Allocation modification cancelled");
+      notify.success(response?.message || "Allocation modification cancelled");
       setCancelTarget(null);
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to cancel allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to cancel allocation modification");
+      notify.error(requestError, "Failed to cancel allocation modification");
     } finally {
       setProcessingAction("");
     }
@@ -288,7 +328,7 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-              <CheckCircle2 className="h-4 w-4" />
+              <SuccessIcon className="h-4 w-4" />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Requests</p>
@@ -300,7 +340,7 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <AlertTriangle className="h-4 w-4" />
+              <WarningIcon className="h-4 w-4" />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pending Requests</p>
@@ -341,15 +381,15 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         modification={rejectTarget}
       />
 
-      <ActionPromptModal
+      <ConfirmationModal
         isOpen={!!cancelTarget}
         title="Cancel Modification Request"
         message={`This will cancel the modification request for ${cancelTarget?.resourceName || "the selected resource"}.`}
         confirmText="Cancel Modification"
-        confirmClassName="h-10 flex-[2] rounded-xl bg-slate-900 text-[10px] font-black tracking-widest text-white shadow-xl shadow-slate-900/10 hover:bg-slate-800"
-        isSubmitting={processingAction === `cancel-${cancelTarget?.id}`}
         onConfirm={handleCancel}
         onCancel={() => setCancelTarget(null)}
+        isLoading={processingAction === `cancel-${cancelTarget?.id}`}
+        variant="danger"
       />
     </div>
   );

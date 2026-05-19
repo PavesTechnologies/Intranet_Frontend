@@ -11,6 +11,17 @@ import {
 import { cn } from "@/lib/utils";
 import demandService from '../../resource_management/demand/services/demandService';
 import { PriorityBadge, StateBadge } from '../../resource_management/demand/components/FormalBadges';
+import DemandModal from "../../resource_management/models/DemandModal";
+import DeleteDemandModal from "../../resource_management/demand/components/DeleteDemandModal";
+import { Pencil, Trash2, Loader2 } from "lucide-react";
+import { showStatusToast } from "../../../components/toastfy/toast";
+import { useAuth } from "../../../contexts/AuthContext";
+import {
+    canProjectManagerEditDemand,
+    canProjectManagerMutateDemand,
+    PM_EDITABLE_DEMAND_MESSAGE,
+    PM_REQUESTED_DEMAND_ONLY_MESSAGE,
+} from '../../resource_management/demand/utils/demandPermissions';
 
 const TabButton = ({ id, label, icon: Icon, active, onClick }) => (
     <button
@@ -50,10 +61,47 @@ const InfoRow = ({ label, value, icon: Icon, colorClass = "text-slate-900" }) =>
 );
 
 const ProjectDemandDetail = ({ projectId, demandId, onBack }) => {
+    const { user } = useAuth();
     const [data, setData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleUpdateSuccess = async () => {
+        setEditModalOpen(false);
+        // Refresh data
+        try {
+            const result = await demandService.getDemandById(demandId);
+            setData(result);
+            showStatusToast("Demand updated successfully", "success");
+        } catch (err) {
+            console.error("Error refreshing demand:", err);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!canProjectManagerMutateDemand(data?.demand)) {
+            showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+            setDeleteModalOpen(false);
+            return;
+        }
+
+        setIsDeleting(true);
+        try {
+            await demandService.deleteDemandByPM(demandId, demand);
+            showStatusToast("Demand deleted successfully", "success");
+            setDeleteModalOpen(false);
+            onBack(); // Go back to list after deletion
+        } catch (err) {
+            console.error("Error deleting demand:", err);
+            showStatusToast(err.response?.data?.message || "Failed to delete demand", "error");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     useEffect(() => {
         const fetchDetail = async () => {
@@ -93,6 +141,15 @@ const ProjectDemandDetail = ({ projectId, demandId, onBack }) => {
     const skill = roleMeta.skill || {};
     const subSkill = roleMeta.subSkill || {};
     const proficiency = roleMeta.proficiencyLevel || {};
+    const canPMEditDemand = canProjectManagerEditDemand(demand);
+    const canPMDeleteDemand = canProjectManagerMutateDemand(demand);
+    const userRole = user?.roles?.includes("Project_Manager")
+        ? "Project_Manager"
+        : user?.roles?.includes("Resource_Manager")
+            ? "Resource_Manager"
+            : user?.roles?.includes("Delivery_Manager")
+                ? "Delivery_Manager"
+                : "";
 
     return (
         <div className="bg-slate-50/50 min-h-screen flex flex-col font-sans">
@@ -115,16 +172,66 @@ const ProjectDemandDetail = ({ projectId, demandId, onBack }) => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-6">
-                    <div className="text-right border-r border-slate-200 pr-6">
+                <div className="flex items-center gap-3">
+                    <div className="text-right border-r border-slate-200 pr-6 mr-3">
                         <span className="text-xs font-medium text-slate-500 block">Priority Score</span>
                         <span className="text-lg font-bold text-indigo-600">{demand.priorityScore || 0}</span>
                     </div>
-                    <Button variant="primary">
-                        Action
-                    </Button>
+
+                    {(canPMEditDemand || canPMDeleteDemand) && (
+                    <div className="flex items-center gap-4 pr-2">
+                        {canPMEditDemand && (
+                            <button
+                                onClick={() => {
+                                    if (!canProjectManagerEditDemand(demand)) {
+                                        showStatusToast(PM_EDITABLE_DEMAND_MESSAGE, "error");
+                                        return;
+                                    }
+                                    setEditModalOpen(true);
+                                }}
+                                className="p-2 text-blue-600 hover:text-blue-700 transition-all active:scale-90 rounded-full hover:bg-blue-50"
+                                title="Edit Demand"
+                            >
+                                <Pencil className="h-4 w-4" />
+                            </button>
+                        )}
+                        {canPMDeleteDemand && (
+                            <button
+                                onClick={() => {
+                                    if (!canProjectManagerMutateDemand(demand)) {
+                                        showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+                                        return;
+                                    }
+                                    setDeleteModalOpen(true);
+                                }}
+                                className="p-2 text-rose-600 hover:text-rose-700 transition-all active:scale-90 rounded-full hover:bg-rose-50"
+                                title="Delete Demand"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        )}
+                    </div>
+                    )}
                 </div>
             </div>
+
+            {/* Modals */}
+            <DemandModal
+                open={editModalOpen}
+                onClose={() => setEditModalOpen(false)}
+                initialData={demand}
+                mode="edit"
+                userRole={userRole}
+                onSuccess={handleUpdateSuccess}
+            />
+
+            <DeleteDemandModal
+                open={deleteModalOpen}
+                demand={demand}
+                loading={isDeleting}
+                onClose={() => setDeleteModalOpen(false)}
+                onSubmit={handleDelete}
+            />
 
             {/* Tab Navigation */}
             <div className="px-8 border-b border-slate-200 bg-white flex gap-2">

@@ -204,8 +204,6 @@ export default function EmployeeDocumentsPage() {
       try {
         setLoading(true);
 
-        const token = localStorage.getItem("token");
-
         const [documentsResponse, offersResponse] = await Promise.all([
           fetch(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/employees/documents`,
@@ -213,7 +211,7 @@ export default function EmployeeDocumentsPage() {
               method: "GET",
               headers: {
                 accept: "application/json",
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
               },
             },
           ),
@@ -223,7 +221,7 @@ export default function EmployeeDocumentsPage() {
               method: "GET",
               headers: {
                 accept: "application/json",
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
               },
             },
           ),
@@ -247,28 +245,26 @@ export default function EmployeeDocumentsPage() {
         );
 
         const formattedEmployees = documentsData
-          .filter((emp) => allowedUserUuids.has(emp.user_uuid) && emp.emp_id)
-          .map((emp) => ({
-            id: emp.user_uuid,
-            empId: emp.emp_id,
-            name: emp.name,
-            department: emp.department,
-            documents: emp.documents.map((doc, index) => {
-              const category = getDocumentCategory(doc);
-              const type = "Uploaded";
-              const status = "Signed";
+  .filter((emp) => emp.emp_id && emp.documents?.length > 0)
+  .map((emp) => ({
+    id: emp.user_uuid,
+    empId: emp.emp_id,
+    name: emp.name,
+    department: emp.department,
+    documents: emp.documents.map((doc, index) => {
+      const category = getDocumentCategory(doc);
 
-              return {
-                id: `${emp.emp_id}-${index}`,
-                docName: getDocumentName(doc, category),
-                fileUrl: doc.file_path,
-                category,
-                type,
-                status,
-                updated: "Recently",
-              };
-            }),
-          }));
+      return {
+        id: `${emp.emp_id}-${index}`,
+        docName: getDocumentName(doc, category),
+        fileUrl: doc.file_path,
+        category,
+        type: "Uploaded",
+        status: "Signed",
+        updated: "Recently",
+      };
+    }),
+  }));
 
         setEmployees(formattedEmployees);
       } catch (err) {
@@ -307,7 +303,7 @@ export default function EmployeeDocumentsPage() {
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/view_documents?file_path=${filePath}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );

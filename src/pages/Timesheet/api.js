@@ -551,6 +551,38 @@ export async function fetchDashboardLast3Months() {
   }
 }
 
+export async function fetchDashboardDateRange(startDate, endDate) {
+  try {
+    const response = await fetch(
+      `${apiEndpoint}/api/dashboard/summary/dateRangeMonths?startDate=${startDate}&endDate=${endDate}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(
+        errorData || `Error ${response.status}: ${response.statusText}`,
+      );
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    showStatusToast({
+      type: "error",
+      message: "Failed to fetch dashboard summary. Please try again.",
+    });
+    console.error("Fetch dashboard summary error:", error);
+    return null;
+  }
+}
+
 export const handleBulkReviewAdmin = async (
   userId,
   timesheetIds,
@@ -593,5 +625,109 @@ export const handleBulkReviewAdmin = async (
       err.message || "Failed to update timesheet status",
       "error",
     );
+  }
+};
+
+export const handleMixedReview = async ({
+  path,
+  userId,
+  approvedIds = [],
+  rejectedIds = [],
+  comments = "",
+  multiUserWrap = false,
+}) => {
+  const payload = {
+    userId,
+    approvedTimesheetIds: approvedIds,
+    rejectedTimesheetIds: rejectedIds,
+    comments,
+  };
+
+  try {
+    const response = await fetch(
+      `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}${path}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(multiUserWrap ? [payload] : payload),
+      },
+    );
+
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (_) {
+      data = { message: text };
+    }
+
+    if (!response.ok) {
+      const message = data?.message || "Failed to review timesheets";
+      throw new Error(message);
+    }
+
+    const message =
+      data?.message ||
+      `${approvedIds.length} day(s) approved, ${rejectedIds.length} day(s) rejected.`;
+    showStatusToast(message, "success");
+    return true;
+  } catch (err) {
+    console.error("❌ Error reviewing timesheets:", err);
+    showStatusToast(
+      err.message || "Failed to update timesheet status",
+      "error",
+    );
+    return false;
+  }
+};
+
+export const getActiveHourSettings = async () => {
+  try {
+    const res = await fetch(`${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/timesheet-settings/active`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Error ${res.status}: ${res.statusText}`);
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error("❌ Failed to load hour settings:", err);
+    showStatusToast("Failed to load hour settings", "error");
+    throw err;
+  }
+};
+
+export const updateHourSettings = async (payload) => {
+  try {
+    const res = await fetch(`${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/timesheet-settings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const raw = await res.text();
+    if (!res.ok) {
+      throw new Error(raw || `Error ${res.status}: ${res.statusText}`);
+    }
+
+    showStatusToast("Hour settings updated successfully", "success");
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    console.error("❌ Failed to update hour settings:", err);
+    showStatusToast(err.message || "Failed to update hour settings", "error");
+    throw err;
   }
 };

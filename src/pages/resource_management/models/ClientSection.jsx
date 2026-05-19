@@ -6,7 +6,7 @@ import ClientEscalationContact from "./ClientEscalationContact";
 import ClientEscalationSection from "./ClientEscalationSection";
 // import ClientAssets from "./ClientAssets";
 
-export default function ClientSection({ clientDetails, slaRefetchKey, complianceRefetchKey, escalationRefetchKey }) {
+export default function ClientSection({ clientDetails, slaRefetchKey, complianceRefetchKey, escalationRefetchKey, actions }) {
   // const [activeTab, setActiveTab] = useState("escalation");
   const TAB_CONFIG = [
     { key: "sla", label: "SLA", enabled: (d) => d?.SLA },
@@ -39,13 +39,13 @@ export default function ClientSection({ clientDetails, slaRefetchKey, compliance
 
   return (
     <div className="w-full mb-8">
-      <div className="flex items-center justify-between border-b border-gray-200 mb-6 overflow-x-auto no-scrollbar">
-        <div className="flex space-x-6 min-w-max">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 mb-6 gap-4">
+        <div className="flex space-x-6 overflow-x-auto no-scrollbar min-w-0 flex-1">
           {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className="relative pb-3 font-medium focus:outline-none"
+              className="relative pb-3 font-medium focus:outline-none whitespace-nowrap"
             >
               <span
                 className={
@@ -66,6 +66,9 @@ export default function ClientSection({ clientDetails, slaRefetchKey, compliance
               )}
             </button>
           ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-1.5">
+          {actions}
         </div>
       </div>
 
@@ -100,3 +103,5 @@ export default function ClientSection({ clientDetails, slaRefetchKey, compliance
     </div>
   );
 }
+
+

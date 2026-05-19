@@ -10,6 +10,7 @@ import Navbar from "../../../components/Navbar/Navbar";
 import TestManagement from "../Testmanagement/TestManagementHome";
 import RiskRegisterPage from "./riskManagement/RiskRegisterPage";
 import RiskHealthModal from "./riskManagement/RiskHealthModal.jsx";
+import RoleExpectations from "../../resource_management/models/RoleExpectations.jsx";
 
 const ProjectDemandManagement  = lazy(() => import("./ProjectDemandManagement"));
 const ProjectConfigurations    = lazy(() => import("./project/ProjectConfigurations"));
@@ -151,8 +152,8 @@ const RESOURCE_TABS = [
 const ResourceDropdown = ({ selectedTab, onSelect }) => {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef(null);
-  const openTimer  = useRef(null);
-  const menuRef    = useRef(null);
+  const openTimer = useRef(null);
+  const menuRef = useRef(null);
 
   const isActive = RESOURCE_TABS.some((t) => t.tab === selectedTab);
 
@@ -190,7 +191,7 @@ const ResourceDropdown = ({ selectedTab, onSelect }) => {
             : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}
         `}
       >
-        Resource
+        ResourceManagement
         <ChevronDown
           className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           strokeWidth={2.5}
@@ -202,7 +203,7 @@ const ResourceDropdown = ({ selectedTab, onSelect }) => {
         onMouseEnter={scheduleOpen}
         onMouseLeave={scheduleClose}
         className={`
-          absolute top-full left-0 mt-1.5 w-44 bg-white border border-slate-200
+          absolute top-full left-0 mt-1.5 w-56 bg-white border border-slate-200
           rounded-lg shadow-lg shadow-slate-200/60 overflow-hidden z-50
           transition-all duration-150 origin-top
           ${open
@@ -252,9 +253,9 @@ const ResourceDropdown = ({ selectedTab, onSelect }) => {
 // ─── Main Component ──────────────────────────────────────────────────────────
 const ProjectTabs = () => {
   const { projectId } = useParams();
-  const location      = useLocation();
-  const navigate      = useNavigate();
-  const token         = localStorage.getItem("token");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const token = localStorage.getItem("token");
 
   const [projectName,   setProjectName]   = useState("");
   const [notFound,      setNotFound]      = useState(false);
@@ -352,6 +353,12 @@ const ProjectTabs = () => {
       return (
         <Suspense fallback={<TabSkeleton />}>
           <ProjectConfigurations projectId={pid} />
+        </Suspense>
+      );
+    if (selectedTab === "delivery-role")
+      return (
+        <Suspense fallback={<TabSkeleton />}>
+          <RoleExpectations projectId={pid} />
         </Suspense>
       );
 

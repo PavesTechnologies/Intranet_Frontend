@@ -351,6 +351,7 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Button from "../../components/Button/Button.jsx";
+import FilterListbox from "../../components/filter/FilterListbox.jsx";
 
 const EmployeeDashboard = ({ employeeId }) => {
   const [isRequestLeaveModalOpen, setIsRequestLeaveModalOpen] = useState(false);
@@ -496,7 +497,7 @@ const EmployeeDashboard = ({ employeeId }) => {
 
       <h2 className="text-small font-semibold m-4">Leave History</h2>
       {/* ✅ No refreshKey — LeaveHistory subscribes to "employee-update" directly */}
-      <LeaveHistory employeeId={employeeId} />
+      <LeaveHistory employeeId={employeeId} year={currentYear} />
 
       <RequestLeaveModal
         isOpen={isRequestLeaveModalOpen}

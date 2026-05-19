@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
+import Button from "../../../../../components/Button/Button";
+import GenericTable from "../../../../../components/Table/table";
+import Modal from "../../../../../components/Modal/modal";
+import { PageCard } from "../../../../../components/Cards/PageCard";
 
 export default function EducationDocumentManagement() {
   const [docs, setDocs] = useState([]);
@@ -9,18 +12,17 @@ export default function EducationDocumentManagement() {
   const [editData, setEditData] = useState(null);
 
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
 
   /* -------------------- FETCH (INITIAL LOAD ONLY) -------------------- */
   const fetchDocs = async () => {
     try {
       setLoading(true);
       const res = await axios.get(`${BASE}/education/education-document`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setDocs(res.data);
     } catch {
-      toast.error("Failed to load education documents");
+      if (window.showError) window.showError("Failed to load education documents");
     } finally {
       setLoading(false);
     }
@@ -36,16 +38,45 @@ export default function EducationDocumentManagement() {
 
     try {
       await axios.delete(`${BASE}/education/education-document/${uuid}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
       setDocs((prev) => prev.filter((d) => d.education_document_uuid !== uuid));
 
-      toast.success("Document deleted");
+      if (window.showSuccess) window.showSuccess("Document deleted");
     } catch {
-      toast.error("Failed to delete document");
+      if (window.showError) window.showError("Failed to delete document");
     }
   };
+
+  const tableHeaders = ["Document Name", "Description", "Action"];
+  const tableColumns = ["document_name", "description", "actions"];
+  const tableRows = docs.map((d) => ({
+    document_name: d.document_name,
+    description: d.description || "—",
+    actions: (
+      <div className="flex justify-end items-center gap-4">
+        <Button
+          variant="link"
+          size="small"
+          onClick={() => {
+            setEditData(d);
+            setShowModal(true);
+          }}
+        >
+          Edit
+        </Button>
+        <Button
+          variant="link"
+          size="small"
+          className="!text-red-600 hover:!underline"
+          onClick={() => deleteDoc(d.education_document_uuid)}
+        >
+          Delete
+        </Button>
+      </div>
+    ),
+  }));
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -60,75 +91,26 @@ export default function EducationDocumentManagement() {
           </p>
         </div>
 
-        <button
+        <Button
           onClick={() => {
             setEditData(null);
             setShowModal(true);
           }}
-          className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg"
+          variant="primary"
         >
           + Add Document
-        </button>
+        </Button>
       </div>
 
       {/* Table Card */}
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-        {loading ? (
-          <div className="p-6 text-center text-gray-600">
-            Loading documents...
-          </div>
-        ) : (
-          <table className="w-full border-collapse">
-            <thead className="bg-blue-900 text-white">
-              <tr>
-                <th className="px-6 py-3 text-left">Document Name</th>
-                <th className="px-6 py-3 text-left">Description</th>
-                <th className="px-6 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {docs.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan="3"
-                    className="px-6 py-6 text-center text-gray-500"
-                  >
-                    No documents found
-                  </td>
-                </tr>
-              ) : (
-                docs.map((d) => (
-                  <tr
-                    key={d.education_document_uuid}
-                    className="border-b hover:bg-gray-50"
-                  >
-                    <td className="px-6 py-3">{d.document_name}</td>
-                    <td className="px-6 py-3">{d.description || "—"}</td>
-                    <td className="px-6 py-3 text-right space-x-4">
-                      <button
-                        className="text-blue-700 hover:underline"
-                        onClick={() => {
-                          setEditData(d);
-                          setShowModal(true);
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="text-red-600 hover:underline"
-                        onClick={() => deleteDoc(d.education_document_uuid)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <PageCard>
+        <GenericTable
+          headers={tableHeaders}
+          columns={tableColumns}
+          rows={tableRows}
+          loading={loading}
+        />
+      </PageCard>
 
       {/* Modal */}
       {showModal && (
@@ -167,11 +149,10 @@ function DocumentModal({ editData, onClose, onSuccess }) {
   const [saving, setSaving] = useState(false);
 
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
 
   const save = async () => {
     if (!name.trim()) {
-      toast.error("Document name is required");
+      if (window.showError) window.showError("Document name is required");
       return;
     }
 
@@ -190,7 +171,7 @@ function DocumentModal({ editData, onClose, onSuccess }) {
           `${BASE}/education/education-document/${editData.education_document_uuid}`,
           payload,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
             responseType: "text",
           },
         );
@@ -199,13 +180,13 @@ function DocumentModal({ editData, onClose, onSuccess }) {
           `${BASE}/education/create_education_document`,
           payload,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
             responseType: "text",
           },
         );
       }
 
-      toast.success(
+      if (window.showSuccess) window.showSuccess(
         `Document ${editData ? "updated" : "created"} successfully`,
       );
 
@@ -217,50 +198,47 @@ function DocumentModal({ editData, onClose, onSuccess }) {
 
       onClose();
     } catch {
-      toast.error("Failed to save document");
+      if (window.showError) window.showError("Failed to save document");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
-        <h2 className="text-xl font-semibold mb-4">
-          {editData ? "Edit" : "Add"} Document
-        </h2>
-
-        <label className="block text-sm font-medium mb-1">Document Name</label>
-        <input
-          className="w-full border rounded-lg px-3 py-2 mb-3"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-
-        <label className="block text-sm font-medium mb-1">Description</label>
-        <textarea
-          className="w-full border rounded-lg px-3 py-2 mb-4"
-          value={desc}
-          onChange={(e) => setDesc(e.target.value)}
-        />
-
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 bg-gray-200 rounded-lg"
-          >
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={`${editData ? "Edit" : "Add"} Document`}
+      size="md"
+      footer={
+        <div className="flex justify-end gap-3 w-full">
+          <Button onClick={onClose} variant="outline" disabled={saving}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={save}
+            variant="primary"
             disabled={saving}
-            className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800"
+            loading={saving}
           >
-            {saving ? "Saving..." : "Save"}
-          </button>
+            Save
+          </Button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <label className="block text-sm font-medium mb-1">Document Name</label>
+      <input
+        className="w-full border rounded-lg px-3 py-2 mb-3"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+
+      <label className="block text-sm font-medium mb-1">Description</label>
+      <textarea
+        className="w-full border rounded-lg px-3 py-2"
+        value={desc}
+        onChange={(e) => setDesc(e.target.value)}
+      />
+    </Modal>
   );
 }

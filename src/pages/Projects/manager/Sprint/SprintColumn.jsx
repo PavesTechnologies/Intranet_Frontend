@@ -176,7 +176,7 @@ const SprintColumn = ({
           )}
 
           {/* Menu - ONLY SHOW IF MANAGER AND (HAS EDIT OR HAS DELETE) */}
-          {permissions.canEdit && (onEditSprint || onDeleteSprint) && (
+          {permissions?.canEdit && (onEditSprint || onDeleteSprint) && (
             <div ref={menuRef} className="relative">
               <button
                 onClick={(e) => {

@@ -42,10 +42,10 @@ jobs:
             cd ~/deploy
 
             echo "Pulling latest frontend image..."
-            docker compose pull frontend
+            docker compose pull 
 
-            echo "Restarting frontend container..."
-            docker compose up -d
+            echo "Recreating ONLY the frontend container..."
+            docker compose up -d --force-recreate frontend
 
             echo "Cleaning old unused images..."
             docker image prune -f

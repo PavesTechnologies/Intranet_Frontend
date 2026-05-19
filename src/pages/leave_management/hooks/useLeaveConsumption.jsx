@@ -7,7 +7,6 @@ import { over } from "stompjs";
 let stompClient = null;
 
 const useLeaveConsumption = (employeeId, refreshKey, year) => {
-  const token = localStorage.getItem("token");
   const [leaveData, setLeaveData] = useState({
     regular: [],
     genderBasedLeaveBalances: [],
@@ -25,7 +24,7 @@ const useLeaveConsumption = (employeeId, refreshKey, year) => {
     setLoading(true);
     axios
       .get(`${BASE_URL}/api/leave-balance/employee/${employeeId}/${year}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       .then((res) => {
         // console.log(res.data);

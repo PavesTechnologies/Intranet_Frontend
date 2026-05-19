@@ -151,6 +151,45 @@ export const getUtilization = async (resourceId, month, year) => {
   }
 };
 
+export const getDashboardSummaryDateRangeMonths = async (resourceId, months = 3) => {
+  try {
+    const params = { months };
+    if (resourceId) params.employeeId = resourceId;
+
+    const response = await axios.get(
+      `${TSM_BASE_URL}/api/dashboard/summary/dateRangeMonths`,
+      {
+        params,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    );
+    return response.data;
+  } catch (err) {
+    throw err;
+  }
+};
+
+export const getDashboardSummaryDateRange = async (resourceId, startDate, endDate) => {
+  try {
+    const params = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    if (resourceId) params.employeeId = resourceId;
+
+    const response = await axios.get(`${TSM_BASE_URL}/api/dashboard/summary`, {
+      params,
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    return response.data;
+  } catch (err) {
+    throw err;
+  }
+};
+
 export const getSkillCategoriesTree = async () => {
   const response = await axios.get(`${BASE_URL}/api/skill-categories/tree`, {
     headers: {
@@ -209,6 +248,23 @@ export const getRoleExpectations = async () => {
     throw err;
   }
 };
+
+export const deleteRoleExpectation = async (roleId) => {
+  try {
+    const response = await axios.delete(
+      `${BASE_URL}/api/admin/role-expectations/${roleId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    );
+    return response.data;
+  } catch (err) {
+    throw err;
+  }
+};
+
 
 export const getProficiencyLevels = async () => {
   try {

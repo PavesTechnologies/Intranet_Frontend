@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
 import FilterListbox from "../../../../components/filter/FilterListbox";
+import Button from "../../../../components/Button/Button";
+import Modal from "../../../../components/Modal/modal";
 
 export default function AddCountryIdentityMappingModal({
   countryUuid,
@@ -14,8 +15,7 @@ export default function AddCountryIdentityMappingModal({
   const [saving, setSaving] = useState(false);
 
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
   /* -------- LOAD IDENTITIES -------- */
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function AddCountryIdentityMappingModal({
         const res = await axios.get(`${BASE_URL}/identity`, { headers });
         setIdentities(res.data);
       } catch {
-        toast.error("Failed to load identities");
+        if (window.showError) window.showError("Failed to load identities");
       }
     };
     loadIdentities();
@@ -33,7 +33,7 @@ export default function AddCountryIdentityMappingModal({
   /* -------- SAVE -------- */
   const handleSave = async () => {
     if (!identityUuid) {
-      toast.error("Select identity type");
+      if (window.showError) window.showError("Select identity type");
       return;
     }
 
@@ -49,7 +49,7 @@ export default function AddCountryIdentityMappingModal({
         },
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
         },
@@ -67,59 +67,58 @@ export default function AddCountryIdentityMappingModal({
         is_mandatory: mandatory,
       };
 
-      toast.success("Identity mapped successfully");
-      onSuccess(newMapping); // ✅ parent updates table instantly
+      if (window.showSuccess) window.showSuccess("Identity mapped successfully");
+      onSuccess(newMapping);
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to create mapping");
+      if (window.showError) window.showError(err.response?.data?.detail || "Failed to create mapping");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold mb-4">Add Identity to Country</h2>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Add Identity to Country"
+      size="md"
+      footer={
+        <div className="flex justify-end gap-3 w-full">
+          <Button onClick={onClose} variant="outline" disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            variant="primary"
+            disabled={!identityUuid || saving}
+            loading={saving}
+          >
+            Save
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Identity Type</label>
+          <FilterListbox
+            options={[{value:"",label:"Select Identity"}, ...identities.map((i) => ({value: i.identity_type_uuid, label: i.identity_type_name}))]}
+            value={identityUuid}
+            onChange={setIdentityUuid}
+          />
+        </div>
 
-        <label className="block text-sm mb-1">Identity Type</label>
-        <FilterListbox
-          options={[{value:"",label:"Select Identity"}, ...identities.map((i) => ({value: i.identity_type_uuid, label: i.identity_type_name}))]}
-          value={identityUuid}
-          onChange={setIdentityUuid}
-        />
-
-        <label className="flex items-center gap-2 mb-6">
+        <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
             checked={mandatory}
             onChange={() => setMandatory(!mandatory)}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          Mandatory
+          <span className="text-sm font-medium text-gray-700">Mandatory</span>
         </label>
-
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-200 rounded-lg transition-all duration-100 ease-in-out
-            active:translate-y-[1px]"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!identityUuid || saving}
-            className={`px-4 py-2 rounded-lg text-white transition-all duration-100 ease-in-out
-            active:translate-y-[1px] ${
-              saving || !identityUuid
-                ? "bg-gray-400"
-                : "bg-blue-700 hover:bg-blue-800"
-            }`}
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

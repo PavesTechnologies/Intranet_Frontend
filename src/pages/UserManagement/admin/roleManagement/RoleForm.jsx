@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
 import Button from "../../../../components/Button/Button";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -14,7 +14,7 @@ import { showStatusToast } from "../../../../components/toastfy/toast";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 
 const ITEMS_PER_PAGE = 5;
-const MANDATORY_ROLES = ["Admin", "Super Admin", "HR", "General"];
+const MANDATORY_ROLES = ["Admin", "Super_Admin", "HR", "General"];
 
 export default function RoleForm({
   roles,
@@ -41,16 +41,26 @@ export default function RoleForm({
   const [selectedRoleUuids, setSelectedRoleUuids] = useState([]);
   const [bulkDeletingRoles, setBulkDeletingRoles] = useState(false);
 
-  const token = localStorage.getItem("token") || "";
+  // const axiosInstance = useMemo(() => {
+  //   const instance = axios.create({
+  //     baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
+  //     headers: {
+  //       "Content-Type": "application/json",
+  //     },
+  //   });
 
-  const axiosInstance = useMemo(() => {
-    return axios.create({
-      baseURL: window.__APP_CONFIG__.USER_MANAGEMENT_URL,
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  }, [token]);
+  //   instance.interceptors.request.use((config) => {
+  //     const latestToken = localStorage.getItem("token");
+
+  //     if (latestToken) {
+  //       config.headers.Authorization = `Bearer ${latestToken}`;
+  //     }
+
+  //     return config;
+  //   });
+
+  //   return instance;
+  // }, []);
 
   useEffect(() => {
     setLocalRoles(roles || []);
@@ -60,7 +70,7 @@ export default function RoleForm({
   useEffect(() => {
     const filtered = searchTerm
       ? localRoles.filter((role) =>
-          role.role_name?.toLowerCase().includes(searchTerm.toLowerCase()),
+          role.role_name?.toLowerCase().includes(searchTerm.toLowerCase())
         )
       : localRoles;
 
@@ -71,14 +81,14 @@ export default function RoleForm({
 
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredRoles.length / ITEMS_PER_PAGE),
+    Math.ceil(filteredRoles.length / ITEMS_PER_PAGE)
   );
 
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedRoles = filteredRoles.slice(
     (safeCurrentPage - 1) * ITEMS_PER_PAGE,
-    safeCurrentPage * ITEMS_PER_PAGE,
+    safeCurrentPage * ITEMS_PER_PAGE
   );
 
   useEffect(() => {
@@ -105,7 +115,7 @@ export default function RoleForm({
     setLoading(true);
 
     try {
-      const res = await axiosInstance.get("/admin/roles");
+      const res = await api.get("/admin/roles");
       const latestRoles = Array.isArray(res.data) ? res.data : [];
 
       syncRoles(latestRoles);
@@ -113,13 +123,13 @@ export default function RoleForm({
       if (afterDelete) {
         const filteredAfterDelete = searchTerm
           ? latestRoles.filter((role) =>
-              role.role_name?.toLowerCase().includes(searchTerm.toLowerCase()),
+              role.role_name?.toLowerCase().includes(searchTerm.toLowerCase())
             )
           : latestRoles;
 
         const newTotalPages = Math.max(
           1,
-          Math.ceil(filteredAfterDelete.length / ITEMS_PER_PAGE),
+          Math.ceil(filteredAfterDelete.length / ITEMS_PER_PAGE)
         );
 
         setCurrentPage((prev) => Math.min(prev, newTotalPages));
@@ -143,7 +153,7 @@ export default function RoleForm({
     if (!regex.test(roleName.trim())) {
       showToast(
         "Role name can only contain letters, spaces, hyphens, and underscores",
-        "error",
+        "error"
       );
       return false;
     }
@@ -157,7 +167,7 @@ export default function RoleForm({
     setSaving(true);
 
     try {
-      const res = await axiosInstance.post("/admin/roles", {
+      const res = await api.post("/admin/roles", {
         role_name: newRoleName.trim(),
       });
 
@@ -188,7 +198,7 @@ export default function RoleForm({
     if (MANDATORY_ROLES.includes(editRole.original_name)) {
       showToast(
         `Role '${editRole.original_name}' is mandatory and cannot be renamed`,
-        "error",
+        "error"
       );
       setEditModalOpen(false);
       return;
@@ -197,9 +207,9 @@ export default function RoleForm({
     setSaving(true);
 
     try {
-      const res = await axiosInstance.put(
+      const res = await api.put(
         `/admin/roles/uuid/${editRole.role_uuid}`,
-        { role_name: editRole.role_name.trim() },
+        { role_name: editRole.role_name.trim() }
       );
 
       if (res.status === 200) {
@@ -227,7 +237,7 @@ export default function RoleForm({
     setSelectedRoleUuids((prev) =>
       prev.includes(roleUuid)
         ? prev.filter((id) => id !== roleUuid)
-        : [...prev, roleUuid],
+        : [...prev, roleUuid]
     );
   };
 
@@ -235,12 +245,12 @@ export default function RoleForm({
     const currentPageUuids = paginatedRoles.map((role) => role.role_uuid);
 
     const allSelected = currentPageUuids.every((id) =>
-      selectedRoleUuids.includes(id),
+      selectedRoleUuids.includes(id)
     );
 
     if (allSelected) {
       setSelectedRoleUuids((prev) =>
-        prev.filter((id) => !currentPageUuids.includes(id)),
+        prev.filter((id) => !currentPageUuids.includes(id))
       );
     } else {
       setSelectedRoleUuids((prev) => [
@@ -262,7 +272,7 @@ export default function RoleForm({
     setBulkDeletingRoles(true);
 
     try {
-      const res = await axiosInstance.delete("/admin/roles/bulk-delete", {
+      const res = await api.delete("/admin/roles/bulk-delete", {
         data: {
           role_uuids: selectedRoleUuids,
         },
@@ -276,7 +286,7 @@ export default function RoleForm({
       } else if (deletedCount > 0 && failedRoles.length > 0) {
         showToast(
           `${deletedCount} role(s) deleted. ${failedRoles.length} failed.`,
-          "warning",
+          "warning"
         );
       } else {
         showToast("No roles were deleted.", "error");
@@ -298,7 +308,7 @@ export default function RoleForm({
       } else {
         showToast(
           detail || err?.response?.data?.message || "Failed to delete roles",
-          "error",
+          "error"
         );
       }
 

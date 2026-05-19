@@ -1,19 +1,16 @@
 import React from 'react';
 import { cn } from "@/lib/utils";
-import {
-    Clock, AlertTriangle, CheckCircle2, ShieldAlert,
-    TrendingUp, Shield, Zap, Target
-} from "lucide-react";
+import { PendingIcon, WarningIcon, SuccessIcon, SecurityAlertIcon, ShieldIcon, ZapIcon, TargetIcon } from "@/components/icons";
 
 export const PriorityBadge = ({ priority }) => {
     const p = String(priority).toUpperCase();
     const config = {
-        'CRITICAL': { color: 'bg-rose-50 text-rose-700 border-rose-100', icon: ShieldAlert },
-        'HIGH': { color: 'bg-amber-50 text-amber-700 border-amber-100', icon: AlertTriangle },
-        'MEDIUM': { color: 'bg-indigo-50 text-indigo-700 border-indigo-100', icon: Clock },
-        'LOW': { color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: Clock },
+        'CRITICAL': { color: 'bg-rose-50 text-rose-700 border-rose-100', icon: SecurityAlertIcon },
+        'HIGH': { color: 'bg-amber-50 text-amber-700 border-amber-100', icon: WarningIcon },
+        'MEDIUM': { color: 'bg-indigo-50 text-indigo-700 border-indigo-100', icon: PendingIcon },
+        'LOW': { color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: PendingIcon },
     };
-    const c = config[p] || { color: 'bg-slate-50 text-slate-600 border-slate-100', icon: Clock };
+    const c = config[p] || { color: 'bg-slate-50 text-slate-600 border-slate-100', icon: PendingIcon };
 
     return (
         <span className={cn(
@@ -29,13 +26,13 @@ export const PriorityBadge = ({ priority }) => {
 export const StateBadge = ({ state }) => {
     const s = String(state).toUpperCase();
     const config = {
-        'APPROVED': { color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: CheckCircle2 },
-        'OPEN': { color: 'bg-indigo-50 text-indigo-700 border-indigo-100', icon: Zap },
-        'SOFT': { color: 'bg-slate-100 text-slate-600 border-slate-200', icon: Shield },
-        'PENDING': { color: 'bg-amber-50 text-amber-600 border-amber-100', icon: Clock },
-        'REJECTED': { color: 'bg-rose-50 text-rose-600 border-rose-100', icon: Target },
+        'APPROVED': { color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: SuccessIcon },
+        'OPEN': { color: 'bg-indigo-50 text-indigo-700 border-indigo-100', icon: ZapIcon },
+        'SOFT': { color: 'bg-slate-100 text-slate-600 border-slate-200', icon: ShieldIcon },
+        'PENDING': { color: 'bg-amber-50 text-amber-600 border-amber-100', icon: PendingIcon },
+        'REJECTED': { color: 'bg-rose-50 text-rose-600 border-rose-100', icon: TargetIcon },
     };
-    const c = config[s] || { color: 'bg-slate-50 text-slate-500 border-slate-100', icon: Clock };
+    const c = config[s] || { color: 'bg-slate-50 text-slate-500 border-slate-100', icon: PendingIcon };
 
     return (
         <span className={cn(
@@ -59,7 +56,7 @@ export const SLABadge = ({ days }) => {
                 isAtRisk ? "bg-amber-50 text-amber-700 border-amber-200" :
                     "bg-emerald-50 text-emerald-700 border-emerald-100"
         )}>
-            {isBreached ? <ShieldAlert className="h-3 w-3 text-rose-400" /> : <Clock className="h-3 w-3" />}
+            {isBreached ? <SecurityAlertIcon className="h-3 w-3 text-rose-400" /> : <PendingIcon className="h-3 w-3" />}
             {isBreached ? `BREACHED (${Math.abs(days)}d)` : `${days} DAYS LEFT`}
         </span>
     );

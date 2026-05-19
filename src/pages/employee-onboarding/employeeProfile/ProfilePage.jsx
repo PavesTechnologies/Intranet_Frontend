@@ -4,6 +4,10 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Pencil, X, Trash2, AlertTriangle } from "lucide-react";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import Button from "../../../components/Button/Button";
+import DynamicCardGrid from "../../../components/Cards/DynamicCardGrid";
+import { PageCard } from "../../../components/Cards/PageCard";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 export default function ProfilePage({
   activeTab,
@@ -190,11 +194,10 @@ export default function ProfilePage({
     const fetchSocialLinks = async () => {
       try {
         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-        const token = localStorage.getItem("token");
         const res = await fetch(
           `${BASE_URL}/employee-details/social-links/${user_uuid}`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
         if (res.ok) {
@@ -217,37 +220,33 @@ export default function ProfilePage({
     setLoading(false);
   }, [coreData, hrData]);
 
-  if (loading) return <div>Loading profile...</div>;
+  if (loading) return <LoadingSpinner text="Loading profile..." />;
 
-  return (
-    <div className="space-y-6">
-      {/* ROW 1 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <Section
-          title="Primary Details"
-          onEdit={() => setEditSection("primary")}
-        >
+  const profileSections = [
+    {
+      key: "primary",
+      title: "Primary Details",
+      onEdit: () => setEditSection("primary"),
+      content: (
+        <>
           <Row label="First Name" value={primaryData?.first_name || ""} />
           <Row label="Last Name" value={primaryData?.last_name || ""} />
           <Row label="Gender" value={primaryData?.gender || ""} />
           <Row label="Date of Birth" value={primaryData?.dob || ""} />
           <Row label="Blood Group" value={primaryData?.blood_group || ""} />
-          <Row
-            label="Marital Status"
-            value={primaryData?.marital_status || ""}
-          />
+          <Row label="Marital Status" value={primaryData?.marital_status || ""} />
           <Row label="Nationality" value={primaryData?.nationality || ""} />
-        </Section>
-
-        <Section
-          title="Contact Details"
-          onEdit={() => setEditSection("contact")}
-        >
+        </>
+      ),
+    },
+    {
+      key: "contact",
+      title: "Contact Details",
+      onEdit: () => setEditSection("contact"),
+      content: (
+        <>
           <Row label="Work Email" value={contactData?.work_email || ""} />
-          <Row
-            label="Personal Email"
-            value={contactData?.personal_email || ""}
-          />
+          <Row label="Personal Email" value={contactData?.personal_email || ""} />
           <Row
             label="Mobile Number"
             value={`${contactData?.country_code} ${contactData?.mobile_number || ""}`}
@@ -256,198 +255,132 @@ export default function ProfilePage({
             label="Emergency Number"
             value={`${contactData?.country_code} ${contactData?.emergency_number || ""}`}
           />
-        </Section>
-      </div>
-
-      {/* ROW 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <Section title="Addresses" onEdit={() => setEditSection("address")}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
-            {/* CURRENT ADDRESS */}
-            <div className="flex flex-col">
-              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-1.5">
-                Current Address
+        </>
+      ),
+    },
+    {
+      key: "address",
+      title: "Addresses",
+      onEdit: () => setEditSection("address"),
+      content: (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
+          <AddressBlock title="Current Address" address={addressData?.current} />
+          <AddressBlock title="Permanent Address" address={addressData?.permanent} />
+        </div>
+      ),
+    },
+    {
+      key: "relations",
+      title: "Relations",
+      onEdit: () => setEditSection("relations"),
+      content: Array.isArray(relationData) && relationData.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
+          {relationData.map((rel, idx) => (
+            <div key={rel.id || idx} className="flex flex-col">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1">
+                {rel.relation || "Relation"}
               </span>
-              {addressData?.current?.line1 ? (
-                <>
-                  <span className="text-[14px] text-gray-800 leading-relaxed">
-                    {addressData.current.line1}
-                  </span>
-                  {addressData.current.line2 && (
-                    <span className="text-[14px] text-gray-800 leading-relaxed">
-                      {addressData.current.line2}
-                    </span>
-                  )}
-                  <span className="text-[14px] text-gray-800 leading-relaxed">
-                    {[
-                      addressData.current.city,
-                      addressData.current.state,
-                      addressData.current.country,
-                      addressData.current.pincode,
-                    ]
-                      .filter(Boolean)
-                      .join("  ")}
-                  </span>
-                </>
-              ) : (
-                <span className="text-sm text-gray-400">No address added</span>
-              )}
-            </div>
-
-            {/* PERMANENT ADDRESS */}
-            <div className="flex flex-col">
-              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-1.5">
-                Permanent Address
+              <span className="text-[14px] text-gray-800">{rel.full_name || "-"}</span>
+              <span className="text-[14px] text-gray-800 mt-0.5">
+                <span className="font-medium text-gray-900">Mobile:</span>{" "}
+                {rel.mobile || "-"}
               </span>
-              {addressData?.permanent?.line1 ? (
-                <>
-                  <span className="text-[14px] text-gray-800 leading-relaxed">
-                    {addressData.permanent.line1}
-                  </span>
-                  {addressData.permanent.line2 && (
-                    <span className="text-[14px] text-gray-800 leading-relaxed">
-                      {addressData.permanent.line2}
-                    </span>
-                  )}
-                  <span className="text-[14px] text-gray-800 leading-relaxed">
-                    {[
-                      addressData.permanent.city,
-                      addressData.permanent.state,
-                      addressData.permanent.country,
-                      addressData.permanent.pincode,
-                    ]
-                      .filter(Boolean)
-                      .join("  ")}
-                  </span>
-                </>
-              ) : (
-                <span className="text-sm text-gray-400">No address added</span>
-              )}
+              <span className="text-[14px] text-gray-800 mt-0.5">
+                <span className="font-medium text-gray-900">Gender:</span>{" "}
+                {rel.gender || "-"}
+              </span>
             </div>
-          </div>
-        </Section>
-
-        <Section title="Relations" onEdit={() => setEditSection("relations")}>
-          {Array.isArray(relationData) && relationData.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
-              {relationData.map((rel, idx) => (
-                <div key={rel.id || idx} className="flex flex-col">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1">
-                    {rel.relation || "Relation"}
-                  </span>
-                  <span className="text-[14px] text-gray-800">
-                    {rel.full_name || "-"}
-                  </span>
-                  <span className="text-[14px] text-gray-800 mt-0.5">
-                    <span className="font-medium text-gray-900">Mobile:</span>{" "}
-                    {rel.mobile || "-"}
-                  </span>
-                  <span className="text-[14px] text-gray-800 mt-0.5">
-                    <span className="font-medium text-gray-900">Gender:</span>{" "}
-                    {rel.gender || "-"}
-                  </span>
-                </div>
-              ))}
+          ))}
+        </div>
+      ) : (
+        <div className="text-gray-400 text-sm">No relations added</div>
+      ),
+    },
+    {
+      key: "education",
+      title: "Education",
+      onEdit: () => onTabChange("documents", { folder: "education", search: "" }),
+      content: educationData.length > 0 ? (
+        <div className="space-y-4">
+          {educationData.map((edu, idx) => (
+            <div key={edu.id || idx} className={idx > 0 ? "pt-4 border-t border-gray-100" : ""}>
+              <Row label="Degree" value={edu.degree || ""} />
+              <Row label="Specialization" value={edu.specialization || ""} />
+              <Row label="Institution/College" value={edu.institution || ""} />
+              <Row label="Year" value={edu.year || ""} />
             </div>
-          ) : (
-            <div className="text-gray-400 text-sm">No relations added</div>
-          )}
-        </Section>
-      </div>
-
-      {/* ROW 3 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <Section
-          title="Education"
-          onEdit={() =>
-            onTabChange("documents", { folder: "education", search: "" })
-          }
-        >
-          {educationData.length > 0 ? (
-            <div className="space-y-4">
-              {educationData.map((edu, idx) => (
-                <div
-                  key={edu.id || idx}
-                  className={idx > 0 ? "pt-4 border-t border-gray-100" : ""}
-                >
-                  <Row label="Degree" value={edu.degree || ""} />
-                  <Row
-                    label="Specialization"
-                    value={edu.specialization || ""}
-                  />
-                  <Row
-                    label="Institution/College"
-                    value={edu.institution || ""}
-                  />
-                  <Row label="Year" value={edu.year || ""} />
-                </div>
-              ))}
+          ))}
+        </div>
+      ) : (
+        <div className="text-gray-400 text-sm">No education records added</div>
+      ),
+    },
+    {
+      key: "experience",
+      title: "Experience",
+      onEdit: () => onTabChange("documents", { folder: "experience", search: "" }),
+      content: experienceData.length > 0 ? (
+        <div className="space-y-4">
+          {experienceData.map((exp, idx) => (
+            <div key={exp.id || idx} className={idx > 0 ? "pt-4 border-t border-gray-100" : ""}>
+              <Row label="Company" value={exp.company || ""} />
+              <Row label="Role" value={exp.role || ""} />
+              <Row label="Duration" value={exp.duration || ""} />
             </div>
-          ) : (
-            <div className="text-gray-400 text-sm">
-              No education records added
-            </div>
-          )}
-        </Section>
-
-        <Section
-          title="Experience"
-          onEdit={() =>
-            onTabChange("documents", { folder: "experience", search: "" })
-          }
-        >
-          {experienceData.length > 0 ? (
-            <div className="space-y-4">
-              {experienceData.map((exp, idx) => (
-                <div
-                  key={exp.id || idx}
-                  className={idx > 0 ? "pt-4 border-t border-gray-100" : ""}
-                >
-                  <Row label="Company" value={exp.company || ""} />
-                  <Row label="Role" value={exp.role || ""} />
-                  <Row label="Duration" value={exp.duration || ""} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-gray-400 text-sm">
-              No experience records added
-            </div>
-          )}
-        </Section>
-      </div>
-
-      {/* ROW 4 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <Section
-          title="Identity Information"
-          onEdit={() =>
-            onTabChange("documents", { folder: "identity", search: "" })
-          }
-        >
+          ))}
+        </div>
+      ) : (
+        <div className="text-gray-400 text-sm">No experience records added</div>
+      ),
+    },
+    {
+      key: "identity",
+      title: "Identity Information",
+      onEdit: () => onTabChange("documents", { folder: "identity", search: "" }),
+      content: (
+        <>
           <Row label="Aadhaar" value={identityData?.aadhaar || ""} />
           <Row label="PAN" value={identityData?.pan || ""} />
-        </Section>
+        </>
+      ),
+    },
+    {
+      key: "social",
+      title: "Social Media",
+      onEdit: () => setEditSection("social"),
+      content: socialData.length > 0 ? (
+        <div className="space-y-3">
+          {socialData.map((link, idx) => (
+            <Row
+              key={idx}
+              label={link.platform_name || "Link"}
+              value={link.url || ""}
+              isLink
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-gray-400 text-sm">No social media links added</div>
+      ),
+    },
+  ];
 
-        <Section title="Social Media" onEdit={() => setEditSection("social")}>
-          {socialData.length > 0 ? (
-            <div className="space-y-3">
-              {socialData.map((link, idx) => (
-                <Row
-                  key={idx}
-                  label={link.platform_name || "Link"}
-                  value={link.url || ""}
-                  isLink
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-gray-400 text-sm">
-              No social media links added
-            </div>
-          )}
-        </Section>
-      </div>
+  return (
+    <div className="space-y-6">
+      <DynamicCardGrid
+        data={profileSections}
+        getKey={(section) => section.key}
+        renderCard={(section) => (
+          <Section title={section.title} onEdit={section.onEdit}>
+            {section.content}
+          </Section>
+        )}
+        cardsPerRow={2}
+        cardsPerPage={profileSections.length}
+        showPagination={false}
+        gapClassName="gap-6"
+        gridClassName="min-w-0"
+      />
 
       {/* MODALS */}
       {editSection === "primary" && (
@@ -534,37 +467,69 @@ export default function ProfilePage({
 /* ---------------- COMMON UI COMPONENTS ---------------- */
 
 const Section = ({ title, children, onEdit }) => (
-  <div className="bg-white/80 backdrop-blur rounded-2xl shadow-md border border-indigo-100 overflow-hidden">
-    <div className="flex justify-between items-center px-6 py-4 border-b border-indigo-100 bg-indigo-50/60">
-      <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
-      <button
+  <PageCard className="h-full min-h-[292px] overflow-hidden rounded-2xl border-[#dfe6f3] shadow-[0_8px_24px_rgba(15,23,42,0.07)]">
+    <div className="flex justify-between items-center px-6 py-5">
+      <div className="flex items-center gap-2">
+        <div className="w-1 h-6 rounded-full bg-[#263383] flex-shrink-0" />
+        <h3 className="text-[13px] font-bold text-[#081534] uppercase tracking-[0.08em]">{title}</h3>
+      </div>
+      <Button
         onClick={onEdit}
-        className="flex items-center gap-1 text-xs text-indigo-600"
+        variant="ghost"
+        size="small"
+        className="text-[#263383] hover:bg-[#f4f6fc] shadow-none"
       >
-        <Pencil size={14} /> Edit
-      </button>
+        <Pencil size={11} /> Edit
+      </Button>
     </div>
-    <div className="p-5 space-y-3">{children}</div>
-  </div>
+    <div className="border-t border-[#eef2f8] px-6 pb-7 pt-6">{children}</div>
+  </PageCard>
 );
 
 const Row = ({ label, value, isLink = false }) => (
-  <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 text-sm min-w-0">
-    <span className="text-gray-500 shrink-0">{label}</span>
-    <span className="text-gray-900 font-medium sm:text-right break-words min-w-0">
+  <div className="grid grid-cols-[42%_1fr] gap-3 items-baseline py-3 border-b border-[#eef2f8] last:border-0">
+    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.08em]">{label}</span>
+    <span className="text-[15px] font-semibold text-[#081534] break-words">
       {isLink && value && value !== "NA" ? (
         <a
           href={value.startsWith("http") ? value : `https://${value}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-indigo-600 hover:underline inline-flex items-center gap-1"
+          className="text-[#263383] hover:underline inline-flex items-center gap-1"
         >
           {value}
         </a>
       ) : (
-        value
+        value || <span className="text-gray-300">—</span>
       )}
     </span>
+  </div>
+);
+
+const AddressBlock = ({ title, address }) => (
+  <div className="flex flex-col">
+    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-3">
+      {title}
+    </span>
+    {address?.line1 ? (
+      <>
+        <span className="text-[15px] font-medium text-[#081534] leading-relaxed">
+          {address.line1}
+        </span>
+        {address.line2 && (
+          <span className="text-[15px] font-medium text-[#081534] leading-relaxed">
+            {address.line2}
+          </span>
+        )}
+        <span className="text-[15px] font-medium text-[#081534] leading-relaxed">
+          {[address.city, address.state, address.country, address.pincode]
+            .filter(Boolean)
+            .join("  ")}
+        </span>
+      </>
+    ) : (
+      <span className="text-base text-slate-400">No address added</span>
+    )}
   </div>
 );
 
@@ -592,7 +557,7 @@ const Input = ({
       disabled={disabled}
       required={required}
       placeholder={`Enter ${label.toLowerCase()}`}
-      className={`w-full border-gray-300 border rounded-xl px-4 py-2.5 text-sm outline-none transition-all placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 
+      className={`w-full border-gray-300 border rounded-xl px-4 py-2.5 text-sm outline-none transition-all placeholder-gray-400 focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 
       ${disabled ? "bg-gray-50 text-gray-400 cursor-not-allowed" : "bg-white hover:border-gray-400"}`}
     />
   </div>
@@ -621,7 +586,7 @@ const AddressInput = ({
       onChange={onChange}
       disabled={disabled}
       required={required}
-      className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 
+      className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none transition-all focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 
       ${disabled ? "bg-gray-50 text-gray-400 cursor-not-allowed" : "bg-white hover:border-gray-400"}`}
     />
   </div>
@@ -649,7 +614,7 @@ const Select = ({
       onChange={onChange}
       disabled={disabled}
       required={required}
-      className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+      className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none transition-all focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10
       ${disabled ? "bg-gray-50 text-gray-400 cursor-not-allowed" : "bg-white hover:border-gray-400 cursor-pointer text-gray-900"}`}
     >
       <option value="" disabled className="text-gray-400">
@@ -698,17 +663,17 @@ const ModalWrapper = ({
         <button
           type="button"
           onClick={onClose}
-          className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+          className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#263383] transition-all"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={saving}
-          className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all focus:ring-offset-1 ${
+          className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#263383] shadow-sm transition-all focus:ring-offset-1 ${
             saving
-              ? "bg-indigo-400 cursor-not-allowed"
-              : "bg-indigo-600 hover:bg-indigo-700"
+              ? "bg-[#263383]/50 cursor-not-allowed"
+              : "bg-[#263383] hover:bg-[#081534]"
           }`}
         >
           {saving ? "Saving..." : "Save Changes"}
@@ -746,7 +711,6 @@ const PrimaryModal = ({
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const personal = hrData?.personal_details || {};
       const core = hrData?.offer || {}; // Actually coreData is passed to ProfilePage
 
@@ -770,7 +734,7 @@ const PrimaryModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(personalPayload),
         },
@@ -801,7 +765,7 @@ const PrimaryModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(corePayload),
         },
@@ -919,7 +883,6 @@ const ContactModal = ({
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const personal = hrData?.personal_details || {};
       const offer = hrData?.offer || {};
 
@@ -949,7 +912,7 @@ const ContactModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(corePayload),
         },
@@ -975,7 +938,7 @@ const ContactModal = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(personalPayload),
         },
@@ -1099,7 +1062,6 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
 
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
 
       const updateAddress = async (addr, type) => {
         if (!addr.address_uuid) return;
@@ -1123,7 +1085,7 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
             body: JSON.stringify(payload),
           },
@@ -1294,7 +1256,7 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
                   type="checkbox"
                   checked={localData.sameAsCurrent}
                   onChange={toggleSameAsCurrent}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  className="w-4 h-4 text-[#263383] border-gray-300 rounded focus:ring-[#263383]"
                 />
                 <span className="text-sm font-medium">
                   Same as Current Address
@@ -1307,17 +1269,17 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#263383] transition-all"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all focus:ring-offset-1 ${
+            className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#263383] shadow-sm transition-all focus:ring-offset-1 ${
               saving
-                ? "bg-indigo-400 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-700"
+                ? "bg-[#263383]/50 cursor-not-allowed"
+                : "bg-[#263383] hover:bg-[#081534]"
             }`}
           >
             {saving ? "Saving..." : "Save Changes"}
@@ -1389,7 +1351,6 @@ const RelationsModal = ({
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const personal = hrData?.personal_details || {};
 
       // Identify the emergency contact (e.g., the first one or a specific one)
@@ -1413,7 +1374,7 @@ const RelationsModal = ({
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify(payload),
       });
@@ -1464,7 +1425,7 @@ const RelationsModal = ({
                 onClick={() => setSelectedIndex(idx)}
                 className={`p-5 rounded-md border relative cursor-pointer transition-all ${
                   selectedIndex === idx
-                    ? "bg-[#f8f6fb] border-indigo-100 shadow-sm"
+                    ? "bg-[#f4f6fc] border-[#263383]/20 shadow-sm"
                     : "bg-white border-gray-100 hover:border-gray-200"
                 }`}
               >
@@ -1494,7 +1455,7 @@ const RelationsModal = ({
             <button
               type="button"
               onClick={handleAdd}
-              className="text-indigo-600 text-sm font-medium hover:underline mt-2 inline-block px-1 tracking-wide"
+              className="text-[#263383] text-sm font-medium hover:underline mt-2 inline-block px-1 tracking-wide"
             >
               + Add new relation
             </button>
@@ -1574,17 +1535,17 @@ const RelationsModal = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#263383] transition-all"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all focus:ring-offset-1 ${
+            className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#263383] shadow-sm transition-all focus:ring-offset-1 ${
               saving
-                ? "bg-indigo-400 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-700"
+                ? "bg-[#263383]/50 cursor-not-allowed"
+                : "bg-[#263383] hover:bg-[#081534]"
             }`}
           >
             {saving ? "Saving..." : "Save Changes"}
@@ -1686,12 +1647,11 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
     if (linkToDelete.social_link_uuid) {
       try {
         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-        const token = localStorage.getItem("token");
         const res = await fetch(
           `${BASE_URL}/employee-details/social-links/${linkToDelete.social_link_uuid}`,
           {
             method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           },
         );
         if (!res.ok) throw new Error("Failed to delete link");
@@ -1719,10 +1679,9 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const token = localStorage.getItem("token");
       const headers = {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
       };
 
       const tasks = [];
@@ -1832,7 +1791,7 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
                         updateLink(idx, "platform_name", e.target.value)
                       }
                       placeholder="e.g. GitHub"
-                      className="w-full bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                      className="w-full bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 outline-none transition-all"
                     />
                   </div>
                   <div className="flex-[2] space-y-1.5 w-full">
@@ -1843,7 +1802,7 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
                       value={link.url}
                       onChange={(e) => updateLink(idx, "url", e.target.value)}
                       placeholder="https://..."
-                      className="w-full bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                      className="w-full bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 outline-none transition-all"
                     />
                   </div>
                   <button
@@ -1867,7 +1826,7 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
           <button
             type="button"
             onClick={handleAdd}
-            className="flex items-center gap-2 text-indigo-600 text-sm font-semibold hover:bg-indigo-50 px-4 py-2.5 rounded-xl transition-all"
+            className="flex items-center gap-2 text-[#263383] text-sm font-semibold hover:bg-[#263383]/5 px-4 py-2.5 rounded-xl transition-all"
           >
             + Add Another Platform
           </button>
@@ -1886,8 +1845,8 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
             disabled={saving}
             className={`px-8 py-2.5 text-sm font-semibold text-white rounded-xl shadow-md transition-all ${
               saving
-                ? "bg-indigo-400 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-700 hover:scale-[1.02]"
+                ? "bg-[#263383]/50 cursor-not-allowed"
+                : "bg-[#263383] hover:bg-[#081534] hover:scale-[1.02]"
             }`}
           >
             {saving ? "Saving..." : "Save Links"}

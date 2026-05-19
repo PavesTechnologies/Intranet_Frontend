@@ -33,3 +33,10 @@ export const bugSummaries = (projectId) =>
       },
     },
   );
+
+export const getBugsByAssignee = (assigneeId) =>
+  axios.get(`${PMS_BASE_URL}/api/testing/bugs/assignee/${assigneeId}`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });

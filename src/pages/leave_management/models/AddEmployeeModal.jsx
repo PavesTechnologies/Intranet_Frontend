@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, User } from "lucide-react";
 import axios from "axios";
 import FilterListbox from "../../../components/filter/FilterListbox";
@@ -21,7 +21,17 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const token = localStorage.getItem("token");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    document.body.style.overflow = "hidden";
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handler);
+    };
+  }, [isOpen, onClose]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,7 +57,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
 
     try {
       await axios.post(`${BASE_URL}/api/employee/register`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setSuccess("Employee added successfully!");
       setLoading(false);
@@ -149,7 +159,9 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
                   { value: "Other", label: "Other" },
                 ]}
                 value={formData.gender}
-                onChange={(val) => handleChange({ target: { name: "gender", value: val } })}
+                onChange={(val) =>
+                  handleChange({ target: { name: "gender", value: val } })
+                }
               />
             </div>
             <div>
