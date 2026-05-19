@@ -48,8 +48,6 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   const [filteredCertificates, setFilteredCertificates] = useState([]);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
 
-  const [proficiencies, setProficiencies] = useState([]);
-
   /* ---- Sync folder and search from prop (deep linking) ---- */
   useEffect(() => {
     if (config?.folder) {
@@ -240,33 +238,6 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
     );
   }, [selectedSkill]);
   useEffect(() => {
-    const fetchProficiencies = async () => {
-      try {
-        const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
-
-        const res = await fetch(
-          `${BASE_URL}/api/proficiency/get-all-proficiency-levels`,
-          {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-          }
-        );
-
-        const result = await res.json();
-
-        const formatted = (result.data || []).map((p) => ({
-          value: p.proficiencyId,
-          label: p.proficiencyName,
-        }));
-
-        setProficiencies(formatted);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
-    fetchProficiencies();
-  }, []);
-  useEffect(() => {
     if (!selectedCertificate) {
       setFilteredProviders([]);
       setSelectedProvider(null);
@@ -293,7 +264,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
   
   useEffect(() => {
-    if (!rawCertifications || !skills.length || !proficiencies.length) return;
+    if (!rawCertifications || !skills.length) return;
 
     const formatted = rawCertifications.map((doc) => {
       // ✅ MAP SKILL NAME
@@ -302,10 +273,6 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       );
 
       // ✅ MAP PROFICIENCY NAME
-      const profObj = proficiencies.find(
-        (p) => p.value === doc.proficiencyId
-      );
-
       return {
         id: doc.id,
         certificateId: doc.certificateId,
@@ -314,7 +281,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
         name: doc.certificate?.certificateName || "NA",
         issuing_org: doc.certificate?.providerName || "NA",
         proficiencyId: doc.proficiencyId,
-        proficiencyName: profObj?.label || "NA",
+        proficiencyName: "NA",
         issue_date: doc.issuedDate,
         expiry_date: doc.expiryDate || "No Expiry",
         documents: doc.fileName
@@ -326,7 +293,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
     });
 
     setCertificationDocs(formatted);
-  }, [rawCertifications, skills, proficiencies]);
+  }, [rawCertifications, skills]);
 
   /* ---- Resolve signed URL from file_path ---- */
   const getSignedUrl = async (filePath) => {
@@ -429,10 +396,6 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
         return;
       }
 
-      if (!uploadFormData.proficiencyId) {
-        alert("Please select proficiency");
-        return;
-      }
       const isEdit = !!uploadModal.docId;
 
 // ✅ BUILD PAYLOAD DIFFERENTLY FOR POST & PUT
@@ -455,9 +418,6 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
               ? null
               : selectedSkill?.value ?? existingDoc?.skillId,
 
-          proficiencyId:
-            uploadFormData.proficiencyId ?? existingDoc?.proficiencyId,
-
           issuedDate:
             uploadFormData.issue_date ?? existingDoc?.issue_date,
 
@@ -475,22 +435,14 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
             selectedSkill?.value === "other"
               ? null
               : selectedSkill?.value,
-          proficiencyId: uploadFormData.proficiencyId,
           issuedDate: uploadFormData.issue_date,
           expiryDate: uploadFormData.expiry_date || null,
           activeFlag: true,
         };
       }
 
-      // ✅ CREATE FORM DATA (IMPORTANT FORMAT)
+      // Swagger shows the DTO as query params and only the file in multipart body.
       const formData = new FormData();
-
-      formData.append(
-        "certificateData",
-        new Blob([JSON.stringify(certData)], {
-          type: "application/json",
-        })
-      );
 
       // ✅ FILE (optional)
       if (uploadFile) {
@@ -498,14 +450,22 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       }
 
       // ✅ API CONFIG
-      const url = isEdit
-        ? `${BASE_URL}/api/resource-certificates/${uploadModal.docId}`
-        : `${BASE_URL}/api/resource-certificates`;
+      const url = new URL(
+        isEdit
+          ? `${BASE_URL}/api/resource-certificates/${uploadModal.docId}`
+          : `${BASE_URL}/api/resource-certificates`
+      );
+
+      Object.entries(certData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== "") {
+          url.searchParams.append(key, String(value));
+        }
+      });
 
       const method = isEdit ? "PUT" : "POST";
 
       // ✅ API CALL
-      const response = await fetch(url, {
+      const response = await fetch(url.toString(), {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -516,7 +476,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       if (!response.ok) {
         const errText = await response.text();
         console.error("API ERROR:", errText);
-        alert("Certification upload failed");
+        alert(`Certification upload failed: ${errText || response.status}`);
         return;
       }
 
@@ -751,7 +711,6 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       };
     } else if (category === "certifications") {
       prefillData = {
-        proficiencyId: doc.proficiencyId || "",
         issue_date: doc.issue_date !== "NA" ? doc.issue_date : "",
         expiry_date:
           doc.expiry_date !== "No Expiry" && doc.expiry_date !== "NA"
@@ -1221,7 +1180,6 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                         <DocField label="Certificate Name" value={doc.name} />
                         <DocField label="Issuing Organization" value={doc.issuing_org} />
 
-                        <DocField label="Proficiency" value={doc.proficiencyName} />
                         <DocField label="Issue Date" value={doc.issue_date} />
                         <DocField label="Expiry Date" value={doc.expiry_date} />
                         {doc.credential_id && (
@@ -1608,22 +1566,6 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                             />
                           </div>
                         )}
-
-                        {/* 🔥 Proficiency */}
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Proficiency</label>
-                          <Select
-                            options={proficiencies}
-                            value={proficiencies.find(p => p.value === uploadFormData.proficiencyId) || null}
-                            onChange={(val) =>
-                              setUploadFormData((d) => ({
-                                ...d,
-                                proficiencyId: val.value,
-                              }))
-                            }
-                            placeholder="Select Proficiency"
-                          />
-                        </div>
 
                         {/* 🔥 Issue Date */}
                         <UploadField

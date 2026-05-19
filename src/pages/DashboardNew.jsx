@@ -37,7 +37,7 @@ import {
 
 const Dashboard = () => {
     const roles = [
-        "Super Admin",
+        "Super_Admin",
         "Admin",
         "Project_Manager",
         "Resource_Manager",
@@ -47,13 +47,13 @@ const Dashboard = () => {
         "General",
     ];
 
-    const [selectedRole, setSelectedRole] = useState("Super Admin");
+    const [selectedRole, setSelectedRole] = useState("Super_Admin");
 
     const chartColors = ["#1B4ED8", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
 
     const roleTheme = {
         // ... (keeping your exact same roleTheme data - no changes needed)
-        "Super Admin": {
+        "Super_Admin": {
             title: "Enterprise Command Center",
             subtitle: "Cross-module visibility, approvals, and executive metrics",
             accent: "from-blue-600 to-indigo-700",
@@ -113,7 +113,7 @@ const Dashboard = () => {
             ],
         },
         // ... (all other roles remain exactly the same)
-        // [I've kept your complete roleTheme data - just showing Super Admin as example]
+        // [I've kept your complete roleTheme data - just showing Super_Admin as example]
     };
 
     const fallbackRole = {
@@ -412,7 +412,7 @@ export default Dashboard;
 //   "HR",
 //   "Hr_Manager",
 //   "Admin",
-//   "Super Admin",
+//   "Super_Admin",
 //   "General",
 // ];
 
@@ -669,11 +669,11 @@ export default Dashboard;
 //       ["Policy update", "Security", "Review", "09:50 AM"],
 //     ],
 //   },
-//   "Super Admin": {
+//   "Super_Admin": {
 //     title: "Platform Governance",
 //     subtitle: "Full visibility across roles, access, and critical events.",
 //     accent: "#0f3638",
-//     summary: "Super Admin sees platform-wide governance, audit pressure, and critical control metrics on the same scaffold.",
+//     summary: "Super_Admin sees platform-wide governance, audit pressure, and critical control metrics on the same scaffold.",
 //     primaryAction: "Review alerts",
 //     secondaryAction: "Inspect audit trail",
 //     kpis: [
@@ -1096,7 +1096,7 @@ export default Dashboard;
 
 //   const roles = user?.roles || [];
 //   const isAdminOrSuperAdmin =
-//     roles.includes("Super Admin") || roles.includes("Admin");
+//     roles.includes("Super_Admin") || roles.includes("Admin");
 //   const isRM = roles.includes("Resource_Manager");
 //   // const isPM = roles.includes("Project_Manager");
 //   const isHR = roles.includes("HR");

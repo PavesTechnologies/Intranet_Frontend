@@ -4,11 +4,24 @@ import axios from "axios";
 
 const BASE_URL = window.__APP_CONFIG__.USER_MANAGEMENT_URL;
 
+// ─────────────────────────────────────
+// MAIN API INSTANCE
+// ─────────────────────────────────────
 const api = axios.create({
   baseURL: BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
+});
+
+// ─────────────────────────────────────
+// REFRESH CLIENT
+// Separate client to avoid interceptor loops
+// ─────────────────────────────────────
+const refreshClient = axios.create({
+  baseURL: BASE_URL,
+  withCredentials: true,
 });
 
 // ─────────────────────────────────────
@@ -20,13 +33,14 @@ const PUBLIC_URLS = [
   "/auth/callback",
   "/auth/send-otp",
   "/auth/forgot-password",
+  "/auth/refresh",
 ];
 
 const isPublicUrl = (url) => {
   if (!url) return false;
 
   try {
-    const path = new URL(url).pathname;
+    const path = new URL(url, window.location.origin).pathname;
 
     return PUBLIC_URLS.some((pub) => path.includes(pub));
   } catch {
@@ -75,6 +89,7 @@ let isRefreshing = false;
 
 let failedQueue = [];
 
+// Process queued requests
 const processQueue = (error, token = null) => {
   failedQueue.forEach((promise) => {
     if (error) {
@@ -108,6 +123,7 @@ api.interceptors.response.use(
 
     const alreadyRetried = originalRequest?._retry;
 
+    // Ignore non-token-expiry errors
     if (
       !is401 ||
       !isExpiredToken ||
@@ -117,7 +133,9 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Queue requests
+    // ─────────────────────────────────────
+    // REQUEST QUEUE HANDLING
+    // ─────────────────────────────────────
     if (isRefreshing) {
       return new Promise((resolve, reject) => {
         failedQueue.push({ resolve, reject });
@@ -136,37 +154,53 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const response = await fetch(
-        `${BASE_URL}/auth/refresh`,
-        {
-          method: "POST",
-          credentials: "include",
-        },
+      console.log("🔄 Refreshing access token...");
+
+      // ─────────────────────────────────────
+      // REFRESH TOKEN API
+      // ─────────────────────────────────────
+      const response = await refreshClient.post(
+        "/auth/refresh",
+        {},
       );
 
-      if (!response.ok) {
-        throw new Error("Refresh failed");
+      const newAccessToken = response.data?.access_token;
+
+      if (!newAccessToken) {
+        throw new Error("No access token returned");
       }
 
-      const data = await response.json();
-
-      const newAccessToken = data.access_token;
-
+      // Save new token
       saveTokens(newAccessToken);
 
+      // Update default headers
+      api.defaults.headers.common.Authorization =
+        `Bearer ${newAccessToken}`;
+
+      // Process queued requests
       processQueue(null, newAccessToken);
 
+      // Retry original request
       originalRequest.headers.Authorization =
         `Bearer ${newAccessToken}`;
+
+      console.log("✅ Token refreshed successfully");
 
       return api(originalRequest);
 
     } catch (refreshError) {
+      console.error("❌ Refresh token failed");
+
       processQueue(refreshError, null);
 
-      clearTokens();
+      // Only logout if token truly missing
+      const latestToken = getAccessToken();
 
-      window.location.href = "/login";
+      if (!latestToken) {
+        clearTokens();
+
+        window.location.href = "/login";
+      }
 
       return Promise.reject(refreshError);
 

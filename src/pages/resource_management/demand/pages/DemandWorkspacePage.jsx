@@ -668,6 +668,7 @@ const DemandWorkspacePage = () => {
                                     {[
                                         { id: 'breached', label: 'Breached', icon: SecurityAlertIcon, color: 'text-rose-600' },
                                         { id: 'at_risk', label: 'At Risk', icon: WarningIcon, color: 'text-orange-600' },
+                                        { id: 'pending', label: 'Pending', icon: PendingIcon, color: 'text-amber-600' },
                                         { id: 'active', label: 'Approved', icon: ActivityIcon, color: 'text-indigo-600' },
                                         { id: 'soft', label: 'Soft', icon: ZapIcon, color: 'text-slate-600' },
                                         { id: 'fulfilled', label: 'Fulfilled', icon: SuccessIcon, color: 'text-emerald-600' },
