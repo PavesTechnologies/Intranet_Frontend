@@ -104,7 +104,7 @@ const CreateModificationModal = ({
     setForm((currentForm) => ({
       ...currentForm,
       currentAllocationPercentage: String(currentAllocation),
-      requestedAllocationPercentage: String(Math.max(Number(currentAllocation), 0)),
+      requestedAllocationPercentage: "",
       effectiveDate: "",
       overrideEndDate: "",
       reason: "",
@@ -131,8 +131,7 @@ const CreateModificationModal = ({
       allocationId: nextAllocationId,
       currentAllocationPercentage:
         nextCurrentAllocation === "" ? "" : String(nextCurrentAllocation),
-      requestedAllocationPercentage:
-        nextCurrentAllocation === "" ? "" : String(nextCurrentAllocation),
+      requestedAllocationPercentage: "",
       overrideEndDate: "",
     }));
   };
@@ -244,7 +243,7 @@ const CreateModificationModal = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overflow-x-hidden p-6">
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1">
@@ -273,6 +272,7 @@ const CreateModificationModal = ({
                   ]}
                   value={form.allocationId}
                   onChange={(val) => handleResourceChange({ target: { value: val } })}
+                  optionsClassName="w-full"
                 />
                 {errors.allocationId && (
                   <p className="text-[11px] text-rose-600">{errors.allocationId}</p>
