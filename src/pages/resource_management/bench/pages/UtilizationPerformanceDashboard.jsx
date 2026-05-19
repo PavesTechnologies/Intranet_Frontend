@@ -657,75 +657,85 @@ const UtilizationPerformanceDashboard = () => {
             </div>
          </div>
 
-         {/* KPI Stats Grid */}
-         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {(liveData ? dynamicKPIs : KPI_STATS).map((stat, idx) => {
-               const originalStat = KPI_STATS.find(s => s.label === stat.label) || KPI_STATS[idx % KPI_STATS.length];
-               return (
-                  <KPICard
-                     key={stat.label}
-                     label={stat.label}
-                     value={stat.value}
-                     icon={React.cloneElement(originalStat.icon, { size: 20, strokeWidth: 2.5 })}
-                     color={`${originalStat.bg} ${originalStat.color}`}
-                  />
-               );
-            })}
-         </div>
-
-         <div className="mb-6 border-b border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-end gap-10 overflow-x-auto no-scrollbar">
-               {[
-                  { id: 'portfolio', label: 'Portfolio Analytics', icon: <AnalyticsIcon size={14} /> },
-                  { id: 'projects', label: 'Projects', icon: <DesktopIcon size={14} /> },
-                  { id: 'resource', label: 'Resource Capability', icon: <BrainCircuitIcon size={14} /> },
-                  // { id: 'governance', label: 'Governance & Readiness', icon: <ShieldAlert size={14} /> }
-               ].map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  return (
-                     <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`group relative flex items-center gap-2 pb-3.5 pt-2 whitespace-nowrap transition-all ${isActive ? "text-[#081534]" : "text-slate-400 hover:text-slate-600"
-                           }`}
-                     >
-                        {tab.icon}
-                        <span className={`text-sm font-semibold tracking-tight ${isActive ? "text-[#081534]" : "text-slate-600"}`}>
-                           {tab.label}
-                        </span>
-                        <span className={`absolute bottom-0 left-0 h-0.5 rounded-full bg-[#081534] transition-all ${isActive ? "w-full opacity-100" : "w-0 opacity-0"}`} />
-                     </button>
-                  );
-               })}
+         {loading && !liveData ? (
+            <div className="flex flex-col items-center justify-center py-32 mt-4">
+               <LoadingSpinner size="lg" text="Aggregating Utilization Intelligence..." />
             </div>
+         ) : (
+            <>
+               {/* KPI Stats Grid */}
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                  {(liveData ? dynamicKPIs : KPI_STATS).map((stat, idx) => {
+                     const originalStat = KPI_STATS.find(s => s.label === stat.label) || KPI_STATS[idx % KPI_STATS.length];
+                     return (
+                        <KPICard
+                           key={stat.label}
+                           label={stat.label}
+                           value={stat.value}
+                           icon={React.cloneElement(originalStat.icon, { size: 20, strokeWidth: 2.5 })}
+                           color={`${originalStat.bg} ${originalStat.color}`}
+                        />
+                     );
+                  })}
+               </div>
 
-               {/* Unified Calendar / Date Range Picker */}
-               <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm h-[38px] mb-2 hover:border-indigo-500 transition-all focus-within:ring-1 focus-within:ring-indigo-500 group">
-                  <DateRangeIcon size={14} className="text-indigo-600 shrink-0 group-hover:scale-110 transition-transform" />
-                  <div className="flex items-center gap-1">
-                     <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        onClick={(e) => e.target.showPicker()}
-                     className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[110px]"
-                  />
-                  <span className="text-slate-300 mx-0.5">—</span>
-                  <input
-                     type="date"
-                     value={endDate}
-                     onChange={(e) => setEndDate(e.target.value)}
-                        onClick={(e) => e.target.showPicker()}
-                        className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[110px]"
-                     />
+               <div className="mb-6 border-b border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="flex items-end gap-10 overflow-x-auto no-scrollbar">
+                     {[
+                        { id: 'portfolio', label: 'Portfolio Analytics', icon: <AnalyticsIcon size={14} /> },
+                        { id: 'projects', label: 'Projects', icon: <DesktopIcon size={14} /> },
+                        { id: 'resource', label: 'Resource Capability', icon: <BrainCircuitIcon size={14} /> },
+                     ].map((tab) => {
+                        const isActive = activeTab === tab.id;
+                        return (
+                           <button
+                              key={tab.id}
+                              onClick={() => setActiveTab(tab.id)}
+                              className={`group relative flex items-center gap-2 pb-3.5 pt-2 whitespace-nowrap transition-all ${isActive ? "text-[#081534]" : "text-slate-400 hover:text-slate-600"
+                                 }`}
+                           >
+                              {tab.icon}
+                              <span className={`text-sm font-semibold tracking-tight ${isActive ? "text-[#081534]" : "text-slate-600"}`}>
+                                 {tab.label}
+                              </span>
+                              <span className={`absolute bottom-0 left-0 h-0.5 rounded-full bg-[#081534] transition-all ${isActive ? "w-full opacity-100" : "w-0 opacity-0"}`} />
+                           </button>
+                        );
+                     })}
+                  </div>
+
+                  {/* Unified Calendar / Date Range Picker */}
+                  <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm h-[38px] mb-2 hover:border-indigo-500 transition-all focus-within:ring-1 focus-within:ring-indigo-500 group">
+                     <DateRangeIcon size={14} className="text-indigo-600 shrink-0 group-hover:scale-110 transition-transform" />
+                     <div className="flex items-center gap-1">
+                        <input
+                           type="date"
+                           value={startDate}
+                           onChange={(e) => setStartDate(e.target.value)}
+                           onClick={(e) => e.target.showPicker()}
+                           className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[110px]"
+                        />
+                        <span className="text-slate-300 mx-0.5">—</span>
+                        <input
+                           type="date"
+                           value={endDate}
+                           onChange={(e) => setEndDate(e.target.value)}
+                           onClick={(e) => e.target.showPicker()}
+                           className="text-[11px] font-bold text-slate-600 bg-transparent border-none focus:ring-0 outline-none cursor-pointer w-auto min-w-[110px]"
+                        />
+                     </div>
                   </div>
                </div>
-            </div>
- 
-            {/* DASHBOARD CONTENT ENGINE */}
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-               {/* TAB 0: UTILIZATION REPORTING & DASHBOARDS */}
+
+               {/* DASHBOARD CONTENT ENGINE */}
+               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  {/* TAB 0: UTILIZATION REPORTING & DASHBOARDS */}
                {activeTab === 'portfolio' && (
+                  loading ? (
+                     <div className="px-6 py-32 flex justify-center items-center bg-white rounded-3xl border border-slate-100 shadow-sm w-full">
+                        <LoadingSpinner text="Refreshing Portfolio Analytics..." />
+                     </div>
+                  ) : (
                    <div className="flex flex-col xl:flex-row gap-6">
                       <div className="flex-1 bg-white rounded-3xl border border-slate-100 shadow-sm p-6 sm:p-8 overflow-hidden">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
@@ -834,6 +844,7 @@ const UtilizationPerformanceDashboard = () => {
                         </div>
                      </div>
                   </div>
+                  )
                )}
 
             {/* TAB 2: PROJECTS & BREACHES (Story 3, 4, 6) */}
@@ -1034,6 +1045,8 @@ const UtilizationPerformanceDashboard = () => {
                )}
 
             </div>
+            </>
+         )}
 
          {/* RESOURCE PROJECTS DRAWER */}
          <ResourceVisualizationDrawer
