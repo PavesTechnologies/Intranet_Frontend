@@ -5,12 +5,27 @@ import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 export default function FilterListbox({ options, value, onChange, disabled = false, optionsClassName = "w-max" }) {
   const selected = options.find((o) => o.value === value) ?? options[0];
   const containerRef = useRef(null);
-  const [openUpward, setOpenUpward] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState({});
 
-  const checkPosition = () => {
+  const calculatePosition = () => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      setOpenUpward(window.innerHeight - rect.bottom < 250);
+      const spaceBelow = window.innerHeight - rect.bottom;
+      if (spaceBelow < 250) {
+        setDropdownStyle({
+          top: "auto",
+          bottom: window.innerHeight - rect.top + 4,
+          left: rect.left,
+          minWidth: rect.width,
+        });
+      } else {
+        setDropdownStyle({
+          top: rect.bottom + 4,
+          bottom: "auto",
+          left: rect.left,
+          minWidth: rect.width,
+        });
+      }
     }
   };
 
@@ -19,7 +34,7 @@ export default function FilterListbox({ options, value, onChange, disabled = fal
       <div className="relative w-full" ref={containerRef}>
         <Listbox.Button
           className="w-full cursor-default rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 text-left text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          onClick={checkPosition}
+          onClick={calculatePosition}
         >
           <span className="block truncate text-gray-700">
             {selected?.label || "SELECT AN OPTION"}
@@ -35,9 +50,8 @@ export default function FilterListbox({ options, value, onChange, disabled = fal
           leaveTo="opacity-0"
         >
           <Listbox.Options
-            className={`absolute z-[100] min-w-full ${optionsClassName} max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm ${
-              openUpward ? "bottom-full mb-2" : "mt-2"
-            }`}
+            style={dropdownStyle}
+            className={`fixed z-[9999] ${optionsClassName} max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm`}
           >
             {options.map((option, idx) => (
               <Listbox.Option
