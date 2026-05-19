@@ -14,7 +14,7 @@ import { showStatusToast } from "../../../../components/toastfy/toast";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 
 const ITEMS_PER_PAGE = 5;
-const MANDATORY_ROLES = ["Admin", "Super Admin", "HR", "General"];
+const MANDATORY_ROLES = ["Admin", "Super_Admin", "HR", "General"];
 
 export default function RoleForm({
   roles,

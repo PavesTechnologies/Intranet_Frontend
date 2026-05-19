@@ -45,7 +45,7 @@ const EmployeePanel = () => {
 
   const isManager =
     roles.includes("manager") ||
-    (employee?.roles || "").toLowerCase() === "super admin";
+    (employee?.roles || "").toLowerCase() === "Super_Admin";
   const isHR = roles.includes("hr");
   const isGeneral = roles.includes("general");
 
