@@ -81,7 +81,7 @@ const Stat = ({ title, value, icon: Icon, color = "indigo" }) => {
       className={`bg-white border rounded-xl p-5 shadow-sm flex justify-between items-center transition-all hover:shadow-md ${theme.border}`}
     >
       <div>
-        <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">
+        <p className="text-xs text-gray-400 font-bold tracking-wider">
           {title}
         </p>
         <p className={`text-2xl font-bold mt-1 ${theme.text}`}>{value}</p>
