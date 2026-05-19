@@ -22,8 +22,9 @@ import { showStatusToast } from "../../../../components/toastfy/toast";
 import { useAuth } from '../../../../contexts/AuthContext';
 import { PriorityBadge, StateBadge } from '../components/FormalBadges';
 import { Button } from "@/components/ui/button";
+import ConfirmationModal from '../../../../components/confirmation_modal/ConfirmationModal';
 import Pagination from '../../../../components/Pagination/pagination';
-import { fetchResourcesByDemandId } from '../../services/resource';
+import { deleteResourceAllocation, fetchResourcesByDemandId, fetchResourcesByProjectId } from '../../services/resource';
 import GenericTable from '../../../../components/Table/table';
 import {
     canProjectManagerEditDemand,
@@ -854,27 +855,133 @@ const AllocationResultsTab = ({ results }) => {
 /**
  * --- TAB 6: DEMAND RESOURCES ---
  */
-const DemandResourcesTable = ({ demandId }) => {
+const DemandResourcesTable = ({ demandId, demand }) => {
+    const { user } = useAuth();
+    const isRM = user?.roles?.includes("Resource_Manager");
+    const isPM = user?.roles?.includes("Project_Manager");
+    const isAdmin = user?.roles?.includes("Admin");
+    const canDelete = isRM || isPM || isAdmin;
     const [allocations, setAllocations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [page, setPage] = useState(1);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deletingAllocationId, setDeletingAllocationId] = useState("");
     const itemsPerPage = 5;
+
+    const getResourceName = (item) =>
+        item?.fullName || item?.resourceName || item?.employeeName || item?.name || `Resource ${item?.resourceId || ""}`.trim();
+
+    const getResourceEmail = (item) =>
+        item?.email || item?.employeeEmail || item?.mail || "--";
+
+    const normalizeText = (value) => String(value || "").trim().toLowerCase();
+
+    const getAllocationDemandName = (allocation) =>
+        allocation?.demandName ||
+        allocation?.demand?.demandName ||
+        allocation?.demand?.name ||
+        allocation?.demand?.title ||
+        "";
+
+    const getAllocationId = (allocation) =>
+        allocation?.allocationId ||
+        allocation?.resourceAllocationId ||
+        allocation?.allocation?.id ||
+        allocation?.id ||
+        "";
+
+    const isPlannedAllocation = (allocation) =>
+        String(allocation?.allocationStatus || allocation?.status || "").toUpperCase() === "PLANNED";
+
+    const getCurrentDemandName = () =>
+        demand?.demandName || demand?.name || demand?.title || "";
+
+    const allocationHasDemandReference = (allocation) =>
+        allocation?.demandId ||
+        allocation?.demand?.id ||
+        allocation?.demand?.demandId ||
+        getAllocationDemandName(allocation);
+
+    const allocationMatchesDemand = (allocation) => {
+        if (
+            String(allocation?.demandId || "") === String(demandId) ||
+            String(allocation?.demand?.id || "") === String(demandId) ||
+            String(allocation?.demand?.demandId || "") === String(demandId)
+        ) {
+            return true;
+        }
+
+        const allocationDemandName = normalizeText(getAllocationDemandName(allocation));
+        const currentDemandName = normalizeText(getCurrentDemandName());
+
+        return Boolean(allocationDemandName && currentDemandName && allocationDemandName === currentDemandName);
+    };
+
+    const filterProjectAllocationsForDemand = (rows = []) => {
+        if (!Array.isArray(rows)) return [];
+
+        const hasDemandReferences = rows.some(allocationHasDemandReference);
+
+        if (!hasDemandReferences) {
+            return rows;
+        }
+
+        return rows.filter(allocationMatchesDemand);
+    };
 
     useEffect(() => {
         const loadResources = async () => {
             try {
                 setLoading(true);
-                const response = await fetchResourcesByDemandId(demandId);
-                if (response.success) {
-                    setAllocations(response.data || []);
+                if (isRM) {
+                    // Resource Managers can access demand allocations directly
+                    const response = await fetchResourcesByDemandId(demandId);
+                    if (response.success) {
+                        setAllocations(response.data || []);
+                        setError(null);
+                    } else {
+                        setError(response.message || "Failed to fetch resources");
+                    }
                 } else {
-                    setError(response.message || "Failed to fetch resources");
+                    // PM/DM fallback: query project allocations directly to avoid 403
+                    const projectId = demand?.projectInfo?.projectId || demand?.projectInfo?.id || demand?.project?.id || demand?.project?.projectId || demand?.projectId;
+                    if (projectId) {
+                        const projectResponse = await fetchResourcesByProjectId(projectId);
+                        if (projectResponse.success && Array.isArray(projectResponse.data)) {
+                            setAllocations(filterProjectAllocationsForDemand(projectResponse.data));
+                            setError(null);
+                        } else {
+                            setError(projectResponse.message || "Failed to fetch project resources");
+                        }
+                    } else {
+                        setAllocations([]);
+                        setError("PERMISSION_RESTRICTED");
+                    }
                 }
             } catch (err) {
-                console.error("Error fetching demand resources:", err);
-                setError("An error occurred while fetching resources");
+                // If it fails, check if it's a 403 that we can still handle by falling back
+                if (err.response?.status === 403) {
+                    const projectId = demand?.projectInfo?.projectId || demand?.projectInfo?.id || demand?.project?.id || demand?.project?.projectId || demand?.projectId;
+                    if (projectId) {
+                        try {
+                            const projectResponse = await fetchResourcesByProjectId(projectId);
+                            if (projectResponse.success && Array.isArray(projectResponse.data)) {
+                                setAllocations(filterProjectAllocationsForDemand(projectResponse.data));
+                                setError(null);
+                                return;
+                            }
+                        } catch (fallbackErr) {
+                            console.error("Fallback fetching project resources failed:", fallbackErr);
+                        }
+                    }
+                    setAllocations([]);
+                    setError("PERMISSION_RESTRICTED");
+                } else {
+                    console.error("Error fetching demand resources:", err);
+                    setError("An error occurred while fetching resources");
+                }
             } finally {
                 setLoading(false);
             }
@@ -884,15 +991,16 @@ const DemandResourcesTable = ({ demandId }) => {
             loadResources();
             setPage(1);
         }
-    }, [demandId]);
+    }, [demandId, demand, isRM]);
 
     useEffect(() => {
         setPage(1);
     }, [searchTerm]);
 
     const filteredAllocations = allocations.filter(item =>
-        item.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.email.toLowerCase().includes(searchTerm.toLowerCase())
+        getResourceName(item).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getResourceEmail(item).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getAllocationDemandName(item).toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const totalPages = Math.ceil(filteredAllocations.length / itemsPerPage);
@@ -900,6 +1008,45 @@ const DemandResourcesTable = ({ demandId }) => {
         (page - 1) * itemsPerPage,
         page * itemsPerPage
     );
+
+    useEffect(() => {
+        if (totalPages > 0 && page > totalPages) {
+            setPage(totalPages);
+        }
+    }, [page, totalPages]);
+
+    const handleConfirmDeleteResource = async () => {
+        if (!deleteTarget) return;
+
+        if (!isPlannedAllocation(deleteTarget)) {
+            showStatusToast("Only planned resource allocations can be deleted", "error");
+            setDeleteTarget(null);
+            return;
+        }
+
+        const allocationId = getAllocationId(deleteTarget);
+        if (!allocationId) {
+            showStatusToast("Unable to delete resource: allocation id is missing", "error");
+            setDeleteTarget(null);
+            return;
+        }
+
+        setDeletingAllocationId(allocationId);
+
+        try {
+            const response = await deleteResourceAllocation(allocationId);
+            setAllocations((current) =>
+                current.filter((allocation) => String(getAllocationId(allocation)) !== String(allocationId))
+            );
+            showStatusToast(response?.message || "Resource allocation deleted successfully", "success");
+            setDeleteTarget(null);
+        } catch (err) {
+            console.error("Failed to delete resource allocation", err);
+            showStatusToast(err.response?.data?.message || "Failed to delete resource allocation", "error");
+        } finally {
+            setDeletingAllocationId("");
+        }
+    };
 
     if (loading) {
         return (
@@ -911,6 +1058,19 @@ const DemandResourcesTable = ({ demandId }) => {
     }
 
     if (error) {
+        if (error === "PERMISSION_RESTRICTED") {
+            return (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 px-6 py-5 rounded-2xl flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <InfoIcon className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1.5">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-amber-900">Access Restricted</h4>
+                        <p className="text-xs text-amber-800/90 font-semibold leading-relaxed">
+                            Detailed allocation query is restricted for your current role. Please contact the Resource Manager to review the assigned resource profiles for this demand.
+                        </p>
+                    </div>
+                </div>
+            );
+        }
         return (
             <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl flex items-center gap-3">
                 <WarningIcon className="h-5 w-5" />
@@ -941,12 +1101,34 @@ const DemandResourcesTable = ({ demandId }) => {
 
             <div className="overflow-x-auto">
                 <GenericTable
-                    headers={["Resource", "Email", "Allocation", "Start Date", "End Date", "Status", "Created By"]}
-                    columns={["fullName", "email", "allocation_info", "allocationStartDate", "allocationEndDate", "allocationStatus", "createdBy_info"]}
+                    headers={["Resource", "Email", "Allocation", "Start Date", "End Date", "Status", "Created By", "Actions"]}
+                    columns={["fullName", "email", "allocation_info", "allocationStartDate", "allocationEndDate", "allocationStatus", "createdBy_info", "actions"]}
                     rows={paginatedAllocations.map((item) => ({
                         ...item,
-                        allocation_info: `${item.allocationPercentage}%`,
+                        fullName: getResourceName(item),
+                        email: getResourceEmail(item),
+                        allocation_info: `${item.allocationPercentage ?? item.allocation ?? 0}%`,
                         createdBy_info: item.createdBy || "System",
+                        actions: canDelete && isPlannedAllocation(item) && getAllocationId(item) ? (
+                            <button
+                                type="button"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    setDeleteTarget(item);
+                                }}
+                                disabled={deletingAllocationId === getAllocationId(item)}
+                                title="Delete resource allocation"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-600 transition-all hover:border-rose-200 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {deletingAllocationId === getAllocationId(item) ? (
+                                    <span className="h-3.5 w-3.5 rounded-full border-2 border-rose-200 border-t-rose-600 animate-spin" />
+                                ) : (
+                                    <DeleteIcon className="h-3.5 w-3.5" />
+                                )}
+                            </button>
+                        ) : (
+                            <span className="text-[10px] font-bold text-slate-300">--</span>
+                        ),
                     }))}
                 />
             </div>
@@ -961,6 +1143,20 @@ const DemandResourcesTable = ({ demandId }) => {
                     />
                 </div>
             )}
+
+            <ConfirmationModal
+                isOpen={!!deleteTarget}
+                title="Delete Resource Allocation"
+                message={`Remove ${getResourceName(deleteTarget)}'s allocation from this demand? This action cannot be undone.`}
+                confirmText="Delete Resource"
+                cancelText="Cancel"
+                variant="danger"
+                isLoading={!!deletingAllocationId}
+                onConfirm={handleConfirmDeleteResource}
+                onCancel={() => {
+                    if (!deletingAllocationId) setDeleteTarget(null);
+                }}
+            />
         </div>
     );
 };
@@ -997,7 +1193,7 @@ const DemandResourcesTab = ({ demandId, demand, user }) => {
                 })}
             </div>
 
-            {activeSubTab === 'resources' && <DemandResourcesTable demandId={demandId} />}
+            {activeSubTab === 'resources' && <DemandResourcesTable demandId={demandId} demand={demand} />}
             {activeSubTab === 'allocation-modifications' && (
                 <AllocationModificationTab
                     demandId={demandId}
