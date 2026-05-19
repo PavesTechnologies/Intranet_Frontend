@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { statusUpdate } from "../services/projectService";
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
@@ -37,14 +37,14 @@ const UpdateProjectStatusModal = ({ open, onClose, onSuccess, pmsProjectId }) =>
     setLoading(true);
     try {
       const res = await statusUpdate(payload);
-      toast.success(res.message || "Project status updated successfully!");
+      notify.success(res.message || "Project status updated successfully!");
       onSuccess?.();
       onClose();
       setStatus("");
       setReason("");
     } catch (err) {
       console.error("Failed to update project status", err);
-      toast.error(err.response?.data?.message || "Failed to update project status");
+      notify.error(err, "Failed to update project status");
     } finally {
       setLoading(false);
     }

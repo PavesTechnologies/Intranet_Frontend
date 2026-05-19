@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import axios from "axios";
@@ -99,6 +99,8 @@ export default function ViewEmpDetails() {
   const [deleteOfferModal, setDeleteOfferModal] = useState(false);
   const [deletingOffer, setDeletingOffer] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [openApproverDropdown, setOpenApproverDropdown] = useState(false);
+  const approverDropdownRef = useRef(null);
 
   const { user } = useAuth();
   const rawRoles = user?.roles || "";
@@ -188,6 +190,19 @@ export default function ViewEmpDetails() {
 
   useEffect(() => { fetchEmployee(); fetchApprovalHistory(); }, [user_uuid]);
   useEffect(() => { if (openApprovalModal) fetchAdminUsers(); }, [openApprovalModal]);
+
+  useEffect(() => {
+    if (!openApproverDropdown) return;
+
+    const handleClickOutside = (event) => {
+      if (!approverDropdownRef.current?.contains(event.target)) {
+        setOpenApproverDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openApproverDropdown]);
 
   /* ── DERIVED STATE ── */
   const rawStatus = approvalHistory?.[0]?.status || "";
@@ -406,7 +421,7 @@ export default function ViewEmpDetails() {
             <ArrowLeft size={16} />
             Back to Offers
           </button>
-          <span className="text-xs text-slate-400 font-mono">{user_uuid}</span>
+          {/* <span className="text-xs text-slate-400 font-mono">{user_uuid}</span> */}
         </div>
       </div>
 
@@ -716,7 +731,7 @@ export default function ViewEmpDetails() {
       {/* ══════════ APPROVAL MODAL ══════════ */}
       {openApprovalModal && (
         <ModalOverlay>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-visible">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
                 <h3 className="emp-name text-xl font-bold text-slate-900">
@@ -735,13 +750,68 @@ export default function ViewEmpDetails() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
                 Approver
               </label>
-              <FilterListbox
+              {/* <FilterListbox
                 options={[{value:"",label:"Select Approver"}, ...adminUsers.map((a) => ({value: String(a.user_id), label: a.name}))]}
                 value={selectedAdmin}
                 onChange={setSelectedAdmin}
-              />
+              /> */}
+              <div className="relative" ref={approverDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setOpenApproverDropdown((prev) => !prev)}
+                  className="w-full h-11 border border-slate-200 rounded-xl px-3 pr-10 text-left text-sm text-slate-800 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                >
+                  <span className={selectedApproverName ? "block truncate" : "block truncate text-slate-400"}>
+                    {selectedApproverName || "Select Approver"}
+                  </span>
+                </button>
+
+                <ChevronRight
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform ${
+                    openApproverDropdown ? "-rotate-90" : "rotate-90"
+                  }`}
+                  size={18}
+                />
+
+                {openApproverDropdown && (
+                  <div className="absolute left-0 right-0 top-full z-[70] mt-2 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedAdmin("");
+                        setOpenApproverDropdown(false);
+                      }}
+                      className="w-full px-3 py-2.5 text-left text-sm text-blue-500 hover:bg-gray-50"
+                    >
+                      Select Approver
+                    </button>
+                    {adminUsers.map((a) => {
+                      const value = String(a.user_id);
+                      const isSelected = String(selectedAdmin) === value;
+
+                      return (
+                        <button
+                          type="button"
+                          key={a.user_id}
+                          onClick={() => {
+                            setSelectedAdmin(value);
+                            setOpenApproverDropdown(false);
+                          }}
+                          className={`w-full px-3 py-2.5 text-left text-sm transition-colors ${
+                            isSelected
+                              ? "bg-indigo-50 font-semibold text-indigo-700"
+                              : "text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <span className="block truncate">{a.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
               <button
                 onClick={() => setOpenApprovalModal(false)}
                 className="px-5 py-2 rounded-xl text-slate-600 bg-white border border-slate-200 text-sm font-medium hover:bg-slate-50 transition-all"
@@ -765,7 +835,7 @@ export default function ViewEmpDetails() {
       {/* ══════════ CONFIRMATION MODAL ══════════ */}
       {showConfirmModal && (
         <ModalOverlay>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-visible relative">
             <div className="px-6 py-5 border-b border-slate-100">
               <h3 className="emp-name text-xl font-bold text-slate-900">
                 Confirm Approval Request

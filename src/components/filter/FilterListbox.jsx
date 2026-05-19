@@ -2,7 +2,7 @@ import { Fragment, useRef, useState } from "react";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 
-export default function FilterListbox({ options, value, onChange, disabled = false }) {
+export default function FilterListbox({ options, value, onChange, disabled = false, optionsClassName = "w-max" }) {
   const selected = options.find((o) => o.value === value) ?? options[0];
   const containerRef = useRef(null);
   const [openUpward, setOpenUpward] = useState(false);
@@ -35,7 +35,7 @@ export default function FilterListbox({ options, value, onChange, disabled = fal
           leaveTo="opacity-0"
         >
           <Listbox.Options
-            className={`absolute z-[100] min-w-full w-max max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm ${
+            className={`absolute z-[100] min-w-full ${optionsClassName} max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm ${
               openUpward ? "bottom-full mb-2" : "mt-2"
             }`}
           >

@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { WarningIcon, SuccessIcon } from "@/components/icons";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import Button from "../../../../components/Button/Button";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
-import { fetchResourcesByDemandId } from "../../services/resource";
+import { fetchResourcesByDemandId, fetchResourcesByProjectId } from "../../services/resource";
 import allocationModificationApi from "../services/allocationModificationApi";
 import CreateModificationModal from "./CreateModificationModal";
 import ModificationTable from "./ModificationTable";
@@ -73,6 +73,47 @@ const normalizeModification = (item, demand, fallbackProjectName) => {
   };
 };
 
+const normalizeText = (value) => String(value || "").trim().toLowerCase();
+
+const getAllocationDemandName = (allocation) =>
+  allocation?.demandName ||
+  allocation?.demand?.demandName ||
+  allocation?.demand?.name ||
+  allocation?.demand?.title ||
+  "";
+
+const allocationHasDemandReference = (allocation) =>
+  allocation?.demandId ||
+  allocation?.demand?.id ||
+  allocation?.demand?.demandId ||
+  getAllocationDemandName(allocation);
+
+const filterProjectAllocationsForDemand = (rows, demandId, demand) => {
+  if (!Array.isArray(rows)) return [];
+
+  const hasDemandReferences = rows.some(allocationHasDemandReference);
+
+  if (!hasDemandReferences) {
+    return rows;
+  }
+
+  const currentDemandName = normalizeText(demand?.demandName || demand?.name || demand?.title || "");
+
+  return rows.filter((allocation) => {
+    if (
+      String(allocation?.demandId || "") === String(demandId) ||
+      String(allocation?.demand?.id || "") === String(demandId) ||
+      String(allocation?.demand?.demandId || "") === String(demandId)
+    ) {
+      return true;
+    }
+
+    const allocationDemandName = normalizeText(getAllocationDemandName(allocation));
+
+    return Boolean(allocationDemandName && currentDemandName && allocationDemandName === currentDemandName);
+  });
+};
+
 const AllocationModificationTab = ({ demandId, demand, user }) => {
   const roles = user?.roles || [];
   const isRM = roles.includes("Resource_Manager");
@@ -92,8 +133,42 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
     if (!demandId) return;
 
     try {
-      const response = await fetchResourcesByDemandId(demandId);
-      const rows = Array.isArray(response?.data) ? response.data : [];
+      let rows = [];
+      if (isRM) {
+        try {
+          const response = await fetchResourcesByDemandId(demandId);
+          rows = Array.isArray(response?.data) ? response.data : [];
+        } catch (err) {
+          if (err.response?.status === 403) {
+            const projectId = demand?.projectInfo?.projectId || demand?.projectInfo?.id || demand?.project?.id || demand?.project?.projectId || demand?.projectId;
+            if (projectId) {
+              try {
+                const projectResponse = await fetchResourcesByProjectId(projectId);
+                if (projectResponse.success && Array.isArray(projectResponse.data)) {
+                  rows = filterProjectAllocationsForDemand(projectResponse.data, demandId, demand);
+                }
+              } catch (fallbackErr) {
+                console.error("Fallback fetching project resources failed:", fallbackErr);
+              }
+            }
+          } else {
+            console.error("Failed to fetch demand allocations directly:", err);
+            throw err;
+          }
+        }
+      } else {
+        const projectId = demand?.projectInfo?.projectId || demand?.projectInfo?.id || demand?.project?.id || demand?.project?.projectId || demand?.projectId;
+        if (projectId) {
+          try {
+            const projectResponse = await fetchResourcesByProjectId(projectId);
+            if (projectResponse.success && Array.isArray(projectResponse.data)) {
+              rows = filterProjectAllocationsForDemand(projectResponse.data, demandId, demand);
+            }
+          } catch (fallbackErr) {
+            console.error("Fallback fetching project resources failed:", fallbackErr);
+          }
+        }
+      }
 
       setResourceOptions(
         rows.map((resource) => ({
@@ -115,7 +190,8 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
     } catch (allocationError) {
       console.error("Failed to fetch demand allocations for modifications", allocationError);
     }
-  }, [demandId, projectName]);
+  }, [demandId, projectName, demand, isRM]);
+
 
   const loadModifications = useCallback(async () => {
     if (!demandId || (!isPM && !isRM)) {
@@ -168,12 +244,12 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
 
     try {
       const response = await allocationModificationApi.createModification(payload);
-      toast.success(response?.message || "Allocation modification created successfully");
+      notify.success(response?.message || "Allocation modification created successfully");
       setIsCreateOpen(false);
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to create allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to create allocation modification");
+      notify.error(requestError, "Failed to create allocation modification");
     } finally {
       setProcessingAction("");
     }
@@ -187,11 +263,11 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         decision: "APPROVE",
         comments: "Approved due to project priority",
       });
-      toast.success(response?.message || "Allocation modification approved");
+      notify.success(response?.message || "Allocation modification approved");
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to approve allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to approve allocation modification");
+      notify.error(requestError, "Failed to approve allocation modification");
     } finally {
       setProcessingAction("");
     }
@@ -207,12 +283,12 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
         decision: "REJECT",
         comments: reason,
       });
-      toast.success(response?.message || "Allocation modification rejected");
+      notify.success(response?.message || "Allocation modification rejected");
       setRejectTarget(null);
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to reject allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to reject allocation modification");
+      notify.error(requestError, "Failed to reject allocation modification");
     } finally {
       setProcessingAction("");
     }
@@ -225,12 +301,12 @@ const AllocationModificationTab = ({ demandId, demand, user }) => {
 
     try {
       const response = await allocationModificationApi.cancelModification(cancelTarget.id);
-      toast.success(response?.message || "Allocation modification cancelled");
+      notify.success(response?.message || "Allocation modification cancelled");
       setCancelTarget(null);
       await loadModifications();
     } catch (requestError) {
       console.error("Failed to cancel allocation modification", requestError);
-      toast.error(requestError?.response?.data?.message || "Failed to cancel allocation modification");
+      notify.error(requestError, "Failed to cancel allocation modification");
     } finally {
       setProcessingAction("");
     }

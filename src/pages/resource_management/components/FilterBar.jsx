@@ -265,19 +265,17 @@ const FilterBar = ({ filters, onUpdate }) => {
     setOpen(false);
   };
 
+  // Prevent background scrolling when filter modal is open
   useEffect(() => {
-    const handler = (e) => {
-      if (buttonRef.current && buttonRef.current.contains(e.target)) return;
-      const portal = document.getElementById('client-filter-portal');
-      if (portal && !portal.contains(e.target)) {
-        setOpen(false);
-      }
-    };
     if (open) {
-      document.addEventListener("mousedown", handler);
+      const original = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = original;
+      };
     }
-    return () => document.removeEventListener("mousedown", handler);
   }, [open]);
+
 
   return (
     <div className="flex items-center gap-2 font-sans">
@@ -360,7 +358,7 @@ const FilterBar = ({ filters, onUpdate }) => {
               </button>
             </div>
 
-            <div className="p-3 space-y-3">
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-0.5">

@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils"
 import { getUtilization } from "../services/workforceService"
 import { useSkillGapAnalysis } from "../hooks/useSkillGapAnalysis"
-import { toast } from "react-toastify"
+import { notify } from "../utils/notify"
 import GenericTable from "../../../components/Table/table"
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -598,7 +598,7 @@ export function ResourceDetailPanel({ resource, open, onOpenChange }) {
       setUtilizationData(response)
     } catch (error) {
       console.error("Error fetching utilization:", error)
-      toast.error(error.response?.data?.message || "Failed To Fetch Utilization Data.")
+      notify.error(error, "Failed To Fetch Utilization Data.")
       setUtilizationData({ monthlySummary: {} })
     } finally {
       setUtilizationLoading(false)

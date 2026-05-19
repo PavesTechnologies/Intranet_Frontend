@@ -19,7 +19,7 @@ import { useNavigate } from "react-router-dom";
 import FilterBar from "../../components/FilterBar";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { searchClients, getAdminKPI } from "../../services/clientservice";
-import { toast } from "react-toastify"; // Removed ToastContainer check
+import { getResourceManagementErrorMessage, notify } from "../../utils/notify";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import ExcelJS from "exceljs/dist/exceljs.min.js"; // Robust Vite Import
 import { saveAs } from "file-saver";
@@ -135,7 +135,7 @@ const AdminPannel = () => {
         totalPages: totalPages,
       }));
     } catch (error) {
-      toast.error("Failed To Load Clients.");
+      notify.error(error, "Failed To Load Clients.");
       setClientDetails([]);
       setPageInfo((prev) => ({ ...prev, totalElements: 0, totalPages: 0 }));
     } finally {
@@ -153,7 +153,7 @@ const AdminPannel = () => {
  
   const handleExport = async () => {
     if (pageInfo.totalElements === 0) {
-      toast.warning("Nothing to download: Current view is empty.");
+      notify.warning("Nothing to download: Current view is empty.");
       return;
     }
  
@@ -162,7 +162,7 @@ const AdminPannel = () => {
       ? `Explicitly downloading ${pageInfo.totalElements} filtered records...`
       : `Explicitly downloading full list of ${pageInfo.totalElements} clients...`;
  
-    toast.info(startMsg, { icon: "📊" });
+    notify.info(startMsg, { icon: "📊" });
  
     setExporting(true);
     setExportProgress(0);
@@ -254,10 +254,10 @@ const AdminPannel = () => {
         blob,
         `${fileName}_${new Date().toISOString().split("T")[0]}.xlsx`,
       );
-      toast.success(`Success! ${allRecords.length} records downloaded.`);
+      notify.success(`Success! ${allRecords.length} records downloaded.`);
     } catch (error) {
       console.error("Export error:", error);
-      toast.error(`Download Failed: ${error.message}`);
+      notify.error(getResourceManagementErrorMessage(error, "Download Failed"));
     } finally {
       setExporting(false);
       setExportProgress(0);

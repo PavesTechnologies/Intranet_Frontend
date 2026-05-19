@@ -1004,7 +1004,7 @@ const UtilizationPerformanceDashboard = () => {
                               ),
                               trend_info: (
                                  <div className="flex flex-col items-center gap-0.5">
-                                    <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black capitalize"><Zap size={14} /> Stable</div>
+                                    <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black capitalize"><ZapIcon size={14} /> Stable</div>
                                  </div>
                               ),
                               utilization_info: (

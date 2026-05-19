@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 import { fetchResources, resourceAllocation } from "../../services/resource";
-import { toast } from 'react-toastify';
+import { notify } from '../../utils/notify';
 import { cn } from "@/lib/utils";
 
 const toDateInputValue = (date) => {
@@ -89,7 +89,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                     setResources(resourceList);
                 } catch (error) {
                     console.error("Failed to fetch resources", error);
-                    toast.error("Failed To Load Resources");
+                    notify.error(error, "Failed To Load Resources");
                 } finally {
                     setIsLoadingResources(false);
                 }
@@ -206,7 +206,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
         const { isValid, errors: validationErrors } = validate();
         if (!isValid) {
             const validationMessages = Object.values(validationErrors).filter(Boolean);
-            toast.warning(validationMessages[0] || "Please correct the validation errors");
+            notify.warning(validationMessages[0] || "Please correct the validation errors");
             return;
         }
 
@@ -221,7 +221,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
             const isFailedAllocationMessage = normalizedMessage.includes("allocation failed");
 
             if (!result.success && !hasAllocationResults) {
-                toast.error(result.message || "Allocation failed");
+                notify.error(result.message || "Allocation failed");
                 return;
             }
 
@@ -231,20 +231,20 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
 
             if (hasAllocationResults && failureCount > 0 && successCount === 0) {
                 if (errorReasons.length > 0) {
-                    errorReasons.forEach(msg => toast.error(msg, { autoClose: 7000 }));
+                    errorReasons.forEach(msg => notify.error(msg, undefined, { autoClose: 7000 }));
                 } else {
-                    toast.error(result.message || "Allocation failed");
+                    notify.error(result.message || "Allocation failed");
                 }
             } else if (hasAllocationResults && failureCount > 0) {
-                toast.warning(result.message || "Allocation completed with some failures");
-                errorReasons.forEach(msg => toast.error(msg, { autoClose: 7000 }));
+                notify.warning(result.message || "Allocation completed with some failures");
+                errorReasons.forEach(msg => notify.error(msg, undefined, { autoClose: 7000 }));
             } else if (result.success && !isFailedAllocationMessage) {
-                toast.success(result.message || "Resources allocated successfully");
+                notify.success(result.message || "Resources allocated successfully");
             } else {
                 if (errorReasons.length > 0) {
-                    errorReasons.forEach(msg => toast.error(msg, { autoClose: 7000 }));
+                    errorReasons.forEach(msg => notify.error(msg, undefined, { autoClose: 7000 }));
                 } else {
-                    toast.error(result.message || "Allocation failed");
+                    notify.error(result.message || "Allocation failed");
                 }
             }
 
@@ -252,7 +252,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
             onClose();
         } catch (error) {
             console.error("Allocation error:", error);
-            toast.error(error.response?.data?.message || "Failed to allocate resources");
+            notify.error(error, "Failed to allocate resources");
         } finally {
             setIsSubmitting(false);
         }
@@ -319,6 +319,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                                 ]}
                                 value={formData.demandId}
                                 onChange={(val) => handleDemandChange({ target: { value: val } })}
+                                optionsClassName="w-full"
                             />
                         </div>
                     ) : (
@@ -434,6 +435,22 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
 
                 {/* Dates Row */}
                 <div className="grid grid-cols-2 gap-4">
+                    {formData.allocationStatus === 'PLANNED' && (
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                <CalendarIcon className="h-3 w-3 text-indigo-500" /> Start Date
+                            </label>
+                            <Input
+                                type="date"
+                                value={formData.allocationStartDate}
+                                min={minStart}
+                                max={formData.allocationEndDate || maxEnd}
+                                onChange={(e) => setFormData({ ...formData, allocationStartDate: e.target.value })}
+                                className={cn("h-10 rounded-xl border-slate-200 font-bold text-slate-900 text-xs", errors.allocationStartDate && "border-rose-500")}
+                            />
+                            {errors.allocationStartDate && <p className="text-[9px] font-bold text-rose-500 mt-0.5">{errors.allocationStartDate}</p>}
+                        </div>
+                    )}
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                             <CalendarIcon className="h-3 w-3 text-indigo-500" /> End Date
@@ -490,13 +507,12 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                         <div className="relative">
                             <FilterListbox
                                 options={[
-                                    { value: "PLANNED", label: "PLANNED" },
                                     { value: "ACTIVE", label: "ACTIVE" },
-                                    { value: "ENDED", label: "ENDED" },
-                                    { value: "CANCELLED", label: "CANCELLED" },
+                                    { value: "PLANNED", label: "PLANNED" }
                                 ]}
                                 value={formData.allocationStatus}
                                 onChange={(val) => setFormData({ ...formData, allocationStatus: val })}
+                                optionsClassName="w-full"
                             />
                         </div>
                         {errors.allocationStatus && <p className="text-[9px] font-bold text-rose-500 mt-1">{errors.allocationStatus}</p>}

@@ -54,7 +54,7 @@ export default function CreateOffer() {
   const typeOptions = [
     { label: "Fixed", value: "Fixed" },
     { label: "Variable", value: "Variable" },
-    { label: "Bonus", value: "Bonus" },
+    
   ];
 
   const componentOptions = [
@@ -109,7 +109,10 @@ export default function CreateOffer() {
     },
   ];
 
-  const progressValue = Math.round((activeStep / steps.length) * 100);
+  const progressValue =
+  activeStep <= 1
+    ? 0
+    : Math.round(((activeStep - 1) / (steps.length - 1)) * 100);
 
   useEffect(() => {
     const loadCountries = async () => {
