@@ -2,7 +2,8 @@ import React, { useState, useEffect, Fragment } from "react";
 import { notify } from "../utils/notify";
 import { CloseIcon, AddIcon, DeleteIcon, EditIcon, ChevronDownIcon, SearchIcon, CheckIcon } from "@/components/icons";
 import { Combobox, Transition } from "@headlessui/react";
-import { createRoleExpectation, updateRoleExpectation } from "../services/workforceService";
+import { createRoleExpectation } from "../services/workforceService";
+import { updateRoleExpectationById } from "../services/demandService";
 
 /* ===================== SEARCHABLE SELECT COMPONENT ===================== */
 
@@ -272,9 +273,8 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
     setLoading(true);
     try {
       if (draftRole.roleId) {
-        // Update case: PUT /api/admin/role-expectations/{roleId}
-        const res = await updateRoleExpectation(draftRole.roleId, payload);
-        notify.success(res.message || "Role updated successfully");
+        const res = await updateRoleExpectationById(draftRole.roleId, payload);
+        toast.success(res.message || "Role updated successfully");
       } else {
         // Create case: POST /api/admin/role-expectations
         const res = await createRoleExpectation(payload);
@@ -535,4 +535,3 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
 };
 
 export default AddDeliverableRoleModal;
-
