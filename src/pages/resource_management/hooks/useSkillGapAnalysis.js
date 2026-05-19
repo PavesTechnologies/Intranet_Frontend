@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { fetchDemands, getSkillGapAnalysis } from "../services/workforceService";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 
 /**
  * useSkillGapAnalysis
@@ -54,7 +54,7 @@ export function useSkillGapAnalysis(resourceId) {
             setDemandsError(
                 err.response?.data?.message || "Failed to load demands"
             );
-            toast.error(err.response?.data?.message || "Failed to load demands");
+            notify.error(err, "Failed to load demands");
         } finally {
             setDemandsLoading(false);
         }
@@ -78,7 +78,7 @@ export function useSkillGapAnalysis(resourceId) {
             const msg =
                 err.response?.data?.message || "Skill gap analysis failed";
             setAnalysisError(msg);
-            toast.error(msg);
+            notify.error(msg);
         } finally {
             setAnalysisLoading(false);
         }

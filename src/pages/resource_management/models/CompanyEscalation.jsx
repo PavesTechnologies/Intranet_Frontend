@@ -6,7 +6,7 @@ import {
   deleteCompanyContact,
   createCompanyContact,
 } from "../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
 import { EditIcon, DeleteIcon } from "@/components/icons";
@@ -83,7 +83,7 @@ const CompanyEscalation = () => {
 
       setCurrentPage(1);
     } catch (error) {
-      toast.error(
+      notify.error(
         error.response?.data?.message || "Failed to fetch escalation contacts",
       );
     } finally {
@@ -109,16 +109,16 @@ const CompanyEscalation = () => {
     try {
       if (selectedContact) {
         const res = await updateCompanyContact(data);
-        toast.success(res.message || "Contact updated successfully.");
+        notify.success(res.message || "Contact updated successfully.");
       } else {
         const res = await createCompanyContact(data);
-        toast.success(res.message || "Contact created successfully.");
+        notify.success(res.message || "Contact created successfully.");
       }
       setOpenUpdateContact(false);
       setSelectedContact(null);
       fetchContact();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save contact.");
+      notify.error(error, "Failed to save contact.");
     } finally {
       setUpdateLoading(false);
     }
@@ -130,10 +130,10 @@ const CompanyEscalation = () => {
     setDeleteLoading(true);
     try {
       await deleteCompanyContact(selectedContactId);
-      toast.success("Escalation Contact Deleted Successfully");
+      notify.success("Escalation Contact Deleted Successfully");
       fetchContact();
     } catch (error) {
-      toast.error(
+      notify.error(
         error.response?.data?.message || "Failed to delete escalation contact",
       );
     } finally {

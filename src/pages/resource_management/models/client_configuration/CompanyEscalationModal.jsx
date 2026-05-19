@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import FilterListbox from "../../../../components/filter/FilterListbox";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import "react-phone-input-2/lib/style.css";
 import PhoneInput from "react-phone-input-2";
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
@@ -49,7 +49,7 @@ const CompanyEscalationContactModal = ({
 
   const handleSubmit = () => {
     if (!formData.contactName || !formData.contactRole || !formData.email) {
-      toast.warning("Contact Name, Role and Email are mandatory");
+      notify.warning("Contact Name, Role and Email are mandatory");
       return;
     }
     if (isEditMode) {

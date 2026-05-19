@@ -10,7 +10,7 @@ import {
 } from "@/components/icons";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { useParams, useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import KPISection from "./KPISection";
 import RoleOffTable from "./RoleOffTable";
 import BulkActionBar from "./BulkActionBar";
@@ -902,7 +902,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         setAllocations(nextAllocations);
       } else {
         setAllocations([]);
-        toast.error("Failed To Load Role-Off Resources");
+        notify.error("Failed To Load Role-Off Resources");
       }
 
       if (kpiResult.status === "fulfilled") {
@@ -916,7 +916,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
       setAllocations([]);
       setProjectKpiData(null);
-      toast.error("Failed To Load Role-Off Resources");
+      notify.error("Failed To Load Role-Off Resources");
     } finally {
       if (isActiveRef()) setLoading(false);
     }
@@ -980,7 +980,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
       setRoleOffRequests([]);
       setApprovedTodayCount(0);
-      toast.error(
+      notify.error(
         mode === "dm"
           ? "Failed To Load Dm Role-Off Requests"
           : "Failed To Load Pending Role-Off Requests",
@@ -1246,7 +1246,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         removeCachedRoleOffDetails([request.id, request.roleOffId, request.allocationId]);
       }
       setPanelState({ open: false, actionType: "view", record: null });
-      toast.success(
+      notify.success(
         getApiMessage(
           response,
           request?.isBulk
@@ -1257,7 +1257,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       refreshAll();
     } catch (err) {
       console.error(err);
-      toast.error(getErrorMessage(err, "Rm Approval Failed"));
+      notify.error(getErrorMessage(err, "Rm Approval Failed"));
     } finally {
       setBulkActionState({ key: null, loading: false });
     }
@@ -1280,7 +1280,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         removeCachedRoleOffDetails([request.id, request.roleOffId, request.allocationId]);
       }
       setPanelState({ open: false, actionType: "view", record: null });
-      toast.success(
+      notify.success(
         getApiMessage(
           response,
           request?.isBulk
@@ -1291,7 +1291,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       refreshAll();
     } catch (err) {
       console.error(err);
-      toast.error(getErrorMessage(err, "Request Rejection Failed"));
+      notify.error(getErrorMessage(err, "Request Rejection Failed"));
     } finally {
       setBulkActionState({ key: null, loading: false });
     }
@@ -1317,7 +1317,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         row.roleOffStatus !== "NOT_REQUESTED" &&
         row.roleOffStatus !== "REJECTED"
       ) {
-        toast.warning(
+        notify.warning(
           `A Role-Off Request Is Already In Progress For ${row.resource} (Status: ${row.roleOffStatus}). ` +
           `Please Check The "Roleoff Process" Tab.`
         );
@@ -1343,11 +1343,11 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     if (mode === "rm" && action === "approve") {
       try {
         const response = await rmApprove(row.id);
-        toast.success(getApiMessage(response, "Role-Off Request Approved By Rm"));
+        notify.success(getApiMessage(response, "Role-Off Request Approved By Rm"));
         refreshAll();
       } catch (err) {
         console.error(err);
-        toast.error(getErrorMessage(err, "Rm Approval Failed"));
+        notify.error(getErrorMessage(err, "Rm Approval Failed"));
       }
       return;
     }
@@ -1356,11 +1356,11 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     if (mode === "rm" && action === "reject") {
       try {
         const response = await rmReject(row.id, "Rejected by RM");
-        toast.success(getApiMessage(response, "Role-Off Request Rejected By Rm"));
+        notify.success(getApiMessage(response, "Role-Off Request Rejected By Rm"));
         refreshAll();
       } catch (err) {
         console.error(err);
-        toast.error(getErrorMessage(err, "Rm Rejection Failed"));
+        notify.error(getErrorMessage(err, "Rm Rejection Failed"));
       }
       return;
     }
@@ -1369,11 +1369,11 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     if (mode === "dm" && action === "approve") {
       try {
         await dlFulfill(row.id, row.acknowledgementType);
-        toast.success("Role-off request fulfilled by DM");
+        notify.success("Role-off request fulfilled by DM");
         refreshAll();
       } catch (err) {
         console.error(err);
-        toast.error(getErrorMessage(err, "Dm Fulfillment Failed"));
+        notify.error(getErrorMessage(err, "Dm Fulfillment Failed"));
       }
       return;
     }
@@ -1382,11 +1382,11 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     if (mode === "dm" && action === "reject") {
       try {
         const response = await dlReject(row.id, "Rejected by DL");
-        toast.success(getApiMessage(response, "Role-Off Request Rejected By Dm"));
+        notify.success(getApiMessage(response, "Role-Off Request Rejected By Dm"));
         refreshAll();
       } catch (err) {
         console.error(err);
-        toast.error(getErrorMessage(err, "Dm Rejection Failed"));
+        notify.error(getErrorMessage(err, "Dm Rejection Failed"));
       }
       return;
     }
@@ -1401,7 +1401,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         row.roleOffStatus !== "NOT_REQUESTED" &&
         row.roleOffStatus !== "REJECTED"
       ) {
-        toast.warning(
+        notify.warning(
           `A Role-Off Request Is Already In Progress For ${row.resource} (Status: ${row.roleOffStatus}). ` +
           `Please Check The "Role-Off Process" Tab.`
         );
@@ -1433,13 +1433,13 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         );
 
         if (eligibleRecords.length === 0) {
-          toast.warning("All Selected Allocations Already Have Role-Off Requests");
+          notify.warning("All Selected Allocations Already Have Role-Off Requests");
           setPanelState({ open: false, actionType: "create", record: null });
           return { success: true };
         }
 
         if (eligibleRecords.length < records.length) {
-          toast.info(`${records.length - eligibleRecords.length} Allocation(s) Skipped As They Already Have Role-Off Requests`);
+          notify.info(`${records.length - eligibleRecords.length} Allocation(s) Skipped As They Already Have Role-Off Requests`);
         }
 
         const bulkPayload = {
@@ -1480,7 +1480,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         });
 
         setPanelState({ open: false, actionType: "create", record: null });
-        toast.success(
+        notify.success(
           getApiMessage(response, `${eligibleRecords.length} Planned Role-Off Request(s) Created`),
         );
         refreshAll();
@@ -1497,7 +1497,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           currentStatus !== "NOT_REQUESTED" &&
           currentStatus !== "REJECTED"
         ) {
-          toast.warning(`Role-Off Request Already Exists For ${currentAllocation.resource}`);
+          notify.warning(`Role-Off Request Already Exists For ${currentAllocation.resource}`);
           continue;
         }
 
@@ -1568,7 +1568,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       }
 
       setPanelState({ open: false, actionType: "view", record: null });
-      toast.success(
+      notify.success(
         getApiMessage(
           lastResponse,
           panelState.actionType === "update"
@@ -1586,7 +1586,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         : panelState.actionType === "update"
           ? "Failed To Update Role-Off"
           : "Failed To Create Role-Off";
-      toast.error(getErrorMessage(err, fallbackMessage));
+      notify.error(getErrorMessage(err, fallbackMessage));
       throw err;
     }
   };
@@ -1594,7 +1594,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   const handlePmCancelRoleOff = async () => {
     const record = cancelModalState.record;
     if (!record?.roleOffId) {
-      toast.error("Role-Off Id Is Missing");
+      notify.error("Role-Off Id Is Missing");
       return;
     }
 
@@ -1605,11 +1605,11 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       removeCachedRoleOffDetails([record?.roleOffId, record?.allocationId, record?.id]);
       await refreshAll();
       setCancelModalState({ open: false, record: null, isSubmitting: false });
-      toast.success(getApiMessage(response, "Role-Off Request Cancelled"));
+      notify.success(getApiMessage(response, "Role-Off Request Cancelled"));
     } catch (err) {
       console.error(err);
       setCancelModalState((prev) => ({ ...prev, isSubmitting: false }));
-      toast.error(getErrorMessage(err, "Failed To Cancel Role-Off"));
+      notify.error(getErrorMessage(err, "Failed To Cancel Role-Off"));
     }
   };
 
@@ -1678,14 +1678,14 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       }
       await refreshAll();
       setPanelState({ open: false, actionType: "view", record: null });
-      toast.success(
+      notify.success(
         request?.isBulk
           ? `${request.records.length} Role-Off Request(s) Fulfilled By Dm`
           : `${request.resource} Role-Off Fulfilled By Dm`,
       );
     } catch (err) {
       console.error(err);
-      toast.error(getErrorMessage(err, "Dm Fulfillment Failed"));
+      notify.error(getErrorMessage(err, "Dm Fulfillment Failed"));
     } finally {
       setBulkActionState({ key: null, loading: false });
     }
@@ -1709,7 +1709,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       }
       await refreshAll();
       setPanelState({ open: false, actionType: "view", record: null });
-      toast.success(
+      notify.success(
         getApiMessage(
           response,
           request?.isBulk
@@ -1719,7 +1719,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       );
     } catch (err) {
       console.error(err);
-      toast.error(getErrorMessage(err, "Dm Rejection Failed"));
+      notify.error(getErrorMessage(err, "Dm Rejection Failed"));
     } finally {
       setBulkActionState({ key: null, loading: false });
     }

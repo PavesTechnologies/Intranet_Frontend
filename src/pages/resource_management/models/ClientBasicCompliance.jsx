@@ -4,7 +4,7 @@ import {
   updateClientCompliance,
   deleteClientCompliance,
 } from "../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
 import { EditIcon, DeleteIcon } from "@/components/icons";
@@ -72,9 +72,9 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
             : item,
         ),
       );
-      toast.success(res.message || "Pre-requisite updated successfully");
+      notify.success(res.message || "Pre-requisite updated successfully");
     } catch (error) {
-      toast.error(
+      notify.error(
         error.response?.data?.message || "Failed to update Pre-requisite.",
       );
     } finally {
@@ -86,12 +86,12 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
     setDeleteLoading(true);
     try {
       const res = await deleteClientCompliance(selectedComplianceId);
-      toast.success(res.message || "Pre-requisite deleted successfully.");
+      notify.success(res.message || "Pre-requisite deleted successfully.");
       setOpenConfirmModal(false);
       setSelectedComplianceId(null);
       fetchCompliance();
     } catch (error) {
-      toast.error(
+      notify.error(
         error.response?.data?.message || "Failed to delete Pre-requisite.",
       );
     } finally {
@@ -113,7 +113,7 @@ const ClientBasicCompliance = ({ clientId, complianceRefetchKey }) => {
       setComplianceList(normalized);
       setCurrentPage(1);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to fetch SLA");
+      notify.error(error, "Failed to fetch SLA");
     } finally {
       setLoading(false);
     }

@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { Eye, Mail } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Mail } from "lucide-react";
 
-import Button from "../../../components/Button/Button";
-import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
-import { Fonts } from "../../../components/Fonts/Fonts";
 import EmployeeProfileModal from "./EmployeeProfileModal";
+
+import { ViewIcon } from "../../../components/icons/ActionIcons";
+import Button from "../../../components/Button/Button";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const colors = [
   "bg-teal-400",
@@ -32,94 +32,156 @@ const getSafeColor = (index) => {
 
 const getInitials = (name) => {
   if (!name) return "";
+
   const parts = name.trim().split(" ");
-  if (parts.length === 1) return parts[0][0].toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+
+  if (parts.length === 1) {
+    return parts[0][0].toUpperCase();
+  }
+
+  return (
+    parts[0][0] + parts[parts.length - 1][0]
+  ).toUpperCase();
 };
 
 const EmployeeCard = ({ employee, index }) => {
   const [open, setOpen] = useState(false);
-  const navigation = useNavigate();
+
   const bgColor = getSafeColor(index);
 
   return (
     <>
-      <PageCard className="relative h-full border-slate-200 transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-lg">
-        <PageCardContent className="flex h-full flex-col p-6">
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(true);
-            }}
-            className="absolute right-3 top-3"
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 rounded-xl bg-gray-100 hover:bg-gray-200"
-              aria-label={`View ${employee.name}`}
-            >
-              <Eye className="h-5 w-5 text-gray-700" />
-            </Button>
-          </div>
+      <div
+        className="
+          relative w-full max-w-[360px] mx-auto
+          bg-white rounded-2xl shadow-md border border-gray-200 p-5
+          transition-all duration-300 ease-in-out
+          hover:shadow-2xl hover:-translate-y-1 hover:scale-[1.02]
+          active:scale-[0.98] active:shadow-lg
+        "
+      >
+        {/* View Icon */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(true);
+          }}
+          className="
+            absolute top-3 right-3
+            p-1.5 rounded-md
+            bg-gray-100 hover:bg-gray-200
+            transition
+          "
+        >
+          <ViewIcon className="w-5 h-5 text-gray-700" />
+        </button>
 
-          <div className="flex justify-center">
-            <div className="relative">
-              <div className={`flex h-16 w-16 items-center justify-center rounded-full text-2xl font-semibold text-white ${bgColor}`}>
-                {getInitials(employee.name)}
-              </div>
-              <span className="absolute bottom-1 right-1 h-3 w-3 rounded-full border-2 border-white bg-green-600" />
+        {/* Avatar */}
+        <div className="flex justify-center">
+          <div className="relative">
+            <div
+              className={`
+                w-16 h-16 rounded-full
+                flex items-center justify-center
+                text-white text-2xl font-semibold
+                ${bgColor}
+              `}
+            >
+              {getInitials(employee.name)}
             </div>
+
+            <span
+              className="
+                absolute bottom-1 right-1
+                w-3 h-3
+                bg-green-600
+                border-2 border-white
+                rounded-full
+              "
+            />
           </div>
+        </div>
 
-          <div className="mt-4 text-center">
-            <h3 className={Fonts.heading4}>{employee.name}</h3>
-            <p className="mt-1 font-medium text-indigo-800">{employee.role}</p>
-          </div>
+        {/* Name & Role */}
+        <div className="mt-4 text-center">
+          <h3 className={Fonts.heading4}>
+            {employee.name}
+          </h3>
 
-          <div className="my-5 h-px bg-slate-200" />
+          <p className="mt-1 font-medium text-indigo-800">
+            {employee.role}
+          </p>
+        </div>
 
-          <div className="grid gap-3 text-sm text-gray-800">
-            <InfoRow label="Department" value={employee.department} />
-            <InfoRow label="Location" value={employee.location} />
-            <InfoRow label="Email" value={employee.email} breakAll />
-          </div>
+        <hr className="my-4" />
 
-          <div className="mt-6 flex items-center gap-3">
-            <Button
-              className="flex-1"
-              onClick={() => navigation(`/employee-onboarding/employeeProfile/${employee.employee_uuid}`)}
+        {/* Details */}
+        <div className="space-y-2 text-sm text-gray-800">
+          <p>
+            <span className="text-gray-600">
+              Department :
+            </span>{" "}
+            {employee.department}
+          </p>
+
+          <p>
+            <span className="text-gray-600">
+              Location :
+            </span>{" "}
+            {employee.location}
+          </p>
+
+          {/* Email */}
+          <div className="flex items-start gap-1">
+            <span className="text-gray-600 shrink-0">
+              Email :
+            </span>
+
+            <p
+              title={employee.email}
+              className="
+                flex-1 truncate overflow-hidden whitespace-nowrap
+                text-gray-800 cursor-pointer
+              "
             >
-              View Profile
-            </Button>
-
-            <a
-              href={`mailto:${employee.email}`}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-indigo-50 text-indigo-800 transition hover:bg-indigo-100"
-              aria-label={`Email ${employee.name}`}
-            >
-              <Mail className="h-4 w-4" />
-            </a>
+              {employee.email}
+            </p>
           </div>
-        </PageCardContent>
-      </PageCard>
+        </div>
 
-      {open && <EmployeeProfileModal employee={employee} onClose={() => setOpen(false)} />}
+        {/* Actions */}
+        <div className="mt-5 flex items-center gap-2 w-full">
+          <Button
+            onClick={() => setOpen(true)}
+            variant="primary"
+            size="medium"
+            className="flex-1 py-2"
+          >
+            View Profile
+          </Button>
+
+          <a
+            href={`mailto:${employee.email}`}
+            className="
+              shrink-0 p-2.5
+              bg-indigo-50 hover:bg-indigo-100
+              rounded-lg transition
+            "
+          >
+            <Mail className="h-4 w-4 text-indigo-800" />
+          </a>
+        </div>
+      </div>
+
+      {/* Profile Modal */}
+      {open && (
+        <EmployeeProfileModal
+          employee={employee}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </>
   );
 };
-
-function InfoRow({ label, value, breakAll = false }) {
-  return (
-    <div className="rounded-xl bg-slate-50 px-3 py-3">
-      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-        {label}
-      </div>
-      <div className={`text-sm font-medium text-slate-800 ${breakAll ? "break-all" : ""}`}>
-        {value || "N/A"}
-      </div>
-    </div>
-  );
-}
 
 export default EmployeeCard;

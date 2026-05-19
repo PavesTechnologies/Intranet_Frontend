@@ -4,7 +4,7 @@ import {
   updateClientSLA,
   deleteClientSLA,
 } from "../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
 import { MoreHorizontalIcon, EditIcon, DeleteIcon } from "@/components/icons";
@@ -66,7 +66,7 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
     try {
       const res = await updateClientSLA(formData);
       const updated = res.data;
-      toast.success(res.message || "SLA updated successfully.");
+      notify.success(res.message || "SLA updated successfully.");
       setOpenUpdateSLA(false);
       setSLAList((prev) =>
         prev.map((item) =>
@@ -75,7 +75,7 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
       );
       // fetchSLA();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to update SLA.");
+      notify.error(error, "Failed to update SLA.");
     } finally {
       setUpdateLoading(false);
     }
@@ -85,10 +85,10 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
     setDeleteLoading(true);
     try {
       const res = await deleteClientSLA(selectedSLAId);
-      toast.success(res.message || "SLA deleted successfully.");
+      notify.success(res.message || "SLA deleted successfully.");
       fetchSLA(); 
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to delete SLA.");
+      notify.error(error, "Failed to delete SLA.");
     } finally {
       setDeleteLoading(false);
       setOpenConfirmModal(false);
@@ -110,7 +110,7 @@ const ClientBasicSLA = ({ clientId, slaRefetchKey }) => {
       setSLAList(normalized);
       setCurrentPage(1);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to fetch SLA");
+      notify.error(error, "Failed to fetch SLA");
     } finally {
       setLoading(false);
     }

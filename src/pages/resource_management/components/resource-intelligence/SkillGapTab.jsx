@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Combobox, Transition } from "@headlessui/react";
 import { fetchDemands, getSkillGapAnalysis } from "../../services/workforceService";
 import { fetchResources } from "../../services/resource";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import Pagination from "../../../../components/Pagination/pagination";
 import GenericTable from "../../../../components/Table/table";
 
@@ -115,10 +115,10 @@ export default function SkillGapTab({ resource, demand }) {
 
             const data = await getSkillGapAnalysis(dId, rId);
             setAnalysis(data);
-            toast.success("Intelligence Analysis Completed Successfully.");
+            notify.success("Intelligence Analysis Completed Successfully.");
         } catch (err) {
             setAnalysisError(err.message || "Analysis Failed");
-            toast.error(err.message || "Skill Gap Analysis Failed.");
+            notify.error(err, "Skill Gap Analysis Failed.");
         }
         finally { setAnalysisLoading(false); }
     };

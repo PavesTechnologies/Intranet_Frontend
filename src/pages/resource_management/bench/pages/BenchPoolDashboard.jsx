@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { PrevIcon, DownloadIcon, FilterIcon, TrendingUpIcon, AlertIcon, PendingIcon, EmployeeIcon, SecurityAlertIcon, ZapIcon, SpinnerIcon, ActivityIcon, TableIcon, DashboardIcon, SearchIcon, CloseIcon } from "@/components/icons";
 import { getBenchPoolReport, exportBenchPoolReport } from "../services/benchService";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import BenchFilters from "../components/BenchFilters";
 import { FILTER_DEFAULTS, CATEGORY_OPTIONS } from "../constants/benchConstants";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -108,7 +108,7 @@ const BenchPoolDashboard = () => {
       const res = await getBenchPoolReport();
       setData(res?.data || {});
     } catch (err) {
-      toast.error("Failed To Fetch Bench Report");
+      notify.error(err, "Failed To Fetch Bench Report");
     } finally {
       setIsLoading(false);
     }
@@ -125,9 +125,9 @@ const BenchPoolDashboard = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success("Export Successful");
+      notify.success("Export Successful");
     } catch (err) {
-      toast.error("Failed To Generate Export");
+      notify.error(err, "Failed To Generate Export");
     } finally {
       setIsExporting(false);
     }
