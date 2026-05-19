@@ -59,3 +59,19 @@ export const deleteDemandByPM = async (demandId, demand = null) => {
     throw error;
   }
 };
+
+export const updateRoleExpectationById = async (roleId, roleDetails) => {
+  try {
+    const response = await axios.put(`${BASE_URL}/api/admin/role-expectations/${roleId}`, 
+      roleDetails,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};

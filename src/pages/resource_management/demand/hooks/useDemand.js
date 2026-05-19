@@ -20,7 +20,7 @@ const ROLE_PRIORITY = [
     "Project_Manager",
     "MANAGER",
     "Admin",
-    "SUPER ADMIN",
+    "Super_Admin",
     "SUPER-ADMIN",
     "GENERAL"
 ];

@@ -1,4 +1,5 @@
 import React from "react";
+import LoadingSpinner from "../LoadingSpinner";
 
 const GenericTable = ({
   headers = [],
@@ -22,9 +23,7 @@ const GenericTable = ({
       }}
     >
       {loading ? (
-        <div className="text-center text-gray-500 py-6 italic font-semibold">
-          Loading data...
-        </div>
+        <LoadingSpinner text="Loading data..." />
       ) : rows.length === 0 ? (
         <div className="text-center text-gray-500 py-6 italic font-semibold">
           No records found.
