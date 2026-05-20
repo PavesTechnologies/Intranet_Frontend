@@ -8,7 +8,7 @@ import Modal from "../Modal/modal";
 import api from "../../api/axiosInstance";
 import { showStatusToast } from "../toastfy/toast";
 
-const EMPTY_PW_FORM = { currentPassword: "", newPassword: "", confirmPassword: "" };
+const EMPTY_PW_FORM = { newPassword: "", confirmPassword: "" };
 const EMPTY_SHOW_PW = { current: false, new: false, confirm: false };
 
 const Header = ({ onToggleSidebar, isSidebarOpen }) => {
@@ -93,7 +93,7 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
   /* ── Change password ── */
   const validatePwForm = () => {
     const errors = {};
-    if (!pwForm.currentPassword) errors.currentPassword = "Current password is required";
+    // if (!pwForm.currentPassword) errors.currentPassword = "Current password is required";
     if (!pwForm.newPassword) errors.newPassword = "New password is required";
     else if (pwForm.newPassword.length < 8) errors.newPassword = "Password must be at least 8 characters";
     if (!pwForm.confirmPassword) errors.confirmPassword = "Please confirm your new password";
@@ -110,8 +110,8 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
     setSaving(true);
     try {
       await api.put(
-        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/general_user/profile`,
-        { current_password: pwForm.currentPassword, new_password: pwForm.newPassword },
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/change-password`,
+        { new_password: pwForm.newPassword, confirm_password: pwForm.confirmPassword },
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       showStatusToast("Password updated successfully", "success");
