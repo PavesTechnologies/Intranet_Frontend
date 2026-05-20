@@ -306,13 +306,13 @@ const FilterBar = ({ filters, onUpdate }) => {
           <Filter
             className={`w-4 h-4 ${open ? "text-white" : "text-gray-500"}`}
           />
-          {(filters.region && filters.region !== 'ALL') ||
+          {/* {(filters.region && filters.region !== 'ALL') ||
             (filters.type && filters.type !== 'ALL') ||
             (filters.priority && filters.priority !== 'ALL') ||
             (filters.status && filters.status !== 'ALL')
             ? (filters.region || filters.type || filters.priority || filters.status)
             : 'Filters'
-          }
+          } */} Filters
           {!open && activeCount > 0 && (
             <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white shadow-sm ring-2 ring-white animate-in zoom-in duration-200">
               {activeCount}
