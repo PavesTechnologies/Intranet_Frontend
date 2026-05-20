@@ -103,9 +103,9 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                 allocationEndDate: toDateInputValue(demand?.demandEndDate),
                 resourceId: initialResourceIds,
                 skipValidation: false,
-                allocationPercentage: 100 // Default or driven by demand if available later
+                allocationPercentage: demand.allocation || 100,
             }));
-            
+
             if (isBenchMode && !demand && initialResourceIds.length > 0) {
                 const targetResId = initialResourceIds[0];
                 const matchObj = benchMatches.find(m => String(m.resourceId) === String(targetResId));
@@ -195,9 +195,9 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
             currentStartDate = toDateInputValue(demand.demandStartDate);
             currentEndDate = toDateInputValue(demand.demandEndDate);
         }
-        return { 
-            minStart: currentStartDate || undefined, 
-            maxEnd: currentEndDate || undefined 
+        return {
+            minStart: currentStartDate || undefined,
+            maxEnd: currentEndDate || undefined
         };
     };
 
@@ -472,27 +472,24 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                             <PercentIcon className="h-3 w-3 text-indigo-500" /> Allocation
-                            {formData.skipValidation && (
+                            {/* {formData.skipValidation && (
                                 <span className="ml-auto text-[8px] font-black text-amber-500 uppercase tracking-widest bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">
                                     Flexible
                                 </span>
-                            )}
+                            )} */}
                         </label>
                         <div className="relative">
                             <Input
-                                readOnly={!formData.skipValidation}
-                                disabled={!formData.skipValidation}
+                                readOnly
+                                disabled
                                 type="number"
                                 min="1"
-                                {...(!formData.skipValidation ? { max: '100' } : {})}
+                                max="100"
                                 value={formData.allocationPercentage}
                                 onWheel={(e) => e.target.blur()}
                                 onChange={(e) => setFormData({ ...formData, allocationPercentage: parseInt(e.target.value) || 0 })}
                                 className={cn(
-                                    "h-10 rounded-xl border-slate-200 font-bold text-slate-900 pr-8 text-xs transition-all",
-                                    (formData.skipValidation)
-                                        ? "bg-white cursor-text border-amber-300 focus-visible:ring-amber-400"
-                                        : "bg-slate-100 opacity-70 cursor-not-allowed select-none",
+                                    "h-10 rounded-xl border-slate-200 font-bold text-slate-900 pr-8 text-xs bg-slate-100 opacity-70 cursor-not-allowed select-none",
                                     errors.allocationPercentage && "border-rose-500"
                                 )}
                             />
@@ -513,6 +510,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                                 value={formData.allocationStatus}
                                 onChange={(val) => setFormData({ ...formData, allocationStatus: val })}
                                 optionsClassName="w-full"
+                                buttonClassName="w-full cursor-default rounded-xl border border-slate-200 bg-white h-10 pl-4 pr-10 text-left text-xs font-bold text-slate-900 transition focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
                             />
                         </div>
                         {errors.allocationStatus && <p className="text-[9px] font-bold text-rose-500 mt-1">{errors.allocationStatus}</p>}
@@ -530,7 +528,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                             ...prev,
                             skipValidation: !prev.skipValidation,
                             // Reset percentage to 100 when unchecking
-                            allocationPercentage: !prev.skipValidation ? prev.allocationPercentage : 100
+                            // allocationPercentage: !prev.skipValidation ? prev.allocationPercentage : 100
                         }))}
                         className={cn(
                             "relative inline-flex h-5 w-9 items-center rounded-full border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1",

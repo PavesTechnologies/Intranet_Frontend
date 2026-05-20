@@ -2,24 +2,29 @@ import { Fragment, useRef, useState } from "react";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 
-export default function FilterListbox({ options, value, onChange, disabled = false, optionsClassName = "w-max" }) {
+export default function FilterListbox({ options, value, onChange, disabled = false, optionsClassName = "w-full", buttonClassName }) {
   const selected = options.find((o) => o.value === value) ?? options[0];
-  const containerRef = useRef(null);
-  const [openUpward, setOpenUpward] = useState(false);
+  const wrapperRef = useRef(null);
+  const [openUp, setOpenUp] = useState(false);
 
-  const checkPosition = () => {
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setOpenUpward(window.innerHeight - rect.bottom < 250);
-    }
+  const calculatePlacement = () => {
+    if (!wrapperRef.current) return;
+
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const maxDropdownHeight = 240;
+
+    setOpenUp(spaceBelow < maxDropdownHeight && spaceAbove > spaceBelow);
   };
 
   return (
     <Listbox value={selected} onChange={(opt) => onChange(opt.value)} disabled={disabled}>
-      <div className="relative w-full" ref={containerRef}>
+      <div className="relative w-full" ref={wrapperRef}>
         <Listbox.Button
-          className="w-full cursor-default rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 text-left text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          onClick={checkPosition}
+          className={buttonClassName ?? "w-full cursor-default rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 text-left text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"}
+          onClick={calculatePlacement}
+          onFocus={calculatePlacement}
         >
           <span className="block truncate text-gray-700">
             {selected?.label || "SELECT AN OPTION"}
@@ -35,9 +40,7 @@ export default function FilterListbox({ options, value, onChange, disabled = fal
           leaveTo="opacity-0"
         >
           <Listbox.Options
-            className={`absolute z-[100] min-w-full ${optionsClassName} max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm ${
-              openUpward ? "bottom-full mb-2" : "mt-2"
-            }`}
+            className={`absolute left-0 z-[9999] ${openUp ? "bottom-full mb-1" : "top-full mt-1"} ${optionsClassName} max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm`}
           >
             {options.map((option, idx) => (
               <Listbox.Option

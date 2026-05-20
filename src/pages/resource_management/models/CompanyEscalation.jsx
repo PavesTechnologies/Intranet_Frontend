@@ -170,7 +170,7 @@ const CompanyEscalation = () => {
           No escalation contacts available.
         </p>
       ) : (
-        <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white border rounded-xl shadow-sm overflow-x-auto">
           <GenericTable
             headers={["Name", "Role", "Email", "Phone", "Level", "Status", "Actions"]}
             columns={["contactName", "contactRole", "email", "phone", "escalationLevel", "status_info", "actions"]}
