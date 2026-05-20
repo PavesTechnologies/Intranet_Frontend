@@ -61,16 +61,6 @@ export default function HeadcountDemographicsPage() {
         employmentDeptData = employmentDeptData.filter(
           (item) => item.dept === filters.dept,
         );
-
-        const totalFromDept = workerDeptData.reduce(
-          (sum, item) => sum + (item.permanent || 0) + (item.contingent || 0),
-          0,
-        );
-
-        demographicsData = {
-          ...demographicsData,
-          total: totalFromDept,
-        };
       }
 
       if (filters.worker) {
@@ -219,7 +209,13 @@ export default function HeadcountDemographicsPage() {
         data={employmentDept || []}
         xKey="dept"
         accentColor="#59b3b8"
-        bars={[{ key: "full", color: "#59b3b8" }]}
+        bars={[
+          { key: "full", color: "#59b3b8" },
+          { key: "partTime", color: "#8b5cf6" },
+          { key: "intern", color: "#f59e0b" },
+          { key: "contract", color: "#ef4444" },
+          { key: "freelance", color: "#14b8a6" },
+        ]}
       />
     </div>
   );
