@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import Button from "../../../components/Button/Button";
-
+import { XCircle } from "lucide-react";
 export default function AllHolidaysGrid({ holidays, onClose }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -70,12 +70,18 @@ export default function AllHolidaysGrid({ holidays, onClose }) {
             >
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
+            {/* <XCircle className="w-8 h-8 text-white" /> */}
           </Button>
         </div>
 
         {/* Scrollable Grid */}
         <div className="flex-1 overflow-y-auto p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {sortedHolidays.map((holiday) => {
+          {sortedHolidays.length === 0 ? (
+            <p className="text-center text-gray-500 col-span-full mt-5 italic font-semibold">
+              No upcoming holidays.
+            </p>
+          ) : (
+            sortedHolidays.map((holiday) => {
             const holidayDate = new Date(holiday.holidayDate);
             holidayDate.setHours(0, 0, 0, 0);
             const isPast = holidayDate < today;
@@ -156,7 +162,8 @@ export default function AllHolidaysGrid({ holidays, onClose }) {
                 </div>
               </div>
             );
-          })}
+          })
+          )}
         </div>
 
         {/* Footer */}

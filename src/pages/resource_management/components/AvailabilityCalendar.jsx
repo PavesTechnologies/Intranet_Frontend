@@ -110,7 +110,7 @@ function getAggregateStatus(day, resourceIds) {
   return { available, partial, allocated, dominant }
 }
 
-const CalendarTooltip = ({ date, data, mode, holiday }) => {
+const CalendarTooltip = ({ date, data, mode, holiday, kpiData }) => {
   if (holiday) {
     return (
       <div className="p-2.5 min-w-[160px] bg-white rounded-lg border-2 border-red-100 shadow-md">
@@ -129,7 +129,11 @@ const CalendarTooltip = ({ date, data, mode, holiday }) => {
   }
 
   if (mode === "aggregate") {
-    const { available, partial, allocated } = data
+    // Prefer KPI values passed from parent when available, fall back to computed day data
+    const available = kpiData?.fullyAvailable ?? data.available
+    const partial = kpiData?.partiallyAvailable ?? data.partial
+    const allocated = kpiData?.fullyAllocated ?? data.allocated
+
     return (
       <div className="space-y-1.5 min-w-[140px] p-2">
         <div className="flex items-center justify-between border-b border-border/50 pb-1">
@@ -192,7 +196,7 @@ const CalendarTooltip = ({ date, data, mode, holiday }) => {
   )
 }
 
-export function AvailabilityCalendar({ filteredResources, onDayClick, selectedResourceId, onSelectResource, currentDate, onNavigate }) {
+export function AvailabilityCalendar({ filteredResources, onDayClick, selectedResourceId, onSelectResource, currentDate, onNavigate, kpiData }) {
   const [viewMode, setViewMode] = useState("aggregate")
   const [selectedDate, setSelectedDate] = useState(null)
   const [holidays, setHolidays] = useState([])
@@ -496,6 +500,7 @@ export function AvailabilityCalendar({ filteredResources, onDayClick, selectedRe
                             data={dayContent}
                             mode={viewMode}
                             holiday={holiday}
+                            kpiData={kpiData}
                           />
                         </TooltipContent>
                       )}

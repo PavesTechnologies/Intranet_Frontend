@@ -511,7 +511,7 @@ const BenchPoolDashboard = () => {
                           </div>
                         ),
                         aging_info: (
-                          <div className="flex flex-col text-left">
+                          <div className="flex flex-col items-center text-center">
                             <span className={`text-[12px] font-bold ${row.benchDays > 30 ? 'text-rose-600' : 'text-slate-900'}`}>{row.benchDays} Days</span>
                             <span className="text-[9px] font-medium text-slate-400 italic">Impact: ₹{Math.round((row.cost || 0) * (row.benchDays || 0)).toLocaleString()}</span>
                           </div>
@@ -528,8 +528,8 @@ const BenchPoolDashboard = () => {
                           </div>
                         ),
                         action_info: (
-                          <div className="text-left">
-                            <span className="text-[11px] font-medium text-slate-600 italic border-l-2 border-indigo-200 pl-2">
+                          <div className="text-center">
+                            <span className="text-[11px] font-medium text-slate-600 italic px-2">
                                {row.recommendedAction || "Monitor allocation status"}
                             </span>
                           </div>

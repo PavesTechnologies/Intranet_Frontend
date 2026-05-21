@@ -294,7 +294,7 @@ const BenchPage = () => {
     
     const getSubState = (type) => {
       if (type === "CoE") return "COE";
-      if (type === "Training") return "TRAINING_POOL";
+      if (type === "TRAINING POOL") return "TRAINING_POOL";
       if (type === "R&D") return "RND";
       return type.toUpperCase().replace(/ /g, "_");
     };
@@ -311,11 +311,11 @@ const BenchPage = () => {
         )
       );
 
-      notify.success("Resources successfully moved to internal pool");
+      notify.success(activeTab === "pool" ? "Resources successfully moved to bench" : "Resources successfully moved to internal pool");
       fetchData(true);
     } catch (error) {
       console.error("Failed to move resources", error);
-      notify.error("Failed to move resources to internal pool");
+      notify.error(activeTab === "pool" ? "Failed to move resources to bench" : "Failed to move resources to internal pool");
     } finally {
       setSelectedRows((prev) => prev.filter((id) => !ids.includes(id)));
       setMoveToPoolTargets([]);
@@ -502,6 +502,7 @@ const BenchPage = () => {
         onMoveToPool={(resource) => handleMoveToPool(resource)}
         liveMatches={liveMatches}
         loadingMatches={loadingMatches}
+        activeTab={activeTab}
       />
 
       <AllocationModal
@@ -528,6 +529,7 @@ const BenchPage = () => {
         resources={moveToPoolTargets}
         onClose={() => setMoveToPoolTargets([])}
         onSubmit={applyMoveToPool}
+        activeTab={activeTab}
       />
     </div>
   );

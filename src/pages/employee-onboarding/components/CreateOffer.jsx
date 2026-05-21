@@ -12,6 +12,11 @@ import FormInput from "../../../components/forms/FormInput";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import { Fonts } from "../../../components/Fonts/Fonts";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[0-9]{7,15}$/;
+const INDIA_PHONE_REGEX = /^[6-9][0-9]{9}$/;
+const US_PHONE_REGEX = /^[2-9][0-9]{9}$/;
+
 export default function CreateOffer() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
@@ -27,6 +32,9 @@ export default function CreateOffer() {
   const [activeStep, setActiveStep] = useState(1);
   const [countries, setCountries] = useState([]);
   const [ccOptions, setCcOptions] = useState([]);
+  const [errors, setErrors] = useState({});
+  const [touchedFields, setTouchedFields] = useState({});
+  const [touchedComponents, setTouchedComponents] = useState({});
 
   const [formData, setFormData] = useState({
     first_name: "",
@@ -157,12 +165,160 @@ export default function CreateOffer() {
     loadCC();
   }, []);
 
-  const handleChange = (e) =>
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const clearError = (field) => {
+    setErrors((prev) => {
+      if (!prev[field]) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const markFieldTouched = (field) => {
+    setTouchedFields((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const markComponentTouched = (id, field) => {
+    const key = `component_${id}_${field}`;
+    setTouchedComponents((prev) => ({ ...prev, [key]: true }));
+  };
+
+  const shouldShowFieldError = (field, value) => {
+    const hasValue = typeof value === "string" ? value.trim().length > 0 : Boolean(value);
+    return touchedFields[field] || hasValue;
+  };
+
+  const shouldShowComponentError = (id, field, value) => {
+    const key = `component_${id}_${field}`;
+    const hasValue = typeof value === "string" ? value.trim().length > 0 : Boolean(value);
+    return touchedComponents[key] || hasValue;
+  };
+
+  const getFieldError = (field, value, nextFormData = formData) => {
+    const trimmedValue = typeof value === "string" ? value.trim() : value;
+
+    switch (field) {
+      case "first_name":
+        return !trimmedValue ? "First name is required." : "";
+      case "last_name":
+        return !trimmedValue ? "Last name is required." : "";
+      case "mail":
+        if (!trimmedValue) return "Email is required.";
+        return EMAIL_REGEX.test(trimmedValue) ? "" : "Enter a valid email address.";
+      case "country_code":
+        return !trimmedValue ? "Country code is required." : "";
+      case "contact_number":
+        if (!trimmedValue) return "Contact number is required.";
+        if (nextFormData.country_code === "91") {
+          return INDIA_PHONE_REGEX.test(trimmedValue)
+            ? ""
+            : "For India, enter a 10-digit number starting with 6 to 9.";
+        }
+        if (nextFormData.country_code === "1") {
+          return US_PHONE_REGEX.test(trimmedValue)
+            ? ""
+            : "Enter a valid US phone number with 10 digits.";
+        }
+        return PHONE_REGEX.test(trimmedValue)
+          ? ""
+          : "Enter a valid contact number.";
+      case "designation":
+        return !trimmedValue ? "Designation is required." : "";
+      case "employee_type":
+        return !trimmedValue ? "Employee type is required." : "";
+      default:
+        return "";
+    }
+  };
+
+  const setFieldError = (field, message) => {
+    setErrors((prev) => {
+      if (!message) {
+        if (!prev[field]) return prev;
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      }
+
+      return { ...prev, [field]: message };
+    });
+  };
+
+  const getComponentFieldError = (field, value) => {
+    const trimmedValue = typeof value === "string" ? value.trim() : value;
+
+    switch (field) {
+      case "name":
+        return !trimmedValue ? "Component name is required." : "";
+      case "type":
+        return !trimmedValue ? "Type is required." : "";
+      case "frequency":
+        return !trimmedValue ? "Frequency is required." : "";
+      case "amount":
+        if (trimmedValue === "" || trimmedValue === null || trimmedValue === undefined) {
+          return "Amount is required.";
+        }
+        return Number(trimmedValue) > 0 ? "" : "Amount must be greater than 0.";
+      default:
+        return "";
+    }
+  };
+
+  const setComponentError = (id, field, message) => {
+    const key = `component_${id}_${field}`;
+
+    setErrors((prev) => {
+      if (!message) {
+        if (!prev[key]) {
+          return prev;
+        }
+
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      }
+
+      return { ...prev, [key]: message };
+    });
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    const nextValue =
+      name === "contact_number" ? value.replace(/[^\d]/g, "").slice(0, 15) : value;
+    const nextFormData = { ...formData, [name]: nextValue };
+
+    setFormData(nextFormData);
+    markFieldTouched(name);
+    setFieldError(
+      name,
+      shouldShowFieldError(name, nextValue) ? getFieldError(name, nextValue, nextFormData) : "",
+    );
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    markFieldTouched(name);
+    setFieldError(name, getFieldError(name, value, formData));
+  };
 
   const handleComponentChange = (id, field, value) => {
+    const nextValue =
+      field === "amount" ? value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1") : value;
+
     setComponents((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)),
+      prev.map((c) => (c.id === id ? { ...c, [field]: nextValue } : c)),
+    );
+    markComponentTouched(id, field);
+    setComponentError(
+      id,
+      field,
+      shouldShowComponentError(id, field, nextValue)
+        ? getComponentFieldError(field, nextValue)
+        : "",
     );
   };
 
@@ -181,6 +337,15 @@ export default function CreateOffer() {
 
   const removeComponent = (id) => {
     setComponents((prev) => prev.filter((c) => c.id !== id));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.components;
+      delete next[`component_${id}_name`];
+      delete next[`component_${id}_type`];
+      delete next[`component_${id}_frequency`];
+      delete next[`component_${id}_amount`];
+      return next;
+    });
   };
 
   const totalCTC = components.reduce((sum, c) => {
@@ -190,12 +355,82 @@ export default function CreateOffer() {
     return sum + Number(c.amount || 0) * multiplier;
   }, 0);
 
+  const validateStepOne = () => {
+    const nextErrors = {};
+
+    ["first_name", "last_name", "mail", "country_code", "contact_number", "designation", "employee_type"].forEach(
+      (field) => {
+        const message = getFieldError(field, formData[field], formData);
+        if (message) {
+          nextErrors[field] = message;
+        }
+      },
+    );
+
+    return nextErrors;
+  };
+
+  const validateStepTwo = () => {
+    const nextErrors = {};
+
+    if (!components.length) {
+      nextErrors.components = "Add at least one compensation component.";
+      return nextErrors;
+    }
+
+    components.forEach((component) => {
+      ["name", "type", "frequency", "amount"].forEach((field) => {
+        const message = getComponentFieldError(field, component[field]);
+        if (message) {
+          nextErrors[`component_${component.id}_${field}`] = message;
+        }
+      });
+    });
+
+    return nextErrors;
+  };
+
+  const goToStep = (step) => {
+    if (step === 2) {
+      const stepOneErrors = validateStepOne();
+      if (Object.keys(stepOneErrors).length) {
+        toast.error("Please fill required fields.");
+        return;
+      }
+    }
+
+    if (step === 3) {
+      const stepTwoErrors = validateStepTwo();
+      if (Object.keys(stepTwoErrors).length) {
+        toast.error("Please fill required fields.");
+        return;
+      }
+    }
+
+    setActiveStep(step);
+  };
+
   const handleCreateOffer = async () => {
+    const stepOneErrors = validateStepOne();
+    const stepTwoErrors = validateStepTwo();
+    const nextErrors = { ...stepOneErrors, ...stepTwoErrors };
+
+    if (Object.keys(nextErrors).length) {
+      setActiveStep(Object.keys(stepOneErrors).length ? 1 : 2);
+      toast.error("Please fill required fields.");
+      return;
+    }
+
     const payload = {
       ...formData,
+      first_name: formData.first_name.trim(),
+      middle_name: formData.middle_name.trim(),
+      last_name: formData.last_name.trim(),
+      mail: formData.mail.trim(),
+      designation: formData.designation.trim(),
       cc_emails: formData.cc_emails.map((c) => c.value) || [],
       compensation_components: components.map((c) => ({
-        name: c.name,
+        name: c.name.trim(),
         type: c.type,
         frequency: c.frequency,
         amount: Number(c.amount),
@@ -332,62 +567,113 @@ export default function CreateOffer() {
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                       <Input
                         label="First Name"
+                        requiredMark
                         name="first_name"
                         value={formData.first_name}
                         onChange={handleChange}
+                        onBlur={handleBlur}
+                        error={errors.first_name}
                       />
                       <Input
                         label="Middle Name"
                         name="middle_name"
                         value={formData.middle_name}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                       />
                       <Input
                         label="Last Name"
+                        requiredMark
                         name="last_name"
                         value={formData.last_name}
                         onChange={handleChange}
+                        onBlur={handleBlur}
+                        error={errors.last_name}
                       />
                     </div>
 
                     <div className="mt-6">
                       <Input
                         label="Email"
+                        requiredMark
                         name="mail"
                         value={formData.mail}
                         onChange={handleChange}
+                        onBlur={handleBlur}
+                        type="email"
+                        error={errors.mail}
                       />
                     </div>
 
                     <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
                       <SelectInput
                         label="Country Code"
+                        requiredMark
                         options={countries}
                         value={countries.find((c) => c.value === formData.country_code)}
-                        onChange={(v) =>
-                          setFormData({ ...formData, country_code: v?.value || "" })
-                        }
+                        onChange={(v) => {
+                          const nextFormData = {
+                            ...formData,
+                            country_code: v?.value || "",
+                          };
+
+                          setFormData(nextFormData);
+                          markFieldTouched("country_code");
+                          setFieldError(
+                            "country_code",
+                            shouldShowFieldError("country_code", nextFormData.country_code)
+                              ? getFieldError(
+                                  "country_code",
+                                  nextFormData.country_code,
+                                  nextFormData,
+                                )
+                              : "",
+                          );
+                          setFieldError(
+                            "contact_number",
+                            shouldShowFieldError("contact_number", nextFormData.contact_number)
+                              ? getFieldError(
+                                  "contact_number",
+                                  nextFormData.contact_number,
+                                  nextFormData,
+                                )
+                              : "",
+                          );
+                        }}
+                        error={errors.country_code}
                       />
                       <Input
                         label="Contact Number"
+                        requiredMark
                         name="contact_number"
                         value={formData.contact_number}
                         onChange={handleChange}
+                        onBlur={handleBlur}
+                        inputMode="numeric"
+                        maxLength={15}
+                        placeholder={
+                          formData.country_code === "91" ? "Enter 10-digit mobile number" : ""
+                        }
+                        error={errors.contact_number}
                       />
                     </div>
 
                     <div className="mt-6">
                       <Input
                         label="Designation"
+                        requiredMark
                         name="designation"
                         value={formData.designation}
                         onChange={handleChange}
+                        onBlur={handleBlur}
+                        error={errors.designation}
                       />
                     </div>
 
                     <div className="mt-6 grid grid-cols-1 gap-6">
                       <SelectInput
                         label="Employee Type"
+                        requiredMark
                         options={[
                           { label: "Full-Time", value: "Full-Time" },
                           { label: "Part-Time", value: "Part-Time" },
@@ -402,9 +688,22 @@ export default function CreateOffer() {
                               }
                             : null
                         }
-                        onChange={(v) =>
-                          setFormData({ ...formData, employee_type: v?.value || "" })
-                        }
+                        onChange={(v) => {
+                          const nextValue = v?.value || "";
+                          const nextFormData = {
+                            ...formData,
+                            employee_type: nextValue,
+                          };
+                          setFormData(nextFormData);
+                          markFieldTouched("employee_type");
+                          setFieldError(
+                            "employee_type",
+                            shouldShowFieldError("employee_type", nextValue)
+                              ? getFieldError("employee_type", nextValue, nextFormData)
+                              : "",
+                          );
+                        }}
+                        error={errors.employee_type}
                       />
 
                       <SelectInput
@@ -412,13 +711,13 @@ export default function CreateOffer() {
                         isMulti
                         options={ccOptions}
                         value={formData.cc_emails}
-                        onChange={(v) => setFormData({ ...formData, cc_emails: v || [] })}
+                        onChange={(v) => setFormData((prev) => ({ ...prev, cc_emails: v || [] }))}
                       />
                     </div>
                   </div>
 
                   <div className="flex justify-end pt-2">
-                    <Button onClick={() => setActiveStep(2)} variant="primary" size="medium">
+                    <Button onClick={() => goToStep(2)} variant="primary" size="medium">
                       Continue
                     </Button>
                   </div>
@@ -451,6 +750,9 @@ export default function CreateOffer() {
                     </div>
 
                     <div className="space-y-4">
+                      {errors.components ? (
+                        <p className="text-sm font-medium text-red-500">{errors.components}</p>
+                      ) : null}
                       {components.map((c, index) => (
                         <div
                           key={c.id}
@@ -478,35 +780,46 @@ export default function CreateOffer() {
                           <div className="grid grid-cols-1 gap-4 md:grid-cols-5 items-end">
                             <CreatableSelectInput
                               label="Component"
+                              requiredMark
                               options={componentOptions}
                               value={c.name ? { label: c.name, value: c.name } : null}
                               onChange={(v) =>
                                 handleComponentChange(c.id, "name", v?.value || "")
                               }
+                              error={errors[`component_${c.id}_name`]}
                             />
                             <SelectInput
                               label="Type"
+                              requiredMark
                               options={typeOptions}
                               value={typeOptions.find((opt) => opt.value === c.type)}
                               onChange={(v) =>
                                 handleComponentChange(c.id, "type", v?.value || "")
                               }
+                              error={errors[`component_${c.id}_type`]}
                             />
                             <SelectInput
                               label="Frequency"
+                              requiredMark
                               options={frequencyOptions}
                               value={frequencyOptions.find((opt) => opt.value === c.frequency)}
                               onChange={(v) =>
                                 handleComponentChange(c.id, "frequency", v?.value || "")
                               }
+                              error={errors[`component_${c.id}_frequency`]}
                             />
                             <Input
                               type="number"
                               label="Amount"
+                              requiredMark
+                              name={`amount_${c.id}`}
                               value={c.amount}
                               onChange={(e) =>
                                 handleComponentChange(c.id, "amount", e.target.value)
                               }
+                              min="0"
+                              step="0.01"
+                              error={errors[`component_${c.id}_amount`]}
                             />
                             <div className="hidden md:block" />
                           </div>
@@ -523,7 +836,7 @@ export default function CreateOffer() {
                     <Button onClick={() => setActiveStep(1)} variant="outline" size="medium">
                       Back
                     </Button>
-                    <Button onClick={() => setActiveStep(3)} variant="primary" size="medium">
+                    <Button onClick={() => goToStep(3)} variant="primary" size="medium">
                       Continue
                     </Button>
                   </div>
@@ -634,8 +947,8 @@ export default function CreateOffer() {
   );
 }
 
-function Input({ label, ...props }) {
-  return <FormInput label={label} {...props} />;
+function Input({ label, error, ...props }) {
+  return <FormInput label={label} error={error} {...props} />;
 }
 
 function StepHeader({ title, description }) {
@@ -663,16 +976,18 @@ function SummaryItem({ label, value }) {
   );
 }
 
-function SelectInput({ label, ...props }) {
+function SelectInput({ label, error, requiredMark = false, ...props }) {
   const customStyles = {
     control: (base, state) => ({
       ...base,
       minHeight: "42px",
       borderRadius: "0.5rem",
-      borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+      borderColor: error ? "#fca5a5" : state.isFocused ? "#3b82f6" : "#d1d5db",
       backgroundColor: "white",
       boxShadow: state.isFocused
-        ? "0 0 0 2px rgba(59, 130, 246, 0.18)"
+        ? error
+          ? "0 0 0 2px rgba(239, 68, 68, 0.15)"
+          : "0 0 0 2px rgba(59, 130, 246, 0.18)"
         : "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
       paddingLeft: "0.5rem",
       paddingRight: "0.5rem",
@@ -748,22 +1063,28 @@ function SelectInput({ label, ...props }) {
 
   return (
     <div>
-      <label className={`${Fonts.label} mb-1.5 block`}>{label}</label>
+      <label className={`${Fonts.label} mb-1.5 block`}>
+        {label}
+        {requiredMark ? <span className="ml-1 text-red-500">*</span> : null}
+      </label>
       <Select styles={customStyles} {...props} />
+      {error ? <p className="mt-1 text-xs text-red-500">{error}</p> : null}
     </div>
   );
 }
 
-function CreatableSelectInput({ label, ...props }) {
+function CreatableSelectInput({ label, error, requiredMark = false, ...props }) {
   const customStyles = {
     control: (base, state) => ({
       ...base,
       minHeight: "42px",
       borderRadius: "0.5rem",
-      borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+      borderColor: error ? "#fca5a5" : state.isFocused ? "#3b82f6" : "#d1d5db",
       backgroundColor: "white",
       boxShadow: state.isFocused
-        ? "0 0 0 2px rgba(59, 130, 246, 0.18)"
+        ? error
+          ? "0 0 0 2px rgba(239, 68, 68, 0.15)"
+          : "0 0 0 2px rgba(59, 130, 246, 0.18)"
         : "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
       paddingLeft: "0.5rem",
       paddingRight: "0.5rem",
@@ -839,8 +1160,12 @@ function CreatableSelectInput({ label, ...props }) {
 
   return (
     <div>
-      <label className={`${Fonts.label} mb-1.5 block`}>{label}</label>
+      <label className={`${Fonts.label} mb-1.5 block`}>
+        {label}
+        {requiredMark ? <span className="ml-1 text-red-500">*</span> : null}
+      </label>
       <CreatableSelect styles={customStyles} {...props} />
+      {error ? <p className="mt-1 text-xs text-red-500">{error}</p> : null}
     </div>
   );
 }
