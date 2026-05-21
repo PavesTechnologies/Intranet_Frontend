@@ -193,21 +193,39 @@ export default function EmployeeCreateModal({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!employeeUuid) return;
+    if (!userUuid && !employeeUuid) return;
 
     const fetchEmployee = async () => {
       try {
-        const res = await fetch(
-          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          },
-        );
+        let data = {};
+        let matchedUserUuid = userUuid;
 
-        const data = await res.json();
-        const matchedUserUuid = data.user_uuid || userUuid;
+        if (employeeUuid) {
+          const res = await fetch(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            },
+          );
+
+          data = await res.json();
+
+          matchedUserUuid =
+            data.user_uuid || userUuid;
+        }
+        // const res = await fetch(
+        //   `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
+        //   {
+        //     headers: {
+        //       Authorization: `Bearer ${localStorage.getItem("token")}`,
+        //     },
+        //   },
+        // );
+
+        // const data = await res.json();
+        // const matchedUserUuid = data.user_uuid || userUuid;
         let offerLetter = null;
 
         try {
@@ -233,43 +251,47 @@ export default function EmployeeCreateModal({
 
         let personalDetails = null;
 
-try {
-  const personalListRes = await fetch(
-    `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/employee-details`,
-    {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    },
-  );
+        try {
+          const personalListRes = await fetch(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/employee-details`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            },
+          );
 
-  if (personalListRes.ok) {
-    const personalListData =
-      await personalListRes.json();
+          if (personalListRes.ok) {
+            const personalRecords =
+              await personalListRes.json();
 
-    const personalRecords = Array.isArray(personalListData)
-      ? personalListData
-      : getArrayPayload(personalListData);
+            console.log(
+              "Personal Details Response:",
+              personalRecords
+            );
 
-    personalDetails = personalRecords.find(
-      (item) =>
-        String(item.user_uuid).trim() ===
-        String(matchedUserUuid).trim()
-    );
+            console.log(
+              "Matched User UUID:",
+              matchedUserUuid
+            );
 
-    if (!personalDetails) {
-      console.warn(
-        "No personal details found for user:",
-        matchedUserUuid
-      );
-    }
-  }
-} catch (personalError) {
-  console.error(
-    "Failed to fetch personal details",
-    personalError
-  );
-}
+            personalDetails = personalRecords.find(
+              (item) =>
+                String(item.user_uuid).trim() ===
+                String(matchedUserUuid).trim()
+            );
+
+            console.log(
+              "Matched Personal Details:",
+              personalDetails
+            );
+          }
+        } catch (personalError) {
+          console.error(
+            "Failed to fetch personal details",
+            personalError
+          );
+        }
 
         const reportingManagerValue =
           offerLetter?.reporting_manager || data.reporting_manager_uuid || "";
@@ -279,11 +301,11 @@ try {
           userUuid: data.user_uuid,
           empId: data.employee_id,
           email: data.work_email,
-          empFirstName: data.first_name,
-          empMiddleName: data.middle_name,
-          empLastName: data.last_name,
+          empFirstName: offerLetter?.first_name || data.first_name || firstName || "",
+          empMiddleName: offerLetter?.middle_name || data.middle_name || middleName || "",
+          empLastName: offerLetter?.last_name || data.last_name || lastName || "",
           empDob: personalDetails?.date_of_birth || data.date_of_birth || "",
-          contact: data.contact_number,
+          contact: personalDetails?.contact_number || offerLetter?.contact_number || data.contact_number || "",
           departmentUuid: data.department_uuid,
           designationUuid: data.designation_uuid,
           reportingManagerUuid: resolveManagerOptionValue(
