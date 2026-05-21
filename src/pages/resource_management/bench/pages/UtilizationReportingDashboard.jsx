@@ -332,15 +332,25 @@ const UtilizationReportingDashboard = () => {
 
           {/* Navigation Tabs */}
           <div className="flex border-b border-slate-200 overflow-x-auto scrollbar-hide">
-             {['ANOMALIES', 'RESOURCE', 'PROJECT', 'ROLE', 'CLIENT'].map(tab => (
-                <button
-                   key={tab}
-                   onClick={() => setActiveTab(tab)}
-                   className={`px-6 py-4 text-[11px] font-black capitalize tracking-widest whitespace-nowrap transition-all border-b-2 flex-1 ${activeTab === tab ? 'text-emerald-600 border-emerald-600 bg-emerald-50/30' : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'}`}
-                >
-                   {tab === 'ANOMALIES' ? 'UTILIZATION ANOMALIES' : `${tab} UTILIZATION REPORT`}
-                </button>
-             ))}
+             {['ANOMALIES', 'RESOURCE', 'PROJECT', 'ROLE', 'CLIENT'].map(tab => {
+                const getTabText = (t) => {
+                  if (t === 'ANOMALIES') return 'Utilization Anomalies';
+                  if (t === 'CLIENT') return 'Client Utilization';
+                  if (t === 'RESOURCE') return 'Resource Utilization Report';
+                  if (t === 'PROJECT') return 'Project Utilization Report';
+                  if (t === 'ROLE') return 'Role Utilization Report';
+                  return t;
+                };
+                return (
+                  <button
+                     key={tab}
+                     onClick={() => setActiveTab(tab)}
+                     className={`px-6 py-4 text-[11px] font-black tracking-widest whitespace-nowrap transition-all border-b-2 flex-1 ${activeTab === tab ? 'text-emerald-600 border-emerald-600 bg-emerald-50/30' : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'}`}
+                  >
+                     {getTabText(tab)}
+                  </button>
+                );
+             })}
           </div>
 
           {/* Alerts */}

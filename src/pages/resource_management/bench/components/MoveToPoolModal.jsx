@@ -3,24 +3,28 @@ import { X } from "lucide-react";
 import { POOL_OPTIONS } from "../constants/benchConstants";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 
-const baseForm = {
-  poolType: "CoE",
-  reason: "",
-};
+const BENCH_OPTIONS = ["Ready", "Shadow", "Low Utilization", "Training"];
 
-const MoveToPoolModal = ({ open, resources = [], onClose, onSubmit }) => {
-  const [form, setForm] = useState(baseForm);
+const MoveToPoolModal = ({ open, resources = [], onClose, onSubmit, activeTab = "bench" }) => {
+  const isTargetBench = activeTab === "pool";
+  const defaultOption = isTargetBench ? "" : "CoE";
+  
+  const [form, setForm] = useState({ poolType: defaultOption, reason: "" });
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
-    setForm(baseForm);
+    setForm({ poolType: isTargetBench ? "" : "CoE", reason: "" });
     setError("");
-  }, [open]);
+  }, [open, isTargetBench]);
 
   if (!open) return null;
 
   const handleSubmit = () => {
+    if (!form.poolType) {
+      setError("Target Environment/Substate Is Required.");
+      return;
+    }
     if (!form.reason.trim()) {
       setError("Reason Is Required.");
       return;
@@ -31,12 +35,19 @@ const MoveToPoolModal = ({ open, resources = [], onClose, onSubmit }) => {
     });
   };
 
+  const options = isTargetBench 
+    ? [{ value: "", label: "Select A Substate" }, ...BENCH_OPTIONS.map(opt => ({ value: opt, label: opt }))]
+    : POOL_OPTIONS.map((option) => ({ value: option, label: option }));
+
+  const title = isTargetBench ? "Transition to Bench" : "Transition to Internal Pool";
+  const label = isTargetBench ? "Target Bench Substate" : "Target Pool Environment";
+
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-lg rounded-2xl border border-white/20 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-5">
           <div>
-            <p className="text-lg font-bold text-slate-800 tracking-tight">Transition to Internal Pool</p>
+            <p className="text-lg font-bold text-slate-800 tracking-tight">{title}</p>
             <p className="text-[12px] font-medium text-slate-500 mt-0.5">{resources.length > 1 ? `${resources.length} resources selected` : resources[0]?.name}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-400 transition-all hover:bg-slate-200 hover:text-slate-700">
@@ -46,10 +57,10 @@ const MoveToPoolModal = ({ open, resources = [], onClose, onSubmit }) => {
 
         <div className="space-y-6 px-6 py-6 bg-white">
           <div className="group">
-            <label className="text-[10px] font-bold capitalize tracking-widest text-slate-400 group-focus-within:text-indigo-600 transition-colors">Target Pool Environment</label>
+            <label className="text-[10px] font-bold capitalize tracking-widest text-slate-400 group-focus-within:text-indigo-600 transition-colors">{label}</label>
             <div className="relative mt-2">
               <FilterListbox
-                options={POOL_OPTIONS.map((option) => ({ value: option, label: option }))}
+                options={options}
                 value={form.poolType}
                 onChange={(val) => setForm((prev) => ({ ...prev, poolType: val }))}
               />
