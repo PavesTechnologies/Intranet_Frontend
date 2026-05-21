@@ -66,6 +66,7 @@ const DemandKPIStrip = ({ data, isLoading }) => {
             })}
         </div>
     );
+    
 };
 
 export default DemandKPIStrip;

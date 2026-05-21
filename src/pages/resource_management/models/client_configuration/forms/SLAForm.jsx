@@ -17,7 +17,7 @@ const SLAForm = ({ formData, setFormData }) => {
         {/* SLA Type */}
         <div>
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">
-            SLA Type *
+            SLA Type <span className="text-red-500">*</span>
           </label>
           <FilterListbox
             options={[
@@ -32,7 +32,7 @@ const SLAForm = ({ formData, setFormData }) => {
         {/* SLA Duration */}
         <div>
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">
-            Duration (Days) *
+            Duration (Days) <span className="text-red-500">*</span>
           </label>
           <input
             type="number"
@@ -70,7 +70,7 @@ const SLAForm = ({ formData, setFormData }) => {
         {/* Warning Threshold */}
         <div>
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">
-            Warning Threshold (Days) *
+            Warning Threshold (Days) <span className="text-red-500">*</span>
           </label>
           <input
             type="number"
