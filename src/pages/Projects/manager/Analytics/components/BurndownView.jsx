@@ -4,10 +4,11 @@ import VelocityMiniChart    from "./charts/VelocityMiniChart";
 import ScopeChangeMiniTable from "./ScopeChangeMiniTable";
 import DownloadMenu         from "./DownloadMenu";
 import {
-  downloadChartAsPNG,
-  downloadChartAsPDF,
-  downloadAsCSV,
+  downloadChartWithScopeAsPNG,
+  downloadChartWithScopeAsPDF,
+  downloadSectionedCSV,
   buildBurndownCSV,
+  buildScopeChangesSection,
 } from "../utils/downloadUtils";
 
 const BurndownView = ({
@@ -24,11 +25,11 @@ const BurndownView = ({
   const chartRef = useRef(null);
 
   const handlePNG = () =>
-    downloadChartAsPNG({ current: chartRef.current?.getCanvas() }, `${sprintName}_Burndown`);
+    downloadChartWithScopeAsPNG(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burndown`);
   const handlePDF = () =>
-    downloadChartAsPDF({ current: chartRef.current?.getCanvas() }, `${sprintName}_Burndown`);
+    downloadChartWithScopeAsPDF(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burndown`);
   const handleCSV = () => {
-    const { headers, data } = buildBurndownCSV(
+    const chartSection = buildBurndownCSV(
       dailyBurnup.map((d, i) => ({
         date:                 labels[i] ?? new Date(d.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
         sprintDayNumber:      d.sprintDayNumber ?? i + 1,
@@ -41,7 +42,10 @@ const BurndownView = ({
       })),
       initialPoints
     );
-    downloadAsCSV(data, headers, `${sprintName}_Burndown`);
+    downloadSectionedCSV(
+      [{ title: "Burndown Data", ...chartSection }, buildScopeChangesSection(scopeChanges)],
+      `${sprintName}_Burndown`
+    );
   };
 
   return (
