@@ -131,7 +131,7 @@ const mergeSavedCategory = (existingCategory, savedCategory) => {
   };
 };
 
-const SkillManagementModal = ({ open, onClose }) => {
+const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraftKey = "" }) => {
   const [activeTab, setActiveTab] = useState("taxonomy");
   const [taxonomy, setTaxonomy] = useState([]);
   const [initialTaxonomy, setInitialTaxonomy] = useState([]);
@@ -151,6 +151,46 @@ const SkillManagementModal = ({ open, onClose }) => {
     [taxonomy],
   );
 
+  const fetchCategorySkillsTree = async (categoryId) => {
+    const response = await skillService.getSkillsByCategoryDto(categoryId);
+    if (!response?.success) {
+      throw new Error(response?.error || "Failed to retrieve skills.");
+    }
+
+    const skills = Array.isArray(response.data) ? response.data : [];
+    const subSkillEntries = await Promise.all(
+      skills.map(async (skill) => {
+        try {
+          const subSkillResponse = await skillService.getSubSkillsBySkillDto(skill.id);
+          if (!subSkillResponse?.success) {
+            throw new Error(
+              subSkillResponse?.error || `Failed to retrieve subskills for ${skill.name}.`,
+            );
+          }
+
+          return [
+            skill.id,
+            Array.isArray(subSkillResponse.data)
+              ? subSkillResponse.data.map(mapSubSkillDto)
+              : [],
+          ];
+        } catch (error) {
+          notify.error(
+            error,
+            `Unable to load subskills for ${skill.name}.`,
+          );
+          return [skill.id, []];
+        }
+      }),
+    );
+
+    const subSkillMap = new Map(subSkillEntries);
+    return skills.map((skill) => ({
+      ...mapSkillDto(skill),
+      subSkills: subSkillMap.get(skill.id) || [],
+    }));
+  };
+
   useEffect(() => {
     if (!open) return;
 
@@ -163,11 +203,30 @@ const SkillManagementModal = ({ open, onClose }) => {
           throw new Error(response?.error || "Failed to retrieve categories.");
         }
 
-        const nextTaxonomy = Array.isArray(response.data)
+        let nextTaxonomy = Array.isArray(response.data)
           ? response.data.map(mapCategoryDto)
           : [];
 
-        loadedCategoryIdsRef.current = new Set();
+        if (initialDraft?.categoryId) {
+          try {
+            const nextSkills = await fetchCategorySkillsTree(initialDraft.categoryId);
+            nextTaxonomy = nextTaxonomy.map((category) =>
+              String(category.id) === String(initialDraft.categoryId)
+                ? { ...category, skills: nextSkills }
+                : category,
+            );
+            loadedCategoryIdsRef.current = new Set([initialDraft.categoryId]);
+          } catch (error) {
+            loadedCategoryIdsRef.current = new Set();
+            notify.error(
+              error,
+              "Unable to fully hydrate the selected taxonomy item for editing.",
+            );
+          }
+        } else {
+          loadedCategoryIdsRef.current = new Set();
+        }
+
         setTaxonomy(nextTaxonomy);
         setInitialTaxonomy(cloneTaxonomy(nextTaxonomy));
         setStagedCategories([]);
@@ -195,7 +254,7 @@ const SkillManagementModal = ({ open, onClose }) => {
     };
 
     fetchCategories();
-  }, [open]);
+  }, [initialDraft?.categoryId, open]);
 
   const loadCategoryDetails = async (categoryId) => {
     if (!categoryId || loadedCategoryIdsRef.current.has(categoryId)) return;
@@ -204,43 +263,7 @@ const SkillManagementModal = ({ open, onClose }) => {
     notify.loading("Loading skills and subskills...", toastId);
 
     try {
-      const response = await skillService.getSkillsByCategoryDto(categoryId);
-      if (!response?.success) {
-        throw new Error(response?.error || "Failed to retrieve skills.");
-      }
-
-      const skills = Array.isArray(response.data) ? response.data : [];
-      const subSkillEntries = await Promise.all(
-        skills.map(async (skill) => {
-          try {
-            const subSkillResponse = await skillService.getSubSkillsBySkillDto(skill.id);
-            if (!subSkillResponse?.success) {
-              throw new Error(
-                subSkillResponse?.error || `Failed to retrieve subskills for ${skill.name}.`,
-              );
-            }
-
-            return [
-              skill.id,
-              Array.isArray(subSkillResponse.data)
-                ? subSkillResponse.data.map(mapSubSkillDto)
-                : [],
-            ];
-          } catch (error) {
-            notify.error(
-              error,
-              `Unable to load subskills for ${skill.name}.`,
-            );
-            return [skill.id, []];
-          }
-        }),
-      );
-
-      const subSkillMap = new Map(subSkillEntries);
-      const nextSkills = skills.map((skill) => ({
-        ...mapSkillDto(skill),
-        subSkills: subSkillMap.get(skill.id) || [],
-      }));
+      const nextSkills = await fetchCategorySkillsTree(categoryId);
 
       const mergeCategorySkills = (currentTaxonomy) =>
         currentTaxonomy.map((category) =>
@@ -357,7 +380,13 @@ const SkillManagementModal = ({ open, onClose }) => {
     }
   };
 
-  const stageTaxonomy = ({ categoryId, categoryName, isCategoryActive, skills }) => {
+  const stageTaxonomy = ({
+    categoryId,
+    categoryName,
+    categoryDescription = "",
+    isCategoryActive,
+    skills,
+  }) => {
     const buildStagedCategory = (current = []) => {
       const existingCategory = current.find(
         (category) =>
@@ -369,7 +398,7 @@ const SkillManagementModal = ({ open, onClose }) => {
         ...(existingCategory || {}),
         id: categoryId || existingCategory?.id || createId("cat"),
         name: categoryName,
-        description: existingCategory?.description || "",
+        description: categoryDescription || existingCategory?.description || "",
         isActive: isCategoryActive,
         skills,
       };
@@ -405,7 +434,8 @@ const SkillManagementModal = ({ open, onClose }) => {
         ...(existingIndex >= 0 ? next[existingIndex] : {}),
         id: categoryId || (existingIndex >= 0 ? next[existingIndex].id : createId("cat")),
         name: categoryName,
-        description: existingIndex >= 0 ? next[existingIndex].description || "" : "",
+        description:
+          categoryDescription || (existingIndex >= 0 ? next[existingIndex].description || "" : ""),
         isActive: isCategoryActive,
         skills,
       };
@@ -566,6 +596,8 @@ const SkillManagementModal = ({ open, onClose }) => {
                       taxonomy={taxonomy}
                       onStageTaxonomy={stageTaxonomy}
                       onLoadCategoryDetails={loadCategoryDetails}
+                      initialDraft={initialDraft}
+                      initialDraftKey={initialDraftKey}
                     />
                   ) : (
                     <BulkUploadTab onApplyRows={applyUploadRows} />

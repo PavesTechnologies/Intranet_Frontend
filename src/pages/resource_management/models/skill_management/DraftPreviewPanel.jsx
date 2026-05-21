@@ -11,8 +11,12 @@ const StatusBadge = ({ isActive }) => (
   </span>
 );
 
-const DraftPreviewPanel = ({ currentDraft, taxonomy }) => {
+const DraftPreviewPanel = ({ currentDraft, taxonomy, showOnlyCurrentDraft = false }) => {
   const categoriesToShow = useMemo(() => {
+    if (showOnlyCurrentDraft) {
+      return currentDraft?.name ? [currentDraft] : [];
+    }
+
     if (!currentDraft?.name) return taxonomy;
 
     const filtered = taxonomy.filter(
@@ -20,7 +24,7 @@ const DraftPreviewPanel = ({ currentDraft, taxonomy }) => {
     );
 
     return [currentDraft, ...filtered];
-  }, [currentDraft, taxonomy]);
+  }, [currentDraft, showOnlyCurrentDraft, taxonomy]);
 
   const [expandedCategories, setExpandedCategories] = useState({});
 

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, X } from "lucide-react";
 import { notify } from "../../utils/notify";
 import DraftPreviewPanel from "./DraftPreviewPanel";
 import SearchableSelect from "./SearchableSelect";
@@ -17,6 +17,25 @@ const createDraftItem = ({ id, name, description = "", isActive = true, prefix }
   isActive,
 });
 
+const prepareDraftSkills = (skills = []) =>
+  skills.map((skill) => ({
+    id: skill.id || createTemporaryId("skill"),
+    name: skill.name || "",
+    description: skill.description || "",
+    isActive: skill.isActive ?? skill.active ?? true,
+    subSkills: (skill.subSkills || []).map((subSkill) => ({
+      id: subSkill.id || createTemporaryId("subskill"),
+      name: subSkill.name || "",
+      description: subSkill.description || "",
+      isActive: subSkill.isActive ?? subSkill.active ?? true,
+    })),
+    isAddingSubSkill: false,
+    isNewSubSkill: false,
+    selectedExistingSubSkillId: "",
+    newSubSkillName: "",
+    isSubSkillActive: true,
+  }));
+
 const modeButtonClass = (isActive) =>
   `rounded-lg px-3 py-2 text-sm font-medium transition ${
     isActive
@@ -24,11 +43,19 @@ const modeButtonClass = (isActive) =>
       : "bg-white text-slate-600 hover:bg-slate-100"
   }`;
 
-const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) => {
+const SkillTaxonomyTab = ({
+  taxonomy,
+  onStageTaxonomy,
+  onLoadCategoryDetails,
+  initialDraft = null,
+  initialDraftKey = "",
+}) => {
+  const lastInitializedDraftKeyRef = useRef("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [isNewCategory, setIsNewCategory] = useState(false);
   const [newCategoryDraftId, setNewCategoryDraftId] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [categoryDescription, setCategoryDescription] = useState("");
   const [isCategoryActive, setIsCategoryActive] = useState(true);
 
   const [skills, setSkills] = useState([]);
@@ -38,6 +65,7 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
   const [selectedSkillId, setSelectedSkillId] = useState("");
   const [newSkillName, setNewSkillName] = useState("");
   const [isSkillActive, setIsSkillActive] = useState(true);
+  const [activeSkillId, setActiveSkillId] = useState("");
 
   const categoryOptions = useMemo(
     () => taxonomy.map((category) => ({ id: category.id, name: category.name })),
@@ -65,18 +93,94 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
     ? {
         id: selectedCategoryId || "draft-category",
         name: activeCategoryName,
+        description: categoryDescription,
         isActive: isCategoryActive,
         skills,
       }
     : null;
+  const showOnlyCurrentDraft = Boolean(initialDraftKey && initialDraft?.scope);
 
   const categoryReady = Boolean(activeCategoryName);
+
+  useEffect(() => {
+    if (!initialDraftKey || !initialDraft) return;
+    if (lastInitializedDraftKeyRef.current === initialDraftKey) return;
+
+    lastInitializedDraftKeyRef.current = initialDraftKey;
+
+    const seededSkills = prepareDraftSkills(initialDraft.skills || []);
+
+    if (initialDraft.isNewCategory) {
+      const draftId = initialDraft.categoryId || createTemporaryId("cat");
+      setIsNewCategory(true);
+      setSelectedCategoryId("");
+      setNewCategoryDraftId(draftId);
+      setNewCategoryName(initialDraft.categoryName || "");
+      setCategoryDescription(initialDraft.categoryDescription || initialDraft.description || "");
+      setIsCategoryActive(initialDraft.isCategoryActive ?? true);
+      setSkills(seededSkills);
+      setShowAddSkillForm(false);
+      setIsNewSkill(false);
+      setSelectedSkillId("");
+      setNewSkillName("");
+      setIsSkillActive(true);
+      setActiveSkillId(seededSkills[0]?.id || "");
+      onStageTaxonomy({
+        categoryId: draftId,
+        categoryName: initialDraft.categoryName || "",
+        categoryDescription: initialDraft.categoryDescription || initialDraft.description || "",
+        isCategoryActive: initialDraft.isCategoryActive ?? true,
+        skills: seededSkills,
+      });
+      return;
+    }
+
+    const matchedCategory = taxonomy.find(
+      (category) => String(category.id) === String(initialDraft.categoryId),
+    );
+
+    if (!matchedCategory && initialDraft.categoryId) return;
+
+    setIsNewCategory(false);
+    setNewCategoryDraftId("");
+    setSelectedCategoryId(initialDraft.categoryId || "");
+    setNewCategoryName(initialDraft.categoryName || matchedCategory?.name || "");
+    setCategoryDescription(
+      initialDraft.categoryDescription ||
+        initialDraft.description ||
+        matchedCategory?.description ||
+        "",
+    );
+    setIsCategoryActive(initialDraft.isCategoryActive ?? matchedCategory?.isActive ?? true);
+    setSkills(seededSkills);
+    setShowAddSkillForm(false);
+    setIsNewSkill(false);
+    setSelectedSkillId("");
+    setNewSkillName("");
+    setIsSkillActive(true);
+    setActiveSkillId(seededSkills[0]?.id || "");
+
+    if (initialDraft.categoryName || initialDraft.categoryId) {
+      onStageTaxonomy({
+        categoryId: initialDraft.categoryId || "",
+        categoryName: initialDraft.categoryName || matchedCategory?.name || "",
+        categoryDescription:
+          initialDraft.categoryDescription ||
+          initialDraft.description ||
+          matchedCategory?.description ||
+          "",
+        isCategoryActive: initialDraft.isCategoryActive ?? matchedCategory?.isActive ?? true,
+        skills: seededSkills,
+      });
+    }
+  }, [initialDraft, initialDraftKey, onStageTaxonomy, taxonomy]);
 
   const resetDraft = () => {
     setSelectedCategoryId("");
     setIsNewCategory(false);
     setNewCategoryDraftId("");
     setNewCategoryName("");
+    setCategoryDescription("");
     setIsCategoryActive(true);
 
     setSkills([]);
@@ -87,6 +191,7 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
     setSelectedSkillId("");
     setNewSkillName("");
     setIsSkillActive(true);
+    setActiveSkillId("");
   };
 
   const syncStagedTaxonomy = (nextSkills, overrides = {}) => {
@@ -95,6 +200,11 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
       (overrides.isNewCategory ?? isNewCategory
         ? overrides.newCategoryName ?? newCategoryName.trim()
         : activeCategory?.name || "");
+    const nextCategoryDescription =
+      overrides.categoryDescription ??
+      (overrides.isNewCategory ?? isNewCategory
+        ? categoryDescription
+        : activeCategory?.description || categoryDescription || "");
 
     if (nextCategoryName) {
       onStageTaxonomy({
@@ -102,6 +212,7 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
           overrides.categoryId ??
           ((overrides.isNewCategory ?? isNewCategory) ? newCategoryDraftId : selectedCategoryId),
         categoryName: nextCategoryName,
+        categoryDescription: nextCategoryDescription,
         isCategoryActive: overrides.isCategoryActive ?? isCategoryActive,
         skills: nextSkills,
       });
@@ -110,6 +221,12 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
 
   const stageTaxonomy = (nextSkills) => {
     setSkills(nextSkills);
+    setActiveSkillId((current) => {
+      if (!nextSkills.length) return "";
+      const stillExists = nextSkills.some((skill) => String(skill.id) === String(current));
+      if (stillExists) return current;
+      return showOnlyCurrentDraft ? "" : nextSkills[0].id;
+    });
     syncStagedTaxonomy(nextSkills);
   };
 
@@ -118,6 +235,25 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
       const next = current.map((skill) =>
         skill.id === skillId ? updater(skill) : skill
       );
+      syncStagedTaxonomy(next);
+      return next;
+    });
+  };
+
+  const toggleSubSkillFormForSingleSkill = (targetSkillId) => {
+    setSkills((current) => {
+      const next = current.map((skill) => {
+        if (skill.id === targetSkillId) {
+          return {
+            ...skill,
+            isAddingSubSkill: !skill.isAddingSubSkill,
+          };
+        }
+        return {
+          ...skill,
+          isAddingSubSkill: false,
+        };
+      });
       syncStagedTaxonomy(next);
       return next;
     });
@@ -181,6 +317,8 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
     setShowAddSkillForm(false);
   };
 
+  const activeSkill = skills.find((skill) => String(skill.id) === String(activeSkillId)) || null;
+
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr),minmax(320px,0.8fr)]">
       <div className="space-y-6">
@@ -207,6 +345,7 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
                   setIsNewCategory(false);
                   setNewCategoryDraftId("");
                   setNewCategoryName("");
+                  setCategoryDescription("");
                 }}
                 className={modeButtonClass(!isNewCategory)}
               >
@@ -219,6 +358,7 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
                   setIsNewCategory(true);
                   setNewCategoryDraftId((current) => current || createTemporaryId("cat"));
                   setSelectedCategoryId("");
+                  setCategoryDescription("");
                 }}
                 className={modeButtonClass(isNewCategory)}
               >
@@ -253,33 +393,69 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
                   placeholder="Enter category name"
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none"
                 />
+                <label className="mb-1.5 mt-3 block text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                  Category Description
+                </label>
+                <textarea
+                  value={categoryDescription}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCategoryDescription(value);
+                    syncStagedTaxonomy(skills, {
+                      categoryDescription: value,
+                      isNewCategory: true,
+                    });
+                  }}
+                  rows={3}
+                  placeholder="Enter category description"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none"
+                />
               </div>
             ) : (
-              <SearchableSelect
-                label="Category"
-                value={selectedCategoryId}
-                onChange={async (value) => {
-                  setSelectedCategoryId(value);
+              <div>
+                <SearchableSelect
+                  label="Category"
+                  value={selectedCategoryId}
+                  onChange={async (value) => {
+                    setSelectedCategoryId(value);
 
-                  const matched = taxonomy.find(
-                    (item) => String(item.id) === String(value)
-                  );
+                    const matched = taxonomy.find(
+                      (item) => String(item.id) === String(value)
+                    );
 
-                  const selectedSkills = matched?.skills || [];
-                  setIsCategoryActive(matched?.isActive ?? true);
-                  setSkills(selectedSkills);
-                  setShowAddSkillForm(false);
-                  setSelectedSkillId("");
-                  setNewSkillName("");
-                  setIsNewSkill(false);
+                    const selectedSkills = matched?.skills || [];
+                    setIsCategoryActive(matched?.isActive ?? true);
+                    setCategoryDescription(matched?.description || "");
+                    setSkills(selectedSkills);
+                    setShowAddSkillForm(false);
+                    setSelectedSkillId("");
+                    setNewSkillName("");
+                    setIsNewSkill(false);
 
-                  if (value && onLoadCategoryDetails) {
-                    await onLoadCategoryDetails(value);
-                  }
-                }}
-                options={categoryOptions}
-                placeholder="Search category"
-              />
+                    if (value && onLoadCategoryDetails) {
+                      await onLoadCategoryDetails(value);
+                    }
+                  }}
+                  options={categoryOptions}
+                  placeholder="Search category"
+                />
+                <label className="mb-1.5 mt-3 block text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                  Category Description
+                </label>
+                <textarea
+                  value={categoryDescription}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCategoryDescription(value);
+                    syncStagedTaxonomy(skills, {
+                      categoryDescription: value,
+                    });
+                  }}
+                  rows={3}
+                  placeholder="Enter category description"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none"
+                />
+              </div>
             )}
 
             <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700">
@@ -320,7 +496,55 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
           </div>
 
           <div className="mt-4 space-y-3">
-            {skills.map((skill) => {
+            {skills.length > 0 ? (
+              <>
+                {showOnlyCurrentDraft ? (
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Skills For Update
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  {skills.map((skill) => {
+                    const isActiveSkill = String(skill.id) === String(activeSkillId);
+                    return (
+                      <button
+                        key={skill.id}
+                        type="button"
+                        onClick={() => setActiveSkillId(skill.id)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          isActiveSkill
+                            ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span>{skill.name}</span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            stageTaxonomy(skills.filter((item) => item.id !== skill.id));
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              stageTaxonomy(skills.filter((item) => item.id !== skill.id));
+                            }
+                          }}
+                          className="rounded-full p-0.5 hover:bg-rose-100 hover:text-rose-700"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : null}
+
+            {activeSkill ? (() => {
+              const skill = activeSkill;
               const matchedExistingSkill =
                 activeCategory?.skills?.find(
                   (item) =>
@@ -342,14 +566,68 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
                 <SkillCard
                   key={skill.id}
                   skill={skill}
+                  isUpdateMode={showOnlyCurrentDraft}
                   existingSubSkillOptions={
                     existingSubSkillOptions
                   }
+                  onSkillNameChange={(value) =>
+                    updateSkill(skill.id, (currentSkill) => ({
+                      ...currentSkill,
+                      name: value,
+                    }))
+                  }
+                  onSkillDescriptionChange={(value) =>
+                    updateSkill(skill.id, (currentSkill) => ({
+                      ...currentSkill,
+                      description: value,
+                    }))
+                  }
+                  onSkillActiveChange={(checked) =>
+                    updateSkill(skill.id, (currentSkill) => ({
+                      ...currentSkill,
+                      isActive: checked,
+                    }))
+                  }
 
-                  onRemoveSkill={() =>
-                    stageTaxonomy(
-                      skills.filter((item) => item.id !== skill.id)
-                    )
+                  onRemoveSkill={() => stageTaxonomy(skills.filter((item) => item.id !== skill.id))}
+                  onSubSkillNameChange={(subSkillId, value) =>
+                    updateSkill(skill.id, (currentSkill) => ({
+                      ...currentSkill,
+                      subSkills: currentSkill.subSkills.map((item) =>
+                        item.id === subSkillId
+                          ? {
+                              ...item,
+                              name: value,
+                            }
+                          : item
+                      ),
+                    }))
+                  }
+                  onSubSkillDescriptionChange={(subSkillId, value) =>
+                    updateSkill(skill.id, (currentSkill) => ({
+                      ...currentSkill,
+                      subSkills: currentSkill.subSkills.map((item) =>
+                        item.id === subSkillId
+                          ? {
+                              ...item,
+                              description: value,
+                            }
+                          : item
+                      ),
+                    }))
+                  }
+                  onSubSkillActiveChange={(subSkillId, checked) =>
+                    updateSkill(skill.id, (currentSkill) => ({
+                      ...currentSkill,
+                      subSkills: currentSkill.subSkills.map((item) =>
+                        item.id === subSkillId
+                          ? {
+                              ...item,
+                              isActive: checked,
+                            }
+                          : item
+                      ),
+                    }))
                   }
 
                   onRemoveSubSkill={(subSkillId) =>
@@ -364,11 +642,7 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
                   }
 
                   onOpenSubSkillForm={() =>
-                    updateSkill(skill.id, (currentSkill) => ({
-                      ...currentSkill,
-                      isAddingSubSkill:
-                        !currentSkill.isAddingSubSkill,
-                    }))
+                    toggleSubSkillFormForSingleSkill(skill.id)
                   }
 
                   onToggleNewSubSkill={(checked) =>
@@ -458,7 +732,11 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
                   }}
                 />
               );
-            })}
+            })() : skills.length > 0 && !showOnlyCurrentDraft ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-5 text-center text-xs text-slate-400">
+                Select a skill to edit.
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-4 border-t border-slate-200 pt-4">
@@ -556,6 +834,7 @@ const SkillTaxonomyTab = ({ taxonomy, onStageTaxonomy, onLoadCategoryDetails }) 
       <DraftPreviewPanel
         currentDraft={previewCategory}
         taxonomy={taxonomy}
+        showOnlyCurrentDraft={showOnlyCurrentDraft}
       />
     </div>
   );
