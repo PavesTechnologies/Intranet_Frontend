@@ -73,7 +73,7 @@ const Sidebar = ({ isCollapsed }) => {
     if (item.name === "Projects") {
       const userRoles = user?.roles?.map((r) => r.toUpperCase()) || [];
       // Roles that should not see Projects by default
-      const forbiddenRoles = ["ADMIN", "SUPER ADMIN", "HR", "HR_MANAGER", "RESOURCE_MANAGER", "DELIVERY_MANAGER", "REPORTING_MANAGER"];
+      const forbiddenRoles = ["ADMIN", "Super_Admin", "HR", "HR_MANAGER", "RESOURCE_MANAGER", "DELIVERY_MANAGER", "REPORTING_MANAGER"];
       // Roles that override the forbidden roles
       const strongRoles = ["PROJECT_MANAGER", "TESTER"];
 
@@ -92,7 +92,7 @@ const Sidebar = ({ isCollapsed }) => {
 
   // Role checks
   const isAdmin =
-    user?.roles?.includes("Admin") || user?.roles?.includes("Super Admin");
+    user?.roles?.includes("Admin") || user?.roles?.includes("Super_Admin");
   const isRMSAdmin = user?.roles?.includes("Admin");
   const isRM = user?.roles?.includes("Resource_Manager");
   const isPM = user?.roles?.includes("Project_Manager");

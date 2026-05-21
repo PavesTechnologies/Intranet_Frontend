@@ -9,6 +9,7 @@ import RevokeLeaveRequests from "./models/RevokeLeaveRequests";
 import { toast } from "react-toastify";
 import { se } from "date-fns/locale";
 import { useWebSocket } from "./websockets/WebSocketProvider.jsx";
+import { set } from "date-fns";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -19,13 +20,14 @@ const AdminPanel = ({ employeeId }) => {
   // const [adminLeaveRequests, setAdminLeaveRequests] = useState([]);
   const [resultMsg, setResultMsg] = useState(null);
   const [revokeRequests, setRevokeRequests] = useState([]);
-  
+
   const { user } = useAuth();
   const permissions = user?.permissions || [];
   const navigate = useNavigate();
   const { subscribe } = useWebSocket();
   const leaveApprovalRef = useRef();
   const refreshCooldown = useRef(false);
+  const [leaveTypes, setLeaveTypes] = useState([]);
 
   // const user = localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : {};
   // const isManager = user?.role?.toLowerCase() === "manager";
@@ -59,6 +61,22 @@ const AdminPanel = ({ employeeId }) => {
         // setAdminLeaveRequests(arr.map(toLeaveRequest));
       })
       .catch((err) => console.error("Failed to fetch leave requests:", err));
+  }, []);
+
+  useEffect(() => {
+    axios
+      .get(`${BASE_URL}/api/leave/get-all-leave-types`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      })
+      .then((res) => {
+        // const arr = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        setLeaveTypes(res.data?.regular || []);
+        console.log("Fetched Leave Types:", res.data?.regular || []);
+        // setAdminLeaveRequests(arr.map(toLeaveRequest));
+      })
+      .catch((err) => console.error("Failed to fetch leave types:", err));
   }, []);
 
   useEffect(() => {
@@ -240,9 +258,10 @@ const AdminPanel = ({ employeeId }) => {
       </div> */}
 
       {/* Comp-Off Balance Requests Section */}
-      {permissions.includes("VIEW_COMPOFF_BY_EMPLOYEE") && (
-        <CompOffBalanceRequests managerId={employeeId} />
-      )}
+      {permissions.includes("VIEW_COMPOFF_BY_EMPLOYEE") &&
+        leaveTypes.some((lt) => lt.leaveTypeId === "L-COMPOFF") && (
+          <CompOffBalanceRequests managerId={employeeId} />
+        )}
       {/* <CompOffBalanceRequests managerId={employeeId} /> */}
 
       {revokeRequests.length > 0 && (
@@ -253,12 +272,12 @@ const AdminPanel = ({ employeeId }) => {
       )}
 
       {/* Search and Filter Section */}
-      {permissions.includes("VIEW_LEAVE_REQUEST_BY_EMPLOYEE") &&
+      {permissions.includes("VIEW_LEAVE_REQUEST_BY_EMPLOYEE") && (
         <HandleLeaveRequestAndApprovals
           employeeId={employeeId}
           ref={leaveApprovalRef}
         />
-      }
+      )}
 
       {/* Modals */}
       {/* <AddEmployeeModal

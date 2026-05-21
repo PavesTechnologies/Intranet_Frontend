@@ -497,7 +497,14 @@ const TimesheetGroup = ({
             <ul className="list-disc list-inside text-gray-200 ml-4">
                            {" "}
               {rejected.map((a) => (
-                <li key={a.approverName}>{a.approverName}</li>
+                <li key={a.approverName}>
+                  <span>{a.approverName}</span>
+                  {a.comments && a.comments.trim() !== "" && (
+                    <div className="text-[11px] text-gray-300 italic mt-0.5 ml-1">
+                      Reason : {a.comments}
+                    </div>
+                  )}
+                </li>
               ))}
                          {" "}
             </ul>

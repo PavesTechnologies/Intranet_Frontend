@@ -8,7 +8,7 @@ export default function UserManagement() {
   const { user } = useAuth();
 
   const isAdmin =
-    user?.roles?.includes("Admin") || user?.roles?.includes("Super Admin");
+    user?.roles?.includes("Admin") || user?.roles?.includes("Super_Admin");
 
   if (!isAdmin) {
     return (

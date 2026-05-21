@@ -219,7 +219,7 @@ const ManagerDashboard = ({ data, loading, setStatusFilter, handleScroll }) => {
         )}
       </div>
       {/* Right: Pending Approvals */}
-      <div className="bg-white shadow-lg items-center rounded-2xl p-8 flex-1">
+      {/* <div className="bg-white shadow-lg items-center rounded-2xl p-8 flex-1">
         <div className="flex justify-between items-center mb-4 ">
           <h2 className="text-lg font-semibold text-gray-700 ">
             Pending Approvals
@@ -239,7 +239,7 @@ const ManagerDashboard = ({ data, loading, setStatusFilter, handleScroll }) => {
             {stats.pending} Weeks
           </p>
         </span>
-      </div>
+      </div> */}
     </div>
   );
 };

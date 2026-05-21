@@ -67,6 +67,22 @@ export const fetchResourcesByDemandId = async (demandId) => {
   }
 };
 
+export const deleteResourceAllocation = async (allocationId) => {
+  try {
+    const response = await axios.delete(
+      `${BASE_URL}/api/allocation/${allocationId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const projectResourceDetails = async (projectId) => {
   try {
     const response = await axios.get(

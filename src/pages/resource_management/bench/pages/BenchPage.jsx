@@ -24,7 +24,7 @@ import {
   toCsv,
   updateCategory,
 } from "../models/benchModel";
-import { getBenchResources, getPoolResources, getBenchKPIs } from "../services/benchService";
+import { getBenchResources, getPoolResources, getBenchKPIs, updateStatusResource } from "../services/benchService";
 import { notify } from "../../utils/notify";
 
 const getStoredState = () => {
@@ -159,7 +159,10 @@ const BenchPage = () => {
       // Unpack and tag resources
       const benchList = (benchRes?.data || (Array.isArray(benchRes) ? benchRes : [])).map(r => ({ ...r, _source: 'bench' }));
       const poolList = (poolRes?.data || (Array.isArray(poolRes) ? poolRes : [])).map(r => ({ ...r, _source: 'pool' }));
-      setResources(sanitizeResources([...benchList, ...poolList]));
+      
+      // Prioritize pool resources so that if a resource is returned in both endpoints,
+      // it retains the '_source: pool' tag and correctly appears in the Internal Pool tab.
+      setResources(sanitizeResources([...poolList, ...benchList]));
 
       // Set live KPI data
       setKpis(kpiRes?.data || kpiRes || null);
@@ -286,29 +289,37 @@ const BenchPage = () => {
     setMoveToPoolTargets(Array.isArray(targets) ? targets : [targets]);
   };
 
-  const applyMoveToPool = ({ poolType, reason }) => {
+  const applyMoveToPool = async ({ poolType, reason }) => {
     const ids = moveToPoolTargets.map((item) => item.id);
-    const poolCategory = poolType === "Training" ? "Training" : "Shadow";
+    
+    const getSubState = (type) => {
+      if (type === "CoE") return "COE";
+      if (type === "Training") return "TRAINING_POOL";
+      if (type === "R&D") return "RND";
+      return type.toUpperCase().replace(/ /g, "_");
+    };
 
-    setResources((prev) =>
-      prev.map((item) =>
-        ids.includes(item.id)
-          ? {
-            ...item,
-            poolType,
-            category: poolCategory,
-            transitionReason: reason,
-            lastProject: {
-              ...item.lastProject,
-              reason,
-            },
-          }
-          : item,
-      ),
-    );
+    try {
+      setLoading(true);
+      await Promise.all(
+        moveToPoolTargets.map((item) =>
+          updateStatusResource({
+            resourceId: item.id,
+            newSubState: getSubState(poolType),
+            reason,
+          })
+        )
+      );
 
-    setSelectedRows((prev) => prev.filter((id) => !ids.includes(id)));
-    setMoveToPoolTargets([]);
+      notify.success("Resources successfully moved to internal pool");
+      fetchData(true);
+    } catch (error) {
+      console.error("Failed to move resources", error);
+      notify.error("Failed to move resources to internal pool");
+    } finally {
+      setSelectedRows((prev) => prev.filter((id) => !ids.includes(id)));
+      setMoveToPoolTargets([]);
+    }
   };
 
   const handleExport = () => {
