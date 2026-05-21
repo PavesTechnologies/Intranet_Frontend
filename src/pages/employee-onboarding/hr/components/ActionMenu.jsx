@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { AddIcon, EditIcon, ViewIcon } from "../../../../components/icons/ActionIcons";
 
 export default function ActionMenu({
   onView,
@@ -7,54 +7,40 @@ export default function ActionMenu({
   showCreate,
   showEdit,
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
   return (
-    <div className="relative inline-block" ref={ref}>
+    <div className="flex items-center justify-center gap-2">
       <button
-        onClick={() => setOpen((p) => !p)}
-        className="px-2 py-1 text-xl font-bold text-gray-600 hover:text-gray-900"
+        type="button"
+        onClick={onView}
+        className="rounded-md bg-gray-100 p-1.5 text-gray-700 transition hover:bg-gray-200 hover:text-gray-900"
+        aria-label="View profile"
+        title="View profile"
       >
-        &#8942;
+        <ViewIcon className="h-4 w-4" />
       </button>
 
-      {open && (
-        <div className="absolute right-full mr-2 top-0 w-32 bg-white border rounded-md shadow-lg z-50">
-          <button
-            onClick={() => {
-              onView();
-              setOpen(false);
-            }}
-            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-          >
-            View
-          </button>
+      {showCreate && (
+        <button
+          type="button"
+          onClick={onCreate}
+          className="rounded-md bg-blue-50 p-1.5 text-blue-700 transition hover:bg-blue-100 hover:text-blue-800"
+          aria-label="Create employee"
+          title="Create employee"
+        >
+          <AddIcon className="h-4 w-4" />
+        </button>
+      )}
 
-          {showCreate && (
-            <button
-              onClick={() => {
-                onCreate();
-                setOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-            >
-              Create
-            </button>
-          )}
-
-          {showEdit && (
-            <button
-              onClick={() => {
-                onEdit();
-                setOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-            >
-              Edit
-            </button>
-          )}
-        </div>
+      {showEdit && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="rounded-md bg-amber-50 p-1.5 text-amber-700 transition hover:bg-amber-100 hover:text-amber-800"
+          aria-label="Edit joining details"
+          title="Edit joining details"
+        >
+          <EditIcon className="h-4 w-4" />
+        </button>
       )}
     </div>
   );

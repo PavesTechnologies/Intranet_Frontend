@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast.jsx";
+import StatusBadge from "../../../components/status/statusbadge";
+import {
+  formatOfferStatusLabel,
+  getNormalizedStatus,
+  OFFER_STATUS,
+} from "../components/offerStatus";
 import {
   ArrowLeft,
   User,
@@ -13,7 +19,107 @@ import {
   Building,
   Wallet,
 } from "lucide-react";
-import { set } from "date-fns";
+
+const INITIAL_SECTION_STATUS = {
+  overview: false,
+  education: false,
+  experience: false,
+  "identity documents": false,
+};
+
+const FINALIZED_PROFILE_STATUSES = new Set([
+  OFFER_STATUS.VERIFIED,
+  OFFER_STATUS.JOINING,
+  OFFER_STATUS.JOINING_PENDING,
+  OFFER_STATUS.RESCHEDULED,
+  OFFER_STATUS.COMPLETED,
+]);
+
+const isBackendVerified = (status) =>
+  getNormalizedStatus(status) === OFFER_STATUS.VERIFIED;
+
+const isBackendRejected = (status) =>
+  getNormalizedStatus(status) === OFFER_STATUS.REJECTED;
+
+const isDocMarkedVerified = (statusValue) => {
+  if (typeof statusValue === "object") {
+    return statusValue.status === true;
+  }
+
+  return statusValue === true;
+};
+
+const areAllItemsVerified = (items = []) => {
+  const presentItems = items.filter(Boolean);
+
+  return (
+    presentItems.length > 0 &&
+    presentItems.every((item) => isBackendVerified(item?.verification_status))
+  );
+};
+
+const collectExperienceDocuments = (experience = []) =>
+  experience.flatMap((exp = {}, expIndex) =>
+    (exp.documents || []).map((doc, docIndex) => ({
+      ...doc,
+      experience_uuid: doc.experience_uuid || exp.experience_uuid,
+      _experience_doc_index: `${exp.experience_uuid || expIndex}-${docIndex}`,
+    })),
+  );
+
+const hasSectionVerificationFlag = (profileData, keys = []) =>
+  keys.some((key) => isBackendVerified(profileData?.[key]));
+
+const getExperienceYears = (profileData = {}) => {
+  const possibleValues = [
+    profileData?.personal_details?.total_experience,
+    profileData?.offer?.total_experience,
+    profileData?.total_experience,
+  ];
+
+  for (const value of possibleValues) {
+    if (value === undefined || value === null || value === "") continue;
+
+    const numericValue = Number(value);
+
+    if (!Number.isNaN(numericValue)) {
+      return numericValue;
+    }
+  }
+
+  return null;
+};
+
+const isFresherCandidate = (profileData = {}) => {
+  const experienceRecords = profileData?.experience || [];
+  const totalExperience = getExperienceYears(profileData);
+
+  return experienceRecords.length === 0 && totalExperience === 0;
+};
+
+const getDocKey = (doc, index) =>
+  doc.document_uuid ||
+  doc.education_document_uuid ||
+  doc.identity_document_uuid ||
+  doc.file_path ||
+  [
+    doc.experience_uuid,
+    doc.identity_type,
+    doc.document_name,
+    doc.doc_type,
+    doc._experience_doc_index,
+    index,
+  ]
+    .filter(Boolean)
+    .join("::") ||
+  `${index}`;
+
+const getDocumentIdentifier = (doc) =>
+  doc.document_uuid ||
+  doc.education_document_uuid ||
+  doc.identity_document_uuid ||
+  doc.experience_uuid ||
+  null;
 
 export default function HrProfileView() {
   const { user_uuid } = useParams();
@@ -21,7 +127,7 @@ export default function HrProfileView() {
 
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
-  const tabs = ["overview", "education", "experience", "identity documents"];
+  const tabs = Object.keys(INITIAL_SECTION_STATUS);
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -29,12 +135,7 @@ export default function HrProfileView() {
   const [activeTab, setActiveTab] = useState("overview");
   const [loadingDoc, setLoadingDoc] = useState(null);
 
-  const [sectionStatus, setSectionStatus] = useState({
-    overview: false,
-    education: false,
-    experience: false,
-    "identity documents": false,
-  });
+  const [sectionStatus, setSectionStatus] = useState(INITIAL_SECTION_STATUS);
 
   const [docStatus, setDocStatus] = useState({});
   const [showConfirm, setShowConfirm] = useState(false);
@@ -42,10 +143,8 @@ export default function HrProfileView() {
   const [finalLoading, setFinalLoading] = useState(false);
   const [rejectModal, setRejectModal] = useState(false);
   const [rejectDocKey, setRejectDocKey] = useState(null);
+  const [rejectDocumentId, setRejectDocumentId] = useState(null);
   const [rejectRemarks, setRejectRemarks] = useState("");
-  const [loadedFromStorage, setLoadedFromStorage] = useState(false);
-
-  const getDocKey = (d, i) => d.document_uuid || d.file_path || `${i}`;
   const getDocType = (tab) => {
     switch (tab) {
       case "overview":
@@ -55,6 +154,77 @@ export default function HrProfileView() {
       default:
         return tab;
     }
+  };
+
+  const buildDocStatusMap = (profileData, forceVerified = false) => {
+    const nextDocStatus = {};
+    const allDocuments = [
+      ...(profileData?.education_documents || []),
+      ...(profileData?.identity_documents || []),
+      ...collectExperienceDocuments(profileData?.experience || []),
+    ];
+
+    allDocuments.forEach((doc, index) => {
+      const key = getDocKey(doc, index);
+      const remarks =
+        doc?.remarks || doc?.verification_remarks || doc?.rejection_remarks;
+
+      if (forceVerified || isBackendVerified(doc?.verification_status)) {
+        nextDocStatus[key] = true;
+        return;
+      }
+
+      if (isBackendRejected(doc?.verification_status)) {
+        nextDocStatus[key] = {
+          status: false,
+          remarks: remarks || "",
+        };
+        return;
+      }
+
+      nextDocStatus[key] = false;
+    });
+
+    return nextDocStatus;
+  };
+
+  const buildSectionStatus = (profileData, forceVerified = false) => {
+    if (forceVerified) {
+      return tabs.reduce((acc, tab) => ({ ...acc, [tab]: true }), {});
+    }
+
+    const overviewItems = [
+      profileData?.personal_details,
+      profileData?.bank_details,
+      profileData?.pf_details,
+      ...(profileData?.addresses || []),
+    ].filter(Boolean);
+    const educationDocs = profileData?.education_documents || [];
+    const experienceRecords = profileData?.experience || [];
+    const experienceDocs = collectExperienceDocuments(experienceRecords);
+    const identityDocs = profileData?.identity_documents || [];
+
+    return {
+      overview:
+        hasSectionVerificationFlag(profileData, ["overview_verification_status"]) ||
+        (overviewItems.length > 0 &&
+          overviewItems.every((item) =>
+            isBackendVerified(item?.verification_status),
+          )),
+      education:
+        hasSectionVerificationFlag(profileData, ["education_verification_status"]) ||
+        areAllItemsVerified(educationDocs),
+      experience:
+        hasSectionVerificationFlag(profileData, ["experience_verification_status"]) ||
+        (experienceDocs.length > 0
+          ? areAllItemsVerified(experienceDocs)
+          : areAllItemsVerified(experienceRecords)),
+      "identity documents":
+        hasSectionVerificationFlag(profileData, [
+          "identity_documents_verification_status",
+          "identity_verification_status",
+        ]) || areAllItemsVerified(identityDocs),
+    };
   };
 
   const verifyDocumentAPI = async ({
@@ -93,7 +263,7 @@ export default function HrProfileView() {
   const handleApproveDocument = async (d, i) => {
     const key = getDocKey(d, i);
     const success = await verifyDocumentAPI({
-      document_uuid: d.document_uuid || d.experience_uuid || null,
+      document_uuid: getDocumentIdentifier(d),
       doc_type: getDocType(activeTab),
       status: "Verified",
     });
@@ -111,84 +281,20 @@ export default function HrProfileView() {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
-        setProfile(res.data);
-const status = res.data.offer?.offer_status;
-setVerificationStatus(status);
+        const profileData = res.data || {};
+        const currentStatus =
+          profileData.offer?.offer_status || profileData.offer?.status || "";
+        const normalizedStatus = getNormalizedStatus(currentStatus);
+        const isVerificationFinalized =
+          FINALIZED_PROFILE_STATUSES.has(normalizedStatus);
 
-// Initialize section status
-const newSectionStatus = {
-  overview: false,
-  education: false,
-  experience: false,
-  "identity documents": false,
-};
-
-// Initialize document status
-const newDocStatus = {};
-
-// Education documents
-(res.data.education_documents || []).forEach((doc, i) => {
-  const key = getDocKey(doc, i);
-  const isVerified = doc.verification_status === "Verified";
-  newDocStatus[key] = isVerified;
-
-  if (isVerified) {
-    newSectionStatus.education = true;
-  }
-});
-
-// Identity documents
-(res.data.identity_documents || []).forEach((doc, i) => {
-  const key = getDocKey(doc, i);
-  const isVerified = doc.verification_status === "Verified";
-  newDocStatus[key] = isVerified;
-
-  if (isVerified) {
-    newSectionStatus["identity documents"] = true;
-  }
-});
-
-// Experience documents
-(res.data.experience || []).forEach((exp) => {
-  (exp.documents || []).forEach((doc, i) => {
-    const key = getDocKey(doc, i);
-    const isVerified = doc.verification_status === "Verified";
-    newDocStatus[key] = isVerified;
-
-    if (isVerified) {
-      newSectionStatus.experience = true;
-    }
-  });
-});
-
-// Overview section
-if (
-  res.data.personal_details?.verification_status === "Verified" ||
-  res.data.bank_details?.verification_status === "Verified" ||
-  res.data.pf_details?.verification_status === "Verified" ||
-  (res.data.addresses || []).some(
-    (a) => a.verification_status === "Verified"
-  )
-) {
-  newSectionStatus.overview = true;
-}
-
-// If profile is fully verified
-if (status === "Verified") {
-  Object.keys(newSectionStatus).forEach((key) => {
-    newSectionStatus[key] = true;
-  });
-
-  Object.keys(newDocStatus).forEach((key) => {
-    newDocStatus[key] = true;
-  });
-}
-
-// Set states
-setSectionStatus(newSectionStatus);
-setDocStatus(newDocStatus);
-setActiveTab("overview");
-setLoadedFromStorage(true);
+        setProfile(profileData);
+        setVerificationStatus(currentStatus);
+        setSectionStatus(
+          buildSectionStatus(profileData, isVerificationFinalized),
+        );
+        setDocStatus(buildDocStatusMap(profileData, isVerificationFinalized));
+        setActiveTab("overview");
       } catch {
         showStatusToast("Failed to load profile", "error");
       } finally {
@@ -225,7 +331,7 @@ setLoadedFromStorage(true);
     }
 
     const success = await verifyDocumentAPI({
-      document_uuid: rejectDocKey,
+      document_uuid: rejectDocumentId,
       doc_type: getDocType(activeTab),
       status: "Rejected",
       remarks: rejectRemarks,
@@ -245,6 +351,7 @@ setLoadedFromStorage(true);
     setRejectModal(false);
     setRejectRemarks("");
     setRejectDocKey(null);
+    setRejectDocumentId(null);
   };
 
   /* verify section */
@@ -254,7 +361,7 @@ setLoadedFromStorage(true);
       activeTab === "education"
         ? profile.education_documents || []
         : activeTab === "experience"
-          ? profile.experience?.flatMap((e) => e.documents || []) || []
+          ? collectExperienceDocuments(profile.experience || [])
           : activeTab === "identity documents"
             ? profile.identity_documents || []
             : [];
@@ -278,8 +385,25 @@ setLoadedFromStorage(true);
 
     if (activeTab === "overview") {
       const types = ["personal", "address", "bank", "pf"];
-      for (const type of types) {
-        await verifyDocumentAPI({ doc_type: type, status: "Verified" });
+      const results = await Promise.all(
+        types.map((type) =>
+          verifyDocumentAPI({ doc_type: type, status: "Verified" }),
+        ),
+      );
+
+      if (results.some((result) => !result)) {
+        return;
+      }
+    }
+
+    if (activeTab === "experience" && currentDocs.length === 0) {
+      const persisted = await verifyDocumentAPI({
+        doc_type: "experience",
+        status: "Verified",
+      });
+
+      if (!persisted) {
+        return;
       }
     }
 
@@ -290,14 +414,7 @@ setLoadedFromStorage(true);
   /* final verify */
 
   const allSectionsVerified = Object.values(sectionStatus).every(Boolean);
-  const allDocsVerified =
-    Object.values(docStatus).length > 0 &&
-    Object.values(docStatus).every((d) => {
-      if (typeof d === "object") {
-        return d.status === true;
-      }
-      return d === true;
-    });
+  const allDocsVerified = Object.values(docStatus).every(isDocMarkedVerified);
 
   const finalVerifyProfile = async () => {
     if (!allSectionsVerified || !allDocsVerified) {
@@ -314,19 +431,16 @@ setLoadedFromStorage(true);
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
 
-      setVerificationStatus("Verified");
-      setSectionStatus({
-        overview: true,
-        education: true,
-        experience: true,
-        "identity documents": true,
-      });
+      setVerificationStatus(OFFER_STATUS.VERIFIED);
+      setSectionStatus(
+        tabs.reduce((acc, tab) => ({ ...acc, [tab]: true }), {}),
+      );
       const allDocs = {};
 
       [
         ...(profile.education_documents || []),
         ...(profile.identity_documents || []),
-        ...(profile.experience?.flatMap((e) => e.documents || []) || []),
+        ...collectExperienceDocuments(profile.experience || []),
       ].forEach((d, i) => {
         allDocs[getDocKey(d, i)] = true;
       });
@@ -361,6 +475,16 @@ setLoadedFromStorage(true);
   const groupedEducation = groupEducation(education_documents);
   const groupedExperience = groupExperience(experience);
   const groupedIdentity = groupIdentity(identity_documents);
+  const normalizedVerificationStatus = getNormalizedStatus(verificationStatus);
+  const isVerificationFinalized =
+    FINALIZED_PROFILE_STATUSES.has(normalizedVerificationStatus);
+  const verifiedSectionCount = Object.values(sectionStatus).filter(Boolean).length;
+  const progressPercentage = Math.round(
+    (verifiedSectionCount / tabs.length) * 100,
+  );
+  const isFresher = isFresherCandidate(profile);
+  const experienceGroups = Object.values(groupedExperience);
+  const hasExperienceRecords = experienceGroups.length > 0;
 
   return (
     <div className="min-h-screen bg-[#f4f6fb]">
@@ -380,19 +504,14 @@ setLoadedFromStorage(true);
                   Verification Progress
                 </h2>
                 <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">
-                  {Math.round(
-                    (Object.values(sectionStatus).filter(Boolean).length /
-                      tabs.length) *
-                      100,
-                  )}
-                  % Complete
+                  {progressPercentage}% Complete
                 </span>
               </div>
               <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-500 ease-out"
                   style={{
-                    width: `${(Object.values(sectionStatus).filter(Boolean).length / tabs.length) * 100}%`,
+                    width: `${progressPercentage}%`,
                   }}
                 />
               </div>
@@ -627,51 +746,59 @@ setLoadedFromStorage(true);
                 onApprove={(d, idx) => handleApproveDocument(d, idx)}
                 onView={openFileInNewTab}
                 setRejectDocKey={setRejectDocKey}
+                setRejectDocumentId={setRejectDocumentId}
                 setRejectModal={setRejectModal}
-                verificationStatus={verificationStatus}
+                isVerificationFinalized={isVerificationFinalized}
                 loadingDoc={loadingDoc}
               />
             </Section>
           ))}
 
         {activeTab === "experience" &&
-          Object.values(groupedExperience).map((exp, i) => (
-            <Section
-              key={i}
-              title={exp.title}
-              verified={sectionStatus.experience}
-            >
-              <div className="text-sm text-gray-600 mb-3">
-                <p>
-                  <b>Company:</b> {exp.company_name}
-                </p>
-                <p>
-                  <b>Role:</b> {exp.role_title}
-                </p>
-                <p>
-                  <b>Employment:</b> {exp.employment_type}
-                </p>
-                <p>
-                  <b>Start:</b> {exp.start_date}
-                </p>
-                <p>
-                  <b>End:</b> {exp.end_date || "Current"}
-                </p>
-                <p>
-                  <b>Notice period day:</b> {exp.notice_period_days}days
-                </p>
-              </div>
+          (hasExperienceRecords ? (
+            experienceGroups.map((exp, i) => (
+              <Section
+                key={i}
+                title={exp.title}
+                verified={sectionStatus.experience}
+              >
+                <div className="text-sm text-gray-600 mb-3">
+                  <p>
+                    <b>Company:</b> {exp.company_name}
+                  </p>
+                  <p>
+                    <b>Role:</b> {exp.role_title}
+                  </p>
+                  <p>
+                    <b>Employment:</b> {exp.employment_type}
+                  </p>
+                  <p>
+                    <b>Start:</b> {exp.start_date}
+                  </p>
+                  <p>
+                    <b>End:</b> {exp.end_date || "Current"}
+                  </p>
+                  <p>
+                    <b>Notice period day:</b> {exp.notice_period_days}days
+                  </p>
+                </div>
 
-              <DocCard
-                documents={exp.documents}
-                docStatus={docStatus}
-                onApprove={(d, idx) => handleApproveDocument(d, idx)}
-                onView={openFileInNewTab}
-                setRejectDocKey={setRejectDocKey}
-                setRejectModal={setRejectModal}
-                verificationStatus={verificationStatus}
-                loadingDoc={loadingDoc}
-              />
+                <DocCard
+                  documents={exp.documents}
+                  docStatus={docStatus}
+                  onApprove={(d, idx) => handleApproveDocument(d, idx)}
+                  onView={openFileInNewTab}
+                  setRejectDocKey={setRejectDocKey}
+                  setRejectDocumentId={setRejectDocumentId}
+                  setRejectModal={setRejectModal}
+                  isVerificationFinalized={isVerificationFinalized}
+                  loadingDoc={loadingDoc}
+                />
+              </Section>
+            ))
+          ) : (
+            <Section title="Experience" verified={sectionStatus.experience}>
+              <EmptyExperienceState isFresher={isFresher} />
             </Section>
           ))}
 
@@ -688,8 +815,9 @@ setLoadedFromStorage(true);
                 onApprove={(d, idx) => handleApproveDocument(d, idx)}
                 onView={openFileInNewTab}
                 setRejectDocKey={setRejectDocKey}
+                setRejectDocumentId={setRejectDocumentId}
                 setRejectModal={setRejectModal}
-                verificationStatus={verificationStatus}
+                isVerificationFinalized={isVerificationFinalized}
                 loadingDoc={loadingDoc}
               />
             </Section>
@@ -708,7 +836,7 @@ setLoadedFromStorage(true);
 
             <div className="flex items-center gap-4">
               {!sectionStatus[activeTab] &&
-                verificationStatus !== "Verified" && (
+                !isVerificationFinalized && (
                   <button
                     onClick={verifySection}
                     className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all transform active:scale-95"
@@ -732,7 +860,7 @@ setLoadedFromStorage(true);
               ) : (
                 <button
                   onClick={() => setShowConfirm(true)}
-                  disabled={verificationStatus === "Verified"}
+                  disabled={isVerificationFinalized}
                   className="px-10 py-3 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-800 shadow-lg shadow-gray-300 disabled:opacity-30 transition-all transform active:scale-95"
                 >
                   Final Verification
@@ -846,50 +974,49 @@ setLoadedFromStorage(true);
 
 /* components */
 
-const Header = ({ offer, verificationStatus, navigate }) => (
-  <header className="bg-white border-b sticky top-0 z-30">
-    <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
-          aria-label="Go back"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center text-lg font-bold shadow-md">
-          {offer.first_name?.[0]}
-          {offer.last_name?.[0]}
+const Header = ({ offer, verificationStatus, navigate }) => {
+  const statusLabel =
+    formatOfferStatusLabel(verificationStatus) || "Pending Verification";
+
+  return (
+    <header className="bg-white border-b sticky top-0 z-30">
+      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
+            aria-label="Go back"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center text-lg font-bold shadow-md">
+            {offer.first_name?.[0]}
+            {offer.last_name?.[0]}
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-gray-900 leading-tight">
+              {offer.first_name} {offer.last_name}
+            </h1>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span>{offer.designation}</span>
+            </div>
+          </div>
         </div>
-        <div>
-          <h1 className="text-lg font-bold text-gray-900 leading-tight">
-            {offer.first_name} {offer.last_name}
-          </h1>
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>{offer.designation}</span>
+
+        <div className="flex items-center gap-3">
+          <div className="text-right hidden sm:block">
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+              Status
+            </p>
+            <div className="mt-0.5">
+              <StatusBadge label={statusLabel} size="sm" />
+            </div>
           </div>
         </div>
       </div>
-
-      <div className="flex items-center gap-3">
-        <div className="text-right hidden sm:block">
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
-            Status
-          </p>
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold mt-0.5 ${
-              verificationStatus === "Verified"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-amber-100 text-amber-700"
-            }`}
-          >
-            {verificationStatus || "Pending Verification"}
-          </span>
-        </div>
-      </div>
-    </div>
-  </header>
-);
+    </header>
+  );
+};
 
 const DocCard = ({
   documents = [],
@@ -897,13 +1024,14 @@ const DocCard = ({
   docStatus,
   onApprove,
   setRejectDocKey,
+  setRejectDocumentId,
   setRejectModal,
-  verificationStatus,
+  isVerificationFinalized,
   loadingDoc,
 }) => (
   <div className="grid gap-4">
     {documents.map((d, i) => {
-      const key = d.document_uuid || d.file_path || `${i}`;
+      const key = getDocKey(d, i);
       const statusData = docStatus[key];
       const isVerified =
         typeof statusData === "object"
@@ -971,7 +1099,7 @@ const DocCard = ({
             </button>
 
             <div className="flex items-center gap-2 border-l border-gray-100 pl-4 ml-2">
-              {verificationStatus === "Verified" || isVerified ? (
+              {isVerificationFinalized || isVerified ? (
                 <div className="flex items-center gap-1.5 text-emerald-600">
                   <Check size={18} strokeWidth={3} />
                   <span className="text-[11px] font-bold uppercase tracking-wider">
@@ -990,6 +1118,7 @@ const DocCard = ({
                   <button
                     onClick={() => {
                       setRejectDocKey(key);
+                      setRejectDocumentId(getDocumentIdentifier(d));
                       setRejectModal(true);
                     }}
                     className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
@@ -1004,6 +1133,25 @@ const DocCard = ({
         </div>
       );
     })}
+  </div>
+);
+
+const EmptyExperienceState = ({ isFresher }) => (
+  <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 px-6 py-8 text-center">
+    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+      <User size={20} />
+    </div>
+    <h4 className="text-base font-bold text-gray-900">No experience records</h4>
+    <p className="mt-2 text-sm text-gray-600">
+      {isFresher
+        ? "Candidate is a Fresher with no prior experience."
+        : "No prior experience records were submitted for this candidate."}
+    </p>
+    <p className="mt-1 text-sm text-gray-500">
+      {isFresher
+        ? "HR can still verify this section after confirming the candidate has no previous employment."
+        : "You can still verify this section if no experience documents are required for this profile."}
+    </p>
   </div>
 );
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Table from "../../../components/Table/table";
 import Pagination from "../../../components/Pagination/pagination";
@@ -8,6 +8,7 @@ import Button from "../../../components/Button/Button";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import StatusBadge from "../../../components/status/statusbadge";
+import { CheckIcon, ViewIcon } from "../../../components/icons/ActionIcons";
 import {
   formatOfferStatusLabel,
   getNormalizedStatus,
@@ -16,55 +17,29 @@ import {
 
 const PAGE_SIZE = 5;
 
-function ActionMenu({ onView, onVerify, showVerify }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
+function ActionButtons({ onView, onVerify, showVerify }) {
   return (
-    <div className="relative inline-block" ref={ref}>
+    <div className="flex items-center justify-center gap-2">
       <button
-        onClick={() => setOpen((p) => !p)}
-        className="px-2 py-1 text-xl font-bold text-gray-600 hover:text-gray-900"
+        type="button"
+        onClick={onView}
+        className="rounded-md bg-gray-100 p-1.5 text-gray-700 transition hover:bg-gray-200 hover:text-gray-900"
+        aria-label="View offer"
+        title="View offer"
       >
-        &#8942;
+        <ViewIcon className="h-4 w-4" />
       </button>
 
-      {open && (
-        <div className="absolute right-full mr-2 top-0 w-32 bg-white border rounded-md shadow-lg z-50">
-          <button
-            onClick={() => {
-              onView();
-              setOpen(false);
-            }}
-            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-          >
-            View
-          </button>
-
-          {showVerify && (
-            <button
-              onClick={() => {
-                onVerify();
-                setOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-            >
-              Verify
-            </button>
-          )}
-        </div>
+      {showVerify && (
+        <button
+          type="button"
+          onClick={onVerify}
+          className="rounded-md bg-emerald-50 p-1.5 text-emerald-700 transition hover:bg-emerald-100 hover:text-emerald-800"
+          aria-label="Verify offer"
+          title="Verify offer"
+        >
+          <CheckIcon className="h-4 w-4" />
+        </button>
       )}
     </div>
   );
@@ -200,7 +175,7 @@ export default function OffersTable({
           "—"
         ),
         action: (
-          <ActionMenu
+          <ActionButtons
             onView={() =>
               navigate(`/employee-onboarding/offer/${offer.user_uuid}`)
             }
