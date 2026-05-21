@@ -73,7 +73,7 @@ const PriorityDistribution = ({ tasks, stories, bugs }) => {
           Breakdown by priority
         </Text>
 
-        <div className="w-full flex-grow min-h-0">
+        <div className="w-full" style={{ height: 300 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}

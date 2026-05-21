@@ -11,6 +11,9 @@ export default function JobForm({
   isEditMode,
 }) {
   const employeeTypes = ["Full-Time", "Intern", "Contract"];
+  const employeeTypeOptions = form.employeeType
+    ? Array.from(new Set([form.employeeType, ...employeeTypes]))
+    : employeeTypes;
   const workModes = ["Remote", "Hybrid", "Office"];
   const experienceOptions = ["0", "0.5", "1"];
   const employeeStatus = [
@@ -58,7 +61,7 @@ export default function JobForm({
         name="employeeType"
         value={form.employeeType || ""}
         onChange={handleChange}
-        options={employeeTypes}
+        options={employeeTypeOptions}
         disabled={isEditMode}
       />
 

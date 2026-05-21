@@ -65,7 +65,8 @@ const Summary = ({ projectId, projectName }) => {
         .get(`${base}/api/testing/bugs/projects/${projectId}/summaries`, {
           headers,
         })
-        .then((res) => ({ bugs: res.data || [] })),
+        .then((res) => ({ bugs: res.data || [] }))
+        .catch(() => ({ bugs: [] })),
       axios
         .get(`${base}/api/projects/${projectId}/statuses`, { headers })
         .then((res) => ({ statuses: res.data || [] })),

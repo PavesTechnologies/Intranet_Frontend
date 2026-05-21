@@ -548,7 +548,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                         <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Skip Validation</span>
                         <span className="text-[9px] font-medium text-slate-400">
                             {formData.skipValidation
-                                ? "Validation bypassed — enter any allocation percentage"
+                                ? "Validation bypassed. Use at your own risk."
                                 : "Enable to override capacity limits and enter a custom percentage"}
                         </span>
                     </div>

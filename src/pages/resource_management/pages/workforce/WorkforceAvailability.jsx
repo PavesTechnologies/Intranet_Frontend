@@ -181,14 +181,9 @@ export default function WorkforceAvailability() {
 
               <div className="pt-1 px-2 pb-2 sm:pt-1.5 sm:px-3 sm:pb-3 min-h-[600px] relative">
                 {loading && (
-                  <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-[1px] transition-all duration-300">
-                    {/* <div className="flex flex-col items-center gap-2 p-6 rounded-xl bg-card shadow-xl border animate-in fade-in zoom-in duration-300"> */}
-                      <LoadingSpinner text="Fetching Resources" />
-                      {/* <div className="flex flex-col items-center -mt-2">
-                        <p className="text-sm font-bold text-slate-900">Fetching Resources</p>
-                        <p className="text-[11px] text-slate-500 font-medium text-center">Updating your view...</p>
-                      </div> */}
-                    {/* </div> */}
+                  // <div> className="absolute inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-[1px] transition-all duration-300"
+                  <div>
+                    <LoadingSpinner text="Fetching Resources" />
                   </div>
                 )}
                 <TabsContent value="calendar" className="mt-0 outline-none">
@@ -200,6 +195,7 @@ export default function WorkforceAvailability() {
                       onSelectResource={null}
                       currentDate={currentDate}
                       onNavigate={setCurrentDate}
+                      kpiData={kpiData}
                     />
                   </div>
                 </TabsContent>
