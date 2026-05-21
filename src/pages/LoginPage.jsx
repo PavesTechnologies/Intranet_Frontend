@@ -296,7 +296,13 @@ export default function LoginPage() {
 
         // ✅ login stores both tokens in localStorage
         login(access_token, path === "/change-password");
-        navigate(path, { replace: true });
+        if (document.startViewTransition) {
+          document.startViewTransition(() => {
+            navigate(path, { replace: true });
+          });
+        } else {
+          navigate(path, { replace: true });
+        }
         window.history.replaceState({}, document.title, window.location.pathname);
 
       } catch (err) {
@@ -360,9 +366,13 @@ export default function LoginPage() {
       redirectPath === "/change-password"
     );
 
-    navigate(redirectPath, {
-      replace: true
-    });
+    if (document.startViewTransition) {
+      document.startViewTransition(() => {
+        navigate(redirectPath, { replace: true });
+      });
+    } else {
+      navigate(redirectPath, { replace: true });
+    }
 
   } catch (err) {
 
