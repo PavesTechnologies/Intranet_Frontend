@@ -212,7 +212,7 @@ export default function EmployeeCreateModal({
 
         try {
           const offerRes = await fetch(
-            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/`,
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/offer/${matchedUserUuid}`,
             {
               headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -221,14 +221,55 @@ export default function EmployeeCreateModal({
           );
 
           if (offerRes.ok) {
-            const offerData = await offerRes.json();
-            offerLetter = getArrayPayload(offerData).find(
-              (offer) => String(offer.user_uuid) === String(matchedUserUuid),
-            );
+            offerLetter = await offerRes.json();
+            // const offerData = await offerRes.json();
+            // offerLetter = getArrayPayload(offerData).find(
+            //   (offer) => String(offer.user_uuid) === String(matchedUserUuid),
+            // );
           }
         } catch (offerError) {
           console.error("Failed to fetch offer letter details", offerError);
         }
+
+        let personalDetails = null;
+
+try {
+  const personalListRes = await fetch(
+    `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/employee-details`,
+    {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    },
+  );
+
+  if (personalListRes.ok) {
+    const personalListData =
+      await personalListRes.json();
+
+    const personalRecords = Array.isArray(personalListData)
+      ? personalListData
+      : getArrayPayload(personalListData);
+
+    personalDetails = personalRecords.find(
+      (item) =>
+        String(item.user_uuid).trim() ===
+        String(matchedUserUuid).trim()
+    );
+
+    if (!personalDetails) {
+      console.warn(
+        "No personal details found for user:",
+        matchedUserUuid
+      );
+    }
+  }
+} catch (personalError) {
+  console.error(
+    "Failed to fetch personal details",
+    personalError
+  );
+}
 
         const reportingManagerValue =
           offerLetter?.reporting_manager || data.reporting_manager_uuid || "";
@@ -241,7 +282,7 @@ export default function EmployeeCreateModal({
           empFirstName: data.first_name,
           empMiddleName: data.middle_name,
           empLastName: data.last_name,
-          empDob: data.date_of_birth,
+          empDob: personalDetails?.date_of_birth || data.date_of_birth || "",
           contact: data.contact_number,
           departmentUuid: data.department_uuid,
           designationUuid: data.designation_uuid,
@@ -257,9 +298,11 @@ export default function EmployeeCreateModal({
           location: data.location,
           workMode: data.work_mode,
           employmentStatus: data.employment_status,
-          bloodGroup: data.blood_group,
-          gender: data.gender,
-          maritalStatus: data.marital_status,
+          bloodGroup: personalDetails?.blood_group || data.blood_group || "",
+          gender: personalDetails?.gender || data.gender || "",
+          maritalStatus: personalDetails?.marital_status || data.marital_status || "",
+          emergencyContactName: personalDetails?.emergency_contact_name || "",
+          emergencyContactNumber: personalDetails?.emergency_contact_phone || "",
           totalExperience: data.total_experience,
         }));
 
@@ -300,6 +343,13 @@ export default function EmployeeCreateModal({
       empFirstName: firstName || "",
       empMiddleName: middleName || "",
       empLastName: lastName || "",
+      empDob: "",
+      contact: "",
+      gender: "",
+      bloodGroup: "",
+      maritalStatus: "",
+      emergencyContactName: "",
+      emergencyContactNumber: "",
     });
     setIsGenerated(false);
   }, [userUuid, firstName, middleName, lastName, isEditMode]);
@@ -332,12 +382,17 @@ export default function EmployeeCreateModal({
         !form.empFirstName ||
         !form.empLastName ||
         !form.empDob ||
+        !form.gender ||
+        !form.bloodGroup ||
+        !form.maritalStatus ||
         !form.contact ||
         !form.departmentUuid ||
         !form.designationUuid ||
         !form.employeeType ||
         !form.joiningDate ||
-        !form.employmentStatus
+        !form.employmentStatus ||
+        !form.emergencyContactName ||
+        !form.emergencyContactNumber
       ) {
         setError("Please fill all required Profile fields.");
         showStatusToast("Please fill all required fields", "info");
@@ -423,6 +478,8 @@ export default function EmployeeCreateModal({
         blood_group: form.bloodGroup || "",
         gender: form.gender || "",
         marital_status: form.maritalStatus || "",
+        emergency_contact_name: form.emergencyContactName || "",
+        emergency_contact_phone:form.emergencyContactNumber || "",
         total_experience: Number(form.totalExperience) || 0,
       };
 
