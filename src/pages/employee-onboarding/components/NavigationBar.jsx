@@ -121,6 +121,12 @@ export default function OnboardingNavBar() {
       match: ["/employee-exit"],
       redirect: "/employee-exit",
     }] : []),
+
+    ...(hasRole(["HR", "ADMIN"]) ? [{
+      label: "ManageSkillTaxonomy",
+      match: ["/employee-onboarding/manage-skill-taxonomy"],
+      redirect: "/employee-onboarding/manage-skill-taxonomy",
+    }] : []),
   ];
 
   /* ================= SUB-NAV DEFINITIONS ================= */
@@ -179,6 +185,11 @@ export default function OnboardingNavBar() {
     { label: "Offboarding Overview", path: "/employee-exit" },
   ];
 
+  const skillTaxonomyNav = [
+    { label: "Skill Taxonomy", path: "/employee-onboarding/manage-skill-taxonomy" },
+    { label: "Requests", path: "/employee-onboarding/manage-skill-taxonomy/requests" },
+  ];
+
   /* ================= NAV SWITCH LOGIC ================= */
 
   let navToRender = managementNav; // Default
@@ -209,6 +220,9 @@ export default function OnboardingNavBar() {
   else if (path.startsWith("/employee-exit")) {
     navToRender = offboardingNav;
   } 
+  else if (path.startsWith("/employee-onboarding/manage-skill-taxonomy")) {
+    navToRender = skillTaxonomyNav;
+  }
   else if (path.startsWith("/employee-onboarding")) {
     navToRender = managementNav;
   }
