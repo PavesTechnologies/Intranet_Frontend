@@ -15,6 +15,7 @@ import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
 import Pagination from "../../../../components/Pagination/pagination";
 import CreateClient from "../../models/CreateClient";
+import SkillManagementModal from "../../models/skill_management/SkillManagementModal";
 import { useNavigate } from "react-router-dom";
 import FilterBar from "../../components/FilterBar";
 import { useAuth } from "../../../../contexts/AuthContext";
@@ -49,6 +50,7 @@ const AdminPannel = () => {
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [openCreateClient, setOpenCreateClient] = useState(false);
+  const [openSkillManagement, setOpenSkillManagement] = useState(false);
   const [kpiData, setKpiData] = useState(null);
  
   const [pageInfo, setPageInfo] = useState({
@@ -360,13 +362,15 @@ const AdminPannel = () => {
               totalResults={pageInfo.totalElements}
             />
             {canCreateClient && (
-              <Button
-                variant="primary"
-                size="medium"
-                onClick={() => setOpenCreateClient(true)}
-              >
-                <Plus className="w-4 h-4" /> Create Client
-              </Button>
+              <>
+                <Button
+                  variant="primary"
+                  size="medium"
+                  onClick={() => setOpenCreateClient(true)}
+                >
+                  <Plus className="w-4 h-4" /> Create Client
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -454,6 +458,11 @@ const AdminPannel = () => {
           }}
         />
       </Modal>
+
+      <SkillManagementModal
+        open={openSkillManagement}
+        onClose={() => setOpenSkillManagement(false)}
+      />
     </div>
   );
 };
