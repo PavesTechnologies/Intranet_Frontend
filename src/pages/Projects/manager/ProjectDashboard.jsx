@@ -26,7 +26,10 @@ import {
   EmployeeIcon,
   LeaveIcon,
   AddIcon,
+  ViewIcon,
+
 } from "../../../components/icons";
+
 
 // -------------------- 3 DOTS MENU --------------------
 const ProjectMenu = ({ project, onEdit, onDelete }) => {
@@ -46,6 +49,17 @@ const ProjectMenu = ({ project, onEdit, onDelete }) => {
 
       {open && (
         <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+          {/* <button
+  onClick={(e) => {
+    e.stopPropagation();
+    onView(project.project);
+    setOpen(false);
+  }}
+  className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+>
+  <ViewIcon size={16} className="text-gray-500" />
+  View
+</button> */}
           <button
             onClick={(e) => {
               e.stopPropagation();

@@ -73,7 +73,7 @@ const SprintColumn = ({
     });
   };
 
-  const start = formatPrettyDate(sprint.startDateReadable || sprint.startDate);
+  const start = formatPrettyDate(sprint.startDateReadable || sprint.startedAt || sprint.startDate );
   const end = formatPrettyDate(sprint.endDateReadable || sprint.endDate);
 
   const totalItems = stories.length + tasks.length;

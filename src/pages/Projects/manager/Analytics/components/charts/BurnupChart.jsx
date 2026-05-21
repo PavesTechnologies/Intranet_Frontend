@@ -18,7 +18,9 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
     if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
 
     const { labels, completed, totalScope, ideal } = burnupData;
-    const scopeLine = totalScope.map((v) => v ?? initialPoints);
+    // totalScope is already filled with per-day initialScopePoints fallback from the transform;
+    // only fall back to initialPoints here as a last resort.
+    const scopeLine = totalScope.map((v) => v ?? initialPoints ?? 0);
 
     const weekendPlugin = {
       id: "weekendShading",
@@ -153,7 +155,7 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
 
       {!hasActualData && (
         <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-          No snapshot data yet — completed line will appear after the first midnight snapshot runs.
+          No completed points recorded yet — the completed line will appear once work is marked done during the sprint.
         </div>
       )}
 
