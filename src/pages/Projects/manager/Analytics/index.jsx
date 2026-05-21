@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { ChevronRight } from "lucide-react";
 import axios from "axios";
 
 import { useSprintBurnup }       from "./hooks/useSprintBurnup";
@@ -157,10 +156,6 @@ useEffect(() => {
     <div className="min-h-screen bg-slate-50">
       <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
 <div className="flex items-center gap-2 text-sm text-slate-400">
-  <span>{projectName}</span>
-  <ChevronRight className="w-3.5 h-3.5" />
-
-  {/* Sprint selector dropdown */}
   <select
     value={sprintId ?? ""}
     onChange={(e) => setSprintId(e.target.value)}
@@ -172,11 +167,6 @@ useEffect(() => {
       </option>
     ))}
   </select>
-
-  <ChevronRight className="w-3.5 h-3.5" />
-  <span className="text-slate-700 font-medium">Analytics</span>
-  <ChevronRight className="w-3.5 h-3.5" />
-  <span className="text-slate-700 font-medium capitalize">{activeChart}</span>
 </div>
         {startDate && endDate && (
           <span className="text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">

@@ -43,6 +43,7 @@ function scopeRow(sc) {
   return {
     date:      fmtDate(sc.changedAt ?? sc.date),
     issue:     sc.issueTitle ?? "—",
+    epic:      sc.epicName   ?? "—",
     eventType: CHANGE_TYPE_LABELS[sc.changeType] ?? sc.changeType ?? "—",
     detail:    getDetail(sc),
     inc:       sc.pointsDelta > 0  ? String(sc.pointsDelta)           : "—",
@@ -65,15 +66,16 @@ const FS_DATA    = 12;
 
 // column definitions: label, fixedWidth (0 = fill remaining)
 const COLS = [
-  { key: "date",      label: "Date",         fw: 195 },
-  { key: "issue",     label: "Issue",        fw: 120 },
-  { key: "eventType", label: "Event Type",   fw: 155 },
+  { key: "date",      label: "Date",         fw: 185 },
+  { key: "issue",     label: "Issue",        fw: 110 },
+  { key: "epic",      label: "Epic",         fw: 120 },
+  { key: "eventType", label: "Event Type",   fw: 145 },
   { key: "detail",    label: "Event Detail", fw: 0   },  // fills rest
-  { key: "inc",       label: "Inc.",         fw: 55  },
-  { key: "dec",       label: "Dec.",         fw: 55  },
-  { key: "pts",       label: "Story Pts",    fw: 80  },
+  { key: "inc",       label: "Inc.",         fw: 50  },
+  { key: "dec",       label: "Dec.",         fw: 50  },
+  { key: "pts",       label: "Story Pts",    fw: 75  },
 ];
-const FIXED_W = COLS.reduce((s, c) => s + c.fw, 0);  // 660
+const FIXED_W = COLS.reduce((s, c) => s + c.fw, 0);  // 735
 
 function buildColLayout(canvasW) {
   const usable   = canvasW - 2 * PAD;
@@ -141,6 +143,7 @@ function createCombinedCanvas(chartCanvas, scopeChanges) {
   const CELL_COLORS = {
     date:      () => "#94a3b8",
     issue:     () => "#4f46e5",
+    epic:      (v) => v !== "—" ? "#7c3aed" : "#94a3b8",
     eventType: () => "#374151",
     detail:    () => "#64748b",
     inc:       (v) => v !== "—" ? "#16a34a" : "#94a3b8",
@@ -279,10 +282,11 @@ export function buildBurnupCSV(dailyBurnup) {
 }
 
 export function buildScopeChangesSection(scopeChanges) {
-  const headers = ["Date", "Issue", "Issue Type", "Event Type", "Event Detail", "Inc.", "Dec.", "Story Pts After"];
+  const headers = ["Date", "Issue", "Epic", "Issue Type", "Event Type", "Event Detail", "Inc.", "Dec.", "Story Pts After"];
   const data    = (scopeChanges ?? []).map((sc) => ({
     "Date":            fmtDate(sc.changedAt ?? sc.date),
     "Issue":           sc.issueTitle ?? "—",
+    "Epic":            sc.epicName   ?? "",
     "Issue Type":      sc.issueType  ?? "—",
     "Event Type":      CHANGE_TYPE_LABELS[sc.changeType] ?? sc.changeType ?? "—",
     "Event Detail":    getDetail(sc),
