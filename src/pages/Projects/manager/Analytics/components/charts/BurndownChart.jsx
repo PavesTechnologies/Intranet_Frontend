@@ -138,7 +138,7 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
 
       {!hasActualData && (
         <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-          No snapshot data yet — actual line will appear after the first midnight snapshot runs.
+          No remaining-points data yet — the actual burndown line will appear once the sprint is active and progress is recorded.
           The ideal burndown line shows the target trajectory.
         </div>
       )}
