@@ -67,7 +67,7 @@ export default function LeaveUsageChart({ leave }) {
           ) : (
             <>
               <span className="text-sm font-bold text-gray-800 leading-none">{usedLeaves}</span>
-              <span className="text-[10px] text-gray-400 mt-0.5">of {accruedLeaves}</span>
+              <span className="text-[10px] text-gray-400 mt-0.5">of {remaining}</span>
             </>
           )}
         </div>
