@@ -6,7 +6,7 @@ import { getAgingTone, isSkillStale } from "../models/benchModel";
 const statCardClassName = "relative group overflow-hidden rounded-2xl border border-white/40 bg-gradient-to-br from-white/60 to-white/30 px-5 py-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-md transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-0.5";
 const cardIconWrapperClass = "absolute -right-4 -top-4 h-24 w-24 rounded-full bg-gradient-to-br opacity-20 transition-all group-hover:scale-110";
 
-const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMatches, loadingMatches }) => {
+const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMatches, loadingMatches, activeTab = "bench" }) => {
   console.log("Resource from Bench Drawer: ", resource);
 
   if (!open || !resource) return null;
@@ -157,86 +157,88 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
           </div> */}
 
           {/* DEMAND MATCHING SECTION */}
-          <div className="rounded-2xl border border-white bg-white/70 p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] backdrop-blur-sm relative overflow-hidden">
-            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-emerald-100 blur-3xl opacity-50 pointer-events-none" />
-            <h3 className="text-[11px] font-bold capitalize tracking-[0.2em] text-slate-500 flex items-center gap-2 relative z-10">
-              <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live Demand Matrix
-            </h3>
-            <div className="mt-4 space-y-3 relative z-10">
-              {loadingMatches ? (
-                <div className="flex flex-col items-center justify-center py-10 text-slate-400">
-                  <div className="relative">
-                    <div className="absolute inset-0 rounded-full border-2 border-indigo-200 animate-ping opacity-20"></div>
-                    <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
-                  </div>
-                  <p className="mt-3 text-[10px] font-bold capitalize tracking-widest">Running ML Matrix...</p>
-                </div>
-              ) : resourceDemands.length === 0 ? (
-                <div className="py-6 text-center text-[12px] font-medium text-slate-400 border border-dashed border-slate-200 bg-white/50 rounded-xl">
-                  No high-confidence pipeline opportunities identified
-                </div>
-              ) : (
-                resourceDemands.map((match, idx) => (
-                  <button
-                    key={match.demandId || idx}
-                    type="button"
-                    onClick={() => onAllocate(resource, match)}
-                    className="w-full text-left group flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-indigo-300 active:scale-[0.99]"
-                  >
-                    <div className="flex items-start justify-between w-full">
-                      <div className="pr-4">
-                        <p className="font-bold text-slate-800 text-[14px] leading-tight group-hover:text-indigo-600 transition-colors">
-                          {match.demandName || "Strategic Project Requirement"}
-                        </p>
-                        <div className="mt-1 flex items-center gap-2">
-                          <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-widest ${matchData?.availability === 'Available' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                            {matchData?.availability || "Availability TBD"}
-                          </span>
-                          <span className="text-[11px] font-medium text-slate-400">
-                            {match.demandId ? `ID: ${match.demandId.toString().slice(-6)}` : "Internal Demand"}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="shrink-0 flex flex-col items-end">
-                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${(match.matchScore || 0) >= 70 ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : (match.matchScore || 0) >= 40 ? 'bg-amber-50 border-amber-100 text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
-                          <span className="text-[14px] font-black">{match.matchScore || 0}%</span>
-                          <span className="text-[9px] font-bold uppercase tracking-widest opacity-80">Match</span>
-                        </div>
-                      </div>
+          {activeTab === "bench" && (
+            <div className="rounded-2xl border border-white bg-white/70 p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] backdrop-blur-sm relative overflow-hidden">
+              <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-emerald-100 blur-3xl opacity-50 pointer-events-none" />
+              <h3 className="text-[11px] font-bold capitalize tracking-[0.2em] text-slate-500 flex items-center gap-2 relative z-10">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live Demand Matrix
+              </h3>
+              <div className="mt-4 space-y-3 relative z-10">
+                {loadingMatches ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                    <div className="relative">
+                      <div className="absolute inset-0 rounded-full border-2 border-indigo-200 animate-ping opacity-20"></div>
+                      <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
                     </div>
-
-                    {match.matchedSkills && match.matchedSkills.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5 w-full">
-                        <span className="text-[10px] font-semibold text-slate-400 mr-1">Overlapping Skills:</span>
-                        {match.matchedSkills.slice(0, 4).map((sk, sidx) => (
-                          <span key={sidx} className="text-[10px] font-medium text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
-                            {sk}
-                          </span>
-                        ))}
-                        {match.matchedSkills.length > 4 && (
-                          <span className="text-[10px] font-medium text-slate-400">+{match.matchedSkills.length - 4} more</span>
-                        )}
+                    <p className="mt-3 text-[10px] font-bold capitalize tracking-widest">Running ML Matrix...</p>
+                  </div>
+                ) : resourceDemands.length === 0 ? (
+                  <div className="py-6 text-center text-[12px] font-medium text-slate-400 border border-dashed border-slate-200 bg-white/50 rounded-xl">
+                    No high-confidence pipeline opportunities identified
+                  </div>
+                ) : (
+                  resourceDemands.map((match, idx) => (
+                    <button
+                      key={match.demandId || idx}
+                      type="button"
+                      onClick={() => onAllocate(resource, match)}
+                      className="w-full text-left group flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-indigo-300 active:scale-[0.99]"
+                    >
+                      <div className="flex items-start justify-between w-full">
+                        <div className="pr-4">
+                          <p className="font-bold text-slate-800 text-[14px] leading-tight group-hover:text-indigo-600 transition-colors">
+                            {match.demandName || "Strategic Project Requirement"}
+                          </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-widest ${matchData?.availability === 'Available' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                              {matchData?.availability || "Availability TBD"}
+                            </span>
+                            <span className="text-[11px] font-medium text-slate-400">
+                              {match.demandId ? `ID: ${match.demandId.toString().slice(-6)}` : "Internal Demand"}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="shrink-0 flex flex-col items-end">
+                          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${(match.matchScore || 0) >= 70 ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : (match.matchScore || 0) >= 40 ? 'bg-amber-50 border-amber-100 text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                            <span className="text-[14px] font-black">{match.matchScore || 0}%</span>
+                            <span className="text-[9px] font-bold uppercase tracking-widest opacity-80">Match</span>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </button>
-                ))
-              )}
+
+                      {match.matchedSkills && match.matchedSkills.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 w-full">
+                          <span className="text-[10px] font-semibold text-slate-400 mr-1">Overlapping Skills:</span>
+                          {match.matchedSkills.slice(0, 4).map((sk, sidx) => (
+                            <span key={sidx} className="text-[10px] font-medium text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+                              {sk}
+                            </span>
+                          ))}
+                          {match.matchedSkills.length > 4 && (
+                            <span className="text-[10px] font-medium text-slate-400">+{match.matchedSkills.length - 4} more</span>
+                          )}
+                        </div>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer Actions */}
         <div className="border-t border-slate-200 bg-white px-6 py-5 shadow-[0_-10px_20px_rgb(0,0,0,0.02)] relative z-20">
           <div className="flex gap-3">
-            <button type="button" onClick={() => onAllocate(resource, null)} className="h-12 flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 text-[13px] font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:from-indigo-700 hover:to-indigo-600 hover:shadow-lg focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:scale-[0.98]">
-              ALLOCATE RESOURCE
-            </button>
-            {!resource.poolType && (
-              <button type="button" onClick={() => onMoveToPool(resource)} className="h-12 flex-1 rounded-xl border border-slate-200 bg-white px-6 text-[13px] font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 border-b-2 hover:border-b-slate-300 focus:ring-2 focus:ring-slate-200 active:scale-[0.98]">
-                TRANSFER TO POOL
+            {activeTab === "bench" && (
+              <button type="button" onClick={() => onAllocate(resource, null)} className="h-12 flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 text-[13px] font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:from-indigo-700 hover:to-indigo-600 hover:shadow-lg focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:scale-[0.98]">
+                ALLOCATE RESOURCE
               </button>
             )}
+            <button type="button" onClick={() => onMoveToPool(resource)} className="h-12 flex-1 rounded-xl border border-slate-200 bg-white px-6 text-[13px] font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 border-b-2 hover:border-b-slate-300 focus:ring-2 focus:ring-slate-200 active:scale-[0.98]">
+              {activeTab === "bench" ? "TRANSFER TO POOL" : "TRANSFER TO BENCH"}
+            </button>
           </div>
         </div>
       </div>
