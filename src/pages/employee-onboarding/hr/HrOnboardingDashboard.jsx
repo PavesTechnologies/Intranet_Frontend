@@ -49,6 +49,7 @@ export default function HrOnboardingDashboard() {
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [sending, setSending] = useState(false);
+  const [previewingJoinLetter, setPreviewingJoinLetter] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [loadingEditDetails, setLoadingEditDetails] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -83,7 +84,7 @@ export default function HrOnboardingDashboard() {
     `${manager.first_name || ""} ${manager.last_name || ""}`.trim();
 
   const getManagerPayloadValue = (manager) =>
-    String(manager.employee_id || "").trim();
+    String(manager.employee_id || manager.user_uuid || manager.uuid || "").trim();
 
   const resolveReportingManager = (value) => {
     const normalizedValue = String(value || "").trim();
@@ -439,6 +440,88 @@ export default function HrOnboardingDashboard() {
       showStatusToast("Failed to send emails");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handlePreviewJoiningLetter = async () => {
+    const {
+      joining_date,
+      reporting_time,
+      location,
+      department,
+      reporting_manager,
+      custom_message,
+    } = joinForm;
+
+    if (
+      !joining_date ||
+      !reporting_time ||
+      !location ||
+      !department ||
+      !reporting_manager
+    ) {
+      showStatusToast("Please fill all required fields");
+      return;
+    }
+
+    const selectedEmployees = filteredData.filter((e) =>
+      selectedIds.includes(e.user_uuid),
+    );
+
+    const previewEmail = selectedEmployees[0]?.mail;
+
+    if (!previewEmail) {
+      showStatusToast("Please select a candidate to preview");
+      return;
+    }
+
+    const normalizedReportingManager =
+      resolveReportingManager(reporting_manager);
+
+    const payload = {
+      user_emails_list: [previewEmail],
+      joining_date,
+      reporting_time,
+      location,
+      department,
+      reporting_manager: normalizedReportingManager,
+      custom_message: custom_message || "",
+    };
+
+    try {
+      setPreviewingJoinLetter(true);
+
+      const res = await axios.post(
+        `${BASE_URL}/hr/offerletters/bulk-join`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+          params: { preview: true },
+          responseType: "blob",
+        },
+      );
+
+      const contentType = res.headers?.["content-type"] || "";
+
+      if (!contentType.includes("application/pdf")) {
+        const errorText = await res.data.text();
+        console.error("Joining preview returned non-PDF response:", errorText);
+        showStatusToast("Failed to generate joining letter PDF");
+        return;
+      }
+
+      const file = new Blob([res.data], { type: "application/pdf" });
+      window.open(URL.createObjectURL(file), "_blank");
+    } catch (err) {
+      const errorBlob = err.response?.data;
+      const errorText = errorBlob?.text ? await errorBlob.text() : "";
+      console.error("Failed to preview joining letter", err, errorText);
+      showStatusToast("Failed to preview joining letter");
+    } finally {
+      setPreviewingJoinLetter(false);
     }
   };
 
@@ -891,7 +974,9 @@ export default function HrOnboardingDashboard() {
         open={showModal}
         onClose={() => setShowModal(false)}
         onSubmit={handleSendJoinEmail}
+        onPreview={handlePreviewJoiningLetter}
         loading={sending}
+        previewLoading={previewingJoinLetter}
         form={joinForm}
         setForm={setJoinForm}
         managerOptions={managerOptions}
@@ -921,3 +1006,5 @@ export default function HrOnboardingDashboard() {
     </div>
   );
 }
+
+

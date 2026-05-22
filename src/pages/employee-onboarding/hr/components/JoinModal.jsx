@@ -12,7 +12,9 @@ export default function JoinModal({
   open,
   onClose,
   onSubmit,
+  onPreview,
   loading,
+  previewLoading,
   form,
   setForm,
   managerOptions,
@@ -97,16 +99,25 @@ export default function JoinModal({
             varient="secondary"
             size="small"
             onClick={onClose}
-            disabled={loading}
+            disabled={loading || previewLoading}
           >
             Cancel
+          </Button>
+
+          <Button
+            varient="secondary"
+            size="small"
+            onClick={onPreview}
+            disabled={loading || previewLoading}
+          >
+            {previewLoading ? "Previewing..." : "Preview Joining Letter"}
           </Button>
 
           <Button
             varient="primary"
             size="small"
             onClick={onSubmit}
-            disabled={loading}
+            disabled={loading || previewLoading}
           >
             {loading ? "Sending..." : "Send Email"}
           </Button>
