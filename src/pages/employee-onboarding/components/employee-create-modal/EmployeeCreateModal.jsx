@@ -6,24 +6,19 @@ import JobForm from "./JobForm";
 import Button from "../../../../components/Button/Button";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { EditIcon } from "../../../../components/icons/ActionIcons";
+import { set } from "date-fns";
 
-const formatDateForInput = (dateValue) => {
-  if (!dateValue) return "";
+const formatDateForInput = (date) => {
+  if (!date) return "";
 
-  const dateString = String(dateValue).trim();
-  const dateOnlyMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const parsedDate = new Date(date);
 
-  if (dateOnlyMatch) {
-    return `${dateOnlyMatch[1]}-${dateOnlyMatch[2]}-${dateOnlyMatch[3]}`;
+  if (isNaN(parsedDate.getTime())) {
+    return "";
   }
 
-  const parsedDate = new Date(dateString);
-
-  if (Number.isNaN(parsedDate.getTime())) return "";
-
-  return parsedDate.toISOString().slice(0, 10);
+  return parsedDate.toISOString().split("T")[0];
 };
-
 const getArrayPayload = (payload) => {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.data)) return payload.data;
@@ -101,10 +96,12 @@ export default function EmployeeCreateModal({
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
   const [managerOptions, setManagerOptions] = useState([]);
-  const [isProfileEditable, setIsProfileEditable] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [isPrefilledData, setIsPrefilledData] = useState(false);
+  const [isProfileEditable, setIsProfileEditable] = useState(false);
+const [isJobEditable, setIsJobEditable] = useState(false);
 
-  
+
   const isEditMode = !!employeeUuid;
 
   const fetchDepartments = async () => {
@@ -141,7 +138,15 @@ export default function EmployeeCreateModal({
       );
 
       const data = await res.json();
-      setDesignations(data);
+      const designationList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.designations)
+        ? data.designations
+        : [];
+
+      setDesignations(designationList);
     } catch (err) {
       console.error("Failed to fetch designations", err);
     }
@@ -215,17 +220,7 @@ export default function EmployeeCreateModal({
           matchedUserUuid =
             data.user_uuid || userUuid;
         }
-        // const res = await fetch(
-        //   `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
-        //   {
-        //     headers: {
-        //       Authorization: `Bearer ${localStorage.getItem("token")}`,
-        //     },
-        //   },
-        // );
-
-        // const data = await res.json();
-        // const matchedUserUuid = data.user_uuid || userUuid;
+       
         let offerLetter = null;
 
         try {
@@ -296,9 +291,21 @@ export default function EmployeeCreateModal({
         const reportingManagerValue =
           offerLetter?.reporting_manager || data.reporting_manager_uuid || "";
 
+          console.log(
+          "Joining Date:",
+          offerLetter?.joining_date
+        );
+
+        console.log(
+          "Formatted Joining Date:",
+          formatDateForInput(
+            offerLetter?.joining_date
+          )
+        );
         setForm((prev) => ({
           ...prev,
-          userUuid: data.user_uuid,
+          personalUuid: personalDetails?.personal_uuid,
+          userUuid: data.user_uuid || matchedUserUuid,
           empId: data.employee_id,
           email: data.work_email,
           empFirstName: offerLetter?.first_name || data.first_name || firstName || "",
@@ -308,25 +315,34 @@ export default function EmployeeCreateModal({
           contact: personalDetails?.contact_number || offerLetter?.contact_number || data.contact_number || "",
           departmentUuid: data.department_uuid,
           designationUuid: data.designation_uuid,
-          reportingManagerUuid: resolveManagerOptionValue(
+          reportingManagerUuid: offerLetter?.reporting_manager_uuid || data.reporting_manager_uuid || resolveManagerOptionValue(
             reportingManagerValue,
             managerOptions,
           ),
-          employeeType:
-            offerLetter?.employee_type || data.employee_type || data.employment_type,
+          employeeType: offerLetter?.employee_type || data.employee_type || data.employment_type,
+          mail:offerLetter?.mail || "",
+          countryCode: offerLetter?.country_code || "",
+          designation:offerLetter?.designation || "",
+          currency:offerLetter?.currency || "",
+          compensationComponents:offerLetter?.compensation_components || [],
+          totalCtc:offerLetter?.total_ctc || 0,
           joiningDate: formatDateForInput(
-            offerLetter?.joining_date || data.joining_date,
-          ),
+          offerLetter?.joining_date || data.joining_date || ""),
           location: data.location,
           workMode: data.work_mode,
           employmentStatus: data.employment_status,
           bloodGroup: personalDetails?.blood_group || data.blood_group || "",
           gender: personalDetails?.gender || data.gender || "",
           maritalStatus: personalDetails?.marital_status || data.marital_status || "",
+          nationalityCountryUuid: personalDetails?.nationality_country_uuid || "",
+          residenceCountryUuid: personalDetails?.residence_country_uuid || "",
+          emergencyContactRelationUuid: personalDetails?.emergency_contact_relation_uuid || "",
           emergencyContactName: personalDetails?.emergency_contact_name || "",
           emergencyContactNumber: personalDetails?.emergency_contact_phone || "",
           totalExperience: data.total_experience,
         }));
+
+        setIsPrefilledData(true);
 
         fetchDesignations(data.department_uuid);
       } catch (error) {
@@ -394,6 +410,7 @@ export default function EmployeeCreateModal({
       fetchDesignations(value);
     }
   };
+  
 
   const handleGenerate = async () => {
     try {
@@ -481,73 +498,13 @@ export default function EmployeeCreateModal({
     }
   };
 
-  const handleUpdate = async ({ closeAfterSave = true } = {}) => {
-    try {
-      const payload = {
-        first_name: form.empFirstName,
-        middle_name: form.empMiddleName || "",
-        last_name: form.empLastName,
-        date_of_birth: form.empDob,
-        contact_number: form.contact,
-        department_uuid: form.departmentUuid,
-        designation_uuid: form.designationUuid,
-        reporting_manager_uuid: form.reportingManagerUuid || null,
-        employment_type: form.employeeType,
-        joining_date: form.joiningDate,
-        location: form.location || "",
-        work_mode: form.workMode || "",
-        employment_status: form.employmentStatus,
-        blood_group: form.bloodGroup || "",
-        gender: form.gender || "",
-        marital_status: form.maritalStatus || "",
-        emergency_contact_name: form.emergencyContactName || "",
-        emergency_contact_phone:form.emergencyContactNumber || "",
-        total_experience: Number(form.totalExperience) || 0,
-      };
-
-      const response = await fetch(
-        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(payload),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Update failed");
-      }
-
-      showStatusToast("Employee updated successfully", "success");
-      if (closeAfterSave) {
-        onClose();
-      }
-      return true;
-    } catch (err) {
-      console.error(err);
-      showStatusToast("Failed to update employee", "error");
-      return false;
-    }
-  };
-
   const handleToggleProfileEdit = () => {
     setIsProfileEditable((prev) => !prev);
   };
-
-  const handleSaveProfileChanges = async () => {
-    try {
-      setSavingProfile(true);
-      const saved = await handleUpdate({ closeAfterSave: false });
-      if (saved) {
-        setIsProfileEditable(false);
-      }
-    } finally {
-      setSavingProfile(false);
-    }
-  };
+  
+const handleToggleJobEdit = () => {
+  setIsJobEditable((prev) => !prev);
+};
 
   return (
     <LargeModal
@@ -560,110 +517,98 @@ export default function EmployeeCreateModal({
 
       {activeTab === "Profile" && (
         <>
-          {isEditMode && (
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Profile Details
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Review and update employee profile details.
-                </p>
-              </div>
-
-              <Button
-                type="button"
-                onClick={handleToggleProfileEdit}
-                variant="outline"
-                size="small"
-                className="rounded-xl px-3 py-2"
-              >
-                <EditIcon size={14} />
-                {isProfileEditable ? "Cancel Edit" : "Edit"}
-              </Button>
-            </div>
-          )}
-
           <ProfileForm
             form={form}
             handleChange={handleChange}
             isGenerated={isGenerated}
             isEditMode={isEditMode}
             isProfileEditable={isProfileEditable}
+            isPrefilledData={isPrefilledData}
+            isJobEditable={isJobEditable}
           />
           <div className="flex justify-end gap-3 mt-6">
-            {isEditMode && isProfileEditable && (
-              <Button
-                variant="outline"
-                size="small"
-                onClick={handleSaveProfileChanges}
-                loading={savingProfile}
-                loadingText="Saving..."
-              >
-                Save Changes
-              </Button>
-            )}
+  {!isProfileEditable ? (
+    <>
+     
 
-            <Button
-              variant="primary"
-              size="small"
-              onClick={() => setActiveTab("Job")}
-            >
-              Next
-            </Button>
-          </div>
+      <Button
+        variant="primary"
+        size="small"
+        onClick={() => setActiveTab("Job")}
+      >
+        Next
+      </Button>
+    </>
+  ) : (
+    <>
+    
+      <Button
+        variant="primary"
+        size="small"
+        onClick={handleSavePersonalDetails}
+        loading={savingProfile}
+        loadingText="Saving..."
+      >
+        Save
+      </Button>
+    </>
+  )}
+</div>
         </>
       )}
-
       {activeTab === "Job" && (
+  <>
+    <JobForm
+      form={form}
+      handleChange={handleChange}
+      departments={departments}
+      designations={designations}
+      managerOptions={managerOptions}
+      isEditMode={isEditMode}
+      isPrefilledData={isPrefilledData}
+      isJobEditable={isJobEditable}
+    />
+
+    <div className="flex justify-end gap-3 mt-6">
+
+      {/* ---------------- CREATE MODE ---------------- */}
+
+      {!isEditMode && !isGenerated && (
+        <Button
+          variant="primary"
+          size="small"
+          onClick={handleGenerate}
+          disabled={loading}
+        >
+          {loading
+            ? "Generating..."
+            : "Generate Credentials"}
+        </Button>
+      )}
+
+      {!isEditMode && isGenerated && (
         <>
-          <JobForm
-            form={form}
-            handleChange={handleChange}
-            departments={departments}
-            designations={designations}
-            managerOptions={managerOptions}
-            isEditMode={isEditMode}
-          />
+          <Button
+            variant="secondary"
+            size="small"
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
 
-          <div className="flex justify-end gap-3 mt-6">
-            {!isEditMode && !isGenerated && (
-              <Button
-                variant="primary"
-                size="small"
-                onClick={handleGenerate}
-                disabled={loading}
-              >
-                {loading ? "Generating..." : "Generate Credentials"}
-              </Button>
-            )}
-
-            {!isEditMode && isGenerated && (
-              <>
-                <Button variant="secondary" size="small" onClick={onClose}>
-                  Cancel
-                </Button>
-
-                <Button variant="primary" size="small" onClick={onClose}>
-                  Save
-                </Button>
-              </>
-            )}
-
-            {isEditMode && (
-              <>
-                <Button variant="secondary" size="small" onClick={onClose}>
-                  Cancel
-                </Button>
-
-                <Button variant="primary" size="small" onClick={handleUpdate}>
-                  Update
-                </Button>
-              </>
-            )}
-          </div>
+          <Button
+            variant="primary"
+            size="small"
+            onClick={onClose}
+          >
+            Save
+          </Button>
         </>
       )}
+
+    </div>
+  </>
+)}
 
       {error && <p className="text-red-600 mt-3 text-sm">{error}</p>}
     </LargeModal>

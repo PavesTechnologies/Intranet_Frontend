@@ -9,6 +9,9 @@ export default function JobForm({
   departments = [],
   managerOptions = [],
   isEditMode,
+  isPrefilledData,
+   isJobEditable,
+ 
 }) {
   const employeeTypes = ["Full-Time", "Intern", "Contract"];
   const employeeTypeOptions = form.employeeType
@@ -62,7 +65,8 @@ export default function JobForm({
         value={form.employeeType || ""}
         onChange={handleChange}
         options={employeeTypeOptions}
-        disabled={isEditMode}
+        disabled={isPrefilledData && !isJobEditable}
+        
       />
 
       <FormSelect
@@ -88,7 +92,8 @@ export default function JobForm({
         name="joiningDate"
         value={form.joiningDate || ""}
         onChange={handleChange}
-        disabled={isEditMode}
+        disabled={isPrefilledData && !isJobEditable}
+        
       />
 
       <FormSelect
@@ -97,6 +102,7 @@ export default function JobForm({
         value={form.reportingManagerUuid || ""}
         onChange={handleChange}
         options={managerOptions}
+        disabled={isPrefilledData && !isJobEditable}
       />
 
       <FormSelect
@@ -105,6 +111,7 @@ export default function JobForm({
         value={form.employmentStatus || ""}
         onChange={handleChange}
         options={employeeStatus}
+        
       />
 
       <FormSelect
