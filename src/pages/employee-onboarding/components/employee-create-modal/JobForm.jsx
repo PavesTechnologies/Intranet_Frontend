@@ -41,7 +41,6 @@ export default function JobForm({
           value: d.department_uuid,
           label: d.department_name,
         }))}
-        disabled={isEditMode}
       />
 
       <FormSelect
@@ -62,7 +61,6 @@ export default function JobForm({
         value={form.employeeType || ""}
         onChange={handleChange}
         options={employeeTypeOptions}
-        disabled={isEditMode}
       />
 
       <FormSelect
@@ -71,7 +69,6 @@ export default function JobForm({
         value={form.workMode || ""}
         onChange={handleChange}
         options={workModes}
-        disabled={isEditMode}
       />
 
       <FormInput
@@ -79,7 +76,6 @@ export default function JobForm({
         name="location"
         value={form.location || ""}
         onChange={handleChange}
-        disabled={isEditMode}
       />
 
       <FormInput
@@ -88,7 +84,6 @@ export default function JobForm({
         name="joiningDate"
         value={form.joiningDate || ""}
         onChange={handleChange}
-        disabled={isEditMode}
       />
 
       <FormSelect

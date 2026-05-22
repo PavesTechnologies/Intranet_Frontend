@@ -5,7 +5,6 @@ import ProfileForm from "./ProfileForm";
 import JobForm from "./JobForm";
 import Button from "../../../../components/Button/Button";
 import { showStatusToast } from "../../../../components/toastfy/toast";
-import { EditIcon } from "../../../../components/icons/ActionIcons";
 
 const formatDateForInput = (dateValue) => {
   if (!dateValue) return "";
@@ -102,7 +101,6 @@ export default function EmployeeCreateModal({
   const [designations, setDesignations] = useState([]);
   const [managerOptions, setManagerOptions] = useState([]);
   const [isProfileEditable, setIsProfileEditable] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
 
   
   const isEditMode = !!employeeUuid;
@@ -187,10 +185,10 @@ export default function EmployeeCreateModal({
 
     setActiveTab("Profile");
     setError("");
-    setIsProfileEditable(false);
+    setIsProfileEditable(isEditMode);
     fetchDepartments();
     fetchManagers();
-  }, [isOpen]);
+  }, [isOpen, isEditMode]);
 
   useEffect(() => {
     if (!employeeUuid) return;
@@ -252,7 +250,7 @@ export default function EmployeeCreateModal({
           employeeType:
             offerLetter?.employee_type || data.employee_type || data.employment_type,
           joiningDate: formatDateForInput(
-            offerLetter?.joining_date || data.joining_date,
+            data.joining_date || offerLetter?.joining_date,
           ),
           location: data.location,
           workMode: data.work_mode,
@@ -454,22 +452,6 @@ export default function EmployeeCreateModal({
     }
   };
 
-  const handleToggleProfileEdit = () => {
-    setIsProfileEditable((prev) => !prev);
-  };
-
-  const handleSaveProfileChanges = async () => {
-    try {
-      setSavingProfile(true);
-      const saved = await handleUpdate({ closeAfterSave: false });
-      if (saved) {
-        setIsProfileEditable(false);
-      }
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
   return (
     <LargeModal
       isOpen={isOpen}
@@ -482,26 +464,13 @@ export default function EmployeeCreateModal({
       {activeTab === "Profile" && (
         <>
           {isEditMode && (
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Profile Details
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Review and update employee profile details.
-                </p>
-              </div>
-
-              <Button
-                type="button"
-                onClick={handleToggleProfileEdit}
-                variant="outline"
-                size="small"
-                className="rounded-xl px-3 py-2"
-              >
-                <EditIcon size={14} />
-                {isProfileEditable ? "Cancel Edit" : "Edit"}
-              </Button>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Profile Details
+              </h3>
+              <p className="text-xs text-slate-500">
+                Review and update employee profile details.
+              </p>
             </div>
           )}
 
@@ -513,18 +482,6 @@ export default function EmployeeCreateModal({
             isProfileEditable={isProfileEditable}
           />
           <div className="flex justify-end gap-3 mt-6">
-            {isEditMode && isProfileEditable && (
-              <Button
-                variant="outline"
-                size="small"
-                onClick={handleSaveProfileChanges}
-                loading={savingProfile}
-                loadingText="Saving..."
-              >
-                Save Changes
-              </Button>
-            )}
-
             <Button
               variant="primary"
               size="small"
