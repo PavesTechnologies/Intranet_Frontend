@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -187,7 +187,7 @@ export default function LeavePolicyViewer() {
   useEffect(() => {
     const fetchPolicies = async () => {
       try {
-        const response = await axios.get(BASE_URL);
+        const response = await api.get(BASE_URL);
 
         // ✅ Normalize Strapi data
         const policies = (response.data.data || []).map((item) => ({

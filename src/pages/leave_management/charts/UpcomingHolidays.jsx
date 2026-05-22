@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import AllHolidaysGrid from "./AllHolidaysGrid";
 
@@ -151,7 +151,7 @@ export default function UpcomingHolidays({ year }) {
   useEffect(() => {
     const fetchHolidays = async () => {
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${window.__APP_CONFIG__.BASE_URL}/api/holidays/year/${year}`,
           {
             headers: {

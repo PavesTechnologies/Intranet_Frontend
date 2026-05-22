@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../api/axiosInstance";
 import CompOffBalanceRequests from "../leave_management/models/CompOffBalanceRequests";
 import HandleLeaveRequestAndApprovals from "../leave_management/models/HandleLeaveRequestAndApprovals";
 import { useAuth } from "../../contexts/AuthContext";
@@ -44,7 +44,7 @@ const AdminPanel = ({ employeeId }) => {
   // }
 
   useEffect(() => {
-    axios
+    api
       .post(
         `${BASE_URL}/api/leave-requests/manager/history`,
         {
@@ -64,7 +64,7 @@ const AdminPanel = ({ employeeId }) => {
   }, []);
 
   useEffect(() => {
-    axios
+    api
       .get(`${BASE_URL}/api/leave/get-all-leave-types`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -88,7 +88,7 @@ const AdminPanel = ({ employeeId }) => {
 
   const fetchRevokeRequests = useCallback(async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/api/leave-revoke/pending/${employeeId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },

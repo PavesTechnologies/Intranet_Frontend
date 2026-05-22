@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from "../../../api/axiosInstance";
 import { X, CheckCircle, XCircle, Loader } from 'lucide-react';
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -22,7 +22,7 @@ const LeaveBalanceJobProgress = ({ jobId, onClose }) => {
 
     const fetchJob = async () => {
         try {
-            const res = await axios.get(
+            const res = await api.get(
                 `${BASE_URL}/api/leave/leave-balance-job/${jobId}`,
                 {
                     headers: {

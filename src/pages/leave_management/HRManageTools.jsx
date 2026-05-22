@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../api/axiosInstance";
 import { motion, AnimatePresence } from "framer-motion";
 import { Pencil, Trash2, Settings, Users, CalendarDays, ClipboardCheck, History } from "lucide-react";
 import { toast } from "react-toastify";
@@ -44,7 +44,7 @@ const HRManageTools = ({ employeeId }) => {
   const fetchLeaveTypes = async () => {
     try {
       setIsLoading(true);
-      const res = await axios.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
+      const res = await api.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setLeaveTypes(res.data?.regular || []);
@@ -59,7 +59,7 @@ const HRManageTools = ({ employeeId }) => {
   const executeDelete = async () => {
     setIsDeleting(true);
     try {
-      await axios.delete(`${BASE_URL}/api/leave/delete-leave-type/${selectedLeaveTypeIdToDelete}`, {
+      await api.delete(`${BASE_URL}/api/leave/delete-leave-type/${selectedLeaveTypeIdToDelete}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         data: { deactivationEffectiveDate: effectiveDeactivationDate },
       });

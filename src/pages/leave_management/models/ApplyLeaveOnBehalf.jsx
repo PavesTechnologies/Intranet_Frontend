@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import Select from "react-select";
 import debounce from "lodash.debounce";
 import { X, Calendar, Calculator, Info, Link as LinkIcon } from "lucide-react";
@@ -70,7 +70,7 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
   // --- Fetch employees (only once on first open) ---
   const fetchEmployees = useCallback(async (searchText) => {
     try {
-      const res = await axios.get(`${BASE_URL}/api/employee/search/${userId}`, {
+      const res = await api.get(`${BASE_URL}/api/employee/search/${userId}`, {
         params: { search: searchText, page: 0 },
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
@@ -113,7 +113,7 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
   useEffect(() => {
     if (!employeeId) return;
     setLoadingBalances(true);
-    axios
+    api
       .get(`${BASE_URL}/api/leave-balance/employee/${employeeId}/${year}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
@@ -166,7 +166,7 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
 
     setSubmitting(true);
     try {
-      await axios.post(
+      await api.post(
         `${BASE_URL}/api/leave-requests/apply-on-behalf`,
         {
           employeeId,

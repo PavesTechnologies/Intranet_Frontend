@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, User } from "lucide-react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import FilterListbox from "../../../components/filter/FilterListbox";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -58,7 +58,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
     }
 
     try {
-      await axios.post(`${BASE_URL}/api/employee/register`, payload, {
+      await api.post(`${BASE_URL}/api/employee/register`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setSuccess("Employee added successfully!");

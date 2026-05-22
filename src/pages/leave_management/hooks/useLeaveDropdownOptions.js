@@ -1,6 +1,6 @@
 // useLeaveDropdownOptions.js
 import { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
