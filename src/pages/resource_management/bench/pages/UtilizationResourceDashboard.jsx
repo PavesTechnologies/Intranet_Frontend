@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { EmployeeIcon, SearchIcon, FilterIcon, DownloadIcon, ZapIcon, TrendUpIcon, TrendDownIcon, CloseIcon, ProjectsIcon, HistoryIcon, AnalyticsIcon, PieChartIcon, SuccessIcon, EmailIcon, PhoneIcon, ChevronRightIcon, MoreHorizontalIcon } from "@/components/icons";
 import { 
    ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip,
@@ -10,11 +10,36 @@ import LoadingSpinner from '../../../../components/LoadingSpinner';
 import Pagination from '../../../../components/Pagination/pagination';
 import GenericTable from "../../../../components/Table/table";
 
+const ITEMS_PER_PAGE = 10;
+
+const extractRows = (payload, keys) => {
+   if (Array.isArray(payload)) return payload;
+   if (!payload || typeof payload !== 'object') return [];
+   for (const key of keys) {
+      if (Array.isArray(payload[key])) return payload[key];
+   }
+   if (Array.isArray(payload.content)) return payload.content;
+   if (payload.data) return extractRows(payload.data, keys);
+   return [];
+};
+
+const extractPageMeta = (payload) => {
+   const source = payload?.page || payload?.data || payload || {};
+   const totalElements = Number(source.totalElements ?? source.totalRecords ?? source.totalCount ?? 0);
+   const totalPages = Number(source.totalPages ?? Math.ceil(totalElements / ITEMS_PER_PAGE) ?? 1);
+   return {
+      totalElements,
+      totalPages: Math.max(totalPages, 1),
+   };
+};
+
 const UtilizationResourceDashboard = () => {
    const [loading, setLoading] = useState(true);
    const [resources, setResources] = useState([]);
    const [searchQuery, setSearchQuery] = useState('');
    const [currentPage, setCurrentPage] = useState(1);
+   const [totalPages, setTotalPages] = useState(1);
+   const [totalElements, setTotalElements] = useState(0);
    const [selectedResource, setSelectedResource] = useState(null);
    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -22,31 +47,29 @@ const UtilizationResourceDashboard = () => {
       const fetchData = async () => {
          try {
             setLoading(true);
-            const response = await utilizationService.getUtilizationSummary();
-            setResources(response?.resources || []);
+            const response = await utilizationService.getUtilizationResources({
+               page: currentPage - 1,
+               size: ITEMS_PER_PAGE,
+               search: searchQuery,
+               sortBy: 'utilizationPercentage',
+               sortDirection: 'desc',
+            });
+            const rows = extractRows(response, ['resourceUtilizations', 'resources']);
+            const meta = extractPageMeta(response);
+            setResources(rows);
+            setTotalPages(meta.totalPages);
+            setTotalElements(meta.totalElements || rows.length);
          } catch (error) {
             console.error('Error fetching resource data:', error);
+            setResources([]);
+            setTotalPages(1);
+            setTotalElements(0);
          } finally {
             setLoading(false);
          }
       };
       fetchData();
-   }, []);
-
-   const filteredResources = useMemo(() => {
-      return resources.filter(res => 
-         res.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-         res.role?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-   }, [resources, searchQuery]);
-
-   const itemsPerPage = 10;
-   const paginatedResources = useMemo(() => {
-      const start = (currentPage - 1) * itemsPerPage;
-      return filteredResources.slice(start, start + itemsPerPage);
-   }, [filteredResources, currentPage]);
-
-   const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
+   }, [currentPage, searchQuery]);
 
    const openDrawer = (res) => {
       setSelectedResource(res);
@@ -93,7 +116,7 @@ const UtilizationResourceDashboard = () => {
                   <GenericTable
                      headers={["Resource Profile", "Workload Util", "Billable Ratio", "Trend Signal", "Activity"]}
                      columns={["profile_info", "utilization_info", "ratio_info", "trend_info", "actions_info"]}
-                     rows={paginatedResources.map((res, idx) => ({
+                     rows={resources.map((res, idx) => ({
                         ...res,
                         profile_info: (
                            <div className="flex items-center gap-4 text-left">
@@ -149,8 +172,8 @@ const UtilizationResourceDashboard = () => {
                         ),
                         actions_info: (
                            <div className="flex justify-end">
-                              <button className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all flex items-center justify-center border border-slate-100">
-                                 <ChevronRight size={18} />
+                                 <button className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all flex items-center justify-center border border-slate-100">
+                                 <ChevronRightIcon size={18} />
                               </button>
                            </div>
                         ),
@@ -161,7 +184,7 @@ const UtilizationResourceDashboard = () => {
                
                {/* PAGINATION */}
                <div className="px-8 py-6 border-t border-slate-100 bg-slate-50/30 flex items-center justify-between">
-                  <p className="text-[11px] font-black text-slate-400 capitalize tracking-widest italic">Showing {paginatedResources.length} of {filteredResources.length} talent profiles</p>
+                  <p className="text-[11px] font-black text-slate-400 capitalize tracking-widest italic">Showing {resources.length} of {totalElements} talent profiles</p>
                   <Pagination 
                      currentPage={currentPage}
                      totalPages={totalPages}

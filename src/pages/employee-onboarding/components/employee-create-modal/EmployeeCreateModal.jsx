@@ -192,10 +192,10 @@ const [isJobEditable, setIsJobEditable] = useState(false);
 
     setActiveTab("Profile");
     setError("");
-    setIsProfileEditable(false);
+    setIsProfileEditable(isEditMode);
     fetchDepartments();
     fetchManagers();
-  }, [isOpen]);
+  }, [isOpen, isEditMode]);
 
   useEffect(() => {
     if (!userUuid && !employeeUuid) return;

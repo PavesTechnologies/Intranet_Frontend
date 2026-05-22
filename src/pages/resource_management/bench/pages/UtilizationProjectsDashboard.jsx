@@ -8,6 +8,17 @@ import utilizationService from '../../../../services/utilizationService';
 import UtilizationNavbar from '../components/UtilizationNavbar';
 import LoadingSpinner from '../../../../components/LoadingSpinner';
 
+const extractRows = (payload, keys) => {
+   if (Array.isArray(payload)) return payload;
+   if (!payload || typeof payload !== 'object') return [];
+   for (const key of keys) {
+      if (Array.isArray(payload[key])) return payload[key];
+   }
+   if (Array.isArray(payload.content)) return payload.content;
+   if (payload.data) return extractRows(payload.data, keys);
+   return [];
+};
+
 const UtilizationProjectsDashboard = () => {
    const [loading, setLoading] = useState(true);
    const [data, setData] = useState(null);
@@ -16,10 +27,17 @@ const UtilizationProjectsDashboard = () => {
       const fetchData = async () => {
          try {
             setLoading(true);
-            const response = await utilizationService.generateReport({ reportType: 'SUMMARY' });
-            setData(response);
+            const [roles, clients] = await Promise.all([
+               utilizationService.getUtilizationRoles({ page: 0, size: 20 }),
+               utilizationService.getUtilizationClients({ page: 0, size: 20 }),
+            ]);
+            setData({
+               roleUtilizations: extractRows(roles, ['roleUtilizations', 'roles']),
+               clientUtilizations: extractRows(clients, ['clientUtilizations', 'clients']),
+            });
          } catch (error) {
             console.error('Error fetching data:', error);
+            setData({ roleUtilizations: [], clientUtilizations: [] });
          } finally {
             setLoading(false);
          }

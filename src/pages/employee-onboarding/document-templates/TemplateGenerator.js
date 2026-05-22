@@ -15,6 +15,11 @@ export const generateHtml = (templateId, data = {}) => {
     grossSalary: data.grossSalary || "12,00,000",
     taxDeducted: data.taxDeducted || "1,20,000",
     joiningDate: data.joiningDate || "[Joining Date]",
+    department: data.department || "[Department]",
+    reportingTime: data.reportingTime || "[Reporting Time]",
+    location: data.location || "[Location]",
+    reportingManager: data.reportingManager || "[Reporting Manager]",
+    customMessage: data.customMessage || "",
     logoPath: "https://pavestechnologies.com/wp-content/uploads/2024/09/Logo.png" // Placeholder or their actual logo if available
   };
 
@@ -412,6 +417,8 @@ export const generateHtml = (templateId, data = {}) => {
       case "joining_letter":
         return `
     <div class="document-container">
+        <div class="date-badge">Date: ${d.date}</div>
+
         <div style="margin-bottom: 35px;">
             <p style="margin-bottom: 8px; font-weight: 600; color: var(--text-dark);">To,</p>
             <p style="margin-bottom: 4px; font-weight: 700; font-size: 11.5pt; color: var(--brand-primary);">${d.firstName} ${d.lastName}</p>
@@ -420,90 +427,83 @@ export const generateHtml = (templateId, data = {}) => {
         </div>
 
         <h1 style="text-align: center; font-size: 24pt; margin: 20px 0 40px 0; border-bottom: 2px solid var(--brand-primary); padding-bottom: 15px; width: fit-content; margin-left: auto; margin-right: auto;">
-            Offer of Employment
+            Joining Letter
         </h1>
 
         <p>Dear <span class="highlight-text">${d.firstName}</span>,</p>
 
-        <p>Following our recent evaluations and interviews, <strong>Paves Global Infotech Private Limited</strong> is absolutely thrilled to offer you a position on our team. Your background, experience, and approach to problem-solving stood out to us, and we are confident that you will play a key role in our company's ongoing success and innovation.</p>
+        <p>We are delighted to welcome you to <strong>Paves Global Infotech Private Limited</strong>. This letter confirms your joining details and the initial reporting information for your first day with our team.</p>
 
-        <h2>Role & Compensation Snapshot</h2>
+        <h2>Joining Details Snapshot</h2>
         <div class="cards-container">
             <div class="value-card">
                 <div class="card-label">Official Designation</div>
                 <div class="card-value">${d.designation}</div>
             </div>
             <div class="value-card">
-                <div class="card-label">Annual Cost to Company</div>
-                <div class="card-value">₹ ${d.totalCtc}</div>
+                <div class="card-label">Department</div>
+                <div class="card-value">${d.department}</div>
             </div>
             <div class="value-card">
-                <div class="card-label">Employment Model</div>
-                <div class="card-value">${d.employeeType}</div>
+                <div class="card-label">Date of Joining</div>
+                <div class="card-value">${d.joiningDate}</div>
             </div>
             <div class="value-card">
-                <div class="card-label">Probation Period</div>
-                <div class="card-value">90 Days</div>
+                <div class="card-label">Reporting Time</div>
+                <div class="card-value">${d.reportingTime}</div>
+            </div>
+            <div class="value-card">
+                <div class="card-label">Work Location</div>
+                <div class="card-value">${d.location}</div>
+            </div>
+            <div class="value-card">
+                <div class="card-label">Reporting Manager</div>
+                <div class="card-value">${d.reportingManager}</div>
             </div>
         </div>
 
-        <p>A comprehensive breakdown of your compensation structure is attached in <strong>Annexure A</strong>. The standard policies, procedures, and terms governing your employment are detailed in <strong>Annexure B</strong>.</p>
-        <p>To accept this offer, please sign your name in the designated area below and return the complete document prior to your anticipated date of joining.</p>
+        <p>On your first day, please report to the HR desk at the above location. Our HR team will assist you with the joining formalities, document verification, and initial onboarding activities.</p>
+
+        ${d.customMessage ? `
+        <div style="background: var(--surface-color); border-left: 4px solid var(--brand-secondary); padding: 15px 20px; border-radius: 0 8px 8px 0; font-size: 9pt; color: var(--text-gray); margin: 25px 0;">
+            <strong style="color: var(--brand-primary);">Additional Information:</strong><br>
+            ${d.customMessage}
+        </div>` : ""}
+
+        <p>We wish you every success in your new role and look forward to a positive and rewarding association with you.</p>
     </div>
 
     <div class="page-break"></div>
     <div class="document-container">
-        <h2>Annexure A: Compensation Structure</h2>
-        <p style="margin-top: -10px; margin-bottom: 25px; font-size: 10pt;">
-            Below is the detailed itemization of your annual compensation package for the role of <strong>${d.designation}</strong>.
-        </p>
+        <h2>Mandatory Onboarding Document Submission</h2>
+        <p>Kindly carry the original copies for visual verification, along with one digital or photocopy set of the following documents on your date of joining:</p>
 
-        <table class="ctc-table">
-            <thead>
-                <tr>
-                    <th width="35%">Salary Component</th>
-                    <th width="20%">Type</th>
-                    <th width="20%">Frequency</th>
-                    <th width="25%" class="amount-col">Amount (₹)</th>
-                </tr>
-            </thead>
-            <tbody>
-               ${compComponents.map(c => `
-<tr>
-    <td><strong>${c.name}</strong></td>
-    <td><span class="type-badge">${c.type}</span></td>
-    <td>${c.frequency}</td>
-    <td class="amount-col">${c.amount}</td>
-</tr>
-`).join('')}
-                <tr class="ctc-total-row">
-                    <td colspan="3" style="text-align: right; text-transform: uppercase; letter-spacing: 1px;">Gross Annual CTC</td>
-                    <td class="amount-col">₹ ${d.totalCtc}</td>
-                </tr>
-            </tbody>
-        </table>
-
-         <div style="background: var(--surface-color); border-left: 4px solid var(--brand-secondary); padding: 15px 20px; border-radius: 0 8px 8px 0; font-size: 9pt; color: var(--text-gray);">
-            <strong style="color: var(--brand-primary);">Tax & Statutory Deductions Disclaimer:</strong><br>
-            Please note that the figures listed above constitute your gross compensation. Actual monthly net "take-home" pay will be calculated after adjusting for applicable statutory deductions.
-        </div>
-    </div>
-
-    <div class="page-break"></div>
-    <div class="document-container">
-        <h2>Annexure B: Terms of Employment</h2>
-        <h3>1. Background Assessment</h3>
-        <p>This offer letter remains provisional and is granted under the assumption that all documentation supplied ensures absolute authenticity.</p>
-
-        <h2 style="margin-top: 40px; border-top: 1px solid var(--border-subtle); padding-top: 25px;">Mandatory Onboarding Document Submission</h2>
         <ul class="modern-list">
-            <li>Comprehensive Updated Resume</li>
-            <li>Last 3 Months' Pay slips</li>
-            <li>Educational Certificates</li>
-            <li>Bank Statement</li>
-            <li>Relieving Letter from Previous Employer</li>
-            <li>Aadhar Card</li>
+            <li>Comprehensive updated resume</li>
+            <li>Educational certificates</li>
+            <li>Last 3 months' pay slips</li>
+            <li>Last 6 months' bank statement</li>
+            <li>Relieving letter from previous employer</li>
+            <li>Passport size photographs</li>
+            <li>Permanent Account Number (PAN) card</li>
+            <li>Aadhaar card</li>
         </ul>
+
+        <h2 style="margin-top: 40px; border-top: 1px solid var(--border-subtle); padding-top: 25px;">Signatures & Acknowledgement</h2>
+        <p>By signing below, I acknowledge that I have received and understood the joining details and reporting instructions provided in this letter.</p>
+
+        <div class="signature-grid">
+            <div class="signature-box">
+                <div class="sign-status">HR Signature</div>
+                <div style="height: 50px;"></div>
+                <div class="signatory-name">Paves HR</div>
+            </div>
+            <div class="signature-box">
+                <div class="sign-status">Employee Acknowledgement</div>
+                <div style="height: 50px;"></div>
+                <div class="signatory-name">${d.firstName} ${d.lastName}</div>
+            </div>
+        </div>
     </div>
         `;
       case "nda":
@@ -732,3 +732,7 @@ export const generateHtml = (templateId, data = {}) => {
 </body>
 </html>`;
 };
+
+
+
+
