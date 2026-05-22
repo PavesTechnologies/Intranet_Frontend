@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, useMemo } from "react";
-import { Dialog, Transition, Listbox, Switch, Combobox } from "@headlessui/react";
+import { Dialog, Transition, Listbox, Combobox } from "@headlessui/react";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -220,7 +220,6 @@ const emptyForm = {
   demandStatus: "",
   demandPriority: "",
   demandCommitment: "",
-  requiresAdditionalApproval: false,
   demandJustification: "",
   rejectionReason: "",
 };
@@ -309,7 +308,6 @@ const buildUpdateDemandPayload = (form, id) => {
     lifecycleState: form.demandStatus,
     status: form.demandStatus,
     demandCommitment: form.demandCommitment,
-    requiresAdditionalApproval: Boolean(form.requiresAdditionalApproval),
     resourcesRequired,
     modifiedBy: form.modifiedBy || null,
   };
@@ -353,7 +351,11 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   const DEMAND_TYPES = useMemo(() => {
     const vals = getEnumValues("DemandType");
     const statuses = normalizeStatusOptions(vals);
-    const filtered = statuses.filter(s => s.value !== "REPLACEMENT");
+    const hiddenDemandTypes = new Set(["REPLACEMENT", "BACK_FILL", "BACKFILL"]);
+    const filtered = statuses.filter((s) => {
+      const value = String(s.value || "").toUpperCase().replace(/[\s-]+/g, "_");
+      return !hiddenDemandTypes.has(value);
+    });
     return filtered.length > 0 ? filtered : [{ label: "Net New", value: "NET_NEW" }];
   }, [getEnumValues]);
 
@@ -522,7 +524,6 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
         minExp: getVal(['minExp', 'experience', 'minimumExperience', 'min_experience', 'MinExperience', 'experience_required', 'min_experience', 'MinExp']),
         deliveryModel: String(getVal(['deliveryModel', 'model', 'DeliveryModel', 'delivery_model', 'Delivery_Model'])).toUpperCase().trim(),
         demandJustification: getVal(['demandJustification', 'justification', 'Justification', 'demand_justification', 'reason', 'demandJustification', 'DemandJustification']),
-        requiresAdditionalApproval: !!getVal(['requiresAdditionalApproval', 'additionalApproval', 'RequiresAdditionalApproval', 'additional_approval', 'AdditionalApproval'], false),
       };
 
 
@@ -758,9 +759,9 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
               <Dialog.Panel
                 className="
                   w-full
-                  max-w-2xl
+                  max-w-3xl
                   overflow-hidden
-                  rounded-2xl
+                  rounded-xl
                   bg-white
                   shadow-2xl
                   flex flex-col
@@ -768,7 +769,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                 "
               >
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
                   <div>
                     <Dialog.Title className="text-lg font-bold text-slate-900">
                       {mode === "edit" || initialData ? "Update Demand" : "Create New Demand"}
@@ -791,7 +792,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                   ref={scrollRef}
                   className="flex-1 overflow-y-auto p-6 space-y-5"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-2">
 
                     {/* Project */}
                     {/* {(!!projectDetails || !!initialData) ? (
@@ -1002,27 +1003,6 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       disabled={mode === "edit" && !isManagerOrPM}
                     />
 
-                    {/* Additional Approval Checkbox */}
-                    <div className="md:col-span-2 flex items-center gap-3 py-3 px-1">
-                      <Switch
-                        checked={form.requiresAdditionalApproval}
-                        onChange={(v) => update("requiresAdditionalApproval", v)}
-                        disabled={mode === "edit" && !isManagerOrPM}
-                        className={`${form.requiresAdditionalApproval ? 'bg-blue-600' : 'bg-slate-200'
-                          } relative inline-flex h-5 w-10 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2  focus-visible:ring-white/75 ${mode === "edit" && !isManagerOrPM ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
-                      >
-                        <span className="sr-only">Additional Approval</span>
-                        <span
-                          aria-hidden="true"
-                          className={`${form.requiresAdditionalApproval ? 'translate-x-5' : 'translate-x-0'
-                            } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
-                        />
-                      </Switch>
-                      <label className={`text-sm font-medium text-slate-700 select-none ${mode === "edit" && !isManagerOrPM ? "cursor-not-allowed" : "cursor-pointer"}`} onClick={() => (mode !== "edit" || isManagerOrPM) && update("requiresAdditionalApproval", !form.requiresAdditionalApproval)}>
-                        Requires Additional Leadership Approval
-                      </label>
-                    </div>
-
                     {/* Justification */}
                     <FormField id="field-demandJustification" label="Demand Justification" error={errors.demandJustification} required className="md:col-span-2">
                       <textarea
@@ -1038,10 +1018,10 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3 rounded-b-2xl">
+                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3 rounded-b-xl">
                   <button
                     onClick={onClose}
-                    className="px-5 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-all"
+                    className="px-5 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-all"
                   >
                     Cancel
                   </button>
@@ -1053,7 +1033,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                       px-6 py-2
                       bg-blue-600 hover:bg-blue-700
                       disabled:bg-slate-300 disabled:cursor-not-allowed
-                      text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-600/20
+                      text-white text-sm font-bold rounded-lg shadow-lg shadow-blue-600/20
                       transition-all active:scale-[0.98]
                       flex items-center justify-center gap-2
                     "
