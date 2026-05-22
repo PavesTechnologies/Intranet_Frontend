@@ -9,7 +9,7 @@ import { TYPE_CONFIG, PRIORITY_CONFIG } from "../utils/myWorkUtils";
 const ENTITY_TYPE_MAP = {
   TASK:  "task",
   STORY: "story",
-  BUG:   "bug",
+  // BUG:   "bug",
 };
 
 export default function ItemDetailPanel({ item, onClose }) {
@@ -131,7 +131,7 @@ export default function ItemDetailPanel({ item, onClose }) {
         <div className="px-5 py-3 border-t border-slate-100 flex-shrink-0">
           <a
             href={`/projects/${item.projectId}?tab=${
-              item.type === "BUG" ? "test-management" :
+              // item.type === "BUG" ? "test-management" :
               item.type === "STORY" ? "backlog" : "backlog"
             }`}
             className="flex items-center gap-1.5 text-xs text-indigo-600 font-medium

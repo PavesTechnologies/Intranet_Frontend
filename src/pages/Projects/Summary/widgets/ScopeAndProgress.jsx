@@ -3,16 +3,16 @@ import React, { useMemo } from "react";
 import { Card, Typography } from "antd";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { FiCheckSquare, FiBookmark, FiZap } from "react-icons/fi";
-import { FaBug } from "react-icons/fa";
+// import { FaBug } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { itemVariants } from "../uiConfig";
 
 const { Title, Text } = Typography;
 
-const ScopeAndProgress = ({  stories, bugs, tasks, statuses }) => {
+const ScopeAndProgress = ({ stories, tasks, statuses /*, bugs */ }) => {
   const allWorkItems = useMemo(
-    () => [...stories, ...tasks, ...bugs],
-    [stories, tasks, bugs]
+    () => [...stories, ...tasks/*, ...bugs*/],
+    [stories, tasks/*, bugs*/]
   );
   const totalItems = allWorkItems.length;
 
@@ -75,13 +75,13 @@ const ScopeAndProgress = ({  stories, bugs, tasks, statuses }) => {
         count: tasks.length,
         icon: <FiCheckSquare className="text-blue-500 text-xl" />,
       },
-      {
-        name: "Bugs",
-        count: bugs.length,
-        icon: <FaBug className="text-red-500 text-xl" />,
-      },
+      // {
+      //   name: "Bugs",
+      //   count: bugs.length,
+      //   icon: <FaBug className="text-red-500 text-xl" />,
+      // },
     ],
-    [ stories.length, tasks.length, bugs.length]
+    [stories.length, tasks.length/*, bugs.length*/]
   );
 
   return (
@@ -103,7 +103,7 @@ const ScopeAndProgress = ({  stories, bugs, tasks, statuses }) => {
         }}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap- items-center">
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {statItems.map((item) => (
               <div
                 key={item.name}

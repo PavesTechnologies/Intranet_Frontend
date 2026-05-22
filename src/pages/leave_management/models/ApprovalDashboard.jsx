@@ -120,7 +120,7 @@ const ApprovalDashboard = () => {
       }
       await loadPendingApprovals();
     } catch (error) {
-      toast.error("Failed to approve request");
+      toast.error(error.response?.data?.message || "Failed to approve request");
       console.error("Failed to approve:", error);
     } finally {
       setIsConfirmationOpen(false);
