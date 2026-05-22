@@ -7,7 +7,7 @@ export const CATEGORY_OPTIONS = [
   "Not Available",
 ];
 
-export const POOL_OPTIONS = ["CoE", "Training", "R&D"];
+export const POOL_OPTIONS = ["CoE", "Training Pool", "R&D"];
 
 export const BENCH_TABS = [
   { id: "bench", label: "Bench" },
@@ -28,7 +28,7 @@ export const EXCLUDE_SHADOW_FROM_BENCH = true;
 export const DEMAND_PROFILES = [
   {
     id: "dem-1",
-    name: "Care Portal Revamp",
+    name: "Care Portal Revamp",  
     project: "All Care",
     requiredSkills: ["React", "TypeScript", "REST APIs"],
   },
