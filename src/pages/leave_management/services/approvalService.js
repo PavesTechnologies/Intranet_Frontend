@@ -1,4 +1,5 @@
 import axios from "axios";
+import { useJobProgress } from "../../../contexts/JobProgressContext";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -16,11 +17,14 @@ export const approvalService = {
   },
 
   approveRequest: async (requestId, comment) => {
-    await axios.post(
+    const response = await axios.post(
       `${BASE_URL}/api/approvals/${requestId}/approve`,
       { comment },
       { headers: getAuthHeader() },
     );
+      {
+          startJob(response.data.data.jobId);
+        }
   },
 
   rejectRequest: async (requestId, reason) => {

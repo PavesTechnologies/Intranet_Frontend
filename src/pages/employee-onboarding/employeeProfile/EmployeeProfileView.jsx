@@ -786,7 +786,6 @@ export default function EmployeeProfileView() {
         const errorText = await res.text();
         const displayMessage = formatAboutApiError(errorText, "Failed to fetch about data");
         console.error("Failed to fetch about data:", displayMessage);
-        showStatusToast(displayMessage, "error");
       }
     } catch (err) { console.error("Failed to fetch about data:", err); }
   };

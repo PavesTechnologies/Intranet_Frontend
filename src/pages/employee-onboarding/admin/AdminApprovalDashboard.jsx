@@ -10,6 +10,7 @@ import {
   Clock,
   Loader2,
 } from "lucide-react";
+import { ViewIcon } from "../../../components/icons/ActionIcons";
 import { useNavigate, Navigate } from "react-router-dom";
 import axios from "axios";
 import Pagination from "../../../components/Pagination/pagination";
@@ -231,14 +232,18 @@ if (!authLoading && !isAuthorizedManager) {
                   <StatusBadge status={getStatus(row)} />
                 </td>
                 <td className="px-4 py-3">{row.requested_by_name}</td>
-                <td className="px-4 py-3 text-indigo-600 cursor-pointer">
-                  <span
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
                     onClick={() =>
                       navigate(`/employee-onboarding/admin/offer/${row.user_uuid}`)
                     }
+                    className="rounded-md bg-gray-100 p-1.5 text-gray-700 transition hover:bg-gray-200 hover:text-gray-900"
+                    aria-label="View offer"
+                    title="View offer"
                   >
-                    View
-                  </span>
+                    <ViewIcon className="h-4 w-4" />
+                  </button>
                 </td>
               </tr>
               )

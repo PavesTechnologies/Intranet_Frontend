@@ -166,6 +166,8 @@ import ApprovalRulesPage from "./pages/leave_management/models/ApprovalRulesPage
 import RiskRegisterPage from "./pages/Projects/manager/riskManagement/RiskRegisterPage.jsx";
 import LeaveUploadWizard from "./pages/leave_management/models/LeaveUploadWizard.jsx";
 import ApplyLeaveOnBehalf from "./pages/leave_management/models/ApplyLeaveOnBehalf.jsx";
+import { JobProgressProvider, useJobProgress } from "./contexts/JobProgressContext.jsx";
+import LeaveBalanceJobProgress from "./pages/leave_management/models/LeaveBalanceJobProgress.jsx";
 
 import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.jsx";
 import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
@@ -926,6 +928,20 @@ const AppRoutes = () => {
   );
 };
 
+// add this just above the App function at the bottom of the file
+const AppJobProgress = () => {
+  const { activeJobId, clearJob } = useJobProgress();
+
+  if (!activeJobId) return null;
+
+  return (
+    <LeaveBalanceJobProgress
+      jobId={activeJobId}
+      onClose={clearJob}
+    />
+  );
+};
+
 // 🚀 App Entry Point
 function App() {
   return (
@@ -935,9 +951,11 @@ function App() {
         <></>
         <AuthProvider>
           <NotificationProvider>
+            <JobProgressProvider>
             <div className="min-h-screen bg-gray-50">
               <AppRoutes />
             </div>
+            </JobProgressProvider>
           </NotificationProvider>
         </AuthProvider>
       </Router>
