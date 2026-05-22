@@ -1,6 +1,6 @@
 import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
-import { Settings2, X } from "lucide-react";
+import { Boxes, Layers, Settings2, Tag, X } from "lucide-react";
 import { notify, getResourceManagementErrorMessage } from "../../utils/notify";
 import BulkUploadTab from "./BulkUploadTab";
 import SkillTaxonomyTab from "./SkillTaxonomyTab";
@@ -10,7 +10,8 @@ import { skillService } from "../../../../services/skillService";
 const normalize = (value) => `${value || ""}`.trim().toLowerCase();
 
 const createId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-const isTemporaryId = (id) => !id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+const isTemporaryId = (id) =>
+  !id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const cloneTaxonomy = (taxonomy) =>
   taxonomy.map((category) => ({
@@ -131,6 +132,17 @@ const mergeSavedCategory = (existingCategory, savedCategory) => {
   };
 };
 
+/* ─── Stat pill ───────────────────────────────────────────────────── */
+const StatPill = ({ icon: Icon, label, count }) => (
+  <div className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5">
+    <Icon className="h-3.5 w-3.5 text-gray-500" />
+    <span className="text-xs font-semibold text-gray-700">{count}</span>
+    <span className="text-xs text-gray-500">{label}</span>
+  </div>
+);
+
+/* ─── Main component ──────────────────────────────────────────────── */
+
 const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraftKey = "" }) => {
   const [activeTab, setActiveTab] = useState("taxonomy");
   const [taxonomy, setTaxonomy] = useState([]);
@@ -167,7 +179,6 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
               subSkillResponse?.error || `Failed to retrieve subskills for ${skill.name}.`,
             );
           }
-
           return [
             skill.id,
             Array.isArray(subSkillResponse.data)
@@ -175,10 +186,7 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
               : [],
           ];
         } catch (error) {
-          notify.error(
-            error,
-            `Unable to load subskills for ${skill.name}.`,
-          );
+          notify.error(error, `Unable to load subskills for ${skill.name}.`);
           return [skill.id, []];
         }
       }),
@@ -218,10 +226,7 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
             loadedCategoryIdsRef.current = new Set([initialDraft.categoryId]);
           } catch (error) {
             loadedCategoryIdsRef.current = new Set();
-            notify.error(
-              error,
-              "Unable to fully hydrate the selected taxonomy item for editing.",
-            );
+            notify.error(error, "Unable to fully hydrate the selected taxonomy item for editing.");
           }
         } else {
           loadedCategoryIdsRef.current = new Set();
@@ -231,11 +236,7 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
         setInitialTaxonomy(cloneTaxonomy(nextTaxonomy));
         setStagedCategories([]);
 
-        notify.complete(
-          toastId,
-          response?.message || "Categories retrieved successfully.",
-          "success",
-        );
+        notify.complete(toastId, response?.message || "Categories retrieved successfully.", "success");
       } catch (error) {
         loadedCategoryIdsRef.current = new Set();
         setTaxonomy([]);
@@ -244,10 +245,7 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
 
         notify.complete(
           toastId,
-          getResourceManagementErrorMessage(
-            error,
-            "Unable to load skill categories.",
-          ),
+          getResourceManagementErrorMessage(error, "Unable to load skill categories."),
           "error",
         );
       }
@@ -276,18 +274,11 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
       setTaxonomy((current) => mergeCategorySkills(current));
       setInitialTaxonomy((current) => mergeCategorySkills(current));
 
-      notify.complete(
-        toastId,
-        response?.message || "Skills retrieved successfully.",
-        "success",
-      );
+      notify.complete(toastId, "Skills retrieved successfully.", "success");
     } catch (error) {
       notify.complete(
         toastId,
-        getResourceManagementErrorMessage(
-          error,
-          "Unable to load skills for the selected category.",
-        ),
+        getResourceManagementErrorMessage(error, "Unable to load skills for the selected category."),
         "error",
       );
     }
@@ -351,7 +342,6 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
               String(category.id) === String(saved.id) ||
               normalize(category.name) === normalize(saved.name),
           );
-
           if (existingIndex >= 0) {
             next[existingIndex] = mergeSavedCategory(next[existingIndex], saved);
           } else {
@@ -361,19 +351,12 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
         return next;
       });
 
-      notify.complete(
-        toastId,
-        response?.message || successFallback,
-        "success",
-      );
+      notify.complete(toastId, response?.message || successFallback, "success");
       return true;
     } catch (error) {
       notify.complete(
         toastId,
-        getResourceManagementErrorMessage(
-          error,
-          "Unable to save skill taxonomy.",
-        ),
+        getResourceManagementErrorMessage(error, "Unable to save skill taxonomy."),
         "error",
       );
       return false;
@@ -509,9 +492,12 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
     }
   };
 
+  const hasPendingChanges = stagedCategories.length > 0;
+
   return (
     <Transition.Root show={open} as={Fragment}>
       <Dialog as="div" className="relative z-[1200]" onClose={onClose}>
+        {/* Backdrop */}
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-200"
@@ -521,7 +507,7 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-slate-950/35 backdrop-blur-sm" />
+          <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-hidden">
@@ -535,19 +521,21 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
               leaveFrom="translate-y-0 scale-100 opacity-100"
               leaveTo="translate-y-4 scale-[0.98] opacity-0"
             >
-              <Dialog.Panel className="flex h-[85vh] w-[78vw] min-w-[320px] max-w-[1260px] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
-                <div className="border-b border-gray-200 px-6 py-4">
+              <Dialog.Panel className="flex h-[88vh] w-[80vw] min-w-[320px] max-w-[1280px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+
+                {/* ── Modal header ─────────────────────────────────── */}
+                <div className="shrink-0 border-b border-gray-200 bg-white px-6 py-4">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-lg bg-indigo-100 p-3 text-indigo-700">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-lg bg-indigo-100 p-2.5 text-indigo-700">
                         <Settings2 className="h-5 w-5" />
                       </div>
                       <div>
-                        <Dialog.Title className="text-lg font-semibold text-gray-800">
+                        <Dialog.Title className="text-base font-semibold text-gray-900">
                           Skill Management
                         </Dialog.Title>
-                        <p className="mt-1 text-sm text-gray-500">
-                          Manage taxonomy hierarchy and bulk uploads in a compact enterprise workflow.
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          Build and maintain the skill taxonomy hierarchy
                         </p>
                       </div>
                     </div>
@@ -555,13 +543,16 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
                     <button
                       type="button"
                       onClick={onClose}
-                      className="rounded-md p-1 text-gray-400 transition hover:text-gray-600"
+                      aria-label="Close modal"
+                      className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                     >
                       <X className="h-5 w-5" />
                     </button>
                   </div>
 
+                  {/* Tab + stats row */}
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    {/* Tab strip */}
                     <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
                       {modalTabs.map((tab) => {
                         const isActive = tab.id === activeTab;
@@ -570,7 +561,7 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
                             key={tab.id}
                             type="button"
                             onClick={() => setActiveTab(tab.id)}
-                            className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
                               isActive
                                 ? "bg-white text-indigo-700 shadow-sm"
                                 : "text-gray-500 hover:text-gray-800"
@@ -582,15 +573,17 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
                       })}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-600">
-                      <span className="rounded-full bg-gray-100 px-3 py-1.5">{stats.categories} Categories</span>
-                      <span className="rounded-full bg-gray-100 px-3 py-1.5">{stats.skills} Skills</span>
-                      <span className="rounded-full bg-gray-100 px-3 py-1.5">{stats.subSkills} SubSkills</span>
+                    {/* Taxonomy stats */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatPill icon={Boxes} label="Categories" count={stats.categories} />
+                      <StatPill icon={Layers} label="Skills" count={stats.skills} />
+                      <StatPill icon={Tag} label="SubSkills" count={stats.subSkills} />
                     </div>
                   </div>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto bg-white p-6">
+                {/* ── Modal body ───────────────────────────────────── */}
+                <div className="min-h-0 flex-1 overflow-y-auto bg-gray-50/30 p-6">
                   {activeTab === "taxonomy" ? (
                     <SkillTaxonomyTab
                       taxonomy={taxonomy}
@@ -604,28 +597,38 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
                   )}
                 </div>
 
-                <div className="sticky bottom-0 border-t border-gray-200 bg-gray-50 px-6 py-4">
+                {/* ── Modal footer ─────────────────────────────────── */}
+                <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-3.5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-xs text-gray-500">Live category reads and taxonomy saves enabled.</p>
-                    <div className="flex items-center justify-end gap-3">
+                    <p className="text-xs text-gray-400">
+                      {hasPendingChanges ? (
+                        <span className="font-medium text-amber-600">
+                          {stagedCategories.length} unsaved change{stagedCategories.length !== 1 ? "s" : ""}
+                        </span>
+                      ) : (
+                        "No pending changes"
+                      )}
+                    </p>
+
+                    <div className="flex items-center justify-end gap-2">
                       <button
                         type="button"
                         onClick={handleReset}
-                        className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                        className="rounded-lg px-3.5 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
                       >
                         Reset
                       </button>
                       <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                        className="rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                       >
                         Cancel
                       </button>
                       <button
                         type="button"
                         onClick={handleSave}
-                        className="rounded-md bg-indigo-600 px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+                        className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
                       >
                         Save Changes
                       </button>
