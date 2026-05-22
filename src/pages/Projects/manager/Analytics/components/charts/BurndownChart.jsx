@@ -17,7 +17,7 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
     if (!burndownData || !canvasRef.current) return;
     if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
 
-    const { labels, actualRemaining, idealRemaining } = burndownData;
+    const { labels, actualRemaining, idealRemaining, totalScope } = burndownData;
 
     const weekendPlugin = {
       id: "weekendShading",
@@ -57,6 +57,21 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
             pointBorderWidth:     2,
             fill:                 true,
             tension:              0.3,
+            spanGaps:             true,
+          },
+          {
+            label:                "Total scope",
+            data:                 totalScope,
+            borderColor:          "#F59E0B",
+            backgroundColor:      "transparent",
+            borderWidth:          2,
+            borderDash:           [4, 3],
+            pointRadius:          3,
+            pointBackgroundColor: "#F59E0B",
+            pointBorderColor:     "#fff",
+            pointBorderWidth:     1.5,
+            fill:                 false,
+            tension:              0,
             spanGaps:             true,
           },
           {
@@ -129,6 +144,10 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-5 h-0.5 bg-indigo-600 rounded" />
           Actual remaining
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-5 h-0" style={{ borderTop: "2px dashed #F59E0B" }} />
+          Total scope
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-5 h-0" style={{ borderTop: "2px dashed #94A3B8" }} />

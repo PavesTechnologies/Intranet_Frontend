@@ -7,18 +7,18 @@ import DistributionBar from "./DistributionBar";
 import { motion } from "framer-motion";
 import { itemVariants } from "../uiConfig";
 import { FiCheckSquare, FiBookmark, FiZap } from "react-icons/fi";
-import { FaBug } from "react-icons/fa";
+// import { FaBug } from "react-icons/fa";
 
 const { Title, Text } = Typography;
 
-const TypesOfWork = ({ tasks, stories, epics, bugs }) => {
+const TypesOfWork = ({ tasks, stories, epics /*, bugs */ }) => {
   const workTypes = useMemo(
     () => [
       { name: "Tasks", items: tasks, icon: <FiCheckSquare className="text-blue-500" /> },
       { name: "Stories", items: stories, icon: <FiBookmark className="text-green-500" /> },
-      { name: "Bugs", items: bugs, icon: <FaBug className="text-red-500" /> },
+      // { name: "Bugs", items: bugs, icon: <FaBug className="text-red-500" /> },
     ],
-    [tasks, stories, epics, bugs]
+    [tasks, stories, epics/*, bugs*/]
   );
 
   const totalItems = useMemo(

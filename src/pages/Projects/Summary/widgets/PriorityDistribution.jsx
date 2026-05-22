@@ -19,16 +19,16 @@ import { useInView } from "framer-motion";
 
 const { Title, Text } = Typography;
 
-const PriorityDistribution = ({ tasks, stories, bugs }) => {
+const PriorityDistribution = ({ tasks, stories /*, bugs */ }) => {
   const data = useMemo(() => {
     const allPriorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL", "UNSPECIFIED"];
     const dataMap = new Map(
-      allPriorities.map((p) => [p, { priority: p, Tasks: 0, Stories: 0, Bugs: 0 }])
+      allPriorities.map((p) => [p, { priority: p, Tasks: 0, Stories: 0/*, Bugs: 0*/ }])
     );
     const allItems = [
       ...(tasks || []).map((item) => ({ ...item, type: "Tasks" })),
       ...(stories || []).map((item) => ({ ...item, type: "Stories" })),
-      ...(bugs || []).map((item) => ({ ...item, type: "Bugs" })),
+      // ...(bugs || []).map((item) => ({ ...item, type: "Bugs" })),
     ];
 
     allItems.forEach((item) => {
@@ -37,9 +37,9 @@ const PriorityDistribution = ({ tasks, stories, bugs }) => {
     });
 
     return Array.from(dataMap.values()).filter(
-      (entry) => entry.Tasks > 0 || entry.Stories > 0 || entry.Bugs > 0
+      (entry) => entry.Tasks > 0 || entry.Stories > 0 /*(|| entry.Bugs > 0)*/
     );
-  }, [tasks, stories, bugs]);
+  }, [tasks, stories /*, bugs*/]);
 
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, amount: 0.5 });
@@ -101,14 +101,14 @@ const PriorityDistribution = ({ tasks, stories, bugs }) => {
                 animationDuration={isInView ? 800 : 0}
                 animationDelay={100}
               />
-              <Bar
+              {/* <Bar
                 dataKey="Bugs"
                 fill="#06b6d4"
                 radius={[6, 6, 0, 0]}
                 barSize={28}
                 animationDuration={isInView ? 800 : 0}
                 animationDelay={200}
-              />
+              /> */}
             </BarChart>
           </ResponsiveContainer>
         </div>

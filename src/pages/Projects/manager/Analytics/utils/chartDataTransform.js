@@ -21,7 +21,13 @@ export function toBurndownDatasetsFromBurndown(dailyBurn) {
         : null
   );
 
-  return { labels, actualRemaining, idealRemaining };
+  const totalScope = dailyBurn.map((d) =>
+    d.totalScopePoints !== null && d.totalScopePoints !== undefined
+      ? d.totalScopePoints
+      : null
+  );
+
+  return { labels, actualRemaining, idealRemaining, totalScope };
 }
 
 export function toBurndownDatasets(dailyBurnup, initialPoints) {

@@ -16,13 +16,13 @@ export const TYPE_CONFIG = {
     border:"border-emerald-200",
     dot:   "bg-emerald-500",
   },
-  BUG: {
-    label: "Bug",
-    color: "text-red-700",
-    bg:    "bg-red-50",
-    border:"border-red-200",
-    dot:   "bg-red-500",
-  },
+  // BUG: {
+  //   label: "Bug",
+  //   color: "text-red-700",
+  //   bg:    "bg-red-50",
+  //   border:"border-red-200",
+  //   dot:   "bg-red-500",
+  // },
   TEST_RUN: {
     label: "Run",
     color: "text-violet-700",

@@ -10,7 +10,7 @@ export default function useDashboardData(projectId) {
     epics: null,
     stories: null,
     tasks: null,
-    bugs: null,
+    // bugs: null,
     statuses: null,
     users: null,
     stage: null,
@@ -20,7 +20,7 @@ export default function useDashboardData(projectId) {
     epics: true,
     stories: true,
     tasks: true,
-    bugs: true,
+    // bugs: true,
     statuses: true,
     users: true,
     stage: true,
@@ -118,10 +118,10 @@ export default function useDashboardData(projectId) {
     fetchWithCache("epics", `${base}/api/projects/${projectId}/epics`);
     fetchWithCache("stories", `${base}/api/projects/${projectId}/stories`);
     fetchWithCache("tasks", `${base}/api/projects/${projectId}/tasks`);
-    fetchWithCache(
-      "bugs",
-      `${base}/api/testing/bugs/projects/${projectId}/summaries`,
-    );
+    // fetchWithCache(
+    //   "bugs",
+    //   `${base}/api/testing/bugs/projects/${projectId}/summaries`,
+    // );
     fetchWithCache("statuses", `${base}/api/projects/${projectId}/statuses`);
     fetchWithCache(
       "users",
