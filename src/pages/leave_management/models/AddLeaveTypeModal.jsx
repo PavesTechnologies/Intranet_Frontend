@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, FileText } from "lucide-react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -17,10 +17,10 @@ const useLeavelables = () => {
   useEffect(() => {
     const fetchLeavelables = async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/api/leave/types`, {
+        const res = await api.get(`${BASE_URL}/api/leave/types`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
-        const accfre = await axios.get(
+        const accfre = await api.get(
           `${BASE_URL}/api/leave/accrual-frequencies`,
           {
             headers: {
@@ -238,7 +238,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
     const method = editData ? "patch" : "post";
 
     try {
-      const response = await axios({
+      const response = await api({
         method,
         url,
         data: payload,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import Pagination from "../../../components/Pagination/pagination";
 import { Fonts } from "../../../components/Fonts/Fonts";
 import { toast } from "react-toastify";
@@ -64,7 +64,7 @@ const LeaveHistory = ({ employeeId, year }) => {
 
     try {
       const [leaveResp, typesResp] = await Promise.all([
-        axios.get(
+        api.get(
           `${BASE_URL}/api/leave-requests/employee/${employeeId}/${selectedYear}`,
           {
             headers: {
@@ -73,7 +73,7 @@ const LeaveHistory = ({ employeeId, year }) => {
             withCredentials: true,
           },
         ),
-        axios.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
+        api.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           withCredentials: true,
         }),
@@ -114,7 +114,7 @@ const LeaveHistory = ({ employeeId, year }) => {
   useEffect(() => {
     const fetchLeaveTypes = async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/api/leave/types`, {
+        const res = await api.get(`${BASE_URL}/api/leave/types`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
         setLeaveTypes(res.data || []);
@@ -221,7 +221,7 @@ const LeaveHistory = ({ employeeId, year }) => {
 
     setIsCancelling(true);
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE_URL}/api/leave-revoke/revoke`,
         { leaveRequestId: selectedLeaveId, reason, employeeId: employeeId }, // ✅ added employeeId for better logging on backend
         {
@@ -442,13 +442,13 @@ export default LeaveHistory;
 // //   useEffect(() => {
 // //     setLoading(true);
 // //     Promise.all([
-// //       axios.get(`${BASE_URL}/api/leave-requests/employee/${employeeId}`, {
+// //       api.get(`${BASE_URL}/api/leave-requests/employee/${employeeId}`, {
 // //         withCredentials: true,
 // //         headers: {
 // //           Authorization: `Bearer ${localStorage.getItem("token")}`,
 // //         },
 // //       }),
-// //       axios.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
+// //       api.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
 // //         withCredentials: true,
 // //         headers: {
 // //           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -475,7 +475,7 @@ export default LeaveHistory;
 // //     const fetchLeaveTypes = async () => {
 // //       // if (!isOpen) return;
 // //       try {
-// //         const res = await axios.get(`${BASE_URL}/api/leave/types`, {
+// //         const res = await api.get(`${BASE_URL}/api/leave/types`, {
 // //           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
 // //         });
 // //         setLeaveTypes(res.data);
@@ -643,7 +643,7 @@ export default LeaveHistory;
 // //     }
 // //     setIsCancelling(true);
 // //     try {
-// //       const res = await axios.post(`${BASE_URL}/api/leave-revoke/revoke`,
+// //       const res = await api.post(`${BASE_URL}/api/leave-revoke/revoke`,
 // //         {
 // //           leaveRequestId: selectedLeaveId,
 // //           reason: reason
@@ -941,13 +941,13 @@ export default LeaveHistory;
 // //     setLoading(true);
 
 // //     Promise.all([
-// //       axios.get(`${BASE_URL}/api/leave-requests/employee/${employeeId}/${selectedYear}`, {
+// //       api.get(`${BASE_URL}/api/leave-requests/employee/${employeeId}/${selectedYear}`, {
 // //         headers: {
 // //           Authorization: `Bearer ${localStorage.getItem("token")}`,
 // //         },
 // //         withCredentials: true,
 // //       }),
-// //       axios.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
+// //       api.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
 // //         headers: {
 // //           Authorization: `Bearer ${localStorage.getItem("token")}`,
 // //         },
@@ -975,7 +975,7 @@ export default LeaveHistory;
 // //   useEffect(() => {
 // //     const fetchLeaveTypes = async () => {
 // //       try {
-// //         const res = await axios.get(`${BASE_URL}/api/leave/types`, {
+// //         const res = await api.get(`${BASE_URL}/api/leave/types`, {
 // //           headers: {
 // //             Authorization: `Bearer ${localStorage.getItem("token")}`,
 // //           },
@@ -1117,7 +1117,7 @@ export default LeaveHistory;
 // //     setIsCancelling(true);
 
 // //     try {
-// //       const res = await axios.post(
+// //       const res = await api.post(
 // //         `${BASE_URL}/api/leave-revoke/revoke`,
 // //         {
 // //           leaveRequestId: selectedLeaveId,
@@ -1398,7 +1398,7 @@ export default LeaveHistory;
 
 //       try {
 //         const [leaveResp, typesResp] = await Promise.all([
-//           axios.get(
+//           api.get(
 //             `${BASE_URL}/api/leave-requests/employee/${employeeId}/${selectedYear}`,
 //             {
 //               headers: {
@@ -1407,7 +1407,7 @@ export default LeaveHistory;
 //               withCredentials: true,
 //             },
 //           ),
-//           axios.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
+//           api.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
 //             headers: {
 //               Authorization: `Bearer ${localStorage.getItem("token")}`,
 //             },
@@ -1443,7 +1443,7 @@ export default LeaveHistory;
 //   useEffect(() => {
 //     const fetchLeaveTypes = async () => {
 //       try {
-//         const res = await axios.get(`${BASE_URL}/api/leave/types`, {
+//         const res = await api.get(`${BASE_URL}/api/leave/types`, {
 //           headers: {
 //             Authorization: `Bearer ${localStorage.getItem("token")}`,
 //           },
@@ -1565,7 +1565,7 @@ export default LeaveHistory;
 //     setIsCancelling(true);
 
 //     try {
-//       const res = await axios.post(
+//       const res = await api.post(
 //         `${BASE_URL}/api/leave-revoke/revoke`,
 //         {
 //           leaveRequestId: selectedLeaveId,

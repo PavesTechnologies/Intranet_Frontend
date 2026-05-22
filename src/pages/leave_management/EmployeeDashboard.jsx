@@ -64,7 +64,7 @@
 //     try {
 //       payload = { ...payload, employeeId };
 
-//       const res = await axios.post(`${BASE_URL}/api/compoff/request`, payload, {
+//       const res = await api.post(`${BASE_URL}/api/compoff/request`, payload, {
 //         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
 //       });
 //       if (res.data.success) {
@@ -103,7 +103,7 @@
 
 //     inFlightRef.current = true;
 //     try {
-//       const res = await axios.get(
+//       const res = await api.get(
 //         `${BASE_URL}/api/compoff/employee/${employeeId}`,
 //         {
 //           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -204,7 +204,7 @@
 //     };
 // }, [subscribe]); // ✅ Remove fetchRequests from deps — not needed here
 
-//   // const holidayData = axios.get(`${process.env.REACT_APP_API_URL}/api/holidays/all`)
+//   // const holidayData = api.get(`${process.env.REACT_APP_API_URL}/api/holidays/all`)
 //   // .then((res)=> res.data).catch((err) => {
 //   //   console.error("Error fetching holiday data:", err);
 //   // });
@@ -349,7 +349,7 @@ import UpcomingHolidays from "./charts/UpcomingHolidays";
 import { YearDropdown } from "./models/EmployeeLeaveBalances.jsx";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../api/axiosInstance";
 import Button from "../../components/Button/Button.jsx";
 import FilterListbox from "../../components/filter/FilterListbox.jsx";
 
@@ -378,7 +378,7 @@ const EmployeeDashboard = ({ employeeId }) => {
     if (!employeeId || inFlightRef.current) return;
     inFlightRef.current = true;
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/api/compoff/employee/${employeeId}`,
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
@@ -405,7 +405,7 @@ const EmployeeDashboard = ({ employeeId }) => {
   const handleCompOffSubmit = async (payload) => {
     setIsLoading(true);
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE_URL}/api/compoff/request`,
         { ...payload, employeeId },
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }

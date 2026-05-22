@@ -4,7 +4,7 @@ import "react-day-picker/dist/style.css";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { format, isSameDay } from "date-fns";
 import { toast } from "react-toastify";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -27,7 +27,7 @@ const DateRangePicker = ({
 
   const fetchHolidays = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/api/holidays/by-location/${year}`,
         {
           params: { state: "All", country: "India" },

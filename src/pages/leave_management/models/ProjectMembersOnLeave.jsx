@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import Tooltip from "../../../components/status/Tooltip";
 
 const PMS_BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
@@ -80,7 +80,7 @@ const ProjectMembersOnLeave = ({ employeeId, leaveId }) => {
         setError(null);
 
         // 1️⃣ Fetch active projects of the employee
-        const projectsRes = await axios.get(
+        const projectsRes = await api.get(
           `${PMS_BASE_URL}/api/projects/member/${employeeId}/active-projects`,
           {
             headers: {
@@ -96,7 +96,7 @@ const ProjectMembersOnLeave = ({ employeeId, leaveId }) => {
         }
 
         // 2️⃣ Fetch current leave dates
-        const empLeaveRes = await axios.get(
+        const empLeaveRes = await api.get(
           `${BASE_URL}/api/leave-requests/${leaveId}`,
           {
             headers: {
@@ -114,7 +114,7 @@ const ProjectMembersOnLeave = ({ employeeId, leaveId }) => {
         // 3️⃣ For each project, fetch members and their leaves
         const results = await Promise.all(
           projects.map(async (project) => {
-            const empRes = await axios.get(
+            const empRes = await api.get(
               `${PMS_BASE_URL}/api/projects/${project.id}/members`,
               {
                 headers: {
@@ -133,7 +133,7 @@ const ProjectMembersOnLeave = ({ employeeId, leaveId }) => {
                 .filter((emp) => emp.id != employeeId) // exclude current employee
                 .map(async (emp) => {
                   if (!leaveCache[emp.id]) {
-                    const leaveRes = await axios.get(
+                    const leaveRes = await api.get(
                       `${BASE_URL}/api/leave-requests/employee/pendingAndApproved-leave/${emp.id}`,
                       {
                         headers: {
