@@ -65,7 +65,7 @@ const BurnupView = ({
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
+        {/* <div className="bg-white border border-slate-200 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-slate-700 mb-3">
             Daily velocity (points completed)
           </h3>
@@ -74,7 +74,7 @@ const BurnupView = ({
             velocityData={velocityData}
             dailyBurnup={dailyBurnup}
           />
-        </div>
+        </div> */}
         <div className="bg-white border border-slate-200 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Scope changes</h3>
           <ScopeChangeMiniTable scopeChanges={scopeChanges} />

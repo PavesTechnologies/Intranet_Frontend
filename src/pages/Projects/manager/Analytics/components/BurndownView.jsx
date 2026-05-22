@@ -1,8 +1,8 @@
 import React, { useRef } from "react";
-import BurndownChart        from "./charts/BurndownChart";
-import VelocityMiniChart    from "./charts/VelocityMiniChart";
-import ScopeChangeMiniTable from "./ScopeChangeMiniTable";
-import DownloadMenu         from "./DownloadMenu";
+import BurndownChart          from "./charts/BurndownChart";
+import VelocityMiniChart      from "./charts/VelocityMiniChart";
+import ScopeChangeMiniTable   from "./ScopeChangeMiniTable";
+import DownloadMenu           from "./DownloadMenu";
 import {
   downloadChartWithScopeAsPNG,
   downloadChartWithScopeAsPDF,
@@ -67,7 +67,7 @@ const BurndownView = ({
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
+        {/* <div className="bg-white border border-slate-200 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-slate-700 mb-3">
             Daily velocity (points completed)
           </h3>
@@ -76,7 +76,7 @@ const BurndownView = ({
             velocityData={velocityData}
             dailyBurnup={dailyBurnup}
           />
-        </div>
+        </div> */}
         <div className="bg-white border border-slate-200 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Scope changes</h3>
           <ScopeChangeMiniTable scopeChanges={scopeChanges} />
