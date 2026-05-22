@@ -1,3 +1,29 @@
+const isNonWorkingDay = (d) =>
+  d.isHoliday === true || (d.isWeekend === true && d.isWorkingWeekend !== true);
+
+export function toBurndownDatasetsFromBurndown(dailyBurn) {
+  const labels = dailyBurn.map((d) => {
+    const date = new Date(d.date);
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  });
+
+  const actualRemaining = dailyBurn.map((d) =>
+    d.remainingStoryPoints !== null && d.remainingStoryPoints !== undefined
+      ? d.remainingStoryPoints
+      : null
+  );
+
+  const idealRemaining = dailyBurn.map((d) =>
+    isNonWorkingDay(d)
+      ? null
+      : d.idealRemainingPoints !== null && d.idealRemainingPoints !== undefined
+        ? d.idealRemainingPoints
+        : null
+  );
+
+  return { labels, actualRemaining, idealRemaining };
+}
+
 export function toBurndownDatasets(dailyBurnup, initialPoints) {
   const labels = dailyBurnup.map((d) => {
     const date = new Date(d.date);
@@ -11,7 +37,7 @@ export function toBurndownDatasets(dailyBurnup, initialPoints) {
   );
 
   const idealRemaining = dailyBurnup.map((d) =>
-    initialPoints - d.idealCompletedPoints
+    isNonWorkingDay(d) ? null : initialPoints - d.idealCompletedPoints
   );
 
   return { labels, actualRemaining, idealRemaining };
@@ -24,8 +50,9 @@ export function toBurnupDatasets(dailyBurnup) {
   });
 
   const completed  = dailyBurnup.map((d) => d.completedPoints  ?? null);
-  const totalScope = dailyBurnup.map((d) => d.totalScopePoints ?? null);
-  const ideal      = dailyBurnup.map((d) => d.idealCompletedPoints);
+  // Prefer snapshot scope, fall back to per-day initial scope when no snapshot exists yet
+  const totalScope = dailyBurnup.map((d) => d.totalScopePoints ?? d.initialScopePoints ?? null);
+  const ideal      = dailyBurnup.map((d) => isNonWorkingDay(d) ? null : d.idealCompletedPoints ?? null);
 
   return { labels, completed, totalScope, ideal };
 }

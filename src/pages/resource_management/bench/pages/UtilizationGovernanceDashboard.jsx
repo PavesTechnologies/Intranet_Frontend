@@ -9,6 +9,17 @@ import UtilizationNavbar from '../components/UtilizationNavbar';
 import LoadingSpinner from '../../../../components/LoadingSpinner';
 import GenericTable from "../../../../components/Table/table";
 
+const extractRows = (payload, keys) => {
+   if (Array.isArray(payload)) return payload;
+   if (!payload || typeof payload !== 'object') return [];
+   for (const key of keys) {
+      if (Array.isArray(payload[key])) return payload[key];
+   }
+   if (Array.isArray(payload.content)) return payload.content;
+   if (payload.data) return extractRows(payload.data, keys);
+   return [];
+};
+
 const UtilizationGovernanceDashboard = () => {
    const [loading, setLoading] = useState(true);
    const [liveData, setLiveData] = useState(null);
@@ -17,7 +28,7 @@ const UtilizationGovernanceDashboard = () => {
       const fetchData = async () => {
          try {
             setLoading(true);
-            const response = await utilizationService.getUtilizationSummary();
+            const response = await utilizationService.getUtilizationAnalytics();
             setLiveData(response);
          } catch (error) {
             console.error('Error fetching governance data:', error);
@@ -30,9 +41,9 @@ const UtilizationGovernanceDashboard = () => {
 
    if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50"><LoadingSpinner text="Compiling Governance Breaches..." /></div>;
 
-   const alerts = liveData?.alerts || [];
-   const criticalCount = alerts.filter(a => a.severity?.toLowerCase() === 'critical' || a.severity?.toLowerCase() === 'high').length;
-   const warningCount = alerts.filter(a => a.severity?.toLowerCase() === 'warning' || a.severity?.toLowerCase() === 'medium').length;
+   const breaches = extractRows(liveData, ['breaches', 'violations', 'patterns', 'insights']);
+   const criticalCount = breaches.filter(a => a.severity?.toLowerCase() === 'critical' || a.severity?.toLowerCase() === 'high').length;
+   const warningCount = breaches.filter(a => a.severity?.toLowerCase() === 'warning' || a.severity?.toLowerCase() === 'medium').length;
 
    return (
       <div className="min-h-screen bg-[#f8fafc] pb-20">
@@ -128,30 +139,30 @@ const UtilizationGovernanceDashboard = () => {
                         <GenericTable
                            headers={["Resource / Project", "Breach Type", "Utilization", "Actions"]}
                            columns={["scope_info", "breach_info", "utilization_info", "actions_info"]}
-                           rows={alerts.map((alert) => ({
-                              ...alert,
+                           rows={breaches.map((breach) => ({
+                              ...breach,
                               scope_info: (
                                  <div className="flex flex-col gap-0.5 text-left">
-                                    <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{alert.scope || 'General'}</span>
-                                    <span className="text-[11px] font-bold text-slate-400 capitalize tracking-widest opacity-70 italic">{alert.id || 'N/A'}</span>
+                                    <span className="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors capitalize tracking-tight">{breach.scope || breach.resourceName || breach.projectName || breach.title || 'General'}</span>
+                                    <span className="text-[11px] font-bold text-slate-400 capitalize tracking-widest opacity-70 italic">{breach.id || breach.code || 'N/A'}</span>
                                  </div>
                               ),
                               breach_info: (
                                  <div className="text-left">
                                     <div className={`inline-flex items-center h-7 px-4 rounded-full text-[10px] font-black capitalize tracking-widest border shadow-sm ${
-                                       alert.severity?.toLowerCase() === 'critical' || alert.severity?.toLowerCase() === 'high' 
+                                       breach.severity?.toLowerCase() === 'critical' || breach.severity?.toLowerCase() === 'high' 
                                        ? 'bg-rose-50 text-rose-600 border-rose-100' 
                                        : 'bg-amber-50 text-amber-600 border-amber-100'
                                     }`}>
-                                       {alert.severity || 'Warning'} Breach
+                                       {breach.severity || breach.status || 'Warning'} Breach
                                     </div>
                                  </div>
                               ),
                               utilization_info: (
                                  <div className="flex flex-col items-center gap-1.5">
-                                    <span className="text-[14px] font-black text-slate-900 tracking-tight">85.4%</span>
+                                    <span className="text-[14px] font-black text-slate-900 tracking-tight">{breach.utilizationPercentage || breach.utilization || 0}%</span>
                                     <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
-                                       <div className="h-full bg-rose-500 w-[85%]" />
+                                       <div className="h-full bg-rose-500" style={{ width: `${Math.min(Number(breach.utilizationPercentage || breach.utilization || 0), 100)}%` }} />
                                     </div>
                                  </div>
                               ),

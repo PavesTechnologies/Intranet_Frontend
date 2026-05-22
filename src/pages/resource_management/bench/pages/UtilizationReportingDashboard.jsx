@@ -9,39 +9,8 @@ import {
 import { DownloadIcon, FilterIcon, SearchIcon, EmployeeIcon, ActivityIcon, ProjectsIcon, DocumentIcon, ChevronRightIcon, TrendingUpIcon, WarningIcon, RefreshIcon, DesktopIcon, SuccessIcon, PendingIcon, AwardIcon, SecurityAlertIcon, TrendUpIcon, TrendDownIcon, ZapIcon, PrevIcon, DateRangeIcon, BarChartIcon, CloseIcon } from "@/components/icons";
 import { utilizationService } from '../../services/utilizationService';
 import GenericTable from "../../../../components/Table/table";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { getResourceManagementErrorMessage, notify } from "../../utils/notify";
-
-const MOCK_REPORT_DATA = {
-  totalHours: 12450.5,
-  utilizationPercentage: 82.4,
-  totalResources: 145,
-  confidenceScore: 98,
-  alerts: [
-    { severity: 'CRITICAL', resourceName: 'Alex Mercer', message: 'Sustained over-utilization (110%) for 3 consecutive weeks.', recommendation: 'Redistribute workload immediately.' },
-    { severity: 'WARNING', resourceName: 'Sarah Chen', message: 'Under-utilization (45%) detected this month.', recommendation: 'Assign to pending internal projects.' }
-  ],
-  resourceUtilizations: [
-    { resourceName: 'Alex Mercer', role: 'Senior Developer', totalHours: 180, utilizationPercentage: 110, utilizationBand: 'CRITICAL', trendSignal: 'UP', confidenceScore: 100 },
-    { resourceName: 'Sarah Chen', role: 'UX Designer', totalHours: 72, utilizationPercentage: 45, utilizationBand: 'LOW', trendSignal: 'DOWN', confidenceScore: 100 },
-    { resourceName: 'Michael Chang', role: 'Project Manager', totalHours: 160, utilizationPercentage: 100, utilizationBand: 'OPTIMAL', trendSignal: 'UP', confidenceScore: 95 },
-    { resourceName: 'Emma Watson', role: 'Frontend Engineer', totalHours: 140, utilizationPercentage: 87, utilizationBand: 'OPTIMAL', trendSignal: 'UP', confidenceScore: 98 },
-    { resourceName: 'James Rodriguez', role: 'Backend Engineer', totalHours: 155, utilizationPercentage: 96, utilizationBand: 'HIGH', trendSignal: 'UP', confidenceScore: 100 }
-  ],
-  projectUtilizations: [
-    { projectName: 'Project Phoenix', clientName: 'Acme Corp', utilizationPercentage: 92, billableRatio: 90, resourceCount: 12, totalHours: 1840 },
-    { projectName: 'Project Titan', clientName: 'Stark Ind.', utilizationPercentage: 105, billableRatio: 98, resourceCount: 8, totalHours: 1350 },
-    { projectName: 'Internal Tools', clientName: 'Internal', utilizationPercentage: 65, billableRatio: 0, resourceCount: 5, totalHours: 600 }
-  ],
-  roleUtilizations: [
-    { roleName: 'Frontend Engineer', totalHours: 4200, resourceCount: 35, utilizationPercentage: 85, billableRatio: 80 },
-    { roleName: 'Backend Engineer', totalHours: 3800, resourceCount: 30, utilizationPercentage: 88, billableRatio: 85 },
-    { roleName: 'UX Designer', totalHours: 1200, resourceCount: 15, utilizationPercentage: 70, billableRatio: 65 }
-  ],
-  clientUtilizations: [
-    { clientName: 'Acme Corp', activeProjects: 3, totalHours: 2400, utilizationPercentage: 88, revenueYield: 92, status: 'Healthy' },
-    { clientName: 'Stark Ind.', activeProjects: 2, totalHours: 1800, utilizationPercentage: 95, revenueYield: 98, status: 'Over-Serviced' }
-  ]
-};
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 const getLastYearStr = () => {
@@ -49,6 +18,120 @@ const getLastYearStr = () => {
   d.setFullYear(d.getFullYear() - 1);
   return d.toISOString().split('T')[0];
 };
+
+const ITEMS_PER_PAGE = 5;
+
+const INITIAL_TOTAL_PAGES = {
+  ANOMALIES: 1,
+  RESOURCE: 1,
+  PROJECT: 1,
+  ROLE: 1,
+  CLIENT: 1,
+};
+
+const extractRows = (payload, keys = []) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+
+  for (const key of keys) {
+    if (Array.isArray(payload[key])) return payload[key];
+  }
+
+  if (Array.isArray(payload.content)) return payload.content;
+  if (payload.data) return extractRows(payload.data, keys);
+  if (payload.page) return extractRows(payload.page, keys);
+
+  return [];
+};
+
+const extractTotalPages = (payload, pageSize = ITEMS_PER_PAGE) => {
+  const source = payload?.page || payload?.data || payload || {};
+  const totalElements = Number(
+    source.totalElements ??
+    source.totalRecords ??
+    source.totalCount ??
+    payload?.totalElements ??
+    payload?.totalRecords ??
+    payload?.totalCount ??
+    0
+  );
+  const totalPages = Number(
+    source.totalPages ??
+    payload?.totalPages ??
+    (totalElements ? Math.ceil(totalElements / pageSize) : 1)
+  );
+
+  return Math.max(totalPages || 1, 1);
+};
+
+const getNumber = (...values) => {
+  const value = values.find((item) => item !== undefined && item !== null && item !== '');
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const normalizeSummary = (summary = {}) => ({
+  ...summary,
+  totalHours: getNumber(summary.totalHours, summary.actualHours),
+  utilizationPercentage: getNumber(
+    summary.utilizationPercentage,
+    summary.overallUtilizationPercentage,
+    summary.utilization,
+  ),
+  totalResources: getNumber(summary.totalResources, summary.totalUsers, summary.resourceCount),
+  confidenceScore: getNumber(summary.confidenceScore, summary.averageConfidenceScore, 100),
+});
+
+const normalizeAlert = (alert = {}) => ({
+  ...alert,
+  resourceName: alert.resourceName || alert.scope || alert.projectName || alert.title || 'General',
+  severity: alert.severity || alert.status || 'WARNING',
+  message: alert.message || alert.description || alert.pattern || 'Utilization threshold signal detected.',
+  recommendation: alert.recommendation || alert.action || alert.nextStep || 'Review utilization distribution.',
+});
+
+const normalizeResource = (resource = {}) => ({
+  ...resource,
+  resourceName: resource.resourceName || resource.userName || resource.name || 'Unassigned Resource',
+  role: resource.role || resource.designation || 'Resource',
+  totalHours: getNumber(resource.totalHours, resource.hours, resource.billableHours),
+  billableRatio: getNumber(resource.billableRatio, resource.billablePercentage),
+  utilizationPercentage: getNumber(
+    resource.utilizationPercentage,
+    resource.utilization,
+    resource.billablePercentage,
+  ),
+  utilizationBand: resource.utilizationBand || resource.status || 'HEALTHY',
+  trendSignal: resource.trendSignal || resource.trend || 'STABLE',
+});
+
+const normalizeProject = (project = {}) => ({
+  ...project,
+  projectName: project.projectName || project.name || 'Unnamed Project',
+  clientName: project.clientName || project.client || '-',
+  uniqueResources: getNumber(project.uniqueResources, project.resourceCount, project.resources),
+  totalHours: getNumber(project.totalHours, project.hours),
+  utilizationPercentage: getNumber(project.utilizationPercentage, project.utilization),
+  utilizationBand: project.utilizationBand || project.status || 'HEALTHY',
+});
+
+const normalizeRole = (role = {}) => ({
+  ...role,
+  roleName: role.roleName || role.role || 'Unnamed Role',
+  uniqueResources: getNumber(role.uniqueResources, role.resourceCount, role.resources),
+  totalHours: getNumber(role.totalHours, role.hours),
+  utilizationPercentage: getNumber(role.utilizationPercentage, role.utilization),
+  utilizationBand: role.utilizationBand || role.status || 'HEALTHY',
+});
+
+const normalizeClient = (client = {}) => ({
+  ...client,
+  clientName: client.clientName || client.name || 'Unnamed Client',
+  uniqueProjects: getNumber(client.uniqueProjects, client.activeProjects, client.projectCount),
+  totalHours: getNumber(client.totalHours, client.hours),
+  utilizationPercentage: getNumber(client.utilizationPercentage, client.utilization),
+  utilizationBand: client.utilizationBand || client.status || 'HEALTHY',
+});
 
 const UtilizationReportingDashboard = () => {
   const navigate = useNavigate();
@@ -70,6 +153,10 @@ const UtilizationReportingDashboard = () => {
   const [reportData, setReportData] = useState(null);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('ANOMALIES');
+  const [loadedTabs, setLoadedTabs] = useState({});
+  const [sectionLoading, setSectionLoading] = useState({});
+  const [sectionErrors, setSectionErrors] = useState({});
+  const [totalPagesByTab, setTotalPagesByTab] = useState(INITIAL_TOTAL_PAGES);
 
   const [currentPageAnomalies, setCurrentPageAnomalies] = useState(1);
   const [currentPageResource, setCurrentPageResource] = useState(1);
@@ -77,54 +164,138 @@ const UtilizationReportingDashboard = () => {
   const [currentPageRole, setCurrentPageRole] = useState(1);
   const [currentPageClient, setCurrentPageClient] = useState(1);
 
-  const ITEMS_PER_PAGE = 5;
+  const buildBaseParams = () => ({
+    startDate: reportParams.startDate,
+    endDate: reportParams.endDate,
+    groupBy: reportParams.groupBy,
+    approvedOnly: reportParams.approvedOnly,
+    overUtilizationThreshold: reportParams.overUtilizationThreshold,
+    underUtilizationThreshold: reportParams.underUtilizationThreshold,
+  });
 
-  const anomaliesList = useMemo(() => reportData?.alerts || [], [reportData]);
-  const totalAnomaliesPages = useMemo(() => Math.ceil(anomaliesList.length / ITEMS_PER_PAGE), [anomaliesList]);
-  const paginatedAnomalies = useMemo(() => {
-    const start = (currentPageAnomalies - 1) * ITEMS_PER_PAGE;
-    return anomaliesList.slice(start, start + ITEMS_PER_PAGE);
-  }, [anomaliesList, currentPageAnomalies]);
+  const buildExportParams = () => ({
+    ...buildBaseParams(),
+    reportType: reportParams.reportType || 'SUMMARY',
+  });
 
-  const resourceList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.resourceUtilizations || [], [reportData]);
-  const totalResourcePages = useMemo(() => Math.ceil(resourceList.length / ITEMS_PER_PAGE), [resourceList]);
-  const paginatedResource = useMemo(() => {
-    const start = (currentPageResource - 1) * ITEMS_PER_PAGE;
-    return resourceList.slice(start, start + ITEMS_PER_PAGE);
-  }, [resourceList, currentPageResource]);
+  const resetPages = () => {
+    setCurrentPageAnomalies(1);
+    setCurrentPageResource(1);
+    setCurrentPageProject(1);
+    setCurrentPageRole(1);
+    setCurrentPageClient(1);
+    setTotalPagesByTab(INITIAL_TOTAL_PAGES);
+  };
 
-  const projectList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.projectUtilizations || [], [reportData]);
-  const totalProjectPages = useMemo(() => Math.ceil(projectList.length / ITEMS_PER_PAGE), [projectList]);
-  const paginatedProject = useMemo(() => {
-    const start = (currentPageProject - 1) * ITEMS_PER_PAGE;
-    return projectList.slice(start, start + ITEMS_PER_PAGE);
-  }, [projectList, currentPageProject]);
+  const setPageForTab = (tab, page) => {
+    if (tab === 'ANOMALIES') setCurrentPageAnomalies(page);
+    if (tab === 'RESOURCE') setCurrentPageResource(page);
+    if (tab === 'PROJECT') setCurrentPageProject(page);
+    if (tab === 'ROLE') setCurrentPageRole(page);
+    if (tab === 'CLIENT') setCurrentPageClient(page);
+  };
 
-  const roleList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.roleUtilizations || [], [reportData]);
-  const totalRolePages = useMemo(() => Math.ceil(roleList.length / ITEMS_PER_PAGE), [roleList]);
-  const paginatedRole = useMemo(() => {
-    const start = (currentPageRole - 1) * ITEMS_PER_PAGE;
-    return roleList.slice(start, start + ITEMS_PER_PAGE);
-  }, [roleList, currentPageRole]);
+  const loadTabData = async (tab, page = 1) => {
+    const baseParams = buildBaseParams();
+    const params = { ...baseParams, page: page - 1, size: ITEMS_PER_PAGE };
 
-  const clientList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.clientUtilizations || [], [reportData]);
-  const totalClientPages = useMemo(() => Math.ceil(clientList.length / ITEMS_PER_PAGE), [clientList]);
-  const paginatedClient = useMemo(() => {
-    const start = (currentPageClient - 1) * ITEMS_PER_PAGE;
-    return clientList.slice(start, start + ITEMS_PER_PAGE);
-  }, [clientList, currentPageClient]);
+    setSectionLoading((prev) => ({ ...prev, [tab]: true }));
+    setSectionErrors((prev) => ({ ...prev, [tab]: null }));
+
+    try {
+      let payload;
+      let rows = [];
+      let key;
+
+      if (tab === 'ANOMALIES') {
+        payload = await utilizationService.getUtilizationAlerts(params);
+        rows = extractRows(payload, ['alerts', 'anomalies', 'breaches', 'content']).map(normalizeAlert);
+        key = 'alerts';
+      }
+
+      if (tab === 'RESOURCE') {
+        payload = await utilizationService.getUtilizationResources(params);
+        rows = extractRows(payload, ['resourceUtilizations', 'resources', 'content']).map(normalizeResource);
+        key = 'resourceUtilizations';
+      }
+
+      if (tab === 'PROJECT') {
+        payload = await utilizationService.getUtilizationProjects(params);
+        rows = extractRows(payload, ['projectUtilizations', 'projects', 'content']).map(normalizeProject);
+        key = 'projectUtilizations';
+      }
+
+      if (tab === 'ROLE') {
+        payload = await utilizationService.getUtilizationRoles(params);
+        rows = extractRows(payload, ['roleUtilizations', 'roles', 'content']).map(normalizeRole);
+        key = 'roleUtilizations';
+      }
+
+      if (tab === 'CLIENT') {
+        payload = await utilizationService.getUtilizationClients(params);
+        rows = extractRows(payload, ['clientUtilizations', 'clients', 'content']).map(normalizeClient);
+        key = 'clientUtilizations';
+      }
+
+      setReportData((prev) => ({ ...(prev || {}), [key]: rows }));
+      setTotalPagesByTab((prev) => ({ ...prev, [tab]: extractTotalPages(payload) }));
+      setPageForTab(tab, page);
+      setLoadedTabs((prev) => ({ ...prev, [tab]: true }));
+    } catch (err) {
+      console.error(err);
+      setReportData((prev) => ({
+        ...(prev || {}),
+        ...(tab === 'ANOMALIES' ? { alerts: [] } : {}),
+        ...(tab === 'RESOURCE' ? { resourceUtilizations: [] } : {}),
+        ...(tab === 'PROJECT' ? { projectUtilizations: [] } : {}),
+        ...(tab === 'ROLE' ? { roleUtilizations: [] } : {}),
+        ...(tab === 'CLIENT' ? { clientUtilizations: [] } : {}),
+      }));
+      setSectionErrors((prev) => ({
+        ...prev,
+        [tab]: getResourceManagementErrorMessage(err, 'Failed to load section data'),
+      }));
+      setTotalPagesByTab((prev) => ({ ...prev, [tab]: 1 }));
+      setLoadedTabs((prev) => ({ ...prev, [tab]: true }));
+    } finally {
+      setSectionLoading((prev) => ({ ...prev, [tab]: false }));
+    }
+  };
 
   const handleGenerateReport = async () => {
     setIsGenerating(true);
     setError(null);
+    setLoadedTabs({});
+    setSectionErrors({});
+    resetPages();
+
+    const nextTab = reportParams.reportType === 'SUMMARY' ? 'ANOMALIES' : reportParams.reportType;
+    setActiveTab(nextTab);
+
     try {
-      const data = await utilizationService.generateUtilizationReport(reportParams);
-      setReportData(data);
-      setCurrentPageAnomalies(1);
-      setCurrentPageResource(1);
-      setCurrentPageProject(1);
-      setCurrentPageRole(1);
-      setCurrentPageClient(1);
+      const baseParams = buildBaseParams();
+      const summary = normalizeSummary(await utilizationService.getUtilizationSummary(baseParams));
+
+      setReportData({
+        ...summary,
+        alerts: [],
+        resourceUtilizations: [],
+        projectUtilizations: [],
+        roleUtilizations: [],
+        clientUtilizations: [],
+      });
+
+      if (reportParams.includeTrends) {
+        utilizationService.getUtilizationTrends(baseParams)
+          .then((trends) => setReportData((prev) => ({ ...(prev || {}), trends })))
+          .catch((err) => console.error('Failed to load utilization trends:', err));
+      }
+
+      utilizationService.getUtilizationAnalytics(baseParams)
+        .then((analytics) => setReportData((prev) => ({ ...(prev || {}), analytics })))
+        .catch((err) => console.error('Failed to load utilization analytics:', err));
+
+      await loadTabData(nextTab, 1);
     } catch (err) {
       console.error(err);
       setError('Failed to generate report. Please try again.');
@@ -134,12 +305,38 @@ const UtilizationReportingDashboard = () => {
     }
   };
 
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (reportData && !loadedTabs[tab]) {
+      loadTabData(tab, 1);
+    }
+  };
+
+  const anomaliesList = useMemo(() => reportData?.alerts || [], [reportData]);
+  const totalAnomaliesPages = totalPagesByTab.ANOMALIES;
+  const paginatedAnomalies = anomaliesList;
+
+  const resourceList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.resourceUtilizations || [], [reportData]);
+  const totalResourcePages = totalPagesByTab.RESOURCE;
+  const paginatedResource = resourceList;
+
+  const projectList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.projectUtilizations || [], [reportData]);
+  const totalProjectPages = totalPagesByTab.PROJECT;
+  const paginatedProject = projectList;
+
+  const roleList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.roleUtilizations || [], [reportData]);
+  const totalRolePages = totalPagesByTab.ROLE;
+  const paginatedRole = roleList;
+
+  const clientList = useMemo(() => Array.isArray(reportData) ? reportData : reportData?.clientUtilizations || [], [reportData]);
+  const totalClientPages = totalPagesByTab.CLIENT;
+  const paginatedClient = clientList;
 
   const handleExportCSV = async () => {
     setIsExportingCSV(true);
     try {
       notify.loading('Exporting CSV...', 'csv-export');
-      await utilizationService.exportUtilizationCSV(reportParams);
+      await utilizationService.exportUtilizationCSV(buildExportParams());
       notify.complete('csv-export', 'Export successful', 'success');
     } catch (err) {
       notify.complete(
@@ -156,7 +353,7 @@ const UtilizationReportingDashboard = () => {
     setIsExportingExcel(true);
     try {
       notify.loading('Exporting Excel...', 'excel-export');
-      await utilizationService.exportUtilizationExcel(reportParams);
+      await utilizationService.exportUtilizationExcel(buildExportParams());
       notify.complete('excel-export', 'Export successful', 'success');
     } catch (err) {
       notify.complete(
@@ -332,15 +529,25 @@ const UtilizationReportingDashboard = () => {
 
           {/* Navigation Tabs */}
           <div className="flex border-b border-slate-200 overflow-x-auto scrollbar-hide">
-             {['ANOMALIES', 'RESOURCE', 'PROJECT', 'ROLE', 'CLIENT'].map(tab => (
-                <button
-                   key={tab}
-                   onClick={() => setActiveTab(tab)}
-                   className={`px-6 py-4 text-[11px] font-black capitalize tracking-widest whitespace-nowrap transition-all border-b-2 flex-1 ${activeTab === tab ? 'text-emerald-600 border-emerald-600 bg-emerald-50/30' : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'}`}
-                >
-                   {tab === 'ANOMALIES' ? 'UTILIZATION ANOMALIES' : `${tab} UTILIZATION REPORT`}
-                </button>
-             ))}
+             {['ANOMALIES', 'RESOURCE', 'PROJECT', 'ROLE', 'CLIENT'].map(tab => {
+                const getTabText = (t) => {
+                  if (t === 'ANOMALIES') return 'Utilization Anomalies';
+                  if (t === 'CLIENT') return 'Client Utilization';
+                  if (t === 'RESOURCE') return 'Resource Utilization Report';
+                  if (t === 'PROJECT') return 'Project Utilization Report';
+                  if (t === 'ROLE') return 'Role Utilization Report';
+                  return t;
+                };
+                return (
+                  <button
+                     key={tab}
+                     onClick={() => handleTabChange(tab)}
+                     className={`px-6 py-4 text-[11px] font-black tracking-widest whitespace-nowrap transition-all border-b-2 flex-1 ${activeTab === tab ? 'text-emerald-600 border-emerald-600 bg-emerald-50/30' : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'}`}
+                  >
+                     {getTabText(tab)}
+                  </button>
+                );
+             })}
           </div>
 
           {/* Alerts */}
@@ -356,25 +563,33 @@ const UtilizationReportingDashboard = () => {
                   </div>
                 </div>
               </div>
-              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-                {paginatedAnomalies.map((alert, idx) => (
-                  <div key={idx} className="p-5 bg-slate-50/30 rounded-2xl border border-slate-100 flex flex-col gap-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[12px] font-black text-slate-900 capitalize">{alert.resourceName}</span>
-                      <span className={`text-[10px] font-black capitalize px-2 py-1 rounded ${alert.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{alert.severity}</span>
+              {sectionLoading.ANOMALIES ? (
+                <div className="p-12 flex justify-center">
+                  <LoadingSpinner text="Loading anomalies..." />
+                </div>
+              ) : sectionErrors.ANOMALIES ? (
+                <div className="m-6 rounded-2xl bg-amber-50 border border-amber-100 p-4 text-[12px] font-bold text-amber-700">{sectionErrors.ANOMALIES}</div>
+              ) : (
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {paginatedAnomalies.map((alert, idx) => (
+                    <div key={idx} className="p-5 bg-slate-50/30 rounded-2xl border border-slate-100 flex flex-col gap-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[12px] font-black text-slate-900 capitalize">{alert.resourceName}</span>
+                        <span className={`text-[10px] font-black capitalize px-2 py-1 rounded ${alert.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{alert.severity}</span>
+                      </div>
+                      <p className="text-[12px] font-medium text-slate-500">{alert.message}</p>
+                      <p className="text-[11px] font-bold text-indigo-600 mt-2">Action: {alert.recommendation}</p>
                     </div>
-                    <p className="text-[12px] font-medium text-slate-500">{alert.message}</p>
-                    <p className="text-[11px] font-bold text-indigo-600 mt-2">Action: {alert.recommendation}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
               {totalAnomaliesPages > 1 && (
                 <div className="py-4 border-t border-slate-100">
                   <Pagination
                     currentPage={currentPageAnomalies}
                     totalPages={totalAnomaliesPages}
-                    onPrevious={() => setCurrentPageAnomalies((p) => Math.max(1, p - 1))}
-                    onNext={() => setCurrentPageAnomalies((p) => Math.min(totalAnomaliesPages, p + 1))}
+                    onPrevious={() => loadTabData('ANOMALIES', Math.max(1, currentPageAnomalies - 1))}
+                    onNext={() => loadTabData('ANOMALIES', Math.min(totalAnomaliesPages, currentPageAnomalies + 1))}
                   />
                 </div>
               )}
@@ -389,50 +604,58 @@ const UtilizationReportingDashboard = () => {
                   <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Resource Utilization Report</h4>
                </div>
                <div className="overflow-x-auto no-scrollbar">
-                  <GenericTable
-                    headers={["Resource", "Hours", "Billable %", "Utilization", "Status", "Trend"]}
-                    columns={["resource_info", "hours_info", "billable_info", "utilization_info", "status_info", "trend_info"]}
-                    rows={paginatedResource.map((res) => ({
-                      ...res,
-                      resource_info: (
-                        <div className="flex flex-col text-left">
-                          <span className="text-[13px] font-black text-slate-900">{res.resourceName}</span>
-                          <span className="text-[11px] text-slate-500">{res.role}</span>
-                        </div>
-                      ),
-                      hours_info: <div className="text-center font-bold">{res.totalHours}h</div>,
-                      billable_info: <div className="text-center text-[12px] font-medium text-slate-600">{res.billableRatio}%</div>,
-                      utilization_info: (
-                        <div className="flex items-center gap-3">
-                          <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
-                             <div
-                                className={`h-full rounded-full ${res.utilizationPercentage > 100 ? 'bg-rose-500' : res.utilizationPercentage < 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                                style={{ width: `${Math.min(res.utilizationPercentage, 100)}%` }}
-                             />
+                  {sectionLoading.RESOURCE ? (
+                    <div className="p-12 flex justify-center">
+                      <LoadingSpinner text="Loading resources..." />
+                    </div>
+                  ) : sectionErrors.RESOURCE ? (
+                    <div className="m-6 rounded-2xl bg-amber-50 border border-amber-100 p-4 text-[12px] font-bold text-amber-700">{sectionErrors.RESOURCE}</div>
+                  ) : (
+                    <GenericTable
+                      headers={["Resource", "Hours", "Billable %", "Utilization", "Status", "Trend"]}
+                      columns={["resource_info", "hours_info", "billable_info", "utilization_info", "status_info", "trend_info"]}
+                      rows={paginatedResource.map((res) => ({
+                        ...res,
+                        resource_info: (
+                          <div className="flex flex-col text-left">
+                            <span className="text-[13px] font-black text-slate-900">{res.resourceName}</span>
+                            <span className="text-[11px] text-slate-500">{res.role}</span>
                           </div>
-                          <span className="text-[11px] font-bold">{res.utilizationPercentage}%</span>
-                        </div>
-                      ),
-                      status_info: (
-                        <div className="text-center">
-                           <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${res.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : res.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{res.utilizationBand || 'HEALTHY'}</span>
-                        </div>
-                      ),
-                      trend_info: (
-                        <div className="text-center">
-                           {res.trendSignal === 'UP' ? <TrendUpIcon className="inline text-emerald-500" size={16} /> : res.trendSignal === 'DOWN' ? <TrendDownIcon className="inline text-rose-500" size={16} /> : <span className="text-slate-400 font-bold">-</span>}
-                        </div>
-                      )
-                    }))}
-                  />
+                        ),
+                        hours_info: <div className="text-center font-bold">{res.totalHours}h</div>,
+                        billable_info: <div className="text-center text-[12px] font-medium text-slate-600">{res.billableRatio}%</div>,
+                        utilization_info: (
+                          <div className="flex items-center gap-3">
+                            <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
+                               <div
+                                  className={`h-full rounded-full ${res.utilizationPercentage > 100 ? 'bg-rose-500' : res.utilizationPercentage < 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                  style={{ width: `${Math.min(res.utilizationPercentage, 100)}%` }}
+                               />
+                            </div>
+                            <span className="text-[11px] font-bold">{res.utilizationPercentage}%</span>
+                          </div>
+                        ),
+                        status_info: (
+                          <div className="text-center">
+                             <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${res.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : res.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{res.utilizationBand || 'HEALTHY'}</span>
+                          </div>
+                        ),
+                        trend_info: (
+                          <div className="text-center">
+                             {res.trendSignal === 'UP' ? <TrendUpIcon className="inline text-emerald-500" size={16} /> : res.trendSignal === 'DOWN' ? <TrendDownIcon className="inline text-rose-500" size={16} /> : <span className="text-slate-400 font-bold">-</span>}
+                          </div>
+                        )
+                      }))}
+                    />
+                  )}
                </div>
                {totalResourcePages > 1 && (
                  <div className="py-4 border-t border-slate-100">
                    <Pagination
                      currentPage={currentPageResource}
                      totalPages={totalResourcePages}
-                     onPrevious={() => setCurrentPageResource((p) => Math.max(1, p - 1))}
-                     onNext={() => setCurrentPageResource((p) => Math.min(totalResourcePages, p + 1))}
+                     onPrevious={() => loadTabData('RESOURCE', Math.max(1, currentPageResource - 1))}
+                     onNext={() => loadTabData('RESOURCE', Math.min(totalResourcePages, currentPageResource + 1))}
                    />
                  </div>
                )}
@@ -447,41 +670,49 @@ const UtilizationReportingDashboard = () => {
                   <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Project Utilization Report</h4>
                </div>
                <div className="overflow-x-auto no-scrollbar">
-                  <GenericTable
-                    headers={["Project", "Client", "Resources", "Hours", "Utilization", "Status"]}
-                    columns={["project_name", "client_name_info", "resources_info", "hours_info", "utilization_info", "status_info"]}
-                    rows={paginatedProject.map((proj) => ({
-                      ...proj,
-                      project_name: <div className="text-left font-black text-[13px] text-slate-900">{proj.projectName}</div>,
-                      client_name_info: <div className="text-center text-[12px] text-slate-600">{proj.clientName}</div>,
-                      resources_info: <div className="text-center text-[12px] text-slate-600">{proj.uniqueResources}</div>,
-                      hours_info: <div className="text-center font-bold">{proj.totalHours}h</div>,
-                      utilization_info: (
-                        <div className="flex items-center gap-3">
-                          <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
-                             <div
-                                className={`h-full rounded-full bg-blue-500`}
-                                style={{ width: `${Math.min(proj.utilizationPercentage, 100)}%` }}
-                             />
+                  {sectionLoading.PROJECT ? (
+                    <div className="p-12 flex justify-center">
+                      <LoadingSpinner text="Loading projects..." />
+                    </div>
+                  ) : sectionErrors.PROJECT ? (
+                    <div className="m-6 rounded-2xl bg-amber-50 border border-amber-100 p-4 text-[12px] font-bold text-amber-700">{sectionErrors.PROJECT}</div>
+                  ) : (
+                    <GenericTable
+                      headers={["Project", "Client", "Resources", "Hours", "Utilization", "Status"]}
+                      columns={["project_name", "client_name_info", "resources_info", "hours_info", "utilization_info", "status_info"]}
+                      rows={paginatedProject.map((proj) => ({
+                        ...proj,
+                        project_name: <div className="text-left font-black text-[13px] text-slate-900">{proj.projectName}</div>,
+                        client_name_info: <div className="text-center text-[12px] text-slate-600">{proj.clientName}</div>,
+                        resources_info: <div className="text-center text-[12px] text-slate-600">{proj.uniqueResources}</div>,
+                        hours_info: <div className="text-center font-bold">{proj.totalHours}h</div>,
+                        utilization_info: (
+                          <div className="flex items-center gap-3">
+                            <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
+                               <div
+                                  className={`h-full rounded-full bg-blue-500`}
+                                  style={{ width: `${Math.min(proj.utilizationPercentage, 100)}%` }}
+                               />
+                            </div>
+                            <span className="text-[11px] font-bold">{proj.utilizationPercentage}%</span>
                           </div>
-                          <span className="text-[11px] font-bold">{proj.utilizationPercentage}%</span>
-                        </div>
-                      ),
-                      status_info: (
-                        <div className="text-center">
-                           <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${proj.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : proj.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{proj.utilizationBand || 'HEALTHY'}</span>
-                        </div>
-                      )
-                    }))}
-                  />
+                        ),
+                        status_info: (
+                          <div className="text-center">
+                             <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${proj.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : proj.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{proj.utilizationBand || 'HEALTHY'}</span>
+                          </div>
+                        )
+                      }))}
+                    />
+                  )}
                </div>
                {totalProjectPages > 1 && (
                  <div className="py-4 border-t border-slate-100">
                    <Pagination
                      currentPage={currentPageProject}
                      totalPages={totalProjectPages}
-                     onPrevious={() => setCurrentPageProject((p) => Math.max(1, p - 1))}
-                     onNext={() => setCurrentPageProject((p) => Math.min(totalProjectPages, p + 1))}
+                     onPrevious={() => loadTabData('PROJECT', Math.max(1, currentPageProject - 1))}
+                     onNext={() => loadTabData('PROJECT', Math.min(totalProjectPages, currentPageProject + 1))}
                    />
                  </div>
                )}
@@ -496,40 +727,48 @@ const UtilizationReportingDashboard = () => {
                   <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Role Utilization Report</h4>
                </div>
                <div className="overflow-x-auto no-scrollbar">
-                  <GenericTable
-                    headers={["Role", "Resources", "Hours", "Utilization", "Status"]}
-                    columns={["role_name", "resources_info", "hours_info", "utilization_info", "status_info"]}
-                    rows={paginatedRole.map((role) => ({
-                      ...role,
-                      role_name: <div className="text-left font-black text-[13px] text-slate-900">{role.roleName}</div>,
-                      resources_info: <div className="text-center text-[12px] text-slate-600">{role.uniqueResources}</div>,
-                      hours_info: <div className="text-center font-bold">{role.totalHours}h</div>,
-                      utilization_info: (
-                        <div className="flex items-center gap-3">
-                          <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
-                             <div
-                                className={`h-full rounded-full bg-amber-500`}
-                                style={{ width: `${Math.min(role.utilizationPercentage, 100)}%` }}
-                             />
+                  {sectionLoading.ROLE ? (
+                    <div className="p-12 flex justify-center">
+                      <LoadingSpinner text="Loading roles..." />
+                    </div>
+                  ) : sectionErrors.ROLE ? (
+                    <div className="m-6 rounded-2xl bg-amber-50 border border-amber-100 p-4 text-[12px] font-bold text-amber-700">{sectionErrors.ROLE}</div>
+                  ) : (
+                    <GenericTable
+                      headers={["Role", "Resources", "Hours", "Utilization", "Status"]}
+                      columns={["role_name", "resources_info", "hours_info", "utilization_info", "status_info"]}
+                      rows={paginatedRole.map((role) => ({
+                        ...role,
+                        role_name: <div className="text-left font-black text-[13px] text-slate-900">{role.roleName}</div>,
+                        resources_info: <div className="text-center text-[12px] text-slate-600">{role.uniqueResources}</div>,
+                        hours_info: <div className="text-center font-bold">{role.totalHours}h</div>,
+                        utilization_info: (
+                          <div className="flex items-center gap-3">
+                            <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
+                               <div
+                                  className={`h-full rounded-full bg-amber-500`}
+                                  style={{ width: `${Math.min(role.utilizationPercentage, 100)}%` }}
+                               />
+                            </div>
+                            <span className="text-[11px] font-bold">{role.utilizationPercentage}%</span>
                           </div>
-                          <span className="text-[11px] font-bold">{role.utilizationPercentage}%</span>
-                        </div>
-                      ),
-                      status_info: (
-                        <div className="text-center">
-                           <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${role.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : role.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{role.utilizationBand || 'HEALTHY'}</span>
-                        </div>
-                      )
-                    }))}
-                  />
+                        ),
+                        status_info: (
+                          <div className="text-center">
+                             <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${role.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : role.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{role.utilizationBand || 'HEALTHY'}</span>
+                          </div>
+                        )
+                      }))}
+                    />
+                  )}
                </div>
                {totalRolePages > 1 && (
                  <div className="py-4 border-t border-slate-100">
                    <Pagination
                      currentPage={currentPageRole}
                      totalPages={totalRolePages}
-                     onPrevious={() => setCurrentPageRole((p) => Math.max(1, p - 1))}
-                     onNext={() => setCurrentPageRole((p) => Math.min(totalRolePages, p + 1))}
+                     onPrevious={() => loadTabData('ROLE', Math.max(1, currentPageRole - 1))}
+                     onNext={() => loadTabData('ROLE', Math.min(totalRolePages, currentPageRole + 1))}
                    />
                  </div>
                )}
@@ -544,40 +783,48 @@ const UtilizationReportingDashboard = () => {
                   <h4 className="text-[13px] font-black text-slate-900 capitalize tracking-[0.1em]">Client Utilization Report</h4>
                </div>
                <div className="overflow-x-auto no-scrollbar">
-                  <GenericTable
-                    headers={["Client", "Active Projects", "Hours", "Utilization", "Status"]}
-                    columns={["client_name_label", "projects_info", "hours_info", "utilization_info", "status_info"]}
-                    rows={paginatedClient.map((client) => ({
-                      ...client,
-                      client_name_label: <div className="text-left font-black text-[13px] text-slate-900">{client.clientName}</div>,
-                      projects_info: <div className="text-center text-[12px] text-slate-600">{client.uniqueProjects}</div>,
-                      hours_info: <div className="text-center font-bold">{client.totalHours}h</div>,
-                      utilization_info: (
-                        <div className="flex items-center gap-3">
-                          <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
-                             <div
-                                className={`h-full rounded-full bg-purple-500`}
-                                style={{ width: `${Math.min(client.utilizationPercentage, 100)}%` }}
-                             />
+                  {sectionLoading.CLIENT ? (
+                    <div className="p-12 flex justify-center">
+                      <LoadingSpinner text="Loading clients..." />
+                    </div>
+                  ) : sectionErrors.CLIENT ? (
+                    <div className="m-6 rounded-2xl bg-amber-50 border border-amber-100 p-4 text-[12px] font-bold text-amber-700">{sectionErrors.CLIENT}</div>
+                  ) : (
+                    <GenericTable
+                      headers={["Client", "Active Projects", "Hours", "Utilization", "Status"]}
+                      columns={["client_name_label", "projects_info", "hours_info", "utilization_info", "status_info"]}
+                      rows={paginatedClient.map((client) => ({
+                        ...client,
+                        client_name_label: <div className="text-left font-black text-[13px] text-slate-900">{client.clientName}</div>,
+                        projects_info: <div className="text-center text-[12px] text-slate-600">{client.uniqueProjects}</div>,
+                        hours_info: <div className="text-center font-bold">{client.totalHours}h</div>,
+                        utilization_info: (
+                          <div className="flex items-center gap-3">
+                            <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
+                               <div
+                                  className={`h-full rounded-full bg-purple-500`}
+                                  style={{ width: `${Math.min(client.utilizationPercentage, 100)}%` }}
+                               />
+                            </div>
+                            <span className="text-[11px] font-bold">{client.utilizationPercentage}%</span>
                           </div>
-                          <span className="text-[11px] font-bold">{client.utilizationPercentage}%</span>
-                        </div>
-                      ),
-                      status_info: (
-                        <div className="text-center">
-                           <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${client.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : client.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{client.utilizationBand || 'HEALTHY'}</span>
-                        </div>
-                      )
-                    }))}
-                  />
+                        ),
+                        status_info: (
+                          <div className="text-center">
+                             <span className={`text-[9px] font-black capitalize px-2 py-1 rounded ${client.utilizationBand === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : client.utilizationBand === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{client.utilizationBand || 'HEALTHY'}</span>
+                          </div>
+                        )
+                      }))}
+                    />
+                  )}
                </div>
                {totalClientPages > 1 && (
                  <div className="py-4 border-t border-slate-100">
                    <Pagination
                      currentPage={currentPageClient}
                      totalPages={totalClientPages}
-                     onPrevious={() => setCurrentPageClient((p) => Math.max(1, p - 1))}
-                     onNext={() => setCurrentPageClient((p) => Math.min(totalClientPages, p + 1))}
+                     onPrevious={() => loadTabData('CLIENT', Math.max(1, currentPageClient - 1))}
+                     onNext={() => loadTabData('CLIENT', Math.min(totalClientPages, currentPageClient + 1))}
                    />
                  </div>
                )}

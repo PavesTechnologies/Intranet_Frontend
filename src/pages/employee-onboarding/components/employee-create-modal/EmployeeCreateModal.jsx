@@ -5,7 +5,6 @@ import ProfileForm from "./ProfileForm";
 import JobForm from "./JobForm";
 import Button from "../../../../components/Button/Button";
 import { showStatusToast } from "../../../../components/toastfy/toast";
-import { EditIcon } from "../../../../components/icons/ActionIcons";
 
 const formatDateForInput = (dateValue) => {
   if (!dateValue) return "";
@@ -102,7 +101,6 @@ export default function EmployeeCreateModal({
   const [designations, setDesignations] = useState([]);
   const [managerOptions, setManagerOptions] = useState([]);
   const [isProfileEditable, setIsProfileEditable] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
 
   
   const isEditMode = !!employeeUuid;
@@ -187,32 +185,50 @@ export default function EmployeeCreateModal({
 
     setActiveTab("Profile");
     setError("");
-    setIsProfileEditable(false);
+    setIsProfileEditable(isEditMode);
     fetchDepartments();
     fetchManagers();
-  }, [isOpen]);
+  }, [isOpen, isEditMode]);
 
   useEffect(() => {
-    if (!employeeUuid) return;
+    if (!userUuid && !employeeUuid) return;
 
     const fetchEmployee = async () => {
       try {
-        const res = await fetch(
-          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          },
-        );
+        let data = {};
+        let matchedUserUuid = userUuid;
 
-        const data = await res.json();
-        const matchedUserUuid = data.user_uuid || userUuid;
+        if (employeeUuid) {
+          const res = await fetch(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            },
+          );
+
+          data = await res.json();
+
+          matchedUserUuid =
+            data.user_uuid || userUuid;
+        }
+        // const res = await fetch(
+        //   `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
+        //   {
+        //     headers: {
+        //       Authorization: `Bearer ${localStorage.getItem("token")}`,
+        //     },
+        //   },
+        // );
+
+        // const data = await res.json();
+        // const matchedUserUuid = data.user_uuid || userUuid;
         let offerLetter = null;
 
         try {
           const offerRes = await fetch(
-            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/`,
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/offer/${matchedUserUuid}`,
             {
               headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -221,13 +237,58 @@ export default function EmployeeCreateModal({
           );
 
           if (offerRes.ok) {
-            const offerData = await offerRes.json();
-            offerLetter = getArrayPayload(offerData).find(
-              (offer) => String(offer.user_uuid) === String(matchedUserUuid),
-            );
+            offerLetter = await offerRes.json();
+            // const offerData = await offerRes.json();
+            // offerLetter = getArrayPayload(offerData).find(
+            //   (offer) => String(offer.user_uuid) === String(matchedUserUuid),
+            // );
           }
         } catch (offerError) {
           console.error("Failed to fetch offer letter details", offerError);
+        }
+
+        let personalDetails = null;
+
+        try {
+          const personalListRes = await fetch(
+            `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/employee-details`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            },
+          );
+
+          if (personalListRes.ok) {
+            const personalRecords =
+              await personalListRes.json();
+
+            console.log(
+              "Personal Details Response:",
+              personalRecords
+            );
+
+            console.log(
+              "Matched User UUID:",
+              matchedUserUuid
+            );
+
+            personalDetails = personalRecords.find(
+              (item) =>
+                String(item.user_uuid).trim() ===
+                String(matchedUserUuid).trim()
+            );
+
+            console.log(
+              "Matched Personal Details:",
+              personalDetails
+            );
+          }
+        } catch (personalError) {
+          console.error(
+            "Failed to fetch personal details",
+            personalError
+          );
         }
 
         const reportingManagerValue =
@@ -238,11 +299,11 @@ export default function EmployeeCreateModal({
           userUuid: data.user_uuid,
           empId: data.employee_id,
           email: data.work_email,
-          empFirstName: data.first_name,
-          empMiddleName: data.middle_name,
-          empLastName: data.last_name,
-          empDob: data.date_of_birth,
-          contact: data.contact_number,
+          empFirstName: offerLetter?.first_name || data.first_name || firstName || "",
+          empMiddleName: offerLetter?.middle_name || data.middle_name || middleName || "",
+          empLastName: offerLetter?.last_name || data.last_name || lastName || "",
+          empDob: personalDetails?.date_of_birth || data.date_of_birth || "",
+          contact: personalDetails?.contact_number || offerLetter?.contact_number || data.contact_number || "",
           departmentUuid: data.department_uuid,
           designationUuid: data.designation_uuid,
           reportingManagerUuid: resolveManagerOptionValue(
@@ -252,14 +313,16 @@ export default function EmployeeCreateModal({
           employeeType:
             offerLetter?.employee_type || data.employee_type || data.employment_type,
           joiningDate: formatDateForInput(
-            offerLetter?.joining_date || data.joining_date,
+            data.joining_date || offerLetter?.joining_date,
           ),
           location: data.location,
           workMode: data.work_mode,
           employmentStatus: data.employment_status,
-          bloodGroup: data.blood_group,
-          gender: data.gender,
-          maritalStatus: data.marital_status,
+          bloodGroup: personalDetails?.blood_group || data.blood_group || "",
+          gender: personalDetails?.gender || data.gender || "",
+          maritalStatus: personalDetails?.marital_status || data.marital_status || "",
+          emergencyContactName: personalDetails?.emergency_contact_name || "",
+          emergencyContactNumber: personalDetails?.emergency_contact_phone || "",
           totalExperience: data.total_experience,
         }));
 
@@ -300,6 +363,13 @@ export default function EmployeeCreateModal({
       empFirstName: firstName || "",
       empMiddleName: middleName || "",
       empLastName: lastName || "",
+      empDob: "",
+      contact: "",
+      gender: "",
+      bloodGroup: "",
+      maritalStatus: "",
+      emergencyContactName: "",
+      emergencyContactNumber: "",
     });
     setIsGenerated(false);
   }, [userUuid, firstName, middleName, lastName, isEditMode]);
@@ -332,12 +402,17 @@ export default function EmployeeCreateModal({
         !form.empFirstName ||
         !form.empLastName ||
         !form.empDob ||
+        !form.gender ||
+        !form.bloodGroup ||
+        !form.maritalStatus ||
         !form.contact ||
         !form.departmentUuid ||
         !form.designationUuid ||
         !form.employeeType ||
         !form.joiningDate ||
-        !form.employmentStatus
+        !form.employmentStatus ||
+        !form.emergencyContactName ||
+        !form.emergencyContactNumber
       ) {
         setError("Please fill all required Profile fields.");
         showStatusToast("Please fill all required fields", "info");
@@ -423,6 +498,8 @@ export default function EmployeeCreateModal({
         blood_group: form.bloodGroup || "",
         gender: form.gender || "",
         marital_status: form.maritalStatus || "",
+        emergency_contact_name: form.emergencyContactName || "",
+        emergency_contact_phone:form.emergencyContactNumber || "",
         total_experience: Number(form.totalExperience) || 0,
       };
 
@@ -454,22 +531,6 @@ export default function EmployeeCreateModal({
     }
   };
 
-  const handleToggleProfileEdit = () => {
-    setIsProfileEditable((prev) => !prev);
-  };
-
-  const handleSaveProfileChanges = async () => {
-    try {
-      setSavingProfile(true);
-      const saved = await handleUpdate({ closeAfterSave: false });
-      if (saved) {
-        setIsProfileEditable(false);
-      }
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
   return (
     <LargeModal
       isOpen={isOpen}
@@ -482,26 +543,13 @@ export default function EmployeeCreateModal({
       {activeTab === "Profile" && (
         <>
           {isEditMode && (
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Profile Details
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Review and update employee profile details.
-                </p>
-              </div>
-
-              <Button
-                type="button"
-                onClick={handleToggleProfileEdit}
-                variant="outline"
-                size="small"
-                className="rounded-xl px-3 py-2"
-              >
-                <EditIcon size={14} />
-                {isProfileEditable ? "Cancel Edit" : "Edit"}
-              </Button>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Profile Details
+              </h3>
+              <p className="text-xs text-slate-500">
+                Review and update employee profile details.
+              </p>
             </div>
           )}
 
@@ -513,18 +561,6 @@ export default function EmployeeCreateModal({
             isProfileEditable={isProfileEditable}
           />
           <div className="flex justify-end gap-3 mt-6">
-            {isEditMode && isProfileEditable && (
-              <Button
-                variant="outline"
-                size="small"
-                onClick={handleSaveProfileChanges}
-                loading={savingProfile}
-                loadingText="Saving..."
-              >
-                Save Changes
-              </Button>
-            )}
-
             <Button
               variant="primary"
               size="small"

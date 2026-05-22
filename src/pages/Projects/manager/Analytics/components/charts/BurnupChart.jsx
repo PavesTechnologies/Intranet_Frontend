@@ -18,7 +18,9 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
     if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
 
     const { labels, completed, totalScope, ideal } = burnupData;
-    const scopeLine = totalScope.map((v) => v ?? initialPoints);
+    // totalScope is already filled with per-day initialScopePoints fallback from the transform;
+    // only fall back to initialPoints here as a last resort.
+    const scopeLine = totalScope.map((v) => v ?? initialPoints ?? 0);
 
     const weekendPlugin = {
       id: "weekendShading",
@@ -26,11 +28,14 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
         const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
         if (!x) return;
         dailyBurnup.forEach((d, i) => {
-          if (!d.isWeekend) return;
+          const nonWorking = d.isHoliday || (d.isWeekend && !d.isWorkingWeekend);
+          if (!nonWorking) return;
           const xStart = x.getPixelForValue(i - 0.5);
           const xEnd   = x.getPixelForValue(i + 0.5);
           ctx.save();
-          ctx.fillStyle = "rgba(148, 163, 184, 0.15)";
+          ctx.fillStyle = d.isHoliday
+            ? "rgba(251, 191, 36, 0.18)"
+            : "rgba(148, 163, 184, 0.15)";
           ctx.fillRect(xStart, top, xEnd - xStart, bottom - top);
           ctx.restore();
         });
@@ -55,7 +60,7 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
             pointBorderWidth:     2,
             fill:                 true,
             tension:              0.3,
-            spanGaps:             false,
+            spanGaps:             true,
           },
           {
             label:                "Total scope",
@@ -78,6 +83,7 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
             pointRadius: 0,
             fill:        false,
             tension:     0,
+            spanGaps:    true,
           },
         ],
       },
@@ -109,9 +115,11 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
               autoSkip:    false,
               maxRotation: 45,
               callback: function (val, index) {
-                const label  = this.getLabelForValue(val);
-                const isWknd = dailyBurnup[index]?.isWeekend;
-                return isWknd ? `${label} 🌙` : label;
+                const label = this.getLabelForValue(val);
+                const d     = dailyBurnup[index];
+                if (d?.isHoliday) return `${label} 🏖`;
+                if (d?.isWeekend && !d?.isWorkingWeekend) return `${label} 🌙`;
+                return label;
               },
             },
           },
@@ -149,11 +157,15 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
           <span className="inline-block w-4 h-3 rounded-sm" style={{ background: "rgba(148,163,184,0.25)" }} />
           Weekend
         </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-4 h-3 rounded-sm" style={{ background: "rgba(251,191,36,0.25)" }} />
+          Holiday
+        </span>
       </div>
 
       {!hasActualData && (
         <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-          No snapshot data yet — completed line will appear after the first midnight snapshot runs.
+          No completed points recorded yet — the completed line will appear once work is marked done during the sprint.
         </div>
       )}
 
