@@ -6,7 +6,9 @@ export default function ProfileForm({
   handleChange,
   isGenerated,
   isEditMode,
-  isProfileEditable = false,
+  isProfileEditable = true,
+  isPrefilledData,
+  isJobEditable,
 }) {
   const isEditLocked = isEditMode && !isProfileEditable;
 
@@ -37,21 +39,23 @@ export default function ProfileForm({
         name="empFirstName"
         value={form.empFirstName || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
+       disabled={isPrefilledData && !isJobEditable}
       />
       <FormInput
         label="Middle Name"
         name="empMiddleName"
         value={form.empMiddleName || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
+        disabled={isPrefilledData && !isJobEditable}
+        
       />
       <FormInput
         label="Last Name"
         name="empLastName"
         value={form.empLastName || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
+        disabled={isPrefilledData && !isJobEditable}
+        
       />
       <FormInput
         label="Date of Birth"
@@ -59,7 +63,7 @@ export default function ProfileForm({
         name="empDob"
         value={form.empDob || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
+       disabled={isPrefilledData && !isProfileEditable}
       />
       <FormSelect
         label="Gender"
@@ -67,21 +71,23 @@ export default function ProfileForm({
         value={form.gender || ""}
         onChange={handleChange}
         options={["Male", "Female", "Other"]}
-        disabled={isEditLocked}
+       disabled={isPrefilledData && !isProfileEditable}
       />
       <FormInput
         label="Contact"
         name="contact"
         value={form.contact || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
+        disabled={isPrefilledData && !isJobEditable}
+        
       />
       <FormInput
         label="Blood Group"
         name="bloodGroup"
         value={form.bloodGroup || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
+       disabled={isPrefilledData && !isProfileEditable}
+
       />
       <FormSelect
         label="Marital Status"
@@ -89,7 +95,7 @@ export default function ProfileForm({
         value={form.maritalStatus || ""}
         onChange={handleChange}
         options={["Single", "Married", "Divorced"]}
-        disabled={isEditLocked}
+       disabled={isPrefilledData && !isProfileEditable}
       />
     </div>
   );

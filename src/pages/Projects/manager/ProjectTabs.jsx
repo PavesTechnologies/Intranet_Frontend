@@ -144,9 +144,10 @@ const AnalyticsDropdown = ({ selectedTab, onSelect }) => {
 
 // ─── Resource Management Dropdown ───────────────────────────────────────────
 const RESOURCE_TABS = [
+  { name: "Configurations", tab: "configurations"     },
+  { name: "Deliverable Roles", tab: "deliverable-roles" },
   { name: "Demand",         tab: "demand-management"  },
   { name: "RoleOff",        tab: "roleoff-management" },
-  { name: "Configurations", tab: "configurations"     },
 ];
 
 const ResourceDropdown = ({ selectedTab, onSelect }) => {
@@ -355,10 +356,10 @@ const ProjectTabs = () => {
           <ProjectConfigurations projectId={pid} />
         </Suspense>
       );
-    if (selectedTab === "delivery-role")
+    if (selectedTab === "deliverable-roles")
       return (
         <Suspense fallback={<TabSkeleton />}>
-          <RoleExpectations projectId={pid} />
+          <RoleExpectations />
         </Suspense>
       );
 
