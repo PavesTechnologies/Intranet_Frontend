@@ -28,11 +28,14 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
         const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
         if (!x) return;
         dailyBurnup.forEach((d, i) => {
-          if (!d.isWeekend) return;
+          const nonWorking = d.isHoliday || (d.isWeekend && !d.isWorkingWeekend);
+          if (!nonWorking) return;
           const xStart = x.getPixelForValue(i - 0.5);
           const xEnd   = x.getPixelForValue(i + 0.5);
           ctx.save();
-          ctx.fillStyle = "rgba(148, 163, 184, 0.15)";
+          ctx.fillStyle = d.isHoliday
+            ? "rgba(251, 191, 36, 0.18)"
+            : "rgba(148, 163, 184, 0.15)";
           ctx.fillRect(xStart, top, xEnd - xStart, bottom - top);
           ctx.restore();
         });
@@ -57,7 +60,7 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
             pointBorderWidth:     2,
             fill:                 true,
             tension:              0.3,
-            spanGaps:             false,
+            spanGaps:             true,
           },
           {
             label:                "Total scope",
@@ -80,6 +83,7 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
             pointRadius: 0,
             fill:        false,
             tension:     0,
+            spanGaps:    true,
           },
         ],
       },
@@ -111,9 +115,11 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
               autoSkip:    false,
               maxRotation: 45,
               callback: function (val, index) {
-                const label  = this.getLabelForValue(val);
-                const isWknd = dailyBurnup[index]?.isWeekend;
-                return isWknd ? `${label} 🌙` : label;
+                const label = this.getLabelForValue(val);
+                const d     = dailyBurnup[index];
+                if (d?.isHoliday) return `${label} 🏖`;
+                if (d?.isWeekend && !d?.isWorkingWeekend) return `${label} 🌙`;
+                return label;
               },
             },
           },
@@ -150,6 +156,10 @@ const BurnupChart = forwardRef(({ burnupData, initialPoints, dailyBurnup = [] },
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-4 h-3 rounded-sm" style={{ background: "rgba(148,163,184,0.25)" }} />
           Weekend
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-4 h-3 rounded-sm" style={{ background: "rgba(251,191,36,0.25)" }} />
+          Holiday
         </span>
       </div>
 
