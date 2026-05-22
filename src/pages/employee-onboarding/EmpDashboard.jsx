@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { FileEdit, Send, Users, ShieldCheck, XCircle, FileText, Handshake, Search } from "lucide-react";
+import { FileEdit, Send, Users, ShieldCheck, XCircle, FileText, Handshake, RefreshCw, Search } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import Button from "../../components/Button/Button";
 import EmpTable from "./components/EmpTable";
@@ -12,8 +12,39 @@ import {
   getOfferDisplayStatus,
 } from "./components/offerStatus";
 import { fetchOfferDetailsList } from "./components/fetchOfferDetails";
-import { KPICard } from "../../components/kpi/KPI";
 import { PageCard } from "../../components/Cards/PageCard";
+import GroupedKPISection from "./components/GroupedKPISection";
+
+const CATEGORY_GROUPS = [
+  {
+    key: "OfferManagement",
+    title: "Offer Management",
+    statusDefs: [
+      { status: "CREATED",  label: "Draft",          icon: FileEdit,  iconBg: "bg-slate-100",   iconColor: "text-slate-600"  },
+      { status: "OFFERED",  label: "Sent",           icon: Send,      iconBg: "bg-indigo-50",   iconColor: "text-indigo-600" },
+      { status: "ACCEPTED", label: "Accepted",       icon: Users,     iconBg: "bg-emerald-50",  iconColor: "text-emerald-600"},
+      { status: "REJECTED", label: "Rejected",       icon: XCircle,   iconBg: "bg-red-50",      iconColor: "text-red-600"    },
+    ],
+  },
+  {
+    key: "EmployeeOnboarding",
+    title: "Employee Onboarding",
+    statusDefs: [
+      { status: "SUBMITTED", label: "Submitted", icon: FileText,   iconBg: "bg-blue-50",    iconColor: "text-blue-600"   },
+      { status: "VERIFIED",  label: "Verified",  icon: ShieldCheck, iconBg: "bg-green-50",  iconColor: "text-green-600"  },
+      { status: "COMPLETED", label: "Completed", icon: ShieldCheck, iconBg: "bg-emerald-50",iconColor: "text-emerald-600"},
+    ],
+  },
+  {
+    key: "JoiningProcess",
+    title: "Joining Process",
+    statusDefs: [
+      { status: "JOINING",         label: "Joining",         icon: Handshake,  iconBg: "bg-teal-50",   iconColor: "text-teal-600"   },
+      { status: "JOINING_PENDING", label: "Joining Pending", icon: Handshake,  iconBg: "bg-amber-50",  iconColor: "text-amber-600"  },
+      { status: "RESCHEDULED",     label: "Rescheduled",     icon: RefreshCw,  iconBg: "bg-orange-50", iconColor: "text-orange-600" },
+    ],
+  },
+];
 
 
 
@@ -85,33 +116,21 @@ export default function EmployeeOnboardingDashboard() {
     fetchData();
   }, []);
 
-  const acceptCount = offers.filter(
-    (o) => getNormalizedStatus(o.status) === "ACCEPTED",
-  ).length;
-  const sentCount = offers.filter(
-    (o) => getNormalizedStatus(o.status) === "OFFERED",
-  ).length;
-  const draftCount = offers.filter(
-    (o) => getNormalizedStatus(o.status) === "CREATED",
-  ).length;
-  const submittedCount = offers.filter(
-    (o) => getOfferDisplayStatus(o, employeeUserIds) === "SUBMITTED",
-  ).length;
-  const verifiedCount = offers.filter(
-    (o) => getOfferDisplayStatus(o, employeeUserIds) === "VERIFIED",
-  ).length;
-  const joiningCount = offers.filter(
-    (o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING",
-  ).length;
-  const joiningPendingCount = offers.filter(
-    (o) => getOfferDisplayStatus(o, employeeUserIds) === "JOINING_PENDING",
-  ).length;
-  const completedCount = offers.filter(
-    (o) => getOfferDisplayStatus(o, employeeUserIds) === "COMPLETED",
-  ).length;
-  const rejectedCount = offers.filter(
-    (o) => getOfferDisplayStatus(o, employeeUserIds) === "REJECTED",
-  ).length;
+  const categoryData = useMemo(() => {
+    const getStatus = (o) => getOfferDisplayStatus(o, employeeUserIds);
+    return CATEGORY_GROUPS.map((group) => ({
+      key: group.key,
+      title: group.title,
+      cards: group.statusDefs.map((def) => ({
+        status:    def.status,
+        label:     def.label,
+        count:     offers.filter((o) => getStatus(o) === def.status).length,
+        icon:      def.icon,
+        iconBg:    def.iconBg,
+        iconColor: def.iconColor,
+      })),
+    }));
+  }, [offers, employeeUserIds]);
 
   // ✅ Filter offers based on search term (case-insensitive)
   const filteredOffers = useMemo(() => {
@@ -180,100 +199,12 @@ export default function EmployeeOnboardingDashboard() {
         <AdminApprovalDashboard />
       ) : (
         <div className="space-y-8">
-          {/* STAT CARDS SECTION */}
-          <div className="flex flex-wrap gap-3">
-            <StatCard
-              title="Total"
-              value={offers.length}
-              icon={Users}
-              iconBg="bg-slate-100"
-              iconColor="text-slate-600"
-              isActive={statusFilter === "ALL"}
-              onClick={() => handleKpiClick("ALL")}
-            />
-            <StatCard
-              title="Draft"
-              value={draftCount}
-              icon={FileEdit}
-              iconBg="bg-slate-100"
-              iconColor="text-slate-600"
-              isActive={statusFilter === "CREATED"}
-              onClick={() => handleKpiClick("CREATED")}
-            />
-            <StatCard
-              title="Sent"
-              value={sentCount}
-              icon={Send}
-              iconBg="bg-indigo-50"
-              iconColor="text-indigo-600"
-              isActive={statusFilter === "OFFERED"}
-              onClick={() => handleKpiClick("OFFERED")}
-            />
-            <StatCard
-              title="Accepted"
-              value={acceptCount}
-              icon={Users}
-              iconBg="bg-emerald-50"
-              iconColor="text-emerald-600"
-              isActive={statusFilter === "ACCEPTED"}
-              onClick={() => handleKpiClick("ACCEPTED")}
-            />
-            <StatCard
-              title="Rejected"
-              value={rejectedCount}
-              icon={XCircle}
-              iconBg="bg-red-50"
-              iconColor="text-red-600"
-              isActive={statusFilter === "REJECTED"}
-              onClick={() => handleKpiClick("REJECTED")}
-            />
-            {/* Additional KPIs */}
-            <StatCard
-              title="Submitted"
-              value={submittedCount}
-              icon={FileText}
-              iconBg="bg-blue-50"
-              iconColor="text-blue-600"
-              isActive={statusFilter === "SUBMITTED"}
-              onClick={() => handleKpiClick("SUBMITTED")}
-            />
-            <StatCard
-              title="Verified"
-              value={verifiedCount}
-              icon={ShieldCheck}
-              iconBg="bg-green-50"
-              iconColor="text-green-600"
-              isActive={statusFilter === "VERIFIED"}
-              onClick={() => handleKpiClick("VERIFIED")}
-            />
-            <StatCard
-              title="Joining Pending"
-              value={joiningPendingCount}
-              icon={Handshake}
-              iconBg="bg-amber-50"
-              iconColor="text-amber-600"
-              isActive={statusFilter === "JOINING_PENDING"}
-              onClick={() => handleKpiClick("JOINING_PENDING")}
-            />
-            <StatCard
-              title="Joining"
-              value={joiningCount}
-              icon={Handshake}
-              iconBg="bg-teal-50"
-              iconColor="text-teal-600"
-              isActive={statusFilter === "JOINING"}
-              onClick={() => handleKpiClick("JOINING")}
-            />
-            <StatCard
-              title="Completed"
-              value={completedCount}
-              icon={ShieldCheck}
-              iconBg="bg-emerald-50"
-              iconColor="text-emerald-600"
-              isActive={statusFilter === "COMPLETED"}
-              onClick={() => handleKpiClick("COMPLETED")}
-            />
-          </div>
+          {/* GROUPED KPI SECTION */}
+          <GroupedKPISection
+            groups={categoryData}
+            statusFilter={statusFilter}
+            onStatusClick={handleKpiClick}
+          />
 
           {/* SEARCH & TABLE SECTION */}
           <PageCard className="overflow-hidden rounded-2xl border-slate-200">
@@ -337,22 +268,3 @@ export default function EmployeeOnboardingDashboard() {
   );
 }
 
-/* Reusable Stat Card */
-function StatCard({ title, value, icon: Icon, iconBg, iconColor, isActive, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="shrink-0 min-w-[140px] flex-1 text-left transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
-    >
-      <KPICard
-        label={title}
-        value={value}
-        icon={<Icon className="h-5 w-5" />}
-        color={`${iconBg} ${iconColor}`}
-        active={isActive}
-        className="h-full w-full bg-white border-slate-200 shadow-sm"
-      />
-    </button>
-  );
-}

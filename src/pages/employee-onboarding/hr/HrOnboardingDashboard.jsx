@@ -1,17 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Users,
-  XCircle,
-  ShieldCheck,
-  Clock,
-  MailCheck,
-  Search,
-  FileText,
-  RefreshCw,
-  CheckCircle2,
-} from "lucide-react";
+import { Search, FileText, ShieldCheck, CheckCircle2, XCircle, MailCheck, Clock, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { showStatusToast } from "../../../components/toastfy/toast";
@@ -32,8 +22,30 @@ import ActionMenu from "./components/ActionMenu";
 import JoinModal from "./components/JoinModal";
 import OfferStatusCell from "./components/OfferStatusCell";
 import ReassignJoiningModal from "./components/ReassignJoiningModal";
-import StatCard from "./components/StatCard";
 import FilterListbox from "../../../components/filter/FilterListbox";
+import GroupedKPISection from "../components/GroupedKPISection";
+
+const HR_CATEGORY_GROUPS = [
+  {
+    key: "EmployeeOnboarding",
+    title: "Employee Onboarding",
+    statusDefs: [
+      { status: "SUBMITTED", label: "Submitted",  icon: FileText,    iconBg: "bg-blue-50",    iconColor: "text-blue-600"    },
+      { status: "VERIFIED",  label: "Verified",   icon: ShieldCheck, iconBg: "bg-green-50",   iconColor: "text-green-600"   },
+      { status: "COMPLETED", label: "Completed",  icon: CheckCircle2,iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
+      { status: "REJECTED",  label: "Rejected",   icon: XCircle,     iconBg: "bg-red-50",     iconColor: "text-red-600"     },
+    ],
+  },
+  {
+    key: "JoiningProcess",
+    title: "Joining Process",
+    statusDefs: [
+      { status: "JOINING",         label: "Joining",         icon: MailCheck,  iconBg: "bg-teal-50",   iconColor: "text-teal-600"   },
+      { status: "JOINING_PENDING", label: "Joining Pending", icon: Clock,      iconBg: "bg-amber-50",  iconColor: "text-amber-600"  },
+      { status: "RESCHEDULED",     label: "Rescheduled",     icon: RefreshCw,  iconBg: "bg-orange-50", iconColor: "text-orange-600" },
+    ],
+  },
+];
 
 export default function HrOnboardingDashboard() {
   const navigate = useNavigate();
@@ -326,6 +338,21 @@ export default function HrOnboardingDashboard() {
     employeeUserIds,
     editDisabledUserIds,
   ]);
+
+  const categoryData = useMemo(() => {
+    return HR_CATEGORY_GROUPS.map((group) => ({
+      key: group.key,
+      title: group.title,
+      cards: group.statusDefs.map((def) => ({
+        status:    def.status,
+        label:     def.label,
+        count:     pageData.filter((e) => getHrDisplayStatus(e) === def.status).length,
+        icon:      def.icon,
+        iconBg:    def.iconBg,
+        iconColor: def.iconColor,
+      })),
+    }));
+  }, [pageData, employeeUserIds]);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
@@ -756,116 +783,12 @@ export default function HrOnboardingDashboard() {
         </p>
       </div>
 
-      {/* KPI Cards — Two-Tier Layout */}
-      <div className="flex flex-col gap-4">
-        {/* Row 1: 6 Small Cards */}
-        <div className="flex flex-wrap gap-3">
-          <StatCard
-            title="Total Profiles"
-            value={loading ? "0" : pageData.length}
-            icon={Users}
-            iconBg="bg-slate-100"
-            iconColor="text-slate-600"
-            isActive={statusFilter === "ALL"}
-            onClick={() => handleKpiClick("ALL")}
-          />
-          <StatCard
-            title="Submitted"
-            value={
-              loading
-                ? "0"
-                : pageData.filter((e) => getHrDisplayStatus(e) === "SUBMITTED").length
-            }
-            icon={FileText}
-            iconBg="bg-blue-50"
-            iconColor="text-blue-600"
-            isActive={statusFilter === "SUBMITTED"}
-            onClick={() => handleKpiClick("SUBMITTED")}
-          />
-          <StatCard
-            title="Verified"
-            value={
-              loading
-                ? "0"
-                : pageData.filter((e) => getHrDisplayStatus(e) === "VERIFIED").length
-            }
-            icon={ShieldCheck}
-            iconBg="bg-green-50"
-            iconColor="text-green-600"
-            isActive={statusFilter === "VERIFIED"}
-            onClick={() => handleKpiClick("VERIFIED")}
-          />
-          <StatCard
-            title="Completed"
-            value={
-              loading
-                ? "0"
-                : pageData.filter((e) => getHrDisplayStatus(e) === "COMPLETED").length
-            }
-            icon={CheckCircle2}
-            iconBg="bg-emerald-50"
-            iconColor="text-emerald-600"
-            isActive={statusFilter === "COMPLETED"}
-            onClick={() => handleKpiClick("COMPLETED")}
-          />
-          <StatCard
-            title="Rescheduled"
-            value={
-              loading
-                ? "0"
-                : pageData.filter((e) => getHrDisplayStatus(e) === "RESCHEDULED").length
-            }
-            icon={RefreshCw}
-            iconBg="bg-orange-50"
-            iconColor="text-orange-600"
-            isActive={statusFilter === "RESCHEDULED"}
-            onClick={() => handleKpiClick("RESCHEDULED")}
-          />
-          <StatCard
-            title="Rejected"
-            value={
-              loading
-                ? "0"
-                : pageData.filter((e) => getHrDisplayStatus(e) === "REJECTED").length
-            }
-            icon={XCircle}
-            iconBg="bg-red-50"
-            iconColor="text-red-600"
-            isActive={statusFilter === "REJECTED"}
-            onClick={() => handleKpiClick("REJECTED")}
-          />
-        </div>
-
-        {/* Row 2: 2 Long Cards */}
-        <div className="flex flex-wrap gap-3">
-          <StatCard
-            title="Joining Pending"
-            value={
-              loading
-                ? "0"
-                : pageData.filter((e) => getHrDisplayStatus(e) === "JOINING_PENDING").length
-            }
-            icon={Clock}
-            iconBg="bg-amber-50"
-            iconColor="text-amber-600"
-            isActive={statusFilter === "JOINING_PENDING"}
-            onClick={() => handleKpiClick("JOINING_PENDING")}
-          />
-          <StatCard
-            title="Joining"
-            value={
-              loading
-                ? "0"
-                : pageData.filter((e) => getHrDisplayStatus(e) === "JOINING").length
-            }
-            icon={MailCheck}
-            iconBg="bg-teal-50"
-            iconColor="text-teal-600"
-            isActive={statusFilter === "JOINING"}
-            onClick={() => handleKpiClick("JOINING")}
-          />
-        </div>
-      </div>
+      {/* Grouped KPI Section */}
+      <GroupedKPISection
+        groups={categoryData}
+        statusFilter={statusFilter}
+        onStatusClick={handleKpiClick}
+      />
 
       {/* Search & Table Section */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">

@@ -11,7 +11,7 @@ import GenericTable from "../../../../components/Table/table";
 const BENCH_STATES = [
   "READY",
   "SHADOW",
-  "NOT_AVAILABLE",
+  // "NOT_AVAILABLE",
   "LOW_UTILIZATION",
   "TRAINING"
 ];
@@ -29,8 +29,8 @@ const categoryStyles = {
   // TRAINING: "border-blue-200 bg-blue-50 text-blue-700",
   Shadow: "border-violet-200 bg-violet-50 text-violet-700",
   // SHADOW: "border-violet-200 bg-violet-50 text-violet-700",
-  Not_Available: "border-slate-200 bg-slate-100 text-slate-700",
-  NOT_AVAILABLE: "border-slate-200 bg-slate-100 text-slate-700",
+  // Not_Available: "border-slate-200 bg-slate-100 text-slate-700",
+  // NOT_AVAILABLE: "border-slate-200 bg-slate-100 text-slate-700",
   LOW_UTILIZATION: "border-amber-200 bg-amber-50 text-amber-700",
   COE: "border-purple-200 bg-purple-50 text-purple-700",
   RND: "border-pink-200 bg-pink-50 text-pink-700",
