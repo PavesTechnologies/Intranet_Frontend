@@ -8,25 +8,59 @@ import utilizationService from '../../../../services/utilizationService';
 import UtilizationNavbar from '../components/UtilizationNavbar';
 import LoadingSpinner from '../../../../components/LoadingSpinner';
 import GenericTable from "../../../../components/Table/table";
+import Pagination from '../../../../components/Pagination/pagination';
+
+const PROJECTS_PER_PAGE = 10;
+
+const extractRows = (payload, keys) => {
+   if (Array.isArray(payload)) return payload;
+   if (!payload || typeof payload !== 'object') return [];
+   for (const key of keys) {
+      if (Array.isArray(payload[key])) return payload[key];
+   }
+   if (Array.isArray(payload.content)) return payload.content;
+   if (payload.data) return extractRows(payload.data, keys);
+   return [];
+};
+
+const extractTotalPages = (payload) => {
+   const source = payload?.page || payload?.data || payload || {};
+   const totalElements = Number(source.totalElements ?? source.totalRecords ?? source.totalCount ?? 0);
+   return Math.max(Number(source.totalPages ?? Math.ceil(totalElements / PROJECTS_PER_PAGE) ?? 1), 1);
+};
 
 const UtilizationPortfolioDashboard = () => {
    const [loading, setLoading] = useState(true);
    const [portfolioData, setPortfolioData] = useState(null);
+   const [currentPage, setCurrentPage] = useState(1);
+   const [totalPages, setTotalPages] = useState(1);
+   const [error, setError] = useState('');
 
    useEffect(() => {
       const fetchData = async () => {
          try {
             setLoading(true);
-            const response = await utilizationService.generateReport({ reportType: 'PROJECT' });
-            setPortfolioData(response);
+            setError('');
+            const response = await utilizationService.getUtilizationProjects({
+               page: currentPage - 1,
+               size: PROJECTS_PER_PAGE,
+               sortBy: 'utilizationPercentage',
+               sortDirection: 'desc',
+            });
+            setPortfolioData({
+               projectUtilizations: extractRows(response, ['projectUtilizations', 'projects']),
+            });
+            setTotalPages(extractTotalPages(response));
          } catch (error) {
             console.error('Error fetching portfolio data:', error);
+            setError('Failed to load project utilization.');
+            setPortfolioData({ projectUtilizations: [] });
          } finally {
             setLoading(false);
          }
       };
       fetchData();
-   }, []);
+   }, [currentPage]);
 
    if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50"><LoadingSpinner text="Analyzing Portfolio Yield..." /></div>;
 
@@ -133,6 +167,11 @@ const UtilizationPortfolioDashboard = () => {
                      </span>
                   </div>
                   <div className="overflow-x-auto no-scrollbar flex-1">
+                     {error && (
+                        <div className="mx-8 mt-5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[12px] font-bold text-amber-700">
+                           {error}
+                        </div>
+                     )}
                      <GenericTable
                         headers={["Project / Client", "Project Yield", "Efficiency", "Cost vs Util", "Status"]}
                         columns={["project_info", "yield_info", "efficiency_info", "burn_info", "actions_info"]}
@@ -162,7 +201,7 @@ const UtilizationPortfolioDashboard = () => {
                            burn_info: (
                               <div className="text-center">
                                  <div className={`inline-flex items-center gap-1 text-[11px] font-black capitalize ${proj.utilizationPercentage > 90 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                    {proj.utilizationPercentage > 90 ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
+                                    {proj.utilizationPercentage > 90 ? <WarningIcon size={12} /> : <SuccessIcon size={12} />}
                                     {proj.utilizationPercentage > 90 ? 'High Burn' : 'Healthy'}
                                  </div>
                               </div>
@@ -170,13 +209,24 @@ const UtilizationPortfolioDashboard = () => {
                            actions_info: (
                               <div className="flex justify-end">
                                  <button className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all flex items-center justify-center border border-slate-100">
-                                    <ExternalLink size={18} />
+                                    <ExportIcon size={18} />
                                  </button>
                               </div>
                            )
                         }))}
                      />
                   </div>
+                  {totalPages > 1 && (
+                     <div className="border-t border-slate-100 px-8 py-5 bg-slate-50/40">
+                        <Pagination
+                           currentPage={currentPage}
+                           totalPages={totalPages}
+                           onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                           onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                           className="justify-end py-0"
+                        />
+                     </div>
+                  )}
                </div>
             </div>
          </div>
