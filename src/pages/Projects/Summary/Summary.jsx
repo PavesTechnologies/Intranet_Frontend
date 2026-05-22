@@ -28,7 +28,7 @@ const Summary = ({ projectId, projectName }) => {
     epics: null,
     stories: null,
     tasks: null,
-    bugs: null,
+    // bugs: null,
     statuses: null,
     users: null,
     stage: null,
@@ -61,12 +61,12 @@ const Summary = ({ projectId, projectName }) => {
       axios
         .get(`${base}/api/projects/${projectId}/tasks`, { headers })
         .then((res) => ({ tasks: res.data || [] })),
-      axios
-        .get(`${base}/api/testing/bugs/projects/${projectId}/summaries`, {
-          headers,
-        })
-        .then((res) => ({ bugs: res.data || [] }))
-        .catch(() => ({ bugs: [] })),
+      // axios
+      //   .get(`${base}/api/testing/bugs/projects/${projectId}/summaries`, {
+      //     headers,
+      //   })
+      //   .then((res) => ({ bugs: res.data || [] }))
+      //   .catch(() => ({ bugs: [] })),
       axios
         .get(`${base}/api/projects/${projectId}/statuses`, { headers })
         .then((res) => ({ statuses: res.data || [] })),
@@ -93,8 +93,8 @@ const Summary = ({ projectId, projectName }) => {
     work:
       projectData.epics &&
       projectData.stories &&
-      projectData.tasks &&
-      projectData.bugs,
+      projectData.tasks,
+      // && projectData.bugs,
     statuses: projectData.statuses,
     users: projectData.users,
   };
@@ -111,11 +111,11 @@ const Summary = ({ projectId, projectName }) => {
         status: { name: s.statusName || "UNKNOWN" }
       })),
 
-      ...(projectData.bugs || []).map(b => ({
-        status: { name: b.status || "UNKNOWN" }
-      })),
+      // ...(projectData.bugs || []).map(b => ({
+      //   status: { name: b.status || "UNKNOWN" }
+      // })),
     ];
-  }, [projectData.tasks, projectData.stories, projectData.bugs, isDataReady.work]);
+  }, [projectData.tasks, projectData.stories, isDataReady.work]);
 
   return (
     <motion.div
@@ -158,7 +158,7 @@ const Summary = ({ projectId, projectName }) => {
               stories={projectData.stories}
               statuses={projectData.statuses}
               tasks={projectData.tasks}
-              bugs={projectData.bugs}
+              // bugs={projectData.bugs}
             />
           </Suspense>
         )}
@@ -188,7 +188,7 @@ const Summary = ({ projectId, projectName }) => {
               <PriorityDistribution
                 tasks={projectData.tasks}
                 stories={projectData.stories}
-                bugs={projectData.bugs}
+                // bugs={projectData.bugs}
               />
             </Suspense>
           )}
@@ -203,7 +203,7 @@ const Summary = ({ projectId, projectName }) => {
                 tasks={projectData.tasks}
                 stories={projectData.stories}
                 epics={projectData.epics}
-                bugs={projectData.bugs}
+                // bugs={projectData.bugs}
               />
             </Suspense>
           )}
@@ -228,7 +228,7 @@ const Summary = ({ projectId, projectName }) => {
               epics={projectData.epics}
               stories={projectData.stories}
               tasks={projectData.tasks}
-              bugs={projectData.bugs}
+              // bugs={projectData.bugs}
               statuses={projectData.statuses}
             />
           </Suspense>

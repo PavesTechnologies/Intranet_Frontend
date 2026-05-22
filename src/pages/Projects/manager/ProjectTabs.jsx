@@ -315,8 +315,8 @@ const ProjectTabs = () => {
       return <Board projectId={pid} projectName={projectName} />;
     if (selectedTab === "risk-management")
       return <RiskRegisterPage projectId={pid} />;
-    if (selectedTab.startsWith("test-management"))
-      return <TestManagement projectId={pid} />;
+    // if (selectedTab.startsWith("test-management"))
+    //   return <TestManagement projectId={pid} />;
 
     // ── Analytics ──────────────────────────────────────────────────────────
     if (
@@ -370,7 +370,7 @@ const ProjectTabs = () => {
     { name: "Backlog", tab: "backlog"         },
     { name: "Board",   tab: "board"           },
     { name: "Risk",    tab: "risk-management" },
-    { name: "Test",    tab: "test-management" },
+    // { name: "Test",    tab: "test-management" },
   ];
 
   if (!projectId) return <div className="p-6 text-slate-400">No project selected.</div>;
