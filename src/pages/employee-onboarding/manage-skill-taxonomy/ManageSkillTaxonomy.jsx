@@ -1,10 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Briefcase, ChevronDown, ChevronRight, Pencil, Search, Trash2 } from "lucide-react";
+import {
+  Briefcase,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Pencil,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { useLocation } from "react-router-dom";
 import Button from "../../../components/Button/Button";
 import SkillManagementModal from "../../resource_management/models/skill_management/SkillManagementModal";
 import { skillService } from "../../../services/skillService";
 import { notify } from "../../resource_management/utils/notify";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
 const normalize = (value) => `${value || ""}`.trim().toLowerCase();
 
@@ -65,12 +74,24 @@ const ManageSkillTaxonomy = () => {
   const [searchHydrating, setSearchHydrating] = useState(false);
   const [skillManagementDraft, setSkillManagementDraft] = useState(null);
   const [skillManagementDraftKey, setSkillManagementDraftKey] = useState("");
+  const [downloadingTaxonomy, setDownloadingTaxonomy] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    type: null,
+    category: null,
+    skill: null,
+    subSkill: null,
+  });
+
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const activeTab = useMemo(
     () =>
-      location.pathname.startsWith("/employee-onboarding/manage-skill-taxonomy/requests")
+      location.pathname.startsWith(
+        "/employee-onboarding/manage-skill-taxonomy/requests",
+      )
         ? "requests"
-      : "taxonomy",
+        : "taxonomy",
     [location.pathname],
   );
 
@@ -83,7 +104,9 @@ const ManageSkillTaxonomy = () => {
         throw new Error(response?.error || "Unable to load categories.");
       }
 
-      setCategories(Array.isArray(response.data) ? response.data.map(mapCategoryDto) : []);
+      setCategories(
+        Array.isArray(response.data) ? response.data.map(mapCategoryDto) : [],
+      );
       setExpandedCategories({});
       setExpandedSkills({});
       setSkillFilters({});
@@ -103,7 +126,12 @@ const ManageSkillTaxonomy = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab !== "taxonomy" || !searchTerm.trim() || categories.length === 0) return;
+    if (
+      activeTab !== "taxonomy" ||
+      !searchTerm.trim() ||
+      categories.length === 0
+    )
+      return;
 
     let cancelled = false;
 
@@ -115,7 +143,9 @@ const ManageSkillTaxonomy = () => {
       if (categoriesNeedingSkills.length === 0) {
         const skillsNeedingSubSkills = categories.flatMap((category) =>
           (category.skills || [])
-            .filter((skill) => !skill.subSkillsLoaded && !skill.subSkillsLoading)
+            .filter(
+              (skill) => !skill.subSkillsLoaded && !skill.subSkillsLoading,
+            )
             .map((skill) => ({ categoryId: category.id, skill })),
         );
 
@@ -132,19 +162,26 @@ const ManageSkillTaxonomy = () => {
             }
 
             try {
-              const response = await skillService.getSkillsByCategoryDto(category.id);
+              const response = await skillService.getSkillsByCategoryDto(
+                category.id,
+              );
               if (!response?.success) {
                 throw new Error(response?.error || "Unable to load skills.");
               }
 
               return {
                 ...category,
-                skills: Array.isArray(response.data) ? response.data.map(mapSkillDto) : [],
+                skills: Array.isArray(response.data)
+                  ? response.data.map(mapSkillDto)
+                  : [],
                 skillsLoaded: true,
                 skillsLoading: false,
               };
             } catch (error) {
-              notify.error(error, `Unable to load skills for ${category.name}.`);
+              notify.error(
+                error,
+                `Unable to load skills for ${category.name}.`,
+              );
               return {
                 ...category,
                 skillsLoading: false,
@@ -162,19 +199,28 @@ const ManageSkillTaxonomy = () => {
                 }
 
                 try {
-                  const response = await skillService.getSubSkillsBySkillDto(skill.id);
+                  const response = await skillService.getSubSkillsBySkillDto(
+                    skill.id,
+                  );
                   if (!response?.success) {
-                    throw new Error(response?.error || "Unable to load subskills.");
+                    throw new Error(
+                      response?.error || "Unable to load subskills.",
+                    );
                   }
 
                   return {
                     ...skill,
-                    subSkills: Array.isArray(response.data) ? response.data.map(mapSubSkillDto) : [],
+                    subSkills: Array.isArray(response.data)
+                      ? response.data.map(mapSubSkillDto)
+                      : [],
                     subSkillsLoaded: true,
                     subSkillsLoading: false,
                   };
                 } catch (error) {
-                  notify.error(error, `Unable to load subskills for ${skill.name}.`);
+                  notify.error(
+                    error,
+                    `Unable to load subskills for ${skill.name}.`,
+                  );
                   return {
                     ...skill,
                     subSkillsLoading: false,
@@ -210,7 +256,9 @@ const ManageSkillTaxonomy = () => {
   const updateCategory = (categoryId, updater) => {
     setCategories((current) =>
       current.map((category) =>
-        String(category.id) === String(categoryId) ? updater(category) : category,
+        String(category.id) === String(categoryId)
+          ? updater(category)
+          : category,
       ),
     );
   };
@@ -244,7 +292,9 @@ const ManageSkillTaxonomy = () => {
 
       updateCategory(category.id, (currentCategory) => ({
         ...currentCategory,
-        skills: Array.isArray(response.data) ? response.data.map(mapSkillDto) : [],
+        skills: Array.isArray(response.data)
+          ? response.data.map(mapSkillDto)
+          : [],
         skillsLoaded: true,
         skillsLoading: false,
       }));
@@ -277,7 +327,9 @@ const ManageSkillTaxonomy = () => {
 
       updateSkill(categoryId, skill.id, (currentSkill) => ({
         ...currentSkill,
-        subSkills: Array.isArray(response.data) ? response.data.map(mapSubSkillDto) : [],
+        subSkills: Array.isArray(response.data)
+          ? response.data.map(mapSubSkillDto)
+          : [],
         subSkillsLoaded: true,
         subSkillsLoading: false,
       }));
@@ -303,7 +355,9 @@ const ManageSkillTaxonomy = () => {
     if (!response?.success) {
       throw new Error(response?.error || "Unable to load subskills.");
     }
-    return Array.isArray(response.data) ? response.data.map(mapSubSkillDto) : [];
+    return Array.isArray(response.data)
+      ? response.data.map(mapSubSkillDto)
+      : [];
   };
 
   const ensureCategoryHydrated = async (category) => {
@@ -351,7 +405,9 @@ const ManageSkillTaxonomy = () => {
 
   const openDraftEditor = (draft) => {
     setSkillManagementDraft(draft);
-    setSkillManagementDraftKey(`${draft.scope}-${draft.categoryId || "new"}-${Date.now()}`);
+    setSkillManagementDraftKey(
+      `${draft.scope}-${draft.categoryId || "new"}-${Date.now()}`,
+    );
     setOpenSkillManagement(true);
   };
 
@@ -409,6 +465,210 @@ const ManageSkillTaxonomy = () => {
     }
   };
 
+  const handleDownloadTaxonomy = async () => {
+    try {
+      setDownloadingTaxonomy(true);
+
+      const blob = await skillService.downloadSkillTaxonomyExcel();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = "skill-taxonomy.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      notify.success("Skill taxonomy downloaded successfully.");
+    } catch (error) {
+      notify.error(error, "Failed to download taxonomy.");
+    } finally {
+      setDownloadingTaxonomy(false);
+    }
+  };
+
+  const handleDeleteCategory = (category) => {
+    setDeleteModal({
+      open: true,
+      type: "category",
+      category,
+      skill: null,
+      subSkill: null,
+    });
+  };
+
+  const handleDeleteSkill = (category, skill) => {
+    setDeleteModal({
+      open: true,
+      type: "skill",
+      category,
+      skill,
+      subSkill: null,
+    });
+  };
+
+  const handleDeleteSubSkill = (category, skill, subSkill) => {
+    setDeleteModal({
+      open: true,
+      type: "subskill",
+      category,
+      skill,
+      subSkill,
+    });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+
+      // ==========================================
+      // DELETE CATEGORY
+      // ==========================================
+
+      if (deleteModal.type === "category") {
+        const response = await skillService.deleteCategory(
+          deleteModal.category.id,
+        );
+
+        if (!response?.success) {
+          throw new Error(response?.error || "Category deletion failed.");
+        }
+
+        setCategories((current) =>
+          current.filter(
+            (category) =>
+              String(category.id) !== String(deleteModal.category.id),
+          ),
+        );
+        setExpandedCategories((current) => {
+          const next = { ...current };
+          delete next[deleteModal.category.id];
+          return next;
+        });
+        setSkillFilters((current) => {
+          const next = { ...current };
+          delete next[deleteModal.category.id];
+          return next;
+        });
+
+        notify.success(response?.message || "Category deleted successfully.");
+      }
+
+      // ==========================================
+      // DELETE SKILL
+      // ==========================================
+
+      if (deleteModal.type === "skill") {
+        const response = await skillService.deleteTaxonomySkill(
+          deleteModal.skill.id,
+        );
+
+        if (!response?.success) {
+          throw new Error(response?.error || "Skill deletion failed.");
+        }
+
+        setCategories((current) =>
+          current.map((c) =>
+            String(c.id) === String(deleteModal.category.id)
+              ? {
+                  ...c,
+                  skills: (c.skills || []).filter(
+                    (s) => String(s.id) !== String(deleteModal.skill.id),
+                  ),
+                }
+              : c,
+          ),
+        );
+
+        notify.success(response?.message || "Skill deleted successfully.");
+      }
+
+      // ==========================================
+      // DELETE SUBSKILL
+      // ==========================================
+
+      if (deleteModal.type === "subskill") {
+        const response = await skillService.deleteSubSkill(
+          deleteModal.subSkill.id,
+        );
+
+        if (!response?.success) {
+          throw new Error(response?.error || "Subskill deletion failed.");
+        }
+
+        setCategories((current) =>
+          current.map((c) =>
+            String(c.id) === String(deleteModal.category.id)
+              ? {
+                  ...c,
+                  skills: (c.skills || []).map((s) =>
+                    String(s.id) === String(deleteModal.skill.id)
+                      ? {
+                          ...s,
+                          subSkills: (s.subSkills || []).filter(
+                            (ss) =>
+                              String(ss.id) !== String(deleteModal.subSkill.id),
+                          ),
+                        }
+                      : s,
+                  ),
+                }
+              : c,
+          ),
+        );
+
+        notify.success(response?.message || "Subskill deleted successfully.");
+      }
+
+      // ==========================================
+      // CLOSE MODAL
+      // ==========================================
+
+      setDeleteModal({
+        open: false,
+        type: null,
+        category: null,
+        skill: null,
+        subSkill: null,
+      });
+    } catch (error) {
+      notify.error(error, "Unable to delete.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  {
+    /* <ConfirmationModal
+  isOpen={deleteModal.open}
+  title={
+    deleteModal.type === "skill"
+      ? "Delete Skill"
+      : "Delete SubSkill"
+  }
+  message={
+    deleteModal.type === "skill"
+      ? `Are you sure you want to delete skill "${deleteModal.skill?.name}"?`
+      : `Are you sure you want to delete subskill "${deleteModal.subSkill?.name}"?`
+  }
+  confirmText="Delete"
+  cancelText="Cancel"
+  variant="danger"
+  isLoading={deleteLoading}
+  onCancel={() =>
+    setDeleteModal({
+      open: false,
+      type: null,
+      category: null,
+      skill: null,
+      subSkill: null,
+    })
+  }
+  onConfirm={confirmDelete}
+/> */
+  }
+
   const handleEditSubSkill = async (category, skill, subSkill) => {
     try {
       const hydratedCategory = await ensureCategoryHydrated(category);
@@ -446,21 +706,30 @@ const ManageSkillTaxonomy = () => {
     }
   };
 
-  const handleTrashClick = (label) => {
-    notify.info(`Trash UI is ready for ${label}. Delete endpoint will be wired later.`);
-  };
+  // const handleTrashClick = (label) => {
+  //   notify.info(
+  //     `Trash UI is ready for ${label}. Delete endpoint will be wired later.`,
+  //   );
+  // };
 
   const filteredCategories = useMemo(() => {
     const query = normalize(searchTerm);
     if (!query) return categories;
 
     return categories.filter((category) => {
-      const categoryMatch = `${category.name} ${category.description}`.toLowerCase().includes(query);
+      const categoryMatch = `${category.name} ${category.description}`
+        .toLowerCase()
+        .includes(query);
       const skillMatch = category.skills.some((skill) => {
         const subSkillMatch = skill.subSkills.some((subSkill) =>
-          `${subSkill.name} ${subSkill.description}`.toLowerCase().includes(query),
+          `${subSkill.name} ${subSkill.description}`
+            .toLowerCase()
+            .includes(query),
         );
-        return `${skill.name} ${skill.description}`.toLowerCase().includes(query) || subSkillMatch;
+        return (
+          `${skill.name} ${skill.description}`.toLowerCase().includes(query) ||
+          subSkillMatch
+        );
       });
 
       return categoryMatch || skillMatch;
@@ -473,6 +742,20 @@ const ManageSkillTaxonomy = () => {
     setSkillManagementDraftKey("");
     fetchCategories();
   };
+
+  const deleteModalTitle =
+    {
+      category: "Delete Category",
+      skill: "Delete Skill",
+      subskill: "Delete SubSkill",
+    }[deleteModal.type] || "Delete";
+
+  const deleteModalMessage =
+    deleteModal.type === "category"
+      ? `Are you sure you want to delete category "${deleteModal.category?.name}"?`
+      : deleteModal.type === "skill"
+        ? `Are you sure you want to delete skill "${deleteModal.skill?.name}"?`
+        : `Are you sure you want to delete subskill "${deleteModal.subSkill?.name}"?`;
 
   return (
     <div className="space-y-6 p-6">
@@ -498,6 +781,16 @@ const ManageSkillTaxonomy = () => {
                   className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10"
                 />
               </div>
+
+              <Button
+                variant="outline"
+                size="medium"
+                onClick={handleDownloadTaxonomy}
+                loading={downloadingTaxonomy}
+                loadingText="Downloading"
+              >
+                <Download className="h-4 w-4" /> Download Excel
+              </Button>
 
               <Button
                 variant="outline"
@@ -528,7 +821,9 @@ const ManageSkillTaxonomy = () => {
           ) : (
             <div className="divide-y divide-gray-100">
               {filteredCategories.map((category) => {
-                const categoryExpanded = Boolean(expandedCategories[category.id]);
+                const categoryExpanded = Boolean(
+                  expandedCategories[category.id],
+                );
 
                 return (
                   <div key={category.id} className="bg-white">
@@ -567,7 +862,7 @@ const ManageSkillTaxonomy = () => {
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
-                            handleTrashClick(`category ${category.name}`);
+                            handleDeleteCategory(category);
                           }}
                           className="rounded-md border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-rose-200 hover:text-rose-700"
                         >
@@ -580,7 +875,9 @@ const ManageSkillTaxonomy = () => {
                     {categoryExpanded ? (
                       <div className="border-t border-gray-100 bg-gray-50 px-5 py-4">
                         {category.skillsLoading ? (
-                          <p className="text-sm text-gray-500">Loading skills...</p>
+                          <p className="text-sm text-gray-500">
+                            Loading skills...
+                          </p>
                         ) : category.skills.length === 0 ? (
                           <p className="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-5 text-center text-sm text-gray-400">
                             No skills mapped under this category.
@@ -604,11 +901,15 @@ const ManageSkillTaxonomy = () => {
 
                             {category.skills
                               .filter((skill) => {
-                                const query = normalize(skillFilters[category.id]);
+                                const query = normalize(
+                                  skillFilters[category.id],
+                                );
                                 if (!query) return true;
 
                                 if (
-                                  `${skill.name} ${skill.description}`.toLowerCase().includes(query)
+                                  `${skill.name} ${skill.description}`
+                                    .toLowerCase()
+                                    .includes(query)
                                 ) {
                                   return true;
                                 }
@@ -620,153 +921,194 @@ const ManageSkillTaxonomy = () => {
                                 );
                               })
                               .map((skill) => {
-                              const skillKey = `${category.id}-${skill.id}`;
-                              const skillExpanded = Boolean(expandedSkills[skillKey]);
+                                const skillKey = `${category.id}-${skill.id}`;
+                                const skillExpanded = Boolean(
+                                  expandedSkills[skillKey],
+                                );
 
-                              return (
-                                <div
-                                  key={skill.id}
-                                  className="overflow-hidden rounded-lg border border-gray-200 bg-white"
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSkillToggle(category.id, skill)}
-                                    className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition hover:bg-gray-50"
+                                return (
+                                  <div
+                                    key={skill.id}
+                                    className="overflow-hidden rounded-lg border border-gray-200 bg-white"
                                   >
-                                    <div className="flex min-w-0 items-center gap-3">
-                                      {skillExpanded ? (
-                                        <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
-                                      ) : (
-                                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
-                                      )}
-                                      <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium text-gray-900">
-                                          {skill.name}
-                                        </p>
-                                        <p className="mt-1 truncate text-xs text-gray-500">
-                                          {skill.description || "No description available"}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          handleEditSkill(category, skill);
-                                        }}
-                                        className="rounded-md border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-indigo-200 hover:text-indigo-700"
-                                      >
-                                        <Pencil className="h-3.5 w-3.5" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          handleTrashClick(`skill ${skill.name}`);
-                                        }}
-                                        className="rounded-md border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-rose-200 hover:text-rose-700"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </button>
-                                      <StatusBadge active={skill.active} />
-                                    </div>
-                                  </button>
-
-                                  {skillExpanded ? (
-                                    <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
-                                      {skill.subSkillsLoading ? (
-                                        <p className="text-sm text-gray-500">Loading subskills...</p>
-                                      ) : skill.subSkills.length === 0 ? (
-                                        <p className="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-4 text-center text-sm text-gray-400">
-                                          No subskills mapped under this skill.
-                                        </p>
-                                      ) : (
-                                        <div className="space-y-2">
-                                          <div className="relative pb-1">
-                                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                                            <input
-                                              value={subSkillFilters[skillKey] || ""}
-                                              onChange={(event) =>
-                                                setSubSkillFilters((current) => ({
-                                                  ...current,
-                                                  [skillKey]: event.target.value,
-                                                }))
-                                              }
-                                              placeholder="Search subskills in this skill"
-                                              className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10"
-                                            />
-                                          </div>
-
-                                          {skill.subSkills
-                                            .filter((subSkill) => {
-                                              const query = normalize(subSkillFilters[skillKey]);
-                                              if (!query) return true;
-
-                                              return `${subSkill.name} ${subSkill.description}`
-                                                .toLowerCase()
-                                                .includes(query);
-                                            })
-                                            .map((subSkill) => (
-                                            <div
-                                              key={subSkill.id}
-                                              className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-3 py-2.5"
-                                            >
-                                              <div className="min-w-0">
-                                                <p className="truncate text-sm font-medium text-gray-800">
-                                                  {subSkill.name}
-                                                </p>
-                                                <p className="mt-1 truncate text-xs text-gray-500">
-                                                  {subSkill.description || "No description available"}
-                                                </p>
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => handleEditSubSkill(category, skill, subSkill)}
-                                                  className="rounded-md border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-indigo-200 hover:text-indigo-700"
-                                                >
-                                                  <Pencil className="h-3.5 w-3.5" />
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => handleTrashClick(`subskill ${subSkill.name}`)}
-                                                  className="rounded-md border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-rose-200 hover:text-rose-700"
-                                                >
-                                                  <Trash2 className="h-3.5 w-3.5" />
-                                                </button>
-                                                <StatusBadge active={subSkill.active} />
-                                              </div>
-                                            </div>
-                                          ))}
-
-                                          {skill.subSkills.length > 0 &&
-                                          skill.subSkills.filter((subSkill) => {
-                                            const query = normalize(subSkillFilters[skillKey]);
-                                            if (!query) return true;
-
-                                            return `${subSkill.name} ${subSkill.description}`
-                                              .toLowerCase()
-                                              .includes(query);
-                                          }).length === 0 ? (
-                                            <p className="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-4 text-center text-sm text-gray-400">
-                                              No subskills match this search.
-                                            </p>
-                                          ) : null}
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleSkillToggle(category.id, skill)
+                                      }
+                                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition hover:bg-gray-50"
+                                    >
+                                      <div className="flex min-w-0 items-center gap-3">
+                                        {skillExpanded ? (
+                                          <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
+                                        ) : (
+                                          <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                                        )}
+                                        <div className="min-w-0">
+                                          <p className="truncate text-sm font-medium text-gray-900">
+                                            {skill.name}
+                                          </p>
+                                          <p className="mt-1 truncate text-xs text-gray-500">
+                                            {skill.description ||
+                                              "No description available"}
+                                          </p>
                                         </div>
-                                      )}
-                                    </div>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleEditSkill(category, skill);
+                                          }}
+                                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-indigo-200 hover:text-indigo-700"
+                                        >
+                                          <Pencil className="h-3.5 w-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleDeleteSkill(category, skill);
+                                          }}
+                                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-rose-200 hover:text-rose-700"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                        <StatusBadge active={skill.active} />
+                                      </div>
+                                    </button>
+
+                                    {skillExpanded ? (
+                                      <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                                        {skill.subSkillsLoading ? (
+                                          <p className="text-sm text-gray-500">
+                                            Loading subskills...
+                                          </p>
+                                        ) : skill.subSkills.length === 0 ? (
+                                          <p className="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-4 text-center text-sm text-gray-400">
+                                            No subskills mapped under this
+                                            skill.
+                                          </p>
+                                        ) : (
+                                          <div className="space-y-2">
+                                            <div className="relative pb-1">
+                                              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                              <input
+                                                value={
+                                                  subSkillFilters[skillKey] ||
+                                                  ""
+                                                }
+                                                onChange={(event) =>
+                                                  setSubSkillFilters(
+                                                    (current) => ({
+                                                      ...current,
+                                                      [skillKey]:
+                                                        event.target.value,
+                                                    }),
+                                                  )
+                                                }
+                                                placeholder="Search subskills in this skill"
+                                                className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10"
+                                              />
+                                            </div>
+
+                                            {skill.subSkills
+                                              .filter((subSkill) => {
+                                                const query = normalize(
+                                                  subSkillFilters[skillKey],
+                                                );
+                                                if (!query) return true;
+
+                                                return `${subSkill.name} ${subSkill.description}`
+                                                  .toLowerCase()
+                                                  .includes(query);
+                                              })
+                                              .map((subSkill) => (
+                                                <div
+                                                  key={subSkill.id}
+                                                  className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-3 py-2.5"
+                                                >
+                                                  <div className="min-w-0">
+                                                    <p className="truncate text-sm font-medium text-gray-800">
+                                                      {subSkill.name}
+                                                    </p>
+                                                    <p className="mt-1 truncate text-xs text-gray-500">
+                                                      {subSkill.description ||
+                                                        "No description available"}
+                                                    </p>
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() =>
+                                                        handleEditSubSkill(
+                                                          category,
+                                                          skill,
+                                                          subSkill,
+                                                        )
+                                                      }
+                                                      className="rounded-md border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-indigo-200 hover:text-indigo-700"
+                                                    >
+                                                      <Pencil className="h-3.5 w-3.5" />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() =>
+                                                        handleDeleteSubSkill(
+                                                          category,
+                                                          skill,
+                                                          subSkill,
+                                                        )
+                                                      }
+                                                      className="rounded-md border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-rose-200 hover:text-rose-700"
+                                                    >
+                                                      <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                    <StatusBadge
+                                                      active={subSkill.active}
+                                                    />
+                                                  </div>
+                                                </div>
+                                              ))}
+
+                                            {skill.subSkills.length > 0 &&
+                                            skill.subSkills.filter(
+                                              (subSkill) => {
+                                                const query = normalize(
+                                                  subSkillFilters[skillKey],
+                                                );
+                                                if (!query) return true;
+
+                                                return `${subSkill.name} ${subSkill.description}`
+                                                  .toLowerCase()
+                                                  .includes(query);
+                                              },
+                                            ).length === 0 ? (
+                                              <p className="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-4 text-center text-sm text-gray-400">
+                                                No subskills match this search.
+                                              </p>
+                                            ) : null}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
 
                             {category.skills.length > 0 &&
                             category.skills.filter((skill) => {
-                              const query = normalize(skillFilters[category.id]);
+                              const query = normalize(
+                                skillFilters[category.id],
+                              );
                               if (!query) return true;
 
-                              if (`${skill.name} ${skill.description}`.toLowerCase().includes(query)) {
+                              if (
+                                `${skill.name} ${skill.description}`
+                                  .toLowerCase()
+                                  .includes(query)
+                              ) {
                                 return true;
                               }
 
@@ -796,10 +1138,31 @@ const ManageSkillTaxonomy = () => {
             Skill taxonomy requests
           </p>
           <p className="mt-1 text-sm text-gray-500">
-            Track incoming skill taxonomy requests and review pending changes from employees or administrators.
+            Track incoming skill taxonomy requests and review pending changes
+            from employees or administrators.
           </p>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={deleteModal.open}
+        title={deleteModalTitle}
+        message={deleteModalMessage}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleteLoading}
+        onCancel={() =>
+          setDeleteModal({
+            open: false,
+            type: null,
+            category: null,
+            skill: null,
+            subSkill: null,
+          })
+        }
+        onConfirm={confirmDelete}
+      />
 
       <SkillManagementModal
         open={openSkillManagement}
