@@ -4,10 +4,11 @@ import VelocityMiniChart    from "./charts/VelocityMiniChart";
 import ScopeChangeMiniTable from "./ScopeChangeMiniTable";
 import DownloadMenu         from "./DownloadMenu";
 import {
-  downloadChartAsPNG,
-  downloadChartAsPDF,
-  downloadAsCSV,
+  downloadChartWithScopeAsPNG,
+  downloadChartWithScopeAsPDF,
+  downloadSectionedCSV,
   buildBurnupCSV,
+  buildScopeChangesSection,
 } from "../utils/downloadUtils";
 
 const BurnupView = ({
@@ -22,24 +23,27 @@ const BurnupView = ({
   const chartRef = useRef(null);
 
   const handlePNG = () =>
-    downloadChartAsPNG({ current: chartRef.current?.getCanvas() }, `${sprintName}_Burnup`);
+    downloadChartWithScopeAsPNG(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burnup`);
   const handlePDF = () =>
-    downloadChartAsPDF({ current: chartRef.current?.getCanvas() }, `${sprintName}_Burnup`);
+    downloadChartWithScopeAsPDF(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burnup`);
   const handleCSV = () => {
-    const { headers, data } = buildBurnupCSV(
+    const chartSection = buildBurnupCSV(
       burnupData
         ? burnupData.labels.map((_, i) => ({
-            date:                i + 1,
-            sprintDayNumber:     i + 1,
-            idealCompletedPoints:burnupData.ideal[i] ?? 0,
-            completedPoints:     burnupData.completed[i] ?? null,
-            totalScopePoints:    burnupData.totalScope[i] ?? null,
-            velocityPoints:      velocityData[i] ?? null,
-            isWeekend:           dailyBurnup[i]?.isWeekend ?? false,
+            date:                 dailyBurnup[i]?.date ?? i + 1,
+            sprintDayNumber:      i + 1,
+            idealCompletedPoints: burnupData.ideal[i] ?? 0,
+            completedPoints:      burnupData.completed[i] ?? null,
+            totalScopePoints:     burnupData.totalScope[i] ?? null,
+            velocityPoints:       velocityData[i] ?? null,
+            isWeekend:            dailyBurnup[i]?.isWeekend ?? false,
           }))
         : []
     );
-    downloadAsCSV(data, headers, `${sprintName}_Burnup`);
+    downloadSectionedCSV(
+      [{ title: "Burnup Data", ...chartSection }, buildScopeChangesSection(scopeChanges)],
+      `${sprintName}_Burnup`
+    );
   };
 
   return (
@@ -61,7 +65,7 @@ const BurnupView = ({
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
+        {/* <div className="bg-white border border-slate-200 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-slate-700 mb-3">
             Daily velocity (points completed)
           </h3>
@@ -70,7 +74,7 @@ const BurnupView = ({
             velocityData={velocityData}
             dailyBurnup={dailyBurnup}
           />
-        </div>
+        </div> */}
         <div className="bg-white border border-slate-200 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Scope changes</h3>
           <ScopeChangeMiniTable scopeChanges={scopeChanges} />

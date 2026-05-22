@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import axios from "axios";
+// import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import useLeaveConsumption from "../hooks/useLeaveConsumption";
@@ -46,7 +47,7 @@ export default function LeaveDashboard({ employeeId, refreshKey, year }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    axios
+    api
       .get(`${BASE_URL}/api/leave/types`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })

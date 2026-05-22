@@ -144,9 +144,10 @@ const AnalyticsDropdown = ({ selectedTab, onSelect }) => {
 
 // ─── Resource Management Dropdown ───────────────────────────────────────────
 const RESOURCE_TABS = [
+  { name: "Configurations", tab: "configurations"     },
+  { name: "Deliverable Roles", tab: "deliverable-roles" },
   { name: "Demand",         tab: "demand-management"  },
   { name: "RoleOff",        tab: "roleoff-management" },
-  { name: "Configurations", tab: "configurations"     },
 ];
 
 const ResourceDropdown = ({ selectedTab, onSelect }) => {
@@ -315,8 +316,8 @@ const ProjectTabs = () => {
       return <Board projectId={pid} projectName={projectName} />;
     if (selectedTab === "risk-management")
       return <RiskRegisterPage projectId={pid} />;
-    if (selectedTab.startsWith("test-management"))
-      return <TestManagement projectId={pid} />;
+    // if (selectedTab.startsWith("test-management"))
+    //   return <TestManagement projectId={pid} />;
 
     // ── Analytics ──────────────────────────────────────────────────────────
     if (
@@ -355,10 +356,10 @@ const ProjectTabs = () => {
           <ProjectConfigurations projectId={pid} />
         </Suspense>
       );
-    if (selectedTab === "delivery-role")
+    if (selectedTab === "deliverable-roles")
       return (
         <Suspense fallback={<TabSkeleton />}>
-          <RoleExpectations projectId={pid} />
+          <RoleExpectations />
         </Suspense>
       );
 
@@ -370,7 +371,7 @@ const ProjectTabs = () => {
     { name: "Backlog", tab: "backlog"         },
     { name: "Board",   tab: "board"           },
     { name: "Risk",    tab: "risk-management" },
-    { name: "Test",    tab: "test-management" },
+    // { name: "Test",    tab: "test-management" },
   ];
 
   if (!projectId) return <div className="p-6 text-slate-400">No project selected.</div>;

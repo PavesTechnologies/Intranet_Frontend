@@ -43,6 +43,9 @@ const ScopeChangeMiniTable = ({ scopeChanges = [] }) => {
               Issue
             </th>
             <th className="text-left px-3 py-2.5 font-semibold text-slate-500 uppercase tracking-wide">
+              Epic
+            </th>
+            <th className="text-left px-3 py-2.5 font-semibold text-slate-500 uppercase tracking-wide">
               Event Type
             </th>
             <th className="text-left px-3 py-2.5 font-semibold text-slate-500 uppercase tracking-wide">
@@ -76,6 +79,9 @@ const ScopeChangeMiniTable = ({ scopeChanges = [] }) => {
                 </td>
                 <td className="px-3 py-2.5 font-medium text-indigo-600 whitespace-nowrap">
                   {sc.issueTitle ?? "—"}
+                </td>
+                <td className="px-3 py-2.5 text-violet-600 whitespace-nowrap">
+                  {sc.epicName ?? <span className="text-slate-300">—</span>}
                 </td>
                 <td className="px-3 py-2.5">
                   <span

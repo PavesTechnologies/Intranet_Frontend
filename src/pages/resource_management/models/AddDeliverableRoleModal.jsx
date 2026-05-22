@@ -103,7 +103,7 @@ const SearchableSelect = ({ label, value, onChange, options, placeholder, disabl
 
 /* ===================== MAIN MODAL ===================== */
 
-const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLevels = [], initialData = null }) => {
+const AddDeliverableRoleModal = ({ open, onClose, onSuccess, categories = [], proficiencyLevels = [], initialData = null }) => {
   const [loading, setLoading] = useState(false);
   const [draftRole, setDraftRole] = useState({
     roleName: "",
@@ -140,6 +140,8 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
   const [availableSubSkills, setAvailableSubSkills] = useState([]);
 
   // Map proficiencies for consistent SearchableSelect usage
+  const normalizeText = (value) => String(value || "").trim().toLowerCase();
+
   const mappedProficiencies = proficiencyLevels.map(p => ({
     id: p.id || p.proficiencyId,
     name: p.name || p.proficiencyName
@@ -166,14 +168,28 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
       return notify.error("Select subskill and proficiency");
     }
 
-    const subSkillName = availableSubSkills.find(s => String(s.id) === String(stagingSubSkill.subSkillId))?.name;
-    const proficiencyName = proficiencyLevels.find(p => String(p.id || p.proficiencyId) === String(stagingSubSkill.proficiencyId))?.name || proficiencyLevels.find(p => String(p.id || p.proficiencyId) === String(stagingSubSkill.proficiencyId))?.proficiencyName;
+    const subSkillName = availableSubSkills.find(s => String(s.id) === String(stagingSubSkill.subSkillId))?.name || "";
+    const proficiencyName = proficiencyLevels.find(p => String(p.id || p.proficiencyId) === String(stagingSubSkill.proficiencyId))?.name || proficiencyLevels.find(p => String(p.id || p.proficiencyId) === String(stagingSubSkill.proficiencyId))?.proficiencyName || "";
 
-    setFormState(prev => ({
-      ...prev,
-      subSkills: [...prev.subSkills, { ...stagingSubSkill, subSkillName, proficiencyName, id: Date.now() }]
-    }));
+    setFormState(prev => {
+      const updatedSubSkills = prev.subSkills.some(ss => ss.id === stagingSubSkill.id)
+        ? prev.subSkills.map(ss =>
+            ss.id === stagingSubSkill.id
+              ? { ...ss, ...stagingSubSkill, subSkillName, proficiencyName }
+              : ss,
+          )
+        : [...prev.subSkills, { ...stagingSubSkill, subSkillName, proficiencyName, id: Date.now() }];
+
+      return {
+        ...prev,
+        subSkills: updatedSubSkills,
+      };
+    });
     setStagingSubSkill(null);
+  };
+
+  const handleEditSubSkill = (subSkill) => {
+    setStagingSubSkill(subSkill);
   };
 
   const handleRemoveStagedSubSkill = (id) => {
@@ -200,16 +216,22 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
       const updatedSkills = [...draftRole.skills];
       const existingSkill = updatedSkills[existingSkillIndex];
 
-      // Merge subskills (avoid duplicates by ID)
-      const existingSubSkillIds = new Set(existingSkill.subSkills.map(ss => String(ss.subSkillId)));
-      const newSubSkills = formState.subSkills.filter(ss => !existingSubSkillIds.has(String(ss.subSkillId)));
+      const mergedSubSkills = [...existingSkill.subSkills];
+      formState.subSkills.forEach((ss) => {
+        const index = mergedSubSkills.findIndex(existing => String(existing.subSkillId) === String(ss.subSkillId));
+        if (index > -1) {
+          mergedSubSkills[index] = { ...mergedSubSkills[index], ...ss };
+        } else {
+          mergedSubSkills.push(ss);
+        }
+      });
 
       updatedSkills[existingSkillIndex] = {
         ...formState,
         skillName,
         proficiencyName,
         id: existingSkill.id, // Keep original ID for stability
-        subSkills: [...existingSkill.subSkills, ...newSubSkills]
+        subSkills: mergedSubSkills,
       };
       setDraftRole(prev => ({ ...prev, skills: updatedSkills }));
       notify.success("Skill Updated In Draft");
@@ -241,7 +263,10 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
       skillName: skill.skillName,
       proficiencyId: skill.proficiencyId,
       mandatoryFlag: skill.mandatoryFlag,
-      subSkills: skill.subSkills || []
+      subSkills: (skill.subSkills || []).map((sub, idx) => ({
+        ...sub,
+        id: sub.id || `${skill.skillId}-${idx}-${Date.now()}`,
+      })),
     });
   };
 
@@ -274,13 +299,13 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
     try {
       if (draftRole.roleId) {
         const res = await updateRoleExpectationById(draftRole.roleId, payload);
-        toast.success(res.message || "Role updated successfully");
+        notify.success(res.message || "Role updated successfully");
       } else {
         // Create case: POST /api/admin/role-expectations
         const res = await createRoleExpectation(payload);
         notify.success(res.message || "Role created successfully");
       }
-      onClose();
+      onSuccess?.();
       // Reset state
       setDraftRole({ roleName: "", skills: [] });
     } catch (err) {
@@ -430,9 +455,12 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
                     <p className="text-[10px] text-gray-400 uppercase font-bold">Staged SubSkills:</p>
                     <div className="flex flex-wrap gap-2">
                       {formState.subSkills.map(ss => (
-                        <div key={ss.id} className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded border border-indigo-100 text-xs font-medium">
+                        <div key={ss.id} className="flex items-center gap-2 bg-slate-100 text-slate-800 px-2.5 py-1.5 rounded border border-slate-200 text-xs font-medium">
                           <span>{ss.subSkillName} | {ss.proficiencyName} | {ss.mandatoryFlag ? "Mand" : "Opt"}</span>
-                          <button onClick={() => handleRemoveStagedSubSkill(ss.id)} className="text-indigo-400 hover:text-indigo-600">
+                          <button onClick={() => handleEditSubSkill(ss)} className="text-indigo-500 hover:text-indigo-700">
+                            <EditIcon size={12} />
+                          </button>
+                          <button onClick={() => handleRemoveStagedSubSkill(ss.id)} className="text-rose-500 hover:text-rose-700">
                             <CloseIcon size={12} />
                           </button>
                         </div>
@@ -481,13 +509,13 @@ const AddDeliverableRoleModal = ({ open, onClose, categories = [], proficiencyLe
                       <div className="flex gap-1">
                         <button
                           onClick={() => handleEditSkill(skill)}
-                          className="p-1 text-gray-400 hover:text-indigo-600"
+                          className="p-1 text-indigo-800 hover:text-indigo-900"
                         >
                           <EditIcon size={14} />
                         </button>
                         <button
                           onClick={() => handleRemoveSkillFromDraft(skill.skillId)}
-                          className="p-1 text-gray-400 hover:text-rose-600"
+                          className="p-1 text-red-500 hover:text-red-700"
                         >
                           <DeleteIcon size={14} />
                         </button>

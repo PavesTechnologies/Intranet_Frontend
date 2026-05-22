@@ -17,6 +17,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
     managerId: "",
     password: "",
     jobTitle: "",
+    status: "ACTIVE",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -48,6 +49,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
       hireDate: formData.hireDate,
       role: formData.role,
       password: formData.password,
+      status: formData.status,
     };
 
     // 🔥 FIX: send as nested object
@@ -75,6 +77,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
         role: "",
         managerId: "",
         password: "",
+        status: "ACTIVE",
       });
     } catch (err) {
       setLoading(false);

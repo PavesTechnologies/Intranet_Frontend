@@ -17,7 +17,7 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
     if (!burndownData || !canvasRef.current) return;
     if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
 
-    const { labels, actualRemaining, idealRemaining } = burndownData;
+    const { labels, actualRemaining, idealRemaining, totalScope } = burndownData;
 
     const weekendPlugin = {
       id: "weekendShading",
@@ -25,11 +25,14 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
         const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
         if (!x) return;
         dailyBurnup.forEach((d, i) => {
-          if (!d.isWeekend) return;
+          const nonWorking = d.isHoliday || (d.isWeekend && !d.isWorkingWeekend);
+          if (!nonWorking) return;
           const xStart = x.getPixelForValue(i - 0.5);
           const xEnd   = x.getPixelForValue(i + 0.5);
           ctx.save();
-          ctx.fillStyle = "rgba(148, 163, 184, 0.15)";
+          ctx.fillStyle = d.isHoliday
+            ? "rgba(251, 191, 36, 0.18)"   // amber — holiday
+            : "rgba(148, 163, 184, 0.15)"; // slate  — non-working weekend
           ctx.fillRect(xStart, top, xEnd - xStart, bottom - top);
           ctx.restore();
         });
@@ -54,7 +57,22 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
             pointBorderWidth:     2,
             fill:                 true,
             tension:              0.3,
-            spanGaps:             false,
+            spanGaps:             true,
+          },
+          {
+            label:                "Total scope",
+            data:                 totalScope,
+            borderColor:          "#F59E0B",
+            backgroundColor:      "transparent",
+            borderWidth:          2,
+            borderDash:           [4, 3],
+            pointRadius:          3,
+            pointBackgroundColor: "#F59E0B",
+            pointBorderColor:     "#fff",
+            pointBorderWidth:     1.5,
+            fill:                 false,
+            tension:              0,
+            spanGaps:             true,
           },
           {
             label:       "Ideal remaining",
@@ -65,6 +83,7 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
             pointRadius: 0,
             fill:        false,
             tension:     0,
+            spanGaps:    true,
           },
         ],
       },
@@ -96,9 +115,11 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
               autoSkip:    false,
               maxRotation: 45,
               callback: function (val, index) {
-                const label  = this.getLabelForValue(val);
-                const isWknd = dailyBurnup[index]?.isWeekend;
-                return isWknd ? `${label} 🌙` : label;
+                const label = this.getLabelForValue(val);
+                const d     = dailyBurnup[index];
+                if (d?.isHoliday) return `${label} 🏖`;
+                if (d?.isWeekend && !d?.isWorkingWeekend) return `${label} 🌙`;
+                return label;
               },
             },
           },
@@ -125,6 +146,10 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
           Actual remaining
         </span>
         <span className="flex items-center gap-1.5">
+          <span className="inline-block w-5 h-0" style={{ borderTop: "2px dashed #F59E0B" }} />
+          Total scope
+        </span>
+        <span className="flex items-center gap-1.5">
           <span className="inline-block w-5 h-0" style={{ borderTop: "2px dashed #94A3B8" }} />
           Ideal burndown
         </span>
@@ -133,6 +158,10 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-4 h-3 rounded-sm" style={{ background: "rgba(148,163,184,0.25)" }} />
           Weekend
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-4 h-3 rounded-sm" style={{ background: "rgba(251,191,36,0.25)" }} />
+          Holiday
         </span>
       </div>
 
