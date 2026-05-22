@@ -121,6 +121,12 @@ export default function OnboardingNavBar() {
       match: ["/employee-exit"],
       redirect: "/employee-exit",
     }] : []),
+
+    ...(hasRole(["HR", "ADMIN"]) ? [{
+      label: "ManageSkillTaxonomy",
+      match: ["/employee-onboarding/manage-skill-taxonomy"],
+      redirect: "/employee-onboarding/manage-skill-taxonomy",
+    }] : []),
   ];
 
   /* ================= SUB-NAV DEFINITIONS ================= */
@@ -179,6 +185,11 @@ export default function OnboardingNavBar() {
     { label: "Offboarding Overview", path: "/employee-exit" },
   ];
 
+  const skillTaxonomyNav = [
+    { label: "Skill Taxonomy", path: "/employee-onboarding/manage-skill-taxonomy" },
+    { label: "Requests", path: "/employee-onboarding/manage-skill-taxonomy/requests" },
+  ];
+
   /* ================= NAV SWITCH LOGIC ================= */
 
   let navToRender = managementNav; // Default
@@ -209,6 +220,9 @@ export default function OnboardingNavBar() {
   else if (path.startsWith("/employee-exit")) {
     navToRender = offboardingNav;
   } 
+  else if (path.startsWith("/employee-onboarding/manage-skill-taxonomy")) {
+    navToRender = skillTaxonomyNav;
+  }
   else if (path.startsWith("/employee-onboarding")) {
     navToRender = managementNav;
   }
@@ -250,7 +264,19 @@ export default function OnboardingNavBar() {
       <div className="relative border-b bg-gray-200 mt-4 z-10">
         <div className="flex gap-6 px-6">
           {navToRender.map((item) => {
-            let isActive = item.path === "/employee-onboarding" ? path === "/employee-onboarding" : path === item.path || path.startsWith(item.path + "/");
+            let isActive = (() => {
+              if (item.path === "/employee-onboarding") return path === "/employee-onboarding";
+              const directMatch = path === item.path || path.startsWith(item.path + "/");
+              if (!directMatch) return false;
+              // Yield to a more specific sibling that also matches (e.g. /requests beats /manage-skill-taxonomy)
+              const moreSpecificSiblingMatches = navToRender.some(
+                (other) =>
+                  other.path !== item.path &&
+                  other.path.startsWith(item.path) &&
+                  (path === other.path || path.startsWith(other.path + "/")),
+              );
+              return !moreSpecificSiblingMatches;
+            })();
 
             return (
               <div key={item.label} onClick={() => navigate(item.path)} className="relative cursor-pointer py-1 text-sm font-medium">

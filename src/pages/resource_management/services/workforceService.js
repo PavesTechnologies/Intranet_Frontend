@@ -249,10 +249,10 @@ export const getRoleExpectations = async () => {
   }
 };
 
-export const deleteRoleExpectation = async (roleId) => {
+export const deleteRoleExpectation = async (roleName) => {
   try {
     const response = await axios.delete(
-      `${BASE_URL}/api/admin/role-expectations/${roleId}`,
+      `${BASE_URL}/api/admin/role-expectations/${roleName}`,
       {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,

@@ -129,14 +129,14 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
         />
       </div>
 
-      <div>
+      {/* <div>
         <label className="block font-medium">Status</label>
         <FilterListbox
           options={[{value:"PLANNING",label:"Planning"},{value:"ACTIVE",label:"Active"},{value:"COMPLETED",label:"Completed"}]}
           value={formData.status}
           onChange={(val) => handleChange({ target: { name: "status", value: val } })}
         />
-      </div>
+      </div> */}
 
       <div className="flex justify-end gap-3">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
