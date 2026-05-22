@@ -17,7 +17,14 @@ export default function FormSelect({
         value={value || ""}
         onChange={onChange}
         disabled={disabled}
-        className={`border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${value ? 'bg-blue-50/50' : 'bg-white'} disabled:bg-gray-100`}
+         
+        
+       className={`
+          border border-gray-300 rounded-lg px-3 py-2
+          focus:outline-none focus:ring-2 focus:ring-blue-500
+          ${value ? "bg-blue-50/50" : "bg-white"}
+          disabled:bg-gray-100
+        `}
       >
         <option value="">Select</option>
 
