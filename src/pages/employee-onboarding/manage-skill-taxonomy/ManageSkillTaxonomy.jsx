@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Briefcase,
-  ChevronDown,
-  ChevronRight,
-  FolderOpen,
-  Loader2,
-  Pencil,
-  Search,
-  Trash2,
-  X,
-} from "lucide-react";
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  DeleteIcon,
+  EditIcon,
+  FolderOpenIcon,
+  JobIcon,
+  SearchIcon,
+  SpinnerIcon,
+} from "../../../components/icons";
 import { useLocation } from "react-router-dom";
 import Button from "../../../components/Button/Button";
 import SkillManagementModal from "../../resource_management/models/skill_management/SkillManagementModal";
@@ -76,8 +76,8 @@ const ActionButton = ({ onClick, icon: Icon, variant = "edit", label }) => (
     aria-label={label}
     className={`rounded-md p-1.5 transition-colors ${
       variant === "edit"
-        ? "text-gray-400 hover:bg-indigo-50 hover:text-indigo-600"
-        : "text-gray-400 hover:bg-rose-50 hover:text-rose-600"
+        ? "text-indigo-600 hover:bg-indigo-50"
+        : "text-rose-600 hover:bg-rose-50"
     }`}
   >
     <Icon className="h-3.5 w-3.5" />
@@ -86,21 +86,21 @@ const ActionButton = ({ onClick, icon: Icon, variant = "edit", label }) => (
 
 const InlineSpinner = ({ message }) => (
   <div className="flex items-center gap-2 py-5 text-sm text-gray-500">
-    <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
+    <SpinnerIcon className="h-4 w-4 animate-spin text-indigo-400" />
     <span>{message}</span>
   </div>
 );
 
 const EmptyPane = ({ message }) => (
   <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-white px-4 py-8 text-center">
-    <FolderOpen className="h-6 w-6 text-gray-300" />
+    <FolderOpenIcon className="h-6 w-6 text-gray-300" />
     <p className="text-sm text-gray-400">{message}</p>
   </div>
 );
 
 const SearchInput = ({ value, onChange, placeholder, onClear }) => (
   <div className="relative">
-    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+    <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
     <input
       value={value}
       onChange={onChange}
@@ -114,7 +114,7 @@ const SearchInput = ({ value, onChange, placeholder, onClear }) => (
         aria-label="Clear search"
         className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600"
       >
-        <X className="h-3.5 w-3.5" />
+        <CloseIcon className="h-3.5 w-3.5" />
       </button>
     ) : null}
   </div>
@@ -476,7 +476,7 @@ const ManageSkillTaxonomy = () => {
         
         {/* Search Input */}
         <div className="relative flex-1 sm:w-80 lg:w-96">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
 
           <input
             value={searchTerm}
@@ -492,7 +492,7 @@ const ManageSkillTaxonomy = () => {
               aria-label="Clear search"
               className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 transition hover:text-gray-600"
             >
-              <X className="h-3.5 w-3.5" />
+              <CloseIcon className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
@@ -504,7 +504,7 @@ const ManageSkillTaxonomy = () => {
           onClick={() => setOpenSkillManagement(true)}
           className="h-11 px-5"
         >
-          <Briefcase className="h-4 w-4" />
+          <JobIcon className="h-4 w-4" />
           Skill Management
         </Button>
       </div>
@@ -520,7 +520,7 @@ const ManageSkillTaxonomy = () => {
         {/* Search hydrating notice */}
         {searchHydrating && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-sm text-indigo-700">
-            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+            <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin" />
             <span>Loading skills and subskills for deeper search results…</span>
           </div>
         )}
@@ -542,7 +542,7 @@ const ManageSkillTaxonomy = () => {
 
           {loadingCategories ? (
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-gray-500">
-              <Loader2 className="h-5 w-5 animate-spin text-indigo-400" />
+              <SpinnerIcon className="h-5 w-5 animate-spin text-indigo-400" />
               <span>Loading skill categories…</span>
             </div>
           ) : filteredCategories.length === 0 ? (
@@ -576,9 +576,9 @@ const ManageSkillTaxonomy = () => {
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="shrink-0 text-gray-400">
                           {categoryExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
+                            <ChevronDownIcon className="h-4 w-4" />
                           ) : (
-                            <ChevronRight className="h-4 w-4" />
+                            <ChevronRightIcon className="h-4 w-4" />
                           )}
                         </span>
                         <div className="min-w-0">
@@ -596,13 +596,13 @@ const ManageSkillTaxonomy = () => {
                       <div className="flex shrink-0 items-center gap-1.5">
                         <ActionButton
                           onClick={(e) => { e.stopPropagation(); handleEditCategory(category); }}
-                          icon={Pencil}
+                          icon={EditIcon}
                           variant="edit"
                           label={`Edit ${category.name}`}
                         />
                         <ActionButton
                           onClick={(e) => { e.stopPropagation(); handleTrashClick(`category ${category.name}`); }}
-                          icon={Trash2}
+                          icon={DeleteIcon}
                           variant="delete"
                           label={`Delete ${category.name}`}
                         />
@@ -674,9 +674,9 @@ const ManageSkillTaxonomy = () => {
                                       <div className="flex min-w-0 items-center gap-3">
                                         <span className="shrink-0 text-gray-400">
                                           {skillExpanded ? (
-                                            <ChevronDown className="h-3.5 w-3.5" />
+                                            <ChevronDownIcon className="h-3.5 w-3.5" />
                                           ) : (
-                                            <ChevronRight className="h-3.5 w-3.5" />
+                                            <ChevronRightIcon className="h-3.5 w-3.5" />
                                           )}
                                         </span>
                                         <div className="min-w-0">
@@ -694,13 +694,13 @@ const ManageSkillTaxonomy = () => {
                                       <div className="flex shrink-0 items-center gap-1.5">
                                         <ActionButton
                                           onClick={(e) => { e.stopPropagation(); handleEditSkill(category, skill); }}
-                                          icon={Pencil}
+                                          icon={EditIcon}
                                           variant="edit"
                                           label={`Edit ${skill.name}`}
                                         />
                                         <ActionButton
                                           onClick={(e) => { e.stopPropagation(); handleTrashClick(`skill ${skill.name}`); }}
-                                          icon={Trash2}
+                                          icon={DeleteIcon}
                                           variant="delete"
                                           label={`Delete ${skill.name}`}
                                         />
@@ -769,13 +769,13 @@ const ManageSkillTaxonomy = () => {
                                                   <div className="flex shrink-0 items-center gap-1.5">
                                                     <ActionButton
                                                       onClick={() => handleEditSubSkill(category, skill, subSkill)}
-                                                      icon={Pencil}
+                                                      icon={EditIcon}
                                                       variant="edit"
                                                       label={`Edit ${subSkill.name}`}
                                                     />
                                                     <ActionButton
                                                       onClick={() => handleTrashClick(`subskill ${subSkill.name}`)}
-                                                      icon={Trash2}
+                                                      icon={DeleteIcon}
                                                       variant="delete"
                                                       label={`Delete ${subSkill.name}`}
                                                     />
@@ -805,7 +805,7 @@ const ManageSkillTaxonomy = () => {
       ) : (
         /* Requests tab placeholder */
         <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-10 text-center">
-          <FolderOpen className="mx-auto mb-3 h-8 w-8 text-gray-300" />
+          <FolderOpenIcon className="mx-auto mb-3 h-8 w-8 text-gray-300" />
           <p className="text-sm font-medium text-gray-700">Skill taxonomy requests</p>
           <p className="mt-1 max-w-sm mx-auto text-sm text-gray-500">
             Track incoming skill taxonomy requests and review pending changes from employees or
