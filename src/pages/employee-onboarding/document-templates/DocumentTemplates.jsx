@@ -29,11 +29,11 @@ const TEMPLATES = [
     id: "joining_letter",
     title: "Joining Letter",
     category: "Onboarding",
-    description: "Official offer and joining confirmation with compensation and role details.",
+    description: "Official joining confirmation with reporting details, onboarding documents, and acknowledgement.",
     icon: <FileSignature className="text-blue-500" size={28} />,
     color: "from-blue-500/20 to-blue-500/5",
     accent: "bg-blue-500",
-    fields: ["firstName", "lastName", "contactNumber", "email", "designation", "totalCtc", "employeeType"]
+    fields: ["firstName", "lastName", "contactNumber", "email", "designation", "department", "joiningDate", "reportingTime", "location", "reportingManager", "customMessage", "date"]
   },
   {
     id: "nda",
@@ -407,7 +407,13 @@ export default function DocumentTemplates() {
                       totalCtc: "18,00,000",
                       employeeType: "Full-Time",
                       date: new Date().toISOString().split('T')[0],
-                      relievingDate: "2026-05-08"
+                      relievingDate: "2026-05-08",
+                      department: "Engineering",
+                      joiningDate: "2026-05-21",
+                      reportingTime: "10:00 AM",
+                      location: "Hyderabad",
+                      reportingManager: "Paves HR",
+                      customMessage: "Welcome aboard."
                     })} 
                     className="w-full h-full bg-white rounded-xl shadow-sm border border-slate-200"
                   />
@@ -493,3 +499,6 @@ export default function DocumentTemplates() {
     </div>
   );
 }
+
+
+

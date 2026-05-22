@@ -260,7 +260,7 @@ const toLongOrNull = (value) => {
 };
 
 const getRoleId = (role = {}) =>
-  role.dev_role_id ||
+  role.role_id ||
   role.deliveryRoleId ||
   role.roleId ||
   role.role_id ||
@@ -498,7 +498,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
         if (rawRole && typeof rawRole === 'object') {
           return getRoleId(rawRole) || getRoleName(rawRole) || "";
         }
-        return getVal(['deliveryRoleId', 'dev_role_id', 'roleId', 'role_id', 'RoleID', 'delivery_role_id', 'delivery_role_uuid', 'deliveryRole', 'roleName', 'role_name', 'role']);
+        return getVal(['roleId', 'role_id']);
       };
 
       const roleValueFromData = getRoleValue();
@@ -562,7 +562,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   const sourceRole =
     initialData.deliveryRoleId ||
     initialData.roleId ||
-    initialData.dev_role_id ||
+    initialData.role_id ||
     initialData.deliveryRole ||
     initialData.role ||
     initialData.roleName;

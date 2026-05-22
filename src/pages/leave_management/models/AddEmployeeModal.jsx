@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, User } from "lucide-react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import FilterListbox from "../../../components/filter/FilterListbox";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -17,6 +17,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
     managerId: "",
     password: "",
     jobTitle: "",
+    status: "ACTIVE",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -48,6 +49,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
       hireDate: formData.hireDate,
       role: formData.role,
       password: formData.password,
+      status: formData.status,
     };
 
     // 🔥 FIX: send as nested object
@@ -56,7 +58,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
     }
 
     try {
-      await axios.post(`${BASE_URL}/api/employee/register`, payload, {
+      await api.post(`${BASE_URL}/api/employee/register`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setSuccess("Employee added successfully!");
@@ -75,6 +77,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
         role: "",
         managerId: "",
         password: "",
+        status: "ACTIVE",
       });
     } catch (err) {
       setLoading(false);

@@ -8,7 +8,7 @@ const TABS = [
 
 const ChartTabBar = ({ activeChart, onChange }) => (
   <div className="flex items-center gap-2 mb-5">
-    {TABS.map(({ id, label, icon: Icon }) => {
+    {/* {TABS.map(({ id, label, icon: Icon }) => {
       const active = activeChart === id;
       return (
         <button
@@ -26,7 +26,7 @@ const ChartTabBar = ({ activeChart, onChange }) => (
           {label}
         </button>
       );
-    })}
+    })} */}
   </div>
 );
 

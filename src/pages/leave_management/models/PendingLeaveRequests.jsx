@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import PendingLeaveRequestsTable from "./PendingLeaveRequestsTable";
 import SkeletonTable from "./SkeletonTable";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -29,14 +29,14 @@ const PendingLeaveRequests = ({ refresh, year }) => {
       const token = localStorage.getItem("token");
 
       const [leaveReqRes, leaveTypeRes, balanceRes] = await Promise.all([
-        axios.get(
+        api.get(
           `${BASE_URL}/api/leave-requests/employee/pending/${employeeId}/${year}`,
           { headers: { Authorization: `Bearer ${token}` } }
         ),
-        axios.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
+        api.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(
+        api.get(
           `${BASE_URL}/api/leave-balance/employee/drop/${employeeId}/${year}`,
           { headers: { Authorization: `Bearer ${token}` } }
         ),

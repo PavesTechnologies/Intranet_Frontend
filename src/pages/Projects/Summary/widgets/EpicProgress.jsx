@@ -29,7 +29,7 @@ const EpicTooltipContent = ({ epic, sortedStatuses }) => (
   </div>
 );
 
-const EpicProgress = ({ epics, stories, tasks, bugs, statuses }) => {
+const EpicProgress = ({ epics, stories, tasks, statuses /*, bugs */ }) => {
   const [epicProgressData, setEpicProgressData] = useState([]);
   const [sortedStatuses, setSortedStatuses] = useState([]);
 
@@ -47,7 +47,7 @@ const EpicProgress = ({ epics, stories, tasks, bugs, statuses }) => {
       }));
     setSortedStatuses(localSortedStatuses);
 
-    const allWorkItems = [...(stories || []), ...(tasks || []), ...(bugs || [])].filter(
+    const allWorkItems = [...(stories || []), ...(tasks || []) /*, ...(bugs || [])*/].filter(
       Boolean,
     );
 
@@ -78,7 +78,7 @@ const EpicProgress = ({ epics, stories, tasks, bugs, statuses }) => {
     });
 
     setEpicProgressData(processed);
-  }, [epics, stories, tasks, bugs, statuses]);
+  }, [epics, stories, tasks, statuses /*, bugs*/]);
 
   return (
     <motion.div variants={itemVariants} initial="hidden" animate="visible">

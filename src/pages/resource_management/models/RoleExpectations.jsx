@@ -3,10 +3,13 @@ import {
   getRoleExpectations,
   getSkillCategoriesTree,
   getProficiencyLevels,
+  deleteRoleExpectation,
 } from "../services/workforceService";
+import { notify } from "../utils/notify";
 import { Badge } from "@/components/ui/badge";
 import Pagination from "@/components/Pagination/pagination";
 import AddDeliverableRoleModal from "./AddDeliverableRoleModal";
+import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import { AlertCircle, Briefcase, ChevronRight, Loader2, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +24,7 @@ const PROFICIENCY_CONFIG = {
     label: "Intermediate",
     className: "border-amber-200 bg-amber-50 text-amber-700",
   },
-  ADVANCED: {
+  ADVANCE: {
     label: "Advanced",
     className: "border-rose-200 bg-rose-50 text-rose-700",
   },
@@ -33,19 +36,23 @@ const PROFICIENCY_CONFIG = {
 
 // Map getRoleExpectations shape → initialData shape expected by AddDeliverableRoleModal.
 // Resolves skill/proficiency names → IDs using the categories tree and proficiency list.
+const normalizeText = (value) => String(value || "").trim().toLowerCase();
+
 const buildInitialData = (role, categories, proficiencyLevels) => {
   const findProficiencyId = (name) => {
     if (!name) return "";
+    const normalized = normalizeText(name);
     const match = proficiencyLevels.find(
-      (p) => (p.name || p.proficiencyName)?.toUpperCase() === name.toUpperCase(),
+      (p) => normalizeText(p.name || p.proficiencyName) === normalized,
     );
     return match?.id || match?.proficiencyId || "";
   };
 
   const findProficiencyName = (name) => {
     if (!name) return "";
+    const normalized = normalizeText(name);
     const match = proficiencyLevels.find(
-      (p) => (p.name || p.proficiencyName)?.toUpperCase() === name.toUpperCase(),
+      (p) => normalizeText(p.name || p.proficiencyName) === normalized,
     );
     return match?.name || match?.proficiencyName || name;
   };
@@ -59,7 +66,7 @@ const buildInitialData = (role, categories, proficiencyLevels) => {
 
       for (const cat of categories) {
         const sk = cat.skills?.find(
-          (s) => s.name?.toLowerCase() === skillEntry.skill?.toLowerCase(),
+          (s) => normalizeText(s.name) === normalizeText(skillEntry.skill || skillEntry.skillName),
         );
         if (sk) {
           skillId = sk.id;
@@ -69,25 +76,26 @@ const buildInitialData = (role, categories, proficiencyLevels) => {
       }
 
       const validSubSkills =
-        skillEntry.subSkills?.filter((s) => s.subSkill !== null) ?? [];
+        skillEntry.subSkills?.filter((s) => s.subSkill !== null && s.subSkill !== undefined) ?? [];
 
       return {
         id: Date.now() + idx,
         skillId,
-        skillName: skillEntry.skill,
-        proficiencyId: findProficiencyId(skillEntry.proficiency),
-        proficiencyName: findProficiencyName(skillEntry.proficiency),
+        skillName: skillEntry.skill || skillEntry.skillName,
+        proficiencyId: findProficiencyId(skillEntry.proficiency || skillEntry.proficiencyName),
+        proficiencyName: findProficiencyName(skillEntry.proficiency || skillEntry.proficiencyName),
         mandatoryFlag: skillEntry.mandatoryFlag ?? false,
         subSkills: validSubSkills.map((s, ssIdx) => {
+          const subSkillName = s.subSkill || s.subSkillName || s.name || "";
           const subSkillObj = subSkillDefs.find(
-            (ss) => ss.name?.toLowerCase() === s.subSkill?.toLowerCase(),
+            (ss) => normalizeText(ss.name) === normalizeText(subSkillName) || String(ss.id) === String(s.subSkillId),
           );
           return {
             id: Date.now() + idx * 1000 + ssIdx,
-            subSkillId: subSkillObj?.id || "",
-            subSkillName: s.subSkill,
-            proficiencyId: findProficiencyId(s.proficiency),
-            proficiencyName: findProficiencyName(s.proficiency),
+            subSkillId: subSkillObj?.id || s.subSkillId || "",
+            subSkillName,
+            proficiencyId: findProficiencyId(s.proficiency || s.proficiencyName),
+            proficiencyName: findProficiencyName(s.proficiency || s.proficiencyName),
             mandatoryFlag: s.mandatoryFlag ?? false,
           };
         }),
@@ -108,6 +116,10 @@ export default function RoleExpectations() {
   const [editingRole, setEditingRole] = useState(null);
   const [categories, setCategories] = useState([]);
   const [proficiencyLevels, setProficiencyLevels] = useState([]);
+
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [selectedRoleForDelete, setSelectedRoleForDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchRoles = async () => {
     try {
@@ -144,6 +156,39 @@ export default function RoleExpectations() {
   const handleEditSuccess = () => {
     handleEditClose();
     fetchRoles();
+  };
+
+  const handleDeleteClick = (role) => {
+    setSelectedRoleForDelete(role);
+    setIsConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedRoleForDelete) return;
+
+    try {
+      setIsDeleting(true);
+      const response = await deleteRoleExpectation(selectedRoleForDelete.role);
+      
+      if (response?.success) {
+        notify.success(response.message || "Role expectations deleted successfully");
+        setIsConfirmOpen(false);
+        setSelectedRoleForDelete(null);
+        fetchRoles();
+      } else {
+        notify.error(response?.message || "Failed to delete role");
+      }
+    } catch (err) {
+      console.error("Failed to delete role:", err);
+      notify.error(err.response?.data?.message || "An error occurred while deleting the role");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setIsConfirmOpen(false);
+    setSelectedRoleForDelete(null);
   };
 
   if (loading) {
@@ -197,7 +242,7 @@ export default function RoleExpectations() {
                 key={role.dev_role_id}
                 role={role}
                 onEdit={handleEditClick}
-                onDelete={(r) => console.log("delete", r)}
+                onDelete={handleDeleteClick}
               />
             ))}
           </div>
@@ -212,10 +257,23 @@ export default function RoleExpectations() {
 
       <AddDeliverableRoleModal
         open={editModalOpen}
-        onClose={handleEditSuccess}
+        onClose={handleEditClose}
+        onSuccess={handleEditSuccess}
         categories={categories}
         proficiencyLevels={proficiencyLevels}
         initialData={editingRole}
+      />
+
+      <ConfirmationModal
+        isOpen={isConfirmOpen}
+        title="Delete Role Expectation"
+        message={`Are you sure you want to delete "${selectedRoleForDelete?.role}"? This action cannot be undone.`}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        isLoading={isDeleting}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
       />
     </div>
   );
@@ -243,17 +301,15 @@ function RoleCard({ role, onEdit, onDelete }) {
         <div className="flex items-center gap-1">
           <button
             onClick={() => onEdit?.(role)}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-blue-50 hover:text-blue-600"
-            aria-label="Edit role"
-            title="Edit"
+            className="flex h-7 w-7 items-center justify-center text-indigo-800 hover:text-indigo-900"
+            title="Edit Role"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => onDelete?.(role)}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
-            aria-label="Delete role"
-            title="Delete"
+            className="flex h-7 w-7 items-center justify-center text-red-500 hover:text-red-700"
+            title="Delete Role"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

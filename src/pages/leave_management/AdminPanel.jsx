@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../api/axiosInstance";
 import CompOffBalanceRequests from "../leave_management/models/CompOffBalanceRequests";
 import HandleLeaveRequestAndApprovals from "../leave_management/models/HandleLeaveRequestAndApprovals";
 import { useAuth } from "../../contexts/AuthContext";
@@ -9,6 +9,7 @@ import RevokeLeaveRequests from "./models/RevokeLeaveRequests";
 import { toast } from "react-toastify";
 import { se } from "date-fns/locale";
 import { useWebSocket } from "./websockets/WebSocketProvider.jsx";
+import { set } from "date-fns";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -19,13 +20,14 @@ const AdminPanel = ({ employeeId }) => {
   // const [adminLeaveRequests, setAdminLeaveRequests] = useState([]);
   const [resultMsg, setResultMsg] = useState(null);
   const [revokeRequests, setRevokeRequests] = useState([]);
-  
+
   const { user } = useAuth();
   const permissions = user?.permissions || [];
   const navigate = useNavigate();
   const { subscribe } = useWebSocket();
   const leaveApprovalRef = useRef();
   const refreshCooldown = useRef(false);
+  const [leaveTypes, setLeaveTypes] = useState([]);
 
   // const user = localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : {};
   // const isManager = user?.role?.toLowerCase() === "manager";
@@ -42,7 +44,7 @@ const AdminPanel = ({ employeeId }) => {
   // }
 
   useEffect(() => {
-    axios
+    api
       .post(
         `${BASE_URL}/api/leave-requests/manager/history`,
         {
@@ -62,6 +64,22 @@ const AdminPanel = ({ employeeId }) => {
   }, []);
 
   useEffect(() => {
+    api
+      .get(`${BASE_URL}/api/leave/get-all-leave-types`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      })
+      .then((res) => {
+        // const arr = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        setLeaveTypes(res.data?.regular || []);
+        console.log("Fetched Leave Types:", res.data?.regular || []);
+        // setAdminLeaveRequests(arr.map(toLeaveRequest));
+      })
+      .catch((err) => console.error("Failed to fetch leave types:", err));
+  }, []);
+
+  useEffect(() => {
     if (resultMsg) {
       const timer = setTimeout(() => setResultMsg(null), 3000);
       return () => clearTimeout(timer);
@@ -70,7 +88,7 @@ const AdminPanel = ({ employeeId }) => {
 
   const fetchRevokeRequests = useCallback(async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/api/leave-revoke/pending/${employeeId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -240,9 +258,10 @@ const AdminPanel = ({ employeeId }) => {
       </div> */}
 
       {/* Comp-Off Balance Requests Section */}
-      {permissions.includes("VIEW_COMPOFF_BY_EMPLOYEE") && (
-        <CompOffBalanceRequests managerId={employeeId} />
-      )}
+      {permissions.includes("VIEW_COMPOFF_BY_EMPLOYEE") &&
+        leaveTypes.some((lt) => lt.leaveTypeId === "L-COMPOFF") && (
+          <CompOffBalanceRequests managerId={employeeId} />
+        )}
       {/* <CompOffBalanceRequests managerId={employeeId} /> */}
 
       {revokeRequests.length > 0 && (
@@ -253,12 +272,12 @@ const AdminPanel = ({ employeeId }) => {
       )}
 
       {/* Search and Filter Section */}
-      {permissions.includes("VIEW_LEAVE_REQUEST_BY_EMPLOYEE") &&
+      {permissions.includes("VIEW_LEAVE_REQUEST_BY_EMPLOYEE") && (
         <HandleLeaveRequestAndApprovals
           employeeId={employeeId}
           ref={leaveApprovalRef}
         />
-      }
+      )}
 
       {/* Modals */}
       {/* <AddEmployeeModal

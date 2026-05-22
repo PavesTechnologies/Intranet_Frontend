@@ -1,7 +1,7 @@
 // src/components/AddHolidaysModal.jsx
 import React, { useState, useEffect, useRef } from "react";
 import Select from "react-select";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { Country, State } from "country-state-city";
 import { toast } from "react-toastify";
 import {
@@ -164,7 +164,7 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
   const handleDownloadTemplate = async () => {
     setDownloading(true);
     try {
-      const res = await axios.get(`${BASE_URL}/api/holidays/template/download`, {
+      const res = await api.get(`${BASE_URL}/api/holidays/template/download`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         responseType: "blob",
       });
@@ -228,7 +228,7 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
       year: rest.year,
     }));
     try {
-      const res = await axios.post(`${BASE_URL}/api/holidays/add`, payload, {
+      const res = await api.post(`${BASE_URL}/api/holidays/add`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       toast.success(res.data.message || "Holidays added successfully!");

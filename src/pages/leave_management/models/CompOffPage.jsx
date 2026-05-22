@@ -5,7 +5,7 @@ import React, {
     forwardRef,
     useImperativeHandle,
 } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import CompOffRequestsTable from "./CompOffRequestsTable";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -30,7 +30,7 @@ const CompOffPage = forwardRef(
         if (!employeeId) return;
         try {
             setIsLoading(true);
-            const res = await axios.get(
+            const res = await api.get(
                 `${BASE_URL}/api/compoff/employee/${employeeId}`,
                 { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
             );
@@ -74,7 +74,7 @@ const CompOffPage = forwardRef(
     const handleCompOffSubmit = async (payload) => {
         try {
             setIsLoading(true);
-            const res = await axios.post(
+            const res = await api.post(
                 `${BASE_URL}/api/compoff/request`,
                 { ...payload, employeeId },
                 { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
@@ -93,7 +93,7 @@ const CompOffPage = forwardRef(
     const handleCancel = async (id) => {
         try {
             setLoading(true);
-            await axios.put(
+            await api.put(
                 `${BASE_URL}/api/compoff/employee/cancel/${id}`,
                 {},
                 { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }

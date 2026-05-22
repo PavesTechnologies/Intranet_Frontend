@@ -1,5 +1,5 @@
 import React, { useEffect, useState, Fragment } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { Listbox, Transition } from "@headlessui/react";
 import { Check, Plus, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -36,7 +36,7 @@ export default function ApprovalRulesPage() {
   const fetchRules = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${BASE_URL}/api/approval-rules/all`, {
+      const res = await api.get(`${BASE_URL}/api/approval-rules/all`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setRules(res.data.data || []);
@@ -49,7 +49,7 @@ export default function ApprovalRulesPage() {
 
   const fetchActionTypes = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/api/approval-rules/action-types`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -63,7 +63,7 @@ export default function ApprovalRulesPage() {
 
   const fetchApproverTypes = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/api/approval-rules/approver-types`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -111,11 +111,11 @@ export default function ApprovalRulesPage() {
     e.preventDefault();
     try {
       if (editingRule) {
-        await axios.put(`${BASE_URL}/api/approval-rules/update`, formData, {
+        await api.put(`${BASE_URL}/api/approval-rules/update`, formData, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
       } else {
-        await axios.post(`${BASE_URL}/api/approval-rules/create`, formData, {
+        await api.post(`${BASE_URL}/api/approval-rules/create`, formData, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
       }
@@ -144,7 +144,7 @@ export default function ApprovalRulesPage() {
 
   const deleteRule = async (id) => {
     try {
-      await axios.delete(`${BASE_URL}/api/approval-rules/delete/${id}`, {
+      await api.delete(`${BASE_URL}/api/approval-rules/delete/${id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       toast.success("Rule deleted successfully");

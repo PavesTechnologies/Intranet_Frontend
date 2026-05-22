@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
@@ -14,7 +14,7 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
 
   const handleResourceCalculate = async (resourceId) => {
     try {
-      const res = axios.post(
+      const res = api.post(
         `${RMS_BASE_URL}/api/availability/recalculate/resource/${resourceId}`,
         {},
         {
@@ -36,7 +36,7 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
     setLoading(true);
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE_URL}/api/leave-revoke/approve/${leaveId}`,
         {
           employeeId: employeeId,
@@ -68,7 +68,7 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
   const handleReject = async (leaveId, employeeId, year) => {
     try {
       setLoading(true);
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE_URL}/api/leave-revoke/reject/${leaveId}`,
         {
           payload: {

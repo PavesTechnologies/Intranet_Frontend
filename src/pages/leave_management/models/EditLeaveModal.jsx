@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Fragment, useMemo } from "react";
-import axios, { all } from "axios";
+import api from "../../../api/axiosInstance";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import {
   X,
@@ -262,7 +262,7 @@ export default function EditLeaveModal({
 
     const fetchLeaveTypes = async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/api/leave/types`, {
+        const res = await api.get(`${BASE_URL}/api/leave/types`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
         setLeaveTypes(res.data);
@@ -273,7 +273,7 @@ export default function EditLeaveModal({
 
     const fetchHolidays = async () => {
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${BASE_URL}/api/holidays/by-location/${year}`,
           {
             params: { state: "All", country: "India" },
@@ -458,7 +458,7 @@ export default function EditLeaveModal({
     };
 
     try {
-      const { data } = await axios.put(
+      const { data } = await api.put(
         `${BASE_URL}/api/leave-requests/employee/update`,
         payload,
         {

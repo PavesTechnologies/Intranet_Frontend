@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { X, FileText } from "lucide-react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
+import { useJobProgress } from "../../../contexts/JobProgressContext";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -16,10 +17,10 @@ const useLeavelables = () => {
   useEffect(() => {
     const fetchLeavelables = async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/api/leave/types`, {
+        const res = await api.get(`${BASE_URL}/api/leave/types`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
-        const accfre = await axios.get(
+        const accfre = await api.get(
           `${BASE_URL}/api/leave/accrual-frequencies`,
           {
             headers: {
@@ -86,6 +87,7 @@ const defaultForm = {
 const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
   const [formData, setFormData] = useState(defaultForm);
   const [submitting, setSubmitting] = useState(false);
+  const { startJob } = useJobProgress();
   const {
     leavelables,
     loading: loadinglables,
@@ -106,7 +108,9 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
 
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+    };
     window.addEventListener("keydown", handler);
     document.body.style.overflow = "hidden";
     return () => {
@@ -234,7 +238,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
     const method = editData ? "patch" : "post";
 
     try {
-      const response = await axios({
+      const response = await api({
         method,
         url,
         data: payload,
@@ -248,6 +252,11 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
         toast.success(
           response.data.message || (editData ? "Updated!" : "Added!"),
         );
+
+        if (!editData && !isGender && response.data?.data?.jobId) {
+          startJob(response.data.data.jobId);
+        }
+
         onSuccess?.();
         onClose();
       } else {
@@ -306,7 +315,10 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               <p className="text-gray-500 text-sm">Loading leave labels...</p>
             ) : (
               <FilterListbox
-                options={leavelables.map((item) => ({ value: item.name, label: item.label }))}
+                options={leavelables.map((item) => ({
+                  value: item.name,
+                  label: item.label,
+                }))}
                 value={formData.leaveName}
                 onChange={(selectedName) =>
                   setFormData((prev) => ({ ...prev, leaveName: selectedName }))
@@ -367,7 +379,10 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               </label>
 
               <FilterListbox
-                options={accrualFrequency.map((freq) => ({ value: freq, label: freq }))}
+                options={accrualFrequency.map((freq) => ({
+                  value: freq,
+                  label: freq,
+                }))}
                 value={formData.accrualFrequency}
                 onChange={(value) =>
                   setFormData((prev) => ({ ...prev, accrualFrequency: value }))
