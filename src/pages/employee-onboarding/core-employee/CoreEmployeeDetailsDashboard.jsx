@@ -56,6 +56,7 @@ export default function EmployeeOnboardingPage() {
   const [designations, setDesignations] = useState([]);
 
   const [editEmployeeUuid, setEditEmployeeUuid] = useState(null);
+  const [editEmployee, setEditEmployee] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -249,6 +250,7 @@ export default function EmployeeOnboardingPage() {
     setIsCreateOpen(false);
     setSelectedUserUuid(null);
     setEditEmployeeUuid(null);
+    setEditEmployee(null);
     fetchEmployees();
   };
 
@@ -610,6 +612,7 @@ console.log(
         action: (
           <ActionMenu
             onEdit={() => {
+              setEditEmployee(emp);
               setEditEmployeeUuid(emp.employee_uuid);
               setSelectedUserUuid(emp.user_uuid);
               setIsCreateOpen(true);
@@ -794,6 +797,9 @@ console.log(
         onClose={handleCloseModal}
         userUuid={selectedUserUuid}
         employeeUuid={editEmployeeUuid}
+        initialEmployee={editEmployee}
+        initialDepartments={departments}
+        initialDesignations={designations}
       />
     </div>
   );
