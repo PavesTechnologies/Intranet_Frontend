@@ -30,6 +30,14 @@ export default function EducationDashboard() {
             </PageCardContent>
           </div>
         </PageCard>
+        <PageCard className="cursor-pointer hover:shadow-lg transition">
+          <div onClick={() => navigate("degrees")} className="w-full h-full">
+            <PageCardContent>
+              <h2 className="font-semibold text-blue-900">Degree Master</h2>
+              <p className="text-sm text-gray-500 mt-1">Manage degree types mapped to education levels</p>
+            </PageCardContent>
+          </div>
+        </PageCard>
       </div>
     </div>
   );

@@ -764,41 +764,22 @@ console.log(
 
 }, []);
   const fetchDegrees = async (education_uuid) => {
-
+  if (!education_uuid) return;
+  setDegreeOptions([]);
   try {
-
-    const BASE_URL =
-      window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-
+    const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
     const response = await fetch(
       `${BASE_URL}/education/degree-master/${education_uuid}`,
       {
         headers: {
-          Authorization:
-            `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       }
     );
-
     const data = await response.json();
-
-    console.log(
-      "DEGREES",
-      data
-    );
-
-    const degrees = data || [];
-
-setDegreeOptions(degrees);
-
-
-
+    setDegreeOptions(Array.isArray(data) ? data : []);
   } catch (err) {
-
-    console.error(
-      "Degree Fetch Error",
-      err
-    );
+    console.error("Degree Fetch Error", err);
   }
 };
 // ✅ ADD HERE
@@ -1699,7 +1680,7 @@ formData.append(
           const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
           response = await fetch(
-            `${BASE_URL}/hr/delete-document/${docId}?category=${encodeURIComponent(category)}`,
+            `${BASE_URL}/education/employee-education-document/${docId}`,
             {
               method: "DELETE",
               headers: {
@@ -2559,75 +2540,38 @@ else if (category === "identity") {
 
   <FilterListbox
     options={[
-      {
-        value: "",
-        label: "Select Education Level",
-      },
-
-    ...(Array.isArray(formattedEducationTypes)
-  ? formattedEducationTypes
-  : []
-).map((edu) => ({
-
-  value: String(edu.mapping_uuid || ""),
-
-  label:
-    edu.education_name ||
-    edu.education?.education_name ||
-    "Unknown",
-}))
+      { value: "", label: "Select Education Level" },
+      ...Array.from(
+        new Map(
+          (Array.isArray(formattedEducationTypes) ? formattedEducationTypes : [])
+            .map(edu => [edu.education_name || edu.mapping_uuid, edu])
+        ).values()
+      ).map(edu => ({
+        value: String(edu.mapping_uuid || ""),
+        label: edu.education_name || "Unknown",
+      })),
     ]}
-
-    value={
-  String(
-    uploadFormData.mapping_uuid || ""
-  )
-}
-
+    value={String(uploadFormData.mapping_uuid || "")}
     onChange={(val) => {
-
-  const selected =
-  formattedEducationTypes.find(
-    e =>
-      String(e.mapping_uuid) === String(val)
-  );
-
-console.log(
-  "SELECTED EDUCATION",
-  selected
-);
-
-  setUploadFormData(d => ({
-
-    ...d,
-
-    document_name:
-  selected?.document_name || "",
-
-    education_uuid:
-  selected?.education_uuid ||
-  selected?.education?.education_uuid ||
-  "",
-
-    // ✅ IMPORTANT FIX
-    mapping_uuid:
-      selected?.mapping_uuid ||
-      selected?.education_mapping_uuid ||
-      "",
-
-    education_name:
-  selected?.education_name ||
-  selected?.education?.education_name ||
-  "",
-
-    degree_uuid:
-  d.degree_uuid || "",
-  }));
-
-  fetchDegrees(
-  selected?.education_uuid
-);
-}}    
+      const raw = (Array.isArray(formattedEducationTypes) ? formattedEducationTypes : [])
+        .find(e => String(e.mapping_uuid) === String(val));
+      const resolvedUuid =
+        raw?.education_uuid ||
+        educationMasters.find(
+          m => String(m.education_name).trim() === String(raw?.education_name).trim()
+        )?.education_uuid || "";
+      setDegreeOptions([]);
+      setUploadFormData(d => ({
+        ...d,
+        mapping_uuid: val,
+        education_uuid: resolvedUuid,
+        education_name: raw?.education_name || "",
+        document_name: raw?.document_name || "",
+        degree_uuid: "",
+        degree_name: "",
+      }));
+      if (resolvedUuid) fetchDegrees(resolvedUuid);
+    }}
   />
 </div>
 <div>
@@ -2639,38 +2583,25 @@ console.log(
     options={[
       {
         value: "",
-        label: "Select Degree",
+        label: !(uploadFormData.education_uuid || uploadFormData.mapping_uuid)
+          ? "Select education level first"
+          : degreeOptions.length === 0
+            ? "No degrees available"
+            : "Select Degree",
       },
-
       ...degreeOptions.map((deg) => ({
         value: String(deg.degree_uuid),
-
-        label:
-          deg.degree_name,
+        label: deg.degree_name,
       })),
     ]}
-
-    value={
-  String(
-    uploadFormData.degree_uuid || ""
-  )
-}
-
+    value={String(uploadFormData.degree_uuid || "")}
+    disabled={!(uploadFormData.education_uuid || uploadFormData.mapping_uuid)}
     onChange={(val) => {
-
-      const selected =
-        degreeOptions.find(
-          d => d.degree_uuid === val
-        );
-
+      const selected = degreeOptions.find(d => d.degree_uuid === val);
       setUploadFormData(d => ({
-
         ...d,
-
         degree_uuid: val,
-
-        degree_name:
-          selected?.degree_name || "",
+        degree_name: selected?.degree_name || "",
       }));
     }}
   />
