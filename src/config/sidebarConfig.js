@@ -94,8 +94,8 @@ export const EO_SUBMENU = [
     to: "/employee-onboarding/manage-skill-taxonomy",
     allowedRoles: MANAGEMENT_ROLES,
     children: [
-      { label: "Skill Taxonomy", to: "/employee-onboarding/manage-skill-taxonomy", allowedRoles: ADMIN },
-      { label: "Requests",       to: "/employee-onboarding/manage-skill-taxonomy/requests", allowedRoles: ADMIN },    
+      { label: "Skill Taxonomy", to: "/employee-onboarding/manage-skill-taxonomy", allowedRoles: HR_ADMIN },
+      { label: "Requests",       to: "/employee-onboarding/manage-skill-taxonomy/requests", allowedRoles: HR_ADMIN },    
     ],
   },
   {
