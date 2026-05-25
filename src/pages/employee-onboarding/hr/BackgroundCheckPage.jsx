@@ -13,13 +13,7 @@ import Button from "../../../components/Button/Button";
 import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { KPICard } from "../../../components/kpi/KPI";
-import {
-  DEFAULT_CHECKS,
-  DEFAULT_PROFILE,
-  MOCK_CHECKS,
-  MOCK_EMPLOYEES,
-  MOCK_PROFILES,
-} from "./bgCheckMockData";
+
  
 /* ── Static BG Checks (not document-linked) ── */
 const STATIC_CHECKS = [
