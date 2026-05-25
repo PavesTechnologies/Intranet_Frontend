@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import ConfirmationModal from "./ConfirmationModal";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import Button from "../../../components/Button/Button";
 const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
@@ -38,7 +38,7 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${BASE_URL}/api/leave-balance/process-carry-forwards/${year}`,
         {},
         {

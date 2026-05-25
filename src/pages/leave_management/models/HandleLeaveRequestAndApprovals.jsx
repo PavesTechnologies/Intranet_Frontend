@@ -1,7 +1,7 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { forwardRef, useImperativeHandle } from "react";
 import { Check, X, Search, Pencil, XCircle } from "lucide-react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import Pagination from "../../../components/Pagination/pagination";
 import LeaveDashboard from "../charts/LeaveDashboard";
 import { toast } from "react-toastify";
@@ -173,7 +173,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
   //       month: selectedMonth || null, // from your month dropdown
   //     };
 
-  //     const res = await axios.post(
+  //     const res = await api.post(
   //       `${BASE_URL}/api/leave-requests/manager/history`,
   //       payload,
   //       {
@@ -183,7 +183,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
   //       }
   //     );
 
-  //     const types = await axios.get(
+  //     const types = await api.get(
   //       `${BASE_URL}/api/leave/get-all-leave-types`,
   //       {
   //         headers: {
@@ -215,10 +215,10 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
       };
 
       const [res, types] = await Promise.all([
-        axios.post(`${BASE_URL}/api/leave-requests/manager/history`, payload, {
+        api.post(`${BASE_URL}/api/leave-requests/manager/history`, payload, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }),
-        axios.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
+        api.get(`${BASE_URL}/api/leave/get-all-leave-types`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }),
       ]);
@@ -345,7 +345,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
     setLoading(true);
     try {
       // Single batch API call with all selected IDs
-      await axios.post(
+      await api.post(
         `${BASE_URL}/api/leave-requests/approve-batch`,
         {
           managerId,
@@ -361,7 +361,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
       setSelectedRequests([]);
       selectedResourceId.forEach((empId) => {
         try {
-          const res = axios.post(
+          const res = api.post(
             `${RMS_BASE_URL}/api/availability/recalculate/resource/${empId}`,
             {},
             {
@@ -392,7 +392,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
     if (selectedRequests.length === 0) return;
     setLoading(true);
     try {
-      await axios.post(
+      await api.post(
         `${BASE_URL}/api/leave-requests/reject-batch`,
         {
           managerId,
@@ -436,7 +436,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
     console.log("handleDecision", { action, leaveId, comment, managerId });
     setLoading(true);
     try {
-      await axios.put(
+      await api.put(
         `${BASE_URL}/api/leave-requests/${action}`,
         {
           managerId,
@@ -464,7 +464,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
       setConfirmation(null);
       if (action === "approve") {
         try {
-          const res = await axios.post(
+          const res = await api.post(
             `${RMS_BASE_URL}/api/availability/recalculate/resource/${resourceId}`,
             {},
             {
@@ -510,7 +510,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
         ...updatedData,
       };
 
-      await axios.put(`${BASE_URL}/api/leave-requests/update`, payload, {
+      await api.put(`${BASE_URL}/api/leave-requests/update`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 

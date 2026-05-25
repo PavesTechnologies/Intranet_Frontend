@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { useJobProgress } from "../../../contexts/JobProgressContext";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -10,14 +10,14 @@ const getAuthHeader = () => {
 
 export const approvalService = {
   getPendingApprovals: async () => {
-    const response = await axios.get(`${BASE_URL}/api/approvals/pending`, {
+    const response = await api.get(`${BASE_URL}/api/approvals/pending`, {
       headers: getAuthHeader(),
     });
     return response.data;
   },
 
   approveRequest: async (requestId, comment) => {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/approvals/${requestId}/approve`,
       { comment },
       { headers: getAuthHeader() },
@@ -28,7 +28,7 @@ export const approvalService = {
   },
 
   rejectRequest: async (requestId, reason) => {
-    await axios.post(
+    await api.post(
       `${BASE_URL}/api/approvals/${requestId}/reject`,
       { reason },
       { headers: getAuthHeader() },

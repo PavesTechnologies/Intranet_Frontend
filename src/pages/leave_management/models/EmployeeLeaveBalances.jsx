@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import Pagination from "../../../components/Pagination/pagination";
 import { useNavigate } from "react-router-dom";
@@ -76,7 +76,7 @@ const fetchLeaveBalances = async ({ query, year, page, rowsPerPage }) => {
       ? `${BASE_URL}/api/leave-balance/leave-balance?year=${year}&page=${pageIndex}&size=${rowsPerPage}`
       : `${BASE_URL}/api/leave-balance/search/${year}?query=${encodeURIComponent(query)}&page=${pageIndex}&size=${rowsPerPage}`;
 
-  const response = await axios.get(url, {
+  const response = await api.get(url, {
     headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
   });
 
@@ -215,7 +215,7 @@ const EmployeeLeaveBalances = () => {
   // ─── useMutation — PUT update + invalidate cache on success ───
   const updateMutation = useMutation({
     mutationFn: (payload) =>
-      axios.put(`${BASE_URL}/api/leave-balance/update`, payload, {
+      api.put(`${BASE_URL}/api/leave-balance/update`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       }),
     onSuccess: (res) => {
@@ -292,7 +292,7 @@ const EmployeeLeaveBalances = () => {
     }
     const fetchSuggestions = async () => {
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${BASE_URL}/api/leave-balance/autocomplete?query=${encodeURIComponent(searchQuery)}`,
           {
             headers: {

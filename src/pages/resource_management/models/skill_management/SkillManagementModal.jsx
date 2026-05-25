@@ -309,6 +309,8 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
     });
   };
 
+  const uploadApplyRef = useRef(null);
+
   const saveTaxonomy = async (categories, successFallback = "Skill taxonomy processed successfully.") => {
     const categoriesToSave = categories.filter((category) => category.name?.trim());
 
@@ -433,51 +435,6 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
     });
   };
 
-  const applyUploadRows = (rows) => {
-    setTaxonomy((current) => {
-      const next = cloneTaxonomy(current);
-
-      rows.forEach((row, index) => {
-        let category = next.find((item) => normalize(item.name) === normalize(row.Category));
-        if (!category) {
-          category = {
-            id: createId(`cat-upload-${index}`),
-            name: row.Category,
-            isActive: true,
-            skills: [],
-          };
-          next.push(category);
-        }
-
-        let skill = category.skills.find((item) => normalize(item.name) === normalize(row.Skill));
-        if (!skill) {
-          skill = {
-            id: createId(`skill-upload-${index}`),
-            name: row.Skill,
-            isActive: true,
-            subSkills: [],
-          };
-          category.skills.push(skill);
-        }
-
-        if (row.SubSkill) {
-          const hasSubSkill = skill.subSkills.some(
-            (item) => normalize(item.name) === normalize(row.SubSkill),
-          );
-          if (!hasSubSkill) {
-            skill.subSkills.push({
-              id: createId(`sub-upload-${index}`),
-              name: row.SubSkill,
-              isActive: true,
-            });
-          }
-        }
-      });
-
-      return next;
-    });
-  };
-
   const handleReset = () => {
     setTaxonomy(cloneTaxonomy(initialTaxonomy));
     setStagedCategories([]);
@@ -593,7 +550,7 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
                       initialDraftKey={initialDraftKey}
                     />
                   ) : (
-                    <BulkUploadTab onApplyRows={applyUploadRows} />
+                    <BulkUploadTab registerApply={(fn) => (uploadApplyRef.current = fn)} />
                   )}
                 </div>
 
@@ -627,10 +584,25 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
                       </button>
                       <button
                         type="button"
-                        onClick={handleSave}
+                        onClick={async () => {
+                          if (activeTab === "upload") {
+                            if (uploadApplyRef.current) {
+                              try {
+                                await uploadApplyRef.current();
+                                onClose();
+                              } catch {
+                                // BulkUploadTab surfaces its own errors.
+                              }
+                            } else {
+                              notify.error("Upload handler not ready.");
+                            }
+                          } else {
+                            await handleSave();
+                          }
+                        }}
                         className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
                       >
-                        Save Changes
+                        {activeTab === "upload" ? "Upload" : "Save"}
                       </button>
                     </div>
                   </div>

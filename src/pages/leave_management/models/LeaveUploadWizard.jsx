@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import {
   X,
   FileText,
@@ -37,7 +37,7 @@ const LeaveUploadWizard = ({ onClose }) => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${window.__APP_CONFIG__.BASE_URL}${config.templateUrl}`,
         { responseType: "blob" },
       );
@@ -65,7 +65,7 @@ const LeaveUploadWizard = ({ onClose }) => {
     formData.append("username", "admin");
     setIsUploading(true);
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${window.__APP_CONFIG__.BASE_URL}${config.uploadUrl}`,
         formData,
       );
