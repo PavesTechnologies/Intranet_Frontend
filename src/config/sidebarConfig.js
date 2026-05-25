@@ -68,7 +68,7 @@ export const EO_SUBMENU = [
     children: [
       { label: "Personal Files",      to: "/employee-onboarding/employeedocuments" },
       { label: "e-Form Template",       to: "/employee-onboarding/documents-template",     allowedRoles: [ROLES.HR] },
-      { label: "Corporate Policies",  to: "/employee-onboarding/organization-documents", allowedRoles: [ROLES.HR] },
+      // { label: "Corporate Policies",  to: "/employee-onboarding/organization-documents", allowedRoles: [ROLES.HR] },
     ],
   },
   {
@@ -85,8 +85,8 @@ export const EO_SUBMENU = [
     allowedRoles: MANAGEMENT_ROLES,
     children: [
       { label: "Internal Audit",  to: "/employee-onboarding/hr",                         allowedRoles: [ROLES.HR] },
-      { label: "BGC Screening", to: "/employee-onboarding/admin/approval-dashboard", allowedRoles: MANAGEMENT_ROLES },
-      { label: "Profile Hub",   to: "/employee-onboarding/employee-credentials",       allowedRoles: HR_ADMIN },
+      { label: "BGC Screening", to: "/employee-onboarding/backgroundcheck", allowedRoles: MANAGEMENT_ROLES },
+      { label: "Profile Hub",   to: "employee-onboarding/core-employee",       allowedRoles: HR_ADMIN },
     ],
   },
   {
