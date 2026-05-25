@@ -14,6 +14,7 @@ import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { KPICard } from "../../../components/kpi/KPI";
 
+ 
 /* ── Static BG Checks (not document-linked) ── */
 const STATIC_CHECKS = [
   { key: "professional_reference", label: "Professional Reference Check",              icon: CheckCircle2,   group: "Reference" },
@@ -23,7 +24,7 @@ const STATIC_CHECKS = [
   { key: "cibil_check",            label: "CIBIL Check",                               icon: CreditCard,     group: "Financial" },
   { key: "bank_statement",         label: "Bank Statement (Last 3 Months)",            icon: Clock3,         group: "Financial" },
 ];
-
+ 
 /* ── Identity doc → check icon map ── */
 const IDENTITY_ICON = {
   "Aadhaar":         ShieldCheck,
@@ -31,14 +32,14 @@ const IDENTITY_ICON = {
   "Passport":        ShieldCheck,
   "Driving Licence": ShieldCheck,
 };
-
+ 
 const SC = {
   VERIFIED:  { bg: "bg-green-100", text: "text-green-700", dot: "bg-green-500", label: "Verification Completed" },
   IN_REVIEW: { bg: "bg-blue-100",  text: "text-blue-700",  dot: "bg-blue-500",  label: "In Verification" },
   PENDING:   { bg: "bg-gray-100",  text: "text-gray-600",  dot: "bg-gray-400",  label: "Pending" },
   REJECTED:  { bg: "bg-red-100",   text: "text-red-700",   dot: "bg-red-500",   label: "Rejected" },
 };
-
+ 
 const normalizeStatus = (raw = "") => {
   const s = raw.toUpperCase().replace(/\s+/g, "_");
   if (s.includes("VERIF"))                             return "VERIFIED";
@@ -46,9 +47,9 @@ const normalizeStatus = (raw = "") => {
   if (s.includes("REJECT"))                            return "REJECTED";
   return "PENDING";
 };
-
-
-
+ 
+ 
+ 
 /* ─────────────────────── SMALL COMPONENTS ─────────────────────── */
 const InfoRow = ({ label, value }) => (
   <div className="flex items-start py-1.5 border-b border-gray-50 last:border-0">
@@ -58,7 +59,7 @@ const InfoRow = ({ label, value }) => (
     </span>
   </div>
 );
-
+ 
 const SectionCard = ({ title, icon: Icon, children }) => (
   <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
     <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
@@ -68,7 +69,7 @@ const SectionCard = ({ title, icon: Icon, children }) => (
     <div className="px-4 py-3">{children}</div>
   </div>
 );
-
+ 
 const StatCard = ({ label, count, color, Icon, onClick, isActive, activeColor }) => (
   <button
     onClick={onClick}
@@ -86,7 +87,7 @@ const StatCard = ({ label, count, color, Icon, onClick, isActive, activeColor })
     />
   </button>
 );
-
+ 
 const CandidateItem = ({ emp, isSelected, bgStatus, onClick }) => {
   const sc = SC[bgStatus] || SC.PENDING;
   return (
@@ -110,13 +111,16 @@ const CandidateItem = ({ emp, isSelected, bgStatus, onClick }) => {
     </button>
   );
 };
-
+ 
 /* ─────────────────── DOCUMENT PREVIEW MODAL ─────────────────── */
 const DocPreviewModal = ({ doc, onClose }) => {
   const [signedUrl, setSignedUrl] = useState(null);
   const [loading, setLoading]     = useState(true);
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
-
+  const BASE_URL =
+    window.__APP_CONFIG__?.EMPLOYEE_ONBOARDING_URL ||
+    import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const token = localStorage.getItem("token");
+ 
   useEffect(() => {
     if (!doc?.file_path) {
       setLoading(false);
@@ -139,9 +143,9 @@ const DocPreviewModal = ({ doc, onClose }) => {
     };
     fetchSignedUrl();
   }, [doc, BASE_URL]);
-
+ 
   const name = doc?.document_name || doc?.doc_type || doc?.identity_type || "Document";
-
+ 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -202,7 +206,7 @@ const DocPreviewModal = ({ doc, onClose }) => {
     </div>
   );
 };
-
+ 
 /* ─────────────────── DOC CARD ─────────────────── */
 const TYPE_COLORS = {
   "Aadhaar":         { bg: "bg-orange-100",  text: "text-orange-700"  },
@@ -212,12 +216,12 @@ const TYPE_COLORS = {
   "Education":       { bg: "bg-indigo-100",  text: "text-indigo-700"  },
   "Experience":      { bg: "bg-teal-100",    text: "text-teal-700"    },
 };
-
+ 
 const DocCard = ({ doc, idx, onPreview, isVerified, onDelete, onUpload }) => {
   const typeKey = doc.identity_type || doc._cat || "Education";
   const color   = TYPE_COLORS[typeKey] || { bg: "bg-gray-100", text: "text-gray-600" };
   const label   = doc.document_name || doc.doc_type || doc.identity_type || `Document ${idx + 1}`;
-
+ 
   return (
     <div className="flex items-start gap-3 px-4 py-3 bg-white rounded-xl border border-gray-200 hover:border-indigo-200 hover:shadow-sm transition-all">
       {/* Icon + badge */}
@@ -229,7 +233,7 @@ const DocCard = ({ doc, idx, onPreview, isVerified, onDelete, onUpload }) => {
           {typeKey}
         </span>
       </div>
-
+ 
       {/* Details */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-gray-800 truncate">{label}</p>
@@ -246,7 +250,7 @@ const DocCard = ({ doc, idx, onPreview, isVerified, onDelete, onUpload }) => {
           )}
         </div>
       </div>
-
+ 
       {/* Actions */}
       <div className="flex items-center gap-1.5 shrink-0">
         <button
@@ -274,37 +278,40 @@ const DocCard = ({ doc, idx, onPreview, isVerified, onDelete, onUpload }) => {
     </div>
   );
 };
-
+ 
 /* ═══════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════════ */
 export default function BackgroundCheckPage() {
   /* ── API config ── */
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
-
+  const BASE_URL =
+    window.__APP_CONFIG__?.EMPLOYEE_ONBOARDING_URL ||
+    import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const token = localStorage.getItem("token");
+ 
   /* ── List ── */
   const [employees, setEmployees]     = useState([]);
   const [loadingList, setLoadingList] = useState(true);
   const [search, setSearch]           = useState("");
   const [bgFilter, setBgFilter]       = useState("ALL");
   const [empBgMap, setEmpBgMap]       = useState({});
-
+ 
   /* ── Selected employee ── */
   const [selectedEmp, setSelectedEmp]         = useState(null);
   const [profile, setProfile]                 = useState(null);
   const [loadingProfile, setLoadingProfile]   = useState(false);
-  
+ 
   // Confirmation Modal States
   const [deleteConf, setDeleteConf] = useState({ isOpen: false, docId: null, cat: null, sourceId: null, doc: null });
   const [showFinalizeConf, setShowFinalizeConf] = useState(false);
   const [rejectionConf, setRejectionConf] = useState({ isOpen: false, id: null, reason: "" });
   const [addCheckModal, setAddCheckModal] = useState({ isOpen: false, group: "" });
   const [newCheckLabel, setNewCheckLabel] = useState("");
-
+ 
   const [checks, setChecks]                   = useState([]);
   const [loadingChecks, setLoadingChecks]     = useState(false);
   const [activeTab, setActiveTab]             = useState("checks");
-
+ 
   /* ── Checks UI ── */
   const [expanded, setExpanded]         = useState(null);
   const [checkFilter, setCheckFilter]   = useState("ALL");
@@ -313,10 +320,10 @@ export default function BackgroundCheckPage() {
   const [editModeId, setEditModeId]     = useState(null);
   const [editFields, setEditFields]     = useState([]);
   const [uploadModal, setUploadModal]   = useState({ isOpen: false, cat: "", file: null, docName: "", docType: "" });
-
+ 
   /* ── Preview ── */
   const [previewDoc, setPreviewDoc] = useState(null);
-
+ 
   /* ── Email modal ── */
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSending, setIsSending]     = useState(false);
@@ -324,28 +331,42 @@ export default function BackgroundCheckPage() {
     to: "", cc: "",
     message: "Please find the attached background verification documents in the ZIP file. Kindly review and proceed with the background checks for the above employee.",
   });
-
+ 
   /* ─── Load employees ─── */
   const loadEmployees = useCallback(async () => {
     setLoadingList(true);
     try {
       const res = await axios.get(
         `${BASE_URL}/permanent-employee/core-employee-details/`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-      setEmployees(res.data || []);
+      const employeeList = res.data || [];
+      setEmployees(employeeList);
+      setEmpBgMap(
+        employeeList.reduce((acc, emp) => {
+          if (emp.user_uuid && emp.bg_status) acc[emp.user_uuid] = normalizeStatus(emp.bg_status);
+          return acc;
+        }, {})
+      );
     } catch (err) {
       console.error("Failed to fetch employees:", err);
-      showStatusToast("Failed to load employee list", "error");
+      setEmployees(MOCK_EMPLOYEES);
+      setEmpBgMap(
+        MOCK_EMPLOYEES.reduce((acc, emp) => {
+          acc[emp.user_uuid] = normalizeStatus(emp.bg_status);
+          return acc;
+        }, {})
+      );
+      showStatusToast("Employee API unavailable. Showing mock background check data.", "warning");
     } finally {
       setLoadingList(false);
     }
-  }, [BASE_URL]);
-
+  }, [BASE_URL, token]);
+ 
   useEffect(() => { loadEmployees(); }, [loadEmployees]);
-
-
-
+ 
+ 
+ 
   /* ─── Load profile + checks ─── */
   const loadProfileAndChecks = useCallback(async (emp) => {
     if (!emp) return;
@@ -356,41 +377,41 @@ export default function BackgroundCheckPage() {
     setExpanded(null);
     setSelectedIds([]);
     setCheckFilter("ALL");
-
+ 
     // Fetch employee profile from real API
     let prof = {};
     try {
       const res = await axios.get(
         `${BASE_URL}/hr/hr/${emp.user_uuid}`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       prof = res.data || {};
     } catch (err) {
       console.error("Failed to fetch profile:", err);
-      showStatusToast("Profile not found, using default view", "warning");
-      prof = {};
+      showStatusToast("Profile API unavailable. Showing available background check data.", "warning");
+      prof = MOCK_PROFILES[emp.user_uuid] || DEFAULT_PROFILE(emp);
     }
     setProfile(prof);
     setLoadingProfile(false);
-
+ 
     // Fetch background check statuses — graceful fallback if endpoint not ready
     let raw = [];
     try {
       const chkRes = await axios.get(
         `${BASE_URL}/hr/background-checks/${emp.user_uuid}`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       raw = chkRes.data || [];
     } catch (err) {
       // Endpoint may not exist yet — silently continue with PENDING statuses
       console.warn("Background checks endpoint not available, defaulting to PENDING:", err?.response?.status);
-      raw = [];
+      raw = MOCK_CHECKS[emp.user_uuid] || DEFAULT_CHECKS;
     }
-
+ 
     // ── Build dynamic checks from profile documents ──
     const dynamicChecks = [];
     const processedGroups = new Set();
-
+ 
     // 1. Identity documents
     const identityDocs = prof.identity_documents || [];
     identityDocs.forEach((doc, i) => {
@@ -429,7 +450,7 @@ export default function BackgroundCheckPage() {
         notes:      api.notes || "",
       });
     }
-
+ 
     // 2. Education documents
     const eduDocs = prof.education_documents || [];
     eduDocs.forEach((edu, i) => {
@@ -471,7 +492,7 @@ export default function BackgroundCheckPage() {
         notes:      api.notes || "",
       });
     }
-
+ 
     // 3. Experience documents
     const expDocs = prof.experience || [];
     expDocs.forEach((exp, i) => {
@@ -511,7 +532,7 @@ export default function BackgroundCheckPage() {
         notes:      api.notes || "",
       });
     }
-
+ 
     // 4. Financial (Always mandatory as a placeholder)
     if (!processedGroups.has("Financial")) {
       processedGroups.add("Financial");
@@ -528,18 +549,18 @@ export default function BackgroundCheckPage() {
         notes:      api.notes || "",
       });
     }
-
+ 
     // 5. Static & Additional checks
     STATIC_CHECKS.forEach(ct => {
       // Avoid duplicates with our placeholders
       if (processedGroups.has(ct.group) && ct.key === "bank_statement") return;
-      
+     
       const api = raw.find(c => c.check_type === ct.key) || {};
       let docRef = null;
       if (ct.key === "bank_statement" && prof.bank_documents?.[0]) {
         docRef = prof.bank_documents[0];
       }
-
+ 
       dynamicChecks.push({
         id:         api.check_uuid || ct.key,
         check_type: ct.key,
@@ -552,35 +573,34 @@ export default function BackgroundCheckPage() {
         notes:      api.notes || "",
       });
     });
-
+ 
     setChecks(dynamicChecks);
-
+ 
     const allV = dynamicChecks.every(c => c.status === "VERIFIED");
     const anyR = dynamicChecks.some(c => c.status === "REJECTED");
     const anyI = dynamicChecks.some(c => c.status === "IN_REVIEW");
     const overall = allV ? "VERIFIED" : anyR ? "REJECTED" : anyI ? "IN_REVIEW" : "PENDING";
     setEmpBgMap(prev => ({ ...prev, [emp.user_uuid]: overall }));
-
+ 
     setLoadingChecks(false);
-  }, [BASE_URL]);
-
-
+  }, [BASE_URL, token]);
+ 
+ 
   const handleSelectEmployee = (emp) => {
     setSelectedEmp(emp);
     setActiveTab("checks");
     loadProfileAndChecks(emp);
   };
-
-
-
-  /* ─── Analytics ─── */
+ 
+ 
+/* ─── Analytics ─── */
   const analytics = useMemo(() => ({
     VERIFIED:  checks.filter(c => c.status === "VERIFIED").length,
     IN_REVIEW: checks.filter(c => c.status === "IN_REVIEW").length,
     PENDING:   checks.filter(c => c.status === "PENDING").length,
     REJECTED:  checks.filter(c => c.status === "REJECTED").length,
   }), [checks]);
-
+ 
   const globalStats = useMemo(() => {
     const stats = { pending: 0, review: 0, verified: 0, rejected: 0 };
     employees.forEach(emp => {
@@ -592,9 +612,9 @@ export default function BackgroundCheckPage() {
     });
     return stats;
   }, [employees, empBgMap]);
-
+ 
   const progress = checks.length ? Math.round((analytics.VERIFIED / checks.length) * 100) : 0;
-
+ 
   /* ─── Filtered employees ─── */
   const filteredEmployees = useMemo(() => {
     const q = search.toLowerCase();
@@ -605,23 +625,23 @@ export default function BackgroundCheckPage() {
       return matchS && matchB;
     });
   }, [employees, search, bgFilter, empBgMap]);
-
+ 
   const visibleChecks = checkFilter === "ALL" ? checks : checks.filter(c => c.status === checkFilter);
-
+ 
   /* ─── Sync overall employee status with sub-checks ─── */
   useEffect(() => {
     if (!selectedEmp || checks.length === 0) return;
-
+ 
     const allV = checks.every(c => c.status === "VERIFIED");
     const anyR = checks.some(c => c.status === "REJECTED");
     const anyI = checks.some(c => c.status === "IN_REVIEW");
     const overall = allV ? "VERIFIED" : anyR ? "REJECTED" : anyI ? "IN_REVIEW" : "PENDING";
-
+ 
     if (empBgMap[selectedEmp.user_uuid] !== overall) {
       setEmpBgMap(prev => ({ ...prev, [selectedEmp.user_uuid]: overall }));
     }
   }, [checks, selectedEmp, empBgMap]);
-
+ 
   /* ─── Update check status ─── */
   const updateCheckStatus = async (id, status, reason = "") => {
     if (status.toUpperCase() === "REJECTED" && !reason) {
@@ -633,7 +653,7 @@ export default function BackgroundCheckPage() {
       await axios.patch(
         `${BASE_URL}/hr/background-checks/${id}`,
         { status, notes: reason },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
     } catch (err) {
       // If endpoint not yet implemented, apply optimistic update silently
@@ -644,7 +664,7 @@ export default function BackgroundCheckPage() {
     setUpdatingId(null);
     setRejectionConf({ isOpen: false, id: null, reason: "" });
   };
-
+ 
   /* ─── Bulk Verify ─── */
   const bulkMarkVerified = async () => {
     if (selectedIds.length === 0) return;
@@ -655,19 +675,19 @@ export default function BackgroundCheckPage() {
     setSelectedIds([]);
     setUpdatingId(null);
   };
-
+ 
   /* ─── Add/Delete Check Logic ─── */
   const deleteCheck = (id) => {
     setDeleteConf({ isOpen: true, docId: id, cat: null, sourceId: "task", doc: null });
   };
-
+ 
   const confirmDeleteCheck = async () => {
     const id = deleteConf.docId;
     if (!id) return;
     setUpdatingId(id);
     try {
       await axios.delete(`${BASE_URL}/hr/background-checks/${id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
     } catch (err) {
       console.warn("DELETE /hr/background-checks not available, applying optimistic update:", err?.response?.status);
@@ -677,12 +697,12 @@ export default function BackgroundCheckPage() {
     setUpdatingId(null);
     setDeleteConf({ isOpen: false, docId: null, cat: null, sourceId: null, doc: null });
   };
-
+ 
   const addCheck = async () => {
     if (!newCheckLabel.trim()) return;
     const { group } = addCheckModal;
     setUpdatingId("add_task");
-    
+   
     const payload = {
       user_uuid: selectedEmp.user_uuid,
       check_type: `manual_${group.toLowerCase().replace(/\s+/g, "_")}`,
@@ -690,10 +710,10 @@ export default function BackgroundCheckPage() {
       group: group,
       status: "PENDING"
     };
-
+ 
     try {
       const res = await axios.post(`${BASE_URL}/hr/background-checks`, payload, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
       const newCheck = {
         ...payload,
@@ -714,13 +734,13 @@ export default function BackgroundCheckPage() {
       };
       setChecks(prev => [...prev, newCheck]);
     }
-    
+   
     showStatusToast("Task added successfully", "success");
     setUpdatingId(null);
     setAddCheckModal({ isOpen: false, group: "" });
     setNewCheckLabel("");
   };
-
+ 
   /* ─── Send to consultancy ─── */
   const handleSend = async () => {
     if (!emailForm.to.trim()) { showStatusToast("Consultancy email required", "error"); return; }
@@ -735,7 +755,7 @@ export default function BackgroundCheckPage() {
           message: emailForm.message,
           check_ids: selectedIds,
         },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" } }
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
       );
     } catch (err) {
       console.warn("Send-to-consultancy API not available, applying optimistic update:", err?.response?.status);
@@ -748,7 +768,7 @@ export default function BackgroundCheckPage() {
     setSelectedIds([]);
     setIsSending(false);
   };
-
+ 
   /* ─── All docs from profile & manual doc uploads ─── */
   const allDocuments = useMemo(() => {
     if (!profile) return [];
@@ -767,7 +787,7 @@ export default function BackgroundCheckPage() {
     (profile.bank_documents || []).forEach(d =>
       docs.push({ ...d, _cat: "Bank Statement", _title: d.document_name || "Bank Statement" })
     );
-
+ 
     // Merge in any manually uploaded session documents
     checks.forEach(c => {
       // Manual uploads should have _isManual: true or identity_type: "Manual Upload" set on the docRef inside checks
@@ -775,14 +795,14 @@ export default function BackgroundCheckPage() {
         docs.push({ ...c.docRef, _cat: c.group || "Other", _title: c.label });
       }
     });
-
+ 
     return docs;
   }, [profile, checks]);
-
+ 
   /* ══════════════════════════ RENDER ══════════════════════════ */
   return (
     <div className="min-h-screen bg-[#f4f6fb] p-6 space-y-5">
-
+ 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -793,7 +813,7 @@ export default function BackgroundCheckPage() {
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </button>
       </div>
-
+ 
       {/* Global stats / KPI Filters */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
@@ -814,10 +834,10 @@ export default function BackgroundCheckPage() {
           />
         ))}
       </div>
-
+ 
       {/* Two panel */}
       <div className="flex gap-5 items-start flex-col lg:flex-row">
-
+ 
         {/* ── LEFT: Candidate list ── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full lg:w-72 shrink-0 flex flex-col">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
@@ -882,7 +902,7 @@ export default function BackgroundCheckPage() {
             ))}
           </div>
         </div>
-
+ 
         {/* ── RIGHT: Detail panel ── */}
         <div className="flex-1 min-w-0">
           {!selectedEmp ? (
@@ -916,7 +936,7 @@ export default function BackgroundCheckPage() {
                   </div>
                   <StatusBadge label={selectedEmp.employment_status || "—"} size="sm" />
                 </div>
-
+ 
                 {!loadingChecks && checks.length > 0 && (
                   <div className="mt-4">
                     <div className="flex justify-between text-xs text-gray-500 mb-1.5">
@@ -949,7 +969,7 @@ export default function BackgroundCheckPage() {
                   </div>
                 )}
               </div>
-
+ 
               {/* Tabs */}
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="flex border-b border-gray-100">
@@ -977,9 +997,9 @@ export default function BackgroundCheckPage() {
                     </button>
                   ))}
                 </div>
-
+ 
                 <div className="p-4">
-
+ 
                   {/* ── BG CHECKS TAB ── */}
                   {activeTab === "checks" && (
                     <div className="space-y-3">
@@ -1013,7 +1033,7 @@ export default function BackgroundCheckPage() {
                           </Button>
                         </div>
                       </div>
-
+ 
                       {loadingChecks ? (
                         <div className="space-y-2 animate-pulse">{[1,2,3,4].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl" />)}</div>
                       ) : (() => {
@@ -1023,16 +1043,16 @@ export default function BackgroundCheckPage() {
                           acc[c.group].push(c);
                           return acc;
                         }, {});
-
+ 
                         return groups.filter(g => grouped[g] || g === "Address" || g === "Compliance").map(groupName => {
                           const groupItems = grouped[groupName] || [];
                           const verifiedCount = groupItems.filter(i => i.status === "VERIFIED").length;
                           const progress = groupItems.length > 0 ? (verifiedCount / groupItems.length) * 100 : 0;
-
+ 
                           if (groupItems.length === 0 && !["Identity", "Education", "Experience"].includes(groupName)) return null;
-                          
+                         
                           const IconGroup = groupName === "Identity" ? ShieldCheck : groupName === "Education" ? GraduationCap : groupName === "Experience" ? Briefcase : Folder;
-
+ 
                           return (
                             <div key={groupName} className="mb-6 bg-white/50 rounded-2xl border border-gray-100 p-4 transition-all hover:bg-white hover:shadow-sm">
                               <div className="flex items-center justify-between mb-4">
@@ -1057,7 +1077,7 @@ export default function BackgroundCheckPage() {
                                   <RefreshCw className="w-3.5 h-3.5" /> Add Task
                                 </button>
                               </div>
-
+ 
                               <div className="space-y-2.5">
                                 {groupItems.map(check => {
                                   const Icon = check.icon;
@@ -1167,7 +1187,8 @@ export default function BackgroundCheckPage() {
                                               <span><span className="font-semibold">Document expected.</span> Please instruct candidate to upload the document.</span>
                                             </div>
                                           )}
-                                          <div className="flex flex-wrap items-center gap-2">
+ 
+<div className="flex flex-wrap items-center gap-2">
                                             {check.docRef ? (
                                               <>
                                                 <Button variant="secondary" size="small" onClick={() => setActiveTab("documents")}>
@@ -1234,7 +1255,7 @@ export default function BackgroundCheckPage() {
                       </div>
                     </div>
                   )}
-
+ 
                   {/* ── PROFILE TAB ── */}
                   {activeTab === "profile" && (
                     loadingProfile ? (
@@ -1279,7 +1300,7 @@ export default function BackgroundCheckPage() {
                             </div>
                           )}
                         </SectionCard>
-
+ 
                         {/* Bank Details */}
                         <SectionCard title="Bank Details" icon={Building2}>
                           <div className="grid grid-cols-2 gap-x-6">
@@ -1290,7 +1311,7 @@ export default function BackgroundCheckPage() {
                             <InfoRow label="Account Type" value={profile.bank_details?.account_type} />
                           </div>
                         </SectionCard>
-
+ 
                         {/* Education */}
                         <SectionCard title="Education" icon={GraduationCap}>
                           {(profile.education_documents?.length > 0) ? profile.education_documents.map((e, i) => (
@@ -1313,7 +1334,7 @@ export default function BackgroundCheckPage() {
                             </div>
                           )}
                         </SectionCard>
-
+ 
                         {/* Work Experience */}
                         <SectionCard title="Work Experience" icon={Briefcase}>
                           {(profile.experience?.length > 0) ? profile.experience.map((exp, i) => (
@@ -1339,7 +1360,7 @@ export default function BackgroundCheckPage() {
                       </div>
                     )
                   )}
-
+ 
                   {/* ── DOCUMENTS TAB ── */}
                   {activeTab === "documents" && (
                     loadingProfile ? (
@@ -1352,9 +1373,9 @@ export default function BackgroundCheckPage() {
                         acc[doc._cat].push(doc);
                         return acc;
                       }, { Identity: [], Education: [], Experience: [], Financial: [] });
-
+ 
                       const catIcons = { Education: GraduationCap, Experience: Briefcase, Identity: ShieldCheck, Certifications: Award, Financial: CreditCard };
-
+ 
                       return (
                         <div className="space-y-4">
                           {Object.entries(grouped)
@@ -1365,7 +1386,7 @@ export default function BackgroundCheckPage() {
                             .map(([cat, docs]) => {
                               const CatIcon = catIcons[cat] || FileText;
                               const isVerified = checks.filter(c => c.group === cat).every(c => c.status === "VERIFIED") && checks.some(c => c.group === cat);
-
+ 
                               return (
                                 <div key={cat} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white hover:border-indigo-100 transition-colors">
                                   <div className="flex items-center justify-between px-4 py-3 bg-gray-50/50 border-b border-gray-100">
@@ -1381,8 +1402,8 @@ export default function BackgroundCheckPage() {
                                         <span className="text-[10px] text-gray-400 font-medium">{docs.length} Document{docs.length !== 1 ? "s" : ""}</span>
                                       </div>
                                     </div>
-                                    <button 
-                                      onClick={() => setUploadModal({ isOpen: true, cat, file: null, docName: "", docType: "" })} 
+                                    <button
+                                      onClick={() => setUploadModal({ isOpen: true, cat, file: null, docName: "", docType: "" })}
                                       disabled={updatingId === `upload_folder_${cat}`}
                                       className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 bg-white text-indigo-600 border border-indigo-100 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
                                     >
@@ -1420,7 +1441,7 @@ export default function BackgroundCheckPage() {
                                                 formData.append("category", cat.toLowerCase());
                                                 formData.append("document_id", docRef.id || "");
                                                 formData.append("document_name", docRef.document_name || file.name);
-
+ 
                                                 await axios.post(`${BASE_URL}/hr/upload-document`, formData, {
                                                   headers: {
                                                     Authorization: `Bearer ${token}`,
@@ -1448,17 +1469,17 @@ export default function BackgroundCheckPage() {
                       );
                     })()
                   )}
-
+ 
                 </div>
               </div>
             </div>
           )}
         </div>
       </div>
-
+ 
       {/* Document preview modal */}
       {previewDoc && <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
-
+ 
       {/* Email modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -1553,12 +1574,12 @@ export default function BackgroundCheckPage() {
         isLoading={updatingId === "finalize"}
         confirmText="Finalize Process"
       />
-
+ 
       {/* Confirmation Modal for Deletion */}
       <ConfirmationModal
         isOpen={deleteConf.isOpen}
         title={deleteConf.sourceId === "task" ? "Remove Verification Task?" : "Delete Document?"}
-        message={deleteConf.sourceId === "task" 
+        message={deleteConf.sourceId === "task"
           ? "Are you sure you want to remove this verification step? This will delete the task and its status."
           : "Are you sure you want to delete this document? This action cannot be undone."
         }
@@ -1567,7 +1588,7 @@ export default function BackgroundCheckPage() {
             await confirmDeleteCheck();
             return;
           }
-
+ 
           setUpdatingId("delete");
           try {
             const d = deleteConf.doc;
@@ -1598,7 +1619,7 @@ export default function BackgroundCheckPage() {
         isLoading={updatingId === "delete" || updatingId === deleteConf.docId}
         confirmText="Delete"
       />
-
+ 
       {/* Manual Prompt for Rejection Reason (Custom Modal) */}
       {rejectionConf.isOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1619,15 +1640,15 @@ export default function BackgroundCheckPage() {
               />
             </div>
             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => setRejectionConf({ isOpen: false, id: null, reason: "" })}
                 className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
               >
                 Cancel
               </button>
-              <Button 
-                variant="danger" 
-                size="small" 
+              <Button
+                variant="danger"
+                size="small"
                 disabled={!rejectionConf.reason.trim() || updatingId === rejectionConf.id}
                 onClick={() => updateCheckStatus(rejectionConf.id, "REJECTED", rejectionConf.reason)}
               >
@@ -1675,7 +1696,7 @@ export default function BackgroundCheckPage() {
           </div>
         </div>
       </div>
-
+ 
       {/* ADD CHECK MODAL */}
       {addCheckModal.isOpen && (
         <div className="fixed inset-0 z-50 bg-indigo-950/20 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1686,7 +1707,7 @@ export default function BackgroundCheckPage() {
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">New Verification Task</h3>
               <p className="text-sm text-gray-500 mb-6">Enter a name for the verification step you want to add to the <span className="font-bold text-indigo-600">{addCheckModal.group}</span> category.</p>
-              
+             
               <div className="space-y-4">
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Task Name</label>
@@ -1703,14 +1724,14 @@ export default function BackgroundCheckPage() {
               </div>
             </div>
             <div className="px-8 py-6 bg-gray-50 flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => { setAddCheckModal({ isOpen: false, group: "" }); setNewCheckLabel(""); }}
                 className="px-5 py-2.5 text-xs font-bold text-gray-500 hover:text-gray-700 transition-colors"
                 disabled={updatingId}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={addCheck}
                 disabled={!newCheckLabel.trim() || updatingId}
                 className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2"
@@ -1721,7 +1742,7 @@ export default function BackgroundCheckPage() {
           </div>
         </div>
       )}
-
+ 
       {/* UPLOAD DOC MODAL */}
       {uploadModal.isOpen && (
         <div className="fixed inset-0 z-50 bg-indigo-950/20 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1732,7 +1753,7 @@ export default function BackgroundCheckPage() {
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Upload Details</h3>
               <p className="text-sm text-gray-500 mb-6">Please provide details for the uploaded document in the <span className="font-bold text-indigo-600">{uploadModal.cat}</span> category.</p>
-              
+             
               <div className="space-y-4">
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Document Name</label>
@@ -1780,14 +1801,14 @@ export default function BackgroundCheckPage() {
               </div>
             </div>
             <div className="px-8 py-6 bg-gray-50 flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => setUploadModal({ isOpen: false, cat: "", file: null, docName: "", docType: "" })}
                 className="px-5 py-2.5 text-xs font-bold text-gray-500 hover:text-gray-700 transition-colors"
                 disabled={updatingId === "upload_new_doc"}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={async () => {
                   if (!uploadModal.file) { showStatusToast("Please select a file", "error"); return; }
                   setUpdatingId("upload_new_doc");
@@ -1798,14 +1819,14 @@ export default function BackgroundCheckPage() {
                     formData.append("category", uploadModal.cat?.toLowerCase() || "identity");
                     formData.append("document_name", uploadModal.docName || uploadModal.file.name);
                     formData.append("doc_type", uploadModal.docType || uploadModal.cat);
-
+ 
                     await axios.post(`${BASE_URL}/hr/upload-document`, formData, {
                       headers: {
                         Authorization: `Bearer ${token}`,
                         "Content-Type": "multipart/form-data"
                       }
                     });
-
+ 
                     showStatusToast("Document uploaded successfully", "success");
                     loadProfileAndChecks(selectedEmp);
                   } catch (err) {
@@ -1825,7 +1846,9 @@ export default function BackgroundCheckPage() {
           </div>
         </div>
       )}
-
+ 
     </div>
   );
 }
+ 
+ 

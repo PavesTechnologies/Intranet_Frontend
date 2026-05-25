@@ -99,9 +99,27 @@ export default function EmployeeOnboardingPage() {
         },
       );
 
+      // const data = await response.json();
+      // setEmployees(data || []);
       const data = await response.json();
 
-      setEmployees(data || []);
+console.log("Employees API Response:", data);
+
+if (!response.ok) {
+  console.error("Employees Fetch Failed:", data);
+
+  setEmployees([]);
+
+  return;
+}
+
+setEmployees(
+  Array.isArray(data)
+    ? data
+    : Array.isArray(data.data)
+      ? data.data
+      : []
+);
     } catch (err) {
       console.error("Failed to fetch employees", err);
     } finally {
@@ -150,8 +168,20 @@ export default function EmployeeOnboardingPage() {
         },
       );
 
+      // const data = await res.json();
+      // setDesignations(data || []);
+
       const data = await res.json();
-      setDesignations(data || []);
+
+      console.log("Designations API Response:", data);
+
+      setDesignations(
+        Array.isArray(data)
+          ? data
+          : Array.isArray(data.data)
+            ? data.data
+            : []
+      );
 
     } catch (err) {
       console.error("Failed to fetch designations", err);
@@ -242,9 +272,15 @@ export default function EmployeeOnboardingPage() {
   const departmentMap = Object.fromEntries(
     departments.map((d) => [d.department_uuid, d.department_name]),
   );
+  // const designationMap = Object.fromEntries(
+  //   designations.map((d) => [d.designation_uuid, d.designation_name]),
+  // );
   const designationMap = Object.fromEntries(
-    designations.map((d) => [d.designation_uuid, d.designation_name]),
-  );
+  (Array.isArray(designations) ? designations : []).map((d) => [
+    d.designation_uuid,
+    d.designation_name,
+  ]),
+);
 
   const handleCloseModal = () => {
     setIsCreateOpen(false);

@@ -646,9 +646,13 @@ export default function EmployeeProfileView() {
       coreData.resolved_designation_name = desigData.designation_name || desigData.name || coreData.designation_uuid;
       setEmployee(coreData);
       console.log("Employee core data with resolved names:", coreData);
+      console.log("hrData full response:", hrResult);
+      console.log("hrData location field:", hrResult?.location, "| coreData location:", coreData?.location);
       setHrData(hrResult);
 
-      const addresses = hrResult?.addresses || [];
+      const addresses = Array.isArray(hrResult?.addresses)
+  ? hrResult.addresses
+  : [];
       const countryUuid = addresses[0]?.country_uuid || null;
       if (countryUuid) {
         try {
@@ -901,13 +905,22 @@ export default function EmployeeProfileView() {
   }
 
   /* ── Derived display values (unchanged) ── */
+  const getDisplayValue = (...values) =>
+    values.find(v => v !== null && v !== undefined && String(v).trim() !== "") || "--";
+
   const mappedEmployee = {
     name: `${employee.first_name || ""} ${employee.last_name || ""}`
       .toLowerCase().replace(/\b\w/g, c => c.toUpperCase()).trim(),
     designation: employee.resolved_designation_name || employee.designation_uuid,
     email: employee.work_email,
     phone: employee.contact_number,
-    office: employee.location || "Not Updated",
+    office: getDisplayValue(
+      employee.location,
+      hrData?.location,
+      hrData?.personal_details?.location,
+      hrData?.employee_details?.location,
+      hrData?.employee?.location
+    ),
     empId: employee.employee_id,
     department: employee.resolved_department_name || employee.department_uuid,
     reportingManager: employee.reporting_manager_uuid || "N/A",
@@ -1098,7 +1111,8 @@ export default function EmployeeProfileView() {
                       {mappedEmployee.employmentType}
                     </span>
                   )}
-                  {employeeSkills.length > 0 && (
+                  {Array.isArray(employeeSkills) &&
+ employeeSkills.length > 0 && (
                     <span className="epv3-float-chip green">
                       <Award size={14} />
                       {employeeSkills.length} Skill{employeeSkills.length !== 1 ? "s" : ""}
@@ -1156,7 +1170,7 @@ export default function EmployeeProfileView() {
                   { label: "Date of Birth", value: employee.date_of_birth || "--" },
                   { label: "Gender",        value: employee.gender || "--" },
                   { label: "Marital Status",value: employee.marital_status || "--" },
-                  { label: "Nationality",   value: employee.nationality || "--" },
+                  { label: "Nationality",   value: getDisplayValue(employee.nationality, hrData?.personal_details?.nationality, hrData?.offer?.nationality, hrData?.offer?.nationality_name) },
                 ].map(({ label, value }) => (
                   <div key={label} className="epv3-row">
                     <span className="text-xs text-slate-500 flex-shrink-0" style={{ minWidth: 108 }}>{label}</span>
@@ -1178,7 +1192,7 @@ export default function EmployeeProfileView() {
                   {[
                     { icon: Mail,   label: "Work Email", value: mappedEmployee.email,                                              bg: "#ede9fe", color: "#7c3aed" },
                     { icon: Phone,  label: "Phone",      value: mappedEmployee.phone,                                              bg: "#d1fae5", color: "#059669" },
-                    { icon: MapPin, label: "Location",   value: mappedEmployee.office !== "Not Updated" ? mappedEmployee.office : "--", bg: "#fce7f3", color: "#db2777" },
+                    { icon: MapPin, label: "Location",   value: mappedEmployee.office, bg: "#fce7f3", color: "#db2777" },
                   ].map(({ icon: Icon, label, value, bg, color }) => (
                     <div key={label} className="flex items-center gap-3 px-3 py-3 border-b border-slate-50 last:border-0">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -1229,8 +1243,13 @@ export default function EmployeeProfileView() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 epv3-anim" style={{ animationDelay: "150ms" }}>
               {[
                 { icon: Users,    title: "Reporting Manager", label: "Reports To",     value: mappedEmployee.reportingManager, bg: "#ede9fe", color: "#7c3aed", tab: "profile",   config: null },
-                { icon: FileText, title: "Documents",         label: "Total Documents",value: "0",                             bg: "#ffedd5", color: "#ea580c", tab: "documents", config: null },
-                { icon: Sparkles, title: "Education",         label: "Total Education",value: "0",                             bg: "#d1fae5", color: "#059669", tab: "documents", config: { folder: "education", search: "" } },
+                { icon: FileText, title: "Documents",         label: "Total Documents",value:
+  (hrData?.education_documents || []).length +
+  (hrData?.experience || []).length +
+  (hrData?.identity_documents || []).length,                             bg: "#ffedd5", color: "#ea580c", tab: "documents", config: null },
+                { icon: Sparkles, title: "Education",
+label: "Total Education",
+value: (hrData?.education_documents || []).length,                             bg: "#d1fae5", color: "#059669", tab: "documents", config: { folder: "education", search: "" } },
                 { icon: Award,    title: "Skills Overview",   label: "Total Skills",   value: employeeSkills.length,           bg: "#fce7f3", color: "#db2777", tab: "about",     config: null },
               ].map(({ icon: Icon, title, label, value, bg, color, tab, config }) => (
                 <div key={title} className="epv3-nav-card"

@@ -118,8 +118,8 @@ export default function OnboardingNavBar() {
       label: "Document Center",
       match: [
         "/employee-onboarding/employeedocuments",
-        "/employee-onboarding/document-templates",
-        "/employee-onboarding/organization-documents",
+        // "/employee-onboarding/document-templates",
+        // "/employee-onboarding/organization-documents",
       ],
       redirect: "/employee-onboarding/employeedocuments",
     }] : []),
@@ -198,7 +198,7 @@ export default function OnboardingNavBar() {
     ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{ label: "Personnel Files", path: "/employee-onboarding/employeedocuments" }] : []),
     ...(hasRole(["HR"]) ? [
       { label: "e-Form Templates", path: "/employee-onboarding/document-templates" },
-      { label: "Corporate Policies", path: "/employee-onboarding/organization-documents" }
+      // { label: "Corporate Policies", path: "/employee-onboarding/organization-documents" }
     ] : []),
   ];
 

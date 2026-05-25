@@ -29,17 +29,9 @@ export default function ProfilePage({
 
   const [loading, setLoading] = useState(true);
 
-  /* ---------------- CONTACT STATE ---------------- */
-
-  const [contactData, setContactData] = useState(null);
-
   /* ---------------- ADDRESS STATE ---------------- */
 
   const [addressData, setAddressData] = useState(null);
-
-  /* ---------------- RELATIONS STATE ---------------- */
-
-  const [relationData, setRelationData] = useState([]);
 
   /* ---------------- EDUCATION STATE ---------------- */
 
@@ -50,88 +42,54 @@ export default function ProfilePage({
   const [experienceData, setExperienceData] = useState([]);
 
   /* ---------------- IDENTITY STATE ---------------- */
-
-  const [identityData, setIdentityData] = useState({
-    aadhaar: "XXXX-XXXX-1234",
-    pan: "ABCDE1234F",
-  });
+  const [identityData, setIdentityData] = useState([]);
 
   /* ---------------- SOCIAL MEDIA STATE ---------------- */
 
-  const [socialData, setSocialData] = useState({
-    github: "https://github.com/username",
-    linkedin: "https://linkedin.com/in/username",
-  });
+  const [socialData, setSocialData] = useState([]);
+  const [countries, setCountries] = useState([]);
+  const [relations, setRelations] = useState([]);
 
   useEffect(() => {
     // Use pre-fetched data from parent — no API calls needed
     const data = hrData || {};
 
     /* PRIMARY */
+    const pd = data.personal_details || {};
     setPrimaryData({
       first_name: coreData.first_name || data.offer?.first_name || "",
       last_name: coreData.last_name || data.offer?.last_name || "",
-      gender: coreData.gender || data.personal_details?.gender || "",
-      dob: coreData.date_of_birth || data.personal_details?.date_of_birth || "",
-      marital_status:
-        coreData.marital_status || data.personal_details?.marital_status || "",
-      blood_group:
-        coreData.blood_group || data.personal_details?.blood_group || "",
-      nationality: data.personal_details?.nationality || "",
-    });
-
-    /* CONTACT */
-    setContactData({
-      work_email: coreData.work_email || "",
+      gender: coreData.gender || pd.gender || "",
+      dob: coreData.date_of_birth || pd.date_of_birth || "",
       personal_email: data.offer?.email || "",
-      country_code: "+91",
-      mobile_number:
-        coreData.contact_number || data.offer?.contact_number || "",
-      emergency_number: data.personal_details?.emergency_contact_phone || "",
+      mobile_number: coreData.contact_number || data.offer?.contact_number || "",
+      marital_status: coreData.marital_status || pd.marital_status || "",
+      blood_group: coreData.blood_group || pd.blood_group || "",
+      nationality_country_uuid: pd.nationality_country_uuid || "",
+      residence_country_uuid: pd.residence_country_uuid || "",
+      emergency_contact_name: pd.emergency_contact_name || "",
+      emergency_contact_phone: pd.emergency_contact_phone || "",
+      emergency_contact_relation_uuid: pd.emergency_contact_relation_uuid || "",
     });
-
-    /* RELATIONS */
-    const personal = data?.personal_details || {};
-
-    const emergencyName = personal.emergency_contact_name || "Akka";
-    const emergencyPhone = personal.emergency_contact_phone || "8765678987";
-    const relationType = personal.emergency_contact_relation || "Sister";
-
-    let relationGender = "Not Specified";
-
-    if (["Father", "Brother", "Son", "Husband"].includes(relationType)) {
-      relationGender = "Male";
-    } else if (
-      ["Mother", "Sister", "Daughter", "Wife"].includes(relationType)
-    ) {
-      relationGender = "Female";
-    }
-
-    if (emergencyName) {
-      setRelationData([
-        {
-          id: 1,
-          relation: relationType || "Relation",
-          full_name: emergencyName,
-          mobile: emergencyPhone || "-",
-          gender: relationGender,
-        },
-      ]);
-    } else {
-      setRelationData([]);
-    }
 
     /* ADDRESS */
-    const current = data.addresses?.find((a) => a.address_type === "current");
-    const permanent = data.addresses?.find(
-      (a) => a.address_type === "permanent",
-    );
+    const addresses = Array.isArray(data.addresses)
+  ? data.addresses
+  : [];
+
+const current = addresses.find(
+  (a) => a.address_type === "current",
+);
+
+const permanent = addresses.find(
+  (a) => a.address_type === "permanent",
+);
 
     setAddressData({
       current: {
         address_uuid: current?.address_uuid || "",
         country: current?.country || "",
-        country_uuid: current?.country_uuid || "",
+        
         line1: current?.address_line1 || "",
         line2: current?.address_line2 || "",
         city: current?.city || "",
@@ -142,7 +100,7 @@ export default function ProfilePage({
       permanent: {
         address_uuid: permanent?.address_uuid || "",
         country: permanent?.country || "",
-        country_uuid: permanent?.country_uuid || "",
+        
         line1: permanent?.address_line1 || "",
         line2: permanent?.address_line2 || "",
         city: permanent?.city || "",
@@ -152,12 +110,12 @@ export default function ProfilePage({
       },
     });
 
-    /* EDUCATION - show only the most recent record */
+    /* EDUCATION - show all records sorted by year descending */
     const eduDocs = data.education_documents || [];
     const sortedEdu = [...eduDocs].sort(
       (a, b) => (b.year_of_passing || 0) - (a.year_of_passing || 0),
     );
-    const recentEdu = sortedEdu.slice(0, 1).map((doc, idx) => ({
+    const recentEdu = sortedEdu.map((doc, idx) => ({
       id: doc.education_document_uuid || `edu-${idx}`,
       degree: doc.degree_name || doc.education_level || "N/A",
       specialization: doc.specialization || "",
@@ -166,9 +124,9 @@ export default function ProfilePage({
     }));
     setEducationData(recentEdu);
 
-    /* EXPERIENCE - show only one recent record */
+    /* EXPERIENCE - show all records */
     const expDocs = data.experience || [];
-    const recentExp = expDocs.slice(0, 1).map((doc, idx) => ({
+    const recentExp = expDocs.map((doc, idx) => ({
       id: doc.experience_uuid || `exp-${idx}`,
       company: doc.company_name || "",
       role: doc.role_title || "",
@@ -176,51 +134,89 @@ export default function ProfilePage({
     }));
     setExperienceData(recentExp);
 
-    /* IDENTITY */
-    const aadhaar = data.identity_documents?.find((d) =>
-      d.identity_type?.toLowerCase().includes("aadhaar"),
-    );
-
-    const pan = data.identity_documents?.find((d) =>
-      d.identity_type?.toLowerCase().includes("pan"),
-    );
-
-    setIdentityData({
-      aadhaar: aadhaar?.identity_file_number || "",
-      pan: pan?.identity_file_number || "",
-    });
-
-    /* SOCIAL MEDIA - Fetch independently from new endpoint */
-    const fetchSocialLinks = async () => {
-      try {
-        const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-        const res = await fetch(
-          `${BASE_URL}/employee-details/social-links/${user_uuid}`,
-          {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-          },
-        );
-        if (res.ok) {
-          const links = await res.json();
-          setSocialData(
-            links.length > 0
-              ? links
-              : [
-                  { platform_name: "GitHub", url: "" },
-                  { platform_name: "LinkedIn", url: "" },
-                ],
-          );
-        }
-      } catch (err) {
-        console.error("Failed to fetch social links:", err);
-      }
-    };
-    fetchSocialLinks();
+    /* IDENTITY - map all documents dynamically, try every possible field name */
+    const allIdentityDocs = (data.identity_documents || []).map((d) => ({
+      identity_type: d.identity_type || d.document_type || "Unknown",
+      document_number:
+        d.identity_file_number ||
+        d.document_number ||
+        d.file_number ||
+        d.identity_number ||
+        d.number ||
+        "",
+    }));
+    setIdentityData(allIdentityDocs);
 
     setLoading(false);
   }, [coreData, hrData]);
 
+  /* fetch static master data once on mount */
+  useEffect(() => {
+    const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+    const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+
+    const fetchCountries = () =>
+      fetch(`${BASE_URL}/masters/country`, { headers })
+        .then((r) => r.json())
+        .then((d) => setCountries(Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : []))
+        .catch((err) => console.error("Failed to fetch countries:", err));
+
+    const fetchRelations = () =>
+      fetch(`${BASE_URL}/employee-upload/relations`, { headers })
+        .then((r) => { if (!r.ok) throw new Error("Failed to fetch relations"); return r.json(); })
+        .then((d) => setRelations(Array.isArray(d) ? d : []))
+        .catch((err) => { console.error("Relations fetch failed:", err); setRelations([]); });
+
+    Promise.all([fetchCountries(), fetchRelations()]);
+  }, []);
+
+  /* fetch social links when user changes */
+  useEffect(() => {
+    if (!user_uuid) return;
+    const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+    fetch(`${BASE_URL}/employee-details/social-links/${user_uuid}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((links) =>
+        setSocialData(
+          links.length > 0
+            ? links
+            : [{ platform_name: "GitHub", url: "" }, { platform_name: "LinkedIn", url: "" }],
+        ),
+      )
+      .catch(() => console.error("Failed to fetch social links"));
+  }, [user_uuid]);
+
   if (loading) return <LoadingSpinner text="Loading profile..." />;
+  const completionSections = {
+  personal:
+    !!primaryData?.gender ||
+    !!primaryData?.dob,
+
+  address:
+    !!addressData?.current?.line1,
+
+  education:
+    (educationData || []).length,
+
+  experience:
+    (experienceData || []).length,
+
+  identity:
+    identityData.length > 0,
+};
+
+const totalSections =
+  Object.keys(completionSections).length;
+
+const completedSections =
+  Object.values(completionSections)
+    .filter(Boolean).length;
+
+const profileCompletion = Math.round(
+  (completedSections / totalSections) * 100,
+);
 
   const profileSections = [
     {
@@ -233,28 +229,60 @@ export default function ProfilePage({
           <Row label="Last Name" value={primaryData?.last_name || ""} />
           <Row label="Gender" value={primaryData?.gender || ""} />
           <Row label="Date of Birth" value={primaryData?.dob || ""} />
+          <Row label="Personal Email" value={primaryData?.personal_email || ""} />
+          <Row label="Mobile Number" value={primaryData?.mobile_number ? `+91 ${primaryData.mobile_number}` : ""} />
           <Row label="Blood Group" value={primaryData?.blood_group || ""} />
           <Row label="Marital Status" value={primaryData?.marital_status || ""} />
-          <Row label="Nationality" value={primaryData?.nationality || ""} />
-        </>
-      ),
-    },
-    {
-      key: "contact",
-      title: "Contact Details",
-      onEdit: () => setEditSection("contact"),
-      content: (
-        <>
-          <Row label="Work Email" value={contactData?.work_email || ""} />
-          <Row label="Personal Email" value={contactData?.personal_email || ""} />
           <Row
-            label="Mobile Number"
-            value={`${contactData?.country_code} ${contactData?.mobile_number || ""}`}
-          />
-          <Row
-            label="Emergency Number"
-            value={`${contactData?.country_code} ${contactData?.emergency_number || ""}`}
-          />
+  label="Nationality"
+  value={
+    primaryData?.nationality_country_uuid
+      ? countries.find(
+          (c) => c.country_uuid === primaryData.nationality_country_uuid
+        )?.country_name || "-"
+      : "-"
+  }
+/>
+
+<Row
+  label="Country of Residence"
+  value={
+    primaryData?.residence_country_uuid
+      ? countries.find(
+          (c) => c.country_uuid === primaryData.residence_country_uuid
+        )?.country_name || "-"
+      : "-"
+  }
+/>
+          {(primaryData?.emergency_contact_name ||
+            primaryData?.emergency_contact_phone ||
+            primaryData?.emergency_contact_relation_uuid) && (
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                Emergency Contact
+              </div>
+              <Row
+                label="Contact Name"
+                value={primaryData?.emergency_contact_name || ""}
+              />
+              <Row
+                label="Contact Phone"
+                value={primaryData?.emergency_contact_phone || ""}
+              />
+              <Row
+                label="Relation"
+                value={
+                  primaryData?.emergency_contact_relation_uuid
+                    ? relations.find(
+                        (r) =>
+                          r.relation_uuid ===
+                          primaryData.emergency_contact_relation_uuid
+                      )?.relation_name || "-"
+                    : "-"
+                }
+              />
+            </div>
+          )}
         </>
       ),
     },
@@ -270,86 +298,73 @@ export default function ProfilePage({
       ),
     },
     {
-      key: "relations",
-      title: "Relations",
-      onEdit: () => setEditSection("relations"),
-      content: Array.isArray(relationData) && relationData.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
-          {relationData.map((rel, idx) => (
-            <div key={rel.id || idx} className="flex flex-col">
-              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1">
-                {rel.relation || "Relation"}
-              </span>
-              <span className="text-[14px] text-gray-800">{rel.full_name || "-"}</span>
-              <span className="text-[14px] text-gray-800 mt-0.5">
-                <span className="font-medium text-gray-900">Mobile:</span>{" "}
-                {rel.mobile || "-"}
-              </span>
-              <span className="text-[14px] text-gray-800 mt-0.5">
-                <span className="font-medium text-gray-900">Gender:</span>{" "}
-                {rel.gender || "-"}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-gray-400 text-sm">No relations added</div>
-      ),
-    },
-    {
       key: "education",
       title: "Education",
       onEdit: () => onTabChange("documents", { folder: "education", search: "" }),
-      content: educationData.length > 0 ? (
-        <div className="space-y-4">
-          {educationData.map((edu, idx) => (
-            <div key={edu.id || idx} className={idx > 0 ? "pt-4 border-t border-gray-100" : ""}>
-              <Row label="Degree" value={edu.degree || ""} />
-              <Row label="Specialization" value={edu.specialization || ""} />
-              <Row label="Institution/College" value={edu.institution || ""} />
-              <Row label="Year" value={edu.year || ""} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-gray-400 text-sm">No education records added</div>
-      ),
+      content:
+        educationData.length > 0 ? (
+          <div className="space-y-3">
+            {educationData.map((edu, idx) => (
+              <EducationCard key={edu.id || idx} edu={edu} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No education records added"
+            buttonText="Add Education"
+            onClick={() =>
+              onTabChange("documents", { folder: "education", search: "" })
+            }
+          />
+        ),
     },
     {
       key: "experience",
       title: "Experience",
       onEdit: () => onTabChange("documents", { folder: "experience", search: "" }),
-      content: experienceData.length > 0 ? (
-        <div className="space-y-4">
-          {experienceData.map((exp, idx) => (
-            <div key={exp.id || idx} className={idx > 0 ? "pt-4 border-t border-gray-100" : ""}>
-              <Row label="Company" value={exp.company || ""} />
-              <Row label="Role" value={exp.role || ""} />
-              <Row label="Duration" value={exp.duration || ""} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-gray-400 text-sm">No experience records added</div>
-      ),
+      content:
+        experienceData.length > 0 ? (
+          <div className="space-y-3">
+            {experienceData.map((exp, idx) => (
+              <ExperienceCard key={exp.id || idx} exp={exp} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No experience records added"
+            buttonText="Add Experience"
+            onClick={() =>
+              onTabChange("documents", { folder: "experience", search: "" })
+            }
+          />
+        ),
     },
     {
       key: "identity",
       title: "Identity Information",
       onEdit: () => onTabChange("documents", { folder: "identity", search: "" }),
-      content: (
-        <>
-          <Row label="Aadhaar" value={identityData?.aadhaar || ""} />
-          <Row label="PAN" value={identityData?.pan || ""} />
-        </>
-      ),
+      content:
+        identityData.length > 0 ? (
+          <div className="space-y-3">
+            {identityData.map((doc, idx) => (
+              <IdentityCard key={idx} doc={doc} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No identity documents added"
+            buttonText="Add Identity"
+            onClick={() =>
+              onTabChange("documents", { folder: "identity", search: "" })
+            }
+          />
+        ),
     },
     {
       key: "social",
       title: "Social Media",
       onEdit: () => setEditSection("social"),
-      content: socialData.length > 0 ? (
-        <div className="space-y-3">
+      content: Array.isArray(socialData) && socialData.length > 0 ? (        <div className="space-y-3">
           {socialData.map((link, idx) => (
             <Row
               key={idx}
@@ -360,13 +375,38 @@ export default function ProfilePage({
           ))}
         </div>
       ) : (
-        <div className="text-gray-400 text-sm">No social media links added</div>
+        <EmptyState
+  title="No social media links added"
+  buttonText="Add Social Links"
+  onClick={() => setEditSection("social")}
+/>
       ),
     },
   ];
 
   return (
-    <div className="space-y-6">
+  <div className="space-y-6">
+
+    <div className="bg-white rounded-2xl border border-[#dfe6f3] p-6 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold text-[#081534] uppercase tracking-wide">
+          Profile Completion
+        </h3>
+
+        <span className="text-sm font-semibold text-[#263383]">
+          {profileCompletion}%
+        </span>
+      </div>
+
+      <div className="w-full h-3 rounded-full bg-gray-100 overflow-hidden">
+        <div
+          className="h-full bg-[#263383] transition-all duration-500"
+          style={{
+            width: `${profileCompletion}%`,
+          }}
+        />
+      </div>
+    </div>
       <DynamicCardGrid
         data={profileSections}
         getKey={(section) => section.key}
@@ -387,25 +427,15 @@ export default function ProfilePage({
         <PrimaryModal
           data={primaryData}
           setData={setPrimaryData}
+          
           onClose={() => setEditSection(null)}
           personalUuid={
             hrData?.personal_details?.personal_uuid ||
             hrData?.personal_details?.user_uuid
           }
           hrData={hrData}
-          refreshData={refreshData}
-        />
-      )}
-      {editSection === "contact" && (
-        <ContactModal
-          data={contactData}
-          setData={setContactData}
-          onClose={() => setEditSection(null)}
-          personalUuid={
-            hrData?.personal_details?.personal_uuid ||
-            hrData?.personal_details?.user_uuid
-          }
-          hrData={hrData}
+          countries={countries}
+          relations={relations}
           refreshData={refreshData}
         />
       )}
@@ -414,20 +444,9 @@ export default function ProfilePage({
           data={addressData}
           setData={setAddressData}
           user_uuid={user_uuid}
-          onClose={() => setEditSection(null)}
-        />
-      )}
-      {editSection === "relations" && (
-        <RelationsModal
-          data={relationData}
-          setData={setRelationData}
-          onClose={() => setEditSection(null)}
-          personalUuid={
-            hrData?.personal_details?.personal_uuid ||
-            hrData?.personal_details?.user_uuid
-          }
           hrData={hrData}
           refreshData={refreshData}
+          onClose={() => setEditSection(null)}
         />
       )}
       {editSection === "education" && (
@@ -487,22 +506,46 @@ const Section = ({ title, children, onEdit }) => (
 );
 
 const Row = ({ label, value, isLink = false }) => (
-  <div className="grid grid-cols-[42%_1fr] gap-3 items-baseline py-3 border-b border-[#eef2f8] last:border-0">
-    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.08em]">{label}</span>
-    <span className="text-[15px] font-semibold text-[#081534] break-words">
-      {isLink && value && value !== "NA" ? (
-        <a
-          href={value.startsWith("http") ? value : `https://${value}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[#263383] hover:underline inline-flex items-center gap-1"
-        >
-          {value}
-        </a>
-      ) : (
-        value || <span className="text-gray-300">—</span>
-      )}
-    </span>
+  <div className="flex items-start justify-between py-2 border-b border-gray-100 last:border-b-0">
+    <span className="text-sm font-medium text-gray-500">{label}</span>
+    {isLink && value ? (
+      <a
+        href={value}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-sm text-blue-600 hover:underline text-right"
+      >
+        {value}
+      </a>
+    ) : (
+      <span className="text-sm text-gray-800 text-right max-w-[60%] break-words">
+        {value || "-"}
+      </span>
+    )}
+  </div>
+);
+
+const EmptyState = ({
+  title,
+  buttonText,
+  onClick,
+}) => (
+  <div className="flex flex-col items-center justify-center py-10 text-center">
+    <AlertTriangle
+      size={32}
+      className="text-gray-300 mb-3"
+    />
+
+    <p className="text-sm text-gray-500 mb-4">
+      {title}
+    </p>
+
+    <button
+      onClick={onClick}
+      className="px-4 py-2 rounded-lg bg-[#263383] text-white text-sm hover:bg-[#081534]"
+    >
+      {buttonText}
+    </button>
   </div>
 );
 
@@ -530,6 +573,81 @@ const AddressBlock = ({ title, address }) => (
     ) : (
       <span className="text-base text-slate-400">No address added</span>
     )}
+  </div>
+);
+
+/* ---- shared info field used by the structured cards below ---- */
+const InfoField = ({ label, value }) => (
+  <div className="flex flex-col gap-0.5 min-w-0">
+    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none truncate">
+      {label}
+    </span>
+    <span className="text-sm font-semibold text-[#081534] leading-snug break-words">
+      {value || "-"}
+    </span>
+  </div>
+);
+
+const EducationCard = ({ edu }) => (
+  <div className="rounded-xl border border-[#dfe6f3] bg-[#f8fbff] px-4 py-4 shadow-[0_1px_4px_rgba(38,51,131,0.06)]">
+    <p className="text-[14px] font-bold text-[#081534] leading-snug">
+      {edu.degree || "N/A"}
+    </p>
+    {edu.specialization && (
+      <p className="text-[12px] text-gray-400 mt-0.5 mb-3 leading-snug">
+        {edu.specialization}
+      </p>
+    )}
+    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 ${edu.specialization ? "" : "mt-3"}`}>
+      {edu.institution && (
+        <InfoField label="University / College" value={edu.institution} />
+      )}
+      {edu.year && <InfoField label="Year of Passing" value={String(edu.year)} />}
+    </div>
+  </div>
+);
+
+const ExperienceCard = ({ exp }) => (
+  <div className="rounded-xl border border-[#dfe6f3] bg-[#f8fbff] px-4 py-4 shadow-[0_1px_4px_rgba(38,51,131,0.06)]">
+    <p className="text-[14px] font-bold text-[#081534] leading-snug mb-3">
+      {exp.role || "N/A"}
+    </p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+      {exp.company && <InfoField label="Company" value={exp.company} />}
+      {exp.duration && <InfoField label="Duration" value={exp.duration} />}
+    </div>
+  </div>
+);
+
+const DOC_CATEGORY = {
+  aadhaar: "Address Proof",
+  aadhar: "Address Proof",
+  pan: "Payroll",
+  passport: "International Travel",
+  driving: "Driving Licence",
+  licence: "Driving Licence",
+  license: "Driving Licence",
+};
+
+const getDocCategory = (type) => {
+  const lower = (type || "").toLowerCase();
+  const match = Object.keys(DOC_CATEGORY).find((k) => lower.includes(k));
+  return match ? DOC_CATEGORY[match] : "Identity Document";
+};
+
+const IdentityCard = ({ doc }) => (
+  <div className="rounded-xl border border-[#dfe6f3] bg-[#f8fbff] px-4 py-4 shadow-[0_1px_4px_rgba(38,51,131,0.06)]">
+    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+      {getDocCategory(doc.identity_type)}
+    </p>
+    <div className="flex items-center gap-2 mb-4">
+      <span className="inline-flex items-center px-3 py-1 rounded-lg bg-[#e8edf8] text-[12px] font-semibold text-[#263383] leading-none">
+        {doc.identity_type}
+      </span>
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+      <InfoField label="Document Number" value={doc.document_number} />
+    </div>
   </div>
 );
 
@@ -636,6 +754,7 @@ const ModalWrapper = ({
   children,
   saving = false,
   contentClassName = "px-8 py-8 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-7 overflow-y-auto bg-gray-50/50",
+  formClassName = "bg-white w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100",
 }) => (
   <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
     <form
@@ -646,7 +765,7 @@ const ModalWrapper = ({
           onClose();
         })
       }
-      className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100"
+      className={formClassName}
     >
       <div className="flex justify-between items-center px-8 py-5 border-b border-gray-100 bg-white shrink-0">
         <h3 className="text-lg font-bold text-gray-900">{title}</h3>
@@ -692,6 +811,8 @@ const PrimaryModal = ({
   personalUuid,
   hrData,
   refreshData,
+  countries,
+  relations,
 }) => {
   const { employee_uuid } = useParams();
   const [localData, setLocalData] = useState({ ...data });
@@ -707,7 +828,7 @@ const PrimaryModal = ({
       );
       return;
     }
-
+    
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
@@ -720,12 +841,12 @@ const PrimaryModal = ({
         gender: localData.gender || "",
         marital_status: localData.marital_status || "",
         blood_group: localData.blood_group || "",
-        nationality_country_uuid: personal.nationality_country_uuid || "",
-        residence_country_uuid: personal.residence_country_uuid || "",
-        emergency_contact_name: personal.emergency_contact_name || "",
-        emergency_contact_phone: personal.emergency_contact_phone || "",
+        nationality_country_uuid: localData.nationality_country_uuid || "",
+        residence_country_uuid: localData.residence_country_uuid || "",
+        emergency_contact_name: localData.emergency_contact_name || "",
+        emergency_contact_phone: localData.emergency_contact_phone || "",
         emergency_contact_relation_uuid:
-          personal.emergency_contact_relation_uuid || "",
+          localData.emergency_contact_relation_uuid || null,
       };
 
       const personalTask = fetch(
@@ -748,7 +869,7 @@ const PrimaryModal = ({
         gender: localData.gender,
         marital_status: localData.marital_status,
         blood_group: localData.blood_group,
-        contact_number: core.contact_number || personal.contact_number || "",
+        contact_number: localData.mobile_number || "",
         department_uuid: personal.department_uuid || null,
         designation_uuid: personal.designation_uuid || null,
         location: personal.location || "",
@@ -795,25 +916,26 @@ const PrimaryModal = ({
       onClose={onClose}
       onSubmit={handleSave}
       saving={saving}
+      formClassName="bg-white w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-gray-100"
+      contentClassName="px-8 py-8 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 overflow-y-auto pr-2 bg-gray-50/50"
     >
+      {/* LEFT */}
       <Input
         required
         label="First Name"
         name="first_name"
         value={localData.first_name}
-        onChange={(e) =>
-          setLocalData({ ...localData, first_name: e.target.value })
-        }
+        onChange={(e) => setLocalData({ ...localData, first_name: e.target.value })}
       />
+      {/* RIGHT */}
       <Input
         required
         label="Last Name"
         name="last_name"
         value={localData.last_name}
-        onChange={(e) =>
-          setLocalData({ ...localData, last_name: e.target.value })
-        }
+        onChange={(e) => setLocalData({ ...localData, last_name: e.target.value })}
       />
+      {/* LEFT */}
       <Select
         label="Gender"
         name="gender"
@@ -822,6 +944,7 @@ const PrimaryModal = ({
         options={["Male", "Female", "Other"]}
         required
       />
+      {/* RIGHT */}
       <Input
         required
         label="Date of Birth"
@@ -830,189 +953,121 @@ const PrimaryModal = ({
         value={localData.dob}
         onChange={(e) => setLocalData({ ...localData, dob: e.target.value })}
       />
-      <Select
-        label="Blood Group"
-        name="blood_group"
-        value={localData.blood_group}
-        onChange={(e) =>
-          setLocalData({ ...localData, blood_group: e.target.value })
-        }
-        options={["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]}
-      />
-      <Select
-        label="Marital Status"
-        name="marital_status"
-        value={localData.marital_status}
-        onChange={(e) =>
-          setLocalData({ ...localData, marital_status: e.target.value })
-        }
-        options={["Single", "Married", "Divorced", "Widowed"]}
-      />
-      <Input
-        label="Nationality"
-        name="nationality"
-        value={localData.nationality}
-        onChange={(e) =>
-          setLocalData({ ...localData, nationality: e.target.value })
-        }
-      />
-    </ModalWrapper>
-  );
-};
-
-const ContactModal = ({
-  data,
-  setData,
-  onClose,
-  personalUuid,
-  hrData,
-  refreshData,
-}) => {
-  const { employee_uuid } = useParams();
-  const [localData, setLocalData] = useState({ ...data });
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-
-    if (!personalUuid) {
-      showStatusToast("Unable to save: employee details not found", "error");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const personal = hrData?.personal_details || {};
-      const offer = hrData?.offer || {};
-
-      // 1. Update Core Details (Mobile Number)
-      // Note: Removed work_email as it is not supported in the core update endpoint schema provided
-      const corePayload = {
-        first_name: offer.first_name || "",
-        last_name: offer.last_name || "",
-        contact_number: localData.mobile_number,
-        date_of_birth: personal.date_of_birth,
-        gender: personal.gender,
-        marital_status: personal.marital_status,
-        blood_group: personal.blood_group,
-        department_uuid: personal.department_uuid || null,
-        designation_uuid: personal.designation_uuid || null,
-        location: personal.location || "",
-        employment_type: personal.employment_type || "Full-Time",
-        joining_date: personal.joining_date || null,
-        employment_status: personal.employment_status || "Probation",
-        work_mode: personal.work_mode || "Office",
-        total_experience: personal.total_experience || 0,
-      };
-
-      const coreTask = fetch(
-        `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(corePayload),
-        },
-      );
-
-      // 2. Update Personal Details (Emergency Phone)
-      const personalPayload = {
-        date_of_birth: personal.date_of_birth || "",
-        gender: personal.gender || "",
-        marital_status: personal.marital_status || "",
-        blood_group: personal.blood_group || "",
-        nationality_country_uuid: personal.nationality_country_uuid || "",
-        residence_country_uuid: personal.residence_country_uuid || "",
-        emergency_contact_name: personal.emergency_contact_name || "",
-        emergency_contact_phone: localData.emergency_number || "",
-        emergency_contact_relation_uuid:
-          personal.emergency_contact_relation_uuid || "",
-      };
-
-      const personalTask = fetch(
-        `${BASE_URL}/employee-details/${personalUuid}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(personalPayload),
-        },
-      );
-
-      const [res1, res2] = await Promise.all([coreTask, personalTask]);
-
-      if (!res1.ok || !res2.ok) {
-        throw new Error("Failed to update contact records");
-      }
-
-      setData(localData);
-      showStatusToast("Contact details updated successfully", "success");
-      if (refreshData) refreshData();
-      onClose();
-    } catch (err) {
-      console.error("Update failed:", err);
-      showStatusToast(
-        err.message || "Failed to update contact details",
-        "error",
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <ModalWrapper
-      title="Contact Details"
-      onClose={onClose}
-      onSubmit={handleSave}
-      saving={saving}
-    >
-      <Input
-        required
-        label="Work Email"
-        type="email"
-        name="work_email"
-        value={localData.work_email}
-        onChange={(e) =>
-          setLocalData({ ...localData, work_email: e.target.value })
-        }
-      />
+      {/* LEFT */}
       <Input
         label="Personal Email"
         type="email"
         name="personal_email"
-        value={localData.personal_email}
-        onChange={(e) =>
-          setLocalData({ ...localData, personal_email: e.target.value })
-        }
+        value={localData.personal_email || ""}
+        onChange={(e) => setLocalData({ ...localData, personal_email: e.target.value })}
       />
+      {/* RIGHT */}
       <Input
-        required
         label="Mobile Number"
         name="mobile_number"
-        value={localData.mobile_number}
-        onChange={(e) =>
-          setLocalData({ ...localData, mobile_number: e.target.value })
-        }
+        value={localData.mobile_number || ""}
+        onChange={(e) => setLocalData({ ...localData, mobile_number: e.target.value })}
       />
+      {/* LEFT */}
+      <Select
+        label="Blood Group"
+        name="blood_group"
+        value={localData.blood_group}
+        onChange={(e) => setLocalData({ ...localData, blood_group: e.target.value })}
+        options={["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]}
+      />
+      {/* RIGHT */}
+      <Select
+        label="Marital Status"
+        name="marital_status"
+        value={localData.marital_status}
+        onChange={(e) => setLocalData({ ...localData, marital_status: e.target.value })}
+        options={["Single", "Married", "Divorced", "Widowed"]}
+      />
+      {/* LEFT: Nationality */}
+      <div>
+        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+          Nationality
+        </label>
+        <select
+          value={localData.nationality_country_uuid || ""}
+          onChange={(e) => setLocalData({ ...localData, nationality_country_uuid: e.target.value })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none transition-all focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 bg-white hover:border-gray-400 cursor-pointer text-gray-900"
+        >
+          <option value="">Select Nationality</option>
+          {countries.map((country) => (
+            <option key={country.country_uuid} value={country.country_uuid}>
+              {country.country_name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {/* RIGHT: Residence Country */}
+      <div>
+        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+          Residence Country
+        </label>
+        <select
+          value={localData.residence_country_uuid || ""}
+          onChange={(e) => setLocalData({ ...localData, residence_country_uuid: e.target.value })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none transition-all focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 bg-white hover:border-gray-400 cursor-pointer text-gray-900"
+        >
+          <option value="">Select Residence Country</option>
+          {countries.map((country) => (
+            <option key={country.country_uuid} value={country.country_uuid}>
+              {country.country_name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* FULL WIDTH: Emergency Contact divider */}
+      <div className="md:col-span-2 mt-2">
+        <div className="border-t border-gray-200 pt-4">
+          <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400">
+            Emergency Contact
+          </h4>
+        </div>
+      </div>
+
+      {/* LEFT: Emergency Contact Name */}
       <Input
-        label="Emergency Number"
-        name="emergency_number"
-        value={localData.emergency_number}
-        onChange={(e) =>
-          setLocalData({ ...localData, emergency_number: e.target.value })
-        }
+        label="Emergency Contact Name"
+        name="emergency_contact_name"
+        value={localData.emergency_contact_name || ""}
+        onChange={(e) => setLocalData({ ...localData, emergency_contact_name: e.target.value })}
       />
+      {/* RIGHT: Emergency Contact Phone */}
+      <Input
+        label="Emergency Contact Phone"
+        name="emergency_contact_phone"
+        value={localData.emergency_contact_phone || ""}
+        onChange={(e) => setLocalData({ ...localData, emergency_contact_phone: e.target.value })}
+      />
+      {/* LEFT: Emergency Relation */}
+      <div>
+        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+          Emergency Relation
+        </label>
+        <select
+          value={localData.emergency_contact_relation_uuid || ""}
+          onChange={(e) => setLocalData({ ...localData, emergency_contact_relation_uuid: e.target.value })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none transition-all focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 bg-white hover:border-gray-400 cursor-pointer text-gray-900"
+        >
+          <option value="">Select Relation</option>
+          {relations.map((relation) => (
+            <option key={relation.relation_uuid} value={relation.relation_uuid}>
+              {relation.relation_name}
+            </option>
+          ))}
+        </select>
+      </div>
     </ModalWrapper>
   );
 };
 
-const AddressModal = ({ data, setData, user_uuid, onClose }) => {
+const AddressModal = ({ data, setData, user_uuid, onClose, hrData, refreshData  }) => {
+ 
   const [localData, setLocalData] = useState({ ...data });
   const [saving, setSaving] = useState(false);
 
@@ -1045,7 +1100,7 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
         ? { ...prev.current }
         : {
             ...prev.permanent,
-            country: "India",
+            
             line1: "",
             line2: "",
             city: "",
@@ -1057,64 +1112,130 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
   };
 
   const handleSave = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
+
+  try {
     setSaving(true);
+    const BASE_URL =
+  window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+  const addresses = Array.isArray(hrData?.addresses)
+  ? hrData.addresses
+  : [];
 
-    try {
-      const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+    const createPayload = (addr, type) => {
+  const existingAddress = addresses.find(
+    (a) => a.address_type === type
+  );
 
-      const updateAddress = async (addr, type) => {
-        if (!addr.address_uuid) return;
+  return {
+    user_uuid: user_uuid,
 
-        const payload = {
-          user_uuid: user_uuid,
-          address_type: type,
-          address_line1: addr.line1,
-          address_line2: addr.line2,
-          city: addr.city,
-          district_or_ward: addr.district_or_ward,
-          state_or_region: addr.state,
-          postal_code: addr.pincode,
-          country_uuid:
-            addr.country_uuid || "019c28d0-d0be-6edc-7adc-2d2e61d5524a", // Fallback to India if missing
-        };
+    country_uuid:
+      existingAddress?.country_uuid,
 
-        const res = await fetch(
-          `${BASE_URL}/employee-details/address/${addr.address_uuid}`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify(payload),
-          },
-        );
+    address_type: type,
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Failed to update ${type} address`);
-        }
-      };
+    address_line1: addr.line1 || "",
 
-      // Update both addresses in parallel if IDs exist
-      await Promise.all([
-        updateAddress(localData.current, "current"),
-        updateAddress(localData.permanent, "permanent"),
-      ]);
+    address_line2: addr.line2 || "",
 
-      setData(localData);
-      showStatusToast("Address updated successfully", "success");
-      onClose();
-    } catch (err) {
-      console.error("Address update failed:", err);
-      showStatusToast(err.message || "Failed to update address", "error");
-    } finally {
-      setSaving(false);
-    }
+    city: addr.city || "",
+
+    district_or_ward:
+      addr.district_or_ward || "",
+
+    state_or_region:
+      addr.state || "",
+
+    postal_code: addr.pincode || "",
   };
+};
+   
 
-  const countries = ["India", "USA", "UK", "Australia", "Canada"];
+const currentAddressRow =
+  addresses.find(
+    (a) => a.address_type === "current"
+  );
+
+const permanentAddressRow =
+  addresses.find(
+    (a) => a.address_type === "permanent"
+  );
+  if (!currentAddressRow || !permanentAddressRow) {
+  showStatusToast(
+    "Address rows not found",
+    "error"
+  );
+
+  return;
+}
+    const currentPayload = createPayload(
+      localData.current,
+      "current"
+    );
+
+    const permanentPayload = createPayload(
+      localData.sameAsCurrent
+        ? localData.current
+        : localData.permanent,
+      "permanent"
+    );
+
+    await Promise.all([
+      fetch(
+        `${BASE_URL}/employee-details/address/${currentAddressRow.address_uuid}`,
+        {
+          method: "PUT",
+
+          headers: {
+            "Content-Type": "application/json",
+
+            Authorization: `Bearer ${localStorage.getItem(
+              "token"
+            )}`,
+          },
+
+          body: JSON.stringify(currentPayload),
+        }
+      ),
+
+      fetch(
+        `${BASE_URL}/employee-details/address/${permanentAddressRow.address_uuid}`,
+        {
+          method: "PUT",
+
+          headers: {
+            "Content-Type": "application/json",
+
+            Authorization: `Bearer ${localStorage.getItem(
+              "token"
+            )}`,
+          },
+
+          body: JSON.stringify(permanentPayload),
+        }
+      ),
+    ]);
+
+    showStatusToast(
+      "Address updated successfully",
+      "success"
+    );
+
+    refreshData();
+
+    onClose();
+  } catch (err) {
+    console.error(err);
+
+    showStatusToast(
+      "Failed to update address",
+      "error"
+    );
+  } finally {
+    setSaving(false);
+  }
+};
   const states = [
     "Andhra Pradesh",
     "Karnataka",
@@ -1145,13 +1266,7 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
               CURRENT ADDRESS
             </div>
             <div className="space-y-4">
-              <Select
-                required
-                label="Country"
-                value={localData.current.country}
-                onChange={(e) => updateCurrent("country", e.target.value)}
-                options={countries}
-              />
+          
               <AddressInput
                 required
                 label="Address Line 1"
@@ -1198,15 +1313,7 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
               PERMANENT ADDRESS
             </div>
             <div className="space-y-4 flex-grow">
-              <Select
-                required={!localData.sameAsCurrent}
-                label="Country"
-                value={localData.permanent.country}
-                disabled={localData.sameAsCurrent}
-                onChange={(e) => updatePermanent("country", e.target.value)}
-                options={countries}
-              />
-              <AddressInput
+                        <AddressInput
                 required={!localData.sameAsCurrent}
                 label="Address Line 1"
                 value={localData.permanent.line1}
@@ -1290,271 +1397,6 @@ const AddressModal = ({ data, setData, user_uuid, onClose }) => {
   );
 };
 
-const RelationsModal = ({
-  data,
-  setData,
-  onClose,
-  personalUuid,
-  hrData,
-  refreshData,
-}) => {
-  const [relations, setRelations] = useState(
-    Array.isArray(data) ? [...data] : [],
-  );
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [saving, setSaving] = useState(false);
-
-  const handleAdd = () => {
-    const newRel = {
-      id: Date.now(),
-      relation: "",
-      gender: "",
-      full_name: "",
-      email: "",
-      mobile: "",
-      profession: "",
-      dob: "",
-    };
-    setRelations([...relations, newRel]);
-    setSelectedIndex(relations.length);
-  };
-
-  const handleDelete = (index) => {
-    const newRels = relations.filter((_, i) => i !== index);
-    setRelations(newRels);
-    if (selectedIndex >= newRels.length) {
-      setSelectedIndex(Math.max(0, newRels.length - 1));
-    } else if (selectedIndex > index) {
-      setSelectedIndex(selectedIndex - 1);
-    }
-  };
-
-  const updateCurrent = (field, value) => {
-    const newRels = [...relations];
-    newRels[selectedIndex] = { ...newRels[selectedIndex], [field]: value };
-    setRelations(newRels);
-  };
-
-  const currentRel = relations[selectedIndex] || {};
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-
-    if (!personalUuid) {
-      showStatusToast(
-        "Unable to save: employee personal details not found",
-        "error",
-      );
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const personal = hrData?.personal_details || {};
-
-      // Identify the emergency contact (e.g., the first one or a specific one)
-      // For now, we update based on the currently selected relation if it's meant to be the emergency contact
-      const payload = {
-        date_of_birth: personal.date_of_birth || "",
-        gender: personal.gender || "",
-        marital_status: personal.marital_status || "",
-        blood_group: personal.blood_group || "",
-        nationality_country_uuid: personal.nationality_country_uuid || "",
-        residence_country_uuid: personal.residence_country_uuid || "",
-        emergency_contact_name:
-          currentRel.full_name || personal.emergency_contact_name || "",
-        emergency_contact_phone:
-          currentRel.mobile || personal.emergency_contact_phone || "",
-        emergency_contact_relation_uuid:
-          personal.emergency_contact_relation_uuid || "", // Need master list to change UUID
-      };
-
-      const res = await fetch(`${BASE_URL}/employee-details/${personalUuid}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || "Failed to update relations");
-      }
-
-      setData(relations);
-      showStatusToast("Relations updated successfully", "success");
-      if (refreshData) refreshData();
-      onClose();
-    } catch (err) {
-      console.error("Update failed:", err);
-      showStatusToast(err.message || "Failed to update relations", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSave();
-        }}
-        className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100"
-      >
-        <div className="flex justify-between items-center px-8 py-5 border-b border-gray-100 bg-white shrink-0">
-          <h3 className="text-xl font-medium text-gray-800">Edit Relations</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-colors focus:outline-none"
-          >
-            <X size={24} strokeWidth={1.5} />
-          </button>
-        </div>
-
-        <div className="flex flex-col md:flex-row overflow-hidden bg-white flex-1 min-h-[400px]">
-          {/* LEFT SIDEBAR: List of relations */}
-          <div className="w-full md:w-1/3 border-r border-gray-100 p-6 overflow-y-auto space-y-4 bg-gray-50/20">
-            {relations.map((rel, idx) => (
-              <div
-                key={rel.id}
-                onClick={() => setSelectedIndex(idx)}
-                className={`p-5 rounded-md border relative cursor-pointer transition-all ${
-                  selectedIndex === idx
-                    ? "bg-[#f4f6fc] border-[#263383]/20 shadow-sm"
-                    : "bg-white border-gray-100 hover:border-gray-200"
-                }`}
-              >
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                  {rel.relation || "NEW RELATION"}
-                </div>
-                <div className="text-[15px] font-medium text-gray-800 mt-2 leading-tight">
-                  {rel.full_name || ""}
-                </div>
-                <div className="text-[13px] text-gray-500 mt-1">
-                  [{rel.profession || "Profession"}]
-                </div>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(idx);
-                  }}
-                  className="absolute bottom-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  <Trash2 size={16} strokeWidth={1.5} />
-                </button>
-              </div>
-            ))}
-
-            <button
-              type="button"
-              onClick={handleAdd}
-              className="text-[#263383] text-sm font-medium hover:underline mt-2 inline-block px-1 tracking-wide"
-            >
-              + Add new relation
-            </button>
-          </div>
-
-          {/* RIGHT SIDE: Form */}
-          <div className="w-full md:w-2/3 p-10 overflow-y-auto">
-            {relations.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-                <Select
-                  label="Relation"
-                  value={currentRel.relation}
-                  onChange={(e) => updateCurrent("relation", e.target.value)}
-                  options={[
-                    "Father",
-                    "Mother",
-                    "Spouse",
-                    "Brother",
-                    "Sister",
-                    "Son",
-                    "Daughter",
-                    "Other",
-                  ]}
-                  required
-                />
-                <Select
-                  label="Gender"
-                  value={currentRel.gender}
-                  onChange={(e) => updateCurrent("gender", e.target.value)}
-                  options={["Male", "Female", "Other"]}
-                  required
-                />
-
-                <div className="md:col-span-2">
-                  <Input
-                    label="Full Name"
-                    value={currentRel.full_name}
-                    onChange={(e) => updateCurrent("full_name", e.target.value)}
-                    required
-                  />
-                </div>
-
-                <Input
-                  label="Email"
-                  type="email"
-                  value={currentRel.email}
-                  onChange={(e) => updateCurrent("email", e.target.value)}
-                />
-                <Input
-                  label="Mobile"
-                  value={currentRel.mobile}
-                  onChange={(e) => updateCurrent("mobile", e.target.value)}
-                  required
-                />
-
-                <Input
-                  label="Profession"
-                  value={currentRel.profession}
-                  onChange={(e) => updateCurrent("profession", e.target.value)}
-                />
-                <Input
-                  label="Date of Birth"
-                  type="date"
-                  value={currentRel.dob}
-                  onChange={(e) => updateCurrent("dob", e.target.value)}
-                />
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                No relations added. Click "+ Add new relation" to begin.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 px-8 py-5 border-t border-gray-100 bg-white shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#263383] transition-all"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#263383] shadow-sm transition-all focus:ring-offset-1 ${
-              saving
-                ? "bg-[#263383]/50 cursor-not-allowed"
-                : "bg-[#263383] hover:bg-[#081534]"
-            }`}
-          >
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-};
 
 const EducationModal = ({ data, setData, onClose }) => (
   <ModalWrapper title="Education" onClose={onClose}>
