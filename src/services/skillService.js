@@ -324,4 +324,101 @@ export const skillService = {
       throw error;
     }
   },
+
+  getAllCategories: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/skill-categories`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching all categories:", error);
+      throw error;
+    }
+  },
+
+  getCertificates: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/certificates`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching certificates:", error);
+      throw error;
+    }
+  },
+
+  getCertificateById: async (certificateId) => {
+    try {
+      const response = await axios.get(`${API_URL}/certificates/${certificateId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching certificate ${certificateId}:`, error);
+      throw error;
+    }
+  },
+
+  getCertificationSkillsByCategory: async (categoryId) => {
+    try {
+      const response = await axios.get(`${API_URL}/certificates/category/${categoryId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching certification skills for category ${categoryId}:`, error);
+      throw error;
+    }
+  },
+
+  createCertificate: async (certificateData) => {
+    try {
+      const response = await axios.post(`${API_URL}/certificates/create`, certificateData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error creating certificate:", error);
+      throw error;
+    }
+  },
+
+  updateCertificate: async (certificateId, certificateData) => {
+    try {
+      const response = await axios.put(`${API_URL}/certificates/${certificateId}`, certificateData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating certificate ${certificateId}:`, error);
+      throw error;
+    }
+  },
+  deleteCertificate: async (certificateId) => {
+    try {
+      const response = await axios.delete(`${API_URL}/certificates/${certificateId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting certificate ${certificateId}:`, error);
+      throw error;
+    }
+  },
 };
