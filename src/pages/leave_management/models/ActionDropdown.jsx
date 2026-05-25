@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import {
   MoreHorizontal,
   MessageSquare,
@@ -47,7 +47,7 @@ const ActionDropdown = ({
       if (isChangeLeaveTypeOpen && employeeId) {
         setIsBalancesLoading(true);
         try {
-          const res = await axios.get(
+          const res = await api.get(
             `${BASE_URL}/api/leave-balance/employee/${employeeId}/${new Date().getFullYear()}`,
             { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
           );

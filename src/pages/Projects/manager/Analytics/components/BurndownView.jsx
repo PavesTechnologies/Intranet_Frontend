@@ -1,13 +1,14 @@
 import React, { useRef } from "react";
-import BurndownChart        from "./charts/BurndownChart";
-import VelocityMiniChart    from "./charts/VelocityMiniChart";
-import ScopeChangeMiniTable from "./ScopeChangeMiniTable";
-import DownloadMenu         from "./DownloadMenu";
+import BurndownChart          from "./charts/BurndownChart";
+import VelocityMiniChart      from "./charts/VelocityMiniChart";
+import ScopeChangeMiniTable   from "./ScopeChangeMiniTable";
+import DownloadMenu           from "./DownloadMenu";
 import {
-  downloadChartAsPNG,
-  downloadChartAsPDF,
-  downloadAsCSV,
+  downloadChartWithScopeAsPNG,
+  downloadChartWithScopeAsPDF,
+  downloadSectionedCSV,
   buildBurndownCSV,
+  buildScopeChangesSection,
 } from "../utils/downloadUtils";
 
 const BurndownView = ({
@@ -18,33 +19,33 @@ const BurndownView = ({
   sprintName,
   initialPoints,
   dailyBurnup = [],
+  sprintId,       // ← new
+  onRefetch,      // ← new
 }) => {
   const chartRef = useRef(null);
 
   const handlePNG = () =>
-    downloadChartAsPNG({ current: chartRef.current?.getCanvas() }, `${sprintName}_Burndown`);
+    downloadChartWithScopeAsPNG(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burndown`);
   const handlePDF = () =>
-    downloadChartAsPDF({ current: chartRef.current?.getCanvas() }, `${sprintName}_Burndown`);
+    downloadChartWithScopeAsPDF(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burndown`);
   const handleCSV = () => {
-    const { headers, data } = buildBurndownCSV(
-      burndownData
-        ? burndownData.labels.map((_, i) => ({
-            date:                 labels[i] ?? "",
-            sprintDayNumber:      i + 1,
-            idealCompletedPoints: initialPoints - (burndownData.idealRemaining[i] ?? 0),
-            completedPoints:
-              burndownData.actualRemaining[i] !== null
-                ? initialPoints - burndownData.actualRemaining[i]
-                : null,
-            velocityPoints:    velocityData[i] ?? null,
-            addedScopePoints:  null,
-            removedScopePoints:null,
-            isWeekend:         dailyBurnup[i]?.isWeekend ?? false,
-          }))
-        : [],
+    const chartSection = buildBurndownCSV(
+      dailyBurnup.map((d, i) => ({
+        date:                 labels[i] ?? new Date(d.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        sprintDayNumber:      d.sprintDayNumber ?? i + 1,
+        idealCompletedPoints: initialPoints - (d.idealRemainingPoints ?? 0),
+        completedPoints:      d.completedStoryPoints ?? null,
+        velocityPoints:       d.velocityPoints ?? null,
+        addedScopePoints:     d.addedScopePoints ?? null,
+        removedScopePoints:   d.removedScopePoints ?? null,
+        isWeekend:            d.isWeekend ?? false,
+      })),
       initialPoints
     );
-    downloadAsCSV(data, headers, `${sprintName}_Burndown`);
+    downloadSectionedCSV(
+      [{ title: "Burndown Data", ...chartSection }, buildScopeChangesSection(scopeChanges)],
+      `${sprintName}_Burndown`
+    );
   };
 
   return (
@@ -65,8 +66,8 @@ const BurndownView = ({
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
+      <div className="grid grid-cols-1 gap-4">
+        {/* <div className="bg-white border border-slate-200 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-slate-700 mb-3">
             Daily velocity (points completed)
           </h3>
@@ -75,9 +76,9 @@ const BurndownView = ({
             velocityData={velocityData}
             dailyBurnup={dailyBurnup}
           />
-        </div>
+        </div> */}
         <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-slate-700 mb-3">Recent scope changes</h3>
+          <h3 className="text-sm font-semibold text-slate-700 mb-4">Scope changes</h3>
           <ScopeChangeMiniTable scopeChanges={scopeChanges} />
         </div>
       </div>

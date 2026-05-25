@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { toast } from "react-toastify";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { PencilIcon } from "lucide-react";
 import EditLeaveModal from "./EditLeaveModal";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -57,7 +57,7 @@ const PendingLeaveRequestsTable = ({
 
       const empId = leaveToCancel.employee?.employeeId || employeeId;
 
-      await axios.put(
+      await api.put(
         `${BASE_URL}/api/leave-requests/${cancelId}/cancel/${empId}`,
         null,
         {

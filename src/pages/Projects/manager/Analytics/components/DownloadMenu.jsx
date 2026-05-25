@@ -25,7 +25,7 @@ const DownloadMenu = ({ onPNG, onPDF, onCSV }) => {
                    font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150"
       >
         <Download className="w-4 h-4" />
-        Download
+        
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
       </button>
 

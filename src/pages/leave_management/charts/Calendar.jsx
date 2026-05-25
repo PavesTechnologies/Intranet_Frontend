@@ -39,7 +39,7 @@
 //   useEffect(() => {
 //     const fetchHolidays = async () => {
 //       try {
-//         const res = await axios.get(
+//         const res = await api.get(
 //           `${window.__APP_CONFIG__.BASE_URL}/api/holidays/all`,
 //           {
 //             headers: { Authorization: `Bearer ${token}` },
@@ -181,7 +181,7 @@
 
 
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 
@@ -224,7 +224,7 @@ export default function Calendar() {
   useEffect(() => {
     const fetchHolidays = async () => {
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${window.__APP_CONFIG__.BASE_URL}/api/holidays/all`,
           {
             headers: { Authorization: `Bearer ${ localStorage.getItem("token")}` },

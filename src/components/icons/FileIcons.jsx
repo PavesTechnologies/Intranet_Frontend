@@ -1,6 +1,7 @@
 import { 
   File, 
-  Folder, 
+  Folder,
+  FolderOpen,
   FileText, 
   FileJson, 
   FileCode, 
@@ -18,6 +19,7 @@ import {
 export {
   File as FileIcon,
   Folder as FolderIcon,
+  FolderOpen as FolderOpenIcon,
   FileText as DocumentIcon,
   FileJson as JsonIcon,
   FileCode as CodeFileIcon,

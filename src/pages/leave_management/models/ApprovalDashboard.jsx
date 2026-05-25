@@ -6,7 +6,7 @@ import { ChevronRight } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import clearingDesk from "../../../components/icons/clearing-desk_emmv.svg";
 import ConfirmationModal from "./ConfirmationModal";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
@@ -84,7 +84,7 @@ const ApprovalDashboard = () => {
 
   const handleHolidayChange = async () => {
     try {
-      const res = axios.post(
+      const res = api.post(
         `${RMS_BASE_URL}/api/availability/trigger/holiday-change`,
         {},
         {
@@ -120,7 +120,7 @@ const ApprovalDashboard = () => {
       }
       await loadPendingApprovals();
     } catch (error) {
-      toast.error("Failed to approve request");
+      toast.error(error.response?.data?.message || "Failed to approve request");
       console.error("Failed to approve:", error);
     } finally {
       setIsConfirmationOpen(false);

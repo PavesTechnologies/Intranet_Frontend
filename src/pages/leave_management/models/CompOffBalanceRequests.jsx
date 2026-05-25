@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Check, X } from "lucide-react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
@@ -28,7 +28,7 @@ const CompOffBalanceRequests = ({ managerId }) => {
         setLoading(true);
 
         try {
-            const res = await axios.post(
+            const res = await api.post(
                 `${BASE_URL}/api/compoff/pending`,
                 { managerId },
                 { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
@@ -49,7 +49,7 @@ const CompOffBalanceRequests = ({ managerId }) => {
     const handleApprove = async (compoffId) => {
         setLoading(true);
         try {
-            await axios.put(
+            await api.put(
                 `${BASE_URL}/api/compoff/approve`,
                 { managerId, compoffId },
                 { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
@@ -66,7 +66,7 @@ const CompOffBalanceRequests = ({ managerId }) => {
     const handleReject = async (compoffId) => {
         setLoading(true);
         try {
-            await axios.put(
+            await api.put(
                 `${BASE_URL}/api/compoff/reject`,
                 { managerId, compoffId },
                 { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }

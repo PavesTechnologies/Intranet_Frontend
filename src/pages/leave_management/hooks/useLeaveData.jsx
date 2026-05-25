@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import SockJS from "sockjs-client";
 import { over } from "stompjs";
@@ -20,7 +20,7 @@ const useLeaveData = (employeeId, refreshKey, year) => {
     try {
       setLoading(true);
 
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/api/leave-requests/employee/${employeeId}/${year}`,
         {
           headers: {

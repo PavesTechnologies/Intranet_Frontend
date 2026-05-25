@@ -84,19 +84,31 @@ export const skillService = {
   },
 
   // Delete a skill (and potentially its subskills)
-  deleteSkill: async (id) => {
-    try {
-      const response = await axios.delete(`${API_URL}/resource-skills/skill/${id}`, {
+  deleteSkill: async (skillId) => {
+
+  try {
+
+    const response = await axios.delete(
+      `${API_URL}/skills/${skillId}`,
+      {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error deleting skill:", error);
-      throw error;
-    }
-  },
+      }
+    );
+
+    return response.data;
+
+  } catch (error) {
+
+    console.error(
+      "Error deleting skill:",
+      error
+    );
+
+    throw error;
+  }
+},
 
   // Save multiple skills (Bulk)
   saveBulkSkills: async (bulkData) => {
@@ -144,19 +156,30 @@ export const skillService = {
   },
 
   // Delete a sub-skill
-  deleteSubSkill: async (id) => {
-    try {
-      const response = await axios.delete(`${API_URL}/resource-sub-skills/${id}`, {
+ deleteSubSkill: async (subSkillId) => {
+  try {
+
+    const response = await axios.delete(
+      `${API_URL}/sub-skills/${subSkillId}`,
+      {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error deleting sub-skill:", error);
-      throw error;
-    }
-  },
+      }
+    );
+
+    return response.data;
+
+  } catch (error) {
+
+    console.error(
+      "Error deleting sub-skill:",
+      error
+    );
+
+    throw error;
+  }
+},
 
   getSkills: async () => {
     try {
@@ -172,6 +195,21 @@ export const skillService = {
     }
   },
 
+  // Delete a taxonomy skill (mapped to backend DELETE /skills/{skillId})
+  deleteTaxonomySkill: async (id) => {
+    try {
+      const response = await axios.delete(`${API_URL}/skills/${id}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting taxonomy skill:", error);
+      throw error;
+    }
+  },
+
   getSkillsByCategory: async (categoryId) => {
     try {
       const response = await axios.get(`${API_URL}/skills/category/${categoryId}`, {
@@ -182,6 +220,107 @@ export const skillService = {
       return response.data;
     } catch (error) {
       console.error(`Error fetching skills for category ${categoryId}:`, error);
+      throw error;
+    }
+  },
+
+  getCategoryDtos: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/skill-categories/dto`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching category DTOs:", error);
+      throw error;
+    }
+  },
+
+  deleteCategory: async (categoryId) => {
+    try {
+      const response = await axios.delete(`${API_URL}/skill-categories/${categoryId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      throw error;
+    }
+  },
+
+  downloadSkillTaxonomyExcel: async () => {
+
+  const response = await axios.get(
+    `${API_URL}/skill-categories/taxonomy/export`,
+    {
+      responseType: "blob",
+      headers: {
+        Authorization:
+          `Bearer ${localStorage.getItem("token")}`,
+      },
+    }
+  );
+
+  return response.data;
+},
+
+  getSkillsByCategoryDto: async (categoryId) => {
+    try {
+      const response = await axios.get(`${API_URL}/skill-categories/${categoryId}/skills-dto`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching skill DTOs for category ${categoryId}:`, error);
+      throw error;
+    }
+  },
+
+  getSubSkillsBySkillDto: async (skillId) => {
+    try {
+      const response = await axios.get(`${API_URL}/skill-categories/skills/${skillId}/subskills-dto`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching subskill DTOs for skill ${skillId}:`, error);
+      throw error;
+    }
+  },
+
+  saveSkillTaxonomy: async (taxonomyData) => {
+    try {
+      const response = await axios.post(`${API_URL}/skill-categories/taxonomy`, taxonomyData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error saving skill taxonomy:", error);
+      throw error;
+    }
+  },
+
+  uploadSkillTaxonomy: async (formData) => {
+    try {
+      const response = await axios.post(`${API_URL}/skill-categories/taxonomy/upload`, formData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error uploading skill taxonomy:", error);
       throw error;
     }
   },

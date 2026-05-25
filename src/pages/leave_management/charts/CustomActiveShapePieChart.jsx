@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import {
   PieChart,
   Pie,
@@ -83,7 +83,7 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
     const fetchLeaves = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(
+        const res = await api.get(
           `${BASE_URL}/api/leave-requests/employee/${employeeId}/${year}`,
           {
             headers: {

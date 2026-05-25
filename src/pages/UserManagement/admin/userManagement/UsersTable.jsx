@@ -161,14 +161,14 @@ export default function UsersTable() {
       setConfirming(true);
 
       if (actionType === "deactivate") {
-        await axios.delete(
+        await api.delete(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}`,
           { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
         );
 
         showStatusToast("User deactivated successfully.", "success");
       } else {
-        await axios.patch(
+        await api.patch(
           `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/uuid/${userToToggle}/activate`,
           {},
           { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
