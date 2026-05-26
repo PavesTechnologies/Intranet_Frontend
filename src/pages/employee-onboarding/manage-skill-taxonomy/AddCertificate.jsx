@@ -409,12 +409,15 @@ const ValidityToggle = ({ value, onChange }) => (
   </div>
 );
 
-const CertificateForm = ({ mode, onCancel, onSaved, certificates = [] }) => {
-  // support editing: props `initialCertificate` and `isEdit` will be passed by parent when editing
-  // We read them from arguments via rest props if provided
-  const args = arguments[0] || {};
-  const initialCertificate = args.initialCertificate || null;
-  const isEdit = Boolean(args.isEdit);
+const CertificateForm = ({
+  mode,
+  onCancel,
+  onSaved,
+  certificates = [],
+  initialCertificate = null,
+  isEdit = false,
+}) => {
+  const editing = Boolean(isEdit);
   const isGeneralCertificate = mode === "general";
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
@@ -592,7 +595,7 @@ const CertificateForm = ({ mode, onCancel, onSaved, certificates = [] }) => {
       const formProvider = normalize(form.providerName);
       const formSkillId = String(form.skillId || "");
       // If editing, skip comparing with the same certificate
-      if (isEdit && initialCertificate) {
+      if (editing && initialCertificate) {
         const currentId = String(getCertificateId(initialCertificate) || "");
         const thisId = String(getCertificateId(c) || "");
         if (currentId && thisId && currentId === thisId) return false;
@@ -624,7 +627,7 @@ const CertificateForm = ({ mode, onCancel, onSaved, certificates = [] }) => {
     setSaving(true);
     try {
       let response;
-      if (isEdit && initialCertificate) {
+      if (editing && initialCertificate) {
         const certId = getCertificateId(initialCertificate);
         response = await skillService.updateCertificate(certId, apiPayload);
         if (response?.success === false)
@@ -638,7 +641,7 @@ const CertificateForm = ({ mode, onCancel, onSaved, certificates = [] }) => {
       const savedCertificate = response?.data || {
         ...apiPayload,
         certificateId:
-          (isEdit &&
+          (editing &&
             initialCertificate &&
             getCertificateId(initialCertificate)) ||
           `temp-${Date.now()}`,
@@ -646,17 +649,17 @@ const CertificateForm = ({ mode, onCancel, onSaved, certificates = [] }) => {
       };
 
       notify.success(
-        isEdit
+        editing
           ? "Certificate updated successfully."
           : "Certificate saved successfully.",
       );
       setForm(initialForm);
       setErrors({});
-      onSaved(savedCertificate, { isEdit });
+      onSaved(savedCertificate, { isEdit: editing });
     } catch (error) {
       notify.error(
         error,
-        isEdit
+        editing
           ? "Unable to update certificate."
           : "Unable to save certificate.",
       );
@@ -757,6 +760,7 @@ const CertificateForm = ({ mode, onCancel, onSaved, certificates = [] }) => {
                   onChange={(event) =>
                     updateField("validityMonths", event.target.value)
                   }
+                  onWheel={(event) => event.currentTarget.blur()}
                   placeholder="e.g. 24"
                   error={errors.validityMonths}
                 />
@@ -1008,14 +1012,14 @@ const CertificateLanding = () => {
           <div className="border-b border-gray-100 px-5 py-5 sm:px-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
-                <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                {/* <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
                   {isGeneral ? (
                     <Sparkles className="h-3.5 w-3.5" />
                   ) : (
                     <ShieldCheck className="h-3.5 w-3.5" />
                   )}
                   Employee Skill Management
-                </div>
+                </div> */}
                 <h1 className="mt-3 text-2xl font-bold text-gray-950 sm:text-3xl">
                   {title}
                 </h1>
@@ -1059,12 +1063,12 @@ const CertificateLanding = () => {
               </span>{" "}
               records
             </div>
-            <div className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-600">
+            {/* <div className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-600">
               <span className="font-semibold text-gray-950">
                 {isGeneral ? "General" : "Skill"}
               </span>{" "}
               flow
-            </div>
+            </div> */}
           </div>
 
           {loading ? (
@@ -1104,9 +1108,9 @@ const CertificateLanding = () => {
                         Certificate Name
                       </th>
                       <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Provider / Organization
+                        {isGeneral ? "Provider / Organization" : "Provider"}
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                      <th className="px-4 py-2 pl-8 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                         Type
                       </th>
                       {!isGeneral ? (
