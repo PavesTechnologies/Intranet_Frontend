@@ -1,6 +1,8 @@
+
+
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mail, Phone, Building2, User, Camera, Bold, Italic, Underline,
@@ -18,6 +20,7 @@ import ConfirmationModal from "../../../components/confirmation_modal/Confirmati
 import SkillModal from "./SkillModal";
 import EditSkillModal from "./EditSkillModal";
 import { skillService } from "../../../services/skillService";
+import GlobalStatusBadge from "../../../components/status/statusbadge";
 
 /* ═══════════════════════════════════════════════════════════════════
    DESIGN SYSTEM  v3  —  Brand palette
@@ -566,6 +569,17 @@ function pf(name = "") {
   return "pf-beginner";
 }
 
+function formatSkillRequestDate(value) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    MAIN COMPONENT  (all state / API logic preserved exactly)
 ═══════════════════════════════════════════════════════════════════ */
@@ -591,6 +605,14 @@ export default function EmployeeProfileView() {
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [employeeSkills, setEmployeeSkills] = useState([]);
+  const [employeeSkillsLoading, setEmployeeSkillsLoading] = useState(false);
+  const [employeeSkillsError, setEmployeeSkillsError] = useState("");
+  const [skillPanelTab, setSkillPanelTab] = useState("skills");
+  const [mySkillRequests, setMySkillRequests] = useState([]);
+  const [mySkillRequestsLoading, setMySkillRequestsLoading] = useState(false);
+  const [mySkillRequestsError, setMySkillRequestsError] = useState("");
+  const [mySkillRequestsSearch, setMySkillRequestsSearch] = useState("");
+  const [mySkillRequestsStatus, setMySkillRequestsStatus] = useState("ALL");
   const [rawCertifications, setRawCertifications] = useState(null);
   const [expandedSkills, setExpandedSkills] = useState(new Set());
   const [selectedSkill, setSelectedSkill] = useState(null);
@@ -674,33 +696,74 @@ export default function EmployeeProfileView() {
   };
 
   const fetchEmployeeSkills = async (empId) => {
+    const targetId = empId || employee?.employee_id;
+    if (!targetId) return;
+    setEmployeeSkillsLoading(true);
+    setEmployeeSkillsError("");
     try {
-      const targetId = empId || employee?.employee_id;
-      if (!targetId) return;
       const res = await skillService.getEmployeeSkills(targetId);
-      const rawData = res?.data || [];
+      const rawData = Array.isArray(res?.data?.skills)
+        ? res.data.skills
+        : Array.isArray(res?.skills)
+          ? res.skills
+          : Array.isArray(res?.data)
+            ? res.data
+            : [];
       const mapped = rawData.map(item => ({
-        id: item.resourceSkillId || item.id,
-        categoryId: item.categoryId || item.skill?.category?.id || "",
-        categoryName: item.category || item.categoryName || "General",
+        id: item.employeeSkillId || item.resourceSkillId || item.id || item.skillId,
+        categoryId: item.categoryId || item.skill?.category?.id || item.category?.id || "",
+        categoryName: item.categoryName || item.category || item.skill?.category?.name || item.category?.name || "General",
         skillId: item.skillId || item.skill_id || item.skill?.id || "",
-        skillName: item.skillName || item.skill || "Unnamed Skill",
+        skillName: item.skillName || item.skill?.name || item.skill || "Unnamed Skill",
         skillProficiencyId: item.skillProficiencyCode || item.proficiencyId || item.skillProficiencyId || item.proficiency?.proficiencyId || "",
         proficiencyName: item.skillProficiency || item.proficiencyName || "Not Set",
+        status: item.status || item.skillStatus || "ACTIVE",
         subSkills: (item.subSkills || item.resourceSubSkills || []).map(ss => ({
-          id: ss.resourceSubSkillId || ss.id,
+          id: ss.employeeSubSkillId || ss.resourceSubSkillId || ss.id || ss.subSkillId,
           subSkillId: ss.subSkillId || ss.id || "",
-          name: ss.subSkill || ss.name,
-          proficiencyName: ss.proficiency || ss.proficiencyName,
-          proficiencyId: ss.proficiencyCode || ss.proficiencyId || ""
+          name: ss.subSkillName || ss.subSkill || ss.name || "Unnamed Subskill",
+          proficiencyName: ss.proficiency || ss.proficiencyName || "Not Set",
+          proficiencyId: ss.proficiencyCode || ss.proficiencyId || "",
+          status: ss.status || "ACTIVE"
         }))
       }));
       setEmployeeSkills(mapped);
     } catch (err) {
       console.error("Error fetching employee skills:", err);
+      setEmployeeSkillsError("Unable to load employee skills.");
       setEmployeeSkills([]);
+    } finally {
+      setEmployeeSkillsLoading(false);
     }
   };
+
+  const fetchMySkillRequests = async () => {
+    const resourceId = employee?.employee_id;
+    if (!resourceId) return;
+    setMySkillRequestsLoading(true);
+    setMySkillRequestsError("");
+    try {
+      const res = await skillService.getMySkillTaxonomyRequests(resourceId);
+      if (res?.success === false) {
+        throw new Error(res?.error || res?.message || "Unable to load skill requests.");
+      }
+      const rawData = Array.isArray(res?.data) ? res.data : [];
+      setMySkillRequests(rawData);
+    } catch (err) {
+      console.error("Error fetching my skill taxonomy requests:", err);
+      setMySkillRequestsError("Unable to load your skill requests.");
+      setMySkillRequests([]);
+      showStatusToast(err?.response?.data?.message || err.message || "Unable to load your skill requests.", "error");
+    } finally {
+      setMySkillRequestsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (skillPanelTab === "requests") {
+      fetchMySkillRequests();
+    }
+  }, [skillPanelTab]);
 
   const handleDeleteSkill = async (id) => {
     if (!window.confirm("Are you sure you want to remove this skill from the profile?")) return;
@@ -880,6 +943,24 @@ export default function EmployeeProfileView() {
 
   const formatText = (cmd) => document.execCommand(cmd, false, null);
   const handleProfileChange = (file) => { if (file) setProfileImg(URL.createObjectURL(file)); };
+
+  const filteredMySkillRequests = useMemo(() => {
+    const search = mySkillRequestsSearch.trim().toLowerCase();
+    const status = mySkillRequestsStatus;
+
+    return mySkillRequests.filter((request) => {
+      const matchesSearch = !search || [
+        request.skillName,
+        request.subskillName,
+        request.subSkillName,
+      ].filter(Boolean).some((value) => String(value).toLowerCase().includes(search));
+
+      const requestStatus = String(request.requestStatus || request.status || "").toUpperCase();
+      const matchesStatus = status === "ALL" || requestStatus === status;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [mySkillRequests, mySkillRequestsSearch, mySkillRequestsStatus]);
 
   /* ── LOADING SCREEN ── */
   if (!employee || hrData === null) {
@@ -1294,17 +1375,56 @@ value: (hrData?.education_documents || []).length,                             b
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => { setSelectedSkill(null); setIsSkillModalOpen(true); }}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5"
-                  style={{ background: "#ff3d72", color: "#fff", boxShadow: "0 2px 8px rgba(255,61,114,0.35)" }}>
-                  <Plus size={13} />Add Skill
-                </button>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <div className="inline-flex rounded-xl border border-white/10 bg-white/10 p-1">
+                    {[
+                      { key: "skills", label: "Skills" },
+                      { key: "requests", label: "My Requests" },
+                    ].map((tab) => {
+                      const isSelected = skillPanelTab === tab.key;
+                      return (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => setSkillPanelTab(tab.key)}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                            isSelected
+                              ? "bg-white text-[#081534] shadow-sm"
+                              : "text-white/70 hover:text-white"
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => { setSelectedSkill(null); setIsSkillModalOpen(true); }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5"
+                    style={{ background: "#ff3d72", color: "#fff", boxShadow: "0 2px 8px rgba(255,61,114,0.35)" }}>
+                    <Plus size={13} />Add Skill
+                  </button>
+                </div>
               </div>
 
               {/* Skills content */}
               <div className="p-5">
-                {employeeSkills.length > 0 ? (
+                {skillPanelTab === "skills" ? (
+                employeeSkillsLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-12 text-sm font-semibold text-slate-500">
+                    <Loader2 size={18} className="animate-spin" />
+                    Loading employee skills...
+                  </div>
+                ) : employeeSkillsError ? (
+                  <div className="flex flex-col items-center justify-center gap-3 py-10 rounded-2xl text-center"
+                    style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>
+                    <AlertCircle size={22} className="text-orange-500" />
+                    <p className="text-sm font-bold text-orange-700">{employeeSkillsError}</p>
+                    <button onClick={() => fetchEmployeeSkills()} className="epv3-btn">
+                      Retry
+                    </button>
+                  </div>
+                ) : employeeSkills.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {employeeSkills.map((record, idx) => {
                       const skillId = record.id || `skill-${idx}`;
@@ -1332,6 +1452,9 @@ value: (hrData?.education_documents || []).length,                             b
                               <span className={`hidden xs:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border text-[10px] font-bold uppercase ${pfClass}`}>
                                 <Check size={9} strokeWidth={3} />
                                 {record.proficiencyName || "Not Set"}
+                              </span>
+                              <span className="hidden md:inline-flex px-2 py-0.5 rounded-lg border border-emerald-100 bg-emerald-50 text-[9px] font-black uppercase text-emerald-700">
+                                {record.status || "ACTIVE"}
                               </span>
                               <div className="flex items-center gap-0.5 border-l border-slate-100 pl-2">
                                 <button
@@ -1369,6 +1492,12 @@ value: (hrData?.education_documents || []).length,                             b
                                     style={{ color: "#9ca3af" }}>
                                     Sub-Skill Specializations
                                   </p>
+                                  <div className="mb-3 grid grid-cols-2 gap-2 text-[10px] text-slate-500 sm:grid-cols-4">
+                                    <span><b>Category:</b> {record.categoryName || "General"}</span>
+                                    <span><b>Skill:</b> {record.skillName || "Unnamed Skill"}</span>
+                                    <span><b>Proficiency:</b> {record.proficiencyName || "Not Set"}</span>
+                                    <span><b>Status:</b> {record.status || "ACTIVE"}</span>
+                                  </div>
                                   <div className="flex flex-wrap gap-2">
                                     {(record.subSkills || []).length > 0
                                       ? record.subSkills.map((ss, i) => (
@@ -1377,6 +1506,9 @@ value: (hrData?.education_documents || []).length,                             b
                                           <span className="text-xs font-semibold" style={{ color: "#1e2a4a" }}>{ss.name}</span>
                                           <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${pf(ss.proficiencyName)}`}>
                                             {ss.proficiencyName}
+                                          </span>
+                                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 uppercase text-slate-500">
+                                            {ss.status || "ACTIVE"}
                                           </span>
                                         </div>
                                       ))
@@ -1409,6 +1541,89 @@ value: (hrData?.education_documents || []).length,                             b
                       className="epv3-btn mt-4">
                       <Plus size={13} />Add First Skill
                     </button>
+                  </div>
+                )) : (
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="relative w-full sm:max-w-xs">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          value={mySkillRequestsSearch}
+                          onChange={(event) => setMySkillRequestsSearch(event.target.value)}
+                          placeholder="Search skill or subskill"
+                          className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10"
+                        />
+                      </div>
+
+                      <select
+                        value={mySkillRequestsStatus}
+                        onChange={(event) => setMySkillRequestsStatus(event.target.value)}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none transition focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10"
+                      >
+                        <option value="ALL">All Statuses</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="APPROVED">Approved</option>
+                        <option value="REJECTED">Rejected</option>
+                      </select>
+                    </div>
+
+                    {mySkillRequestsLoading ? (
+                      <div className="flex items-center justify-center gap-2 py-12 text-sm font-semibold text-slate-500">
+                        <Loader2 size={18} className="animate-spin" />
+                        Loading your skill requests...
+                      </div>
+                    ) : mySkillRequestsError ? (
+                      <div className="flex flex-col items-center justify-center gap-3 py-10 rounded-2xl text-center"
+                        style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>
+                        <AlertCircle size={22} className="text-orange-500" />
+                        <p className="text-sm font-bold text-orange-700">{mySkillRequestsError}</p>
+                        <button onClick={fetchMySkillRequests} className="epv3-btn">
+                          Retry
+                        </button>
+                      </div>
+                    ) : filteredMySkillRequests.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-3">
+                        {filteredMySkillRequests.map((request) => {
+                          const status = String(request.requestStatus || request.status || "PENDING").toUpperCase();
+                          return (
+                            <div key={request.id} className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-300">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0">
+                                  <span className="text-[9px] font-black uppercase tracking-[0.12em]" style={{ color: "#9ca3af" }}>
+                                    {request.categoryName || "General"}
+                                  </span>
+                                  <p className="mt-1 text-sm font-bold text-slate-900">
+                                    {request.skillName || "Unnamed Skill"}
+                                  </p>
+                                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                                    Subskill: {request.subskillName || request.subSkillName || "--"}
+                                  </p>
+                                </div>
+                                <GlobalStatusBadge label={status} size="sm" />
+                              </div>
+
+                              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-100 pt-3 text-xs text-slate-600 sm:grid-cols-4">
+                                <span><b>Proficiency:</b> {request.proficiency || request.proficiencyName || "--"}</span>
+                                <span><b>Requested:</b> {formatSkillRequestDate(request.requestedAt)}</span>
+                                <span><b>Reviewed By:</b> {request.approvedBy || request.reviewedBy || "--"}</span>
+                                <span><b>Remarks:</b> {request.remarks || "--"}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 rounded-2xl text-center"
+                        style={{ background: "linear-gradient(135deg, #f8f9fe 0%, #eef1f9 100%)", border: "2px dashed #d8ddf0" }}>
+                        <div className="w-14 h-14 rounded-2xl mb-3 flex items-center justify-center"
+                          style={{ background: "linear-gradient(145deg, #081534, #263383)" }}>
+                          <Award size={22} className="text-white" />
+                        </div>
+                        <p className="epv3-display text-sm font-bold" style={{ color: "#0c1b45" }}>
+                          You have not submitted any skill requests yet.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1454,7 +1669,7 @@ value: (hrData?.education_documents || []).length,                             b
           employeeId={employee.employee_id}
           selectedSkill={null}
           onClose={() => setIsSkillModalOpen(false)}
-          onSaveSuccess={() => { fetchEmployeeSkills(); setIsSkillModalOpen(false); }}
+          onSaveSuccess={async () => { await fetchEmployeeSkills(); await fetchMySkillRequests(); setIsSkillModalOpen(false); }}
         />
       )}
       {isEditModalOpen && (
