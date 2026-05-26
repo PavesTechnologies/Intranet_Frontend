@@ -1,6 +1,11 @@
+
 import axios from "axios";
 
 const API_URL = window.__APP_CONFIG__.RMS_BASE_URL + "/api";
+
+const authHeaders = () => ({
+  Authorization: `Bearer ${localStorage.getItem("token")}`,
+});
 
 export const skillService = {
   // ✅ GET Categories
@@ -39,17 +44,91 @@ export const skillService = {
   getEmployeeSkills: async (employeeId) => {
     try {
       const response = await axios.get(
-        `${API_URL}/resource-skills/resource/${employeeId}/profile`,
+        `${API_URL}/employee-skills/${employeeId}`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          headers: authHeaders(),
         }
       );
       return response.data;
     } catch (error) {
       console.error("Error fetching employee skills:", error);
-      return { success: true, data: [] }; // prevent crash
+      throw error;
+    }
+  },
+
+  saveEmployeeSkills: async (payload) => {
+    try {
+      const response = await axios.post(`${API_URL}/employee-skills`, payload, {
+        headers: authHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error saving employee skills:", error);
+      throw error;
+    }
+  },
+
+  saveSkillTaxonomyRequest: async (payload) => {
+    try {
+      const response = await axios.post(`${API_URL}/skill-taxonomy/requests`, payload, {
+        headers: authHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error saving skill taxonomy request:", error);
+      throw error;
+    }
+  },
+
+  getSkillTaxonomyRequests: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/skill-taxonomy/requests`, {
+        headers: authHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching skill taxonomy requests:", error);
+      throw error;
+    }
+  },
+
+  getMySkillTaxonomyRequests: async (resourceId) => {
+    try {
+      const response = await axios.get(`${API_URL}/skill-taxonomy/requests/${resourceId}`, {
+        headers: authHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching my skill taxonomy requests:", error);
+      throw error;
+    }
+  },
+
+  approveSkillRequest: async (id, approvedBy) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/skill-taxonomy/requests/${id}/approve?approvedBy=${encodeURIComponent(approvedBy)}`,
+        {},
+        { headers: authHeaders() },
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error approving skill taxonomy request ${id}:`, error);
+      throw error;
+    }
+  },
+
+  rejectSkillRequest: async (id, remarks) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/skill-taxonomy/requests/${id}/reject`,
+        { remarks },
+        { headers: authHeaders() },
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error rejecting skill taxonomy request ${id}:`, error);
+      throw error;
     }
   },
 
@@ -242,3 +321,8 @@ export const skillService = {
     }
   },
 };
+
+
+
+
+
