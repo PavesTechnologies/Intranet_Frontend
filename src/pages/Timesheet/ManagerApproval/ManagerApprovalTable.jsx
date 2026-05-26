@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import api from "../../../api/axiosInstance";
 import { reviewTimesheet, handleBulkReview, handleMixedReview } from "../api";
 import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
@@ -53,16 +54,10 @@ const ManagerApprovalTable = ({
   useEffect(() => {
     const fetchProjectInfo = async () => {
       try {
-        const res = await fetch(
+        const res = await api.get(
           `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/project-info/all`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          },
         );
-        if (!res.ok) throw new Error("Failed to fetch project info");
-        const data = await res.json();
+        const data = res.data;
 
         const normalized = data.map((p) => ({
           projectId: p.projectId,
@@ -86,18 +81,11 @@ const ManagerApprovalTable = ({
   const fetchHolidayExcludedUsers = async () => {
     setHolidayLoading(true);
     try {
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
-      if (!res.ok) throw new Error("Failed to fetch holiday users");
-      const data = await res.json();
-      setHolidayData(data);
+      setHolidayData(res.data);
     } catch (err) {
       console.error("Error fetching holiday users:", err);
       showStatusToast("Failed to load holiday data", "error");
@@ -220,20 +208,11 @@ const ManagerApprovalTable = ({
         comments: reason || "Approved by manager",
       }));
 
-      const res = await fetch(
+      await api.post(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheets/review_multiple_users`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(requestPayload),
-        },
+        requestPayload,
       );
-
-      if (!res.ok) throw new Error("Bulk review failed");
 
       showStatusToast(
         `All submitted weeks ${status.toLowerCase()} successfully for ${user.userName
@@ -718,17 +697,10 @@ const ManagerApprovalTable = ({
 
     try {
       for (const id of selectedUsers) {
-        const res = await fetch(
+        await api.delete(
           `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holiday-exclude-users/${id}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          },
         );
-        if (!res.ok) throw new Error(`Failed to delete user ${id}`);
       }
 
       showStatusToast("Selected user(s) removed successfully!", "success");
@@ -756,25 +728,15 @@ const ManagerApprovalTable = ({
     }
 
     try {
-      const res = await fetch(
+      await api.post(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/create`,
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({
-            userId: parseInt(selectedAddUser, 10),
-            holidayDate: selectedHoliday,
-            reason,
-          }),
+          userId: parseInt(selectedAddUser, 10),
+          holidayDate: selectedHoliday,
+          reason,
         },
       );
-
-      if (!res.ok)
-        throw new Error("Failed to add user to holiday exclude list");
 
       showStatusToast(
         "User added to holiday exclusion successfully!",
@@ -799,35 +761,17 @@ const ManagerApprovalTable = ({
 
       // Run both API calls in parallel and wait for both to finish
       const [usersRes, holidaysRes] = await Promise.all([
-        fetch(
+        api.get(
           `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/manager/users`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          },
         ),
-        fetch(
+        api.get(
           `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/holidays/currentMonth`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          },
         ),
       ]);
 
-      if (!usersRes.ok || !holidaysRes.ok)
-        throw new Error("Failed to fetch data");
-
-      const [usersData, holidaysData] = await Promise.all([
-        usersRes.json(),
-        holidaysRes.json(),
-      ]);
-
-      setManagerUsers(usersData);
-      setMonthlyHolidays(holidaysData);
+      setManagerUsers(usersRes.data);
+      setMonthlyHolidays(holidaysRes.data);
     } catch (err) {
       console.error("Error loading add-user data:", err);
       showStatusToast("Failed to load user or holiday data", "error");
@@ -848,24 +792,15 @@ const ManagerApprovalTable = ({
     }
 
     try {
-      const res = await fetch(
+      await api.put(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/holiday-exclude-users/${selectedUpdateRecord.id}`,
         {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({
-            userId: selectedUpdateRecord.userId,
-            holidayDate: updateHoliday,
-            reason: updateReason,
-          }),
+          userId: selectedUpdateRecord.userId,
+          holidayDate: updateHoliday,
+          reason: updateReason,
         },
       );
-
-      if (!res.ok) throw new Error("Failed to update user record");
 
       showStatusToast("Holiday exclusion updated successfully!", "success");
       fetchHolidayExcludedUsers(); // refresh list

@@ -7,7 +7,7 @@ import { Pencil, Check, X, Trash2 } from "lucide-react";
 import { showStatusToast } from "../../components/toastfy/toast";
 import Button from "../../components/Button/Button";
 import { add } from "date-fns";
-import axios from "axios";
+import api from "../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { ConfirmDialog } from "./TimesheetGroup";
 
@@ -137,12 +137,9 @@ const EntriesTable = ({
 
     setDeleteLoading(true);
     try {
-      const deleteEntry = await axios.delete(
+      const deleteEntry = await api.delete(
         `${TS_BASE_URL}/api/timesheet/deleteEntries/${timesheetId}`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
           data: {
             entryIds: [tsId],
           },
