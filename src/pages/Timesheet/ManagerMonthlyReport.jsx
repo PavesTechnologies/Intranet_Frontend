@@ -6,7 +6,7 @@ import React, {
   useRef,
   useEffect,
 } from "react";
-import axios from "axios";
+import api from "../../api/axiosInstance";
 import FilterListbox from "../../components/filter/FilterListbox";
 import {
   Chart as ChartJS,
@@ -126,15 +126,9 @@ const ManagerMonthlyReport = () => {
   const canViewFinance = user?.permissions?.includes("VIEW_FINANCE_REPORT");
 
   useEffect(() => {
-    axios
-      .get(`${TS_BASE_URL}/api/project-info/all`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      })
-      .then((res) => {
-        setProjectInfo(res.data);
-      });
+    api.get(`${TS_BASE_URL}/api/project-info/all`).then((res) => {
+      setProjectInfo(res.data);
+    });
   }, []);
 
   const getProjectName = (pid) => {
@@ -156,12 +150,9 @@ const ManagerMonthlyReport = () => {
       setIsLoading(true);
       try {
         // Fetch data from the endpoint
-        const response = await axios.get(
+        const response = await api.get(
           `${TS_BASE_URL}/api/report/managerMonthly`,
           {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
             params: {
               month: appliedMonth,
               year: appliedYear,
@@ -274,12 +265,9 @@ const ManagerMonthlyReport = () => {
   const sendMailPDF = async () => {
     setMailLoading(true);
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${TS_BASE_URL}/api/report/managerMonthlyPdf`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
           params: {
             month: appliedMonth,
             year: appliedYear,

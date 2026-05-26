@@ -8,7 +8,7 @@ import TimesheetHeader from "../TimesheetHeader";
 // import { getManagerDashboardData } from "../api";
 import { useMemo } from "react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { CheckCircle, XCircle } from "lucide-react";
 import { ArrowLeft } from "lucide-react";
@@ -43,19 +43,12 @@ const AdminApprovalPage = () => {
   // ✅ Fetch Timesheets
   const fetchGroupedTimesheets = async () => {
     try {
-      const response = await fetch(
+      const response = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheets/internal/summary`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
 
-      if (!response.ok) throw new Error("Failed to fetch timesheets");
-
-      const data = await response.json();
+      const data = response.data;
       setGroupedTimesheets(data);
       setFilteredTimesheets(data);
       setLoading(false);
@@ -78,13 +71,8 @@ const AdminApprovalPage = () => {
 
   const fetchEmailUsers = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/users`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
       setEmailOptions(res.data);
     } catch (err) {
@@ -95,13 +83,8 @@ const AdminApprovalPage = () => {
 
   const fetchEmail = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/emailSettings`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
       console.log(res);
       setEmailData(res.data[0]);
@@ -217,15 +200,10 @@ const AdminApprovalPage = () => {
       return;
     }
     try {
-      await axios.put(
+      await api.put(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/emailSettings/${emailData.id
         }`,
         { email: editValue },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
       setIsEditing(false);
       setEmailData({ ...emailData, email: editValue });

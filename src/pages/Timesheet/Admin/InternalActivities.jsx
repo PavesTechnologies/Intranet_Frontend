@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { Pencil, CheckCircle, XCircle, Trash2 } from "lucide-react";
@@ -19,15 +19,10 @@ const InternalActivities = () => {
   const fetchInternalActivities = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${
           window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/internal-projects/all`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
       setInternalActivities(res.data);
     } catch (err) {
@@ -47,17 +42,12 @@ const InternalActivities = () => {
     }
     setLoading(true);
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${
           window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/internal-projects/create`,
         {
           taskName: newTaskName,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
         },
       );
       setNewTaskName("");
@@ -94,16 +84,11 @@ const InternalActivities = () => {
     }
     setLoading(true);
     try {
-      const res = await axios.put(
+      const res = await api.put(
         `${
           window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/internal-projects/${id}`,
         { taskName: tempTaskName },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
       setEditingTaskId(null);
       setTempTaskName("");
@@ -129,15 +114,10 @@ const InternalActivities = () => {
 
     setLoading(true);
     try {
-      const res = await axios.delete(
+      const res = await api.delete(
         `${
           window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/internal-projects/${id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
       setEditingTaskId(null);
       setTempTaskName("");
