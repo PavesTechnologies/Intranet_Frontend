@@ -89,17 +89,27 @@ const RequestStatusBadge = ({ status }) => {
   return <GlobalStatusBadge label={normalizedStatus} size="sm" />;
 };
 
-const ActionButton = ({ onClick, icon: Icon, variant = "edit", label }) => (
+const ActionButton = ({
+  onClick,
+  icon: Icon,
+  variant = "edit",
+  label,
+  disabled = false,
+}) => (
   <Button
     type="button"
-    onClick={onClick}
+    onClick={disabled ? undefined : onClick}
+    disabled={disabled}
     aria-label={label}
+    title={disabled ? "Inactive items cannot be edited or deleted" : label}
     variant="ghost"
     size="icon"
     className={`h-8 w-8 shadow-none ${
-      variant === "edit"
-        ? "text-indigo-600 hover:bg-indigo-50"
-        : "text-rose-600 hover:bg-rose-50"
+      disabled
+        ? "cursor-not-allowed text-gray-300"
+        : variant === "edit"
+          ? "text-indigo-600 hover:bg-indigo-50"
+          : "text-rose-600 hover:bg-rose-50"
     }`}
   >
     <Icon className="h-3.5 w-3.5" />
@@ -1029,6 +1039,8 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleEditCategory = async (category) => {
+    if (!category.active) return;
+
     try {
       const hydratedCategory = await ensureCategoryHydrated(category);
       openDraftEditor({
@@ -1051,6 +1063,8 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleEditSkill = async (category, skill) => {
+    if (!skill.active) return;
+
     try {
       const hydratedCategory = await ensureCategoryHydrated(category);
       const matchedSkill = hydratedCategory.skills.find(
@@ -1102,6 +1116,8 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleDeleteCategory = (category) => {
+    if (!category.active) return;
+
     setDeleteModal({
       open: true,
       type: "category",
@@ -1112,6 +1128,8 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleDeleteSkill = (category, skill) => {
+    if (!skill.active) return;
+
     setDeleteModal({
       open: true,
       type: "skill",
@@ -1122,6 +1140,8 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleDeleteSubSkill = (category, skill, subSkill) => {
+    if (!subSkill.active) return;
+
     setDeleteModal({
       open: true,
       type: "subskill",
@@ -1150,8 +1170,7 @@ const ManageSkillTaxonomy = () => {
 
         setCategories((current) =>
           current.filter(
-            (category) =>
-              String(category.id) !== String(deleteModal.category.id),
+            (category) => String(category.id) !== String(deleteModal.category.id),
           ),
         );
         setExpandedCategories((current) => {
@@ -1186,8 +1205,11 @@ const ManageSkillTaxonomy = () => {
             String(c.id) === String(deleteModal.category.id)
               ? {
                   ...c,
-                  skills: (c.skills || []).filter(
-                    (s) => String(s.id) !== String(deleteModal.skill.id),
+                  skills: (c.skills || []).map(
+                    (s) =>
+                      String(s.id) === String(deleteModal.skill.id)
+                        ? { ...s, active: false }
+                        : s,
                   ),
                 }
               : c,
@@ -1219,9 +1241,11 @@ const ManageSkillTaxonomy = () => {
                     String(s.id) === String(deleteModal.skill.id)
                       ? {
                           ...s,
-                          subSkills: (s.subSkills || []).filter(
+                          subSkills: (s.subSkills || []).map(
                             (ss) =>
-                              String(ss.id) !== String(deleteModal.subSkill.id),
+                              String(ss.id) === String(deleteModal.subSkill.id)
+                                ? { ...ss, active: false }
+                                : ss,
                           ),
                         }
                       : s,
@@ -1253,6 +1277,8 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleEditSubSkill = async (category, skill, subSkill) => {
+    if (!subSkill.active) return;
+
     try {
       const hydratedCategory = await ensureCategoryHydrated(category);
       const matchedSkill = hydratedCategory.skills.find(
@@ -1538,12 +1564,14 @@ const ManageSkillTaxonomy = () => {
                           icon={EditIcon}
                           variant="edit"
                           label={`Edit ${category.name}`}
+                          disabled={!category.active}
                         />
                         <ActionButton
                           onClick={(e) => { e.stopPropagation(); handleDeleteCategory(category); }}
                           icon={DeleteIcon}
                           variant="delete"
                           label={`Delete ${category.name}`}
+                          disabled={!category.active}
                         />
                         <GlobalStatusBadge label={category.active ? "Active" : "Inactive"} size="sm" />
                       </div>
@@ -1638,12 +1666,14 @@ const ManageSkillTaxonomy = () => {
                                           icon={EditIcon}
                                           variant="edit"
                                           label={`Edit ${skill.name}`}
+                                          disabled={!skill.active}
                                         />
                                         <ActionButton
                                           onClick={(e) => { e.stopPropagation(); handleDeleteSkill(category, skill); }}
                                           icon={DeleteIcon}
                                           variant="delete"
                                           label={`Delete ${skill.name}`}
+                                          disabled={!skill.active}
                                         />
                                         <GlobalStatusBadge label={skill.active ? "Active" : "Inactive"} size="sm" />
                                       </div>
@@ -1703,20 +1733,36 @@ const ManageSkillTaxonomy = () => {
                                                       {subSkill.description || "No description available"}
                                                     </p>
                                                   </div>
-                                                  <div className="flex shrink-0 items-center gap-1.5">
+                                                  <div className="flex items-center gap-2">
                                                     <ActionButton
-                                                      onClick={() => handleEditSubSkill(category, skill, subSkill)}
+                                                      onClick={() =>
+                                                        handleEditSubSkill(
+                                                          category,
+                                                          skill,
+                                                          subSkill,
+                                                        )
+                                                      }
                                                       icon={EditIcon}
                                                       variant="edit"
                                                       label={`Edit ${subSkill.name}`}
+                                                      disabled={!subSkill.active}
                                                     />
                                                     <ActionButton
-                                                      onClick={() => handleDeleteSubSkill(category, skill, subSkill)}
+                                                      onClick={() =>
+                                                        handleDeleteSubSkill(
+                                                          category,
+                                                          skill,
+                                                          subSkill,
+                                                        )
+                                                      }
                                                       icon={DeleteIcon}
                                                       variant="delete"
                                                       label={`Delete ${subSkill.name}`}
+                                                      disabled={!subSkill.active}
                                                     />
-                                                    <GlobalStatusBadge label={subSkill.active ? "Active" : "Inactive"} size="sm" />
+                                                    <StatusBadge
+                                                      active={subSkill.active}
+                                                    />
                                                   </div>
                                                 </div>
                                               ));
