@@ -163,19 +163,31 @@ export const skillService = {
   },
 
   // Delete a skill (and potentially its subskills)
-  deleteSkill: async (id) => {
-    try {
-      const response = await axios.delete(`${API_URL}/resource-skills/skill/${id}`, {
+  deleteSkill: async (skillId) => {
+
+  try {
+
+    const response = await axios.delete(
+      `${API_URL}/skills/${skillId}`,
+      {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error deleting skill:", error);
-      throw error;
-    }
-  },
+      }
+    );
+
+    return response.data;
+
+  } catch (error) {
+
+    console.error(
+      "Error deleting skill:",
+      error
+    );
+
+    throw error;
+  }
+},
 
   // Save multiple skills (Bulk)
   saveBulkSkills: async (bulkData) => {
@@ -223,19 +235,30 @@ export const skillService = {
   },
 
   // Delete a sub-skill
-  deleteSubSkill: async (id) => {
-    try {
-      const response = await axios.delete(`${API_URL}/resource-sub-skills/${id}`, {
+ deleteSubSkill: async (subSkillId) => {
+  try {
+
+    const response = await axios.delete(
+      `${API_URL}/sub-skills/${subSkillId}`,
+      {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error deleting sub-skill:", error);
-      throw error;
-    }
-  },
+      }
+    );
+
+    return response.data;
+
+  } catch (error) {
+
+    console.error(
+      "Error deleting sub-skill:",
+      error
+    );
+
+    throw error;
+  }
+},
 
   getSkills: async () => {
     try {
@@ -247,6 +270,21 @@ export const skillService = {
       return response.data;
     } catch (error) {
       console.error("Error fetching skills:", error);
+      throw error;
+    }
+  },
+
+  // Delete a taxonomy skill (mapped to backend DELETE /skills/{skillId})
+  deleteTaxonomySkill: async (id) => {
+    try {
+      const response = await axios.delete(`${API_URL}/skills/${id}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting taxonomy skill:", error);
       throw error;
     }
   },
@@ -278,6 +316,36 @@ export const skillService = {
       throw error;
     }
   },
+
+  deleteCategory: async (categoryId) => {
+    try {
+      const response = await axios.delete(`${API_URL}/skill-categories/${categoryId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      throw error;
+    }
+  },
+
+  downloadSkillTaxonomyExcel: async () => {
+
+  const response = await axios.get(
+    `${API_URL}/skill-categories/taxonomy/export`,
+    {
+      responseType: "blob",
+      headers: {
+        Authorization:
+          `Bearer ${localStorage.getItem("token")}`,
+      },
+    }
+  );
+
+  return response.data;
+},
 
   getSkillsByCategoryDto: async (categoryId) => {
     try {
@@ -317,6 +385,118 @@ export const skillService = {
       return response.data;
     } catch (error) {
       console.error("Error saving skill taxonomy:", error);
+      throw error;
+    }
+  },
+
+  uploadSkillTaxonomy: async (formData) => {
+    try {
+      const response = await axios.post(`${API_URL}/skill-categories/taxonomy/upload`, formData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error uploading skill taxonomy:", error);
+      throw error;
+    }
+  },
+
+  getAllCategories: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/skill-categories`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching all categories:", error);
+      throw error;
+    }
+  },
+
+  getCertificates: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/certificates`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching certificates:", error);
+      throw error;
+    }
+  },
+
+  getCertificateById: async (certificateId) => {
+    try {
+      const response = await axios.get(`${API_URL}/certificates/${certificateId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching certificate ${certificateId}:`, error);
+      throw error;
+    }
+  },
+
+  getCertificationSkillsByCategory: async (categoryId) => {
+    try {
+      const response = await axios.get(`${API_URL}/certificates/category/${categoryId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching certification skills for category ${categoryId}:`, error);
+      throw error;
+    }
+  },
+
+  createCertificate: async (certificateData) => {
+    try {
+      const response = await axios.post(`${API_URL}/certificates/create`, certificateData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error creating certificate:", error);
+      throw error;
+    }
+  },
+
+  updateCertificate: async (certificateId, certificateData) => {
+    try {
+      const response = await axios.put(`${API_URL}/certificates/${certificateId}`, certificateData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating certificate ${certificateId}:`, error);
+      throw error;
+    }
+  },
+  deleteCertificate: async (certificateId) => {
+    try {
+      const response = await axios.delete(`${API_URL}/certificates/${certificateId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting certificate ${certificateId}:`, error);
       throw error;
     }
   },

@@ -7,7 +7,7 @@ import {
   CheckIcon,
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import DateRangePicker from "./DateRangePicker";
 import { format } from "date-fns";
@@ -304,16 +304,16 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
       setLoading(true);
 
       const [projRes, ltRes, ltIdsRes, blocksRes] = await Promise.all([
-        axios.get(`${PMS_BASE_URL}/api/projects/owner/${employeeId}`, {
+        api.get(`${PMS_BASE_URL}/api/projects/owner/${employeeId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }),
-        axios.get(`${BASE_URL}/api/leave/types`, {
+        api.get(`${BASE_URL}/api/leave/types`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }),
-        axios.get(`${BASE_URL}/api/leave/get-all-leave-type-ids`, {
+        api.get(`${BASE_URL}/api/leave/get-all-leave-type-ids`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }),
-        axios.get(`${BASE_URL}/api/leave-block/blocked-leaves/${employeeId}`, {
+        api.get(`${BASE_URL}/api/leave-block/blocked-leaves/${employeeId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }),
       ]);
@@ -364,7 +364,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
       const memberEntries = await Promise.all(
         uniqueProjectIds.map(async (pid) => {
           try {
-            const res = await axios.get(
+            const res = await api.get(
               `${PMS_BASE_URL}/api/projects/${pid}/members`,
               {
                 headers: {
@@ -508,7 +508,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
   const fetchHolidays = async () => {
     try {
       const year = new Date().getFullYear();
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/api/holidays/by-location/${year}`,
         {
           params: { state: "All", country: "India" },
@@ -533,7 +533,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
     const key = String(pid);
     if (membersMap.has(key)) return;
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${PMS_BASE_URL}/api/projects/${key}/members`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -612,7 +612,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
   //       };
 
   //       // Adjust method/URL to your backend
-  //       const res = await axios.post(`${BASE_URL}/api/leave-block/unblock`, payload, {
+  //       const res = await api.post(`${BASE_URL}/api/leave-block/unblock`, payload, {
   //         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
   //       });
   //       if (!res.data?.success) {
@@ -672,7 +672,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
 
   //       console.log("🔹 Unblock Payload:", payload);
 
-  //       await axios.post(`${BASE_URL}/api/leave-block/unblock`, payload, {
+  //       await api.post(`${BASE_URL}/api/leave-block/unblock`, payload, {
   //         headers: {
   //           Authorization: `Bearer ${localStorage.getItem("token")}`,
   //         },
@@ -691,7 +691,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
 
   //       console.log("🟦 Update Block Payload:", updatePayload);
 
-  //       await axios.put(
+  //       await api.put(
   //         `${BASE_URL}/api/leave-block/update/${blockId}`,
   //         updatePayload,
   //         {
@@ -737,7 +737,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
   //     console.log("🟦 Update Block Payload:", payload);
 
   //     // PUT update call (single API)
-  //     await axios.put(`${BASE_URL}/api/leave-block/update/${blockId}`, payload, {
+  //     await api.put(`${BASE_URL}/api/leave-block/update/${blockId}`, payload, {
   //       headers: {
   //         Authorization: `Bearer ${localStorage.getItem("token")}`,
   //       },
@@ -781,7 +781,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
     // console.log("📌 Final API Payload →", payload);
 
     try {
-      await axios.patch(
+      await api.patch(
         `${BASE_URL}/api/leave-block/update/${blockId}`,
         payload,
         {
@@ -804,7 +804,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
     setUnblockingId(id);
     try {
       // Using provided deactivate endpoint
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE_URL}/api/leave-block/deactivate/${id}`,
         null,
         {

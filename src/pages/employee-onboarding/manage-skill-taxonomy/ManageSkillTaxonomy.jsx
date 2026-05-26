@@ -4,6 +4,7 @@ import {
   ChevronRightIcon,
   CloseIcon,
   DeleteIcon,
+  DownloadIcon,
   EditIcon,
   FolderOpenIcon,
   JobIcon,
@@ -21,6 +22,7 @@ import SkillManagementModal from "../../resource_management/models/skill_managem
 import { skillService } from "../../../services/skillService";
 import { notify } from "../../resource_management/utils/notify";
 import { useAuth } from "../../../contexts/AuthContext";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
 const normalize = (value) => `${value || ""}`.trim().toLowerCase();
 
@@ -541,6 +543,16 @@ const ManageSkillTaxonomy = () => {
   const [searchHydrating, setSearchHydrating] = useState(false);
   const [skillManagementDraft, setSkillManagementDraft] = useState(null);
   const [skillManagementDraftKey, setSkillManagementDraftKey] = useState("");
+  const [downloadingTaxonomy, setDownloadingTaxonomy] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    type: null,
+    category: null,
+    skill: null,
+    subSkill: null,
+  });
+
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   /* ── Requests state ── */
   const [requests, setRequests] = useState([]);
@@ -575,7 +587,10 @@ const ManageSkillTaxonomy = () => {
       if (!response?.success) {
         throw new Error(response?.error || "Unable to load categories.");
       }
-      setCategories(Array.isArray(response.data) ? response.data.map(mapCategoryDto) : []);
+
+      setCategories(
+        Array.isArray(response.data) ? response.data.map(mapCategoryDto) : [],
+      );
       setExpandedCategories({});
       setExpandedSkills({});
       setSkillFilters({});
@@ -786,7 +801,12 @@ const ManageSkillTaxonomy = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab !== "taxonomy" || !searchTerm.trim() || categories.length === 0) return;
+    if (
+      activeTab !== "taxonomy" ||
+      !searchTerm.trim() ||
+      categories.length === 0
+    )
+      return;
 
     let cancelled = false;
 
@@ -798,7 +818,9 @@ const ManageSkillTaxonomy = () => {
       if (categoriesNeedingSkills.length === 0) {
         const skillsNeedingSubSkills = categories.flatMap((category) =>
           (category.skills || [])
-            .filter((skill) => !skill.subSkillsLoaded && !skill.subSkillsLoading)
+            .filter(
+              (skill) => !skill.subSkillsLoaded && !skill.subSkillsLoading,
+            )
             .map((skill) => ({ categoryId: category.id, skill })),
         );
         if (skillsNeedingSubSkills.length === 0) return;
@@ -811,17 +833,30 @@ const ManageSkillTaxonomy = () => {
           categories.map(async (category) => {
             if (category.skillsLoaded) return category;
             try {
-              const response = await skillService.getSkillsByCategoryDto(category.id);
-              if (!response?.success) throw new Error(response?.error || "Unable to load skills.");
+              const response = await skillService.getSkillsByCategoryDto(
+                category.id,
+              );
+              if (!response?.success) {
+                throw new Error(response?.error || "Unable to load skills.");
+              }
+
               return {
                 ...category,
-                skills: Array.isArray(response.data) ? response.data.map(mapSkillDto) : [],
+                skills: Array.isArray(response.data)
+                  ? response.data.map(mapSkillDto)
+                  : [],
                 skillsLoaded: true,
                 skillsLoading: false,
               };
             } catch (error) {
-              notify.error(error, `Unable to load skills for ${category.name}.`);
-              return { ...category, skillsLoading: false };
+              notify.error(
+                error,
+                `Unable to load skills for ${category.name}.`,
+              );
+              return {
+                ...category,
+                skillsLoading: false,
+              };
             }
           }),
         );
@@ -832,17 +867,32 @@ const ManageSkillTaxonomy = () => {
               (category.skills || []).map(async (skill) => {
                 if (skill.subSkillsLoaded) return skill;
                 try {
-                  const response = await skillService.getSubSkillsBySkillDto(skill.id);
-                  if (!response?.success) throw new Error(response?.error || "Unable to load subskills.");
+                  const response = await skillService.getSubSkillsBySkillDto(
+                    skill.id,
+                  );
+                  if (!response?.success) {
+                    throw new Error(
+                      response?.error || "Unable to load subskills.",
+                    );
+                  }
+
                   return {
                     ...skill,
-                    subSkills: Array.isArray(response.data) ? response.data.map(mapSubSkillDto) : [],
+                    subSkills: Array.isArray(response.data)
+                      ? response.data.map(mapSubSkillDto)
+                      : [],
                     subSkillsLoaded: true,
                     subSkillsLoading: false,
                   };
                 } catch (error) {
-                  notify.error(error, `Unable to load subskills for ${skill.name}.`);
-                  return { ...skill, subSkillsLoading: false };
+                  notify.error(
+                    error,
+                    `Unable to load subskills for ${skill.name}.`,
+                  );
+                  return {
+                    ...skill,
+                    subSkillsLoading: false,
+                  };
                 }
               }),
             );
@@ -863,7 +913,9 @@ const ManageSkillTaxonomy = () => {
   const updateCategory = (categoryId, updater) => {
     setCategories((current) =>
       current.map((category) =>
-        String(category.id) === String(categoryId) ? updater(category) : category,
+        String(category.id) === String(categoryId)
+          ? updater(category)
+          : category,
       ),
     );
   };
@@ -886,10 +938,15 @@ const ManageSkillTaxonomy = () => {
     updateCategory(category.id, (c) => ({ ...c, skillsLoading: true }));
     try {
       const response = await skillService.getSkillsByCategoryDto(category.id);
-      if (!response?.success) throw new Error(response?.error || "Unable to load skills.");
-      updateCategory(category.id, (c) => ({
-        ...c,
-        skills: Array.isArray(response.data) ? response.data.map(mapSkillDto) : [],
+      if (!response?.success) {
+        throw new Error(response?.error || "Unable to load skills.");
+      }
+
+      updateCategory(category.id, (currentCategory) => ({
+        ...currentCategory,
+        skills: Array.isArray(response.data)
+          ? response.data.map(mapSkillDto)
+          : [],
         skillsLoaded: true,
         skillsLoading: false,
       }));
@@ -908,10 +965,15 @@ const ManageSkillTaxonomy = () => {
     updateSkill(categoryId, skill.id, (s) => ({ ...s, subSkillsLoading: true }));
     try {
       const response = await skillService.getSubSkillsBySkillDto(skill.id);
-      if (!response?.success) throw new Error(response?.error || "Unable to load subskills.");
-      updateSkill(categoryId, skill.id, (s) => ({
-        ...s,
-        subSkills: Array.isArray(response.data) ? response.data.map(mapSubSkillDto) : [],
+      if (!response?.success) {
+        throw new Error(response?.error || "Unable to load subskills.");
+      }
+
+      updateSkill(categoryId, skill.id, (currentSkill) => ({
+        ...currentSkill,
+        subSkills: Array.isArray(response.data)
+          ? response.data.map(mapSubSkillDto)
+          : [],
         subSkillsLoaded: true,
         subSkillsLoading: false,
       }));
@@ -929,8 +991,12 @@ const ManageSkillTaxonomy = () => {
 
   const fetchSubSkillDtos = async (skillId) => {
     const response = await skillService.getSubSkillsBySkillDto(skillId);
-    if (!response?.success) throw new Error(response?.error || "Unable to load subskills.");
-    return Array.isArray(response.data) ? response.data.map(mapSubSkillDto) : [];
+    if (!response?.success) {
+      throw new Error(response?.error || "Unable to load subskills.");
+    }
+    return Array.isArray(response.data)
+      ? response.data.map(mapSubSkillDto)
+      : [];
   };
 
   const ensureCategoryHydrated = async (category) => {
@@ -957,7 +1023,9 @@ const ManageSkillTaxonomy = () => {
 
   const openDraftEditor = (draft) => {
     setSkillManagementDraft(draft);
-    setSkillManagementDraftKey(`${draft.scope}-${draft.categoryId || "new"}-${Date.now()}`);
+    setSkillManagementDraftKey(
+      `${draft.scope}-${draft.categoryId || "new"}-${Date.now()}`,
+    );
     setOpenSkillManagement(true);
   };
 
@@ -1011,6 +1079,210 @@ const ManageSkillTaxonomy = () => {
     }
   };
 
+  const handleDownloadTaxonomy = async () => {
+    try {
+      setDownloadingTaxonomy(true);
+
+      const blob = await skillService.downloadSkillTaxonomyExcel();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = "skill-taxonomy.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      notify.success("Skill taxonomy downloaded successfully.");
+    } catch (error) {
+      notify.error(error, "Failed to download taxonomy.");
+    } finally {
+      setDownloadingTaxonomy(false);
+    }
+  };
+
+  const handleDeleteCategory = (category) => {
+    setDeleteModal({
+      open: true,
+      type: "category",
+      category,
+      skill: null,
+      subSkill: null,
+    });
+  };
+
+  const handleDeleteSkill = (category, skill) => {
+    setDeleteModal({
+      open: true,
+      type: "skill",
+      category,
+      skill,
+      subSkill: null,
+    });
+  };
+
+  const handleDeleteSubSkill = (category, skill, subSkill) => {
+    setDeleteModal({
+      open: true,
+      type: "subskill",
+      category,
+      skill,
+      subSkill,
+    });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+
+      // ==========================================
+      // DELETE CATEGORY
+      // ==========================================
+
+      if (deleteModal.type === "category") {
+        const response = await skillService.deleteCategory(
+          deleteModal.category.id,
+        );
+
+        if (!response?.success) {
+          throw new Error(response?.error || "Category deletion failed.");
+        }
+
+        setCategories((current) =>
+          current.filter(
+            (category) =>
+              String(category.id) !== String(deleteModal.category.id),
+          ),
+        );
+        setExpandedCategories((current) => {
+          const next = { ...current };
+          delete next[deleteModal.category.id];
+          return next;
+        });
+        setSkillFilters((current) => {
+          const next = { ...current };
+          delete next[deleteModal.category.id];
+          return next;
+        });
+
+        notify.success(response?.message || "Category deleted successfully.");
+      }
+
+      // ==========================================
+      // DELETE SKILL
+      // ==========================================
+
+      if (deleteModal.type === "skill") {
+        const response = await skillService.deleteTaxonomySkill(
+          deleteModal.skill.id,
+        );
+
+        if (!response?.success) {
+          throw new Error(response?.error || "Skill deletion failed.");
+        }
+
+        setCategories((current) =>
+          current.map((c) =>
+            String(c.id) === String(deleteModal.category.id)
+              ? {
+                  ...c,
+                  skills: (c.skills || []).filter(
+                    (s) => String(s.id) !== String(deleteModal.skill.id),
+                  ),
+                }
+              : c,
+          ),
+        );
+
+        notify.success(response?.message || "Skill deleted successfully.");
+      }
+
+      // ==========================================
+      // DELETE SUBSKILL
+      // ==========================================
+
+      if (deleteModal.type === "subskill") {
+        const response = await skillService.deleteSubSkill(
+          deleteModal.subSkill.id,
+        );
+
+        if (!response?.success) {
+          throw new Error(response?.error || "Subskill deletion failed.");
+        }
+
+        setCategories((current) =>
+          current.map((c) =>
+            String(c.id) === String(deleteModal.category.id)
+              ? {
+                  ...c,
+                  skills: (c.skills || []).map((s) =>
+                    String(s.id) === String(deleteModal.skill.id)
+                      ? {
+                          ...s,
+                          subSkills: (s.subSkills || []).filter(
+                            (ss) =>
+                              String(ss.id) !== String(deleteModal.subSkill.id),
+                          ),
+                        }
+                      : s,
+                  ),
+                }
+              : c,
+          ),
+        );
+
+        notify.success(response?.message || "Subskill deleted successfully.");
+      }
+
+      // ==========================================
+      // CLOSE MODAL
+      // ==========================================
+
+      setDeleteModal({
+        open: false,
+        type: null,
+        category: null,
+        skill: null,
+        subSkill: null,
+      });
+    } catch (error) {
+      notify.error(error, "Unable to delete.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  {
+    /* <ConfirmationModal
+  isOpen={deleteModal.open}
+  title={
+    deleteModal.type === "skill"
+      ? "Delete Skill"
+      : "Delete SubSkill"
+  }
+  message={
+    deleteModal.type === "skill"
+      ? `Are you sure you want to delete skill "${deleteModal.skill?.name}"?`
+      : `Are you sure you want to delete subskill "${deleteModal.subSkill?.name}"?`
+  }
+  confirmText="Delete"
+  cancelText="Cancel"
+  variant="danger"
+  isLoading={deleteLoading}
+  onCancel={() =>
+    setDeleteModal({
+      open: false,
+      type: null,
+      category: null,
+      skill: null,
+      subSkill: null,
+    })
+  }
+  onConfirm={confirmDelete}
+/> */
+  }
+
   const handleEditSubSkill = async (category, skill, subSkill) => {
     try {
       const hydratedCategory = await ensureCategoryHydrated(category);
@@ -1039,63 +1311,29 @@ const ManageSkillTaxonomy = () => {
     }
   };
 
-  const handleTrashClick = (label) => {
-    notify.info(`Trash UI is ready for ${label}. Delete endpoint will be wired later.`);
-  };
-
-  /* ── Filtered + grouped requests ── */
-  const filteredRequests = useMemo(() => {
-    const query = normalize(requestsSearchTerm);
-    if (!query) return requests;
-    return requests.filter((request) =>
-      [
-        request.resourceName || request.employeeName || request.employeeId,
-        request.categoryName,
-        request.skillName,
-        request.subskillName,
-        request.proficiency,
-        request.requestStatus,
-        request.approvedBy,
-        request.remarks,
-      ]
-        .filter(Boolean)
-        .some((value) => normalize(value).includes(query)),
-    );
-  }, [requests, requestsSearchTerm]);
-
-  const groupedRequests = useMemo(() => {
-    const map = new Map();
-    filteredRequests.forEach((req) => {
-      const key = String(req.resourceId || req.employeeId || req.resourceName || "unknown");
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
-          name: req.resourceName || req.employeeName || req.employeeId || "Unknown Employee",
-          requests: [],
-        });
-      }
-      map.get(key).requests.push(req);
-    });
-    return [...map.values()];
-  }, [filteredRequests]);
-
-  const groupsPageCount = Math.max(1, Math.ceil(groupedRequests.length / REQUESTS_PAGE_SIZE));
-
-  const paginatedGroups = useMemo(() => {
-    const start = (requestsPage - 1) * REQUESTS_PAGE_SIZE;
-    return groupedRequests.slice(start, start + REQUESTS_PAGE_SIZE);
-  }, [groupedRequests, requestsPage]);
+  // const handleTrashClick = (label) => {
+  //   notify.info(
+  //     `Trash UI is ready for ${label}. Delete endpoint will be wired later.`,
+  //   );
+  // };
 
   const filteredCategories = useMemo(() => {
     const query = normalize(searchTerm);
     if (!query) return categories;
     return categories.filter((category) => {
-      const categoryMatch = `${category.name} ${category.description}`.toLowerCase().includes(query);
+      const categoryMatch = `${category.name} ${category.description}`
+        .toLowerCase()
+        .includes(query);
       const skillMatch = category.skills.some((skill) => {
         const subSkillMatch = skill.subSkills.some((subSkill) =>
-          `${subSkill.name} ${subSkill.description}`.toLowerCase().includes(query),
+          `${subSkill.name} ${subSkill.description}`
+            .toLowerCase()
+            .includes(query),
         );
-        return `${skill.name} ${skill.description}`.toLowerCase().includes(query) || subSkillMatch;
+        return (
+          `${skill.name} ${skill.description}`.toLowerCase().includes(query) ||
+          subSkillMatch
+        );
       });
       return categoryMatch || skillMatch;
     });
@@ -1120,6 +1358,20 @@ const ManageSkillTaxonomy = () => {
   };
 
   /* ─── Render ────────────────────────────────────────────────────── */
+
+  const deleteModalTitle =
+    {
+      category: "Delete Category",
+      skill: "Delete Skill",
+      subskill: "Delete SubSkill",
+    }[deleteModal.type] || "Delete";
+
+  const deleteModalMessage =
+    deleteModal.type === "category"
+      ? `Are you sure you want to delete category "${deleteModal.category?.name}"?`
+      : deleteModal.type === "skill"
+        ? `Are you sure you want to delete skill "${deleteModal.skill?.name}"?`
+        : `Are you sure you want to delete subskill "${deleteModal.subSkill?.name}"?`;
 
   return (
     <div className="space-y-5 p-6">
@@ -1238,7 +1490,9 @@ const ManageSkillTaxonomy = () => {
           ) : (
             <div className="divide-y divide-gray-100">
               {filteredCategories.map((category) => {
-                const categoryExpanded = Boolean(expandedCategories[category.id]);
+                const categoryExpanded = Boolean(
+                  expandedCategories[category.id],
+                );
 
                 return (
                   <div
@@ -1280,7 +1534,7 @@ const ManageSkillTaxonomy = () => {
                           label={`Edit ${category.name}`}
                         />
                         <ActionButton
-                          onClick={(e) => { e.stopPropagation(); handleTrashClick(`category ${category.name}`); }}
+                          onClick={(e) => { e.stopPropagation(); handleDeleteCategory(category); }}
                           icon={DeleteIcon}
                           variant="delete"
                           label={`Delete ${category.name}`}
@@ -1316,9 +1570,13 @@ const ManageSkillTaxonomy = () => {
 
                             {(() => {
                               const filteredSkills = category.skills.filter((skill) => {
-                                const query = normalize(skillFilters[category.id]);
+                                const query = normalize(
+                                  skillFilters[category.id],
+                                );
                                 if (!query) return true;
-                                if (`${skill.name} ${skill.description}`.toLowerCase().includes(query)) return true;
+                                if (`${skill.name} ${skill.description}`
+                                    .toLowerCase()
+                                    .includes(query)) return true;
                                 return skill.subSkills.some((sub) =>
                                   `${sub.name} ${sub.description}`.toLowerCase().includes(query),
                                 );
@@ -1329,8 +1587,10 @@ const ManageSkillTaxonomy = () => {
                               }
 
                               return filteredSkills.map((skill) => {
-                                const skillKey = `${category.id}-${skill.id}`;
-                                const skillExpanded = Boolean(expandedSkills[skillKey]);
+                                  const skillKey = `${category.id}-${skill.id}`;
+                                  const skillExpanded = Boolean(
+                                  expandedSkills[skillKey],
+                                );
 
                                 return (
                                   <div
@@ -1374,7 +1634,7 @@ const ManageSkillTaxonomy = () => {
                                           label={`Edit ${skill.name}`}
                                         />
                                         <ActionButton
-                                          onClick={(e) => { e.stopPropagation(); handleTrashClick(`skill ${skill.name}`); }}
+                                          onClick={(e) => { e.stopPropagation(); handleDeleteSkill(category, skill); }}
                                           icon={DeleteIcon}
                                           variant="delete"
                                           label={`Delete ${skill.name}`}
@@ -1412,31 +1672,24 @@ const ManageSkillTaxonomy = () => {
                                               const filteredSubs = skill.subSkills.filter((sub) => {
                                                 const query = normalize(subSkillFilters[skillKey]);
                                                 if (!query) return true;
-                                                return `${sub.name} ${sub.description}`
+
+                                                return `${subSkill.name} ${subSkill.description}`
                                                   .toLowerCase()
                                                   .includes(query);
-                                              });
-
-                                              if (filteredSubs.length === 0) {
-                                                return (
-                                                  <EmptyPane message="No subskills matched this search." />
-                                                );
-                                              }
-
-                                              return filteredSubs.map((subSkill) => (
+                                              })
+                                              .map((subSkill) => (
                                                 <div
                                                   key={subSkill.id}
-                                                  className="flex items-center justify-between gap-4 rounded-lg border border-gray-100 bg-white px-3 py-2.5 hover:border-gray-200"
+                                                  className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-3 py-2.5"
                                                 >
                                                   <div className="min-w-0">
                                                     <p className="truncate text-sm font-medium text-gray-800">
                                                       {subSkill.name}
                                                     </p>
-                                                    {subSkill.description && (
-                                                      <p className="mt-0.5 truncate text-xs text-gray-500">
-                                                        {subSkill.description}
-                                                      </p>
-                                                    )}
+                                                    <p className="mt-1 truncate text-xs text-gray-500">
+                                                      {subSkill.description ||
+                                                        "No description available"}
+                                                    </p>
                                                   </div>
                                                   <div className="flex shrink-0 items-center gap-1.5">
                                                     <ActionButton
@@ -1454,12 +1707,29 @@ const ManageSkillTaxonomy = () => {
                                                     <GlobalStatusBadge label={subSkill.active ? "Active" : "Inactive"} size="sm" />
                                                   </div>
                                                 </div>
-                                              ));
-                                            })()}
+                                              ))}
+
+                                            {skill.subSkills.length > 0 &&
+                                            skill.subSkills.filter(
+                                              (subSkill) => {
+                                                const query = normalize(
+                                                  subSkillFilters[skillKey],
+                                                );
+                                                if (!query) return true;
+
+                                                return `${subSkill.name} ${subSkill.description}`
+                                                  .toLowerCase()
+                                                  .includes(query);
+                                              },
+                                            ).length === 0 ? (
+                                              <p className="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-4 text-center text-sm text-gray-400">
+                                                No subskills match this search.
+                                              </p>
+                                            ) : null}
                                           </div>
                                         )}
                                       </div>
-                                    )}
+                                    ) : null}
                                   </div>
                                 );
                               });
@@ -1555,6 +1825,26 @@ const ManageSkillTaxonomy = () => {
           )}
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={deleteModal.open}
+        title={deleteModalTitle}
+        message={deleteModalMessage}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleteLoading}
+        onCancel={() =>
+          setDeleteModal({
+            open: false,
+            type: null,
+            category: null,
+            skill: null,
+            subSkill: null,
+          })
+        }
+        onConfirm={confirmDelete}
+      />
 
       <SkillManagementModal
         open={openSkillManagement}

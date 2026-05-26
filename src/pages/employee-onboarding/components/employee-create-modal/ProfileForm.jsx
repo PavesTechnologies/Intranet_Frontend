@@ -5,11 +5,7 @@ export default function ProfileForm({
   form,
   handleChange,
   isGenerated,
-  isEditMode,
-  isProfileEditable = false,
 }) {
-  const isEditLocked = isEditMode && !isProfileEditable;
-
   return (
     <div className="grid grid-cols-2 gap-4">
       {isGenerated && (
@@ -37,21 +33,20 @@ export default function ProfileForm({
         name="empFirstName"
         value={form.empFirstName || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
       />
       <FormInput
         label="Middle Name"
         name="empMiddleName"
         value={form.empMiddleName || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
+        
       />
       <FormInput
         label="Last Name"
         name="empLastName"
         value={form.empLastName || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
+        
       />
       <FormInput
         label="Date of Birth"
@@ -59,7 +54,6 @@ export default function ProfileForm({
         name="empDob"
         value={form.empDob || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
       />
       <FormSelect
         label="Gender"
@@ -67,21 +61,20 @@ export default function ProfileForm({
         value={form.gender || ""}
         onChange={handleChange}
         options={["Male", "Female", "Other"]}
-        disabled={isEditLocked}
       />
       <FormInput
         label="Contact"
         name="contact"
         value={form.contact || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
+        
       />
       <FormInput
         label="Blood Group"
         name="bloodGroup"
         value={form.bloodGroup || ""}
         onChange={handleChange}
-        disabled={isEditLocked}
+
       />
       <FormSelect
         label="Marital Status"
@@ -89,7 +82,6 @@ export default function ProfileForm({
         value={form.maritalStatus || ""}
         onChange={handleChange}
         options={["Single", "Married", "Divorced"]}
-        disabled={isEditLocked}
       />
     </div>
   );

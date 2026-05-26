@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import FilterListbox from "../../../components/filter/FilterListbox";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const SECOND_URL = "/api/workflow/admin";
 
 // Axios instance with baseURL and token
-const api = axios.create({
+const api = api.create({
   baseURL: BASE_URL,
   headers: {
     "Content-Type": "application/json",

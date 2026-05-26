@@ -2,12 +2,14 @@
 
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function OnboardingNavBar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { hasRole } = useAuth();
+  const [certificateMenuOpen, setCertificateMenuOpen] = useState(false);
+  const certificateCloseTimer = useRef(null);
 
   const isAdmin = hasRole(["ADMIN"]);
   const isManager = hasRole(["REPORTING_MANAGER"]);
@@ -28,6 +30,37 @@ export default function OnboardingNavBar() {
       navigate("/employee-onboarding/employee-directory", { replace: true });
     }
   }, [isOnlyGeneral, location.pathname, navigate]);
+
+  useEffect(() => {
+    return () => {
+      if (certificateCloseTimer.current) {
+        clearTimeout(certificateCloseTimer.current);
+      }
+    };
+  }, []);
+
+  const openCertificateMenu = () => {
+    if (certificateCloseTimer.current) {
+      clearTimeout(certificateCloseTimer.current);
+    }
+    setCertificateMenuOpen(true);
+  };
+
+  const closeCertificateMenu = () => {
+    if (certificateCloseTimer.current) {
+      clearTimeout(certificateCloseTimer.current);
+    }
+    certificateCloseTimer.current = setTimeout(() => {
+      setCertificateMenuOpen(false);
+    }, 120);
+  };
+
+  const toggleCertificateMenu = () => {
+    if (certificateCloseTimer.current) {
+      clearTimeout(certificateCloseTimer.current);
+    }
+    setCertificateMenuOpen((open) => !open);
+  };
 
   /* ================= HIDE NAVBAR ================= */
 
@@ -85,8 +118,8 @@ export default function OnboardingNavBar() {
       label: "Document Center",
       match: [
         "/employee-onboarding/employeedocuments",
-        "/employee-onboarding/document-templates",
-        "/employee-onboarding/organization-documents",
+        // "/employee-onboarding/document-templates",
+        // "/employee-onboarding/organization-documents",
       ],
       redirect: "/employee-onboarding/employeedocuments",
     }] : []),
@@ -165,7 +198,7 @@ export default function OnboardingNavBar() {
     ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{ label: "Personnel Files", path: "/employee-onboarding/employeedocuments" }] : []),
     ...(hasRole(["HR"]) ? [
       { label: "e-Form Templates", path: "/employee-onboarding/document-templates" },
-      { label: "Corporate Policies", path: "/employee-onboarding/organization-documents" }
+      // { label: "Corporate Policies", path: "/employee-onboarding/organization-documents" }
     ] : []),
   ];
 
@@ -185,9 +218,25 @@ export default function OnboardingNavBar() {
     { label: "Offboarding Overview", path: "/employee-exit" },
   ];
 
+  const certificateNavOptions = [
+    {
+      label: "Skill Certifications",
+      path: "/employee-onboarding/manage-skill-taxonomy/certificates",
+    },
+    {
+      label: "General Certifications",
+      path: "/employee-onboarding/manage-skill-taxonomy/certificates/general",
+    },
+  ];
+
   const skillTaxonomyNav = [
     { label: "Skill Taxonomy", path: "/employee-onboarding/manage-skill-taxonomy" },
     { label: "Requests", path: "/employee-onboarding/manage-skill-taxonomy/requests" },
+    {
+      label: "Certificates",
+      path: "/employee-onboarding/manage-skill-taxonomy/certificates",
+      children: certificateNavOptions,
+    },
   ];
 
   /* ================= NAV SWITCH LOGIC ================= */
@@ -266,6 +315,9 @@ export default function OnboardingNavBar() {
           {navToRender.map((item) => {
             let isActive = (() => {
               if (item.path === "/employee-onboarding") return path === "/employee-onboarding";
+              if (item.children) {
+                return item.children.some((child) => path === child.path || path.startsWith(child.path + "/"));
+              }
               const directMatch = path === item.path || path.startsWith(item.path + "/");
               if (!directMatch) return false;
               // Yield to a more specific sibling that also matches (e.g. /requests beats /manage-skill-taxonomy)
@@ -277,6 +329,79 @@ export default function OnboardingNavBar() {
               );
               return !moreSpecificSiblingMatches;
             })();
+
+            if (item.children) {
+              return (
+                <div
+                  key={item.label}
+                  className="relative flex h-8 items-center"
+                  onMouseEnter={openCertificateMenu}
+                  onMouseLeave={closeCertificateMenu}
+                >
+                  <button
+                    type="button"
+                    onClick={toggleCertificateMenu}
+                    aria-expanded={certificateMenuOpen}
+                    aria-haspopup="menu"
+                    className="group inline-flex h-full items-center gap-1.5 text-sm font-medium outline-none"
+                  >
+                    <span className={isActive ? "text-gray-900" : "text-gray-500 group-hover:text-gray-900"}>{item.label}</span>
+                    <span
+                      className={`mt-0.5 h-1.5 w-1.5 rotate-45 border-b border-r transition-transform duration-150 ${
+                        isActive ? "border-gray-900" : "border-gray-500 group-hover:border-gray-900"
+                      } ${certificateMenuOpen ? "rotate-[225deg]" : ""}`}
+                    />
+                  </button>
+
+                  {isActive && (
+                    <span className="absolute left-1/2 -bottom-1 h-0 w-0 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-green-500" />
+                  )}
+
+                  <div
+                    className={`absolute left-0 top-full z-40 mt-2 w-56 rounded-lg border border-gray-200 bg-white p-1 shadow-lg shadow-slate-900/10 transition-[opacity,transform,visibility] duration-150 before:absolute before:-top-2 before:left-0 before:h-2 before:w-full before:content-[''] ${
+                      certificateMenuOpen
+                        ? "visible translate-y-0 opacity-100"
+                        : "invisible -translate-y-1 opacity-0"
+                    }`}
+                    role="menu"
+                  >
+                    {item.children.map((child) => {
+                      const childActive = (() => {
+                        const directMatch = path === child.path || path.startsWith(child.path + "/");
+                        if (!directMatch) return false;
+                        return !item.children.some(
+                          (other) =>
+                            other.path !== child.path &&
+                            other.path.startsWith(child.path) &&
+                            (path === other.path || path.startsWith(other.path + "/")),
+                        );
+                      })();
+                      return (
+                        <button
+                          key={child.path}
+                          type="button"
+                          onClick={() => {
+                            if (certificateCloseTimer.current) {
+                              clearTimeout(certificateCloseTimer.current);
+                            }
+                            setCertificateMenuOpen(false);
+                            navigate(child.path);
+                          }}
+                          className={`flex h-9 w-full items-center rounded-md px-3 text-left text-sm transition-colors duration-150 ${
+                            childActive
+                              ? "bg-indigo-50 text-indigo-700"
+                              : "text-gray-700 hover:bg-gray-50 hover:text-gray-950"
+                          }`}
+                          role="menuitem"
+                        >
+                          {child.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
 
             return (
               <div key={item.label} onClick={() => navigate(item.path)} className="relative cursor-pointer py-1 text-sm font-medium">

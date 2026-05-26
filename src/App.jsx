@@ -119,6 +119,7 @@ import DesignationsList from "./pages/employee-onboarding/hr-configuration/depar
 import WeeklyJoiningDashboard from "./pages/employee-onboarding/weekly-joining-report-dashboard/WeeklyJoiningDashboard.jsx";
 import DocumentTemplates from "./pages/employee-onboarding/document-templates/DocumentTemplates.jsx";
 import ManageSkillTaxonomy from "./pages/employee-onboarding/manage-skill-taxonomy/ManageSkillTaxonomy.jsx";
+import AddCertificate from "./pages/employee-onboarding/manage-skill-taxonomy/AddCertificate.jsx";
 
 import EmployeeDocuments from "./pages/employee-onboarding/employeedocuments/EmployeeDocuments.jsx";
 
@@ -167,6 +168,8 @@ import ApprovalRulesPage from "./pages/leave_management/models/ApprovalRulesPage
 import RiskRegisterPage from "./pages/Projects/manager/riskManagement/RiskRegisterPage.jsx";
 import LeaveUploadWizard from "./pages/leave_management/models/LeaveUploadWizard.jsx";
 import ApplyLeaveOnBehalf from "./pages/leave_management/models/ApplyLeaveOnBehalf.jsx";
+import { JobProgressProvider, useJobProgress } from "./contexts/JobProgressContext.jsx";
+import LeaveBalanceJobProgress from "./pages/leave_management/models/LeaveBalanceJobProgress.jsx";
 
 import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.jsx";
 import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
@@ -482,6 +485,8 @@ const AppRoutes = () => {
             <Route path="weekly-joining-report-dashboard" element={<ProtectedRoute roles={["HR", "MANAGER"]}><WeeklyJoiningDashboard /></ProtectedRoute>} />
             <Route path="manage-skill-taxonomy" element={<ProtectedRoute roles={["HR", "ADMIN"]}><ManageSkillTaxonomy /></ProtectedRoute>} />
             <Route path="manage-skill-taxonomy/requests" element={<ProtectedRoute roles={["HR", "ADMIN"]}><ManageSkillTaxonomy /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy/certificates" element={<ProtectedRoute roles={["HR", "ADMIN"]}><AddCertificate /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy/certificates/general" element={<ProtectedRoute roles={["HR", "ADMIN"]}><AddCertificate /></ProtectedRoute>} />
             <Route path="document-templates" element={<ProtectedRoute roles={["HR"]}><DocumentTemplates /></ProtectedRoute>} />
             <Route path="offer/:user_uuid" element={<ViewEmpDetails />} />
             <Route path="offer-preview/:offerId" element={<OfferPreview />} />
@@ -667,7 +672,7 @@ const AppRoutes = () => {
             path="/leave-management"
             element={
               <ProtectedRoute
-                allowedRoles={["General", "HR", "Manager", "Hr-Manager"]}
+                allowedRoles={["General", "HR", "Manager", "Hr-Manager", "Super_Admin", "Admin"]}
               >
                 <EmployeePanel />
               </ProtectedRoute>
@@ -684,7 +689,7 @@ const AppRoutes = () => {
           <Route
             path="/leave-management/hr"
             element={
-              <ProtectedRoute allowedRoles={["HR"]}>
+              <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin"]}>
                 <HRManageTools />
               </ProtectedRoute>
             }
@@ -708,7 +713,7 @@ const AppRoutes = () => {
           <Route
             path={`/block-leave-dates/:employeeId`}
             element={
-              <ProtectedRoute allowedRoles={["Manager"]}>
+              <ProtectedRoute allowedRoles={["Manager", "Super_Admin", "Admin"]}>
                 <ManageBlockLeave />
               </ProtectedRoute>
             }
@@ -716,7 +721,7 @@ const AppRoutes = () => {
           <Route
             path={`/leave-upload`}
             element={
-              <ProtectedRoute allowedRoles={["HR"]}>
+              <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin"]}>
                 <LeaveUploadWizard />
               </ProtectedRoute>
             }
@@ -724,7 +729,7 @@ const AppRoutes = () => {
           <Route
             path="/leave-policy"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin"]}>
                 <LeavePolicy />
               </ProtectedRoute>
             }
@@ -733,7 +738,7 @@ const AppRoutes = () => {
           <Route
             path={`/leave-details/:employeeId/:leaveName`}
             element={
-              <ProtectedRoute allowedRoles={["General"]}>
+              <ProtectedRoute allowedRoles={["General", "Super_Admin", "Admin"]}>
                 <LeaveDetailsPage />
               </ProtectedRoute>
             }
@@ -741,7 +746,7 @@ const AppRoutes = () => {
           <Route
             path="/approval-rules"
             element={
-              <ProtectedRoute allowedRoles={["HR", "Hr-Manager"]}>
+              <ProtectedRoute allowedRoles={["HR", "Hr-Manager", "Super_Admin", "Admin"]}>
                 <ApprovalRulesPage />
               </ProtectedRoute>
             }
@@ -750,7 +755,7 @@ const AppRoutes = () => {
           <Route
             path="/behalf-leave"
             element={
-              <ProtectedRoute allowedRoles={["HR", "Hr-Manager", "Manager"]}>
+              <ProtectedRoute allowedRoles={["HR", "Hr-Manager", "Manager", "Super_Admin", "Admin"]}>
                 <ApplyLeaveOnBehalf />
               </ProtectedRoute>
             }
@@ -929,6 +934,20 @@ const AppRoutes = () => {
   );
 };
 
+// add this just above the App function at the bottom of the file
+const AppJobProgress = () => {
+  const { activeJobId, clearJob } = useJobProgress();
+
+  if (!activeJobId) return null;
+
+  return (
+    <LeaveBalanceJobProgress
+      jobId={activeJobId}
+      onClose={clearJob}
+    />
+  );
+};
+
 // 🚀 App Entry Point
 function App() {
   return (
@@ -938,9 +957,11 @@ function App() {
         <></>
         <AuthProvider>
           <NotificationProvider>
+            <JobProgressProvider>
             <div className="min-h-screen bg-gray-50">
               <AppRoutes />
             </div>
+            </JobProgressProvider>
           </NotificationProvider>
         </AuthProvider>
       </Router>

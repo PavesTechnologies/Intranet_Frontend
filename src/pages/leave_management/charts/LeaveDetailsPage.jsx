@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import beachDay from "../../../components/icons/beach-day_cnsv.svg";
@@ -58,7 +58,7 @@ export default function LeaveDetailsPage() {
 
   const fetchAllLeaveTypes = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}/api/leave/types`, {
+      const res = await api.get(`${BASE_URL}/api/leave/types`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       // Assuming res.data is an array like [{ name: 'SICK_LEAVE', label: 'Sick Leave' }]
@@ -82,7 +82,7 @@ export default function LeaveDetailsPage() {
       try {
         const year = new Date().getFullYear();
         // NOTE: Adjust the API endpoint if it's different.
-        const res = await axios.get(
+        const res = await api.get(
           `${BASE_URL}/api/leave-requests/view-details`,
           {
             params: { employeeId: employeeId, leaveName: leaveName, year },
