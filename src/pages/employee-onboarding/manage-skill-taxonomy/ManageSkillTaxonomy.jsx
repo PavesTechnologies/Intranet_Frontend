@@ -4,7 +4,6 @@ import {
   ChevronRightIcon,
   CloseIcon,
   DeleteIcon,
-  DownloadIcon,
   EditIcon,
   FolderOpenIcon,
   JobIcon,
@@ -1253,36 +1252,6 @@ const ManageSkillTaxonomy = () => {
     }
   };
 
-  {
-    /* <ConfirmationModal
-  isOpen={deleteModal.open}
-  title={
-    deleteModal.type === "skill"
-      ? "Delete Skill"
-      : "Delete SubSkill"
-  }
-  message={
-    deleteModal.type === "skill"
-      ? `Are you sure you want to delete skill "${deleteModal.skill?.name}"?`
-      : `Are you sure you want to delete subskill "${deleteModal.subSkill?.name}"?`
-  }
-  confirmText="Delete"
-  cancelText="Cancel"
-  variant="danger"
-  isLoading={deleteLoading}
-  onCancel={() =>
-    setDeleteModal({
-      open: false,
-      type: null,
-      category: null,
-      skill: null,
-      subSkill: null,
-    })
-  }
-  onConfirm={confirmDelete}
-/> */
-  }
-
   const handleEditSubSkill = async (category, skill, subSkill) => {
     try {
       const hydratedCategory = await ensureCategoryHydrated(category);
@@ -1338,6 +1307,43 @@ const ManageSkillTaxonomy = () => {
       return categoryMatch || skillMatch;
     });
   }, [categories, searchTerm]);
+
+  const filteredRequests = useMemo(() => {
+    const query = normalize(requestsSearchTerm);
+    if (!query) return requests;
+    return requests.filter((request) =>
+      [request.resourceName, request.employeeName, request.categoryName, request.skillName, request.subskillName]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [requests, requestsSearchTerm]);
+
+  const groupedRequests = useMemo(() => {
+    const map = new Map();
+    filteredRequests.forEach((request) => {
+      const employeeKey = request.resourceId
+        ? `id:${request.resourceId}`
+        : request.resourceName || request.employeeName || "Unknown";
+      const displayName = request.resourceName || request.employeeName || "Unknown";
+      if (!map.has(employeeKey)) {
+        map.set(employeeKey, { key: employeeKey, name: displayName, requests: [] });
+      }
+      map.get(employeeKey).requests.push(request);
+    });
+    return Array.from(map.values());
+  }, [filteredRequests]);
+
+  const groupsPageCount = useMemo(
+    () => Math.max(1, Math.ceil(groupedRequests.length / REQUESTS_PAGE_SIZE)),
+    [groupedRequests.length],
+  );
+
+  const paginatedGroups = useMemo(() => {
+    const start = (requestsPage - 1) * REQUESTS_PAGE_SIZE;
+    return groupedRequests.slice(start, start + REQUESTS_PAGE_SIZE);
+  }, [groupedRequests, requestsPage]);
 
   useEffect(() => {
     setRequestsPage(1);
@@ -1669,15 +1675,22 @@ const ManageSkillTaxonomy = () => {
                                             />
 
                                             {(() => {
-                                              const filteredSubs = skill.subSkills.filter((sub) => {
-                                                const query = normalize(subSkillFilters[skillKey]);
-                                                if (!query) return true;
+                                              const query = normalize(subSkillFilters[skillKey]);
+                                              const filteredSubs = query
+                                                ? skill.subSkills.filter((sub) =>
+                                                    `${sub.name} ${sub.description}`.toLowerCase().includes(query)
+                                                  )
+                                                : skill.subSkills;
 
-                                                return `${subSkill.name} ${subSkill.description}`
-                                                  .toLowerCase()
-                                                  .includes(query);
-                                              })
-                                              .map((subSkill) => (
+                                              if (filteredSubs.length === 0) {
+                                                return (
+                                                  <p className="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-4 text-center text-sm text-gray-400">
+                                                    No subskills match this search.
+                                                  </p>
+                                                );
+                                              }
+
+                                              return filteredSubs.map((subSkill) => (
                                                 <div
                                                   key={subSkill.id}
                                                   className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-3 py-2.5"
@@ -1687,8 +1700,7 @@ const ManageSkillTaxonomy = () => {
                                                       {subSkill.name}
                                                     </p>
                                                     <p className="mt-1 truncate text-xs text-gray-500">
-                                                      {subSkill.description ||
-                                                        "No description available"}
+                                                      {subSkill.description || "No description available"}
                                                     </p>
                                                   </div>
                                                   <div className="flex shrink-0 items-center gap-1.5">
@@ -1699,7 +1711,7 @@ const ManageSkillTaxonomy = () => {
                                                       label={`Edit ${subSkill.name}`}
                                                     />
                                                     <ActionButton
-                                                      onClick={() => handleTrashClick(`subskill ${subSkill.name}`)}
+                                                      onClick={() => handleDeleteSubSkill(category, skill, subSkill)}
                                                       icon={DeleteIcon}
                                                       variant="delete"
                                                       label={`Delete ${subSkill.name}`}
@@ -1707,29 +1719,12 @@ const ManageSkillTaxonomy = () => {
                                                     <GlobalStatusBadge label={subSkill.active ? "Active" : "Inactive"} size="sm" />
                                                   </div>
                                                 </div>
-                                              ))}
-
-                                            {skill.subSkills.length > 0 &&
-                                            skill.subSkills.filter(
-                                              (subSkill) => {
-                                                const query = normalize(
-                                                  subSkillFilters[skillKey],
-                                                );
-                                                if (!query) return true;
-
-                                                return `${subSkill.name} ${subSkill.description}`
-                                                  .toLowerCase()
-                                                  .includes(query);
-                                              },
-                                            ).length === 0 ? (
-                                              <p className="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-4 text-center text-sm text-gray-400">
-                                                No subskills match this search.
-                                              </p>
-                                            ) : null}
+                                              ));
+                                            })()}
                                           </div>
                                         )}
                                       </div>
-                                    ) : null}
+                                    )}
                                   </div>
                                 );
                               });
