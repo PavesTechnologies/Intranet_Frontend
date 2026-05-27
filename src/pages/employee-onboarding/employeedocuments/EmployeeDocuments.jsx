@@ -14,6 +14,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import FilterListbox from "../../../components/filter/FilterListbox";
+import api from "../../../api/axiosInstance"
  
 export default function EmployeeDocumentsPage() {
   const [search, setSearch] = useState("");
@@ -226,26 +227,23 @@ export default function EmployeeDocumentsPage() {
             },
           ),
         ]);
+        
  
-        if (!documentsResponse.ok) {
-          throw new Error("Failed to fetch documents");
-        }
- 
-        if (!offersResponse.ok) {
-          throw new Error("Failed to fetch employee access");
-        }
- 
-        const [documentsData, offersData] = await Promise.all([
-          documentsResponse.json(),
-          offersResponse.json(),
-        ]);
+       const documentsData = documentsResponse.data;
+
+const offersData = await offersResponse.json();
  
         const allowedUserUuids = new Set(
-          (offersData || []).map((offer) => offer.user_uuid).filter(Boolean),
-        );
+  (Array.isArray(offersData)
+    ? offersData
+    : offersData.data || []
+  )
+    .map((offer) => offer.user_uuid)
+    .filter(Boolean)
+);
  
         const formattedEmployees = documentsData
-  .filter((emp) => emp.emp_id && emp.documents?.length > 0)
+  .filter((emp) => emp.emp_id)
   .map((emp) => ({
     id: emp.user_uuid,
     empId: emp.emp_id,
@@ -427,7 +425,7 @@ export default function EmployeeDocumentsPage() {
             return matchesGlobalCategory && matchesGroupCategory;
           }),
         }))
-        .filter((emp) => emp.documentsToShow.length > 0);
+        .filter((emp) => emp);
  
       return {
         departmentName,
