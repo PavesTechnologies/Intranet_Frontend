@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const BASE_URL = window.__APP_CONFIG__?.RMS_BASE_URL;
 
@@ -20,7 +20,7 @@ export const getProjects = async ({ page, size, search, filters }) => {
   }
 
   try {
-    const res = await axios.get(`${BASE_URL}/api/projects/get-projects`, {
+    const res = await api.get(`${BASE_URL}/api/projects/get-projects`, {
       params,
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -34,7 +34,7 @@ export const getProjects = async ({ page, size, search, filters }) => {
 
 export const getProjectById = async (projectId) => {
   try {
-    const res = await axios.get(
+    const res = await api.get(
       `${BASE_URL}/api/projects/get-project-by-id/${projectId}`,
       {
         headers: {
@@ -50,7 +50,7 @@ export const getProjectById = async (projectId) => {
 
 export const checkDemandCreation = async (projectId) => {
   try {
-    const res = await axios.get(
+    const res = await api.get(
       `${BASE_URL}/api/projects/check-demand-creation/${projectId}`,
       {
         headers: {
@@ -66,7 +66,7 @@ export const checkDemandCreation = async (projectId) => {
 
 export const createDemand = async (demandData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/demand/create`,
       demandData,
       {
@@ -83,7 +83,7 @@ export const createDemand = async (demandData) => {
 
 export const statusUpdate = async (readinessData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${BASE_URL}/api/projects/readiness-status-update`,
       readinessData,
       {
@@ -100,7 +100,7 @@ export const statusUpdate = async (readinessData) => {
 
 export const getProjectEscalations = async (projectId) => {
   try {
-    const res = await axios.get(
+    const res = await api.get(
       `${BASE_URL}/api/projects/${projectId}/escalations`,
       {
         headers: {
@@ -118,7 +118,7 @@ export const getProjectEscalations = async (projectId) => {
 // 🔹 CREATE new escalation mapping (existing or new contact)
 export const createProjectEscalation = async (payload) => {
   try {
-    const res = await axios.post(
+    const res = await api.post(
       `${BASE_URL}/api/projects/escalations`,
       payload,
       {
@@ -138,7 +138,7 @@ export const createProjectEscalation = async (payload) => {
 // 🔹 DELETE escalation mapping from project
 export const deleteProjectEscalation = async (escalationId) => {
   try {
-    const res = await axios.delete(
+    const res = await api.delete(
       `${BASE_URL}/api/projects/escalations/${escalationId}`,
       {
         headers: {
@@ -155,7 +155,7 @@ export const deleteProjectEscalation = async (escalationId) => {
 
 export const getLocations = async () => {
   try {
-    const res = await axios.get(`${BASE_URL}/api/projects/get-locations`, {
+    const res = await api.get(`${BASE_URL}/api/projects/get-locations`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -168,7 +168,7 @@ export const getLocations = async () => {
 
 export const updateDemandStatus = async (payload) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${BASE_URL}/api/demand/update/pm`,
       payload,
       {
@@ -185,7 +185,7 @@ export const updateDemandStatus = async (payload) => {
 
 export const getProjectKPIs = async () => {
   try {
-    const res = await axios.get(`${BASE_URL}/api/projects/kpi`, {
+    const res = await api.get(`${BASE_URL}/api/projects/kpi`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },

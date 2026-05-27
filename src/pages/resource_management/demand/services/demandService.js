@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import {
   canProjectManagerMutateDemand,
   PM_REQUESTED_DEMAND_ONLY_MESSAGE,
@@ -54,7 +54,7 @@ export const demandService = {
    */
   getAllDemands: async () => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/api/demand/demands`,
         getAuthHeader(),
       );
@@ -74,7 +74,7 @@ export const demandService = {
    */
   getDemandById: async (id) => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/api/demand/${id}`,
         getAuthHeader(),
       );
@@ -95,7 +95,7 @@ export const demandService = {
    */
   getKPISummary: async () => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/api/demand/kpi`,
         getAuthHeader(),
       );
@@ -123,7 +123,7 @@ export const demandService = {
     }
 
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}${endpoints.kpi}`,
         getAuthHeader(),
       );
@@ -153,7 +153,7 @@ export const demandService = {
     }
 
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}${endpoints.demands}`,
         getAuthHeader(),
       );
@@ -173,7 +173,7 @@ export const demandService = {
    */
   getDashboardKPIs: async () => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/api/demand/dashboard-kpi`,
         getAuthHeader(),
       );
@@ -192,7 +192,7 @@ export const demandService = {
    */
   getDemandsCreatedByMe: async () => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/api/demand/created-by-me`,
         getAuthHeader(),
       );
@@ -214,7 +214,7 @@ export const demandService = {
    */
   getProjectKPIs: async (projectId) => {
     try {
-      const response = await axios.get(`${BASE_URL}/api/demand/pm/kpi`, {
+      const response = await api.get(`${BASE_URL}/api/demand/pm/kpi`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -236,7 +236,7 @@ export const demandService = {
    */
   getProjectDemands: async (projectId) => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/api/demand/project/${projectId}`,
         {
           headers: {
@@ -262,7 +262,7 @@ export const demandService = {
    */
   handleDMDecision: async (payload) => {
     try {
-      const response = await axios.put(
+      const response = await api.put(
         `${BASE_URL}/api/demand/dm/decision`,
         payload,
         getAuthHeader(),
@@ -280,7 +280,7 @@ export const demandService = {
    */
   handleRMDecision: async (payload) => {
     try {
-      const response = await axios.put(
+      const response = await api.put(
         `${BASE_URL}/api/demand/rm/decision`,
         payload,
         getAuthHeader(),
@@ -302,7 +302,7 @@ export const demandService = {
     }
 
     try {
-      const response = await axios.delete(
+      const response = await api.delete(
         `${BASE_URL}/api/demand/delete/pm/${demandId}`,
         getAuthHeader(),
       );
