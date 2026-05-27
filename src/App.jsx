@@ -121,6 +121,7 @@ import DesignationsList from "./pages/employee-onboarding/hr-configuration/depar
 import WeeklyJoiningDashboard from "./pages/employee-onboarding/weekly-joining-report-dashboard/WeeklyJoiningDashboard.jsx";
 import DocumentTemplates from "./pages/employee-onboarding/document-templates/DocumentTemplates.jsx";
 import ManageSkillTaxonomy from "./pages/employee-onboarding/manage-skill-taxonomy/ManageSkillTaxonomy.jsx";
+import AddCertificate from "./pages/employee-onboarding/manage-skill-taxonomy/AddCertificate.jsx";
 
 import EmployeeDocuments from "./pages/employee-onboarding/employeedocuments/EmployeeDocuments.jsx";
 
@@ -488,6 +489,8 @@ const AppRoutes = () => {
             <Route path="weekly-joining-report-dashboard" element={<ProtectedRoute roles={["HR", "MANAGER"]}><WeeklyJoiningDashboard /></ProtectedRoute>} />
             <Route path="manage-skill-taxonomy" element={<ProtectedRoute roles={["HR", "ADMIN"]}><ManageSkillTaxonomy /></ProtectedRoute>} />
             <Route path="manage-skill-taxonomy/requests" element={<ProtectedRoute roles={["HR", "ADMIN"]}><ManageSkillTaxonomy /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy/certificates" element={<ProtectedRoute roles={["HR", "ADMIN"]}><AddCertificate /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy/certificates/general" element={<ProtectedRoute roles={["HR", "ADMIN"]}><AddCertificate /></ProtectedRoute>} />
             <Route path="document-templates" element={<ProtectedRoute roles={["HR"]}><DocumentTemplates /></ProtectedRoute>} />
             <Route path="offer/:user_uuid" element={<ViewEmpDetails />} />
             <Route path="offer-preview/:offerId" element={<OfferPreview />} />

@@ -3,6 +3,7 @@ import { X, ChevronDown, ChevronRight, CheckCircle2, XCircle } from "lucide-reac
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import api from "../../../api/axiosInstance";
 
 const STATUS_OPTIONS = [
   { value: "BOTH", label: "Approved & Rejected" },
@@ -97,17 +98,16 @@ const ReviewedTimesheetsModal = ({ isOpen, onClose }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/timesheets/review/audit?${buildQuery(overrides)}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
       );
-      if (!res.ok) throw new Error(`Failed to load reviewed timesheets (${res.status})`);
-      const json = await res.json();
-      setData(json);
+      setData(res.data);
     } catch (e) {
-      setError(e.message || "Failed to load reviewed timesheets");
+      const status = e.response?.status;
+      const message = status
+        ? `Failed to load reviewed timesheets (${status})`
+        : e.message || "Failed to load reviewed timesheets";
+      setError(message);
       setData(null);
     } finally {
       setLoading(false);
@@ -116,14 +116,10 @@ const ReviewedTimesheetsModal = ({ isOpen, onClose }) => {
 
   const fetchReviewees = async () => {
     try {
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/manager/users`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
       );
-      if (!res.ok) return;
-      const users = await res.json();
+      const users = res.data;
       setReviewees(Array.isArray(users) ? users : []);
     } catch (e) {
       // Silent — user filter just won't be populated

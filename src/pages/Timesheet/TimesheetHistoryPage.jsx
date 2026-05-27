@@ -4,6 +4,7 @@ import { TimesheetFilters } from "./TimesheetFilters";
 import { TimesheetTable } from "./TimesheetTable";
 import { fetchTimesheetHistory, fetchProjectTaskInfo } from "./api";
 import DashboardPage from "./DashboardPage";
+import api from "../../api/axiosInstance";
 
 const TimesheetHistoryPage = () => {
   const [entries, setEntries] = useState([]);
@@ -163,22 +164,11 @@ const TimesheetHistoryPage = () => {
   // Function to fetch and store project/task information
   const fetchAndStoreProjectTaskInfo = async () => {
     try {
-      const response = await fetch(
+      const response = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/project-info`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
 
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = response.data;
       // console.log("Fetched project/task info:", data);
 
       // Create mapping objects for quick lookup
@@ -382,20 +372,13 @@ const TimesheetHistoryPage = () => {
               const projectTaskMapping = await fetchAndStoreProjectTaskInfo();
 
               // Then fetch timesheet history
-              const response = await fetch(
+              const response = await api.get(
                 `${
                   window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
                 }/api/timesheet/history`,
-                {
-                  method: "GET",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${localStorage.getItem("token")}`,
-                  },
-                },
               );
 
-              const data = await response.json();
+              const data = response.data;
 
               // Map API response to our expected format using the mapping data
               const weeklyEntries = mapApiResponseToEntries(

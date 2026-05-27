@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Tooltip from "../../components/status/Tooltip";
 import { showStatusToast } from "../../components/toastfy/toast";
+import api from "../../api/axiosInstance";
 import { submitWeeklyTimesheet } from "./api";
 import "react-datepicker/dist/react-datepicker.css";
 import DatePicker from "react-datepicker";
@@ -331,27 +332,17 @@ const TimesheetGroup = ({
       let responseText = "";
 
       if (realIds.length > 0 && targetTimesheetId) {
-        const response = await fetch(
+        const response = await api.delete(
           `${
             window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
           }/api/timesheet/deleteEntries/${targetTimesheetId}`,
           {
-            method: "DELETE",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify({ entryIds: realIds }),
+            data: { entryIds: realIds },
           },
         );
 
-        const data = await response.text();
-
-        if (!response.ok) {
-          throw new Error(data || "Failed to delete entries");
-        }
-
-        responseText = data;
+        const data = response.data;
+        responseText = typeof data === "string" ? data : data?.message || "";
 
         if (responseText) showStatusToast(responseText, "success");
         if (refreshData) await refreshData();
@@ -362,7 +353,12 @@ const TimesheetGroup = ({
       setSelectedEntryIds([]);
       setSelectionTimesheetId(null);
     } catch (error) {
-      showStatusToast(error.message || "Error deleting entries", "error");
+      const respData = error.response?.data;
+      const message =
+        (typeof respData === "string" ? respData : respData?.message) ||
+        error.message ||
+        "Error deleting entries";
+      showStatusToast(message, "error");
     }
   };
 

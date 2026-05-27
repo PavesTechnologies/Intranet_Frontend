@@ -4,18 +4,23 @@ import {
   ChevronRightIcon,
   CloseIcon,
   DeleteIcon,
-  DownloadIcon,
   EditIcon,
   FolderOpenIcon,
   JobIcon,
   SearchIcon,
-  SpinnerIcon,
 } from "../../../components/icons";
 import { useLocation } from "react-router-dom";
 import Button from "../../../components/Button/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import Modal from "../../../components/Modal/modal";
+import Pagination from "../../../components/Pagination/pagination";
+import GlobalStatusBadge from "../../../components/status/statusbadge";
+import Tooltip from "../../../components/status/Tooltip";
+import FormTextArea from "../../../components/forms/FormTextArea";
 import SkillManagementModal from "../../resource_management/models/skill_management/SkillManagementModal";
 import { skillService } from "../../../services/skillService";
 import { notify } from "../../resource_management/utils/notify";
+import { useAuth } from "../../../contexts/AuthContext";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
 const normalize = (value) => `${value || ""}`.trim().toLowerCase();
@@ -54,43 +59,65 @@ const mapSubSkillDto = (subSkill) => ({
   active: subSkill.active ?? true,
 });
 
+const REQUESTS_PAGE_SIZE = 5;
+
+const formatRequestDate = (value) => {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const getRequestStatus = (request) => `${request?.requestStatus || ""}`.toUpperCase();
+
+const isRequestActionDisabled = (request) =>
+  ["APPROVED", "REJECTED"].includes(getRequestStatus(request));
+
+const getApprovedByDisplay = (request) =>
+  request?.approvedBy || (getRequestStatus(request) === "APPROVED" ? "ADMIN" : "--");
+
 /* ─── Small reusable UI atoms ─────────────────────────────────────── */
 
-const StatusBadge = ({ active }) => (
-  <span
-    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-      active
-        ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20"
-        : "bg-gray-100 text-gray-500 ring-1 ring-inset ring-gray-400/20"
-    }`}
-  >
-    <span
-      className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-gray-400"}`}
-    />
-    {active ? "Active" : "Inactive"}
-  </span>
-);
+const RequestStatusBadge = ({ status }) => {
+  const normalizedStatus = `${status || "PENDING"}`.toUpperCase();
+  return <GlobalStatusBadge label={normalizedStatus} size="sm" />;
+};
 
-const ActionButton = ({ onClick, icon: Icon, variant = "edit", label }) => (
-  <button
+const ActionButton = ({
+  onClick,
+  icon: Icon,
+  variant = "edit",
+  label,
+  disabled = false,
+}) => (
+  <Button
     type="button"
-    onClick={onClick}
+    onClick={disabled ? undefined : onClick}
+    disabled={disabled}
     aria-label={label}
-    className={`rounded-md p-1.5 transition-colors ${
-      variant === "edit"
-        ? "text-indigo-600 hover:bg-indigo-50"
-        : "text-rose-600 hover:bg-rose-50"
+    title={disabled ? "Inactive items cannot be edited or deleted" : label}
+    variant="ghost"
+    size="icon"
+    className={`h-8 w-8 shadow-none ${
+      disabled
+        ? "cursor-not-allowed text-gray-300"
+        : variant === "edit"
+          ? "text-indigo-600 hover:bg-indigo-50"
+          : "text-rose-600 hover:bg-rose-50"
     }`}
   >
     <Icon className="h-3.5 w-3.5" />
-  </button>
+  </Button>
 );
 
 const InlineSpinner = ({ message }) => (
-  <div className="flex items-center gap-2 py-5 text-sm text-gray-500">
-    <SpinnerIcon className="h-4 w-4 animate-spin text-indigo-400" />
-    <span>{message}</span>
-  </div>
+  <LoadingSpinner text={message} size="sm" />
 );
 
 const EmptyPane = ({ message }) => (
@@ -110,22 +137,410 @@ const SearchInput = ({ value, onChange, placeholder, onClear }) => (
       className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-8 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10"
     />
     {value ? (
-      <button
+      <Button
         type="button"
         onClick={onClear}
         aria-label="Clear search"
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600"
+        variant="ghost"
+        size="icon"
+        className="absolute right-2.5 top-1/2 h-6 w-6 -translate-y-1/2 p-0 text-gray-400 shadow-none hover:text-gray-600"
       >
         <CloseIcon className="h-3.5 w-3.5" />
-      </button>
+      </Button>
     ) : null}
   </div>
 );
+
+/* Updated: uses Set-based processingRequestIds + bulkProcessing flag */
+const RequestActions = ({ request, onApprove, onReject, processingRequestIds, bulkProcessing, canApprove }) => {
+  const isProcessing = processingRequestIds.has(request.id) || bulkProcessing;
+  const disabled = isRequestActionDisabled(request) || isProcessing;
+  const adminOnlyTooltip = "Only ADMIN can approve and reject the request";
+  const wrapAdminTooltip = (children) =>
+    canApprove ? children : <Tooltip content={adminOnlyTooltip}>{children}</Tooltip>;
+
+  return (
+    <div className="flex items-center gap-2">
+      {wrapAdminTooltip(
+        <span className="inline-flex">
+          <Button
+            type="button"
+            onClick={() => onApprove(request)}
+            disabled={disabled || !canApprove}
+            variant="success"
+            size="small"
+            className="border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+          >
+            Approve
+          </Button>
+        </span>,
+      )}
+      {wrapAdminTooltip(
+        <span className="inline-flex">
+          <Button
+            type="button"
+            onClick={() => onReject(request)}
+            disabled={disabled || !canApprove}
+            variant="danger"
+            size="small"
+            className="border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+          >
+            Reject
+          </Button>
+        </span>,
+      )}
+    </div>
+  );
+};
+
+/* ─── Employee Group Card (accordion) ────────────────────────────── */
+
+const EmployeeGroupCard = ({
+  group,
+  isExpanded,
+  onToggle,
+  selectedRequestIds,
+  onSelectRequest,
+  onSelectAll,
+  onApprove,
+  onReject,
+  onApproveEmployee,
+  onRejectEmployee,
+  onBulkApproveSelected,
+  onBulkRejectSelected,
+  processingRequestIds,
+  bulkProcessing,
+  canApprove,
+}) => {
+  const pending = group.requests.filter((r) => getRequestStatus(r) === "PENDING");
+  const approvedCount = group.requests.filter((r) => getRequestStatus(r) === "APPROVED").length;
+  const rejectedCount = group.requests.filter((r) => getRequestStatus(r) === "REJECTED").length;
+
+  const groupRequestIds = group.requests.map((r) => r.id);
+  const groupSelectedCount = groupRequestIds.filter((id) => selectedRequestIds.has(id)).length;
+  const allSelected = group.requests.length > 0 && groupSelectedCount === group.requests.length;
+  const someSelected = groupSelectedCount > 0 && !allSelected;
+
+  const pendingSelected = group.requests.filter(
+    (r) => selectedRequestIds.has(r.id) && getRequestStatus(r) === "PENDING",
+  );
+
+  const initials =
+    group.name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((n) => n[0].toUpperCase())
+      .join("") || "?";
+
+  return (
+    <div
+      className={`overflow-hidden rounded-xl border shadow-sm transition-all duration-200 ${
+        isExpanded ? "border-indigo-200" : "border-gray-200"
+      }`}
+    >
+      {/* ── Card Header ── */}
+      <div className={`transition-colors duration-200 ${isExpanded ? "bg-indigo-50/60" : "bg-white"}`}>
+        <div className="flex items-center gap-3 px-4 py-3.5">
+
+          {/* Avatar + name toggle */}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="flex flex-1 min-w-0 items-center gap-3 text-left"
+          >
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-colors ${
+                isExpanded ? "bg-indigo-600 text-white" : "bg-indigo-100 text-indigo-700"
+              }`}
+            >
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-gray-900">{group.name}</p>
+              <p className="text-xs text-gray-400">
+                {group.requests.length} request{group.requests.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+          </button>
+
+          {/* Status counts — desktop */}
+          <div className="hidden lg:flex items-center gap-2 shrink-0">
+            {pending.length > 0 && (
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                {pending.length} pending
+              </span>
+            )}
+            {approvedCount > 0 && (
+              <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                {approvedCount} approved
+              </span>
+            )}
+            {rejectedCount > 0 && (
+              <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
+                {rejectedCount} rejected
+              </span>
+            )}
+          </div>
+
+          {/* Card-level quick actions (desktop) */}
+          {pending.length > 0 && canApprove && !bulkProcessing && (
+            <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+              <Button
+                type="button"
+                variant="success"
+                size="small"
+                onClick={(e) => { e.stopPropagation(); onApproveEmployee(pending); }}
+                className="border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs"
+              >
+                Approve All
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="small"
+                onClick={(e) => { e.stopPropagation(); onRejectEmployee(group.name, pending); }}
+                className="border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs"
+              >
+                Reject All
+              </Button>
+            </div>
+          )}
+
+          {/* Expand/collapse icon */}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="shrink-0 rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            aria-label={isExpanded ? "Collapse" : "Expand"}
+          >
+            <ChevronDownIcon
+              className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "rotate-0" : "-rotate-90"}`}
+            />
+          </button>
+        </div>
+
+        {/* Status counts + mobile quick actions */}
+        <div className="flex lg:hidden items-center gap-2 px-4 pb-3 flex-wrap">
+          {pending.length > 0 && (
+            <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+              {pending.length} pending
+            </span>
+          )}
+          {approvedCount > 0 && (
+            <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+              {approvedCount} approved
+            </span>
+          )}
+          {rejectedCount > 0 && (
+            <span className="rounded-full border border-rose-100 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+              {rejectedCount} rejected
+            </span>
+          )}
+          {pending.length > 0 && canApprove && !bulkProcessing && (
+            <div className="flex sm:hidden items-center gap-1.5 ml-auto">
+              <Button
+                type="button"
+                variant="success"
+                size="small"
+                onClick={(e) => { e.stopPropagation(); onApproveEmployee(pending); }}
+                className="border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs"
+              >
+                Approve All
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="small"
+                onClick={(e) => { e.stopPropagation(); onRejectEmployee(group.name, pending); }}
+                className="border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs"
+              >
+                Reject All
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Expanded content ── */}
+      {isExpanded && (
+        <div className="border-t border-indigo-100">
+
+          {/* Bulk action bar — shown when pending items are selected */}
+          {pendingSelected.length > 0 && canApprove && (
+            <div className="flex flex-wrap items-center gap-2.5 border-b border-indigo-100 bg-indigo-50 px-4 py-2.5">
+              <span className="text-xs font-semibold text-indigo-700">
+                {pendingSelected.length} pending selected
+              </span>
+              <Button
+                type="button"
+                variant="success"
+                size="small"
+                onClick={() => onBulkApproveSelected(pendingSelected)}
+                disabled={bulkProcessing}
+                className="border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              >
+                Bulk Approve
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="small"
+                onClick={() => onBulkRejectSelected(pendingSelected)}
+                disabled={bulkProcessing}
+                className="border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+              >
+                Bulk Reject
+              </Button>
+            </div>
+          )}
+
+          {/* Desktop table */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="min-w-full divide-y divide-gray-100">
+              <thead className="bg-gray-50/80">
+                <tr>
+                  <th className="px-3 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(el) => { if (el) el.indeterminate = someSelected; }}
+                      onChange={(e) => onSelectAll(groupRequestIds, e.target.checked)}
+                      className="h-4 w-4 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </th>
+                  {["Category", "Skill", "Subskill", "Proficiency", "Status", "Requested", "Approved By", "Remarks", "Actions"].map((col) => (
+                    <th
+                      key={col}
+                      scope="col"
+                      className="whitespace-nowrap px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500"
+                    >
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {group.requests.map((request) => {
+                  const isSelected = selectedRequestIds.has(request.id);
+                  return (
+                    <tr
+                      key={request.id}
+                      className={`transition-colors ${isSelected ? "bg-indigo-50/40" : "hover:bg-gray-50"}`}
+                    >
+                      <td className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => onSelectRequest(request.id, e.target.checked)}
+                          className="h-4 w-4 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-700">{request.categoryName || "--"}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-700">{request.skillName || "--"}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-700">{request.subskillName || "--"}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-700">{request.proficiency || "--"}</td>
+                      <td className="whitespace-nowrap px-3 py-3">
+                        <RequestStatusBadge status={request.requestStatus} />
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-600">
+                        {formatRequestDate(request.requestedAt)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-700">
+                        {getApprovedByDisplay(request)}
+                      </td>
+                      <td className="min-w-[140px] px-3 py-3 text-sm text-gray-600">
+                        {request.remarks || "--"}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3">
+                        <RequestActions
+                          request={request}
+                          onApprove={onApprove}
+                          onReject={onReject}
+                          processingRequestIds={processingRequestIds}
+                          bulkProcessing={bulkProcessing}
+                          canApprove={canApprove}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="space-y-3 p-4 md:hidden">
+            {group.requests.map((request) => {
+              const isSelected = selectedRequestIds.has(request.id);
+              return (
+                <div
+                  key={request.id}
+                  className={`rounded-xl border p-4 shadow-sm transition-colors ${
+                    isSelected ? "border-indigo-200 bg-indigo-50/30" : "border-gray-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => onSelectRequest(request.id, e.target.checked)}
+                      className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div className="flex flex-1 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-400">{request.categoryName || "--"}</p>
+                        <p className="mt-0.5 text-sm font-semibold text-gray-900">{request.skillName || "--"}</p>
+                        <p className="text-xs text-gray-500">Subskill: {request.subskillName || "--"}</p>
+                      </div>
+                      <RequestStatusBadge status={request.requestStatus} />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="font-semibold uppercase tracking-wide text-gray-400">Proficiency</p>
+                      <p className="mt-0.5 text-gray-800">{request.proficiency || "--"}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold uppercase tracking-wide text-gray-400">Requested</p>
+                      <p className="mt-0.5 text-gray-800">{formatRequestDate(request.requestedAt)}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold uppercase tracking-wide text-gray-400">Approved By</p>
+                      <p className="mt-0.5 text-gray-800">{getApprovedByDisplay(request)}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold uppercase tracking-wide text-gray-400">Remarks</p>
+                      <p className="mt-0.5 text-gray-800">{request.remarks || "--"}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 border-t border-gray-100 pt-3">
+                    <RequestActions
+                      request={request}
+                      onApprove={onApprove}
+                      onReject={onReject}
+                      processingRequestIds={processingRequestIds}
+                      bulkProcessing={bulkProcessing}
+                      canApprove={canApprove}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 /* ─── Main component ──────────────────────────────────────────────── */
 
 const ManageSkillTaxonomy = () => {
   const location = useLocation();
+  const { hasRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [openSkillManagement, setOpenSkillManagement] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -148,6 +563,18 @@ const ManageSkillTaxonomy = () => {
 
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  /* ── Requests state ── */
+  const [requests, setRequests] = useState([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestsSearchTerm, setRequestsSearchTerm] = useState("");
+  const [requestsPage, setRequestsPage] = useState(1);
+  const [processingRequestIds, setProcessingRequestIds] = useState(new Set());
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [rejectContext, setRejectContext] = useState(null); // { title, subtitle, queue[] }
+  const [rejectRemarks, setRejectRemarks] = useState("");
+  const [expandedEmployees, setExpandedEmployees] = useState(new Set());
+  const [selectedRequestIds, setSelectedRequestIds] = useState(new Set());
+
   const activeTab = useMemo(
     () =>
       location.pathname.startsWith(
@@ -158,6 +585,10 @@ const ManageSkillTaxonomy = () => {
     [location.pathname],
   );
 
+  const canApproveRequests = hasRole(["ADMIN"]);
+  const approvedBy = "ADMIN";
+
+  /* ── Taxonomy fetching (unchanged) ── */
   const fetchCategories = async () => {
     setLoadingCategories(true);
     try {
@@ -181,9 +612,200 @@ const ManageSkillTaxonomy = () => {
     }
   };
 
+  const fetchRequests = async () => {
+    setRequestsLoading(true);
+    try {
+      const response = await skillService.getSkillTaxonomyRequests();
+      if (!response?.success) {
+        throw new Error(response?.error || "Unable to load skill taxonomy requests.");
+      }
+      setRequests(Array.isArray(response.data) ? response.data : []);
+      setRequestsPage(1);
+    } catch (error) {
+      notify.error(error, "Unable to load skill taxonomy requests.");
+      setRequests([]);
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  /* ── Single request approve ── */
+  const handleApproveRequest = async (request) => {
+    if (!request?.id || isRequestActionDisabled(request)) return;
+    if (!canApproveRequests) {
+      notify.error("Only admin can approve skill taxonomy requests.");
+      return;
+    }
+    setProcessingRequestIds((prev) => new Set([...prev, request.id]));
+    try {
+      const response = await skillService.approveSkillRequest(request.id, approvedBy);
+      notify.success(response?.message || "Skill taxonomy request approved successfully.");
+      await fetchRequests();
+    } catch (error) {
+      notify.error(error, "Unable to approve skill taxonomy request.");
+    } finally {
+      setProcessingRequestIds((prev) => {
+        const next = new Set(prev);
+        next.delete(request.id);
+        return next;
+      });
+    }
+  };
+
+  /* ── Single request reject (opens modal) ── */
+  const openRejectRequest = (request) => {
+    if (!request?.id || isRequestActionDisabled(request)) return;
+    if (!canApproveRequests) {
+      notify.error("Only admin can approve and reject skill taxonomy requests.");
+      return;
+    }
+    setRejectContext({
+      title: `Reject: ${request.skillName || "this request"}`,
+      subtitle: `Add remarks for ${request.skillName || "this request"}.`,
+      queue: [request],
+    });
+    setRejectRemarks("");
+  };
+
+  const closeRejectRequest = () => {
+    setRejectContext(null);
+    setRejectRemarks("");
+  };
+
+  /* ── Shared reject handler (single / bulk / employee-level) ── */
+  const handleRejectRequest = async () => {
+    const remarks = rejectRemarks.trim();
+    if (!rejectContext?.queue?.length || !remarks) {
+      notify.error("Please enter remarks before rejecting.");
+      return;
+    }
+    setBulkProcessing(true);
+    try {
+      await Promise.all(
+        rejectContext.queue.map((req) => skillService.rejectSkillRequest(req.id, remarks)),
+      );
+      notify.success(
+        rejectContext.queue.length === 1
+          ? "Skill taxonomy request rejected successfully."
+          : `${rejectContext.queue.length} requests rejected successfully.`,
+      );
+      closeRejectRequest();
+      setSelectedRequestIds(new Set());
+      await fetchRequests();
+    } catch (error) {
+      notify.error(error, "Unable to reject skill taxonomy request.");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  /* ── Employee-level approve all ── */
+  const handleApproveEmployee = async (pendingRequests) => {
+    if (!canApproveRequests) {
+      notify.error("Only admin can approve skill taxonomy requests.");
+      return;
+    }
+    if (!pendingRequests.length) return;
+    setBulkProcessing(true);
+    try {
+      await Promise.all(
+        pendingRequests.map((req) => skillService.approveSkillRequest(req.id, approvedBy)),
+      );
+      notify.success(
+        `${pendingRequests.length} request${pendingRequests.length !== 1 ? "s" : ""} approved successfully.`,
+      );
+      await fetchRequests();
+    } catch (error) {
+      notify.error(error, "Unable to approve requests.");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  /* ── Employee-level reject all (opens modal) ── */
+  const handleRejectEmployee = (employeeName, pendingRequests) => {
+    if (!canApproveRequests) {
+      notify.error("Only admin can reject skill taxonomy requests.");
+      return;
+    }
+    if (!pendingRequests.length) return;
+    setRejectContext({
+      title: `Reject All — ${employeeName}`,
+      subtitle: `${pendingRequests.length} pending request${pendingRequests.length !== 1 ? "s" : ""} will be rejected with these remarks.`,
+      queue: pendingRequests,
+    });
+    setRejectRemarks("");
+  };
+
+  /* ── Bulk approve selected ── */
+  const handleBulkApproveSelected = async (pendingSelected) => {
+    if (!canApproveRequests) {
+      notify.error("Only admin can approve skill taxonomy requests.");
+      return;
+    }
+    if (!pendingSelected.length) return;
+    setBulkProcessing(true);
+    try {
+      await Promise.all(
+        pendingSelected.map((req) => skillService.approveSkillRequest(req.id, approvedBy)),
+      );
+      notify.success(
+        `${pendingSelected.length} request${pendingSelected.length !== 1 ? "s" : ""} approved successfully.`,
+      );
+      setSelectedRequestIds(new Set());
+      await fetchRequests();
+    } catch (error) {
+      notify.error(error, "Unable to approve selected requests.");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  /* ── Bulk reject selected (opens modal) ── */
+  const handleBulkRejectSelected = (pendingSelected) => {
+    if (!canApproveRequests) {
+      notify.error("Only admin can reject skill taxonomy requests.");
+      return;
+    }
+    if (!pendingSelected.length) return;
+    setRejectContext({
+      title: "Bulk Reject",
+      subtitle: `${pendingSelected.length} pending request${pendingSelected.length !== 1 ? "s" : ""} will be rejected with these remarks.`,
+      queue: pendingSelected,
+    });
+    setRejectRemarks("");
+  };
+
+  /* ── Checkbox handlers ── */
+  const handleSelectRequest = (id, checked) => {
+    setSelectedRequestIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = (ids, checked) => {
+    setSelectedRequestIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (checked ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  };
+
+  const toggleEmployee = (key) => {
+    setExpandedEmployees((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (activeTab === "taxonomy") {
       fetchCategories();
+    } else {
+      fetchRequests();
     }
   }, [activeTab]);
 
@@ -417,6 +1039,8 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleEditCategory = async (category) => {
+    if (!category.active) return;
+
     try {
       const hydratedCategory = await ensureCategoryHydrated(category);
       openDraftEditor({
@@ -439,6 +1063,8 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleEditSkill = async (category, skill) => {
+    if (!skill.active) return;
+
     try {
       const hydratedCategory = await ensureCategoryHydrated(category);
       const matchedSkill = hydratedCategory.skills.find(
@@ -490,6 +1116,8 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleDeleteCategory = (category) => {
+    if (!category.active) return;
+
     setDeleteModal({
       open: true,
       type: "category",
@@ -500,6 +1128,8 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleDeleteSkill = (category, skill) => {
+    if (!skill.active) return;
+
     setDeleteModal({
       open: true,
       type: "skill",
@@ -510,6 +1140,8 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleDeleteSubSkill = (category, skill, subSkill) => {
+    if (!subSkill.active) return;
+
     setDeleteModal({
       open: true,
       type: "subskill",
@@ -538,8 +1170,7 @@ const ManageSkillTaxonomy = () => {
 
         setCategories((current) =>
           current.filter(
-            (category) =>
-              String(category.id) !== String(deleteModal.category.id),
+            (category) => String(category.id) !== String(deleteModal.category.id),
           ),
         );
         setExpandedCategories((current) => {
@@ -574,8 +1205,11 @@ const ManageSkillTaxonomy = () => {
             String(c.id) === String(deleteModal.category.id)
               ? {
                   ...c,
-                  skills: (c.skills || []).filter(
-                    (s) => String(s.id) !== String(deleteModal.skill.id),
+                  skills: (c.skills || []).map(
+                    (s) =>
+                      String(s.id) === String(deleteModal.skill.id)
+                        ? { ...s, active: false }
+                        : s,
                   ),
                 }
               : c,
@@ -607,9 +1241,11 @@ const ManageSkillTaxonomy = () => {
                     String(s.id) === String(deleteModal.skill.id)
                       ? {
                           ...s,
-                          subSkills: (s.subSkills || []).filter(
+                          subSkills: (s.subSkills || []).map(
                             (ss) =>
-                              String(ss.id) !== String(deleteModal.subSkill.id),
+                              String(ss.id) === String(deleteModal.subSkill.id)
+                                ? { ...ss, active: false }
+                                : ss,
                           ),
                         }
                       : s,
@@ -640,37 +1276,9 @@ const ManageSkillTaxonomy = () => {
     }
   };
 
-  {
-    /* <ConfirmationModal
-  isOpen={deleteModal.open}
-  title={
-    deleteModal.type === "skill"
-      ? "Delete Skill"
-      : "Delete SubSkill"
-  }
-  message={
-    deleteModal.type === "skill"
-      ? `Are you sure you want to delete skill "${deleteModal.skill?.name}"?`
-      : `Are you sure you want to delete subskill "${deleteModal.subSkill?.name}"?`
-  }
-  confirmText="Delete"
-  cancelText="Cancel"
-  variant="danger"
-  isLoading={deleteLoading}
-  onCancel={() =>
-    setDeleteModal({
-      open: false,
-      type: null,
-      category: null,
-      skill: null,
-      subSkill: null,
-    })
-  }
-  onConfirm={confirmDelete}
-/> */
-  }
-
   const handleEditSubSkill = async (category, skill, subSkill) => {
+    if (!subSkill.active) return;
+
     try {
       const hydratedCategory = await ensureCategoryHydrated(category);
       const matchedSkill = hydratedCategory.skills.find(
@@ -726,6 +1334,54 @@ const ManageSkillTaxonomy = () => {
     });
   }, [categories, searchTerm]);
 
+  const filteredRequests = useMemo(() => {
+    const query = normalize(requestsSearchTerm);
+    if (!query) return requests;
+    return requests.filter((request) =>
+      [request.resourceName, request.employeeName, request.categoryName, request.skillName, request.subskillName]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [requests, requestsSearchTerm]);
+
+  const groupedRequests = useMemo(() => {
+    const map = new Map();
+    filteredRequests.forEach((request) => {
+      const employeeKey = request.resourceId
+        ? `id:${request.resourceId}`
+        : request.resourceName || request.employeeName || "Unknown";
+      const displayName = request.resourceName || request.employeeName || "Unknown";
+      if (!map.has(employeeKey)) {
+        map.set(employeeKey, { key: employeeKey, name: displayName, requests: [] });
+      }
+      map.get(employeeKey).requests.push(request);
+    });
+    return Array.from(map.values());
+  }, [filteredRequests]);
+
+  const groupsPageCount = useMemo(
+    () => Math.max(1, Math.ceil(groupedRequests.length / REQUESTS_PAGE_SIZE)),
+    [groupedRequests.length],
+  );
+
+  const paginatedGroups = useMemo(() => {
+    const start = (requestsPage - 1) * REQUESTS_PAGE_SIZE;
+    return groupedRequests.slice(start, start + REQUESTS_PAGE_SIZE);
+  }, [groupedRequests, requestsPage]);
+
+  useEffect(() => {
+    setRequestsPage(1);
+    setSelectedRequestIds(new Set());
+  }, [requestsSearchTerm]);
+
+  useEffect(() => {
+    if (requestsPage > groupsPageCount) {
+      setRequestsPage(groupsPageCount);
+    }
+  }, [requestsPage, groupsPageCount]);
+
   const handleSkillManagementClose = () => {
     setOpenSkillManagement(false);
     setSkillManagementDraft(null);
@@ -754,87 +1410,93 @@ const ManageSkillTaxonomy = () => {
       {/* Page header */}
       <div className="rounded-xl border border-gray-200 bg-white px-6 py-5 shadow-sm">
         <div className="flex flex-col gap-2 border-b border-gray-200 pb-4">
-  
-  {/* Top Section */}
-  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-    
-    {/* Left Content */}
-    <div className="min-w-0">
-      <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
-        Manage Skill Taxonomy
-      </h1>
-    </div>
 
-    {/* Right Actions */}
-    {activeTab === "taxonomy" && (
-      <div className="flex w-full shrink-0 flex-col gap-2.5 sm:flex-row lg:w-auto lg:items-center lg:justify-end">
-        
-        {/* Search Input */}
-        <div className="relative flex-1 sm:w-80 lg:w-96">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          {/* Top Section */}
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 
-          <input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search skill taxonomy..."
-            className="h-11 w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-9 pr-9 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 focus:shadow-sm"
-          />
+            {/* Left Content */}
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
+                Manage Skill Taxonomy
+              </h1>
+            </div>
 
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => setSearchTerm("")}
-              aria-label="Clear search"
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 transition hover:text-gray-600"
-            >
-              <CloseIcon className="h-3.5 w-3.5" />
-            </button>
-          )}
+            {/* Right Actions */}
+            {activeTab === "taxonomy" ? (
+              <div className="flex w-full shrink-0 flex-col gap-2.5 sm:flex-row lg:w-auto lg:items-center lg:justify-end">
+                <div className="relative flex-1 sm:w-80 lg:w-96">
+                  <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search skill taxonomy..."
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-9 pr-9 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 focus:shadow-sm"
+                  />
+                  {searchTerm && (
+                    <Button
+                      type="button"
+                      onClick={() => setSearchTerm("")}
+                      aria-label="Clear search"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2.5 top-1/2 h-6 w-6 -translate-y-1/2 p-0 text-gray-400 shadow-none hover:text-gray-600"
+                    >
+                      <CloseIcon className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+                <Button
+                  variant="primary"
+                  size="medium"
+                  onClick={() => setOpenSkillManagement(true)}
+                  className="h-11 px-5"
+                >
+                  <JobIcon className="h-4 w-4" />
+                  Skill Management
+                </Button>
+              </div>
+            ) : (
+              <div className="relative w-full shrink-0 sm:w-80 lg:w-96">
+                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={requestsSearchTerm}
+                  onChange={(e) => setRequestsSearchTerm(e.target.value)}
+                  placeholder="Search requests..."
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-9 pr-9 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 focus:shadow-sm"
+                />
+                {requestsSearchTerm && (
+                  <Button
+                    type="button"
+                    onClick={() => setRequestsSearchTerm("")}
+                    aria-label="Clear request search"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2.5 top-1/2 h-6 w-6 -translate-y-1/2 p-0 text-gray-400 shadow-none hover:text-gray-600"
+                  >
+                    <CloseIcon className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Description */}
+          <p className="max-w-3xl text-sm leading-relaxed text-gray-500">
+            {tabDescriptions[activeTab]}
+          </p>
         </div>
-
-              <Button
-                variant="outline"
-                size="medium"
-                onClick={handleDownloadTaxonomy}
-                loading={downloadingTaxonomy}
-                loadingText="Downloading"
-              >
-                <DownloadIcon className="h-4 w-4" /> Download Excel
-              </Button>
-
-        {/* Action Button */}
-        <Button
-          variant="primary"
-          size="medium"
-          onClick={() => setOpenSkillManagement(true)}
-          className="h-11 px-5"
-        >
-          <JobIcon className="h-4 w-4" />
-          Skill Management
-        </Button>
-      </div>
-    )}
-  </div>
-
-  {/* Description */}
-  <p className="max-w-3xl text-sm leading-relaxed text-gray-500">
-    {tabDescriptions[activeTab]}
-  </p>
-</div>
 
         {/* Search hydrating notice */}
         {searchHydrating && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-sm text-indigo-700">
-            <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin" />
-            <span>Loading skills and subskills for deeper search results…</span>
+            <LoadingSpinner text="Loading skills and subskills for deeper search results..." size="sm" />
           </div>
         )}
       </div>
 
-      {/* Taxonomy tab content */}
+      {/* ── Taxonomy tab ── */}
       {activeTab === "taxonomy" ? (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          {/* Result count strip */}
           {!loadingCategories && !searchHydrating && searchTerm && (
             <div className="border-b border-gray-100 bg-gray-50 px-5 py-2.5">
               <span className="text-xs text-gray-500">
@@ -846,10 +1508,7 @@ const ManageSkillTaxonomy = () => {
           )}
 
           {loadingCategories ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-sm text-gray-500">
-              <SpinnerIcon className="h-5 w-5 animate-spin text-indigo-400" />
-              <span>Loading skill categories…</span>
-            </div>
+            <LoadingSpinner text="Loading skill categories..." size="md" />
           ) : filteredCategories.length === 0 ? (
             <div className="p-10">
               <EmptyPane
@@ -874,7 +1533,6 @@ const ManageSkillTaxonomy = () => {
                       categoryExpanded ? "border-l-2 border-l-indigo-400" : "border-l-2 border-l-transparent"
                     }`}
                   >
-                    {/* Category row */}
                     <button
                       type="button"
                       onClick={() => handleCategoryToggle(category)}
@@ -906,18 +1564,19 @@ const ManageSkillTaxonomy = () => {
                           icon={EditIcon}
                           variant="edit"
                           label={`Edit ${category.name}`}
+                          disabled={!category.active}
                         />
                         <ActionButton
                           onClick={(e) => { e.stopPropagation(); handleDeleteCategory(category); }}
                           icon={DeleteIcon}
                           variant="delete"
                           label={`Delete ${category.name}`}
+                          disabled={!category.active}
                         />
-                        <StatusBadge active={category.active} />
+                        <GlobalStatusBadge label={category.active ? "Active" : "Inactive"} size="sm" />
                       </div>
                     </button>
 
-                    {/* Skills panel */}
                     {categoryExpanded && (
                       <div className="border-t border-gray-100 bg-gray-50/70 px-5 pb-4 pt-3">
                         {category.skillsLoading ? (
@@ -926,7 +1585,6 @@ const ManageSkillTaxonomy = () => {
                           <EmptyPane message="No skills mapped under this category." />
                         ) : (
                           <div className="space-y-3">
-                            {/* Skill filter */}
                             <SearchInput
                               value={skillFilters[category.id] || ""}
                               onChange={(e) =>
@@ -944,7 +1602,6 @@ const ManageSkillTaxonomy = () => {
                               }
                             />
 
-                            {/* Skill list */}
                             {(() => {
                               const filteredSkills = category.skills.filter((skill) => {
                                 const query = normalize(
@@ -978,7 +1635,6 @@ const ManageSkillTaxonomy = () => {
                                         : "border-gray-200 hover:border-gray-300"
                                     }`}
                                   >
-                                    {/* Skill row */}
                                     <button
                                       type="button"
                                       onClick={() => handleSkillToggle(category.id, skill)}
@@ -1010,19 +1666,20 @@ const ManageSkillTaxonomy = () => {
                                           icon={EditIcon}
                                           variant="edit"
                                           label={`Edit ${skill.name}`}
+                                          disabled={!skill.active}
                                         />
                                         <ActionButton
                                           onClick={(e) => { e.stopPropagation(); handleDeleteSkill(category, skill); }}
                                           icon={DeleteIcon}
                                           variant="delete"
                                           label={`Delete ${skill.name}`}
+                                          disabled={!skill.active}
                                         />
-                                        <StatusBadge active={skill.active} />
+                                        <GlobalStatusBadge label={skill.active ? "Active" : "Inactive"} size="sm" />
                                       </div>
                                     </button>
 
-                                    {/* SubSkills panel */}
-                                    {skillExpanded ? (
+                                    {skillExpanded && (
                                       <div className="border-t border-gray-100 bg-gray-50/60 px-4 pb-3 pt-2.5">
                                         {skill.subSkillsLoading ? (
                                           <InlineSpinner message="Loading subskills…" />
@@ -1030,7 +1687,6 @@ const ManageSkillTaxonomy = () => {
                                           <EmptyPane message="No subskills mapped under this skill." />
                                         ) : (
                                           <div className="space-y-2">
-                                            {/* SubSkill filter */}
                                             <SearchInput
                                               value={subSkillFilters[skillKey] || ""}
                                               onChange={(e) =>
@@ -1048,18 +1704,23 @@ const ManageSkillTaxonomy = () => {
                                               }
                                             />
 
-                                            {skill.subSkills
-                                              .filter((subSkill) => {
-                                                const query = normalize(
-                                                  subSkillFilters[skillKey],
-                                                );
-                                                if (!query) return true;
+                                            {(() => {
+                                              const query = normalize(subSkillFilters[skillKey]);
+                                              const filteredSubs = query
+                                                ? skill.subSkills.filter((sub) =>
+                                                    `${sub.name} ${sub.description}`.toLowerCase().includes(query)
+                                                  )
+                                                : skill.subSkills;
 
-                                                return `${subSkill.name} ${subSkill.description}`
-                                                  .toLowerCase()
-                                                  .includes(query);
-                                              })
-                                              .map((subSkill) => (
+                                              if (filteredSubs.length === 0) {
+                                                return (
+                                                  <p className="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-4 text-center text-sm text-gray-400">
+                                                    No subskills match this search.
+                                                  </p>
+                                                );
+                                              }
+
+                                              return filteredSubs.map((subSkill) => (
                                                 <div
                                                   key={subSkill.id}
                                                   className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-3 py-2.5"
@@ -1069,13 +1730,11 @@ const ManageSkillTaxonomy = () => {
                                                       {subSkill.name}
                                                     </p>
                                                     <p className="mt-1 truncate text-xs text-gray-500">
-                                                      {subSkill.description ||
-                                                        "No description available"}
+                                                      {subSkill.description || "No description available"}
                                                     </p>
                                                   </div>
                                                   <div className="flex items-center gap-2">
-                                                    <button
-                                                      type="button"
+                                                    <ActionButton
                                                       onClick={() =>
                                                         handleEditSubSkill(
                                                           category,
@@ -1083,12 +1742,12 @@ const ManageSkillTaxonomy = () => {
                                                           subSkill,
                                                         )
                                                       }
-                                                      className="rounded-md border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-indigo-200 hover:text-indigo-700"
-                                                    >
-                                                      <EditIcon className="h-3.5 w-3.5" />
-                                                    </button>
-                                                    <button
-                                                      type="button"
+                                                      icon={EditIcon}
+                                                      variant="edit"
+                                                      label={`Edit ${subSkill.name}`}
+                                                      disabled={!subSkill.active}
+                                                    />
+                                                    <ActionButton
                                                       onClick={() =>
                                                         handleDeleteSubSkill(
                                                           category,
@@ -1096,38 +1755,22 @@ const ManageSkillTaxonomy = () => {
                                                           subSkill,
                                                         )
                                                       }
-                                                      className="rounded-md border border-gray-200 bg-white p-2 text-gray-500 transition hover:border-rose-200 hover:text-rose-700"
-                                                    >
-                                                      <DeleteIcon className="h-3.5 w-3.5" />
-                                                    </button>
+                                                      icon={DeleteIcon}
+                                                      variant="delete"
+                                                      label={`Delete ${subSkill.name}`}
+                                                      disabled={!subSkill.active}
+                                                    />
                                                     <StatusBadge
                                                       active={subSkill.active}
                                                     />
                                                   </div>
                                                 </div>
-                                              ))}
-
-                                            {skill.subSkills.length > 0 &&
-                                            skill.subSkills.filter(
-                                              (subSkill) => {
-                                                const query = normalize(
-                                                  subSkillFilters[skillKey],
-                                                );
-                                                if (!query) return true;
-
-                                                return `${subSkill.name} ${subSkill.description}`
-                                                  .toLowerCase()
-                                                  .includes(query);
-                                              },
-                                            ).length === 0 ? (
-                                              <p className="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-4 text-center text-sm text-gray-400">
-                                                No subskills match this search.
-                                              </p>
-                                            ) : null}
+                                              ));
+                                            })()}
                                           </div>
                                         )}
                                       </div>
-                                    ) : null}
+                                    )}
                                   </div>
                                 );
                               });
@@ -1142,16 +1785,85 @@ const ManageSkillTaxonomy = () => {
             </div>
           )}
         </div>
+
       ) : (
-        /* Requests tab placeholder */
-        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-10 text-center">
-          <FolderOpenIcon className="mx-auto mb-3 h-8 w-8 text-gray-300" />
-          <p className="text-sm font-medium text-gray-700">Skill taxonomy requests</p>
-          <p className="mt-1 max-w-sm mx-auto text-sm text-gray-500">
-            Track incoming skill taxonomy requests and review pending changes
-            from employees or
-            administrators.
-          </p>
+        /* ── Requests tab ── */
+        <div className="space-y-3">
+          {/* Summary bar */}
+          {!requestsLoading && (
+            <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-xs text-gray-500">
+                {requestsSearchTerm
+                  ? `${groupedRequests.length} employee${groupedRequests.length !== 1 ? "s" : ""} matched (${filteredRequests.length} request${filteredRequests.length !== 1 ? "s" : ""})`
+                  : `${groupedRequests.length} employee${groupedRequests.length !== 1 ? "s" : ""} · ${requests.length} total request${requests.length !== 1 ? "s" : ""}`}
+              </span>
+              {groupedRequests.length > 0 && (
+                <span className="text-xs text-gray-400">
+                  Page {requestsPage} of {groupsPageCount}
+                </span>
+              )}
+            </div>
+          )}
+
+          {requestsLoading ? (
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              <LoadingSpinner text="Loading skill taxonomy requests..." size="md" />
+            </div>
+          ) : groupedRequests.length === 0 ? (
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-10 shadow-sm">
+              <EmptyPane
+                message={
+                  requestsSearchTerm
+                    ? "No skill taxonomy requests matched your search."
+                    : "No skill taxonomy requests found."
+                }
+              />
+            </div>
+          ) : (
+            <>
+              {/* Employee group cards */}
+              <div className="space-y-3">
+                {paginatedGroups.map((group) => (
+                  <EmployeeGroupCard
+                    key={group.key}
+                    group={group}
+                    isExpanded={expandedEmployees.has(group.key)}
+                    onToggle={() => toggleEmployee(group.key)}
+                    selectedRequestIds={selectedRequestIds}
+                    onSelectRequest={handleSelectRequest}
+                    onSelectAll={handleSelectAll}
+                    onApprove={handleApproveRequest}
+                    onReject={openRejectRequest}
+                    onApproveEmployee={handleApproveEmployee}
+                    onRejectEmployee={handleRejectEmployee}
+                    onBulkApproveSelected={handleBulkApproveSelected}
+                    onBulkRejectSelected={handleBulkRejectSelected}
+                    processingRequestIds={processingRequestIds}
+                    bulkProcessing={bulkProcessing}
+                    canApprove={canApproveRequests}
+                  />
+                ))}
+              </div>
+
+              {/* Pagination */}
+              <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-gray-500">
+                  Showing employees {(requestsPage - 1) * REQUESTS_PAGE_SIZE + 1}
+                  {" – "}
+                  {Math.min(requestsPage * REQUESTS_PAGE_SIZE, groupedRequests.length)}
+                  {" of "}
+                  {groupedRequests.length}
+                </p>
+                <Pagination
+                  currentPage={requestsPage}
+                  totalPages={groupsPageCount}
+                  onPrevious={() => setRequestsPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setRequestsPage((p) => Math.min(groupsPageCount, p + 1))}
+                  className="justify-end py-0"
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1181,6 +1893,52 @@ const ManageSkillTaxonomy = () => {
         initialDraft={skillManagementDraft}
         initialDraftKey={skillManagementDraftKey}
       />
+
+      {/* Shared reject modal (single / employee-level / bulk) */}
+      <Modal
+        isOpen={Boolean(rejectContext)}
+        onClose={closeRejectRequest}
+        title={rejectContext?.title || "Reject Skill Request"}
+        subtitle={rejectContext?.subtitle || ""}
+        size="md"
+        zIndex="z-[1300]"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="small"
+              onClick={closeRejectRequest}
+              disabled={bulkProcessing}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="small"
+              onClick={handleRejectRequest}
+              loading={bulkProcessing}
+              loadingText="Rejecting..."
+              disabled={!rejectRemarks.trim() || bulkProcessing}
+            >
+              {rejectContext?.queue?.length > 1
+                ? `Reject ${rejectContext.queue.length} Requests`
+                : "Reject Request"}
+            </Button>
+          </div>
+        }
+      >
+        <FormTextArea
+          label="Remarks"
+          name="rejectRemarks"
+          value={rejectRemarks}
+          onChange={(event) => setRejectRemarks(event.target.value)}
+          rows={4}
+          placeholder="Skill already exists under a different category"
+          disabled={bulkProcessing}
+        />
+      </Modal>
     </div>
   );
 };
