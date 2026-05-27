@@ -127,62 +127,64 @@ export default function EmployeeOnboardingPage() {
   ============================ */
 
   const fetchDepartments = async () => {
-    try {
-    
-      const response = await api.get(
-        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
-      );
+  try {
 
-      const data = await response.json();
+    const response = await api.get(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`
+    );
 
-      setDepartments(Array.isArray(data) ? data : data.data || []);
-    } catch (error) {
-      console.error("Failed to fetch departments", error);
-    }
-  };
+    console.log(
+      "Departments API Response:",
+      response.data
+    );
+
+    const data = response.data;
+
+    setDepartments(
+      Array.isArray(data)
+        ? data
+        : data.data || []
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Failed to fetch departments",
+      error
+    );
+
+  }
+};
 
   const fetchDesignations = async () => {
-    try {
+  try {
 
+    const response = await api.get(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/`
+    );
 
-      const res = await api.get(
-        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
-      );
+    console.log(
+      "Designations API Response:",
+      response.data
+    );
 
-      // const data = await res.json();
-      // setDesignations(data || []);
+    const data = response.data;
 
-      const data = await res.json();
+    setDesignations(
+      Array.isArray(data)
+        ? data
+        : data.data || []
+    );
 
-      console.log("Designations API Response:", data);
+  } catch (err) {
 
-      setDesignations(
-        Array.isArray(data)
-          ? data
-          : Array.isArray(data.data)
-            ? data.data
-            : []
-      );
+    console.error(
+      "Failed to fetch designations",
+      err
+    );
 
-    } catch (err) {
-      console.error("Failed to fetch designations", err);
-    }
-  };
-
+  }
+};
   const handleBulkUpload = async (event) => {
   try {
     const file = event.target.files[0];
