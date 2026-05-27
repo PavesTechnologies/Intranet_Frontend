@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import Table from "../../../components/Table/table";
 import Pagination from "../../../components/Pagination/pagination";
 import Button from "../../../components/Button/Button";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import StatusBadge from "../../../components/status/statusbadge";
 import { CheckIcon, ViewIcon } from "../../../components/icons/ActionIcons";
@@ -77,7 +77,7 @@ export default function OffersTable({
     try {
       setSending(true);
 
-      const res = await axios.post(
+      const res = await api.post(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/bulk-send`,
         {
           user_uuid_list: selectedIds,

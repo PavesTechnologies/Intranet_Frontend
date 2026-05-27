@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance"
 import Modal from "../../../../components/Modal/modal";
 import Button from "../../../../components/Button/Button";
 
@@ -18,7 +18,7 @@ export default function AddCountryModal({ onClose, onSuccess, BASE_URL }) {
       setError(null);
 
       // Create country
-      await axios.post(
+      await api.post(
         `${BASE_URL}/masters/country`,
         null,
         {
@@ -28,7 +28,7 @@ export default function AddCountryModal({ onClose, onSuccess, BASE_URL }) {
       );
 
       // Fetch the newly added country
-      const countriesRes = await axios.get(`${BASE_URL}/masters/country`, {
+      const countriesRes = await apiget(`${BASE_URL}/masters/country`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const newCountry = countriesRes.data.find(

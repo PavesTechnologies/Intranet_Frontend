@@ -1,7 +1,7 @@
 export const fetchDashboardAnalytics = async () => {
   try {
 
-    const response = await fetch(
+    const response = await api.get(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/analytics/dashboard`,
       {
         method: "GET",

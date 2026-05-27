@@ -52,7 +52,7 @@ export default function EmployeeListPage() {
   }, [employees]);
   const loadDepartments = async () => {
 
-    const res = await fetch(
+    const res = await api.get(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
       {
         headers: {
@@ -74,7 +74,7 @@ export default function EmployeeListPage() {
   const loadDesignations = async () => {
     try {
 
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/`,
         {
           headers: {

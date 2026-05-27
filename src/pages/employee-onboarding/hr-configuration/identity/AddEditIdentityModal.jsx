@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance" ;
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
 
@@ -38,7 +38,7 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
       let savedItem;
 
       if (editData) {
-        await axios.put(
+        await api.put(
           `${BASE_URL}/identity/${editData.identity_type_uuid}`,
           payload,
           {
@@ -51,7 +51,7 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
         if (window.showSuccess) window.showSuccess("Identity type updated");
         savedItem = payload;
       } else {
-        const res = await axios.post(`${BASE_URL}/identity`, payload, {
+        const res = await api.post(`${BASE_URL}/identity`, payload, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",

@@ -286,7 +286,7 @@ export default function OrganizationTree() {
  const fetchHierarchy = async (employeeId) => {
   try {
 
-    const response = await fetch(
+    const response = await api.get(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/hr/organization-hierarchy/${employeeId}`,
       {
         method: "GET",

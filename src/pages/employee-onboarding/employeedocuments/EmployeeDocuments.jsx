@@ -205,7 +205,7 @@ export default function EmployeeDocumentsPage() {
         setLoading(true);
  
         const [documentsResponse, offersResponse] = await Promise.all([
-          fetch(
+          api.get(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/employees/documents`,
             {
               method: "GET",
@@ -299,7 +299,7 @@ export default function EmployeeDocumentsPage() {
  
       const token = localStorage.getItem("token");
  
-      const response = await fetch(
+      const response = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/view_documents?file_path=${filePath}`,
         {
           headers: {
@@ -1104,7 +1104,7 @@ export default function EmployeeDocumentsPage() {
 
 //       const token = localStorage.getItem("token");
 
-//       const response = await fetch(
+//       const response = await api.get(
 //         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/view_documents?file_path=${filePath}`,
 //         {
 //           headers: {

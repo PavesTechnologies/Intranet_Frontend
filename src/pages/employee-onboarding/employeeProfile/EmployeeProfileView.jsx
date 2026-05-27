@@ -630,7 +630,7 @@ export default function EmployeeProfileView() {
   const fetchAllData = async () => {
     try {
       const token = localStorage.getItem("token");
-      const coreRes = await fetch(
+      const coreRes = await api.get(
         `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -645,20 +645,20 @@ export default function EmployeeProfileView() {
       const parallelPromises = [];
 
       const deptPromise = coreData.department_uuid
-        ? fetch(`${BASE_URL}/masters/departments/${coreData.department_uuid}`, { headers: { Authorization: `Bearer ${token}` } })
+        ? api.get(`${BASE_URL}/masters/departments/${coreData.department_uuid}`, { headers: { Authorization: `Bearer ${token}` } })
             .then(r => r.ok ? r.json() : {}).catch(() => ({}))
         : Promise.resolve({});
       parallelPromises.push(deptPromise);
 
       const desigPromise = coreData.designation_uuid
-        ? fetch(`${BASE_URL}/masters/designations/${coreData.designation_uuid}`, { headers: { Authorization: `Bearer ${token}` } })
+        ? api.get(`${BASE_URL}/masters/designations/${coreData.designation_uuid}`, { headers: { Authorization: `Bearer ${token}` } })
             .then(r => r.ok ? r.json() : {}).catch(() => ({}))
         : Promise.resolve({});
       parallelPromises.push(desigPromise);
 
       const targetUserUuid = coreData.user_uuid;
       const hrPromise = targetUserUuid
-        ? fetch(`${BASE_URL}/hr/hr/${targetUserUuid}`, { headers: { Authorization: `Bearer ${token}` } })
+        ? api.get(`${BASE_URL}/hr/hr/${targetUserUuid}`, { headers: { Authorization: `Bearer ${token}` } })
             .then(r => r.ok ? r.json() : {}).catch(() => ({}))
         : Promise.resolve({});
       parallelPromises.push(hrPromise);
@@ -678,7 +678,7 @@ export default function EmployeeProfileView() {
       const countryUuid = addresses[0]?.country_uuid || null;
       if (countryUuid) {
         try {
-          const idTypesRes = await fetch(
+          const idTypesRes = await api.get(
             `${BASE_URL}/identity/country-mapping/identities/${countryUuid}`,
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -793,7 +793,7 @@ export default function EmployeeProfileView() {
       const targetId = empId || employee?.employee_id;
       if (!targetId) return;
       const RMSURL = window.__APP_CONFIG__.RMS_BASE_URL;
-      const res = await fetch(`${RMSURL}/api/resource-certificates/resource/${targetId}`, {
+      const res = await api.get(`${RMSURL}/api/resource-certificates/resource/${targetId}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const result = await res.json();
@@ -841,7 +841,7 @@ export default function EmployeeProfileView() {
 
   const fetchAboutData = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
+      const res = await api.get(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       if (res.ok) {
@@ -883,7 +883,7 @@ export default function EmployeeProfileView() {
         work_enjoyment: updatedAbout.work_enjoyment,
         interests_hobbies: updatedAbout.interests_hobbies,
       };
-      const res = await fetch(url, {
+      const res = await api.get(url, {
         method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify(payload),
@@ -919,7 +919,7 @@ export default function EmployeeProfileView() {
     setIsDeleting(true);
     try {
       const updatedAbout = { ...about, [fieldToDelete]: "" };
-      const res = await fetch(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
+      const res = await api.get(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({

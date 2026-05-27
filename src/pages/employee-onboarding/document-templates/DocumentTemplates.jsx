@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import FilterListbox from "../../../components/filter/FilterListbox";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import {
   FileText,
   FileSignature,
@@ -114,7 +114,7 @@ export default function DocumentTemplates() {
   const downloadBulkTemplate = async () => {
     try {
       setBulkLoading(true);
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/permanent-employee/core-employee-details/bulk-template/`,
         {
           responseType: "blob",

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../../api/axiosInstance"
 import { useAuth } from "../../../../../contexts/AuthContext";
 import Button from "../../../../../components/Button/Button";
 import GenericTable from "../../../../../components/Table/table";
@@ -23,7 +23,7 @@ export default function DegreeMasterManagement() {
   /* -------------------- FETCH EDUCATION LEVELS -------------------- */
   const fetchEducationLevels = async () => {
     try {
-      const res = await axios.get(`${BASE}/masters/education-level`, {
+      const res = await api.get(`${BASE}/masters/education-level`, {
         headers: authHeaders,
       });
       setEducationLevels(res.data);
@@ -39,7 +39,7 @@ export default function DegreeMasterManagement() {
       const url = educationUuid
         ? `${BASE}/education/degree-master/${educationUuid}`
         : `${BASE}/education/degree-master`;
-      const res = await axios.get(url, { headers: authHeaders });
+      const res = await api.get(url, { headers: authHeaders });
       setDegrees(Array.isArray(res.data) ? res.data : []);
     } catch {
       setDegrees([]);
@@ -176,7 +176,7 @@ function AddDegreeModal({ educationLevels, onClose, onSuccess }) {
 
     try {
       setSaving(true);
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE}/education/degree-master`,
         { degree_name: degreeName.trim(), education_uuid: educationUuid },
         {

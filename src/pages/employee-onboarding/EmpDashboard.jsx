@@ -5,7 +5,7 @@ import { FileEdit, Send, Users, ShieldCheck, XCircle, FileText, Handshake, Refre
 import { useAuth } from "../../contexts/AuthContext";
 import Button from "../../components/Button/Button";
 import EmpTable from "./components/EmpTable";
-import axios from "axios";
+import api from "../../api/axiosInstance";
 import AdminApprovalDashboard from "./admin/AdminApprovalDashboard";
 import {
   getNormalizedStatus,
@@ -91,7 +91,7 @@ export default function EmployeeOnboardingDashboard() {
     };
 
     const fetchCoreEmployees = async () => {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
           headers: { Authorization: `Bearer ${ localStorage.getItem("token")}` },

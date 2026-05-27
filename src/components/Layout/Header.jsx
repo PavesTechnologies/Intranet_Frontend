@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Bell, LogOut, User, Menu, X, Eye,EyeOff, KeyRound, ChevronDown, } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
-import axios from "axios";
+
 import Modal from "../Modal/modal";
 import api from "../../api/axiosInstance";
 import { showStatusToast } from "../toastfy/toast";
@@ -42,7 +42,7 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
       try {
         const token = localStorage.getItem("token");
         if (!token) return;
-        const res = await axios.get(
+        const res = await api.get(
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
           { headers: { Authorization: `Bearer ${token}` } }
         );

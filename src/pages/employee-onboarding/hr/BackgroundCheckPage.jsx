@@ -7,7 +7,7 @@ import {
   Lock, Upload, Trash2, Plus
 } from "lucide-react";
 import FilterListbox from "../../../components/filter/FilterListbox";
-import axios from "axios";
+import api from "../../../api/axiosInstance"
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
 import StatusBadge from "../../../components/status/statusbadge";
@@ -128,7 +128,7 @@ const DocPreviewModal = ({ doc, onClose }) => {
     }
     const fetchSignedUrl = async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/hr/view_documents`, {
+        const res = await api.get(`${BASE_URL}/hr/view_documents`, {
           params: { file_path: doc.file_path },
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
         });
@@ -336,7 +336,7 @@ export default function BackgroundCheckPage() {
   const loadEmployees = useCallback(async () => {
     setLoadingList(true);
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/permanent-employee/core-employee-details/`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -381,7 +381,7 @@ export default function BackgroundCheckPage() {
     // Fetch employee profile from real API
     let prof = {};
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/hr/hr/${emp.user_uuid}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -397,7 +397,7 @@ export default function BackgroundCheckPage() {
     // Fetch background check statuses — graceful fallback if endpoint not ready
     let raw = [];
     try {
-      const chkRes = await axios.get(
+      const chkRes = await api.get(
         `${BASE_URL}/hr/background-checks/${emp.user_uuid}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -650,7 +650,7 @@ export default function BackgroundCheckPage() {
     }
     setUpdatingId(id);
     try {
-      await axios.patch(
+      await api.patch(
         `${BASE_URL}/hr/background-checks/${id}`,
         { status, notes: reason },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -686,7 +686,7 @@ export default function BackgroundCheckPage() {
     if (!id) return;
     setUpdatingId(id);
     try {
-      await axios.delete(`${BASE_URL}/hr/background-checks/${id}`, {
+      await api.delete(`${BASE_URL}/hr/background-checks/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
     } catch (err) {
@@ -712,7 +712,7 @@ export default function BackgroundCheckPage() {
     };
  
     try {
-      const res = await axios.post(`${BASE_URL}/hr/background-checks`, payload, {
+      const res = await api.post(`${BASE_URL}/hr/background-checks`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const newCheck = {
@@ -746,7 +746,7 @@ export default function BackgroundCheckPage() {
     if (!emailForm.to.trim()) { showStatusToast("Consultancy email required", "error"); return; }
     setIsSending(true);
     try {
-      await axios.post(
+      await api.post(
         `${BASE_URL}/hr/background-checks/send-to-consultancy`,
         {
           user_uuid: selectedEmp.user_uuid,
@@ -1442,7 +1442,7 @@ export default function BackgroundCheckPage() {
                                                 formData.append("document_id", docRef.id || "");
                                                 formData.append("document_name", docRef.document_name || file.name);
  
-                                                await axios.post(`${BASE_URL}/hr/upload-document`, formData, {
+                                                await api.post(`${BASE_URL}/hr/upload-document`, formData, {
                                                   headers: {
                                                     Authorization: `Bearer ${token}`,
                                                     "Content-Type": "multipart/form-data"
@@ -1594,7 +1594,7 @@ export default function BackgroundCheckPage() {
             const d = deleteConf.doc;
             if (d && d.id) {
               const category = d._cat?.toLowerCase() || "identity";
-              await axios.delete(`${BASE_URL}/hr/delete-document/${d.id}?category=${category}`, {
+              await api.delete(`${BASE_URL}/hr/delete-document/${d.id}?category=${category}`, {
                 headers: { Authorization: `Bearer ${token}` }
               });
               showStatusToast("Document deleted successfully", "success");
@@ -1820,7 +1820,7 @@ export default function BackgroundCheckPage() {
                     formData.append("document_name", uploadModal.docName || uploadModal.file.name);
                     formData.append("doc_type", uploadModal.docType || uploadModal.cat);
  
-                    await axios.post(`${BASE_URL}/hr/upload-document`, formData, {
+                    await api.post(`${BASE_URL}/hr/upload-document`, formData, {
                       headers: {
                         Authorization: `Bearer ${token}`,
                         "Content-Type": "multipart/form-data"

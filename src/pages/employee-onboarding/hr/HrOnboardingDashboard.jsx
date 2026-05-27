@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, FileText, ShieldCheck, CheckCircle2, XCircle, MailCheck, Clock, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
 import Table from "../../../components/Table/table";
@@ -136,7 +136,7 @@ export default function HrOnboardingDashboard() {
 
   const fetchCoreEmployees = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/permanent-employee/core-employee-details/`,
         {
           headers: {
@@ -182,7 +182,7 @@ export default function HrOnboardingDashboard() {
     try {
       setLoadingEditDetails(true);
 
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/hr/offerletters/${employee.user_uuid}`,
         {
           headers: {
@@ -244,7 +244,7 @@ export default function HrOnboardingDashboard() {
     setLoadingManagers(true);
 
     try {
-      const res = await axios.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
+      const res = await api.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
@@ -284,7 +284,7 @@ export default function HrOnboardingDashboard() {
     try {
       setLoadingStatusCommentUserId(userUuid);
 
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/hr/offerletters/${userUuid}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -425,7 +425,7 @@ export default function HrOnboardingDashboard() {
     try {
       setSending(true);
 
-      await axios.post(`${BASE_URL}/hr/offerletters/bulk-join`, payload, {
+      await api.post(`${BASE_URL}/hr/offerletters/bulk-join`, payload, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
@@ -518,7 +518,7 @@ export default function HrOnboardingDashboard() {
     try {
       setPreviewingJoinLetter(true);
 
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE_URL}/hr/offerletters/bulk-join`,
         payload,
         {
@@ -592,7 +592,7 @@ export default function HrOnboardingDashboard() {
     try {
       setSavingEdit(true);
 
-      const res = await axios.put(`${BASE_URL}/hr/offerletters/reassign-joining`, payload, {
+      const res = await api.put(`${BASE_URL}/hr/offerletters/reassign-joining`, payload, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",

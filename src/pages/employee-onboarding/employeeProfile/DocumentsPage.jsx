@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import Select from "react-select";
 
+
 /* ─── Employment-type → relevant path keys ───────────────────────────── */
 const RELEVANT_EXP_PATHS = {
   "full-time":  ["payslip_path", "exp_certificate_path"],
@@ -449,7 +450,7 @@ useEffect(() => {
         hrData?.personal_details?.nationality_country_uuid ||
         hrData?.personal_details?.residence_country_uuid;
 
-const response = await fetch(
+const response = await api.get(
   `${BASE_URL}/education/country-mapping/${country_uuid}`,
         {
           headers: {
@@ -534,7 +535,7 @@ console.log(
       try {
         const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
-        const res = await fetch(`${BASE_URL}/api/skills/active`, {
+        const res = await api.get(`${BASE_URL}/api/skills/active`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
@@ -562,7 +563,7 @@ console.log(
 
         const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
-        const res = await fetch(`${BASE_URL}/api/certificates`, {
+        const res = await api.get(`${BASE_URL}/api/certificates`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
@@ -676,7 +677,7 @@ console.log(
 
     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
-    const response = await fetch(
+    const response = await api.get(
       `${BASE_URL}/hr/view_documents?file_path=${encodeURIComponent(filePath)}`,
       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
     );
@@ -727,7 +728,7 @@ console.log(
         const BASE_URL =
           window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
-        const response = await fetch(
+        const response = await api.get(
           `${BASE_URL}/masters/education-level`,
           {
             headers: {
@@ -768,7 +769,7 @@ console.log(
   setDegreeOptions([]);
   try {
     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-    const response = await fetch(
+    const response = await api.get(
       `${BASE_URL}/education/degree-master/${education_uuid}`,
       {
         headers: {
@@ -955,7 +956,7 @@ useEffect(() => {
       const method = isEdit ? "PUT" : "POST";
 
       // ✅ API CALL
-      const response = await fetch(url.toString(), {
+      const response = await api.get(url.toString(), {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1060,7 +1061,7 @@ useEffect(() => {
   // ✅ UPDATE
   if (uploadModal.docId) {
 
-    response = await fetch(
+    response = await api.get(
       `${BASE_URL}/education/employee-education-document/${uploadModal.docId}`,
       {
         method: "PUT",
@@ -1078,7 +1079,7 @@ useEffect(() => {
   // ✅ CREATE
   else {
 
-    response = await fetch(
+    response = await api.get(
       `${BASE_URL}/education/employee-education-document`,
       {
         method: "POST",
@@ -1296,12 +1297,12 @@ if (uploadModal.category === "experience") {
   let response;
 
   if (uploadModal.docId) {
-    response = await fetch(
+    response = await api.get(
       `${BASE_URL}/experience/${uploadModal.docId}`,
       { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: formData }
     );
   } else {
-    response = await fetch(
+    response = await api.get(
       `${BASE_URL}/experience`,
       { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData }
     );
@@ -1439,7 +1440,7 @@ formData.append(
   // ✅ UPDATE
   if (uploadModal.docId) {
 
-    response = await fetch(
+    response = await api.get(
       `${BASE_URL}/identity/employee-document/${uploadModal.docId}`,
       {
         method: "PUT",
@@ -1457,7 +1458,7 @@ formData.append(
   // ✅ CREATE
   else {
 
-    response = await fetch(
+    response = await api.get(
       `${BASE_URL}/employee-upload/identity-documents`,
       {
         method: "POST",
@@ -1557,7 +1558,7 @@ formData.append(
       if (value) formData.append(key, value);
     });
 
-    const response = await fetch(`${BASE_URL}/hr/upload-document`, {
+    const response = await api.get(`${BASE_URL}/hr/upload-document`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1610,7 +1611,7 @@ formData.append(
   //         const token = localStorage.getItem("token");
   //         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
-  //         const response = await fetch(
+  //         const response = await api.get(
   //           `${BASE_URL}/hr/delete-document/${docId}?category=${encodeURIComponent(category)}`,
   //           {
   //             method: "DELETE",
@@ -1664,7 +1665,7 @@ formData.append(
         if (category === "certifications") {
           const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
-          response = await fetch(
+          response = await api.get(
             `${BASE_URL}/api/resource-certificates/${docId}`,
             {
               method: "DELETE",
@@ -1679,7 +1680,7 @@ formData.append(
         else {
           const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
-          response = await fetch(
+          response = await api.get(
             `${BASE_URL}/education/employee-education-document/${docId}`,
             {
               method: "DELETE",

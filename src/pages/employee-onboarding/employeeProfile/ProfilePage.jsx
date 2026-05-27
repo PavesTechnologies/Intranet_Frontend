@@ -8,6 +8,7 @@ import Button from "../../../components/Button/Button";
 import DynamicCardGrid from "../../../components/Cards/DynamicCardGrid";
 import { PageCard } from "../../../components/Cards/PageCard";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import api from "../../../api/axiosInstance";
 
 export default function ProfilePage({
   activeTab,
@@ -880,7 +881,7 @@ const PrimaryModal = ({
         total_experience: personal.total_experience || 0,
       };
 
-      const coreTask = fetch(
+      const coreTask = api.get(
         `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
         {
           method: "PUT",
@@ -1489,7 +1490,7 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
     if (linkToDelete.social_link_uuid) {
       try {
         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-        const res = await fetch(
+        const res = await api.get(
           `${BASE_URL}/employee-details/social-links/${linkToDelete.social_link_uuid}`,
           {
             method: "DELETE",

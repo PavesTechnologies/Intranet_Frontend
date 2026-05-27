@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance" ;
 import { useParams } from "react-router-dom";
 
 export default function OfferPreview() {
@@ -11,7 +11,7 @@ export default function OfferPreview() {
   useEffect(() => {
     const fetchPreview = async () => {
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${offerId}/docusign-preview`,
           {
             headers: {

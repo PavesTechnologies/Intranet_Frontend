@@ -29,7 +29,7 @@ export default function HeadcountDemographicsPage() {
 
   const fetchDepartments = async () => {
     try {
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
         {
           headers: {

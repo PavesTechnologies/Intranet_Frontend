@@ -389,7 +389,7 @@ export default function WeeklyDashboard() {
       try {
         setLoading(true);
 
-        const response = await fetch(
+        const response = await api.get(
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/weekly-dashboard/?start_date=${formatDateSafe(dateRange.start)}&end_date=${formatDateSafe(dateRange.end)}`,
           {
             headers: {

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import { Download, FileSpreadsheet, UploadCloud } from "lucide-react";
@@ -149,7 +149,7 @@ export default function BulkUpload() {
       };
 
       try {
-        await axios.post(
+        await api.post(
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/create`,
           payload,
           {

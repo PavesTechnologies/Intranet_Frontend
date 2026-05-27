@@ -25,7 +25,7 @@ export default function DesignationManagement() {
 
   const fetchDepartments = async () => {
     try {
-      const res = await fetch(`${BASE}/masters/departments/`, {
+      const res = await api.get(`${BASE}/masters/departments/`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
@@ -42,7 +42,7 @@ export default function DesignationManagement() {
     try {
       setLoading(true);
 
-      const res = await fetch(`${BASE}/masters/designations/`, {
+      const res = await api.get(`${BASE}/masters/designations/`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
@@ -66,7 +66,7 @@ export default function DesignationManagement() {
     if (!window.confirm("Delete designation?")) return;
 
     try {
-      const res = await fetch(`${BASE}/masters/designations/${uuid}`, {
+      const res = await api.get(`${BASE}/masters/designations/${uuid}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
@@ -257,7 +257,7 @@ function DesignationModal({ editData, departments, onClose, onSuccess }) {
       let res;
 
       if (editData) {
-        res = await fetch(
+        res = await api.get(
           `${BASE}/masters/designations/${editData.designation_uuid}`,
           {
             method: "PUT",
@@ -269,7 +269,7 @@ function DesignationModal({ editData, departments, onClose, onSuccess }) {
           },
         );
       } else {
-        res = await fetch(`${BASE}/masters/designations/`, {
+        res = await api.get(`${BASE}/masters/designations/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../../api/axiosInstance" ;
 import { useAuth } from "../../../../../contexts/AuthContext";
 import Button from "../../../../../components/Button/Button";
 import GenericTable from "../../../../../components/Table/table";
@@ -23,7 +23,7 @@ export default function EducationLevelManagement() {
   const fetchLevels = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${BASE}/masters/education-level`, {
+      const res = await api.get(`${BASE}/masters/education-level`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setLevels(res.data);
@@ -53,7 +53,7 @@ export default function EducationLevelManagement() {
     if (!window.confirm("Delete education level?")) return;
 
     try {
-      await axios.delete(`${BASE}/masters/education-level/${uuid}`, {
+      await api.delete(`${BASE}/masters/education-level/${uuid}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setLevels((prev) => prev.filter((l) => l.education_uuid !== uuid));
@@ -185,7 +185,7 @@ function LevelModal({ editData, onClose, onSuccess }) {
       let res;
 
       if (editData) {
-        res = await axios.put(
+        res = await api.put(
           `${BASE}/masters/education-level/${editData.education_uuid}`,
           payload,
           {
@@ -194,7 +194,7 @@ function LevelModal({ editData, onClose, onSuccess }) {
           },
         );
       } else {
-        res = await axios.post(`${BASE}/masters/education-level/`, payload, {
+        res = await api.post(`${BASE}/masters/education-level/`, payload, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           responseType: "text",
         });

@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { ViewIcon } from "../../../components/icons/ActionIcons";
 import { useNavigate, Navigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import Pagination from "../../../components/Pagination/pagination";
 import {useAuth} from "../../../contexts/AuthContext";
 import { KPICard } from "../../../components/kpi/KPI";
@@ -70,7 +70,7 @@ const isAuthorizedManager = isManager || isAdmin;
     const fetchApprovals = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`${BASE_URL}/offer-approval/my-actions`, {
+        const res = await api.get(`${BASE_URL}/offer-approval/my-actions`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 

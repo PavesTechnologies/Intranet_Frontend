@@ -12,6 +12,7 @@ import ExcelPreviewModal from "./components/ExcelPreviewModal";
 import * as XLSX from "xlsx";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { KPICard } from "../../../components/kpi/KPI";
+import api from "../../../api/axiosInstance";
 
 const PAGE_SIZE = 5;
 
@@ -83,50 +84,44 @@ export default function EmployeeOnboardingPage() {
   ============================ */
 
   const fetchEmployees = async () => {
-    try {
-      setLoading(true);
+  try {
 
+    setLoading(true);
 
+    const response = await api.get(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`
+    );
 
-      const response = await fetch(
-        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
-      );
+    console.log(
+      "Employees API Response:",
+      response.data
+    );
 
-      // const data = await response.json();
-      // setEmployees(data || []);
-      const data = await response.json();
+    const data = response.data;
 
-console.log("Employees API Response:", data);
+    setEmployees(
+      Array.isArray(data)
+        ? data
+        : Array.isArray(data.data)
+        ? data.data
+        : []
+    );
 
-if (!response.ok) {
-  console.error("Employees Fetch Failed:", data);
+  } catch (err) {
 
-  setEmployees([]);
+    console.error(
+      "Failed to fetch employees",
+      err
+    );
 
-  return;
-}
+    setEmployees([]);
 
-setEmployees(
-  Array.isArray(data)
-    ? data
-    : Array.isArray(data.data)
-      ? data.data
-      : []
-);
-    } catch (err) {
-      console.error("Failed to fetch employees", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } finally {
 
+    setLoading(false);
+
+  }
+};
   /* ============================
      FETCH DEPARTMENTS
   ============================ */
@@ -134,7 +129,7 @@ setEmployees(
   const fetchDepartments = async () => {
     try {
     
-      const response = await fetch(
+      const response = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
         {
           method: "GET",
@@ -157,7 +152,7 @@ setEmployees(
     try {
 
 
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/`,
         {
           method: "GET",
@@ -189,75 +184,72 @@ setEmployees(
   };
 
   const handleBulkUpload = async (event) => {
-    try {
+  try {
+    const file = event.target.files[0];
 
-      const file = event.target.files[0];
+    if (!file) return;
 
-      if (!file) return;
+    const formData = new FormData();
 
-    
+    formData.append("file", file);
 
-      const formData = new FormData();
-      formData.append("file", file);
+    setUploadLoading(true);
 
-      setUploadLoading(true);
+    const response = await api.post(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/bulk-direct-upload`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
 
-      const response = await fetch(
-        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/bulk-direct-upload`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`
-          },
-          body: formData
-        }
-      );
+    const data = response.data;
 
-      const data = await response.json();
+    if (response.status === 200) {
 
-      if (response.ok) {
+      if (data.success_count > 0) {
+        showStatusToast(
+          `${data.success_count} employees uploaded successfully`,
+          "success"
+        );
+      }
 
-        // Success toast
-        if (data.success_count > 0) {
+      if (data.failed_records?.length > 0) {
+
+        data.failed_records.forEach((item) => {
+
           showStatusToast(
-            `${data.success_count} employees uploaded successfully`,
-            "success"
+            `Row ${item.row}: ${formatError(item.reason)}`,
+            "error"
           );
-        }
 
-        // Error toasts
-        if (data.failed_records?.length > 0) {
-
-          data.failed_records.forEach((item) => {
-
-            showStatusToast(
-              `Row ${item.row}: ${formatError(item.reason)}`,
-              "error"
-            );
-
-          });
-
-        }
-
-        fetchEmployees();
-
-      } else {
-
-        showStatusToast("Upload failed", "error");
+        });
 
       }
 
-    } catch (error) {
+      fetchEmployees();
 
-      console.error(error);
+    } else {
+
       showStatusToast("Upload failed", "error");
 
-    } finally {
-
-      setUploadLoading(false);
-
     }
-  };
+
+  } catch (error) {
+
+    console.error(error);
+
+    showStatusToast("Upload failed", "error");
+
+  } finally {
+
+    setUploadLoading(false);
+
+  }
+};
 
   useEffect(() => {
     fetchEmployees();
@@ -345,77 +337,71 @@ const handleExportPreview = async () => {
 
     setExportLoading(true);
 
- 
-    const response = await fetch(
-      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/export-preview`,
-      {
-        method: "GET",
-
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
+    const response = await api.get(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/export-preview`
     );
 
-    const result = await response.json();
+    console.log(
+      "Export Preview Response:",
+      response.data
+    );
 
-    if (response.ok) {
+    const result = response.data;
 
-      const previewData =
-        result.data || [];
+    const previewData =
+      result.data || [];
 
-      if (previewData.length === 0) {
+    if (previewData.length === 0) {
 
-        showStatusToast(
-          "No employees available for export",
-          "info"
-        );
-
-        return;
-      }
-
-      const formattedData =
-        previewData.map((emp) => ({
-
-          user_uuid: emp.employee_uuid,
-
-          employee_id: emp.employee_id,
-
-          first_name: emp.first_name,
-
-          last_name: emp.last_name,
-
-          mail: emp.mail,
-
-          contact: emp.contact,
-
-          Department:
-            departmentMap[
-              emp.department_uuid
-            ] || "—",
-
-          Designation:
-            designationMap[
-              emp.designation_uuid
-            ] || "—",
-
-          Status:
-            emp.employment_status,
-
-          export_status:
-            emp.export_status,
-
-          export_error:
-            emp.export_error
-        }));
-
-      setExcelPreview(
-        formattedData
+      showStatusToast(
+        "No employees available for export",
+        "info"
       );
 
-      setShowPreview(true);
-
+      return;
     }
+
+    const formattedData =
+      previewData.map((emp) => ({
+
+        user_uuid: emp.employee_uuid,
+
+        employee_id: emp.employee_id,
+
+        first_name: emp.first_name,
+
+        last_name: emp.last_name,
+
+        mail: emp.mail,
+
+        contact: emp.contact,
+
+        Department:
+          departmentMap[
+            emp.department_uuid
+          ] || "—",
+
+        Designation:
+          designationMap[
+            emp.designation_uuid
+          ] || "—",
+
+        Status:
+          emp.employment_status,
+
+        export_status:
+          emp.export_status,
+
+        export_error:
+          emp.export_error
+
+      }));
+
+    setExcelPreview(
+      formattedData
+    );
+
+    setShowPreview(true);
 
   } catch (error) {
 
@@ -429,9 +415,9 @@ const handleExportPreview = async () => {
   } finally {
 
     setExportLoading(false);
+
   }
 };
-
 const downloadExcel = async () => {
 console.log(
   "calling ums api"
@@ -507,20 +493,18 @@ console.log(
     // SEND TO UMS
     // =========================
 
-    const response = await fetch(
+    const response = await api.post(
 
       `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/multiple-users`,
 
-      {
-        method: "POST",
-
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-
-        body: formData,
-      }
+      formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
     );
+    
 
     const data = await response.json();
 
@@ -528,7 +512,7 @@ console.log(
     // UPDATE EXPORT STATUS
     // =========================
 
-    await fetch(
+    await api.get(
 
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/update-export-status`,
 

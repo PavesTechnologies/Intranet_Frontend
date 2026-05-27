@@ -174,7 +174,7 @@ export default function EmployeeCreateModal({
 
   const fetchDepartments = async () => {
     try {
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
         {
           method: "GET",
@@ -194,7 +194,7 @@ export default function EmployeeCreateModal({
 
   const fetchDesignations = async (departmentUuid) => {
     try {
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/department/${departmentUuid}`,
         {
           method: "GET",
@@ -222,7 +222,7 @@ export default function EmployeeCreateModal({
 
   const fetchManagers = async () => {
     try {
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
           method: "GET",
@@ -297,7 +297,7 @@ export default function EmployeeCreateModal({
         let matchedUserUuid = userUuid;
 
         if (employeeUuid) {
-          const res = await fetch(
+          const res = await api.get(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
             {
               headers: {
@@ -315,7 +315,7 @@ export default function EmployeeCreateModal({
         let offerLetter = null;
 
         try {
-          const offerRes = await fetch(
+          const offerRes = await api.get(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/offer/${matchedUserUuid}`,
             {
               headers: {
@@ -338,7 +338,7 @@ export default function EmployeeCreateModal({
         let personalDetails = null;
 
         try {
-          const personalListRes = await fetch(
+          const personalListRes = await api.get(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/employee-details`,
             {
               headers: {
@@ -470,7 +470,7 @@ export default function EmployeeCreateModal({
         return;
       }
 
-      const response = await fetch(
+      const response = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
           method: "POST",
@@ -553,7 +553,7 @@ export default function EmployeeCreateModal({
         return;
       }
 
-      const response = await fetch(
+      const response = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
         {
           method: "PUT",
