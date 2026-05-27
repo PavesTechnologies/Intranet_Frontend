@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import {
   canProjectManagerMutateDemand,
   PM_REQUESTED_DEMAND_ONLY_MESSAGE,
@@ -8,7 +8,7 @@ const BASE_URL = window.__APP_CONFIG__?.RMS_BASE_URL;
 
 export const handleDMDecision = async (dmDemandDecision) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${BASE_URL}/api/demand/dm/decision`,
       dmDemandDecision,
       {
@@ -25,7 +25,7 @@ export const handleDMDecision = async (dmDemandDecision) => {
 
 export const handleRMDecision = async (rmDemandDecision) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${BASE_URL}/api/demand/rm/decision`,
       rmDemandDecision,
       {
@@ -46,7 +46,7 @@ export const deleteDemandByPM = async (demandId, demand = null) => {
   }
 
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${BASE_URL}/api/demand/delete/pm/${demandId}`,
       {
         headers: {
@@ -62,7 +62,7 @@ export const deleteDemandByPM = async (demandId, demand = null) => {
 
 export const updateRoleExpectationById = async (roleId, roleDetails) => {
   try {
-    const response = await axios.put(`${BASE_URL}/api/admin/role-expectations/${roleId}`, 
+    const response = await api.put(`${BASE_URL}/api/admin/role-expectations/${roleId}`, 
       roleDetails,
       {
         headers: {

@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
@@ -8,7 +8,7 @@ const getAuthHeaders = () => ({
 
 export const getResources = async (projectId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/role-off/get-resources/${projectId}`,
       {
         headers: {
@@ -24,7 +24,7 @@ export const getResources = async (projectId) => {
 
 export const getRoleOffProjectKPI = async (projectId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/role-off/get-role-off-project-kpi/${projectId}`,
       {
         headers: {
@@ -40,7 +40,7 @@ export const getRoleOffProjectKPI = async (projectId) => {
 
 export const getRoleOffsApprovedToday = async (projectId) => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/role-off/approved-today`, {
+    const response = await api.get(`${BASE_URL}/api/role-off/approved-today`, {
       params: projectId ? { projectId } : {},
       headers: getAuthHeaders(),
     });
@@ -57,7 +57,7 @@ export const getRoleOffsApprovedToday = async (projectId) => {
 // ✅ CREATE ROLE-OFF (PM)
 export const createRoleOff = async (payload) => {
   try {
-    const response = await axios.post(`${BASE_URL}/api/role-off`, payload, {
+    const response = await api.post(`${BASE_URL}/api/role-off`, payload, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -68,7 +68,7 @@ export const createRoleOff = async (payload) => {
 
 export const bulkPlannedRoleOff = async (payload) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/role-off/bulk-planned`,
       payload,
       {
@@ -83,7 +83,7 @@ export const bulkPlannedRoleOff = async (payload) => {
 
 export const pmCancelRoleOff = async (id) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/role-off/${id}/pm-cancel`,
       null,
       {
@@ -99,7 +99,7 @@ export const pmCancelRoleOff = async (id) => {
 // ✅ GET ALL ROLE-OFFS
 // export const getAllRoleOffs = async () => {
 //   try {
-//     const response = await axios.get(
+//     const response = await api.get(
 //       `${BASE_URL}/api/role-off`,
 //       {
 //         headers: getAuthHeaders(),
@@ -114,7 +114,7 @@ export const pmCancelRoleOff = async (id) => {
 // ✅ RM APPROVE / REJECT
 export const rmApprove = async (id) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/role-off/${id}/rm-approve`,
       null,
       {
@@ -129,7 +129,7 @@ export const rmApprove = async (id) => {
 
 export const rmReject = async (id, rejectionReason) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/role-off/${id}/rm-reject`,
       null,
       {
@@ -145,7 +145,7 @@ export const rmReject = async (id, rejectionReason) => {
 
 export const bulkRmApprove = async (ids) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/role-off/bulk-rm-approve`,
       ids,
       {
@@ -160,7 +160,7 @@ export const bulkRmApprove = async (ids) => {
 
 export const bulkRmReject = async (ids, rejectionReason) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/role-off/bulk-rm-reject`,
       ids,
       {
@@ -178,7 +178,7 @@ export const bulkRmReject = async (ids, rejectionReason) => {
 export const dlFulfill = async (id, acknowledgementType) => {
   try {
     const payload = acknowledgementType ? { acknowledgementType } : null;
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/role-off/${id}/dl-fulfill`,
       payload,
       {
@@ -194,7 +194,7 @@ export const dlFulfill = async (id, acknowledgementType) => {
 
 export const dlReject = async (id, rejectionReason) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/role-off/${id}/dl-reject`,
       null,
       {
@@ -210,7 +210,7 @@ export const dlReject = async (id, rejectionReason) => {
 
 export const bulkDlFulfill = async (ids) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/role-off/bulk-dl-fulfill`,
       ids,
       {
@@ -225,7 +225,7 @@ export const bulkDlFulfill = async (ids) => {
 
 export const bulkDlReject = async (ids, rejectionReason) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/role-off/bulk-dl-reject`,
       ids,
       {
@@ -240,7 +240,7 @@ export const bulkDlReject = async (ids, rejectionReason) => {
 };
 
 export const getAllocations = async (projectId) => {
-  const response = await axios.get(
+  const response = await api.get(
     `${BASE_URL}/api/allocation/project/${projectId}`,
     {
       headers: getAuthHeaders(),
@@ -251,7 +251,7 @@ export const getAllocations = async (projectId) => {
 
 export const getRoleOffReasons = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/role-off/reasons`, {
+    const response = await api.get(`${BASE_URL}/api/role-off/reasons`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -262,7 +262,7 @@ export const getRoleOffReasons = async () => {
 
 export const getPendingRoleOffs = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/role-off/get-role-off-rm`,
       {
         headers: getAuthHeaders(),
@@ -276,7 +276,7 @@ export const getPendingRoleOffs = async () => {
 
 export const getPendingRoleOffsForDM = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/role-off/pending-dm-action`,
       {
         headers: getAuthHeaders(),
@@ -290,7 +290,7 @@ export const getPendingRoleOffsForDM = async () => {
 
 export const getFulfilledRoleOffsForDM = async (projectId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/role-off/fulfilled-dm-action`,
       {
         params: projectId ? { projectId } : {},
@@ -307,7 +307,7 @@ export const getFulfilledRoleOffsForDM = async (projectId) => {
 // ✅ ROLE-OFF REPORTING & EXPORT
 export const getFilteredRoleOffs = async (payload) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/reports/role-off/filtered`,
       payload,
       {
@@ -322,7 +322,7 @@ export const getFilteredRoleOffs = async (payload) => {
 
 export const exportRoleOffsCsv = async (payload) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/reports/role-off/export/csv`,
       payload,
       {
