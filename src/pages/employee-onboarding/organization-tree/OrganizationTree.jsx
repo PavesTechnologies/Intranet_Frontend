@@ -1,30 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import Tree from "react-d3-tree";
-
-/* ---------------- EMPLOYEE DATA ---------------- */
-
-const employees = [
-  "Alwala Swarna Raj",
-  "Bhukya Ajay Kumar",
-  "Bolli Aditya Teja",
-  "Busam Lokeswari",
-  "Dama Rangaswamy",
-  "Gajula Thejas",
-  "Gali Venkatesh",
-  "Korada Ajay Kumar",
-  "Niharika Kandukoori",
-  "Nuthula Ruchitha",
-  "Pannala Jagadish",
-  "Patan Sumiya",
-  "Perka Sathwik",
-  "Pothamsetti Mounika",
-  "Rohit Lingarker",
-  "Saladi Mohan Dharma Teja",
-  "Sri Charan Reddy Chilkuri",
-  "Vijayadurga Balada",
-  "Wazid Shaik",
-  "Yanala Sindhu",
-];
+import { jwtDecode } from "jwt-decode";
+import Button  from "../../../components/Button/Button";
 
 /* ---------------- AVATAR HELPERS ---------------- */
 
@@ -39,97 +16,157 @@ const palette = [
   "#14b8a6", // Teal 500
 ];
 
-const getColor = (name) => {
+const getColor = (name = "") => {
+
+  if (!name) {
+    return palette[0];
+  }
+
   let hash = 0;
+
   for (let i = 0; i < name.length; i++) {
     hash += name.charCodeAt(i);
   }
-  return palette[hash % palette.length];
+
+  return palette[
+    Math.abs(hash) % palette.length
+  ];
 };
 
-const getInitials = (name) =>
-  name
+const getInitials = (name = "") => {
+
+  if (!name) {
+    return "NA";
+  }
+
+  return name
     .split(" ")
-    .map((n) => n[0])
+    .map((n) => n?.[0] || "")
     .join("")
     .slice(0, 2)
     .toUpperCase();
+};
+
+
 
 /* ---------------- TREE CREATION ---------------- */
+const createNode = (employee) => ({
+  name: employee.name,
+  employee_id: employee.employee_id,
+  attributes: {
+    designation: employee.designation,
+    department: employee.department,
+    location: employee.location || "Hyderabad",
+  },
+  children: employee.children || [],
+  _collapsed: true,
+});
 
-const createOrgTree = (groupByDepartment = false) => {
-  const engineerNodes = employees.map((name) => ({
-    name,
-    attributes: {
-      designation: "Graduate Software Engineer",
-      department: "Engineering",
-      location: "Hyderabad HQ",
-    },
-  }));
-
-  const engineeringGrouped = {
-    name: "Engineering Division",
-    attributes: {
-      designation: "Core Development",
-      department: "Engineering",
-      location: "Hyderabad HQ",
-    },
-    children: engineerNodes,
-  };
+const createOrgTree = (manager, employees) => {
 
   return {
-    name: "Sambi Reddy Eada",
+    name: manager?.name || "Organization",
+    employee_id: manager?.employee_id,
     attributes: {
-      designation: "Managing Director",
-      department: "Administration",
-      location: "Hyderabad HQ",
+      designation: manager?.designation || "",
+      department: manager?.department || "",
+      location: manager?.location || "",
     },
-    children: [
-      {
-        name: "Accounts Paves",
-        attributes: {
-          designation: "Accounts Lead",
-          department: "Administration",
-          location: "Hyderabad HQ",
-        },
-      },
-      {
-        name: "Veni Priya P",
-        attributes: {
-          designation: "HR Business Partner",
-          department: "Human Resources",
-          location: "Hyderabad HQ",
-        },
-      },
-      {
-        name: "Varshinya",
-        attributes: {
-          designation: "HR Intern",
-          department: "Human Resources",
-          location: "Hybrid / Remote",
-        },
-      },
-      {
-        name: "Rama Gopal Durgam",
-        attributes: {
-          designation: "Engineering Manager",
-          department: "Administration",
-          location: "Hyderabad HQ",
-        },
-        children: groupByDepartment
-          ? [engineeringGrouped]
-          : engineerNodes,
-      },
-      {
-        name: "Rakesh K",
-        attributes: {
-          designation: "Recruitment Lead Intern",
-          department: "Human Resources",
-          location: "Hyderabad HQ",
-        },
-      },
-    ],
+    children: Array.isArray(employees)
+  ? employees.map(createNode)
+  : [],
   };
+};
+
+
+const filterDepartmentEmployees = (
+  employees,
+  department
+) => {
+
+  return employees.filter(
+    (employee) =>
+      employee.department === department
+  );
+};
+
+const filterEmployeesBySearch = (
+  node,
+  search
+) => {
+
+  if (!node) return null;
+
+  const searchText =
+    search.toLowerCase();
+
+  const matches =
+    node.name
+      ?.toLowerCase()
+      .includes(searchText);
+
+  const filteredChildren =
+    node.children
+      ?.map((child) =>
+        filterEmployeesBySearch(
+          child,
+          search
+        )
+      )
+      .filter(Boolean) || [];
+
+  if (
+    matches ||
+    filteredChildren.length > 0
+  ) {
+    return {
+      ...node,
+      children: filteredChildren,
+    };
+  }
+
+  return null;
+
+};
+
+const groupEmployeesByDepartment = (
+  employees
+) => {
+
+  const grouped = {};
+
+  employees.forEach((employee) => {
+
+    const dept =
+      employee.department ||
+      "Others";
+
+    if (!grouped[dept]) {
+      grouped[dept] = [];
+    }
+
+    grouped[dept].push(employee);
+  });
+
+  return Object.keys(grouped).map(
+    (department) => ({
+
+      name: department,
+
+      employee_id: department,
+
+      attributes: {
+        designation: "Department",
+        department,
+        location: "Hyderabad",
+      },
+
+      children:
+        grouped[department].map(
+          createNode
+        ),
+    })
+  );
 };
 
 /* ---------------- EXPAND PATH ---------------- */
@@ -153,14 +190,24 @@ const expandPath = (node, targetName) => {
 
 /* ---------------- CUSTOM NODE ---------------- */
 
-const CardNode = ({ nodeDatum, toggleNode }) => {
+const CardNode = ({ nodeDatum, toggleNode, onExpand }) => {
   const hasChildren = !!nodeDatum.children?.length;
 
   return (
     <g>
       <foreignObject x="-140" y="-60" width="280" height="120">
         <div
-          onClick={toggleNode}
+          onClick={() => {
+
+            if (
+              !nodeDatum.children?.length
+            ) {
+
+              onExpand(nodeDatum);
+            }
+
+            toggleNode();
+          }}
           className="w-full h-full bg-white rounded-xl border border-slate-200 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)] hover:shadow-lg cursor-pointer flex flex-col p-4 relative overflow-hidden group transition-all duration-300 transform hover:-translate-y-0.5"
         >
           {/* Top colored edge accent */}
@@ -222,15 +269,158 @@ const CardNode = ({ nodeDatum, toggleNode }) => {
 
 export default function OrganizationTree() {
   const treeContainer = useRef(null);
-
+  const [manager, setManager] = useState(null);
+  const [treeData, setTreeData] = useState(null);
   const [groupByDepartment, setGroupByDepartment] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [translate, setTranslate] = useState({ x: 600, y: 120 });
+  const [searchValue, setSearchValue] = useState("");
+  const [employees, setEmployees] =useState([]);
+  const [currentEmployee, setCurrentEmployee] = useState(null);
+  const employeeUuid = localStorage.getItem("employee_id")|| "5100025";
+  const token = localStorage.getItem("token");
+  const decodedToken = token ? jwtDecode(token) : null;
+  const [viewMode, setViewMode] = useState("full");
 
-  const treeData = useMemo(
-    () => createOrgTree(groupByDepartment),
-    [groupByDepartment]
+
+ const fetchHierarchy = async (employeeId) => {
+  try {
+
+    const response = await api.get(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/hr/organization-hierarchy/${employeeId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+
+    return await response.json();
+
+  } catch (error) {
+
+    console.error(
+      "Hierarchy fetch failed",
+      error
+    );
+
+    return null;
+  }
+};
+
+const updateNodeChildren = (
+  node,
+  targetEmployeeId,
+  children
+) => {
+
+  if (
+    node.employee_id === targetEmployeeId
+  ) {
+
+    return {
+      ...node,
+      children,
+      _collapsed: false,
+    };
+  }
+
+  if (!node.children) {
+    return node;
+  }
+
+  return {
+    ...node,
+    children: node.children.map((child) =>
+      updateNodeChildren(
+        child,
+        targetEmployeeId,
+        children
+      )
+    ),
+  };
+};
+
+const handleExpand = async (node) => {
+
+  if (
+    node.children &&
+    node.children.length > 0
+  ) {
+    return;
+  }
+
+  const data = await fetchHierarchy(
+    node.employee_id
   );
+
+  if (!data) return;
+
+ const childNodes =
+  Array.isArray(data.employees)
+    ? data.employees.map(createNode)
+    : [];
+
+  setTreeData((prevTree) =>
+    updateNodeChildren(
+      prevTree,
+      node.employee_id,
+      childNodes
+    )
+  );
+};
+
+const loadInitialHierarchy = async () => {
+console.log("employeeUuid", employeeUuid);
+  const data = await fetchHierarchy(
+    employeeUuid
+  );
+ 
+  if (!data) return;
+ setManager(data.manager);
+const loggedEmployeeData =
+  await fetchHierarchy(
+    decodedToken?.employee_id
+  );
+
+const loggedEmployee = {
+  name: decodedToken?.name,
+
+  employee_id:
+    decodedToken?.employee_id,
+
+  designation:
+    loggedEmployeeData?.manager
+      ?.designation || "",
+
+  department:
+    loggedEmployeeData?.manager
+      ?.department || "",
+
+  location:
+    loggedEmployeeData?.manager
+      ?.location || "",
+};
+
+setCurrentEmployee(
+  loggedEmployee
+);
+
+
+setEmployees([
+  data.manager,
+  ...(data.employees || [])
+]);
+
+  const fullTree = createOrgTree(
+  data.manager,
+  data.employees
+);
+
+setTreeData(fullTree);
+};
 
   const animateZoom = (targetZoom) => {
     const step = (targetZoom - zoom) / 15;
@@ -246,7 +436,9 @@ export default function OrganizationTree() {
     const width = treeContainer.current.offsetWidth;
     const height = treeContainer.current.offsetHeight;
 
-    expandPath(treeData, name);
+  if (treeData) {
+  expandPath(treeData, name);
+}
 
     animateZoom(1.1);
 
@@ -255,6 +447,11 @@ export default function OrganizationTree() {
       y: height / 4,
     });
   };
+useEffect(() => {
+
+  loadInitialHierarchy();
+
+}, []);
 
   useEffect(() => {
     if (treeContainer.current) {
@@ -262,7 +459,128 @@ export default function OrganizationTree() {
       setTranslate({ x: width / 2, y: 120 });
     }
   }, []);
+  useEffect(() => {
 
+  if (!manager) return;
+
+  if (!searchValue.trim()) {
+
+    loadInitialHierarchy();
+
+    return;
+  }
+
+
+
+  const filteredTree =
+    filterEmployeesBySearch(
+      treeData,
+      searchValue
+    );
+
+  setTreeData(filteredTree);
+
+}, [searchValue]);
+ useEffect(() => {
+
+  if (!manager || !employees.length) {
+    return;
+  }
+
+  if (groupByDepartment) {
+
+    const groupedDepartments = {};
+
+    employees.forEach((employee) => {
+
+      const department =
+        employee.department ||
+        "Others";
+
+      if (
+        !groupedDepartments[
+          department
+        ]
+      ) {
+
+        groupedDepartments[
+          department
+        ] = [];
+      }
+
+      groupedDepartments[
+        department
+      ].push(employee);
+    });
+
+    const groupedTree = {
+      name: manager.name,
+
+      employee_id:
+        manager.employee_id,
+
+      attributes: {
+        designation:
+          manager.designation,
+
+        department:
+          manager.department,
+
+        location:
+          manager.location,
+      },
+
+      children:
+        Object.entries(
+          groupedDepartments
+        ).map(
+          ([department, emps]) => ({
+
+            name: department,
+
+            employee_id:
+              department,
+
+            attributes: {
+              designation:
+                "Department",
+
+              department,
+
+              location:
+                "Hyderabad",
+            },
+
+            children:
+              emps.map(
+                createNode
+              ),
+          })
+        ),
+    };
+
+    setTreeData(groupedTree);
+
+  } else {
+
+    const normalTree =
+      createOrgTree(
+        manager,
+        employees.filter(
+          (emp) =>
+            emp.employee_id !==
+            manager.employee_id
+        )
+      );
+
+    setTreeData(normalTree);
+  }
+
+}, [
+  groupByDepartment,
+  employees,
+  manager
+]);
   return (
     <div className="w-full h-screen flex flex-col bg-[#f8fafc] font-sans antialiased text-slate-800">
       <style>
@@ -287,34 +605,141 @@ export default function OrganizationTree() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
-              placeholder="Search employee directory..."
-              className="bg-slate-50 text-slate-900 placeholder-slate-400
-              pl-11 pr-4 py-2.5 rounded-xl w-64 md:w-80 outline-none border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 focus:bg-white transition-all shadow-sm font-medium text-sm"
-            />
+                type="text"
+                value={searchValue}
+                onChange={(e) =>
+                  setSearchValue(e.target.value)
+                }
+                placeholder="Search employee directory..."
+                className="bg-slate-50 text-slate-900 placeholder-slate-400
+                pl-11 pr-4 py-2.5 rounded-xl w-64 md:w-80 outline-none border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 focus:bg-white transition-all shadow-sm font-medium text-sm"
+              />
           </div>
         </div>
 
         <div className="flex items-center gap-3 md:gap-5 flex-wrap">
-          <button
-            onClick={() => focusNode("Rama Gopal Durgam")}
-            className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl shadow-sm hover:bg-slate-50 hover:border-slate-300 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-slate-200"
+         
+          <Button
+              variant="outline"
+              size="medium"
+              className="rounded-xl"
+            onClick={async () => {
+
+              setViewMode("department");
+
+              const loggedEmployee =
+                currentEmployee;
+
+              if (!loggedEmployee) {
+                return;
+              }
+
+              const data =
+                await fetchHierarchy(
+                  employeeUuid
+                );
+
+              const filteredEmployees = [
+                data.manager,
+                ...(data.employees || [])
+              ].filter(
+                (employee) =>
+                  employee.department ===
+                  loggedEmployee.department
+              );
+
+              setTreeData({
+                name:
+                  loggedEmployee.department,
+
+                employee_id: "department",
+
+                attributes: {
+                  designation: "Department",
+
+                  department:
+                    loggedEmployee.department,
+
+                  location: "Hyderabad",
+                },
+
+                children:
+                  filteredEmployees.map(
+                    createNode
+                  ),
+              });
+
+              animateZoom(1);
+            }}
           >
             My Department
-          </button>
+          </Button>
           
-          <button
-            onClick={() => animateZoom(1)}
+
+          <Button variant="outline"
+            onClick={() => {
+
+              setViewMode("top");
+
+              setTreeData({
+                name: manager?.name,
+                employee_id:
+                  manager?.employee_id,
+                attributes: {
+                  designation:
+                    manager?.designation,
+                  department:
+                    manager?.department,
+                  location:
+                    manager?.location,
+                },
+                children: [],
+              });
+
+              animateZoom(1);
+            }}
             className="px-4 py-2.5 bg-indigo-50 text-indigo-700 text-sm font-bold rounded-xl hover:bg-indigo-100 hover:text-indigo-800 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-200 border border-indigo-100"
           >
             Top of Org
-          </button>
+          </Button>
           
-          <button
-            onClick={() => focusNode("Pannala Jagadish")}
-            className="px-4 py-2.5 bg-slate-900 border border-slate-900 text-white text-sm font-semibold rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.2)] hover:bg-slate-800 hover:border-slate-800 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2"
-          >
-            Me
-          </button>
+       
+          <Button variant="primary"
+              onClick={() => {
+
+                setViewMode("me");
+
+                setTreeData({
+                  name:
+                    decodedToken?.name ||
+                    "Employee",
+
+                  employee_id:
+                    decodedToken?.employee_id,
+
+                  attributes: {
+                    designation:
+                      currentEmployee?.designation ||
+                      "",
+
+                    department:
+                      currentEmployee?.department ||
+                      "",
+
+                    location:
+                      currentEmployee?.location ||
+                      "",
+                  },
+
+                  children: [],
+                });
+
+                animateZoom(1);
+              }}
+              className="px-4 py-2.5 bg-slate-900 border border-slate-900 text-white text-sm font-semibold rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.2)] hover:bg-slate-800 hover:border-slate-800 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2"
+            >
+              Me
+          </Button>
 
           <div className="hidden md:block w-px h-8 bg-slate-200 mx-1"></div>
 
@@ -341,6 +766,7 @@ export default function OrganizationTree() {
       >
         <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:32px_32px] opacity-40 mix-blend-multiply z-[-1]"></div>
 
+      {treeData?.name && (
         <Tree
           data={treeData}
           orientation="vertical"
@@ -353,8 +779,14 @@ export default function OrganizationTree() {
           pathFunc="step"
           transitionDuration={400}
           enableLegacyTransitions={true}
-          renderCustomNodeElement={(props) => <CardNode {...props} />}
+         renderCustomNodeElement={(props) => (
+          <CardNode
+            {...props}
+            onExpand={handleExpand}
+          />
+        )}
         />
+      )}
 
         {/* RIGHT SIDE ZOOM CONTROLS */}
         <div className="absolute right-8 top-8 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex flex-col overflow-hidden z-10 transition-shadow hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)]">

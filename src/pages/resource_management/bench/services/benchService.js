@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
 const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
@@ -11,7 +11,7 @@ const getAuthHeaders = () => ({
  */
 export const getBenchResources = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/bench/bench-resources`, {
+    const response = await api.get(`${BASE_URL}/api/bench/bench-resources`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -26,7 +26,7 @@ export const getBenchResources = async () => {
  */
 export const getPoolResources = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/bench/pool-resources`, {
+    const response = await api.get(`${BASE_URL}/api/bench/pool-resources`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -68,7 +68,7 @@ export const getAllResources = async () => {
  */
 export const getBenchKPIs = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/bench/kpi`, {
+    const response = await api.get(`${BASE_URL}/api/bench/kpi`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -80,7 +80,7 @@ export const getBenchKPIs = async () => {
 
 export const updateStatusResource = async (payload) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${BASE_URL}/api/bench/update-resource-state`,
       payload,
       {
@@ -98,7 +98,7 @@ export const updateStatusResource = async (payload) => {
  */
 export const getBenchMatches = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/bench/matches`, {
+    const response = await api.get(`${BASE_URL}/api/bench/matches`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -114,7 +114,7 @@ export const getBenchMatches = async () => {
 export const getOpenDemands = async () => {
   try {
     // Using /api/demand/rm/demands as generic /api/demand/* paths are being intercepted by UUID routers
-    const response = await axios.get(`${BASE_URL}/api/demand/rm/demands`, {
+    const response = await api.get(`${BASE_URL}/api/demand/rm/demands`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -139,7 +139,7 @@ export const quickAllocate = async (
     params.set("demandId", demandId);
     params.set("allocationPercentage", String(allocationPercentage));
 
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/bench/quick-allocate`,
       params,
       {
@@ -161,7 +161,7 @@ export const quickAllocate = async (
  */
 export const getBenchPoolReport = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/reports/bench-pool`, {
+    const response = await api.get(`${BASE_URL}/api/reports/bench-pool`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -176,7 +176,7 @@ export const getBenchPoolReport = async () => {
  */
 export const exportBenchPoolReport = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/reports/bench-pool/export`,
       {
         headers: getAuthHeaders(),

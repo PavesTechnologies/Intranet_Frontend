@@ -11,6 +11,7 @@ import {
 
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { showStatusToast } from "../../components/toastfy/toast";
+import api from "../../api/axiosInstance";
 
 const ManagerDashboard = ({ data, loading, setStatusFilter, handleScroll }) => {
   const [stats, setStats] = useState(null);
@@ -70,34 +71,28 @@ const ManagerDashboard = ({ data, loading, setStatusFilter, handleScroll }) => {
     setReminding(true);
     try {
       // ✅ FIXED URL: removed extra brace and ensured correct base URL usage
-      const response = await fetch(
+      await api.post(
         `${
           window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheet/send_reminder`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(emails),
-        },
+        emails,
       );
 
-      if (response.ok) {
-        showStatusToast(
-          `Reminder emails sent to ${emails.length} users successfully!`,
-          "success",
-        );
-      } else {
-        const errMsg = await response.text();
+      showStatusToast(
+        `Reminder emails sent to ${emails.length} users successfully!`,
+        "success",
+      );
+    } catch (error) {
+      const respData = error.response?.data;
+      if (respData !== undefined) {
+        const errMsg = typeof respData === "string" ? respData : respData?.message || "";
         showStatusToast(
           `Failed to send reminders. Server response: ${errMsg}`,
           "error",
         );
+      } else {
+        showStatusToast(`Failed to send reminders. Please try again.`, "error");
       }
-    } catch (error) {
-      showStatusToast(`Failed to send reminders. Please try again.`, "error");
     } finally {
       setReminding(false);
     }

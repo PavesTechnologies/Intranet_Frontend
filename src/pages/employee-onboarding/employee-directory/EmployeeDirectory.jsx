@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { Search } from "lucide-react";
 
 import Button from "../../../components/Button/Button";
@@ -41,19 +41,19 @@ const EmployeeDirectory = () => {
         setLoading(true);
 
         const [empRes, deptRes, desigRes] = await Promise.all([
-          axios.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
+          api.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           }),
 
-          axios.get(`${BASE_URL}/masters/departments/`, {
+          api.get(`${BASE_URL}/masters/departments/`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           }),
 
-          axios.get(`${BASE_URL}/masters/designations/`, {
+          api.get(`${BASE_URL}/masters/designations/`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },

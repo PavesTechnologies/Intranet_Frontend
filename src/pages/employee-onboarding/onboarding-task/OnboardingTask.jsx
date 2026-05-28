@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance" ;
 
 import TaskBoard from "./components/TaskBoard";
 import AddTaskModal from "./components/AddTaskModal";
@@ -98,7 +98,7 @@ export default function OnboardingTask() {
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${TASKS_API}/all`, { headers });
+      const res = await api.get(`${TASKS_API}/all`, { headers });
       const data = Array.isArray(res.data) ? res.data : res.data.tasks || [];
       setTasks(data.map((task) => normalizeTask(task, employeeMap)));
     } catch {
@@ -110,7 +110,7 @@ export default function OnboardingTask() {
 
   const fetchOptions = async () => {
     try {
-      const empRes = await axios.get(EMPLOYEES_API, { headers });
+      const empRes = await api.get(EMPLOYEES_API, { headers });
       setEmployees(empRes.data || []);
     } catch {
       showStatusToast("Failed to load options", "error");
@@ -159,7 +159,7 @@ export default function OnboardingTask() {
   const handleCreateTask = async (task) => {
     try {
       setSaving(true);
-      await axios.post(`${TASKS_API}/create`, task, { headers });
+      await api.post(`${TASKS_API}/create`, task, { headers });
       await fetchTasks();
       showStatusToast("Task created successfully", "success");
       setShowModal(false);
@@ -173,7 +173,7 @@ export default function OnboardingTask() {
   const handleUpdateTask = async (task) => {
     try {
       setSaving(true);
-      await axios.put(`${TASKS_API}/update/${selectedTask.task_uuid}`, buildTaskPayload(task), {
+      await api.put(`${TASKS_API}/update/${selectedTask.task_uuid}`, buildTaskPayload(task), {
         headers,
       });
       await fetchTasks();
@@ -190,7 +190,7 @@ export default function OnboardingTask() {
   const deleteTask = async (id) => {
     try {
       setDeleting(true);
-      await axios.delete(`${TASKS_API}/delete/${id}`, { headers });
+      await api.delete(`${TASKS_API}/delete/${id}`, { headers });
       showStatusToast("Task deleted successfully", "success");
       await fetchTasks();
       setTaskToDelete(null);

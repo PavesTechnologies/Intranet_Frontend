@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Select from "react-select";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import debounce from "lodash.debounce";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -13,7 +13,7 @@ const EmployeeSearchDropdown = ({ value, onChange }) => {
 
   const fetchEmployees = async (searchText, pageNo, append = false) => {
     try {
-      const res = await axios.get(`${BASE_URL}/api/employees/search`, {
+      const res = await api.get(`${BASE_URL}/api/employees/search`, {
         params: { search: searchText, page: pageNo },
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,

@@ -1,6 +1,6 @@
 // src/pages/EditHolidaysPage.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Edit, Trash2, Save, XCircle } from "lucide-react";
@@ -39,7 +39,7 @@ const EditHolidaysPage = () => {
   const fetchHolidays = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/api/holidays/year/${selectedYear}`,
         {
           headers: {
@@ -81,7 +81,7 @@ const EditHolidaysPage = () => {
   const handleSaveHoliday = async (holidayId) => {
     try {
       setIsLoading(true);
-      await axios.put(`${BASE_URL}/api/holidays/update`, editedData, {
+      await api.put(`${BASE_URL}/api/holidays/update`, editedData, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       toast.success("Holiday updated successfully!");
@@ -104,7 +104,7 @@ const EditHolidaysPage = () => {
   const handleDeleteHoliday = async (holidayId) => {
     try {
       setIsDeleting(true);
-      const res = await axios.delete(
+      const res = await api.delete(
         `${BASE_URL}/api/holidays/delete/${holidayId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },

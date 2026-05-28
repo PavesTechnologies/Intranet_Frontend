@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import api from "../../../api/axiosInstance";
 import { reviewTimesheet, handleBulkReviewAdmin, handleMixedReview } from "../api";
 import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
@@ -37,16 +38,10 @@ const ReportingManagerApprovalTable = ({
   useEffect(() => {
     const fetchProjectInfo = async () => {
       try {
-        const res = await fetch(
+        const res = await api.get(
           `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/project-info/all`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          },
         );
-        if (!res.ok) throw new Error("Failed to fetch project info");
-        const data = await res.json();
+        const data = res.data;
 
         const normalized = data.map((p) => ({
           projectId: p.projectId,
@@ -152,20 +147,11 @@ const ReportingManagerApprovalTable = ({
         comments: reason || "Approved by manager",
       }));
 
-      const res = await fetch(
+      await api.post(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/timesheets/review/internal/bulk`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(requestPayload),
-        },
+        requestPayload,
       );
-
-      if (!res.ok) throw new Error("Bulk review failed");
 
       showStatusToast(
         `All submitted weeks ${status.toLowerCase()} successfully for ${user.userName

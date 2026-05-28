@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../../api/axiosInstance" ;
 import { useAuth } from "../../../../../contexts/AuthContext";
 import FilterListbox from "../../../../../components/filter/FilterListbox";
 import Button from "../../../../../components/Button/Button";
@@ -60,7 +60,7 @@ export default function CountryEducationMapping() {
     setShowAddForm(false);
 
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE}/education/country-mapping/${countryUuid}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -81,12 +81,12 @@ export default function CountryEducationMapping() {
 
     try {
       const [levelsRes, docsRes] = await Promise.all([
-        axios.get(`${BASE}/masters/education-level`, 
+        api.get(`${BASE}/masters/education-level`, 
           {
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }
         ),
-        axios.get(`${BASE}/education/education-document`, 
+        api.get(`${BASE}/education/education-document`, 
           {
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }
@@ -111,7 +111,7 @@ export default function CountryEducationMapping() {
     setError("");
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE}/masters/${selectedLevel}/${selectedDocument}/${selectedCountry}`,
         null,
         {

@@ -1,6 +1,7 @@
+import api from "../../../../api/axiosInstance";
 export const fetchEmployees = async () => {
 
-  const res = await fetch(
+  const res = await api.get(
     `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
     {
       headers: {
@@ -9,7 +10,5 @@ export const fetchEmployees = async () => {
     },
   );
 
-  if (!res.ok) throw new Error("Failed to fetch employees");
-
-  return res.json();
+  return res.data;
 };

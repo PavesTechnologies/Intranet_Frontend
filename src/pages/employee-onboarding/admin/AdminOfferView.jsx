@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -81,7 +81,7 @@ export default function AdminOfferView() {
 
   /* ---------------- FETCH OFFER ---------------- */
   const fetchOffer = async () => {
-    const res = await axios.get(`${BASE}/offerletters/offer/${user_uuid}`, {
+    const res = await api.get(`${BASE}/offerletters/offer/${user_uuid}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
     setOffer(getOfferWithJoiningStatus(res.data));
@@ -90,7 +90,7 @@ export default function AdminOfferView() {
 
   /* ---------------- FETCH APPROVAL ---------------- */
   const fetchApproval = async () => {
-    const res = await axios.get(`${BASE}/offer-approval/my-actions`, {
+    const res = await api.get(`${BASE}/offer-approval/my-actions`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
     console.log("ADMIN APPROVAL API RAW:", res.data);
@@ -131,7 +131,7 @@ export default function AdminOfferView() {
     setActing(true);
     setError("");
     try {
-      await axios.put(
+      await api.put(
         `${BASE}/offer-approval/update_action`,
         {
           user_uuid,
@@ -166,7 +166,7 @@ export default function AdminOfferView() {
   /* ---------------- PREVIEW OFFER ---------------- */
   const handlePreviewOffer = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE}/offerletters/${user_uuid}/generate-preview`,
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }, responseType: "blob" }
       );
@@ -182,7 +182,7 @@ export default function AdminOfferView() {
     if (!approval) return;
     try {
       setActing(true);
-      await axios.delete(`${BASE}/offer-approval-requests/request/delete`, {
+      await api.delete(`${BASE}/offer-approval-requests/request/delete`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" },
         data: [{ user_uuid }],
       });

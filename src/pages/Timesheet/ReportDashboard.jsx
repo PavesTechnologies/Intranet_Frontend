@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import axios from "axios";
+import api from "../../api/axiosInstance";
 import Pagination from "../../components/Pagination/pagination";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button/Button.jsx";
@@ -111,12 +111,9 @@ export default function ReportDashboard() {
       setLeaveError(false);
       setServerError(false);
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${TS_BASE_URL}/api/report/monthly_finance`,
           {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
             params: {
               month: appliedMonth,
               year: appliedYear,
@@ -148,12 +145,9 @@ export default function ReportDashboard() {
   const sendMailPDF = async () => {
     setMailLoading(true);
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${TS_BASE_URL}/api/finance/report/monthly_pdf`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
           params: {
             month: appliedMonth,
             year: appliedYear,

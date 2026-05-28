@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const EmployeeDocumentsTemplate = () => {
 
@@ -12,7 +12,7 @@ const EmployeeDocumentsTemplate = () => {
 
       setLoading(true);
 
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/permanent-employee/core-employee-details/bulk-template/`,
         {
           responseType: "blob",

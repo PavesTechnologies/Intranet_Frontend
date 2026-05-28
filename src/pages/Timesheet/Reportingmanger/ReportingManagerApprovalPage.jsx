@@ -6,6 +6,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import api from "../../../api/axiosInstance";
 
 const ReportingManagerApprovalPage = () => {
   const navigate = useNavigate();
@@ -27,36 +28,24 @@ const ReportingManagerApprovalPage = () => {
   // ✅ Fetch Timesheets
   const fetchGroupedTimesheets = async () => {
     try {
-      const response = await fetch(
+      const response = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheets/internal/summary/reportingManager`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
 
-      // Read body once — Spring error responses carry `message`, success carries the data.
-      const payload = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        const message =
-          payload?.message ||
-          payload?.error ||
-          `Failed to fetch timesheets (${response.status})`;
-        showStatusToast(message, "error");
-        setGroupedTimesheets([]);
-        return;
-      }
-
+      const payload = response.data;
       setGroupedTimesheets(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error("Error fetching timesheets:", error);
-      showStatusToast(
-        error?.message || "Failed to fetch timesheets",
-        "error",
-      );
+      const payload = error?.response?.data;
+      const message =
+        payload?.message ||
+        payload?.error ||
+        (error?.response?.status
+          ? `Failed to fetch timesheets (${error.response.status})`
+          : error?.message || "Failed to fetch timesheets");
+      showStatusToast(message, "error");
+      setGroupedTimesheets([]);
     } finally {
       setLoading(false);
     }

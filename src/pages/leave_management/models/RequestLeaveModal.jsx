@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Fragment, useMemo } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { X } from "lucide-react";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
@@ -21,7 +21,7 @@ const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 //   const [leaveTypes, setLeaveTypes] = useState([]);
 //   const fetchLeaveTypes = async () => {
 //     try {
-//       const res = await axios.get(`${BASE_URL}/api/leave/types`, {
+//       const res = await api.get(`${BASE_URL}/api/leave/types`, {
 //         headers: {
 //           Authorization: `Bearer ${localStorage.getItem("token")}`,
 //         },
@@ -359,7 +359,7 @@ export default function RequestLeaveModal({
   useEffect(() => {
     if (!isOpen) return;
     setLoadingBalances(true);
-    axios
+    api
       .get(`${BASE_URL}/api/leave-balance/employee/${employeeId}/${year}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
@@ -375,7 +375,7 @@ export default function RequestLeaveModal({
     const fetchHolidays = async () => {
       try {
         // Replace with your actual holiday API endpoint
-        const res = await axios.get(
+        const res = await api.get(
           `${BASE_URL}/api/holidays/by-location/${year}`,
           {
             params: { state: "All", country: "India" },
@@ -459,7 +459,7 @@ export default function RequestLeaveModal({
     };
 
     try {
-      await axios.post(`${BASE_URL}/api/leave-requests/apply`, payload, {
+      await api.post(`${BASE_URL}/api/leave-requests/apply`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setSuccess("Leave request submitted!");

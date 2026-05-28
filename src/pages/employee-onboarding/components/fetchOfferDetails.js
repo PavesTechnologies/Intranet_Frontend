@@ -1,8 +1,8 @@
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { getOfferWithJoiningStatus } from "./offerStatus";
 
 export const fetchOfferDetailsList = async (baseUrl, token) => {
-  const summaryRes = await axios.get(
+  const summaryRes = await api.get(
     `${baseUrl}/offerletters/user_id/details`,
     {
       headers: { Authorization: `Bearer ${token}` },
@@ -14,7 +14,7 @@ export const fetchOfferDetailsList = async (baseUrl, token) => {
   const detailedOffers = await Promise.all(
     summaries.map(async (offer) => {
       try {
-        const detailRes = await axios.get(
+        const detailRes = await api.get(
           `${baseUrl}/offerletters/offer/${offer.user_uuid}`,
           {
             headers: { Authorization: `Bearer ${token}` },

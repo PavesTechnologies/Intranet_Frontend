@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance" ;
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
@@ -21,7 +21,7 @@ export default function AddCountryIdentityMappingModal({
   useEffect(() => {
     const loadIdentities = async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/identity`, { headers });
+        const res = await api.get(`${BASE_URL}/identity`, { headers });
         setIdentities(res.data);
       } catch {
         if (window.showError) window.showError("Failed to load identities");
@@ -40,7 +40,7 @@ export default function AddCountryIdentityMappingModal({
     try {
       setSaving(true);
 
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE_URL}/identity/country-mapping`,
         {
           country_uuid: countryUuid,

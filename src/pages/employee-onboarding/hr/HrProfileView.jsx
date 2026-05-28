@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { showStatusToast } from "../../../components/toastfy/toast.jsx";
 import StatusBadge from "../../../components/status/statusbadge";
 import {
@@ -234,7 +234,7 @@ export default function HrProfileView() {
     remarks = "",
   }) => {
     try {
-      await axios.post(
+      await api.post(
         `${BASE_URL}/hr/verify-document`,
         {
           user_uuid,
@@ -277,7 +277,7 @@ export default function HrProfileView() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/hr/hr/${user_uuid}`, {
+        const res = await api.get(`${BASE_URL}/hr/hr/${user_uuid}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
@@ -310,7 +310,7 @@ export default function HrProfileView() {
     setLoadingDoc(key);
 
     try {
-      const res = await axios.get(`${BASE_URL}/hr/view_documents`, {
+      const res = await api.get(`${BASE_URL}/hr/view_documents`, {
         params: { file_path: encodeURIComponent(url) },
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
@@ -425,7 +425,7 @@ export default function HrProfileView() {
     try {
       setFinalLoading(true);
 
-      await axios.post(
+      await api.post(
         `${BASE_URL}/hr/verify-profile`,
         { user_uuid, status: "Verified" },
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },

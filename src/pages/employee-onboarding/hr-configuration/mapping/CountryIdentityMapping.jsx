@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance" ;
 import AddCountryIdentityMappingModal from "./AddCountryIdentityMappingModal";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import Button from "../../../../components/Button/Button";
@@ -32,14 +32,14 @@ export default function CountryIdentityMapping() {
 
   /* ---------------- FETCH DATA ---------------- */
   const fetchCountries = async () => {
-    const res = await axios.get(`${BASE_URL}/masters/country`, { headers: {
+    const res = await api.get(`${BASE_URL}/masters/country`, { headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
     } });
     setCountries(res.data);
   };
 
   const fetchIdentityTypes = async () => {
-    const res = await axios.get(`${BASE_URL}/identity`, { headers : {
+    const res = await api.get(`${BASE_URL}/identity`, { headers : {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
     } });
     setIdentityTypes(res.data);
@@ -49,7 +49,7 @@ export default function CountryIdentityMapping() {
     try {
       setLoading(true);
 
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/identity/country-mapping/identities/${countryUuid}`,
         { headers : {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -86,7 +86,7 @@ export default function CountryIdentityMapping() {
       setFormLoading(true);
 
       if (editingMapping) {
-        await axios.put(
+        await api.put(
           `${BASE_URL}/identity/country-mapping/${editingMapping.mapping_uuid}`,
           {
             country_uuid: selectedCountry,
@@ -116,7 +116,7 @@ export default function CountryIdentityMapping() {
 
         if (window.showSuccess) window.showSuccess("Mapping updated");
       } else {
-        const res = await axios.post(
+        const res = await api.post(
           `${BASE_URL}/identity/country-mapping`,
           {
             country_uuid: selectedCountry,
@@ -157,7 +157,7 @@ export default function CountryIdentityMapping() {
     try {
       setDeleteLoading(true);
 
-      await axios.delete(
+      await api.delete(
         `${BASE_URL}/identity/country-mapping/${confirmDelete.mapping_uuid}`,
         { headers : {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -188,7 +188,7 @@ export default function CountryIdentityMapping() {
     try {
       setDeletingDocUuid(document_uuid);
 
-      await axios.delete(
+      await api.delete(
         `${BASE_URL}/employee-details/identity/${document_uuid}`,
         { headers : {
           Authorization: `Bearer ${localStorage.getItem("token")}`,

@@ -9,7 +9,7 @@ import DayOfWeekBarChart from "./DayOfWeekBarChart";
 import WeeklySummaryCard from "./WeeklySummaryCard";
 import "./MonthlyTSReport.css";
 import LoadingSpinner from "../../components/LoadingSpinner.jsx";
-import axios from "axios";
+import api from "../../api/axiosInstance";
 import { toast } from "react-toastify";
 import Button from "../../components/Button/Button.jsx";
 import { useNavigate } from "react-router-dom";
@@ -63,18 +63,8 @@ const MonthlyTSReport = () => {
   useEffect(() => {
     const loadProjectInfo = async () => {
       try {
-        const res = await fetch(`${TS_BASE_URL}/api/project-info`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const data = await res.json();
-        setProjectInfo(data);
+        const res = await api.get(`${TS_BASE_URL}/api/project-info`);
+        setProjectInfo(res.data);
       } catch (err) {
         console.error("Failed to load project info", err);
       }
@@ -99,14 +89,8 @@ const MonthlyTSReport = () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await axios.get(
+      const res = await api.get(
         `${TS_BASE_URL}/api/report/user_monthly?month=${month}&year=${year}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
       const data = await res.data;
       setApiData(data);
@@ -640,10 +624,7 @@ const MonthlyTSReport = () => {
   const sendMailPDF = async () => {
     setMailLoading(true);
     try {
-      const res = await axios.get(`${TS_BASE_URL}/api/report/userMonthlyPdf`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+      const res = await api.get(`${TS_BASE_URL}/api/report/userMonthlyPdf`, {
         params: {
           month: month,
           year: year,

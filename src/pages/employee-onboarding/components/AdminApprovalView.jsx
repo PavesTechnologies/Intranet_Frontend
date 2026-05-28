@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import Pagination from "../../../components/Pagination/pagination";
 
 export default function AdminApprovalView() {
@@ -19,7 +19,7 @@ export default function AdminApprovalView() {
   useEffect(() => {
     const fetchApprovals = async () => {
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/pending`,
           {
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },

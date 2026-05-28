@@ -5,13 +5,18 @@ import ProfileForm from "./ProfileForm";
 import JobForm from "./JobForm";
 import Button from "../../../../components/Button/Button";
 import { showStatusToast } from "../../../../components/toastfy/toast";
-import { EditIcon } from "../../../../components/icons/ActionIcons";
-import { set } from "date-fns";
 
-const formatDateForInput = (date) => {
-  if (!date) return "";
+const formatDateForInput = (dateValue) => {
+  if (!dateValue) return "";
 
-  const parsedDate = new Date(date);
+  const dateString = String(dateValue).trim();
+  const dateOnlyMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (dateOnlyMatch) {
+    return `${dateOnlyMatch[1]}-${dateOnlyMatch[2]}-${dateOnlyMatch[3]}`;
+  }
+
+  const parsedDate = new Date(dateString);
 
   if (isNaN(parsedDate.getTime())) {
     return "";
@@ -79,11 +84,77 @@ const resolveManagerOptionValue = (value, managerOptions = []) => {
   return manager?.value || normalizedValue;
 };
 
+const getEmployeeFormValues = (
+  data = {},
+  {
+    matchedUserUuid,
+    offerLetter,
+    personalDetails,
+    firstName,
+    middleName,
+    lastName,
+  } = {},
+) => {
+  const reportingManagerValue =
+    data.reporting_manager_uuid || offerLetter?.reporting_manager || "";
+
+  return {
+    personalUuid: personalDetails?.personal_uuid,
+    userUuid: data.user_uuid || matchedUserUuid,
+    empId: data.employee_id,
+    email: data.work_email,
+    empFirstName: data.first_name || offerLetter?.first_name || firstName || "",
+    empMiddleName:
+      data.middle_name || offerLetter?.middle_name || middleName || "",
+    empLastName: data.last_name || offerLetter?.last_name || lastName || "",
+    empDob: data.date_of_birth || personalDetails?.date_of_birth || "",
+    contact:
+      data.contact_number ||
+      personalDetails?.contact_number ||
+      offerLetter?.contact_number ||
+      "",
+    departmentUuid: data.department_uuid,
+    designationUuid: data.designation_uuid,
+    reportingManagerUuid:
+      data.reporting_manager_uuid ||
+      offerLetter?.reporting_manager_uuid ||
+      reportingManagerValue,
+    employeeType:
+      data.employment_type || data.employee_type || offerLetter?.employee_type,
+    mail: offerLetter?.mail || "",
+    countryCode: offerLetter?.country_code || "",
+    designation: offerLetter?.designation || "",
+    currency: offerLetter?.currency || "",
+    compensationComponents: offerLetter?.compensation_components || [],
+    totalCtc: offerLetter?.total_ctc || 0,
+    joiningDate: formatDateForInput(
+      data.joining_date || offerLetter?.joining_date || "",
+    ),
+    location: data.location || "",
+    workMode: data.work_mode || "",
+    employmentStatus: data.employment_status || "",
+    bloodGroup: data.blood_group || personalDetails?.blood_group || "",
+    gender: data.gender || personalDetails?.gender || "",
+    maritalStatus:
+      data.marital_status || personalDetails?.marital_status || "",
+    nationalityCountryUuid: personalDetails?.nationality_country_uuid || "",
+    residenceCountryUuid: personalDetails?.residence_country_uuid || "",
+    emergencyContactRelationUuid:
+      personalDetails?.emergency_contact_relation_uuid || "",
+    emergencyContactName: personalDetails?.emergency_contact_name || "",
+    emergencyContactNumber: personalDetails?.emergency_contact_phone || "",
+    totalExperience: data.total_experience,
+  };
+};
+
 export default function EmployeeCreateModal({
   isOpen,
   onClose,
   userUuid,
   employeeUuid,
+  initialEmployee,
+  initialDepartments = [],
+  initialDesignations = [],
   firstName,
   middleName,
   lastName,
@@ -92,21 +163,18 @@ export default function EmployeeCreateModal({
   const [form, setForm] = useState({});
   const [isGenerated, setIsGenerated] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
   const [managerOptions, setManagerOptions] = useState([]);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [isPrefilledData, setIsPrefilledData] = useState(false);
-  const [isProfileEditable, setIsProfileEditable] = useState(false);
-const [isJobEditable, setIsJobEditable] = useState(false);
 
 
   const isEditMode = !!employeeUuid;
 
   const fetchDepartments = async () => {
     try {
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
         {
           method: "GET",
@@ -126,7 +194,7 @@ const [isJobEditable, setIsJobEditable] = useState(false);
 
   const fetchDesignations = async (departmentUuid) => {
     try {
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/department/${departmentUuid}`,
         {
           method: "GET",
@@ -154,7 +222,7 @@ const [isJobEditable, setIsJobEditable] = useState(false);
 
   const fetchManagers = async () => {
     try {
-      const res = await fetch(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
           method: "GET",
@@ -192,13 +260,36 @@ const [isJobEditable, setIsJobEditable] = useState(false);
 
     setActiveTab("Profile");
     setError("");
-    setIsProfileEditable(isEditMode);
+    if (initialDepartments.length) {
+      setDepartments(initialDepartments);
+    }
+    if (initialDesignations.length) {
+      setDesignations(initialDesignations);
+    }
     fetchDepartments();
     fetchManagers();
-  }, [isOpen, isEditMode]);
+  }, [isOpen, initialDepartments, initialDesignations]);
 
   useEffect(() => {
-    if (!userUuid && !employeeUuid) return;
+    if (!isOpen || !initialEmployee) return;
+
+    setForm((prev) => ({
+      ...prev,
+      ...getEmployeeFormValues(initialEmployee, {
+        matchedUserUuid: initialEmployee.user_uuid || userUuid,
+        firstName,
+        middleName,
+        lastName,
+      }),
+    }));
+
+    if (initialEmployee.department_uuid) {
+      fetchDesignations(initialEmployee.department_uuid);
+    }
+  }, [isOpen, initialEmployee, userUuid, firstName, middleName, lastName]);
+
+  useEffect(() => {
+    if (!isOpen || (!userUuid && !employeeUuid)) return;
 
     const fetchEmployee = async () => {
       try {
@@ -206,7 +297,7 @@ const [isJobEditable, setIsJobEditable] = useState(false);
         let matchedUserUuid = userUuid;
 
         if (employeeUuid) {
-          const res = await fetch(
+          const res = await api.get(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
             {
               headers: {
@@ -224,7 +315,7 @@ const [isJobEditable, setIsJobEditable] = useState(false);
         let offerLetter = null;
 
         try {
-          const offerRes = await fetch(
+          const offerRes = await api.get(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/offer/${matchedUserUuid}`,
             {
               headers: {
@@ -247,7 +338,7 @@ const [isJobEditable, setIsJobEditable] = useState(false);
         let personalDetails = null;
 
         try {
-          const personalListRes = await fetch(
+          const personalListRes = await api.get(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/employee-details`,
             {
               headers: {
@@ -260,25 +351,10 @@ const [isJobEditable, setIsJobEditable] = useState(false);
             const personalRecords =
               await personalListRes.json();
 
-            console.log(
-              "Personal Details Response:",
-              personalRecords
-            );
-
-            console.log(
-              "Matched User UUID:",
-              matchedUserUuid
-            );
-
             personalDetails = personalRecords.find(
               (item) =>
                 String(item.user_uuid).trim() ===
                 String(matchedUserUuid).trim()
-            );
-
-            console.log(
-              "Matched Personal Details:",
-              personalDetails
             );
           }
         } catch (personalError) {
@@ -288,61 +364,17 @@ const [isJobEditable, setIsJobEditable] = useState(false);
           );
         }
 
-        const reportingManagerValue =
-          offerLetter?.reporting_manager || data.reporting_manager_uuid || "";
-
-          console.log(
-          "Joining Date:",
-          offerLetter?.joining_date
-        );
-
-        console.log(
-          "Formatted Joining Date:",
-          formatDateForInput(
-            offerLetter?.joining_date
-          )
-        );
         setForm((prev) => ({
           ...prev,
-          personalUuid: personalDetails?.personal_uuid,
-          userUuid: data.user_uuid || matchedUserUuid,
-          empId: data.employee_id,
-          email: data.work_email,
-          empFirstName: offerLetter?.first_name || data.first_name || firstName || "",
-          empMiddleName: offerLetter?.middle_name || data.middle_name || middleName || "",
-          empLastName: offerLetter?.last_name || data.last_name || lastName || "",
-          empDob: personalDetails?.date_of_birth || data.date_of_birth || "",
-          contact: personalDetails?.contact_number || offerLetter?.contact_number || data.contact_number || "",
-          departmentUuid: data.department_uuid,
-          designationUuid: data.designation_uuid,
-          reportingManagerUuid: offerLetter?.reporting_manager_uuid || data.reporting_manager_uuid || resolveManagerOptionValue(
-            reportingManagerValue,
-            managerOptions,
-          ),
-          employeeType: offerLetter?.employee_type || data.employee_type || data.employment_type,
-          mail:offerLetter?.mail || "",
-          countryCode: offerLetter?.country_code || "",
-          designation:offerLetter?.designation || "",
-          currency:offerLetter?.currency || "",
-          compensationComponents:offerLetter?.compensation_components || [],
-          totalCtc:offerLetter?.total_ctc || 0,
-          joiningDate: formatDateForInput(
-          offerLetter?.joining_date || data.joining_date || ""),
-          location: data.location,
-          workMode: data.work_mode,
-          employmentStatus: data.employment_status,
-          bloodGroup: personalDetails?.blood_group || data.blood_group || "",
-          gender: personalDetails?.gender || data.gender || "",
-          maritalStatus: personalDetails?.marital_status || data.marital_status || "",
-          nationalityCountryUuid: personalDetails?.nationality_country_uuid || "",
-          residenceCountryUuid: personalDetails?.residence_country_uuid || "",
-          emergencyContactRelationUuid: personalDetails?.emergency_contact_relation_uuid || "",
-          emergencyContactName: personalDetails?.emergency_contact_name || "",
-          emergencyContactNumber: personalDetails?.emergency_contact_phone || "",
-          totalExperience: data.total_experience,
+          ...getEmployeeFormValues(data, {
+            matchedUserUuid,
+            offerLetter,
+            personalDetails,
+            firstName,
+            middleName,
+            lastName,
+          }),
         }));
-
-        setIsPrefilledData(true);
 
         fetchDesignations(data.department_uuid);
       } catch (error) {
@@ -351,7 +383,7 @@ const [isJobEditable, setIsJobEditable] = useState(false);
     };
 
     fetchEmployee();
-  }, [employeeUuid, managerOptions, userUuid]);
+  }, [isOpen, employeeUuid, userUuid, firstName, middleName, lastName]);
 
   useEffect(() => {
     if (!managerOptions.length) return;
@@ -438,7 +470,7 @@ const [isJobEditable, setIsJobEditable] = useState(false);
         return;
       }
 
-      const response = await fetch(
+      const response = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
           method: "POST",
@@ -498,13 +530,73 @@ const [isJobEditable, setIsJobEditable] = useState(false);
     }
   };
 
-  const handleToggleProfileEdit = () => {
-    setIsProfileEditable((prev) => !prev);
+  const handleUpdate = async () => {
+    if (!employeeUuid) return;
+
+    try {
+      setUpdating(true);
+      setError("");
+
+      if (
+        !form.empFirstName ||
+        !form.empLastName ||
+        !form.empDob ||
+        !form.contact ||
+        !form.departmentUuid ||
+        !form.designationUuid ||
+        !form.employeeType ||
+        !form.joiningDate ||
+        !form.employmentStatus
+      ) {
+        setError("Please fill all required fields.");
+        showStatusToast("Please fill all required fields", "info");
+        return;
+      }
+
+      const response = await api.get(
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            first_name: form.empFirstName,
+            middle_name: form.empMiddleName || "",
+            last_name: form.empLastName,
+            date_of_birth: form.empDob,
+            contact_number: form.contact,
+            department_uuid: form.departmentUuid,
+            designation_uuid: form.designationUuid,
+            reporting_manager_uuid: form.reportingManagerUuid || null,
+            employment_type: form.employeeType,
+            joining_date: form.joiningDate,
+            location: form.location || "",
+            work_mode: form.workMode || "",
+            employment_status: form.employmentStatus,
+            blood_group: form.bloodGroup || "",
+            gender: form.gender || "",
+            marital_status: form.maritalStatus || "",
+            total_experience: Number(form.totalExperience) || 0,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Update failed");
+      }
+
+      showStatusToast("Employee updated successfully", "success");
+      onClose();
+    } catch (err) {
+      console.error("Failed to update employee", err);
+      setError("Something went wrong while updating employee.");
+      showStatusToast("Failed to update employee", "error");
+    } finally {
+      setUpdating(false);
+    }
   };
-  
-const handleToggleJobEdit = () => {
-  setIsJobEditable((prev) => !prev);
-};
 
   return (
     <LargeModal
@@ -521,39 +613,16 @@ const handleToggleJobEdit = () => {
             form={form}
             handleChange={handleChange}
             isGenerated={isGenerated}
-            isEditMode={isEditMode}
-            isProfileEditable={isProfileEditable}
-            isPrefilledData={isPrefilledData}
-            isJobEditable={isJobEditable}
           />
           <div className="flex justify-end gap-3 mt-6">
-  {!isProfileEditable ? (
-    <>
-     
-
-      <Button
-        variant="primary"
-        size="small"
-        onClick={() => setActiveTab("Job")}
-      >
-        Next
-      </Button>
-    </>
-  ) : (
-    <>
-    
-      <Button
-        variant="primary"
-        size="small"
-        onClick={handleSavePersonalDetails}
-        loading={savingProfile}
-        loadingText="Saving..."
-      >
-        Save
-      </Button>
-    </>
-  )}
-</div>
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => setActiveTab("Job")}
+            >
+              Next
+            </Button>
+          </div>
         </>
       )}
       {activeTab === "Job" && (
@@ -564,9 +633,6 @@ const handleToggleJobEdit = () => {
       departments={departments}
       designations={designations}
       managerOptions={managerOptions}
-      isEditMode={isEditMode}
-      isPrefilledData={isPrefilledData}
-      isJobEditable={isJobEditable}
     />
 
     <div className="flex justify-end gap-3 mt-6">
@@ -602,6 +668,27 @@ const handleToggleJobEdit = () => {
             onClick={onClose}
           >
             Save
+          </Button>
+        </>
+      )}
+
+      {isEditMode && (
+        <>
+          <Button
+            variant="secondary"
+            size="small"
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            variant="primary"
+            size="small"
+            onClick={handleUpdate}
+            disabled={updating}
+          >
+            {updating ? "Updating..." : "Update"}
           </Button>
         </>
       )}

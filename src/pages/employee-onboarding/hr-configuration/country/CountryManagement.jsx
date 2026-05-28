@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance"
 import AddCountryModal from "./AddCountryModal";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
@@ -19,7 +19,7 @@ export default function CountryManagement() {
   const fetchCountries = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${BASE_URL}/masters/country`, {
+      const res = await api.get(`${BASE_URL}/masters/country`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setCountries(res.data);
@@ -45,7 +45,7 @@ export default function CountryManagement() {
     }
 
     try {
-      await axios.put(
+      await api.put(
         `${BASE_URL}/masters/country/deactivateoractivate/${country.country_uuid}`,
         null,
         {

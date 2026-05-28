@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { showStatusToast } from "../../../components/toastfy/toast.jsx";
 import Button from "../../../components/Button/Button";
@@ -96,7 +96,7 @@ export default function OnboardingSummary() {
   const fetchSummaryData = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${BASE_URL}/dashboard/onboarding-summary`, {
+      const res = await api.get(`${BASE_URL}/dashboard/onboarding-summary`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setSummaryData(res.data);

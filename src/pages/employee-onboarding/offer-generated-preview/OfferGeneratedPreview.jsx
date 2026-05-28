@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 export default function OfferGeneratedPreview() {
   const { offerId } = useParams();
@@ -14,7 +14,7 @@ export default function OfferGeneratedPreview() {
     const loadPreview = async () => {
       try {
 
-        const res = await axios.get(
+        const res = await api.get(
           `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/${offerId}/generate-preview`,
           {
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },

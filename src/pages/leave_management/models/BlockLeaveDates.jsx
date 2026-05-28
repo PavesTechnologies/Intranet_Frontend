@@ -8,7 +8,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import DateRangePicker from "./DateRangePicker";
 import { format } from "date-fns";
@@ -242,17 +242,17 @@ export default function BlockLeaveDates({ employeeId }) {
         setLoading(true);
         // Replace with your endpoints
         const [projRes, ltRes, ltIdsRes] = await Promise.all([
-          axios.get(`${PMS_BASE_URL}/api/projects/owner/${employeeId}`, {
+          api.get(`${PMS_BASE_URL}/api/projects/owner/${employeeId}`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           }),
-          axios.get(`${BASE_URL}/api/leave/types`, {
+          api.get(`${BASE_URL}/api/leave/types`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           }),
-          axios.get(`${BASE_URL}/api/leave/get-all-leave-type-ids`, {
+          api.get(`${BASE_URL}/api/leave/get-all-leave-type-ids`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
@@ -286,7 +286,7 @@ export default function BlockLeaveDates({ employeeId }) {
       try {
         const year = new Date().getFullYear();
         console.log("yeaer", year);
-        const res = await axios.get(
+        const res = await api.get(
           `${BASE_URL}/api/holidays/by-location/${year}`,
           {
             params: { state: "All", country: "India" }, // Adjust params if needed
@@ -319,7 +319,7 @@ export default function BlockLeaveDates({ employeeId }) {
       setSelectedMembers([]);
       if (!projectId) return;
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${PMS_BASE_URL}/api/projects/${projectId}/members`,
           {
             headers: {
@@ -369,7 +369,7 @@ export default function BlockLeaveDates({ employeeId }) {
         reason: reason,
         year: new Date().getFullYear(),
       };
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE_URL}/api/leave-block/block`,
         payload,
         {

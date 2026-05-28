@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 const LMS_BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -6,7 +6,7 @@ const TSM_BASE_URL = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
 
 export const getWorkforceFilters = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/resource/get-all-resource-filters`,
       {
         headers: {
@@ -40,7 +40,7 @@ export const getWorkforceKPI = async (filters) => {
     if (filters.project && filters.project !== "All Projects")
       params.project = filters.project;
 
-    const response = await axios.get(`${BASE_URL}/api/rms/kpis`, {
+    const response = await api.get(`${BASE_URL}/api/rms/kpis`, {
       params,
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -96,7 +96,7 @@ export const getAvailabilityTimeline = async (filters, pagination) => {
     if (filters.project && filters.project !== "All Projects")
       params.project = filters.project;
 
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/availability/timeline/window`,
       {
         params,
@@ -113,7 +113,7 @@ export const getAvailabilityTimeline = async (filters, pagination) => {
 
 export const getHolidaysByYear = async (year) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${LMS_BASE_URL}/api/holidays/year/${year}`,
       {
         headers: {
@@ -133,7 +133,7 @@ export const getUtilization = async (resourceId, month, year) => {
     const targetMonth = month || (now.getMonth() + 1);
     const targetYear = year || now.getFullYear();
 
-    const response = await axios.get(
+    const response = await api.get(
       `${TSM_BASE_URL}/api/utilization/monthly/${resourceId}`,
       {
         params: {
@@ -156,7 +156,7 @@ export const getDashboardSummaryDateRangeMonths = async (resourceId, months = 3)
     const params = { months };
     if (resourceId) params.employeeId = resourceId;
 
-    const response = await axios.get(
+    const response = await api.get(
       `${TSM_BASE_URL}/api/dashboard/summary/dateRangeMonths`,
       {
         params,
@@ -178,7 +178,7 @@ export const getDashboardSummaryDateRange = async (resourceId, startDate, endDat
     if (endDate) params.endDate = endDate;
     if (resourceId) params.employeeId = resourceId;
 
-    const response = await axios.get(`${TSM_BASE_URL}/api/dashboard/summary`, {
+    const response = await api.get(`${TSM_BASE_URL}/api/dashboard/summary`, {
       params,
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -191,7 +191,7 @@ export const getDashboardSummaryDateRange = async (resourceId, startDate, endDat
 };
 
 export const getSkillCategoriesTree = async () => {
-  const response = await axios.get(`${BASE_URL}/api/skill-categories/tree`, {
+  const response = await api.get(`${BASE_URL}/api/skill-categories/tree`, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
     },
@@ -201,7 +201,7 @@ export const getSkillCategoriesTree = async () => {
 
 export const createRoleExpectation = async (payload) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/admin/role-expectations`,
       payload,
       {
@@ -218,7 +218,7 @@ export const createRoleExpectation = async (payload) => {
 
 export const updateRoleExpectation = async (roleId, payload) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${BASE_URL}/api/admin/role-expectations/${roleId}`,
       payload,
       {
@@ -235,7 +235,7 @@ export const updateRoleExpectation = async (roleId, payload) => {
 
 export const getRoleExpectations = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/admin/role-expectations`,
       {
         headers: {
@@ -251,7 +251,7 @@ export const getRoleExpectations = async () => {
 
 export const deleteRoleExpectation = async (roleName) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${BASE_URL}/api/admin/role-expectations/${roleName}`,
       {
         headers: {
@@ -268,7 +268,7 @@ export const deleteRoleExpectation = async (roleName) => {
 
 export const getProficiencyLevels = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/proficiency/get-all-proficiency-levels`,
       {
         headers: {
@@ -286,7 +286,7 @@ export const getProficiencyLevels = async () => {
 
 export const fetchDemands = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/demand/rm/demands`, {
+    const response = await api.get(`${BASE_URL}/api/demand/rm/demands`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -299,7 +299,7 @@ export const fetchDemands = async () => {
 
 // export const fetchResources = async () => {
 //   try {
-//     const response = await axios.get(
+//     const response = await api.get(
 //       `${BASE_URL}/api/availability/timeline/window`,
 //       {
 //         params: { page: 0, size: 500 },
@@ -316,7 +316,7 @@ export const fetchDemands = async () => {
 
 export const getSkillGapAnalysis = async (demandId, resourceId) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/matching/skill-gap-analysis`,
       { demandId, resourceId },
       {

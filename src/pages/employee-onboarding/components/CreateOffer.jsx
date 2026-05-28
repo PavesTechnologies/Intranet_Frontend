@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
@@ -124,7 +124,7 @@ export default function CreateOffer() {
 
   useEffect(() => {
     const loadCountries = async () => {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/country`,
         {
           headers: {
@@ -144,7 +144,7 @@ export default function CreateOffer() {
     };
 
     const loadCC = async () => {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/admin-users`,
         {
           headers: {
@@ -441,7 +441,7 @@ export default function CreateOffer() {
     const toastId = toast.loading("Creating offer...");
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/create`,
         payload,
         {

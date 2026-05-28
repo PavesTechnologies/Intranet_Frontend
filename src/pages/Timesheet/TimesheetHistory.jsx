@@ -2,12 +2,12 @@ import React, { useState, useEffect, useMemo } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { showStatusToast } from "../../components/toastfy/toast";
-import axios from "axios";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TimesheetHistoryGroup } from "./TimesheetHistoryGroup";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button/Button";
+import api from "../../api/axiosInstance";
 
 // Converts a "YYYY-MM-DD" string safely to a Date object in local Indian time
 const parseLocalDate = (dateStr) => {
@@ -78,23 +78,10 @@ const TimesheetHistory = () => {
   useEffect(() => {
     const fetchAndStoreProjectTaskInfo = async () => {
       try {
-        const response = await fetch(
+        const response = await api.get(
           `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/project-info`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          },
         );
-
-        if (!response.ok) {
-          throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json(); // 💡 FIX: Set the project info here once the data is fetched successfully
-        setProjectInfo(data);
+        setProjectInfo(response.data);
       } catch (error) {
         console.log("project info fetch error :", error);
         showStatusToast(
@@ -118,11 +105,7 @@ const TimesheetHistory = () => {
       const baseUrl = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
       const url = `${baseUrl}/api/timesheet/historyRange?startDate=${startStr}&endDate=${endStr}`;
 
-      const res = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      const res = await api.get(url);
 
       const data = res.data;
       setHistoryData(data?.weeklySummary || []);

@@ -22,8 +22,62 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import Select from "react-select";
+
+
+/* ─── Employment-type → relevant path keys ───────────────────────────── */
+const RELEVANT_EXP_PATHS = {
+  "full-time":  ["payslip_path", "exp_certificate_path"],
+  "intern":     ["internship_certificate_path"],
+  "contract":   ["contract_aggrement_path"],
+  "part-time":  ["exp_certificate_path"],
+  "freelance":  ["exp_certificate_path"],
+};
+
+const EXP_DOC_LABELS = {
+  payslip_path:                  "Payslip",
+  exp_certificate_path:          "Experience Certificate",
+  internship_certificate_path:   "Internship Certificate",
+  contract_aggrement_path:       "Contract Agreement",
+};
+
+/* Maps raw backend doc_type strings → canonical path key */
+const NESTED_TYPE_TO_PATH_KEY = {
+  payslip_path:                "payslip_path",
+  payslip:                     "payslip_path",
+  exp_certificate_path:        "exp_certificate_path",
+  exp_certificate:             "exp_certificate_path",
+  experience_certificate:      "exp_certificate_path",
+  internship_certificate_path: "internship_certificate_path",
+  internship_certificate:      "internship_certificate_path",
+  contract_aggrement_path:     "contract_aggrement_path",
+  contract_agreement_path:     "contract_aggrement_path",
+  contract_agreement:          "contract_aggrement_path",
+};
+
+/**
+ * Returns only the documents relevant to the given employment type.
+ * Passing all historically-uploaded paths is safe — irrelevant ones are
+ * silently ignored, preventing stale docs from a prior employment type.
+ */
+const buildExperienceDocuments = (employmentType, paths) => {
+  const type = (employmentType || "").toLowerCase().trim();
+  const relevantKeys = RELEVANT_EXP_PATHS[type] || [];
+  return relevantKeys
+    .map((key) => {
+      const filePath = paths[key] || "";
+      if (!filePath) return null;
+      return { doc_type: EXP_DOC_LABELS[key] || key, file_path: filePath };
+    })
+    .filter(Boolean);
+};
+
 export default function DocumentsPage({ employee, user_uuid, hrData = {}, identityTypes = [], config = null, rawCertifications = [], refreshCertifications }) {
   const { employee_uuid } = useParams();
+  
+const [degreeOptions, setDegreeOptions] = useState([]);
+const [educationMasters, setEducationMasters] = useState([]);
+const [educationTypes, setEducationTypes] = useState([]);
+const [formattedEducationTypes, setFormattedEducationTypes] = useState([]);
 
   const [educationDocs, setEducationDocs] = useState([]);
   const [experienceDocs, setExperienceDocs] = useState([]);
@@ -47,7 +101,57 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   const [allCertificates, setAllCertificates] = useState([]);
   const [filteredCertificates, setFilteredCertificates] = useState([]);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
+  const [experienceFiles, setExperienceFiles] =
+  useState({
+    payslip: null,
+    exp_certificate: null,
+    internship_certificate: null,
+    contract_agreement: null,
+  });
+useEffect(() => {
 
+  if (
+    educationTypes.length > 0 &&
+    educationMasters.length > 0
+  ) {
+
+    const formattedMappings =
+      educationTypes.map((item) => ({
+
+        mapping_uuid:
+          item.mapping_uuid || "",
+
+        education_name:
+          item.education_name || "",
+
+        document_name:
+          item.document_name ||
+          "Upload File",
+
+        // ✅ NOW THIS WORKS
+        education_uuid:
+          educationMasters.find(
+            e =>
+              String(
+                e.education_name
+              ).trim() ===
+              String(
+                item.education_name
+              ).trim()
+          )?.education_uuid || "",
+      }));
+
+    console.log(
+      "FINAL EDUCATION TYPES",
+      formattedMappings
+    );
+
+    setEducationTypes(
+      formattedMappings
+    );
+  }
+
+}, [educationMasters]);
   /* ---- Sync folder and search from prop (deep linking) ---- */
   useEffect(() => {
     if (config?.folder) {
@@ -85,80 +189,353 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadFormData, setUploadFormData] = useState({});
   const fileInputRef = useRef(null);
+  useEffect(() => {
+
+    if (!hrData) return;
+
+    const latestDocs =
+      hrData.identity_documents || [];
+
+    console.log(
+      "UPDATED HR DATA",
+      latestDocs
+    );
+
+  }, [hrData]);
 
   useEffect(() => {
+   
+   
     // Use pre-fetched data from parent — no API calls needed
     const data = hrData || {};
-
+    console.log(
+  "HR EDUCATION DOCS",
+  hrData.education_documents
+);
+    
     /* ---- Map Education Documents ---- */
-    const eduDocs = (data.education_documents || []).map((doc, idx) => ({
-      id: doc.education_document_uuid || `edu-${idx}`,
-      degree: doc.degree_name || doc.education_level || "NA",
-      specialization: doc.specialization || "NA",
-      institution: doc.institution_name || "NA",
-      year_of_joining: doc.year_of_joining || "NA",
-      year_of_completion: doc.year_of_passing || "NA",
-      cgpa: doc.cgpa || doc.percentage || "NA",
-      file_path: doc.file_path || null,
-      documents:
-        doc.documents ||
-        (doc.file_path
-          ? [{ doc_type: "certificate", file_path: doc.file_path }]
-          : []),
-    }));
+    const eduDocs =
+  (data.education_documents || []).map((doc, idx) => ({
+
+    id:
+      doc.document_uuid ||
+      `edu-${idx}`,
+
+    document_uuid:
+      doc.document_uuid || "",
+
+    mapping_uuid:
+      doc.mapping_uuid || "",
+    education_level:
+      doc.education_level || "",
+      
+    education_uuid:
+      educationMasters.find(
+        e =>
+          e.education_name ===
+          doc.education_name
+      )?.education_uuid || "",
+
+    education_name:
+      doc.education_name || "",
+    document_name:
+      doc.document_name || "",
+
+    degree_uuid:
+      doc.degree_uuid || "",
+
+    degree:
+      doc.degree_name || "NA",
+
+    specialization:
+      doc.specialization || "NA",
+
+    institution:
+      doc.institution_name || "NA",
+
+    institute_location:
+      doc.institute_location || "NA",
+
+    education_mode:
+      doc.education_mode || "NA",
+
+    start_year:
+      doc.start_year || "NA",
+
+    year_of_passing:
+      doc.year_of_passing || "NA",
+
+    percentage_cgpa:
+      doc.percentage_cgpa || "NA",
+
+    delay_reason:
+      doc.delay_reason || "",
+
+    file_path:
+      doc.file_path || null,
+
+    documents:
+      doc.file_path
+        ? [
+            {
+              doc_type:
+                "education_certificate",
+
+              file_path:
+                doc.file_path,
+            },
+          ]
+        : [],
+}));
     setEducationDocs(eduDocs);
 
     /* ---- Map Experience Documents ---- */
-    const expDocs = (data.experience || []).map((doc, idx) => ({
-      id: doc.experience_uuid || `exp-${idx}`,
-      company: doc.company_name || "NA",
-      role: doc.role_title || doc.designation || "NA",
-      employment_type: doc.employment_type || "NA",
-      start_date: doc.start_date || "NA",
-      end_date: doc.end_date || "Present",
-      description: doc.description || "",
-      file_path: doc.file_path || null,
-      documents:
-        doc.documents ||
-        (doc.file_path
-          ? [{ doc_type: "experience_letter", file_path: doc.file_path }]
-          : []),
-    }));
-    setExperienceDocs(expDocs);
+    // Collect all available paths from either flat keys or nested array,
+    // then delegate to buildExperienceDocuments() which filters by employment type.
+    const resolveExpPaths = (doc) => {
+      const paths = {
+        payslip_path:                doc.payslip_path || "",
+        exp_certificate_path:        doc.exp_certificate_path || "",
+        internship_certificate_path: doc.internship_certificate_path || "",
+        contract_aggrement_path:     doc.contract_aggrement_path || doc.contract_agreement_path || "",
+      };
 
+      if (Object.values(paths).some(Boolean)) return paths;
+
+      // Format B: backend returns a nested documents array
+      const nested = doc.experience_documents || doc.experience_files || doc.documents || [];
+      if (Array.isArray(nested)) {
+        nested.forEach((d) => {
+          const rawType = (d.doc_type || d.document_type || d.type || "")
+            .toLowerCase().trim().replace(/\s+/g, "_");
+          const filePath = d.file_path || d.path || d.url || "";
+          if (!filePath) return;
+          const pathKey = NESTED_TYPE_TO_PATH_KEY[rawType];
+          if (pathKey && !paths[pathKey]) paths[pathKey] = filePath;
+        });
+      }
+
+      return paths;
+    };
+
+    const expDocs = (data.experience || []).map((doc) => {
+      const paths = resolveExpPaths(doc);
+      const documents = buildExperienceDocuments(doc.employment_type, paths);
+      // Resolve flat paths for the prefill modal (handle both spellings)
+      return {
+        id: doc.experience_uuid,
+        experience_uuid: doc.experience_uuid,
+        company: doc.company_name || "",
+        company_name: doc.company_name || "",
+        role: doc.role_title || "",
+        role_title: doc.role_title || "",
+        employment_type: doc.employment_type || "",
+        start_date: doc.start_date || "",
+        end_date: doc.end_date || "",
+        description: doc.description || "",
+        payslip_path:                paths.payslip_path,
+        exp_certificate_path:        paths.exp_certificate_path,
+        internship_certificate_path: paths.internship_certificate_path,
+        contract_aggrement_path:     paths.contract_aggrement_path,
+        documents,
+      };
+    });
+
+
+setExperienceDocs(expDocs);
+    
     /* ---- Map Identity Documents ---- */
-    const idDocs = (data.identity_documents || []).map((doc, idx) => ({
-      id: doc.identity_document_uuid || `id-${idx}`,
-      type: doc.identity_type || doc.identity_type_name || "NA",
-      number: doc.identity_file_number || "NA",
-      name: doc.name_on_document || employee?.name || "NA",
-      file_path: doc.file_path || null,
-      documents:
-        doc.documents ||
-        (doc.file_path
-          ? [
-              {
-                doc_type: doc.identity_type || "identity",
-                file_path: doc.file_path,
-              },
-            ]
-          : []),
-    }));
-    setIdentityDocs(idDocs);
 
-    /* ---- Map Certifications ---- */
+const countryIdentityTypes = identityTypes || [];
 
+const existingDocs = data.identity_documents || [];
+console.log(
+  "LATEST DOCS",
+  existingDocs
+);
 
+const idDocs = countryIdentityTypes.map((typeObj, idx) => {
 
-    setLoading(false);
-  }, [hrData]);
+  const existingDoc = existingDocs.find((doc) => {
+
+  // ✅ UUID MATCH
+  if (
+    doc.identity_type_uuid ===
+    typeObj.identity_type_uuid
+  ) {
+    return true;
+  }
+
+  // ✅ NAME MATCH
+  if (
+    (doc.identity_type || "")
+      .toLowerCase()
+      .trim()
+    ===
+    (typeObj.identity_type_name || "")
+      .toLowerCase()
+      .trim()
+  ) {
+    return true;
+  }
+
+  return false;
+});
+  return {
+    id:
+      existingDoc?.document_uuid ||
+      `identity-${idx}`,
+
+    document_uuid:
+      existingDoc?.document_uuid || null,
+
+    // ✅ IMPORTANT
+    mapping_uuid:
+      typeObj.mapping_uuid,
+
+    identity_type_uuid:
+      typeObj.identity_type_uuid,
+
+    type:
+  existingDoc?.identity_type ||
+  typeObj.identity_type_name,
+
+    number:
+      existingDoc?.identity_file_number || "",
+
+    name:
+      existingDoc?.name_on_document ||
+      employee?.name ||
+      "",
+
+    file_path:
+      existingDoc?.file_path || null,
+
+    isExisting:
+      !!existingDoc,
+
+    documents:
+      existingDoc?.file_path
+        ? [
+            {
+              doc_type:
+                typeObj.identity_type_name,
+
+              file_path:
+                existingDoc.file_path,
+            },
+          ]
+        : [],
+  };
+});
+setIdentityDocs(idDocs);
+
+setLoading(false);
+
+}, [
+  hrData,
+  identityTypes,
+  employee
+]);
+useEffect(() => {
+
+  const fetchEducationTypes = async () => {
+
+    try {
+
+      const BASE_URL =
+        window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+
+      const country_uuid =
+        hrData?.personal_details?.nationality_country_uuid ||
+        hrData?.personal_details?.residence_country_uuid;
+
+const response = await api.get(
+  `${BASE_URL}/education/country-mapping/${country_uuid}`,
+        {
+          headers: {
+            Authorization:
+              `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+
+console.log(
+  "EDUCATION TYPES API",
+  result
+);
+
+// ✅ HANDLE DIFFERENT RESPONSE SHAPES
+const mappings =
+  result.data ||
+  result.results ||
+  result.mappings ||
+  result ||
+  [];
+  console.log(
+  "FINAL EDUCATION TYPES",
+  mappings
+);
+
+const formattedMappings =
+  (Array.isArray(mappings)
+    ? mappings
+    : []
+  ).map((item) => ({
+
+    mapping_uuid:
+      item.mapping_uuid ||
+      "",
+
+    // ✅ IMPORTANT FIX
+    education_uuid:
+      item.education_master_uuid ||
+      item.education_uuid ||
+      item.education?.education_uuid ||
+      "",
+
+    education_name:
+      item.education_name ||
+      item.education?.education_name ||
+      "",
+
+    document_name:
+      item.document_name ||
+      "Upload File",
+  }));
+
+console.log(
+  "FORMATTED EDUCATION TYPES",
+  formattedMappings
+);
+
+setFormattedEducationTypes(formattedMappings);
+console.log(
+  "FINAL EDUCATION TYPES",
+  formattedMappings
+);
+    } catch (err) {
+
+      console.error(
+        "Education Types Error",
+        err
+      );
+    }
+  };
+
+  fetchEducationTypes();
+
+}, []);
+ /* ---- Map Certifications ---- */
 
   useEffect(() => {
     const fetchSkills = async () => {
       try {
         const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
-        const res = await fetch(`${BASE_URL}/api/skills/active`, {
+        const res = await api.get(`${BASE_URL}/api/skills/active`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
@@ -186,7 +563,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
         const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
-        const res = await fetch(`${BASE_URL}/api/certificates`, {
+        const res = await api.get(`${BASE_URL}/api/certificates`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
@@ -300,7 +677,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
-    const response = await fetch(
+    const response = await api.get(
       `${BASE_URL}/hr/view_documents?file_path=${encodeURIComponent(filePath)}`,
       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
     );
@@ -341,12 +718,120 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
     if (lower.match(/\.pdf/)) return "pdf";
     return "other";
   };
+  useEffect(() => {
+
+  const fetchEducationMasters =
+    async () => {
+
+      try {
+
+        const BASE_URL =
+          window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+
+        const response = await api.get(
+          `${BASE_URL}/masters/education-level`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+
+        const data =
+          await response.json();
+
+        console.log(
+          "EDUCATION MASTERS",
+          data
+        );
+
+        setEducationMasters(
+          Array.isArray(data)
+            ? data
+            : data?.data || []
+        );
+
+      } catch (err) {
+
+        console.error(
+          "Education Master Error",
+          err
+        );
+      }
+    };
+
+  fetchEducationMasters();
+
+}, []);
+  const fetchDegrees = async (education_uuid) => {
+  if (!education_uuid) return;
+  setDegreeOptions([]);
+  try {
+    const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+    const response = await api.get(
+      `${BASE_URL}/education/degree-master/${education_uuid}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+    const data = await response.json();
+    setDegreeOptions(Array.isArray(data) ? data : []);
+  } catch (err) {
+    console.error("Degree Fetch Error", err);
+  }
+};
+// ✅ ADD HERE
+useEffect(() => {
+
+  if (
+    uploadFormData.degree_uuid &&
+    degreeOptions.length > 0
+  ) {
+
+    const exists = degreeOptions.find(
+      d =>
+        String(d.degree_uuid) ===
+        String(uploadFormData.degree_uuid)
+    );
+
+    if (exists) {
+
+      setUploadFormData(prev => ({
+
+        ...prev,
+
+        degree_uuid:
+          exists.degree_uuid,
+
+        degree_name:
+          exists.degree_name,
+      }));
+    }
+  }
+
+}, [degreeOptions]);
+
 
   /* ---- View Document (opens preview modal) ---- */
   const viewDocument = async (filePath, docId, docTitle) => {
     if (!filePath) return;
     try {
       setLoadingDoc(docId);
+
+      // Blob URLs are already accessible — skip signed URL fetch
+      if (filePath.startsWith("blob:")) {
+        const fileType = getFileType(filePath) || "pdf";
+        setPreviewModal({
+          open: true,
+          url: filePath,
+          title: docTitle || "Document Preview",
+          type: fileType,
+        });
+        return;
+      }
 
       const signedUrl = await getSignedUrl(filePath);
 
@@ -375,7 +860,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   };
 
  const handleUpload = async () => {
-  if (!uploadFile && uploadModal.category !== "certifications") return;
+// ✅ NEW DOCUMENT → file required
 
   try {
     setUploading(true);
@@ -443,6 +928,12 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
       // Swagger shows the DTO as query params and only the file in multipart body.
       const formData = new FormData();
+      if (
+  uploadFile &&
+  uploadFile !== "null"
+) {
+  formData.append("file", uploadFile);
+}
 
       // ✅ FILE (optional)
       if (uploadFile) {
@@ -465,7 +956,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       const method = isEdit ? "PUT" : "POST";
 
       // ✅ API CALL
-      const response = await fetch(url.toString(), {
+      const response = await api.get(url.toString(), {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -498,17 +989,564 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       setUploadFile(null);
 
       return;
-
-      
-
-   
     }
+    if (uploadModal.category === "education") {
 
+  const BASE_URL =
+    window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+
+  const formData = new FormData();
+
+  if (
+    uploadFile &&
+    uploadFile !== "null"
+  ) {
+    formData.append("file", uploadFile);
+  }
+
+  formData.append("user_uuid", user_uuid);
+
+  formData.append(
+    "mapping_uuid",
+    uploadFormData.mapping_uuid
+  );
+
+  formData.append(
+    "degree_uuid",
+    uploadFormData.degree_uuid
+  );
+
+  formData.append(
+    "institution_name",
+    uploadFormData.institution_name || ""
+  );
+
+  formData.append(
+    "institute_location",
+    uploadFormData.institute_location || ""
+  );
+
+  formData.append(
+    "specialization",
+    uploadFormData.specialization || ""
+  );
+
+  formData.append(
+    "education_mode",
+    uploadFormData.education_mode || ""
+  );
+
+  formData.append(
+    "start_year",
+    uploadFormData.start_year || ""
+  );
+
+  formData.append(
+    "year_of_passing",
+    uploadFormData.year_of_passing || ""
+  );
+
+  formData.append(
+    "percentage_cgpa",
+    uploadFormData.percentage_cgpa || ""
+  );
+
+  formData.append(
+    "delay_reason",
+    uploadFormData.delay_reason || ""
+  );
+
+  let response;
+
+  // ✅ UPDATE
+  if (uploadModal.docId) {
+
+    response = await api.get(
+      `${BASE_URL}/education/employee-education-document/${uploadModal.docId}`,
+      {
+        method: "PUT",
+
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+
+        body: formData,
+      }
+    );
+
+  }
+
+  // ✅ CREATE
+  else {
+
+    response = await api.get(
+      `${BASE_URL}/education/employee-education-document`,
+      {
+        method: "POST",
+
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+
+        body: formData,
+      }
+    );
+
+  }
+
+  if (response.ok) {
+
+    showStatusToast(
+      uploadModal.docId
+        ? "Education updated successfully"
+        : "Education uploaded successfully",
+      "success"
+    );
+
+    // ✅ REFRESH UI WITHOUT RELOAD
+
+    const updatedDoc = {
+
+      ...uploadFormData,
+
+      id:
+  uploadModal.docId ||
+  `edu-${Date.now()}`,
+
+document_uuid:
+  uploadModal.docId ||
+  `edu-${Date.now()}`,
+  education_uuid:
+  uploadFormData.education_uuid,
+
+education_name:
+  uploadFormData.education_name,
+
+      degree:
+        uploadFormData.degree_name,
+
+      institution:
+        uploadFormData.institution_name,
+
+      file_path:
+        uploadFile
+          ? URL.createObjectURL(uploadFile)
+          : uploadFormData.file_path,
+
+      documents:
+        uploadFile
+          ? [
+              {
+                doc_type:
+                  "education_certificate",
+
+                file_path:
+                  URL.createObjectURL(uploadFile),
+              },
+            ]
+          : [],
+    };
+
+    setEducationDocs(prev => {
+
+  // ✅ UPDATE
+  if (uploadModal.docId) {
+
+    return prev.map(doc => {
+
+      if (
+        doc.document_uuid === uploadModal.docId
+      ) {
+
+        return {
+
+          ...doc,
+
+          ...updatedDoc,
+
+          // ✅ KEEP OLD FILE IF NEW FILE NOT SELECTED
+          file_path:
+            updatedDoc.file_path ||
+            doc.file_path,
+
+          // ✅ KEEP OLD DOCUMENTS
+          documents:
+            updatedDoc.documents?.length > 0
+              ? updatedDoc.documents
+              : doc.documents,
+        };
+      }
+
+      return doc;
+    });
+  }
+
+  // ✅ CREATE
+  return [...prev, updatedDoc];
+});
+    setUploadModal({
+      open: false,
+      category: "",
+      docId: null,
+    });
+
+    setUploadFile(null);
+
+    setUploadFormData({});
+    return;
+  }
+}
+if (uploadModal.category === "experience") {
+
+  if (!user_uuid) {
+    showStatusToast("User UUID is missing. Please reload the page.", "error"); return;
+  }
+  if (!uploadFormData.company_name?.trim() || uploadFormData.company_name.trim().length < 2) {
+    showStatusToast("Company name must be at least 2 characters", "error"); return;
+  }
+  if (!uploadFormData.role_title?.trim() || uploadFormData.role_title.trim().length < 2) {
+    showStatusToast("Role / Designation must be at least 2 characters", "error"); return;
+  }
+  if (!uploadFormData.employment_type) {
+    showStatusToast("Employment type is required", "error"); return;
+  }
+  if (!uploadFormData.start_date) {
+    showStatusToast("Start date is required", "error"); return;
+  }
+
+  const BASE_URL =
+    window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+
+  const formData = new FormData();
+
+  formData.append(
+    "employee_uuid",
+    user_uuid
+  );
+
+  formData.append(
+    "company_name",
+    uploadFormData.company_name || ""
+  );
+
+  formData.append(
+    "role_title",
+    uploadFormData.role_title || ""
+  );
+
+  formData.append(
+    "employment_type",
+    uploadFormData.employment_type || ""
+  );
+
+  formData.append(
+    "start_date",
+    uploadFormData.start_date || ""
+  );
+
+  if (uploadFormData.end_date) {
+    formData.append("end_date", uploadFormData.end_date);
+  }
+
+  const isCurrent = !uploadFormData.end_date;
+  formData.append("is_current", isCurrent ? "true" : "false");
+
+  if (uploadFormData.description) {
+    formData.append("description", uploadFormData.description);
+  }
+
+
+  
+
+  if (uploadFormData.employment_type === "Full-Time") {
+    if (experienceFiles.payslip) {
+      formData.append("doc_types", "payslip_path");
+      formData.append("files", experienceFiles.payslip);
+    }
+    if (experienceFiles.exp_certificate) {
+      formData.append("doc_types", "exp_certificate_path");
+      formData.append("files", experienceFiles.exp_certificate);
+    }
+  } else if (uploadFormData.employment_type === "Intern") {
+    if (experienceFiles.internship_certificate) {
+      formData.append("doc_types", "internship_certificate_path");
+      formData.append("files", experienceFiles.internship_certificate);
+    }
+  } else if (uploadFormData.employment_type === "Contract") {
+    if (experienceFiles.contract_agreement) {
+      formData.append("doc_types", "contract_aggrement_path");
+      formData.append("files", experienceFiles.contract_agreement);
+    }
+  } else if (uploadFormData.employment_type === "Part-Time" || uploadFormData.employment_type === "Freelance") {
+    if (experienceFiles.exp_certificate) {
+      formData.append("doc_types", "exp_certificate_path");
+      formData.append("files", experienceFiles.exp_certificate);
+    }
+  }
+  // Log payload for debugging (use Array.from to show duplicate keys like doc_types/files)
+  const debugEntries = {};
+  formData.forEach((value, key) => {
+    if (debugEntries[key] !== undefined) {
+      debugEntries[key] = [].concat(debugEntries[key], value instanceof File ? value.name : value);
+    } else {
+      debugEntries[key] = value instanceof File ? value.name : value;
+    }
+  });
+  console.log("EXPERIENCE PAYLOAD:", debugEntries);
+
+  let response;
+
+  if (uploadModal.docId) {
+    response = await api.get(
+      `${BASE_URL}/experience/${uploadModal.docId}`,
+      { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: formData }
+    );
+  } else {
+    response = await api.get(
+      `${BASE_URL}/experience`,
+      { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData }
+    );
+  }
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("EXPERIENCE API ERROR:", errText);
+    let friendlyMsg = "Experience save failed";
+    try {
+      const errJson = JSON.parse(errText);
+      if (errJson?.detail) {
+        friendlyMsg = Array.isArray(errJson.detail)
+          ? errJson.detail.map(e => e.msg || JSON.stringify(e)).join("; ")
+          : String(errJson.detail);
+      }
+    } catch (_) {}
+    showStatusToast(friendlyMsg, "error");
+    return;
+  }
+
+  const responseData = await response.json().catch(() => ({}));
+
+  showStatusToast(
+    uploadModal.docId ? "Experience updated successfully" : "Experience uploaded successfully",
+    "success"
+  );
+
+  const pPath = experienceFiles.payslip
+    ? URL.createObjectURL(experienceFiles.payslip)
+    : (responseData?.payslip_path || uploadFormData.payslip_path || "");
+  const ePath = experienceFiles.exp_certificate
+    ? URL.createObjectURL(experienceFiles.exp_certificate)
+    : (responseData?.exp_certificate_path || uploadFormData.exp_certificate_path || "");
+  const iPath = experienceFiles.internship_certificate
+    ? URL.createObjectURL(experienceFiles.internship_certificate)
+    : (responseData?.internship_certificate_path || uploadFormData.internship_certificate_path || "");
+  const cPath = experienceFiles.contract_agreement
+    ? URL.createObjectURL(experienceFiles.contract_agreement)
+    : (responseData?.contract_aggrement_path || responseData?.contract_agreement_path ||
+       uploadFormData.contract_aggrement_path || uploadFormData.contract_agreement_path || "");
+
+  const newExperienceUuid = responseData?.experience_uuid || uploadModal.docId;
+
+  const updatedDoc = {
+    id: newExperienceUuid || uploadModal.docId || `exp-${Date.now()}`,
+    experience_uuid: newExperienceUuid || uploadModal.docId,
+    company: uploadFormData.company_name || "",
+    company_name: uploadFormData.company_name || "",
+    role: uploadFormData.role_title || "",
+    role_title: uploadFormData.role_title || "",
+    employment_type: uploadFormData.employment_type || "",
+    start_date: uploadFormData.start_date || "",
+    end_date: uploadFormData.end_date || "",
+    description: uploadFormData.description || "",
+    payslip_path:                pPath,
+    exp_certificate_path:        ePath,
+    internship_certificate_path: iPath,
+    contract_aggrement_path:     cPath,
+    // Rebuild documents array from scratch using current employment type — prevents stale
+    // files from a prior employment type persisting in the UI.
+    documents: buildExperienceDocuments(uploadFormData.employment_type, {
+      payslip_path:                pPath,
+      exp_certificate_path:        ePath,
+      internship_certificate_path: iPath,
+      contract_aggrement_path:     cPath,
+    }),
+  };
+
+  setExperienceDocs(prev => {
+    if (uploadModal.docId) {
+      return prev.map(doc => {
+        if (doc.experience_uuid === uploadModal.docId || doc.id === uploadModal.docId) {
+          // Always replace documents wholesale — never merge with old employment type's docs
+          return { ...doc, ...updatedDoc };
+        }
+        return doc;
+      });
+    }
+    return [...prev, updatedDoc];
+  });
+
+  setUploadModal({ open: false, category: "", docId: null });
+  setUploadFile(null);
+  setUploadFormData({});
+  setExperienceFiles({
+    payslip: null,
+    exp_certificate: null,
+    internship_certificate: null,
+    contract_agreement: null,
+  });
+  return;
+}
     // 🔥 2. OTHER DOCUMENTS (UNCHANGED)
+    // 🔥 IDENTITY DOCUMENTS
+if (uploadModal.category === "identity") {
+
+  const BASE_URL =
+    window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+
+  const formData = new FormData();
+
+ if (
+  uploadFile &&
+  uploadFile !== "null"
+) {
+  formData.append("file", uploadFile);
+}
+
+  formData.append("user_uuid", user_uuid);
+console.log("FINAL UPLOAD DATA", uploadFormData);
+
+formData.append(
+  "mapping_uuid",
+  uploadFormData.mapping_uuid || "PUT-REAL-MAPPING-UUID-HERE"
+);
+
+  formData.append(
+    "identity_type_uuid",
+    uploadFormData.identity_type_uuid
+  );
+
+  formData.append(
+    "identity_file_number",
+    uploadFormData.identity_file_number
+  );
+
+  formData.append(
+    "name_on_document",
+    uploadFormData.name_on_document
+  );
+
+  let response;
+
+  // ✅ UPDATE
+  if (uploadModal.docId) {
+
+    response = await api.get(
+      `${BASE_URL}/identity/employee-document/${uploadModal.docId}`,
+      {
+        method: "PUT",
+
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+
+        body: formData,
+      }
+    );
+
+  }
+
+  // ✅ CREATE
+  else {
+
+    response = await api.get(
+      `${BASE_URL}/employee-upload/identity-documents`,
+      {
+        method: "POST",
+
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+
+        body: formData,
+      }
+    );
+
+  }
+
+  if (response.ok) {
+
+  const newFilePath = uploadFile
+    ? URL.createObjectURL(uploadFile)
+    : uploadFormData.file_path || null;
+
+  const updatedDoc = {
+    id: uploadModal.docId || `identity-${Date.now()}`,
+    document_uuid: uploadModal.docId || null,
+    mapping_uuid: uploadFormData.mapping_uuid,
+    identity_type_uuid: uploadFormData.identity_type_uuid,
+    type: uploadFormData.identity_type || "",
+    number: uploadFormData.identity_file_number || "",
+    name: uploadFormData.name_on_document || "",
+    file_path: newFilePath,
+    isExisting: true,
+    documents: newFilePath
+      ? [{ doc_type: uploadFormData.identity_type || "Identity", file_path: newFilePath }]
+      : [],
+  };
+
+  setIdentityDocs(prev => {
+    if (uploadModal.docId) {
+      return prev.map(doc =>
+        doc.document_uuid === uploadModal.docId
+          ? { ...doc, ...updatedDoc, document_uuid: uploadModal.docId }
+          : doc
+      );
+    }
+    // New document: match placeholder by mapping_uuid and update in-place
+    return prev.map(doc =>
+      doc.mapping_uuid === uploadFormData.mapping_uuid
+        ? { ...doc, ...updatedDoc }
+        : doc
+    );
+  });
+
+  showStatusToast(
+    uploadModal.docId
+      ? "Identity updated successfully"
+      : "Identity uploaded successfully",
+    "success"
+  );
+
+  setUploadModal({
+    open: false,
+    category: "",
+    docId: null,
+  });
+
+  setUploadFile(null);
+}
+ else {
+
+    const err = await response.text();
+
+    console.error(err);
+
+    showStatusToast(
+      "Identity upload failed",
+      "error"
+    );
+
+  }
+
+  return;
+}
     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
     const formData = new FormData();
-    formData.append("file", uploadFile);
+// ✅ ONLY APPEND FILE IF USER SELECTED NEW FILE
+
+  formData.append("file", uploadFile);
+
     formData.append("user_uuid", user_uuid);
     formData.append("category", uploadModal.category);
 
@@ -520,7 +1558,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       if (value) formData.append(key, value);
     });
 
-    const response = await fetch(`${BASE_URL}/hr/upload-document`, {
+    const response = await api.get(`${BASE_URL}/hr/upload-document`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -535,7 +1573,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
         setUploadFile(null);
         setUploadFormData({});
         setUploadSuccess(false);
-        window.location.reload();
+        
       }, 1500);
     } else {
       alert("Upload failed");
@@ -552,6 +1590,12 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
     setUploadFile(null);
     setUploadFormData({});
     setUploadSuccess(false);
+    setExperienceFiles({
+      payslip: null,
+      exp_certificate: null,
+      internship_certificate: null,
+      contract_agreement: null,
+    });
   };
 
   /* ---- Delete Document ---- */
@@ -567,7 +1611,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   //         const token = localStorage.getItem("token");
   //         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
-  //         const response = await fetch(
+  //         const response = await api.get(
   //           `${BASE_URL}/hr/delete-document/${docId}?category=${encodeURIComponent(category)}`,
   //           {
   //             method: "DELETE",
@@ -588,7 +1632,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   //             setIdentityDocs((prev) => prev.filter((d) => d.id !== docId));
   //           } else if (category === "certifications") {
   //             setCertificationDocs((prev) => prev.filter((d) => d.id !== docId));
-  //           }
+  //        
   //         } else {
   //           const errData = await response.json().catch(() => ({}));
   //           showStatusToast(errData.detail || "Delete failed. Please try again.", "error");
@@ -621,7 +1665,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
         if (category === "certifications") {
           const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
-          response = await fetch(
+          response = await api.get(
             `${BASE_URL}/api/resource-certificates/${docId}`,
             {
               method: "DELETE",
@@ -636,8 +1680,8 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
         else {
           const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
-          response = await fetch(
-            `${BASE_URL}/hr/delete-document/${docId}?category=${encodeURIComponent(category)}`,
+          response = await api.get(
+            `${BASE_URL}/education/employee-education-document/${docId}`,
             {
               method: "DELETE",
               headers: {
@@ -683,32 +1727,158 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
 
     if (category === "education") {
       prefillData = {
-        degree_name: doc.degree !== "NA" ? doc.degree : "",
-        specialization: doc.specialization !== "NA" ? doc.specialization : "",
-        institution_name: doc.institution !== "NA" ? doc.institution : "",
-        year_of_joining:
-          doc.year_of_joining !== "NA" ? doc.year_of_joining : "",
-        year_of_passing:
-          doc.year_of_completion !== "NA" ? doc.year_of_completion : "",
-        cgpa: doc.cgpa !== "NA" ? doc.cgpa : "",
-      };
+
+  document_uuid:
+    doc.document_uuid || "",
+
+  mapping_uuid:
+    doc.mapping_uuid || "",
+
+  education_uuid:
+    doc.education_uuid || "",
+  education_name:
+    doc.education_name || "",
+
+  degree_uuid:
+    doc.degree_uuid || "",
+
+  degree_name:
+    doc.degree || "",
+
+  specialization:
+    doc.specialization || "",
+
+  institution_name:
+    doc.institution || "",
+
+  institute_location:
+    doc.institute_location || "",
+
+  education_mode:
+    doc.education_mode || "",
+
+  start_year:
+    doc.start_year || "",
+
+  year_of_passing:
+    doc.year_of_passing || "",
+
+  percentage_cgpa:
+    doc.percentage_cgpa || "",
+
+  delay_reason:
+    doc.delay_reason || "",
+
+  file_path:
+  doc.file_path || "",
+};
+if (doc.education_name) {
+
+  const selectedEducation =
+formattedEducationTypes.find(
+        e => e.education_name ===
+        doc.education_name
+    );
+
+  console.log(
+    "MATCHED EDUCATION",
+    selectedEducation
+  );
+
+  if (selectedEducation) {
+
+  prefillData.mapping_uuid =
+    selectedEducation.mapping_uuid || "";
+
+  prefillData.education_uuid =
+    selectedEducation.education_uuid || "";
+
+  // ✅ SET DATA FIRST
+  setUploadFormData(prefillData);
+
+  // ✅ FETCH DEGREES
+  fetchDegrees(
+    selectedEducation.education_uuid ||
+    doc.education_uuid
+  );
+
+}else {
+
+  setUploadFormData(prefillData);
+}
+}
     } else if (category === "experience") {
+
+  prefillData = {
+
+    experience_uuid:
+      doc.experience_uuid || "",
+
+    mapping_uuid:
+      doc.mapping_uuid || "",
+
+    company_name:
+  doc.company_name || "",
+
+    role_title:
+      doc.role_title || "",
+
+    employment_type:
+      doc.employment_type || "",
+
+    start_date:
+      doc.start_date || "",
+
+    end_date:
+      doc.end_date || "",
+
+    description:
+      doc.description || "",
+
+    // ✅ FILE PATHS FOR EXISTING DOCS
+    payslip_path:
+      doc.payslip_path || "",
+    exp_certificate_path:
+      doc.exp_certificate_path || "",
+    internship_certificate_path:
+      doc.internship_certificate_path || "",
+    contract_aggrement_path:
+      doc.contract_aggrement_path || "",
+
+    documents: buildExperienceDocuments(doc.employment_type, {
+      payslip_path:                doc.payslip_path || "",
+      exp_certificate_path:        doc.exp_certificate_path || "",
+      internship_certificate_path: doc.internship_certificate_path || "",
+      contract_aggrement_path:     doc.contract_aggrement_path || "",
+    }),
+  };
+}
+else if (category === "identity") {
       prefillData = {
-        company_name: doc.company !== "NA" ? doc.company : "",
-        role_title: doc.role !== "NA" ? doc.role : "",
-        start_date: doc.start_date !== "NA" ? doc.start_date : "",
-        end_date:
-          doc.end_date !== "Present" && doc.end_date !== "NA"
-            ? doc.end_date
-            : "",
-        description: doc.description || "",
-      };
-    } else if (category === "identity") {
-      prefillData = {
-        identity_type: doc.type !== "NA" ? doc.type : "",
-        identity_file_number: doc.number !== "NA" ? doc.number : "",
-        name_on_document: doc.name !== "NA" ? doc.name : "",
-      };
+  mapping_uuid: doc.mapping_uuid || "",
+
+  identity_type_uuid:
+    doc.identity_type_uuid || "",
+
+  identity_type:
+    doc.type !== "NA"
+      ? doc.type
+      : "",
+
+  identity_file_number:
+    doc.number !== "NA"
+      ? doc.number
+      : "",
+
+  name_on_document:
+    doc.name !== "NA"
+      ? doc.name
+      : "",
+
+  // ✅ ADD THIS
+  file_path:
+    doc.file_path || "",
+};
     } else if (category === "certifications") {
       prefillData = {
         issue_date: doc.issue_date !== "NA" ? doc.issue_date : "",
@@ -735,8 +1905,23 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
       });
     }
 
+    if (category === "experience") {
+      setExperienceFiles({
+        payslip: null,
+        exp_certificate: null,
+        internship_certificate: null,
+        contract_agreement: null,
+      });
+    }
+
     setUploadFormData(prefillData);
-    setUploadModal({ open: true, category, docId: doc.id });
+    setUploadModal({
+      open: true,
+      category,
+      docId: category === "experience"
+        ? (doc.experience_uuid || doc.id)
+        : (doc.document_uuid || doc.id),
+    });
   };
 
   /* ---- Handle drag and drop ---- */
@@ -768,12 +1953,12 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
   };
 
   const filteredEducation = filterDocs(educationDocs, [
-    "degree",
-    "specialization",
-    "institution",
-    "year_of_joining",
-    "year_of_completion",
-  ]);
+  "degree",
+  "specialization",
+  "institution",
+  "start_year",
+  "year_of_passing",
+]);
   const filteredExperience = filterDocs(experienceDocs, [
     "company",
     "role",
@@ -949,8 +2134,11 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       hasFile={doc.documents.length > 0}
                       documents={doc.documents}
                       onViewDocument={(filePath, docTitle) =>
-                        viewDocument(filePath, doc.id, docTitle)
-                      }
+                        viewDocument(
+                          filePath,
+                          doc.document_uuid || doc.id,
+                          docTitle
+                        )}
                       cardTitle={`${doc.degree} - ${doc.institution}`}
                       onUpload={() => openReuploadModal(doc, "education")}
                       onDelete={() => deleteDocument(doc.id, "education")}
@@ -964,18 +2152,27 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                           value={doc.specialization}
                         />
                         <DocField
+                          label="Education Mode"
+                          value={doc.education_mode}
+                        />
+                        <DocField
                           label="Year of Joining"
-                          value={doc.year_of_joining}
+                          value={doc.start_year}
                         />
                         <DocField
                           label="Year of Completion"
-                          value={doc.year_of_completion}
+                          value={doc.year_of_passing}
                         />
-                        <DocField label="CGPA / Percentage" value={doc.cgpa} />
+                        <DocField label="CGPA / Percentage" value={doc.percentage_cgpa} />
                         <DocField
-                          label="University / College"
-                          value={doc.institution}
-                        />
+  label="University / College"
+  value={doc.institution}
+/>
+
+<DocField
+  label="Location"
+  value={doc.institute_location}
+/>
                       </div>
                     </DocumentCard>
                   ))}
@@ -996,7 +2193,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                 setUploadModal({
                   open: true,
                   category: "experience",
-                  docId: null,
+                  docId: null
                 });
               }}
             >
@@ -1012,7 +2209,8 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                     setUploadModal({
                       open: true,
                       category: "experience",
-                      docId: null,
+                      docId: null
+ 
                     });
                   }}
                 />
@@ -1101,14 +2299,21 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       }
                       cardTitle={doc.type}
                       onUpload={() => openReuploadModal(doc, "identity")}
-                      onDelete={() => deleteDocument(doc.id, "identity")}
-                      deleting={deletingDoc === doc.id}
+                      onDelete={() =>
+                        deleteDocument(
+                          doc.document_uuid || doc.id,
+                          "identity"
+                        )
+                      }
+                        deleting={deletingDoc === doc.id}
                       loading={loadingDoc === doc.id}
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                         <DocField label="Document Type" value={doc.type} />
-                        <DocField label="Document Number" value={doc.number} />
-                        <DocField label="Name on Document" value={doc.name} />
+                        <DocField
+  label="Document Number"
+  value={doc.number?.trim() ? doc.number : "-"}
+/>                        <DocField label="Name on Document" value={doc.name} />
                       </div>
                     </DocumentCard>
                   ))}
@@ -1329,14 +2534,79 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                         Degree / Certificate Details
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <UploadField
-                          label="Degree / Certificate Name"
-                          placeholder="e.g. B.Tech, Internship Certificate"
-                          value={uploadFormData.degree_name || ""}
-                          onChange={(v) =>
-                            setUploadFormData((d) => ({ ...d, degree_name: v }))
-                          }
-                        />
+                        <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+    Education Level
+  </label>
+
+  <FilterListbox
+    options={[
+      { value: "", label: "Select Education Level" },
+      ...Array.from(
+        new Map(
+          (Array.isArray(formattedEducationTypes) ? formattedEducationTypes : [])
+            .map(edu => [edu.education_name || edu.mapping_uuid, edu])
+        ).values()
+      ).map(edu => ({
+        value: String(edu.mapping_uuid || ""),
+        label: edu.education_name || "Unknown",
+      })),
+    ]}
+    value={String(uploadFormData.mapping_uuid || "")}
+    onChange={(val) => {
+      const raw = (Array.isArray(formattedEducationTypes) ? formattedEducationTypes : [])
+        .find(e => String(e.mapping_uuid) === String(val));
+      const resolvedUuid =
+        raw?.education_uuid ||
+        educationMasters.find(
+          m => String(m.education_name).trim() === String(raw?.education_name).trim()
+        )?.education_uuid || "";
+      setDegreeOptions([]);
+      setUploadFormData(d => ({
+        ...d,
+        mapping_uuid: val,
+        education_uuid: resolvedUuid,
+        education_name: raw?.education_name || "",
+        document_name: raw?.document_name || "",
+        degree_uuid: "",
+        degree_name: "",
+      }));
+      if (resolvedUuid) fetchDegrees(resolvedUuid);
+    }}
+  />
+</div>
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+    Degree
+  </label>
+
+  <FilterListbox
+    options={[
+      {
+        value: "",
+        label: !(uploadFormData.education_uuid || uploadFormData.mapping_uuid)
+          ? "Select education level first"
+          : degreeOptions.length === 0
+            ? "No degrees available"
+            : "Select Degree",
+      },
+      ...degreeOptions.map((deg) => ({
+        value: String(deg.degree_uuid),
+        label: deg.degree_name,
+      })),
+    ]}
+    value={String(uploadFormData.degree_uuid || "")}
+    disabled={!(uploadFormData.education_uuid || uploadFormData.mapping_uuid)}
+    onChange={(val) => {
+      const selected = degreeOptions.find(d => d.degree_uuid === val);
+      setUploadFormData(d => ({
+        ...d,
+        degree_uuid: val,
+        degree_name: selected?.degree_name || "",
+      }));
+    }}
+  />
+</div>
                         <UploadField
                           label="Specialization"
                           placeholder="e.g. Computer Science"
@@ -1348,6 +2618,47 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                             }))
                           }
                         />
+                        <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+    Education Mode
+  </label>
+
+  <FilterListbox
+    options={[
+      {
+        value: "",
+        label: "Select Mode",
+      },
+      {
+        value: "Regular",
+        label: "Regular",
+      },
+      {
+        value: "Distance",
+        label: "Distance",
+      },
+      {
+        value: "Part Time",
+        label: "Part Time",
+      },
+      {
+        value: "Online",
+        label: "Online",
+      },
+    ]}
+
+    value={
+      uploadFormData.education_mode || ""
+    }
+
+    onChange={(val) =>
+      setUploadFormData((d) => ({
+        ...d,
+        education_mode: val,
+      }))
+    }
+  />
+</div>
                         <UploadField
                           label="Institution / Organization"
                           placeholder="e.g. JNTU, Coursera"
@@ -1360,13 +2671,24 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                           }
                         />
                         <UploadField
+  label="Institute Location"
+  placeholder="e.g. Hyderabad"
+  value={uploadFormData.institute_location || ""}
+  onChange={(v) =>
+    setUploadFormData((d) => ({
+      ...d,
+      institute_location: v,
+    }))
+  }
+/>
+                        <UploadField
                           label="Year of Joining"
                           placeholder="e.g. 2020"
-                          value={uploadFormData.year_of_joining || ""}
+                          value={uploadFormData.start_year || ""}
                           onChange={(v) =>
                             setUploadFormData((d) => ({
                               ...d,
-                              year_of_joining: v,
+                              start_year: v,
                             }))
                           }
                         />
@@ -1384,9 +2706,9 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                         <UploadField
                           label="CGPA / Percentage"
                           placeholder="e.g. 8.5 or 85%"
-                          value={uploadFormData.cgpa || ""}
+                          value={uploadFormData.percentage_cgpa || ""}
                           onChange={(v) =>
-                            setUploadFormData((d) => ({ ...d, cgpa: v }))
+                            setUploadFormData((d) => ({ ...d, percentage_cgpa: v }))
                           }
                         />
                       </div>
@@ -1418,6 +2740,28 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                             setUploadFormData((d) => ({ ...d, role_title: v }))
                           }
                         />
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Employment Type
+                          </label>
+                          <FilterListbox
+                            options={[
+                              { value: "", label: "Select Type" },
+                              { value: "Full-Time", label: "Full-Time" },
+                              { value: "Part-Time", label: "Part-Time" },
+                              { value: "Intern", label: "Intern" },
+                              { value: "Contract", label: "Contract" },
+                              { value: "Freelance", label: "Freelance" },
+                            ]}
+                            value={uploadFormData.employment_type || ""}
+                            onChange={(val) =>
+                              setUploadFormData(d => ({
+                                ...d,
+                                employment_type: val,
+                              }))
+                            }
+                          />
+                        </div>
                         <UploadField
                           label="Start Date"
                           placeholder="e.g. 2023-01-15"
@@ -1436,19 +2780,66 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                             setUploadFormData((d) => ({ ...d, end_date: v }))
                           }
                         />
-                        <div className="sm:col-span-2">
-                          <UploadField
-                            label="Description (Optional)"
-                            placeholder="Brief description of your role"
-                            value={uploadFormData.description || ""}
-                            onChange={(v) =>
-                              setUploadFormData((d) => ({
-                                ...d,
-                                description: v,
-                              }))
-                            }
-                          />
-                        </div>
+                        <UploadField
+                          label="Description (Optional)"
+                          placeholder="Brief description of your role"
+                          value={uploadFormData.description || ""}
+                          onChange={(v) =>
+                            setUploadFormData((d) => ({
+                              ...d,
+                              description: v,
+                            }))
+                          }
+                        />
+                              {uploadFormData.employment_type === "Full-Time" && (
+                                <>
+                                  <ExperienceFileField
+                                    label="Payslip"
+                                    file={experienceFiles.payslip}
+                                    existingPath={uploadFormData.payslip_path}
+                                    onChange={(file) => setExperienceFiles(prev => ({ ...prev, payslip: file }))}
+                                    onView={(path) => viewDocument(path, uploadModal.docId, "Payslip")}
+                                  />
+                                  <ExperienceFileField
+                                    label="Experience Certificate"
+                                    file={experienceFiles.exp_certificate}
+                                    existingPath={uploadFormData.exp_certificate_path}
+                                    onChange={(file) => setExperienceFiles(prev => ({ ...prev, exp_certificate: file }))}
+                                    onView={(path) => viewDocument(path, uploadModal.docId, "Experience Certificate")}
+                                  />
+                                </>
+                              )}
+
+                              {uploadFormData.employment_type === "Intern" && (
+                                <ExperienceFileField
+                                  label="Internship Certificate"
+                                  file={experienceFiles.internship_certificate}
+                                  existingPath={uploadFormData.internship_certificate_path}
+                                  onChange={(file) => setExperienceFiles(prev => ({ ...prev, internship_certificate: file }))}
+                                  onView={(path) => viewDocument(path, uploadModal.docId, "Internship Certificate")}
+                                />
+                              )}
+
+                              {uploadFormData.employment_type === "Contract" && (
+                                <ExperienceFileField
+                                  label="Contract Agreement"
+                                  file={experienceFiles.contract_agreement}
+                                  existingPath={uploadFormData.contract_aggrement_path}
+                                  onChange={(file) => setExperienceFiles(prev => ({ ...prev, contract_agreement: file }))}
+                                  onView={(path) => viewDocument(path, uploadModal.docId, "Contract Agreement")}
+                                />
+                              )}
+
+                              {(uploadFormData.employment_type === "Part-Time" || uploadFormData.employment_type === "Freelance") && (
+                                <ExperienceFileField
+                                  label="Experience Certificate"
+                                  file={experienceFiles.exp_certificate}
+                                  existingPath={uploadFormData.exp_certificate_path}
+                                  onChange={(file) => setExperienceFiles(prev => ({ ...prev, exp_certificate: file }))}
+                                  onView={(path) => viewDocument(path, uploadModal.docId, "Experience Certificate")}
+                                />
+                              )}
+
                       </div>
                     </div>
                   )}
@@ -1467,9 +2858,25 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                             options={[{value:"",label:"Select type"}, ...identityTypes.map((idType) => ({value: idType.identity_type_uuid, label: idType.identity_type_name}))]}
                             value={uploadFormData.identity_type_uuid || ""}
                             onChange={(val) => {
-                              const selected = identityTypes.find(t => t.identity_type_uuid === val);
-                              setUploadFormData(d => ({ ...d, identity_type_uuid: val, identity_type: selected?.identity_type_name || "" }));
-                            }}
+
+  const selected =
+    identityTypes.find(
+      t => t.identity_type_uuid === val
+    );
+
+  setUploadFormData(d => ({
+    ...d,
+
+    identity_type_uuid: val,
+
+    identity_type:
+      selected?.identity_type_name || "",
+
+    // ✅ IMPORTANT
+    mapping_uuid:
+      selected?.mapping_uuid || "",
+  }));
+}}
                           />
                         </div>
                         <UploadField
@@ -1589,11 +2996,62 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       </div>
                     </div>
                   )}
+                  {/* ---- Existing File Preview (Education/Identity) ---- */}
+                  {uploadModal.docId && uploadFormData.file_path && uploadModal.category !== "experience" && (
+  <div className="mb-4 p-3 border border-gray-200 rounded-xl bg-gray-50">
 
-                  {/* ---- File Drop Zone ---- */}
+    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+      Existing Uploaded File
+    </p>
+
+    <button
+      type="button"
+      onClick={() =>
+        viewDocument(
+          uploadFormData.file_path,
+          uploadModal.docId,
+          uploadFormData.identity_type || "Document"
+        )
+      }
+      className="text-sm text-blue-600 underline"
+    >
+      View Existing Document
+    </button>
+
+  </div>
+)}
+
+                  {/* ---- Existing Experience Documents Preview ---- */}
+                  {uploadModal.docId && uploadModal.category === "experience" && uploadFormData.documents && uploadFormData.documents.length > 0 && (
+  <div className="mb-4 p-3 border border-gray-200 rounded-xl bg-gray-50">
+    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+      Existing Uploaded Documents
+    </p>
+    <div className="space-y-2">
+      {uploadFormData.documents.map((doc, idx) => (
+        <div key={idx} className="flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-gray-100">
+          <div className="flex items-center gap-2">
+            <FileText size={14} className="text-[#263383]" />
+            <span className="text-sm text-gray-700">{doc.doc_type}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => viewDocument(doc.file_path, uploadModal.docId, doc.doc_type)}
+            className="text-xs text-blue-600 underline"
+          >
+            View
+          </button>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+                  {/* ---- File Drop Zone (NOT for Experience) ---- */}
+                  {uploadModal.category !== "experience" && (
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                      Upload File
+                      {uploadFormData.document_name ||"Upload File"}
                     </p>
                     <div
                       onClick={() => fileInputRef.current?.click()}
@@ -1647,6 +3105,7 @@ export default function DocumentsPage({ employee, user_uuid, hrData = {}, identi
                       )}
                     </div>
                   </div>
+                  )}
                 </>
               )}
             </div>
@@ -1961,3 +3420,72 @@ const UploadField = ({
     />
   </div>
 );
+
+/* ---- Experience File Upload Field ---- */
+const ExperienceFileField = ({ label, file, existingPath, onChange, onView }) => {
+  const inputRef = React.useRef(null);
+  return (
+    <div className="sm:col-span-2">
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+      <div
+        onClick={() => inputRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+          file
+            ? "border-[#263383]/30 bg-[#263383]/5"
+            : "border-gray-200 bg-gray-50/50 hover:border-[#263383]/30 hover:bg-[#263383]/5"
+        }`}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+          onChange={(e) => onChange(e.target.files[0] || null)}
+          className="hidden"
+        />
+        {file ? (
+          <div className="flex items-center justify-between gap-2 px-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileText size={14} className="text-[#263383] flex-shrink-0" />
+              <span className="text-sm font-medium text-gray-800 truncate">{file.name}</span>
+              <span className="text-xs text-gray-400 flex-shrink-0">
+                {(file.size / 1024 / 1024).toFixed(2)} MB
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onChange(null); }}
+              className="text-xs text-red-500 hover:text-red-700 font-medium flex-shrink-0"
+            >
+              Remove
+            </button>
+          </div>
+        ) : existingPath ? (
+          <div className="flex items-center justify-between gap-2 px-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileText size={14} className="text-emerald-500 flex-shrink-0" />
+              <span className="text-sm text-gray-600 truncate">Existing file uploaded</span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onView(existingPath); }}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+              >
+                View
+              </button>
+              <span className="text-xs text-gray-400">|</span>
+              <span className="text-xs text-gray-500">Click to replace</span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <Upload size={20} className="text-gray-300 mx-auto" />
+            <p className="text-xs text-gray-500">Click to upload {label}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+

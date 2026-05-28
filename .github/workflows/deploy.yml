@@ -50,4 +50,4 @@ jobs:
             echo "Cleaning old unused images..."
             docker image prune -f
 
-            echo "Frontend deployed successfully."
+            echo "Frontend deployed successfully to EC2."

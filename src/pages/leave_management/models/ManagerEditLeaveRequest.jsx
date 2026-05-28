@@ -277,7 +277,7 @@
 //         setLoadingData(true);
 //         try {
 //           const [balancesRes, typesRes, holidays] = await Promise.all([
-//             axios.get(
+//             api.get(
 //               `${BASE_URL}/api/leave-balance/employee/${requestDetails.employeeId}/${year}`,
 //               {
 //                 headers: {
@@ -285,12 +285,12 @@
 //                 },
 //               },
 //             ),
-//             axios.get(`${BASE_URL}/api/leave/types`, {
+//             api.get(`${BASE_URL}/api/leave/types`, {
 //               headers: {
 //                 Authorization: `Bearer ${localStorage.getItem("token")}`,
 //               },
 //             }),
-//             axios.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
+//             api.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
 //               params: { state: "All", country: "India" },
 //               headers: {
 //                 Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -608,7 +608,7 @@
 // }
 
 import React, { useEffect, useState, Fragment, useMemo } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import {
   X,
   Lock,
@@ -869,12 +869,12 @@ export default function ManagerEditLeaveRequest({
           requestDetails.employeeId || requestDetails.employee?.employeeId;
 
         const [balancesRes, holidaysRes] = await Promise.all([
-          axios.get(`${BASE_URL}/api/leave-balance/employee/${empId}/${year}`, {
+          api.get(`${BASE_URL}/api/leave-balance/employee/${empId}/${year}`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           }),
-          axios.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
+          api.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
             params: { state: "All", country: "India" },
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,

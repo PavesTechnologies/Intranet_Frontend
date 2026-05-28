@@ -7,6 +7,7 @@ import TimesheetHeader from "../TimesheetHeader";
 import { getManagerDashboardData } from "../api";
 import { useMemo } from "react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import api from "../../../api/axiosInstance";
 
 const ManagerApprovalPage = () => {
   const [groupedTimesheets, setGroupedTimesheets] = useState([]);
@@ -30,18 +31,11 @@ const ManagerApprovalPage = () => {
   const fetchGroupedTimesheets = async () => {
     setLoading(true);
     try {
-      const response = await fetch(
+      const response = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/timesheets/manager`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       );
 
-      if (!response.ok) throw new Error("Failed to fetch timesheets");
-
-      const data = await response.json();
+      const data = response.data;
       setGroupedTimesheets(data);
       setFilteredTimesheets(data);
     } catch (error) {

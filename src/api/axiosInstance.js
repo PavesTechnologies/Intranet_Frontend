@@ -119,7 +119,10 @@ api.interceptors.response.use(
 
     const isExpiredToken =
       typeof errorDetail === "string" &&
-      errorDetail.toLowerCase().includes("token has expired");
+      (
+        errorDetail.toLowerCase().includes("token expired") ||
+        errorDetail.toLowerCase().includes("token has expired")
+      );
 
     const alreadyRetried = originalRequest?._retry;
 

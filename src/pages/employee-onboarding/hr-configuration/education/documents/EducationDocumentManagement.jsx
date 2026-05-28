@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../../api/axiosInstance" ;
 import Button from "../../../../../components/Button/Button";
 import GenericTable from "../../../../../components/Table/table";
 import Modal from "../../../../../components/Modal/modal";
@@ -17,7 +17,7 @@ export default function EducationDocumentManagement() {
   const fetchDocs = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${BASE}/education/education-document`, {
+      const res = await api.get(`${BASE}/education/education-document`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setDocs(res.data);
@@ -37,7 +37,7 @@ export default function EducationDocumentManagement() {
     if (!window.confirm("Delete document?")) return;
 
     try {
-      await axios.delete(`${BASE}/education/education-document/${uuid}`, {
+      await api.delete(`${BASE}/education/education-document/${uuid}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
@@ -167,7 +167,7 @@ function DocumentModal({ editData, onClose, onSuccess }) {
       let res;
 
       if (editData) {
-        res = await axios.put(
+        res = await api.put(
           `${BASE}/education/education-document/${editData.education_document_uuid}`,
           payload,
           {
@@ -176,7 +176,7 @@ function DocumentModal({ editData, onClose, onSuccess }) {
           },
         );
       } else {
-        res = await axios.post(
+        res = await api.post(
           `${BASE}/education/create_education_document`,
           payload,
           {

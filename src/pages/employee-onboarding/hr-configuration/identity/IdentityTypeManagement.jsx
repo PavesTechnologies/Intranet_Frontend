@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance" ;
 import AddEditIdentityModal from "./AddEditIdentityModal";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../../components/Button/Button";
@@ -23,7 +23,7 @@ export default function IdentityTypeManagement() {
   const fetchIdentities = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${BASE_URL}/identity`, {
+      const res = await api.get(`${BASE_URL}/identity`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setIdentities(res.data);
@@ -55,7 +55,7 @@ export default function IdentityTypeManagement() {
       return;
 
     try {
-      await axios.delete(`${BASE_URL}/identity/${uuid}`, {
+      await api.delete(`${BASE_URL}/identity/${uuid}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 

@@ -17,7 +17,7 @@ export default function DepartmentManagement() {
     try {
       setLoading(true);
 
-      const res = await fetch(`${BASE}/masters/departments/`, {
+      const res = await api.get(`${BASE}/masters/departments/`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -46,7 +46,7 @@ export default function DepartmentManagement() {
     if (!window.confirm("Delete department?")) return;
 
     try {
-      const res = await fetch(`${BASE}/masters/departments/${uuid}`, {
+      const res = await api.get(`${BASE}/masters/departments/${uuid}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -186,7 +186,7 @@ function DepartmentModal({ editData, onClose, onSuccess }) {
       let res;
 
       if (editData) {
-        res = await fetch(
+        res = await api.get(
           `${BASE}/masters/departments/${editData.department_uuid}`,
           {
             method: "PUT",
@@ -198,7 +198,7 @@ function DepartmentModal({ editData, onClose, onSuccess }) {
           },
         );
       } else {
-        res = await fetch(`${BASE}/masters/departments/`, {
+        res = await api.get(`${BASE}/masters/departments/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

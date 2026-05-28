@@ -1,24 +1,13 @@
 // utils/timesheetApi.js
 import { showStatusToast } from "../../components/toastfy/toast";
+import api from "../../api/axiosInstance";
 
 const apiEndpoint = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
 
 export const fetchProjectTaskInfo = async () => {
   try {
-    const response = await fetch(`${apiEndpoint}/api/project-info`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data;
+    const response = await api.get(`${apiEndpoint}/api/project-info`);
+    return response.data;
   } catch (error) {
     showStatusToast({
       type: "error",
@@ -31,27 +20,15 @@ export const fetchProjectTaskInfo = async () => {
 
 export const reviewTimesheet = async (timesheetId, comment, status) => {
   try {
-    const res = await fetch(
+    await api.put(
       `${apiEndpoint}/api/timesheets/review?status=${encodeURIComponent(
         status,
       )}`,
       {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          timesheetId,
-          comment: comment,
-        }),
+        timesheetId,
+        comment: comment,
       },
     );
-
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.message || "Failed to review timesheet");
-    }
 
     showStatusToast(`Timesheet ${status} successfully`, "success");
     return;
@@ -63,45 +40,29 @@ export const reviewTimesheet = async (timesheetId, comment, status) => {
 
 export async function updateTimesheet(timesheetId, payload) {
   try {
-    const response = await fetch(
+    const response = await api.put(
       `${apiEndpoint}/api/timesheet/updateEntries/${timesheetId}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify(payload),
-      },
+      payload,
     );
 
-    // Try parsing JSON first; if not possible, fallback to text
-    const contentType = response.headers.get("content-type");
-    let responseData;
-    if (contentType && contentType.includes("application/json")) {
-      responseData = await response.json();
-    } else {
-      responseData = await response.text();
-    }
-
-    // ✅ Success handling
-    if (response.ok) {
-      const message =
-        typeof responseData === "string"
-          ? responseData
-          : responseData.message || "Timesheet updated successfully.";
-      showStatusToast(message, "success");
-      return responseData;
-    }
-
-    // ❌ Error handling (server responded with 4xx or 5xx)
-    const errorMessage =
+    const responseData = response.data;
+    const message =
       typeof responseData === "string"
         ? responseData
-        : responseData.message || "Failed to update timesheet.";
-    showStatusToast(errorMessage, "error");
-    throw new Error(errorMessage);
+        : responseData?.message || "Timesheet updated successfully.";
+    showStatusToast(message, "success");
+    return responseData;
   } catch (err) {
+    // ❌ Server error response (4xx/5xx) — preserve original error toast text
+    if (err.response) {
+      const responseData = err.response.data;
+      const errorMessage =
+        typeof responseData === "string"
+          ? responseData
+          : responseData?.message || "Failed to update timesheet.";
+      showStatusToast(errorMessage, "error");
+      throw new Error(errorMessage);
+    }
     // 🧠 Network / unexpected errors
     const message = err.message || "Unexpected error while updating timesheet.";
     showStatusToast(message, "error");
@@ -111,65 +72,51 @@ export async function updateTimesheet(timesheetId, payload) {
 
 export async function fetchTimesheetHistory() {
   try {
-    const res = await fetch(`${apiEndpoint}/api/timesheet/history`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.message || "Failed to fetch timesheet history");
-    }
-
-    const data = await res.json();
-    return data;
+    const res = await api.get(`${apiEndpoint}/api/timesheet/history`);
+    return res.data;
   } catch (err) {
-    showStatusToast(err.message || "Fetch failed", "error");
+    const message =
+      err.response?.data?.message ||
+      err.message ||
+      "Failed to fetch timesheet history";
+    showStatusToast(message || "Fetch failed", "error");
     throw err;
   }
 }
 
 export async function addEntryToTimesheet(timesheetId, workdate, payload) {
   try {
-    let res;
     if (timesheetId === undefined) {
-      res = await fetch(
+      await api.post(
         `${apiEndpoint}/api/timesheet/create?workDate=${workdate}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(payload),
-        },
+        payload,
       );
     } else {
-      res = await fetch(`${apiEndpoint}/api/timesheet/addEntries`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ timeSheetId: timesheetId, entries: payload }),
+      await api.post(`${apiEndpoint}/api/timesheet/addEntries`, {
+        timeSheetId: timesheetId,
+        entries: payload,
       });
-    }
-
-    if (!res.ok) {
-      if (res.status === 400) {
-        const errorData = await res.text();
-        throw new Error(errorData || "Failed to add entry to timesheet");
-      }
-      const errorData = await res.json();
-      throw new Error(errorData.message || "Failed to add entry to timesheet");
     }
     showStatusToast("Timesheet entry added successfully", "success");
   } catch (err) {
-    showStatusToast(err.message || "Update failed", "error");
-    throw err;
+    let message;
+    if (err.response) {
+      const status = err.response.status;
+      const data = err.response.data;
+      if (status === 400) {
+        message =
+          (typeof data === "string" ? data : data?.message) ||
+          "Failed to add entry to timesheet";
+      } else {
+        message =
+          (typeof data === "string" ? data : data?.message) ||
+          "Failed to add entry to timesheet";
+      }
+    } else {
+      message = err.message || "Update failed";
+    }
+    showStatusToast(message, "error");
+    throw new Error(message);
   }
 }
 
@@ -182,23 +129,11 @@ export async function bulkReviewTimesheet(timesheetIds, status, comment) {
     //   "status": "Approved",
     //   "comment": "Testing Bulk"
     // }
-    const res = await fetch(`${apiEndpoint}/api/timesheets/review/bulk`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify({
-        timesheetIds,
-        status,
-        comment: status === "Rejected" ? comment : "Bulk Approved",
-      }),
+    await api.put(`${apiEndpoint}/api/timesheets/review/bulk`, {
+      timesheetIds,
+      status,
+      comment: status === "Rejected" ? comment : "Bulk Approved",
     });
-
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.message || "Failed to bulk review timesheet");
-    }
 
     showStatusToast(`Timesheet ${status} successfully`, "success");
     return;
@@ -211,23 +146,8 @@ export async function bulkReviewTimesheet(timesheetIds, status, comment) {
 // Dashboard Summary API
 export async function fetchDashboardSummary() {
   try {
-    const response = await fetch(`${apiEndpoint}/api/dashboard/summary`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(
-        errorData || `Error ${response.status}: ${response.statusText}`,
-      );
-    }
-
-    const data = await response.json();
-    return data;
+    const response = await api.get(`${apiEndpoint}/api/dashboard/summary`);
+    return response.data;
   } catch (error) {
     showStatusToast({
       type: "error",
@@ -240,54 +160,30 @@ export async function fetchDashboardSummary() {
 
 export async function filterByRange(startDate, endDate) {
   try {
-    const res = await fetch(
+    const res = await api.get(
       `${apiEndpoint}/api/timesheet/filter?startDate=${startDate}&endDate=${endDate}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      },
     );
-
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.message || "Failed to filter timesheet");
-    }
-
-    const data = await res.json();
-    return data;
+    return res.data;
   } catch (err) {
-    showStatusToast(err.message || "Filter failed", "error");
+    const message =
+      err.response?.data?.message ||
+      err.message ||
+      "Failed to filter timesheet";
+    showStatusToast(message || "Filter failed", "error");
     throw err;
   }
 }
 
 export async function getManagerDashboardData(startDate, endDate) {
   try {
-    const res = await fetch(`${apiEndpoint}/api/manager/summary`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(
-        errorData.message || "Failed to fetch manager dashboard data",
-      );
-    }
-
-    const data = await res.json();
-    return data;
+    const res = await api.get(`${apiEndpoint}/api/manager/summary`);
+    return res.data;
   } catch (err) {
-    showStatusToast(
-      err.message || "Failed to fetch manager dashboard data",
-      "error",
-    );
+    const message =
+      err.response?.data?.message ||
+      err.message ||
+      "Failed to fetch manager dashboard data";
+    showStatusToast(message, "error");
     throw err;
   }
 }
@@ -342,78 +238,45 @@ export async function getManagerDashboardData(startDate, endDate) {
 // }
 export async function submitWeeklyTimesheet(timesheetIds) {
   try {
-    const res = await fetch(`${apiEndpoint}/api/weeklyReview/submit`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify(timesheetIds),
-    });
+    const res = await api.post(
+      `${apiEndpoint}/api/weeklyReview/submit`,
+      timesheetIds,
+    );
 
-    // Handle non-OK responses (includes 400)
-    if (!res.ok) {
-      let errorMessage = "Failed to submit weekly timesheet";
-
-      try {
-        const contentType = res.headers.get("content-type");
-
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await res.json();
-          errorMessage = errorData?.message || JSON.stringify(errorData);
-        } else {
-          const errorText = await res.text();
-          errorMessage = errorText || errorMessage;
-        }
-      } catch (err) {
-        console.error("Error parsing error response:", err);
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    // ✅ Handle success response (either JSON or text)
+    // ✅ Handle success response (either JSON or text — axios auto-parses)
     let responseMessage = "Weekly timesheet submitted successfully";
-    const contentType = res.headers.get("content-type");
-
-    if (contentType && contentType.includes("application/json")) {
-      const data = await res.json();
-      responseMessage = data?.message || responseMessage;
+    const data = res.data;
+    if (typeof data === "string") {
+      responseMessage = data || responseMessage;
     } else {
-      const text = await res.text();
-      responseMessage = text || responseMessage;
+      responseMessage = data?.message || responseMessage;
     }
 
     showStatusToast(responseMessage, "success");
     return responseMessage;
   } catch (err) {
-    showStatusToast(
-      err.message || "Failed to submit weekly timesheet",
-      "error",
-    );
-    throw err;
+    let errorMessage = "Failed to submit weekly timesheet";
+    if (err.response) {
+      const data = err.response.data;
+      if (typeof data === "string") {
+        errorMessage = data || errorMessage;
+      } else if (data) {
+        errorMessage = data?.message || JSON.stringify(data);
+      }
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    showStatusToast(errorMessage, "error");
+    throw new Error(errorMessage);
   }
 }
 
 export async function fetchCalendarHolidays() {
   try {
-    const response = await fetch(
+    const response = await api.get(
       `${apiEndpoint}/api/holidays/currentMonthLeaves`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      },
     );
-
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data;
+    return response.data;
   } catch (error) {
     showStatusToast({
       type: "error",
@@ -426,17 +289,8 @@ export async function fetchCalendarHolidays() {
 
 export async function fetchProjects() {
   try {
-    const response = await fetch(`${apiEndpoint}/api/project-info/all`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-    if (!response.ok) {
-      throw new Error("Failed to fetch timesheets");
-    }
-
-    const data = await response.json();
-    return data;
+    const response = await api.get(`${apiEndpoint}/api/project-info/all`);
+    return response.data;
   } catch (error) {
     console.error("Error fetching timesheets:", error);
     showStatusToast("Failed to fetch timesheets", "error");
@@ -451,30 +305,17 @@ export const handleBulkReview = async (
   comments = "",
 ) => {
   try {
-    const response = await fetch(
+    const response = await api.post(
       `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/timesheets/review`,
       {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          userId,
-          timesheetIds,
-          status,
-          comments: comments || (status === "APPROVED" ? "approved" : ""),
-        }),
+        userId,
+        timesheetIds,
+        status,
+        comments: comments || (status === "APPROVED" ? "approved" : ""),
       },
     );
 
-    // Read the response body as JSON
-    const data = await response.json();
-
-    if (!response.ok) {
-      const message = data?.message || "Failed to review timesheets";
-      throw new Error(message);
-    }
+    const data = response.data;
 
     // ✅ Show the exact message returned from backend
     const message =
@@ -482,34 +323,19 @@ export const handleBulkReview = async (
     showStatusToast(message, "success");
   } catch (err) {
     console.error("❌ Error reviewing timesheets:", err);
-    showStatusToast(
-      err.message || "Failed to update timesheet status",
-      "error",
-    );
+    const message =
+      err.response?.data?.message ||
+      err.message ||
+      "Failed to update timesheet status";
+    showStatusToast(message, "error");
   }
 };
 export async function fetchDashboardLastMonth() {
   try {
-    const response = await fetch(
+    const response = await api.get(
       `${apiEndpoint}/api/dashboard/summary/lastMonth`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      },
     );
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(
-        errorData || `Error ${response.status}: ${response.statusText}`,
-      );
-    }
-
-    const data = await response.json();
-    return data;
+    return response.data;
   } catch (error) {
     showStatusToast({
       type: "error",
@@ -521,26 +347,10 @@ export async function fetchDashboardLastMonth() {
 }
 export async function fetchDashboardLast3Months() {
   try {
-    const response = await fetch(
+    const response = await api.get(
       `${apiEndpoint}/api/dashboard/summary/last3Months`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      },
     );
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(
-        errorData || `Error ${response.status}: ${response.statusText}`,
-      );
-    }
-
-    const data = await response.json();
-    return data;
+    return response.data;
   } catch (error) {
     showStatusToast({
       type: "error",
@@ -553,26 +363,10 @@ export async function fetchDashboardLast3Months() {
 
 export async function fetchDashboardDateRange(startDate, endDate) {
   try {
-    const response = await fetch(
+    const response = await api.get(
       `${apiEndpoint}/api/dashboard/summary/dateRangeMonths?startDate=${startDate}&endDate=${endDate}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      },
     );
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(
-        errorData || `Error ${response.status}: ${response.statusText}`,
-      );
-    }
-
-    const data = await response.json();
-    return data;
+    return response.data;
   } catch (error) {
     showStatusToast({
       type: "error",
@@ -590,30 +384,17 @@ export const handleBulkReviewAdmin = async (
   comments = "",
 ) => {
   try {
-    const response = await fetch(
+    const response = await api.post(
       `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/timesheets/review/internal`,
       {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          userId,
-          timesheetIds,
-          status,
-          comments: comments || (status === "APPROVED" ? "approved" : ""),
-        }),
+        userId,
+        timesheetIds,
+        status,
+        comments: comments || (status === "APPROVED" ? "approved" : ""),
       },
     );
 
-    // Read the response body as JSON
-    const data = await response.json();
-
-    if (!response.ok) {
-      const message = data?.message || "Failed to review timesheets";
-      throw new Error(message);
-    }
+    const data = response.data;
 
     // ✅ Show the exact message returned from backend
     const message =
@@ -621,10 +402,11 @@ export const handleBulkReviewAdmin = async (
     showStatusToast(message, "success");
   } catch (err) {
     console.error("❌ Error reviewing timesheets:", err);
-    showStatusToast(
-      err.message || "Failed to update timesheet status",
-      "error",
-    );
+    const message =
+      err.response?.data?.message ||
+      err.message ||
+      "Failed to update timesheet status";
+    showStatusToast(message, "error");
   }
 };
 
@@ -644,62 +426,35 @@ export const handleMixedReview = async ({
   };
 
   try {
-    const response = await fetch(
+    const response = await api.post(
       `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}${path}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify(multiUserWrap ? [payload] : payload),
-      },
+      multiUserWrap ? [payload] : payload,
     );
 
-    const text = await response.text();
-    let data = null;
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch (_) {
-      data = { message: text };
-    }
-
-    if (!response.ok) {
-      const message = data?.message || "Failed to review timesheets";
-      throw new Error(message);
-    }
-
+    const data = response.data;
     const message =
-      data?.message ||
+      (typeof data === "string" ? data : data?.message) ||
       `${approvedIds.length} day(s) approved, ${rejectedIds.length} day(s) rejected.`;
     showStatusToast(message, "success");
     return true;
   } catch (err) {
     console.error("❌ Error reviewing timesheets:", err);
-    showStatusToast(
-      err.message || "Failed to update timesheet status",
-      "error",
-    );
+    const respData = err.response?.data;
+    const message =
+      (typeof respData === "string" ? respData : respData?.message) ||
+      err.message ||
+      "Failed to update timesheet status";
+    showStatusToast(message, "error");
     return false;
   }
 };
 
 export const getActiveHourSettings = async () => {
   try {
-    const res = await fetch(`${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/timesheet-settings/active`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || `Error ${res.status}: ${res.statusText}`);
-    }
-
-    return await res.json();
+    const res = await api.get(
+      `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/timesheet-settings/active`,
+    );
+    return res.data;
   } catch (err) {
     console.error("❌ Failed to load hour settings:", err);
     showStatusToast("Failed to load hour settings", "error");
@@ -709,25 +464,21 @@ export const getActiveHourSettings = async () => {
 
 export const updateHourSettings = async (payload) => {
   try {
-    const res = await fetch(`${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/timesheet-settings`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const raw = await res.text();
-    if (!res.ok) {
-      throw new Error(raw || `Error ${res.status}: ${res.statusText}`);
-    }
+    const res = await api.post(
+      `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/timesheet-settings`,
+      payload,
+    );
 
     showStatusToast("Hour settings updated successfully", "success");
-    return raw ? JSON.parse(raw) : null;
+    return res.data ?? null;
   } catch (err) {
     console.error("❌ Failed to update hour settings:", err);
-    showStatusToast(err.message || "Failed to update hour settings", "error");
-    throw err;
+    const respData = err.response?.data;
+    const message =
+      (typeof respData === "string" ? respData : respData?.message) ||
+      err.message ||
+      "Failed to update hour settings";
+    showStatusToast(message, "error");
+    throw new Error(message);
   }
 };
