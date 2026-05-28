@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
 const TSM_BASE_URL = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
 
@@ -11,7 +11,7 @@ const getAuthHeaders = () => ({
  */
 export const getOperationalProjects = async () => {
   try {
-    const response = await axios.get(`${TSM_BASE_URL}/api/timesheets/RMS/project-hours-summary`, {
+    const response = await api.get(`${TSM_BASE_URL}/api/timesheets/RMS/project-hours-summary`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -23,7 +23,7 @@ export const getOperationalProjects = async () => {
 
 export const getOperationalProjectDetail = async (projectId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${TSM_BASE_URL}/api/timesheets/RMS/project-hours-summary/${projectId}`,
       {
         headers: getAuthHeaders(),

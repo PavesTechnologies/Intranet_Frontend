@@ -11,6 +11,20 @@ import {
   buildScopeChangesSection,
 } from "../utils/downloadUtils";
 
+const BURNUP_META = {
+  title:       "Sprint burnup",
+  subtitle:    "Completed story points over time",
+  legendItems: [
+    { label: "Completed",        color: "#16A34A", type: "solid-line"  },
+    { label: "Total scope",      color: "#6366F1", type: "dashed-line" },
+    { label: "Ideal completion", color: "#94A3B8", type: "dashed-line" },
+    { label: "▲ Scope added",   color: "#16a34a", type: "text"        },
+    { label: "▼ Scope removed", color: "#dc2626", type: "text"        },
+    { label: "Weekend",          color: "rgba(148,163,184,0.4)", type: "box" },
+    { label: "Holiday",          color: "rgba(251,191,36,0.5)",  type: "box" },
+  ],
+};
+
 const BurnupView = ({
   burnupData,
   velocityData,
@@ -23,9 +37,9 @@ const BurnupView = ({
   const chartRef = useRef(null);
 
   const handlePNG = () =>
-    downloadChartWithScopeAsPNG(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burnup`);
+    downloadChartWithScopeAsPNG(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burnup`, BURNUP_META);
   const handlePDF = () =>
-    downloadChartWithScopeAsPDF(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burnup`);
+    downloadChartWithScopeAsPDF(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burnup`, BURNUP_META);
   const handleCSV = () => {
     const chartSection = buildBurnupCSV(
       burnupData

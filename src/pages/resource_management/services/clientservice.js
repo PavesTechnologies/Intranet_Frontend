@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const RMS_BASE_URL = window.__APP_CONFIG__?.RMS_BASE_URL;
 
@@ -8,13 +8,14 @@ const RMS_BASE_URL = window.__APP_CONFIG__?.RMS_BASE_URL;
  */
 export const getAdminKPI = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client/get-admin-kpi`,
       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}`,
      },
     });
     return response.data;
   } catch (error) {
+    console.log(error);
     console.error("KPI Fetch Error:", error);
     throw error;
   }
@@ -26,13 +27,13 @@ export const getAdminKPI = async () => {
 
 export const getClientPageData = async (clientId) => {
   // Assuming you have an axios instance or fetch wrapper
-  // const response = await axios.get(`api/client/${clientId}/page-data`);
+  // const response = await api.get(`api/client/${clientId}/page-data`);
   // return response.data;
 
   // Mocking the call based on your request for now:
   // return fetch(`/api/client/${clientId}/page-data`).then(res => res.json());
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client/${clientId}/page-data`,
       {headers: {
     Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -46,7 +47,7 @@ export const getClientPageData = async (clientId) => {
 
 export const searchClients = async (filters, page = 0, size = 10) => {
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/client/search`, {
+    const response = await api.get(`${RMS_BASE_URL}/api/client/search`, {
   headers: {
     Authorization: `Bearer ${localStorage.getItem("token")}`,
   },
@@ -72,7 +73,7 @@ export const searchClients = async (filters, page = 0, size = 10) => {
 
 export const createClient = async (clientData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client/create`,
       clientData,
       {headers: {
@@ -87,7 +88,7 @@ export const createClient = async (clientData) => {
 
 export const getClients = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client/get-all-clients`,
       {
         headers: {
@@ -103,7 +104,7 @@ export const getClients = async () => {
 
 export const getClientById = async (clientId) => {
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/client/${clientId}`, {
+    const response = await api.get(`${RMS_BASE_URL}/api/client/${clientId}`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -116,7 +117,7 @@ export const getClientById = async (clientId) => {
 
 export const createClientSLA = async (slaData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client-sla/create`,
       slaData,
       {
@@ -133,7 +134,7 @@ export const createClientSLA = async (slaData) => {
 
 export const updateClientSLA = async (slaData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-sla/update`,
       slaData,
       {
@@ -150,7 +151,7 @@ export const updateClientSLA = async (slaData) => {
 
 export const deleteClientSLA = async (slaId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/client-sla/delete/${slaId}`,
       {
         headers: {
@@ -166,7 +167,7 @@ export const deleteClientSLA = async (slaId) => {
 
 export const getClientSLA = async (clientId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-sla/clientSLA/${clientId}`,
       {
         headers: {
@@ -182,7 +183,7 @@ export const getClientSLA = async (clientId) => {
 
 export const createClientCompliance = async (complianceData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client-compliance/create`,
       complianceData,
       {
@@ -199,7 +200,7 @@ export const createClientCompliance = async (complianceData) => {
 
 export const updateClientCompliance = async (complianceData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-compliance/update`,
       complianceData,
       {
@@ -216,7 +217,7 @@ export const updateClientCompliance = async (complianceData) => {
 
 export const deleteClientCompliance = async (complianceId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/client-compliance/delete/${complianceId}`,
       {
         headers: {
@@ -232,7 +233,7 @@ export const deleteClientCompliance = async (complianceId) => {
 
 export const getClientCompliance = async (clientId) => {
   try {
-    const responce = await axios.get(
+    const responce = await api.get(
       `${RMS_BASE_URL}/api/client-compliance/clientCompliance/${clientId}`,
       {
         headers: {
@@ -248,7 +249,7 @@ export const getClientCompliance = async (clientId) => {
 
 export const createClientEscalation = async (escalationData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client-contact/create`,
       escalationData,
       {
@@ -265,7 +266,7 @@ export const createClientEscalation = async (escalationData) => {
 
 export const updateClientContact = async (complianceData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-contact/update`,
       complianceData,
       {
@@ -282,7 +283,7 @@ export const updateClientContact = async (complianceData) => {
 
 export const deleteClientContact = async (contactId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/client-contact/delete/${contactId}`,
       {
         headers: {
@@ -298,7 +299,7 @@ export const deleteClientContact = async (contactId) => {
 
 export const getClientEscalation = async (clientId) => {
   try {
-    const responce = await axios.get(
+    const responce = await api.get(
       `${RMS_BASE_URL}/api/client-contact/clientContact/${clientId}`,
       {
         headers: {
@@ -314,7 +315,7 @@ export const getClientEscalation = async (clientId) => {
 
 export const createClientAsset = async (assetData, clientId) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client-assets/clients/${clientId}/assets`,
       assetData,
       {
@@ -335,7 +336,7 @@ export const createClientAsset = async (assetData, clientId) => {
    =============================== */
 export const updateClientAsset = async (assetId, assetData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-assets/${assetId}`,
       assetData,
       {
@@ -357,7 +358,7 @@ export const updateClientAsset = async (assetId, assetData) => {
    =============================== */
 export const deleteClientAsset = async (assetId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/client-assets/${assetId}`,
       {
         headers: {
@@ -376,7 +377,7 @@ export const deleteClientAsset = async (assetId) => {
    =============================== */
 export const getAssetsByClient = async (clientId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-assets/client/${clientId}`,
       {
         headers: {
@@ -391,7 +392,7 @@ export const getAssetsByClient = async (clientId) => {
 };
 // export const getAssetById = async (assetId) => {
 //   try {
-//     const response = await axios.get(
+//     const response = await api.get(
 //       `${RMS_BASE_URL}/api/client-assets/${assetId}`,
 //       {
 //         headers: {
@@ -412,7 +413,7 @@ export const getClientAssetAssignments = async (assetId) => {
     // 1. Ensure this URL matches your @GetMapping in Java EXACTLY
     // 2. Double check if your backend expects /api/client-assets/54
     //    or perhaps /api/assets/54
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-asset-assignments/by-asset/${assetId}`,
       {
         headers: {
@@ -429,7 +430,7 @@ export const getClientAssetAssignments = async (assetId) => {
 
 export const getAssetById = async (assetId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-assets/${assetId}`,
       {
         headers: {
@@ -453,7 +454,7 @@ export const assignClientAsset = async (assignmentData) => {
       assignmentData.asset?.assetId ||
       assignmentData.assetId;
 
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client-asset-assignments/${id}`,
       assignmentData,
       {
@@ -470,7 +471,7 @@ export const assignClientAsset = async (assignmentData) => {
 };
 export const updateClient = async (clientData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client/update-client`,
       clientData,
       {
@@ -490,7 +491,7 @@ export const updateClient = async (clientData) => {
  */
 export const updateClientStatus = async (clientId, clientData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client/update-client`,
       {
         clientId: clientId,
@@ -512,7 +513,7 @@ export const updateClientStatus = async (clientId, clientData) => {
 
 export const assignUpdateClientAsset = async (assignmentId, assignmentData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-asset-assignments/${assignmentId}`,
       assignmentData,
       {
@@ -534,7 +535,7 @@ export const returnAssetAssignment = async (
   remarks,
 ) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-asset-assignments/return/${assignmentId}`,
       {},
       {
@@ -555,7 +556,7 @@ export const returnAssetAssignment = async (
 
 export const getAssignmentKPI = async (assetId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-asset-assignments/kpi/${assetId}`,
       {
         headers: {
@@ -571,7 +572,7 @@ export const getAssignmentKPI = async (assetId) => {
 
 export const deleteClient = async (clientId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/client/delete-client/${clientId}`,
       {
         headers: {
@@ -590,7 +591,7 @@ export const deleteClient = async (clientId) => {
    =============================== */
 export const deleteClientAssignment = async (assignmentId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/client-asset-assignments/${assignmentId}`,
       {
         headers: {
@@ -606,7 +607,7 @@ export const deleteClientAssignment = async (assignmentId) => {
 };
 
 export const getAssetDashboard = async () => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/client-assets/dashboard`,
     {
       headers: {
@@ -619,7 +620,7 @@ export const getAssetDashboard = async () => {
 
 export const getAssetDashboardByClient = async (clientId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-assets/dashboard/client/${clientId}`,
       {
         headers: {
@@ -638,7 +639,7 @@ export const getAssetDashboardByClient = async (clientId) => {
    =============================== */
 export const getProjectOverlaps = async (projectId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/projects/${projectId}/overlaps`,
       {
         headers: {
@@ -654,7 +655,7 @@ export const getProjectOverlaps = async (projectId) => {
 };
 
 export const getProjectsByClient = async (clientId) => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/projects/get-project-by-client-id/${clientId}`,
     {
       headers: {
@@ -667,7 +668,7 @@ export const getProjectsByClient = async (clientId) => {
 };
 
 export const getProjectSLA = async (projectId) => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/project-sla/project/${projectId}`,
     {
       headers: {
@@ -679,7 +680,7 @@ export const getProjectSLA = async (projectId) => {
 };
 
 export const getProjectCompliance = async (projectId) => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/project-compliance/project/${projectId}`,
     {
       headers: {
@@ -691,7 +692,7 @@ export const getProjectCompliance = async (projectId) => {
 };
 
 export const getProjectEscalations = async (projectId) => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/projects/${projectId}/escalations`,
     {
       headers: {
@@ -703,7 +704,7 @@ export const getProjectEscalations = async (projectId) => {
 };
 //GET ASSETS BY PROJECT ID
 export const getAssetsByProjectId = async (projectId) => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/client-asset-assignments/project/${projectId}`,
     {
       headers: {
@@ -717,7 +718,7 @@ export const getAssetsByProjectId = async (projectId) => {
 
 export const getSkills = async () => {
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/skills/active`, {
+    const response = await api.get(`${RMS_BASE_URL}/api/skills/active`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -730,7 +731,7 @@ export const getSkills = async () => {
 
 export const getCertificates = async () => {
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/certificates`, {
+    const response = await api.get(`${RMS_BASE_URL}/api/certificates`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -746,7 +747,7 @@ export const getCertificates = async () => {
    =============================== */
 export const getAvailableSerialsByAssetId = async (assetId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-assets/${assetId}/available-serials`,
       {
         headers: {
@@ -778,7 +779,7 @@ export function formatCurrency(value) {
  */
 export const createCompanyContact = async (companyContactData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/company-contact/create`,
       companyContactData,
       {
@@ -801,7 +802,7 @@ export const createCompanyContact = async (companyContactData) => {
  */
 export const getCompanyContactsByCompanyId = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/company-contact/all`,
       {
         headers: {
@@ -823,7 +824,7 @@ export const getCompanyContactsByCompanyId = async () => {
  */
 export const updateCompanyContact = async (companyContactData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/company-contact/update/${companyContactData.contactId}`,
       companyContactData,
       {
@@ -846,7 +847,7 @@ export const updateCompanyContact = async (companyContactData) => {
  */
 export const deleteCompanyContact = async (contactId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/company-contact/delete/${contactId}`,
       {
         headers: {

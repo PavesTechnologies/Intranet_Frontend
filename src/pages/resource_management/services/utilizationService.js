@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const TMS_API_BASE_URL = window.__APP_CONFIG__?.TIMESHEET_API_ENDPOINT;
 
@@ -26,7 +26,7 @@ const toDateParams = (startDate, endDate, extra = {}) => {
 };
 
 const getUtilization = async (path, params = {}) => {
-  const response = await axios.get(`${TMS_API_BASE_URL}${path}`, {
+  const response = await api.get(`${TMS_API_BASE_URL}${path}`, {
     headers: getAuthHeaders(),
     params: sanitizeParams(params),
   });
@@ -130,7 +130,7 @@ export const utilizationService = {
 
   getRMSUsers: async (startDate, endDate) => {
     try {
-      const response = await axios.get(`${TMS_API_BASE_URL}/api/timesheets/RMS/users`, {
+      const response = await api.get(`${TMS_API_BASE_URL}/api/timesheets/RMS/users`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
@@ -157,7 +157,7 @@ export const utilizationService = {
   exportUtilizationCSV: async (params) => {
     try {
       const exportParams = { reportType: 'SUMMARY', ...(params || {}) };
-      const response = await axios.post(`${TMS_API_BASE_URL}/api/utilization/export/csv`, exportParams, {
+      const response = await api.post(`${TMS_API_BASE_URL}/api/utilization/export/csv`, exportParams, {
         headers: { 
           Authorization: `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
@@ -182,7 +182,7 @@ export const utilizationService = {
   exportUtilizationExcel: async (params) => {
     try {
       const exportParams = { reportType: 'SUMMARY', ...(params || {}) };
-      const response = await axios.post(`${TMS_API_BASE_URL}/api/utilization/export/excel`, exportParams, {
+      const response = await api.post(`${TMS_API_BASE_URL}/api/utilization/export/excel`, exportParams, {
         headers: { 
           Authorization: `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
@@ -218,7 +218,7 @@ utilizationService.generateReport = utilizationService.generateUtilizationReport
 
 export const getBillNonBillable = async (startDate, endDate) => {
     try {
-        const response = await axios.get(`${TMS_API_BASE_URL}/api/users/hours`, {
+        const response = await api.get(`${TMS_API_BASE_URL}/api/users/hours`, {
             params: {
                 startDate: startDate,
                 endDate: endDate,
@@ -236,7 +236,7 @@ export const getBillNonBillable = async (startDate, endDate) => {
 
 export const getResourceProjects = async (resourceId) => {
     try {
-        const response = await axios.get(`${TMS_API_BASE_URL}/api/users/${resourceId}/project-details`, {
+        const response = await api.get(`${TMS_API_BASE_URL}/api/users/${resourceId}/project-details`, {
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             },

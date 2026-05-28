@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import ProjectResourcesTable from "./ProjectResourcesTable";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import SLAForm from "../../models/client_configuration/forms/SLAForm";
 import ComplianceForm from "../../models/client_configuration/forms/ComplianceForm";
 import EscalationForm from "../../models/client_configuration/forms/EscalationForm";
@@ -107,7 +107,7 @@ const RMSProjectDetails = () => {
   // 1. Fetch Client SLAs when entering Inherit Mode
   const handleInheritClick = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${RMS_BASE_URL}/api/client-sla/clientSLA/${project.clientId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -131,7 +131,7 @@ const RMSProjectDetails = () => {
   };
   const fetchProjectSLAs = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${RMS_BASE_URL}/api/project-sla/project/${projectId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -155,7 +155,7 @@ const RMSProjectDetails = () => {
       }
       // We loop through selected types and call your backend inherit endpoint
       const promises = selectedClientSlas.map((type) =>
-        axios.post(
+        api.post(
           `${RMS_BASE_URL}/api/project-sla/inherit/${project.pmsProjectId}/type/${type}`,
           {},
           {
@@ -204,7 +204,7 @@ const RMSProjectDetails = () => {
         project: { pmsProjectId: projectId },
       };
 
-      await axios.post(`${RMS_BASE_URL}/api/project-sla/save`, payload, {
+      await api.post(`${RMS_BASE_URL}/api/project-sla/save`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
@@ -255,7 +255,7 @@ const RMSProjectDetails = () => {
 
     try {
       if (deleteType === "sla") {
-        await axios.delete(
+        await api.delete(
           `${RMS_BASE_URL}/api/project-sla/${deleteConfigId}`,
           {
             headers: {
@@ -268,7 +268,7 @@ const RMSProjectDetails = () => {
       }
 
       if (deleteType === "compliance") {
-        await axios.delete(
+        await api.delete(
           `${RMS_BASE_URL}/api/project-compliance/${deleteConfigId}`,
           {
             headers: {
@@ -281,7 +281,7 @@ const RMSProjectDetails = () => {
       }
 
       if (deleteType === "escalation") {
-        await axios.delete(
+        await api.delete(
           `${RMS_BASE_URL}/api/projects/delete-escalation/${deleteConfigId}`,
           {
             headers: {
@@ -322,7 +322,7 @@ const RMSProjectDetails = () => {
   // . Fetch Existing Project Compliance (for the tab table and validation)
   const fetchProjectCompliance = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${RMS_BASE_URL}/api/project-compliance/project/${projectId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -339,7 +339,7 @@ const RMSProjectDetails = () => {
   const handleComplianceInheritClick = async () => {
     try {
       // 🔥 1️⃣ Fetch latest project compliance from DB
-      const projectRes = await axios.get(
+      const projectRes = await api.get(
         `${RMS_BASE_URL}/api/project-compliance/project/${projectId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -349,7 +349,7 @@ const RMSProjectDetails = () => {
       const latestProjectCompliance = projectRes.data.data || [];
 
       // 🔥 2️⃣ Fetch client compliance
-      const clientRes = await axios.get(
+      const clientRes = await api.get(
         `${RMS_BASE_URL}/api/client-compliance/clientCompliance/${project.clientId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -384,7 +384,7 @@ const RMSProjectDetails = () => {
 
       // Call the specific inherit endpoint: /inherit/{projectId}/type/{complianceType}
       const promises = selectedClientCompliance.map((complianceType) =>
-        axios.post(
+        api.post(
           `${RMS_BASE_URL}/api/project-compliance/inherit/${projectId}/type/${complianceType}`,
           {},
           {
@@ -435,7 +435,7 @@ const RMSProjectDetails = () => {
         project: { pmsProjectId: projectId },
       };
 
-      await axios.post(`${RMS_BASE_URL}/api/project-compliance/save`, payload, {
+      await api.post(`${RMS_BASE_URL}/api/project-compliance/save`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
@@ -472,7 +472,7 @@ const RMSProjectDetails = () => {
         type: "manual",
       };
 
-      await axios.post(
+      await api.post(
         `${RMS_BASE_URL}/api/projects/escalations/save`,
         payload,
         {
@@ -508,7 +508,7 @@ const RMSProjectDetails = () => {
 
   const fetchProjectEscalations = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${RMS_BASE_URL}/api/projects/${projectId}/escalations`,
         {
           headers: {
@@ -537,7 +537,7 @@ const RMSProjectDetails = () => {
 
   const handleEscalationInheritClick = async () => {
     try {
-      const projectRes = await axios.get(
+      const projectRes = await api.get(
         `${RMS_BASE_URL}/api/projects/${projectId}/escalations`,
         {
           headers: {
@@ -550,7 +550,7 @@ const RMSProjectDetails = () => {
         (e) => e.contactId,
       );
 
-      const clientRes = await axios.get(
+      const clientRes = await api.get(
         `${RMS_BASE_URL}/api/client-contact/clientContact/${project.clientId}`,
         {
           headers: {
@@ -600,7 +600,7 @@ const RMSProjectDetails = () => {
         contactId: selectedClientEscalations,
       };
 
-      await axios.post(
+      await api.post(
         `${RMS_BASE_URL}/api/projects/escalations/save`,
         payload,
         {
@@ -637,7 +637,7 @@ const RMSProjectDetails = () => {
         activeFlag: formData.activeFlag,
       };
 
-      await axios.put(
+      await api.put(
         `${RMS_BASE_URL}/api/projects/update-escalation/${formData.projectEscalationId}`,
         payload,
         {
@@ -744,7 +744,7 @@ const RMSProjectDetails = () => {
   const fetchOverlaps = async () => {
     try {
       setLoadingOverlaps(true);
-      const res = await axios.get(
+      const res = await api.get(
         `${RMS_BASE_URL}/api/projects/${projectId}/overlaps`,
         {
           headers: {

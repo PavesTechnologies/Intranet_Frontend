@@ -1,10 +1,10 @@
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const BASE_URL = window.__APP_CONFIG__?.RMS_BASE_URL;
 
 export const fetchResources = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/resource/get-all-resources`,
       {
         headers: {
@@ -20,7 +20,7 @@ export const fetchResources = async () => {
 
 export const resourceAllocation = async (allocationData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/allocation/assign`,
       allocationData,
       {
@@ -37,7 +37,7 @@ export const resourceAllocation = async (allocationData) => {
 
 export const fetchResourcesByProjectId = async (projectId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/allocation/project/${projectId}`,
       {
         headers: {
@@ -53,7 +53,7 @@ export const fetchResourcesByProjectId = async (projectId) => {
 
 export const fetchResourcesByDemandId = async (demandId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/allocation/demand/${demandId}`,
       {
         headers: {
@@ -69,7 +69,7 @@ export const fetchResourcesByDemandId = async (demandId) => {
 
 export const deleteResourceAllocation = async (allocationId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${BASE_URL}/api/allocation/${allocationId}`,
       {
         headers: {
@@ -85,7 +85,7 @@ export const deleteResourceAllocation = async (allocationId) => {
 
 export const projectResourceDetails = async (projectId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${BASE_URL}/api/allocation/get-all-resources/${projectId}`,
       {
         headers: {
