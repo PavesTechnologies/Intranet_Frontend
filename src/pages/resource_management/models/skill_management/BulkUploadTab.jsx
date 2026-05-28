@@ -49,20 +49,19 @@ const BulkUploadTab = ({ registerApply }) => {
   }, [rows]);
 
   const invalidIndexes = useMemo(
-    () =>
-      new Set(
-        rows
-          .map((row, index) => ({ row, index }))
-          .filter(
-            ({ row }) =>
-              !row["Category Name"] ||
-              !row["Skill Name"] ||
-              !row["SubSkill Name"],
-          )
-          .map(({ index }) => index),
-      ),
-    [rows],
-  );
+  () =>
+    new Set(
+      rows
+        .map((row, index) => ({ row, index }))
+        .filter(
+          ({ row }) =>
+            !row["Category Name"] ||
+            !row["Skill Name"],
+        )
+        .map(({ index }) => index),
+    ),
+  [rows],
+);
 
   const validCount = rows.filter((_, index) => !duplicateIndexes.has(index) && !invalidIndexes.has(index)).length;
 
@@ -140,6 +139,10 @@ const BulkUploadTab = ({ registerApply }) => {
       formData.append("file", uploadedFile);
 
       const response = await skillService.uploadSkillTaxonomy(formData);
+
+      if (response?.success === false) {
+        throw response;
+      }
 
       notify.success(response?.message || "Excel uploaded successfully.");
     } catch (error) {
