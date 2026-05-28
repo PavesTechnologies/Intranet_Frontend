@@ -11,6 +11,20 @@ import {
   buildScopeChangesSection,
 } from "../utils/downloadUtils";
 
+const BURNDOWN_META = {
+  title:       "Sprint burndown",
+  subtitle:    "Remaining story points over time",
+  legendItems: [
+    { label: "Actual remaining", color: "#4F46E5", type: "solid-line"  },
+    { label: "Total scope",      color: "#F59E0B", type: "dashed-line" },
+    { label: "Ideal burndown",   color: "#94A3B8", type: "dashed-line" },
+    { label: "▲ Scope added",   color: "#16a34a", type: "text"        },
+    { label: "▼ Scope removed", color: "#dc2626", type: "text"        },
+    { label: "Weekend",          color: "rgba(148,163,184,0.4)", type: "box" },
+    { label: "Holiday",          color: "rgba(251,191,36,0.5)",  type: "box" },
+  ],
+};
+
 const BurndownView = ({
   burndownData,
   velocityData,
@@ -25,9 +39,9 @@ const BurndownView = ({
   const chartRef = useRef(null);
 
   const handlePNG = () =>
-    downloadChartWithScopeAsPNG(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burndown`);
+    downloadChartWithScopeAsPNG(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burndown`, BURNDOWN_META);
   const handlePDF = () =>
-    downloadChartWithScopeAsPDF(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burndown`);
+    downloadChartWithScopeAsPDF(chartRef.current?.getCanvas(), scopeChanges, `${sprintName}_Burndown`, BURNDOWN_META);
   const handleCSV = () => {
     const chartSection = buildBurndownCSV(
       dailyBurnup.map((d, i) => ({
