@@ -397,8 +397,7 @@ export default function WeeklyDashboard() {
             },
           },
         );
-        const data = await response.json();
-        setApiData(data);
+        setApiData(response.data);
       } catch (error) {
         console.error("API Error:", error);
       } finally {

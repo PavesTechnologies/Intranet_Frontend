@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import api from "../../../api/axiosInstance";
 import EmployeeTable from "./components/EmployeeTable";
 import SearchBar from "./components/SearchBar";
 import FiltersBar from "./components/FiltersBar";
@@ -61,11 +62,8 @@ export default function EmployeeListPage() {
       },
     );
 
-    const data = await res.json();
-
-    // 🔥 convert to map
     const map = {};
-    data.forEach((d) => {
+    (res.data || []).forEach((d) => {
       map[d.department_uuid] = d.department_name;
     });
 
@@ -83,14 +81,7 @@ export default function EmployeeListPage() {
         },
       );
 
-      if (!res.ok) {
-        console.error("Designation API failed:", res.status);
-        return; // 🚨 stop here
-      }
-
-      const data = await res.json();
-
-      const list = Array.isArray(data) ? data : data.data || data.results || [];
+      const list = Array.isArray(res.data) ? res.data : res.data?.data || res.data?.results || [];
 
       const map = {};
       list.forEach((d) => {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import api from "../../../../../api/axiosInstance";
 import { Pencil, Trash } from "lucide-react";
 import Pagination from "../../../../../components/Pagination/pagination";
 import FilterListbox from "../../../../../components/filter/FilterListbox";
@@ -29,8 +30,7 @@ export default function DesignationManagement() {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
-      const data = await res.json();
-      setDepartments(data);
+      setDepartments(res.data);
     } catch {
       if (window.showError) window.showError("Failed to load departments");
     }
@@ -46,8 +46,7 @@ export default function DesignationManagement() {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
-      const data = await res.json();
-      setDesignations(data);
+      setDesignations(res.data);
     } catch {
       if (window.showError) window.showError("Failed to load designations");
     } finally {
@@ -66,12 +65,9 @@ export default function DesignationManagement() {
     if (!window.confirm("Delete designation?")) return;
 
     try {
-      const res = await api.get(`${BASE}/masters/designations/${uuid}`, {
-        method: "DELETE",
+      await api.delete(`${BASE}/masters/designations/${uuid}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
-
-      if (!res.ok) throw new Error();
 
       setDesignations((prev) =>
         prev.filter((d) => d.designation_uuid !== uuid),
@@ -256,32 +252,24 @@ function DesignationModal({ editData, departments, onClose, onSuccess }) {
 
       let res;
 
+      const authHeaders = {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      };
+
       if (editData) {
-        res = await api.get(
+        res = await api.put(
           `${BASE}/masters/designations/${editData.designation_uuid}`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify(payload),
-          },
+          payload,
+          authHeaders,
         );
       } else {
-        res = await api.get(`${BASE}/masters/designations/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(payload),
-        });
+        res = await api.post(`${BASE}/masters/designations/`, payload, authHeaders);
       }
 
-      if (!res.ok) throw new Error();
-
-      const data = await res.json();
+      const data = res.data;
 
       if (window.showSuccess) window.showSuccess(
         `Designation ${editData ? "updated" : "created"} successfully`,

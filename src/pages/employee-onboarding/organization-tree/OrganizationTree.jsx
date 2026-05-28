@@ -289,7 +289,6 @@ export default function OrganizationTree() {
     const response = await api.get(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/hr/organization-hierarchy/${employeeId}`,
       {
-        method: "GET",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -297,7 +296,7 @@ export default function OrganizationTree() {
       }
     );
 
-    return await response.json();
+    return response.data;
 
   } catch (error) {
 
