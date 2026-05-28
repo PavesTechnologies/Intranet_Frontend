@@ -21,6 +21,7 @@ import SkillModal from "./SkillModal";
 import EditSkillModal from "./EditSkillModal";
 import { skillService } from "../../../services/skillService";
 import GlobalStatusBadge from "../../../components/status/statusbadge";
+import api from "../../../api/axiosInstance";
 
 /* ═══════════════════════════════════════════════════════════════════
    DESIGN SYSTEM  v3  —  Brand palette
@@ -631,11 +632,15 @@ export default function EmployeeProfileView() {
     try {
       const token = localStorage.getItem("token");
       const coreRes = await api.get(
-        `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!coreRes.ok) throw new Error("Failed to fetch employee");
-      const coreData = await coreRes.json();
+  `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }
+);
+
+const coreData = coreRes.data;
 
       if (coreData.employee_id) {
         fetchEmployeeSkills(coreData.employee_id);
@@ -646,20 +651,20 @@ export default function EmployeeProfileView() {
 
       const deptPromise = coreData.department_uuid
         ? api.get(`${BASE_URL}/masters/departments/${coreData.department_uuid}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.ok ? r.json() : {}).catch(() => ({}))
+            .then(r => r.data || {}).catch(() => ({}))
         : Promise.resolve({});
       parallelPromises.push(deptPromise);
 
       const desigPromise = coreData.designation_uuid
         ? api.get(`${BASE_URL}/masters/designations/${coreData.designation_uuid}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.ok ? r.json() : {}).catch(() => ({}))
+            .then(r => r.data || {}).catch(() => ({}))
         : Promise.resolve({});
       parallelPromises.push(desigPromise);
 
       const targetUserUuid = coreData.user_uuid;
       const hrPromise = targetUserUuid
         ? api.get(`${BASE_URL}/hr/hr/${targetUserUuid}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.ok ? r.json() : {}).catch(() => ({}))
+            .then(r => r.data || {}).catch(() => ({}))
         : Promise.resolve({});
       parallelPromises.push(hrPromise);
 
@@ -682,10 +687,7 @@ export default function EmployeeProfileView() {
             `${BASE_URL}/identity/country-mapping/identities/${countryUuid}`,
             { headers: { Authorization: `Bearer ${token}` } }
           );
-          if (idTypesRes.ok) {
-            const idTypesData = await idTypesRes.json();
-            setIdentityTypes(Array.isArray(idTypesData) ? idTypesData : []);
-          }
+          setIdentityTypes(Array.isArray(idTypesRes.data) ? idTypesRes.data : []);
         } catch (e) { console.error("Failed to fetch identity types:", e); }
       }
     } catch (err) {
@@ -796,8 +798,7 @@ export default function EmployeeProfileView() {
       const res = await api.get(`${RMSURL}/api/resource-certificates/resource/${targetId}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
-      const result = await res.json();
-      setRawCertifications(result.data || []);
+      setRawCertifications(res.data?.data || []);
     } catch (err) { console.error("Error fetching raw certifications:", err); }
   };
 
@@ -844,17 +845,14 @@ export default function EmployeeProfileView() {
       const res = await api.get(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
-      if (res.ok) {
-        const responseData = await res.json();
-        const rawData = responseData.data || responseData;
-        const data = Array.isArray(rawData) ? rawData[0] : rawData;
-        if (data) { setAbout(normalizeAboutData(data)); setAboutUuid(data.employee_about_uuid); }
-      } else {
-        const errorText = await res.text();
-        const displayMessage = formatAboutApiError(errorText, "Failed to fetch about data");
-        console.error("Failed to fetch about data:", displayMessage);
-      }
-    } catch (err) { console.error("Failed to fetch about data:", err); }
+      const responseData = res.data?.data || res.data;
+      const rawData = responseData?.data || responseData;
+      const data = Array.isArray(rawData) ? rawData[0] : rawData;
+      if (data) { setAbout(normalizeAboutData(data)); setAboutUuid(data.employee_about_uuid); }
+    } catch (err) {
+      const errMsg = err?.response?.data?.message || err.message || "Failed to fetch about data";
+      console.error("Failed to fetch about data:", errMsg);
+    }
   };
 
   useEffect(() => {
@@ -872,7 +870,6 @@ export default function EmployeeProfileView() {
     const updatedAbout = { ...about, [key]: newContent };
     setSavingAbout(true);
     try {
-      const method = aboutUuid ? "PUT" : "POST";
       const url = aboutUuid
         ? `${BASE_URL}/employee-details/about/${employee_uuid}`
         : `${BASE_URL}/employee-details/about`;
@@ -883,17 +880,21 @@ export default function EmployeeProfileView() {
         work_enjoyment: updatedAbout.work_enjoyment,
         interests_hobbies: updatedAbout.interests_hobbies,
       };
-      const res = await api.get(url, {
-        method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(formatAboutApiError(errorText, "Failed to save data"));
+     const res = aboutUuid
+  ? await api.put(url, payload, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
+  : await api.post(url, payload, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    if (!res.data) {
+        throw new Error("Failed to save data");
       }
-      const responseData = await res.json();
-      const serverData = responseData.data || responseData;
+      const serverData = res.data;
       setAbout(prev => ({
         ...prev,
         ...normalizeAboutData({
@@ -919,25 +920,20 @@ export default function EmployeeProfileView() {
     setIsDeleting(true);
     try {
       const updatedAbout = { ...about, [fieldToDelete]: "" };
-      const res = await api.get(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
-        method: "PUT",
+      await api.put(`${BASE_URL}/employee-details/about/${employee_uuid}`, {
+        employee_uuid,
+        ...(aboutUuid ? { employee_about_uuid: aboutUuid } : {}),
+        about_me: updatedAbout.about_me,
+        work_enjoyment: updatedAbout.work_enjoyment,
+        interests_hobbies: updatedAbout.interests_hobbies,
+      }, {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
-        body: JSON.stringify({
-          employee_uuid,
-          ...(aboutUuid ? { employee_about_uuid: aboutUuid } : {}),
-          about_me: updatedAbout.about_me,
-          work_enjoyment: updatedAbout.work_enjoyment,
-          interests_hobbies: updatedAbout.interests_hobbies,
-        }),
       });
-      if (res.ok) { setAbout(updatedAbout); showStatusToast("Content deleted successfully", "success"); }
-      else {
-        const errorText = await res.text();
-        throw new Error(formatAboutApiError(errorText, "Failed to delete content"));
-      }
+      setAbout(updatedAbout);
+      showStatusToast("Content deleted successfully", "success");
     } catch (err) {
       console.error("Delete failed:", err);
-      showStatusToast("Failed to delete content", "error");
+      showStatusToast(err?.response?.data?.message || err.message || "Failed to delete content", "error");
     } finally { setIsDeleting(false); setIsDeleteModalOpen(false); setFieldToDelete(null); }
   };
 

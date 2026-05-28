@@ -157,15 +157,13 @@ const permanent = addresses.find(
     const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
     const fetchCountries = () =>
-      fetch(`${BASE_URL}/masters/country`, { headers })
-        .then((r) => r.json())
-        .then((d) => setCountries(Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : []))
+      api.get(`${BASE_URL}/masters/country`, { headers })
+        .then((r) => setCountries(Array.isArray(r.data?.data) ? r.data.data : Array.isArray(r.data) ? r.data : []))
         .catch((err) => console.error("Failed to fetch countries:", err));
 
     const fetchRelations = () =>
-      fetch(`${BASE_URL}/employee-upload/relations`, { headers })
-        .then((r) => { if (!r.ok) throw new Error("Failed to fetch relations"); return r.json(); })
-        .then((d) => setRelations(Array.isArray(d) ? d : []))
+      api.get(`${BASE_URL}/employee-upload/relations`, { headers })
+        .then((r) => setRelations(Array.isArray(r.data) ? r.data : []))
         .catch((err) => { console.error("Relations fetch failed:", err); setRelations([]); });
 
     Promise.all([fetchCountries(), fetchRelations()]);
@@ -175,17 +173,17 @@ const permanent = addresses.find(
   useEffect(() => {
     if (!user_uuid) return;
     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-    fetch(`${BASE_URL}/employee-details/social-links/${user_uuid}`, {
+    api.get(`${BASE_URL}/employee-details/social-links/${user_uuid}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((links) =>
+      .then((r) => {
+        const links = r.data || [];
         setSocialData(
           links.length > 0
             ? links
             : [{ platform_name: "GitHub", url: "" }, { platform_name: "LinkedIn", url: "" }],
-        ),
-      )
+        );
+      })
       .catch(() => console.error("Failed to fetch social links"));
   }, [user_uuid]);
 
@@ -850,16 +848,12 @@ const PrimaryModal = ({
           localData.emergency_contact_relation_uuid || null,
       };
 
-      const personalTask = fetch(
+      const authHeader = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+
+      const personalTask = api.put(
         `${BASE_URL}/employee-details/${personalUuid}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(personalPayload),
-        },
+        personalPayload,
+        { headers: authHeader },
       );
 
       // 2. Update Core Details
@@ -881,23 +875,13 @@ const PrimaryModal = ({
         total_experience: personal.total_experience || 0,
       };
 
-      const coreTask = api.get(
+      const coreTask = api.put(
         `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(corePayload),
-        },
+        corePayload,
+        { headers: authHeader },
       );
 
-      const [res1, res2] = await Promise.all([personalTask, coreTask]);
-
-      if (!res1.ok || !res2.ok) {
-        throw new Error("Failed to update one or more backend records");
-      }
+      await Promise.all([personalTask, coreTask]);
 
       setData(localData);
       showStatusToast("Profile updated successfully", "success");
@@ -1182,39 +1166,23 @@ const permanentAddressRow =
       "permanent"
     );
 
+    const addrHeaders = {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    };
+
     await Promise.all([
-      fetch(
+      api.put(
         `${BASE_URL}/employee-details/address/${currentAddressRow.address_uuid}`,
-        {
-          method: "PUT",
-
-          headers: {
-            "Content-Type": "application/json",
-
-            Authorization: `Bearer ${localStorage.getItem(
-              "token"
-            )}`,
-          },
-
-          body: JSON.stringify(currentPayload),
-        }
+        currentPayload,
+        addrHeaders,
       ),
-
-      fetch(
+      api.put(
         `${BASE_URL}/employee-details/address/${permanentAddressRow.address_uuid}`,
-        {
-          method: "PUT",
-
-          headers: {
-            "Content-Type": "application/json",
-
-            Authorization: `Bearer ${localStorage.getItem(
-              "token"
-            )}`,
-          },
-
-          body: JSON.stringify(permanentPayload),
-        }
+        permanentPayload,
+        addrHeaders,
       ),
     ]);
 
@@ -1490,14 +1458,10 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
     if (linkToDelete.social_link_uuid) {
       try {
         const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-        const res = await api.get(
+        await api.delete(
           `${BASE_URL}/employee-details/social-links/${linkToDelete.social_link_uuid}`,
-          {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-          },
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
         );
-        if (!res.ok) throw new Error("Failed to delete link");
 
         // Success notification after background sync
         showStatusToast("Link deleted successfully", "success");
@@ -1522,9 +1486,11 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
     setSaving(true);
     try {
       const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
-      const headers = {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      const axiosHeaders = {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       };
 
       const tasks = [];
@@ -1535,54 +1501,37 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
 
         if (link.social_link_uuid) {
           if (!hasUrl) {
-            // Existing link cleared -> DELETE it ("if the link is not provided then data is no need to store")
+            // Existing link cleared -> DELETE it
             tasks.push(
-              fetch(
+              api.delete(
                 `${BASE_URL}/employee-details/social-links/${link.social_link_uuid}`,
-                {
-                  method: "DELETE",
-                  headers,
-                },
+                axiosHeaders,
               ),
             );
           } else {
             // Existing link modified -> PUT it
             tasks.push(
-              fetch(
+              api.put(
                 `${BASE_URL}/employee-details/social-links/${link.social_link_uuid}`,
-                {
-                  method: "PUT",
-                  headers,
-                  body: JSON.stringify({
-                    platform_name: link.platform_name || "Other",
-                    url: link.url,
-                    user_uuid: user_uuid,
-                  }),
-                },
+                { platform_name: link.platform_name || "Other", url: link.url, user_uuid },
+                axiosHeaders,
               ),
             );
           }
         } else if (hasUrl) {
           // New link with URL -> POST it
           tasks.push(
-            fetch(`${BASE_URL}/employee-details/social-links`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                platform_name: link.platform_name || "Other",
-                url: link.url,
-                user_uuid: user_uuid,
-              }),
-            }),
+            api.post(
+              `${BASE_URL}/employee-details/social-links`,
+              { platform_name: link.platform_name || "Other", url: link.url, user_uuid },
+              axiosHeaders,
+            ),
           );
         }
       });
 
       if (tasks.length > 0) {
-        const results = await Promise.all(tasks);
-        const failed = results.filter((r) => !r.ok);
-        if (failed.length > 0)
-          throw new Error(`${failed.length} operations failed`);
+        await Promise.all(tasks);
       }
 
       setData(links);

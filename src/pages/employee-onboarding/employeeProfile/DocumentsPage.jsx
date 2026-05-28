@@ -22,6 +22,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import Select from "react-select";
+import api from "../../../api/axiosInstance";
 
 
 /* ─── Employment-type → relevant path keys ───────────────────────────── */
@@ -460,7 +461,7 @@ const response = await api.get(
         }
       );
 
-      const result = await response.json();
+      const result = response.data;
 
 console.log(
   "EDUCATION TYPES API",
@@ -539,9 +540,7 @@ console.log(
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
-        const result = await res.json();
-
-        const formatted = (result.data || []).map((s) => ({
+        const formatted = (res.data?.data || []).map((s) => ({
           value: s.id,
           label: s.name,
         }));
@@ -567,12 +566,10 @@ console.log(
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
-        const result = await res.json();
-
-        setAllCertificates(result.data || []);
+        setAllCertificates(res.data?.data || []);
 
         const providerSet = new Set();
-        (result.data || []).forEach((cert) => {
+        (res.data?.data || []).forEach((cert) => {
           if (cert.providerName) {
             providerSet.add(cert.providerName);
           }
@@ -682,13 +679,12 @@ console.log(
       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
     );
 
-    const textResult = await response.text();
+    const rawData = response.data;
     let signedUrl;
-    try {
-      const parsed = JSON.parse(textResult);
-      signedUrl = parsed.url || parsed;
-    } catch {
-      signedUrl = textResult;
+    if (typeof rawData === "string") {
+      try { const parsed = JSON.parse(rawData); signedUrl = parsed.url || rawData; } catch { signedUrl = rawData; }
+    } else {
+      signedUrl = rawData?.url || String(rawData);
     }
 
     if (typeof signedUrl !== "string") signedUrl = String(signedUrl);
@@ -738,18 +734,15 @@ console.log(
           }
         );
 
-        const data =
-          await response.json();
-
         console.log(
           "EDUCATION MASTERS",
-          data
+          response.data
         );
 
         setEducationMasters(
-          Array.isArray(data)
-            ? data
-            : data?.data || []
+          Array.isArray(response.data)
+            ? response.data
+            : response.data?.data || []
         );
 
       } catch (err) {
@@ -777,8 +770,7 @@ console.log(
         },
       }
     );
-    const data = await response.json();
-    setDegreeOptions(Array.isArray(data) ? data : []);
+    setDegreeOptions(Array.isArray(response.data) ? response.data : []);
   } catch (err) {
     console.error("Degree Fetch Error", err);
   }
@@ -953,23 +945,11 @@ useEffect(() => {
         }
       });
 
-      const method = isEdit ? "PUT" : "POST";
-
       // ✅ API CALL
-      const response = await api.get(url.toString(), {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error("API ERROR:", errText);
-        alert(`Certification upload failed: ${errText || response.status}`);
-        return;
-      }
+      const certAxiosConfig = { headers: { Authorization: `Bearer ${token}` } };
+      const response = isEdit
+        ? await api.put(url.toString(), formData, certAxiosConfig)
+        : await api.post(url.toString(), formData, certAxiosConfig);
 
       // ✅ SUCCESS
       alert(
@@ -1058,51 +1038,34 @@ useEffect(() => {
 
   let response;
 
+  const eduAxiosConfig = { headers: { Authorization: `Bearer ${token}` } };
+
   // ✅ UPDATE
   if (uploadModal.docId) {
-
-    response = await api.get(
+    response = await api.put(
       `${BASE_URL}/education/employee-education-document/${uploadModal.docId}`,
-      {
-        method: "PUT",
-
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-
-        body: formData,
-      }
+      formData,
+      eduAxiosConfig,
     );
-
   }
 
   // ✅ CREATE
   else {
-
-    response = await api.get(
+    response = await api.post(
       `${BASE_URL}/education/employee-education-document`,
-      {
-        method: "POST",
-
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-
-        body: formData,
-      }
+      formData,
+      eduAxiosConfig,
     );
-
   }
 
-  if (response.ok) {
+  showStatusToast(
+    uploadModal.docId
+      ? "Education updated successfully"
+      : "Education uploaded successfully",
+    "success"
+  );
 
-    showStatusToast(
-      uploadModal.docId
-        ? "Education updated successfully"
-        : "Education uploaded successfully",
-      "success"
-    );
-
+  {
     // ✅ REFRESH UI WITHOUT RELOAD
 
     const updatedDoc = {
@@ -1296,35 +1259,14 @@ if (uploadModal.category === "experience") {
 
   let response;
 
+  const expAxiosConfig = { headers: { Authorization: `Bearer ${token}` } };
   if (uploadModal.docId) {
-    response = await api.get(
-      `${BASE_URL}/experience/${uploadModal.docId}`,
-      { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: formData }
-    );
+    response = await api.put(`${BASE_URL}/experience/${uploadModal.docId}`, formData, expAxiosConfig);
   } else {
-    response = await api.get(
-      `${BASE_URL}/experience`,
-      { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData }
-    );
+    response = await api.post(`${BASE_URL}/experience`, formData, expAxiosConfig);
   }
 
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error("EXPERIENCE API ERROR:", errText);
-    let friendlyMsg = "Experience save failed";
-    try {
-      const errJson = JSON.parse(errText);
-      if (errJson?.detail) {
-        friendlyMsg = Array.isArray(errJson.detail)
-          ? errJson.detail.map(e => e.msg || JSON.stringify(e)).join("; ")
-          : String(errJson.detail);
-      }
-    } catch (_) {}
-    showStatusToast(friendlyMsg, "error");
-    return;
-  }
-
-  const responseData = await response.json().catch(() => ({}));
+  const responseData = response.data || {};
 
   showStatusToast(
     uploadModal.docId ? "Experience updated successfully" : "Experience uploaded successfully",
@@ -1437,43 +1379,24 @@ formData.append(
 
   let response;
 
+  const identityAxiosConfig = { headers: { Authorization: `Bearer ${token}` } };
+
   // ✅ UPDATE
   if (uploadModal.docId) {
-
-    response = await api.get(
+    response = await api.put(
       `${BASE_URL}/identity/employee-document/${uploadModal.docId}`,
-      {
-        method: "PUT",
-
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-
-        body: formData,
-      }
+      formData,
+      identityAxiosConfig,
     );
-
   }
-
   // ✅ CREATE
   else {
-
-    response = await api.get(
+    response = await api.post(
       `${BASE_URL}/employee-upload/identity-documents`,
-      {
-        method: "POST",
-
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-
-        body: formData,
-      }
+      formData,
+      identityAxiosConfig,
     );
-
   }
-
-  if (response.ok) {
 
   const newFilePath = uploadFile
     ? URL.createObjectURL(uploadFile)
@@ -1502,7 +1425,6 @@ formData.append(
           : doc
       );
     }
-    // New document: match placeholder by mapping_uuid and update in-place
     return prev.map(doc =>
       doc.mapping_uuid === uploadFormData.mapping_uuid
         ? { ...doc, ...updatedDoc }
@@ -1517,33 +1439,13 @@ formData.append(
     "success"
   );
 
-  setUploadModal({
-    open: false,
-    category: "",
-    docId: null,
-  });
-
+  setUploadModal({ open: false, category: "", docId: null });
   setUploadFile(null);
-}
- else {
-
-    const err = await response.text();
-
-    console.error(err);
-
-    showStatusToast(
-      "Identity upload failed",
-      "error"
-    );
-
-  }
-
   return;
-}
+} // end identity block
     const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
     const formData = new FormData();
-// ✅ ONLY APPEND FILE IF USER SELECTED NEW FILE
 
   formData.append("file", uploadFile);
 
@@ -1558,26 +1460,17 @@ formData.append(
       if (value) formData.append(key, value);
     });
 
-    const response = await api.get(`${BASE_URL}/hr/upload-document`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
+    await api.post(`${BASE_URL}/hr/upload-document`, formData, {
+      headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (response.ok) {
-      setUploadSuccess(true);
-      setTimeout(() => {
-        setUploadModal({ open: false, category: "", docId: null });
-        setUploadFile(null);
-        setUploadFormData({});
-        setUploadSuccess(false);
-        
-      }, 1500);
-    } else {
-      alert("Upload failed");
-    }
+    setUploadSuccess(true);
+    setTimeout(() => {
+      setUploadModal({ open: false, category: "", docId: null });
+      setUploadFile(null);
+      setUploadFormData({});
+      setUploadSuccess(false);
+    }, 1500);
   } catch (error) {
     console.error(error);
   } finally {
@@ -1665,10 +1558,9 @@ formData.append(
         if (category === "certifications") {
           const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
-          response = await api.get(
+          response = await api.delete(
             `${BASE_URL}/api/resource-certificates/${docId}`,
             {
-              method: "DELETE",
               headers: {
                 Authorization: `Bearer ${token}`,
               },
@@ -1680,40 +1572,33 @@ formData.append(
         else {
           const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
-          response = await api.get(
+          response = await api.delete(
             `${BASE_URL}/education/employee-education-document/${docId}`,
             {
-              method: "DELETE",
               headers: {
                 Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
               },
             },
           );
         }
 
         // ✅ HANDLE RESPONSE
-        if (response.ok) {
-          showStatusToast("Deleted successfully", "success");
+        showStatusToast("Deleted successfully", "success");
 
-          if (category === "certifications") {
-            setCertificationDocs(prev => prev.filter(d => d.id !== docId));
-          } else if (category === "education") {
-            setEducationDocs(prev => prev.filter(d => d.id !== docId));
-          } else if (category === "experience") {
-            setExperienceDocs(prev => prev.filter(d => d.id !== docId));
-          } else if (category === "identity") {
-            setIdentityDocs(prev => prev.filter(d => d.id !== docId));
-          }
-
-        } else {
-          const errData = await response.json().catch(() => ({}));
-          showStatusToast(errData.message || "Delete failed", "error");
+        if (category === "certifications") {
+          setCertificationDocs(prev => prev.filter(d => d.id !== docId));
+        } else if (category === "education") {
+          setEducationDocs(prev => prev.filter(d => d.id !== docId));
+        } else if (category === "experience") {
+          setExperienceDocs(prev => prev.filter(d => d.id !== docId));
+        } else if (category === "identity") {
+          setIdentityDocs(prev => prev.filter(d => d.id !== docId));
         }
 
       } catch (error) {
         console.error("Delete error:", error);
-        showStatusToast("Delete failed", "error");
+        const errData = error?.response?.data || {};
+        showStatusToast(errData.message || error.message || "Delete failed", "error");
       } finally {
         setDeletingDoc(null);
       }

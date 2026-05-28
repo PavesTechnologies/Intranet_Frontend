@@ -508,28 +508,20 @@ console.log(
     );
     
 
-    const data = await response.json();
+    const data = response.data;
 
     // =========================
     // UPDATE EXPORT STATUS
     // =========================
 
-    await api.get(
-
+    await api.post(
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/update-export-status`,
-
+      data,
       {
-        method: "POST",
-
         headers: {
-          "Content-Type":
-            "application/json",
-
-          Authorization:
-            `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-
-        body: JSON.stringify(data),
       }
     );
 
@@ -537,31 +529,18 @@ console.log(
     // SUCCESS UI
     // =========================
 
-    if (response.ok) {
+    showStatusToast(
+      data.message || "Employees exported successfully",
+      "success"
+    );
 
-      showStatusToast(
+    setShowPreview(false);
 
-        data.message ||
-        "Employees exported successfully",
+    // Refresh latest employees
+    fetchEmployees();
 
-        "success"
-      );
-
-      setShowPreview(false);
-
-      // Refresh latest employees
-      fetchEmployees();
-
-      // Refresh preview queue
-      setExcelPreview([]);
-
-    } else {
-
-      showStatusToast(
-        "Export failed",
-        "error"
-      );
-    }
+    // Refresh preview queue
+    setExcelPreview([]);
 
   } catch (error) {
 
