@@ -1151,6 +1151,45 @@ const ManageSkillTaxonomy = () => {
     });
   };
 
+  const throwIfDeleteFailed = (response, fallbackMessage) => {
+    if (response?.success === false) {
+      throw response;
+    }
+
+    if (!response?.success) {
+      throw new Error(fallbackMessage);
+    }
+  };
+
+  const deleteCategoryWithChildren = async (category) => {
+    const hydratedCategory = await ensureCategoryHydrated(category);
+
+    for (const skill of hydratedCategory.skills || []) {
+      for (const subSkill of skill.subSkills || []) {
+        if (!subSkill.active) continue;
+
+        const subSkillResponse = await skillService.deleteSubSkill(subSkill.id);
+        throwIfDeleteFailed(
+          subSkillResponse,
+          `Subskill "${subSkill.name}" deletion failed.`,
+        );
+      }
+
+      if (!skill.active) continue;
+
+      const skillResponse = await skillService.deleteTaxonomySkill(skill.id);
+      throwIfDeleteFailed(
+        skillResponse,
+        `Skill "${skill.name}" deletion failed.`,
+      );
+    }
+
+    const categoryResponse = await skillService.deleteCategory(category.id);
+    throwIfDeleteFailed(categoryResponse, "Category deletion failed.");
+
+    return categoryResponse;
+  };
+
   const confirmDelete = async () => {
     try {
       setDeleteLoading(true);
@@ -1160,13 +1199,7 @@ const ManageSkillTaxonomy = () => {
       // ==========================================
 
       if (deleteModal.type === "category") {
-        const response = await skillService.deleteCategory(
-          deleteModal.category.id,
-        );
-
-        if (!response?.success) {
-          throw new Error(response?.error || "Category deletion failed.");
-        }
+        const response = await deleteCategoryWithChildren(deleteModal.category);
 
         setCategories((current) =>
           current.filter(
@@ -1196,9 +1229,7 @@ const ManageSkillTaxonomy = () => {
           deleteModal.skill.id,
         );
 
-        if (!response?.success) {
-          throw new Error(response?.error || "Skill deletion failed.");
-        }
+        throwIfDeleteFailed(response, "Skill deletion failed.");
 
         setCategories((current) =>
           current.map((c) =>
@@ -1228,9 +1259,7 @@ const ManageSkillTaxonomy = () => {
           deleteModal.subSkill.id,
         );
 
-        if (!response?.success) {
-          throw new Error(response?.error || "Subskill deletion failed.");
-        }
+        throwIfDeleteFailed(response, "Subskill deletion failed.");
 
         setCategories((current) =>
           current.map((c) =>
@@ -1760,8 +1789,9 @@ const ManageSkillTaxonomy = () => {
                                                       label={`Delete ${subSkill.name}`}
                                                       disabled={!subSkill.active}
                                                     />
-                                                    <StatusBadge
-                                                      active={subSkill.active}
+                                                    <GlobalStatusBadge
+                                                      label={subSkill.active ? "Active" : "Inactive"}
+                                                      size="sm"
                                                     />
                                                   </div>
                                                 </div>
