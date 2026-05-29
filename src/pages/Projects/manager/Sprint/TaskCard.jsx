@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useDrag } from "react-dnd";
-import { 
-  MoreHorizontalIcon, 
-  AddIcon, 
-  ApprovedIcon 
+import {
+  MoreHorizontalIcon,
+  AddIcon,
+  ApprovedIcon
 } from "../../../../components/icons";
+import RiskBadge from "../RiskBadge";
 
 const TaskCard = ({
   task,
@@ -13,6 +14,9 @@ const TaskCard = ({
   onAddToSprint,
   onSelectParentStory,
   onClick,
+  riskCount = 0,
+  projectId,
+  navigate,
 }) => {
   const [{ isDragging }, dragRef] = useDrag({
     type: "TASK",
@@ -72,6 +76,7 @@ const TaskCard = ({
       <p className="flex-1 text-sm text-gray-800 truncate">
         {task.title}
       </p>
+      <RiskBadge count={riskCount} issueType="Task" issueId={task.id} projectId={projectId} navigate={navigate} />
 
       {/* Status */}
       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200 shrink-0">

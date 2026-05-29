@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   AddIcon,
   FilterIcon,
@@ -25,6 +26,8 @@ const TYPE_ICON = {
 };
 
 export default function RiskRegisterPage({ projectId = "P-123" }) {
+  const location = useLocation();
+
   const [showCreateRisk, setShowCreateRisk] = useState(false);
   const [showRiskModal, setShowRiskModal] = useState(false);
 
@@ -39,6 +42,15 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
   const [selectedIssue, setSelectedIssue] = useState(null);
 
   const [selectedRisk, setSelectedRisk] = useState(null);
+
+  // Pre-select issue type + issue when navigated from a RiskBadge
+  useEffect(() => {
+    const s = location.state;
+    if (!s?.linkedType || !s?.linkedId) return;
+    setActiveIssueType(s.activeLabel ?? "All");
+    setIssuePage(1);
+    setSelectedIssue({ linkedType: s.linkedType, linkedId: s.linkedId });
+  }, [location.state]);
 
   // ✅ TOKEN SAFE AXIOS INSTANCE
   const axiosInstance = useMemo(() => {

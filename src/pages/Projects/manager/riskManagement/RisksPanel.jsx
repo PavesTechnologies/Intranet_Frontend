@@ -260,7 +260,7 @@ export default function RisksPanel({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {!selectedIssue ? (
             <EmptyState />
           ) : isLoading ? (

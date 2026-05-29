@@ -246,6 +246,8 @@ useEffect(() => {
             dailyBurnup={burndownDailyData.length > 0 ? burndownDailyData : data.raw.dailyBurnup}
             sprintId={sprintId}
             onRefetch={refetchBurndown}
+            startDate={startDate}
+            endDate={endDate}
           />
         )}
 
@@ -258,6 +260,8 @@ useEffect(() => {
             sprintName={sprintName}
             initialPoints={kpis.initialScope}
             dailyBurnup={data.raw.dailyBurnup}
+            startDate={startDate}
+            endDate={endDate}
           />
         )}
       </div>

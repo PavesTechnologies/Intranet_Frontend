@@ -51,6 +51,8 @@ const CreateTaskForm = ({
     const load = async () => {
       try {
         const [storyRes, userRes] = await Promise.all([
+          axios.get(
+            `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/sprint/${defaultSprintId}`,
           api.get(
             `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/sprint/${defaultSprintId}`,
             axiosConfig
@@ -140,7 +142,7 @@ const CreateTaskForm = ({
             onChange={handleChange}
           />
           <FormSelect
-            label="Story *"
+            label="Story "
             name="storyId"
             value={formData.storyId || ""}
             onChange={handleChange}
