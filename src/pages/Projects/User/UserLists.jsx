@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import CommentBox from "./UserCommentBox";
 import ExpandableList from "../../../components/List/List";
 import { showStatusToast } from "../../../components/toastfy/toast";
@@ -20,19 +20,19 @@ const Lists = ({ projectId }) => {
     try {
       // ✅ Fetch epics, stories, and tasks (only once)
       const [epicRes, storyRes, taskRes] = await Promise.all([
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
         ),
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
         ),
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
           {
             headers: { Authorization: `Bearer ${token}` },

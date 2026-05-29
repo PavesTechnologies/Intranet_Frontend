@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../../../api/axiosInstance";
 import { computeScopeSummary } from "../utils/scopeChangeHelpers";
 
 export function useSprintScopeChanges(sprintId) {
@@ -15,7 +15,7 @@ export function useSprintScopeChanges(sprintId) {
     setLoading(true);
     setError(null);
 
-    axios
+    api
       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/scope-changes`, {
         headers: { Authorization: `Bearer ${token}` },
       })

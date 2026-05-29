@@ -1,7 +1,7 @@
 import { Trash2, Pencil, Check, X } from "lucide-react";
 import { useState, useMemo } from "react";
 import FilterListbox from "../../../../components/filter/FilterListbox";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
 /* =========================
    Reusable Toggle Switch
@@ -66,7 +66,7 @@ function MitigationRow({ mitigation, members, onUpdated, onDelete }) {
   const [form, setForm] = useState(mitigation);
 
   const axiosInstance = useMemo(() => {
-    const instance = axios.create({
+    const instance = api.create({
       baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
       headers: {
         "Content-Type": "application/json",

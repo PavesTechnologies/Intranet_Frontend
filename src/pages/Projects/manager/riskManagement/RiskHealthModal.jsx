@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import {
   X,
   AlertTriangle,
@@ -74,7 +74,7 @@ const RiskHealthModal = ({ projectId, open, onClose }) => {
 
   // ✅ TOKEN SAFE AXIOS INSTANCE
   const axiosInstance = useMemo(() => {
-    const instance = axios.create({
+    const instance = api.create({
       baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
       headers: {
         "Content-Type": "application/json",

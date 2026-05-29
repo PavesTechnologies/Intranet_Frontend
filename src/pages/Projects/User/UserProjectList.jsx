@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import {
   ChevronDown,
   ChevronRight,
@@ -38,7 +38,7 @@ const ProjectList = () => {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -55,7 +55,7 @@ const ProjectList = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/users?page=0&size=100`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -135,7 +135,7 @@ const ProjectList = () => {
   const submitEdit = async (projectId) => {
     try {
       setIsSubmitting(true);
-      await axios.put(
+      await api.put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
         {
           ...formData,
@@ -161,7 +161,7 @@ const ProjectList = () => {
 
   const executeDeleteProject = async () => {
     try {
-      await axios.delete(
+      await api.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectIdToDelete}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );

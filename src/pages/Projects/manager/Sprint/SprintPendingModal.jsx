@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Button from "../../../../components/Button/Button";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Modal from "../../../../components/Modal/modal";
@@ -19,7 +19,7 @@ const SprintPendingModal = ({
 
   const completeWithOption = async (option) => {
     try {
-      await axios.post(
+      await api.post(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${pendingData.sprintId}/finish`,
         {},
         {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import {
   EditIcon,
   DeleteIcon,
@@ -20,6 +20,7 @@ import EditTaskForm from "./EditTaskForm";
 import EditEpicForm from "./EditEpicForm";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
+import RiskBadge from "../RiskBadge";
 
 const IssueTracker = () => {
   const location = useLocation();
@@ -35,6 +36,7 @@ const IssueTracker = () => {
     storiesData: [],
     tasksData: [],
   });
+  const [riskMap, setRiskMap] = useState({});
 
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
@@ -68,15 +70,15 @@ const IssueTracker = () => {
     try {
       setLoading(true);
       const [epicsRes, storiesRes, tasksRes] = await Promise.all([
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
           { headers },
         ),
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
           { headers },
         ),
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
           { headers },
         ),
@@ -135,7 +137,7 @@ const IssueTracker = () => {
 
   const fetchProjects = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
         { headers },
       );
@@ -145,10 +147,32 @@ const IssueTracker = () => {
     }
   };
 
+  const fetchRiskMap = async () => {
+    const numId = Number(projectId);
+    if (!numId || isNaN(numId)) return;
+    try {
+      const res = await axios.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${numId}/risks/issues`,
+        { headers, params: { page: 0, size: 5000 } },
+      );
+      const items = Array.isArray(res.data?.content)
+        ? res.data.content
+        : Array.isArray(res.data) ? res.data : [];
+      const map = {};
+      items.forEach((r) => {
+        if (r.linkedType && r.linkedId) map[`${r.linkedType}-${r.linkedId}`] = r.riskCount ?? 1;
+      });
+      setRiskMap(map);
+    } catch {
+      // non-critical
+    }
+  };
+
   useEffect(() => {
     if (projectId) {
       fetchIssues();
       fetchProjects();
+      fetchRiskMap();
     }
   }, [projectId]);
 
@@ -160,7 +184,7 @@ const IssueTracker = () => {
     if (issue.type === "Task") endpoint = `/api/tasks/${issue.id}`;
 
     try {
-      await axios.delete(`${window.__APP_CONFIG__.PMS_BASE_URL}${endpoint}`, {
+      await api.delete(`${window.__APP_CONFIG__.PMS_BASE_URL}${endpoint}`, {
         headers,
       });
       fetchIssues();
@@ -300,7 +324,7 @@ const IssueTracker = () => {
     const isStory = issue.type === "Story";
     const rowBg =
       level === 0 ? "bg-white" : level === 1 ? "bg-slate-50/50" : "bg-white";
-
+    const riskCount = riskMap[`${issue.type}-${issue.id}`] ?? 0;
     return (
       <tr
         className={`${rowBg} hover:bg-indigo-50/60 border-b border-gray-100 cursor-pointer transition-all duration-200 group`}
@@ -334,6 +358,13 @@ const IssueTracker = () => {
             >
               {issue.title}
             </span>
+            <RiskBadge
+              count={riskCount}
+              issueType={issue.type}
+              issueId={issue.id}
+              projectId={Number(projectId) || projectId}
+              navigate={navigate}
+            />
           </div>
         </td>
 

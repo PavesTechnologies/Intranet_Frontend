@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../../components/toastfy/toast";
 import LoadingSpinner from "../../../../../components/LoadingSpinner";
 import StatusBadge from "../../../../../components/status/statusbadge";
@@ -14,7 +14,7 @@ const ViewTestPlan = ({ projectId, planId, onClose }) => {
     const fetchPlan = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/test-plans/${planId}`,
           {
             headers: { Authorization: `Bearer ${token}` },

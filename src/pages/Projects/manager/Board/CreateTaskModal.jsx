@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
@@ -41,7 +41,7 @@ export const CreateTaskModal = ({
     setSubmitting(true);
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE}/api/tasks`,
         {
           title: title.trim(),

@@ -11,7 +11,7 @@ import {
   DeleteIcon,
   CloseIcon,
 } from "../../../../components/icons";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import Modal from "../../../../components/Modal/modal";
@@ -48,7 +48,7 @@ export default function RiskDetailModal({
   const [error, setError] = useState(null);
 
   const axiosInstance = React.useMemo(() => {
-    const instance = axios.create({
+    const instance = api.create({
       baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
       headers: {
         "Content-Type": "application/json",

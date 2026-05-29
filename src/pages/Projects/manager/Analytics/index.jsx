@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
 import { useSprintBurnup }       from "./hooks/useSprintBurnup";
 import { useSprintBurndown }     from "./hooks/useSprintBurnDown";
@@ -46,7 +46,7 @@ const SprintAnalyticsPage = ({
   //   setSprintLoading(true);
   //   setSprintError(null);
 
-  //   axios
+  //   api
   //     .get(
   //       `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/active/project/${projectId}`,
   //       { headers: { Authorization: `Bearer ${token}` } }
@@ -75,7 +75,7 @@ useEffect(() => {
   setSprintLoading(true);
   setSprintError(null);
 
-  axios
+  api
     .get(
       `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
       { headers: { Authorization: `Bearer ${token}` } }
@@ -246,6 +246,8 @@ useEffect(() => {
             dailyBurnup={burndownDailyData.length > 0 ? burndownDailyData : data.raw.dailyBurnup}
             sprintId={sprintId}
             onRefetch={refetchBurndown}
+            startDate={startDate}
+            endDate={endDate}
           />
         )}
 
@@ -258,6 +260,8 @@ useEffect(() => {
             sprintName={sprintName}
             initialPoints={kpis.initialScope}
             dailyBurnup={data.raw.dailyBurnup}
+            startDate={startDate}
+            endDate={endDate}
           />
         )}
       </div>

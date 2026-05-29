@@ -1,6 +1,6 @@
 // hooks/useSprintDayOverrides.js
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import api from "../../../../../api/axiosInstance";
 
 export function useSprintDayOverrides(sprintId, onSuccess) {
   const [holidays,        setHolidays]        = useState([]);
@@ -15,8 +15,8 @@ export function useSprintDayOverrides(sprintId, onSuccess) {
     setOverrideLoading(true);
     try {
       const [hRes, wwRes] = await Promise.all([
-        axios.get(`${base}/holidays`,        { headers: getHeaders() }),
-        axios.get(`${base}/working-weekends`, { headers: getHeaders() }),
+        api.get(`${base}/holidays`,        { headers: getHeaders() }),
+        api.get(`${base}/working-weekends`, { headers: getHeaders() }),
       ]);
       setHolidays(hRes.data        ?? []);
       setWorkingWeekends(wwRes.data ?? []);
@@ -32,9 +32,9 @@ export function useSprintDayOverrides(sprintId, onSuccess) {
   const toggleHoliday = async (date, markAsHoliday) => {
     const payload = { dates: [date] };
     if (markAsHoliday) {
-      await axios.post(`${base}/holidays`, payload, { headers: getHeaders() });
+      await api.post(`${base}/holidays`, payload, { headers: getHeaders() });
     } else {
-      await axios.delete(`${base}/holidays`, { headers: getHeaders(), data: payload });
+      await api.delete(`${base}/holidays`, { headers: getHeaders(), data: payload });
     }
     await fetchOverrides();
     onSuccess();
@@ -43,9 +43,9 @@ export function useSprintDayOverrides(sprintId, onSuccess) {
   const toggleWorkingWeekend = async (date, markAsWorking) => {
     const payload = { dates: [date] };
     if (markAsWorking) {
-      await axios.post(`${base}/working-weekends`, payload, { headers: getHeaders() });
+      await api.post(`${base}/working-weekends`, payload, { headers: getHeaders() });
     } else {
-      await axios.delete(`${base}/working-weekends`, { headers: getHeaders(), data: payload });
+      await api.delete(`${base}/working-weekends`, { headers: getHeaders(), data: payload });
     }
     await fetchOverrides();
     onSuccess();
