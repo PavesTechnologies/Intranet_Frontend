@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import FormInput from "../../../../components/forms/FormInput";
 import FormTextArea from "../../../../components/forms/FormTextArea";
@@ -43,11 +43,11 @@ const CreateStoryForm = ({
     const loadData = async () => {
       try {
         const [epicsRes, usersRes] = await Promise.all([
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
             axiosConfig,
           ),
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
             axiosConfig,
           ),
@@ -88,7 +88,7 @@ const CreateStoryForm = ({
 
     try {
       setLoading(true);
-      await axios.post(
+      await api.post(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories`,
         payload,
         axiosConfig,

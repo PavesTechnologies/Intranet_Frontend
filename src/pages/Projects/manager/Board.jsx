@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
   FilterIcon,
@@ -139,7 +139,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
     try {
       let fetchedSprintId = null;
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${BASE}/api/sprints/active/project/${projectId}`,
           { headers: headersWithToken() }
         );
@@ -152,15 +152,15 @@ const Board = ({ projectId, sprintId, projectName }) => {
         console.error("Sprint fetch:", err?.response?.data || err?.message);
       }
 
-      const statusReq = axios.get(
+      const statusReq = api.get(
         `${BASE}/api/projects/${projectId}/statuses`,
         { headers: headersWithToken() }
       );
       const tasksUrl = fetchedSprintId
         ? `${BASE}/api/projects/sprint/${fetchedSprintId}/tasks`
         : `${BASE}/api/projects/${projectId}/tasks`;
-      const tasksReq = axios.get(tasksUrl, { headers: headersWithToken() });
-      const membersReq = axios
+      const tasksReq = api.get(tasksUrl, { headers: headersWithToken() });
+      const membersReq = api
         .get(`${BASE}/api/projects/${projectId}/members`, { headers: headersWithToken() })
         .catch(() => ({ data: [] }));
 
@@ -298,7 +298,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
     if (!name) { showStatusToast("Column name required", "error"); return; }
     setCreatingStatus(true);
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE}/api/projects/${projectId}/statuses`,
         { name },
         { headers: headersWithToken() }
@@ -340,7 +340,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
 
   const doDirectDelete = async (statusId) => {
     try {
-      await axios.delete(`${BASE}/api/statuses/${statusId}`, { headers: headersWithToken() });
+      await api.delete(`${BASE}/api/statuses/${statusId}`, { headers: headersWithToken() });
       showStatusToast("Column deleted", "success");
       setStatuses((prev) => prev.filter((s) => s.id !== statusId));
       await loadBoard();
@@ -354,7 +354,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
   const confirmDeleteWithMigration = async (newStatusId) => {
     if (!statusToDelete) return;
     try {
-      await axios.delete(`${BASE}/api/statuses/${statusToDelete.id}`, {
+      await api.delete(`${BASE}/api/statuses/${statusToDelete.id}`, {
         params: { newStatusId },
         headers: headersWithToken(),
       });
@@ -372,7 +372,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
 
   const fetchSprintPopup = async (sid) => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE}/api/sprints/${sid}/popup-status`,
         { headers: headersWithToken() }
       );
@@ -390,7 +390,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
     if (!activeSprintId) return;
     setIsFinishingSprint(true);
     try {
-      await axios.post(`${BASE}/api/sprints/${activeSprintId}/finish`, null, {
+      await api.post(`${BASE}/api/sprints/${activeSprintId}/finish`, null, {
         params: { option },
         headers: headersWithToken(),
       });
@@ -415,7 +415,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
     if (!name) { showStatusToast("Name required", "error"); return; }
     try {
       const payload = statuses.map((s) => (s.id === statusId ? { ...s, name } : s));
-      await axios.put(`${BASE}/api/projects/${projectId}/statuses`, payload, {
+      await api.put(`${BASE}/api/projects/${projectId}/statuses`, payload, {
         headers: headersWithToken(),
       });
       setStatuses((prev) => prev.map((s) => (s.id === statusId ? { ...s, name } : s)));
@@ -444,7 +444,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
         const [moved] = newOrder.splice(source.index, 1);
         newOrder.splice(destination.index, 0, moved);
         setStatuses(newOrder);
-        await axios.post(`${BASE}/api/statuses/reorder`, makeReorderPayload(newOrder), {
+        await api.post(`${BASE}/api/statuses/reorder`, makeReorderPayload(newOrder), {
           headers: headersWithToken(),
         });
         showStatusToast("Columns reordered", "success");
@@ -471,7 +471,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
               : t
           )
         );
-        await axios.patch(
+        await api.patch(
           `${BASE}/api/tasks/${taskId}/status`,
           { statusId: Number(destStatusId) },
           { headers: headersWithToken() }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../../components/toastfy/toast";
 import { X } from "lucide-react";
 
@@ -51,7 +51,7 @@ const EditTestPlan = ({
 
     const fetchPlan = async () => {
       try {
-        const response = await axios.get(
+        const response = await api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/${planId}`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
@@ -97,7 +97,7 @@ const EditTestPlan = ({
     };
 
     try {
-      await axios.put(
+      await api.put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/update/${planId}`,
         payload,
         {

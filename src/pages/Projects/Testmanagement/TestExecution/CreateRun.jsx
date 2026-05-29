@@ -3,7 +3,7 @@ import axiosInstance from "../api/axiosInstance";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
 export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuccess, onClose }) {
 
@@ -39,7 +39,7 @@ export default function CreateTestRunForm({ projectId, cycleId, cycleName, onSuc
     };
         const [ usersRes] = await Promise.all([
           
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
             axiosConfig,
           ),

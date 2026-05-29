@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import Button from "../../../../components/Button/Button";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
@@ -41,19 +41,19 @@ const UserIssueTracker = () => {
     try {
       setLoading(true);
       const [epicsRes, storiesRes, tasksRes, bugsRes] = await Promise.all([
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
           { headers },
         ),
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
           { headers },
         ),
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
           { headers },
         ),
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/bugs/project/${projectId}`,
           { headers },
         ),
@@ -111,7 +111,7 @@ const UserIssueTracker = () => {
   // ===== FETCH PROJECTS =====
   const fetchProjects = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
         { headers },
       );

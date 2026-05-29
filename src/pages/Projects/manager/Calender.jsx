@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const Calendar = ({ projectId }) => {
   const [events, setEvents] = useState([]);
@@ -12,7 +12,7 @@ const Calendar = ({ projectId }) => {
   // ===========================
   const fetchTasks = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
         {
           headers: {

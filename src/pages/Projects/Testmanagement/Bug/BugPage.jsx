@@ -10,7 +10,7 @@ import {
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
 import Button from "../../../../components/Button/Button";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import Select from "react-select";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Modal from "../../../../components/Modal/modal";
@@ -111,7 +111,7 @@ const BugPage = () => {
 
   const loadEmployees = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
@@ -130,7 +130,7 @@ const BugPage = () => {
     setLoadingBugDetails(true);
     setBugDetails(null);
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/testing/bugs/${bugId}`,
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
@@ -161,7 +161,7 @@ const BugPage = () => {
   const addAssignee = async (bugId, userId) => {
     setAssignLoading(true);
     try {
-      await axios.put(
+      await api.put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/testing/bugs/${bugId}/assign`,
         { assigneeId: userId },
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },

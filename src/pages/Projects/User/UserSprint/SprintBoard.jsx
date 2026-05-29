@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import SprintColumn from "./SprintColumn";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 
@@ -14,7 +14,7 @@ const SprintBoard = ({ projectId, projectName }) => {
 
   const fetchStories = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
         { headers },
       );
@@ -27,7 +27,7 @@ const SprintBoard = ({ projectId, projectName }) => {
 
   const fetchSprints = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
         { headers },
       );
@@ -45,7 +45,7 @@ const SprintBoard = ({ projectId, projectName }) => {
 
   const handleStatusChange = async (sprintId, action) => {
     try {
-      const response = await axios.put(
+      const response = await api.put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
         {},
         { headers },

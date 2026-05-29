@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../../../api/axiosInstance";
 import {
   toBurndownDatasets,
   toBurnupDatasets,
@@ -20,7 +20,7 @@ export function useSprintBurnup(sprintId) {
     setLoading(true);
     setError(null);
 
-    axios
+    api
       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/burnup`, {
         headers: { Authorization: `Bearer ${token}` },
       })

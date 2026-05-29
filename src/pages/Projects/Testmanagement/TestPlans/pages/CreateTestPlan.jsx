@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../../components/toastfy/toast";
 import { X } from "lucide-react";
 
@@ -64,7 +64,7 @@ const CreateTestPlan = ({ projectId, onClose, onSuccess, mode = "modal" }) => {
     };
 
     try {
-      await axios.post(
+      await api.post(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans`,
         payload,
         {

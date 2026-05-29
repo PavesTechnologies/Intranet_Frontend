@@ -1,6 +1,6 @@
 // src/pages/Projects/manager/Sprint/CreateSprintModal.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
@@ -52,7 +52,7 @@ const CreateSprintModal = ({
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
@@ -168,7 +168,7 @@ const CreateSprintModal = ({
         // -------------------------
         // EDIT MODE
         // -------------------------
-        res = await axios.put(
+        res = await api.put(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprint.id}`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } },
@@ -179,7 +179,7 @@ const CreateSprintModal = ({
         // -------------------------
         // CREATE MODE
         // -------------------------
-        res = await axios.post(
+        res = await api.post(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } },

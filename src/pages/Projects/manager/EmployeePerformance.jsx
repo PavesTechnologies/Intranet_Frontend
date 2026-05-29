@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import Pagination from "../../../components/Pagination/pagination";
 import SearchInput from "../../../components/filter/Searchbar";
 
@@ -14,7 +14,7 @@ const EmployeePerformance = () => {
 
   const token = localStorage.getItem("token");
 
-  const axiosInstance = axios.create({
+  const axiosInstance = api.create({
     baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
     headers: { Authorization: `Bearer ${token}` },
   });
