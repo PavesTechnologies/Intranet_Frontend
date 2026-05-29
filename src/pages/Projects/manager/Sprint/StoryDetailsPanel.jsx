@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import EditStoryForm from "../Backlog/EditStoryForm";
 
 const StoryDetailsPanel = ({ storyId, projectId, onClose, onUpdated }) => {

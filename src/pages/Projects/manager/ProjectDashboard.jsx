@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import CreateProjectModal from "./CreateProjectModal";
@@ -167,7 +167,7 @@ const ProjectDashboard = () => {
       let url = `${base}/api/projects/my-projects`;
       if (status && status !== "All") url += `?status=${status}`;
 
-      const { data } = await axios.get(url, { headers });
+      const { data } = await api.get(url, { headers });
       setProjects(data);
     } catch (error) {
       console.error("❌ Failed to load projects", error);
@@ -193,7 +193,7 @@ const ProjectDashboard = () => {
 
   const executeDeleteProject = async () => {
     try {
-      await axios.delete(
+      await api.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectIdToDelete}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );

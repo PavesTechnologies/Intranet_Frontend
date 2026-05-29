@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -77,7 +77,7 @@ const Board = ({ projectId, projectName }) => {
     const fetchBoardData = async () => {
       try {
         // Load statuses dynamically
-        const statusRes = await axios.get(
+        const statusRes = await api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
@@ -88,7 +88,7 @@ const Board = ({ projectId, projectName }) => {
         setStatuses(sortedStatuses);
 
         // Load tasks
-        const taskRes = await axios.get(
+        const taskRes = await api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
@@ -111,7 +111,7 @@ const Board = ({ projectId, projectName }) => {
     const updatedTask = { ...task, statusId: newStatusId };
 
     try {
-      await axios.put(
+      await api.put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}`,
         updatedTask,
         { headers: { Authorization: `Bearer ${token}` } },

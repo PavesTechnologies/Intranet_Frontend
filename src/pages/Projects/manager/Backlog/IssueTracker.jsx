@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import {
   EditIcon,
   DeleteIcon,
@@ -68,15 +68,15 @@ const IssueTracker = () => {
     try {
       setLoading(true);
       const [epicsRes, storiesRes, tasksRes] = await Promise.all([
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
           { headers },
         ),
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
           { headers },
         ),
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
           { headers },
         ),
@@ -135,7 +135,7 @@ const IssueTracker = () => {
 
   const fetchProjects = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
         { headers },
       );
@@ -160,7 +160,7 @@ const IssueTracker = () => {
     if (issue.type === "Task") endpoint = `/api/tasks/${issue.id}`;
 
     try {
-      await axios.delete(`${window.__APP_CONFIG__.PMS_BASE_URL}${endpoint}`, {
+      await api.delete(`${window.__APP_CONFIG__.PMS_BASE_URL}${endpoint}`, {
         headers,
       });
       fetchIssues();

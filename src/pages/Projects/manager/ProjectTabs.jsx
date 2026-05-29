@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, lazy, Suspense } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { ChevronRight, ChevronDown, Check } from "lucide-react";
 
 import Summary from "../Summary/Summary.jsx";
@@ -282,7 +282,7 @@ const ProjectTabs = () => {
 
   useEffect(() => {
     if (!projectId || !token) return;
-    axios
+    api
       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })

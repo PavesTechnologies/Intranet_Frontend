@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { X } from "lucide-react";
 
@@ -75,23 +75,23 @@ const EditTaskForm = ({
       try {
         const [taskRes, userRes, storyRes, sprintRes, statusRes] =
           await Promise.all([
-            axios.get(
+            api.get(
               `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}`,
               axiosConfig,
             ),
-            axios.get(
+            api.get(
               `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
               axiosConfig,
             ),
-            axios.get(
+            api.get(
               `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
               axiosConfig,
             ),
-            axios.get(
+            api.get(
               `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
               axiosConfig,
             ),
-            axios.get(
+            api.get(
               `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
               axiosConfig,
             ),
@@ -219,7 +219,7 @@ const EditTaskForm = ({
     }
 
     try {
-      await axios.put(
+      await api.put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}`,
         updatedPayload,
         axiosConfig,

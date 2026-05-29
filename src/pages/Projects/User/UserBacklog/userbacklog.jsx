@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 
 import { Plus, List, X } from "lucide-react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 
 import StoryCard from "../UserSprint/StoryCard";
@@ -33,14 +33,14 @@ const Backlog = ({ projectId, projectName }) => {
   };
 
   const fetchProjects = () => {
-    axios
+    api
       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`, { headers })
       .then((res) => setProjects(res.data.content || res.data || []))
       .catch((err) => console.error("Failed to fetch projects", err));
   };
 
   const fetchStories = () => {
-    axios
+    api
       .get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
         { headers },
@@ -50,7 +50,7 @@ const Backlog = ({ projectId, projectName }) => {
   };
 
   const fetchNoEpicStories = () => {
-    axios
+    api
       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/no-epic`, {
         params: { projectId },
         headers,
@@ -60,7 +60,7 @@ const Backlog = ({ projectId, projectName }) => {
   };
 
   const fetchSprints = () => {
-    axios
+    api
       .get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
         { headers },
@@ -77,7 +77,7 @@ const Backlog = ({ projectId, projectName }) => {
   }, [projectId]);
 
   const handleDropStory = (storyId, sprintId) => {
-    axios
+    api
       .put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}/assign-sprint`,
         { sprintId },

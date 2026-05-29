@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import Button from "../../../../components/Button/Button";
 
@@ -20,10 +20,10 @@ const CreateEpic = ({ onClose }) => {
   const token = localStorage.getItem("token");
 
   // Axios default header for Authorization
-  axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
   useEffect(() => {
-    axios
+    api
       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`)
       .then((response) => {
         const content = response.data.content || response.data;
@@ -57,7 +57,7 @@ const CreateEpic = ({ onClose }) => {
       dueDate: formData.dueDate ? formData.dueDate + "T00:00:00" : null,
     };
 
-    axios
+    api
       .post(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/epics`, payload)
       .then((res) => {
         console.log("Epic created:", res.data);

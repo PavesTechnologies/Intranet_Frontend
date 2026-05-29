@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import {
   PieChart,
   Pie,
@@ -75,7 +75,7 @@ const Summary = ({ projectId, projectName }) => {
         const base = window.__APP_CONFIG__.PMS_BASE_URL;
 
         // Fetch project details (to get stage)
-        const projectRes = await axios.get(
+        const projectRes = await api.get(
           `${base}/api/projects/${projectId}`,
           { headers },
         );
@@ -90,10 +90,10 @@ const Summary = ({ projectId, projectName }) => {
 
         // Fetch related entities
         const [epicRes, storyRes, taskRes, bugRes] = await Promise.all([
-          axios.get(`${base}/api/projects/${projectId}/epics`, { headers }),
-          axios.get(`${base}/api/projects/${projectId}/stories`, { headers }),
-          axios.get(`${base}/api/projects/${projectId}/tasks`, { headers }),
-          axios.get(`${base}/api/bugs/project/${projectId}`, { headers }),
+          api.get(`${base}/api/projects/${projectId}/epics`, { headers }),
+          api.get(`${base}/api/projects/${projectId}/stories`, { headers }),
+          api.get(`${base}/api/projects/${projectId}/tasks`, { headers }),
+          api.get(`${base}/api/bugs/project/${projectId}`, { headers }),
         ]);
 
         setEpics(epicRes.data);
@@ -109,7 +109,7 @@ const Summary = ({ projectId, projectName }) => {
               type,
               id: i.id,
               name: i.name || i.title || `Unnamed ${type}`,
-              request: axios.get(`${base}/api/comments/${type}/${i.id}`, {
+              request: api.get(`${base}/api/comments/${type}/${i.id}`, {
                 headers,
               }),
             }),

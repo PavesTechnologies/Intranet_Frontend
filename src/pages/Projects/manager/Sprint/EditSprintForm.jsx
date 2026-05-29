@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Button from "../../../../components/Button/Button";
 import FilterListbox from "../../../../components/filter/FilterListbox";
@@ -23,7 +23,7 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
     const fetchSprint = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(
+        const res = await api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
@@ -62,7 +62,7 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
     };
 
     try {
-      await axios.put(
+      await api.put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}`,
         payload,
         { headers: { Authorization: `Bearer ${token}` } },

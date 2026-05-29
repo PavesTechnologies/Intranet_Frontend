@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertIcon } from "../../../../components/icons";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
 import SearchInput from "../../../../components/filter/Searchbar";
@@ -42,7 +42,7 @@ export default function IssuesPanel({
   const PAGE_SIZE = 3;
 
   const axiosInstance = useMemo(() => {
-    const instance = axios.create({
+    const instance = api.create({
       baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
       headers: {
         "Content-Type": "application/json",

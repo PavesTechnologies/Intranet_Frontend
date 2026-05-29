@@ -1,6 +1,6 @@
 // ✅ ProjectList.jsx (Final Updated Version)
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { ChevronDown, ChevronRight, Pencil, Trash } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -35,11 +35,11 @@ const ProjectList = () => {
   //         status && status !== "All"
   //           ? `${base}/api/projects/owner?status=${status}`
   //           : `${base}/api/projects/owner`;
-  //       const ownerRes = await axios.get(ownerUrl, { headers });
+  //       const ownerRes = await api.get(ownerUrl, { headers });
   //       let memberRes = { data: [] };
   //       if (user?.id) {
   //         const memberUrl = `${base}/api/projects/member/${user.id}`;
-  //         memberRes = await axios.get(memberUrl, { headers });
+  //         memberRes = await api.get(memberUrl, { headers });
   //       }
   //       const allProjects = [...ownerRes.data, ...memberRes.data];
   //       const uniqueProjects = Array.from(
@@ -56,7 +56,7 @@ const ProjectList = () => {
   //   // ✅ Fetch Users for Owner/Member dropdowns
   //   const fetchUsers = async () => {
   //     try {
-  //       const res = await axios.get(
+  //       const res = await api.get(
   //         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/users?page=0&size=100`,
   //         { headers: { Authorization: `Bearer ${token}` } }
   //       );
@@ -143,7 +143,7 @@ const ProjectList = () => {
   //         startDate: formData.startDate ? `${formData.startDate}T00:00:00` : null,
   //         endDate: formData.endDate ? `${formData.endDate}T00:00:00` : null,
   //       };
-  //       const res = await axios.put(
+  //       const res = await api.put(
   //         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
   //         updatedProjectData,
   //         { headers: { Authorization: `Bearer ${token}` } }
@@ -178,7 +178,7 @@ const ProjectList = () => {
   //   const handleDelete = async (projectId) => {
   //   if (!window.confirm("🗑️ Are you sure you want to delete this project?")) return;
   //   try {
-  //     await axios.delete(
+  //     await api.delete(
   //       `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
   //       { headers: { Authorization: `Bearer ${token}` } }
   //     );

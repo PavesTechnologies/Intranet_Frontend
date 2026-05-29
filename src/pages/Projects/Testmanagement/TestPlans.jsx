@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, Edit2, Trash2, FileText, Layers, AlertCircle, LayoutList } from "lucide-react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import CreateTestPlan from "./TestPlans/pages/CreateTestPlan";
 import EditTestPlan from "./TestPlans/pages/EditTestPlan";
 import { useParams } from "react-router-dom";
@@ -54,7 +54,7 @@ export default function TestPlans() {
 
   const fetchPlans = async () => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/projects/${projectId}?t=${Date.now()}`,
         { headers: { Authorization: `Bearer ${token}`, "Cache-Control": "no-cache", Pragma: "no-cache" } },
       );
@@ -74,7 +74,7 @@ export default function TestPlans() {
     if (!planId) return;
     setLoadingScenarios(true);
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/scenarios/plans/${planId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -92,7 +92,7 @@ export default function TestPlans() {
   const fetchStoryTitle = async (storyId) => {
     if (!storyId || storyTitles[storyId]) return;
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -108,7 +108,7 @@ export default function TestPlans() {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(
+      await api.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/${id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
