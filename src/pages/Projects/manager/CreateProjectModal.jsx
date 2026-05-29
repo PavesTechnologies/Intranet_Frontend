@@ -184,6 +184,7 @@ const DEFAULT_FORM = {
   riskLevel: "",
   priorityLevel: "",
   projectBudget: "",
+  projectBudgetCurrency: "USD",
   ownerId: "",
   clientId: "",
   rmId: "",
@@ -760,22 +761,27 @@ const Step2 = ({ fd, err, onChange }) => (
     <div className="pmw-divider" />
 
     <Field label="Project Budget" optional>
-      <div style={{ position: "relative", maxWidth: 220 }}>
-        <span
+      <div className="flex items-center gap-2">
+        <select
+          name="projectBudgetCurrency"
+          value={fd.projectBudgetCurrency}
+          onChange={onChange}
           style={{
-            position: "absolute",
-            left: 12,
-            top: "50%",
-            transform: "translateY(-50%)",
-            fontSize: 11.5,
+            height: 36,
+            padding: "0 8px",
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
+            fontSize: 12,
             fontWeight: 700,
-            color: "#64748b",
-            letterSpacing: ".04em",
-            pointerEvents: "none",
+            color: "#334155",
+            background: "#f8fafc",
+            cursor: "pointer",
+            outline: "none",
           }}
         >
-          USD
-        </span>
+          <option value="USD">USD</option>
+          <option value="INR">INR</option>
+        </select>
         <Inp
           name="projectBudget"
           type="text"
@@ -783,7 +789,7 @@ const Step2 = ({ fd, err, onChange }) => (
           placeholder="0.00"
           value={fd.projectBudget}
           onChange={onChange}
-          style={{ paddingLeft: 44 }}
+          style={{ maxWidth: 180 }}
         />
       </div>
     </Field>
@@ -1307,6 +1313,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
             riskLevel: p.riskLevel || "",
             priorityLevel: p.priorityLevel || "",
             projectBudget: p.projectBudget ? String(p.projectBudget) : "",
+            projectBudgetCurrency: p.projectBudgetCurrency || "USD",
             ownerId: p.ownerId ? String(p.ownerId) : "",
             clientId: p.clientId ? String(p.clientId) : "",
             rmId: p.rmId ? String(p.rmId) : "",
@@ -1527,7 +1534,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
       primaryLocation: fd.primaryLocation,
       riskLevel: fd.riskLevel,
       projectBudget: fd.projectBudget ? parseFloat(fd.projectBudget) : null,
-      projectBudgetCurrency: fd.projectBudget ? "USD" : null,
+      projectBudgetCurrency: fd.projectBudget ? fd.projectBudgetCurrency : null,
       priorityLevel: fd.priorityLevel,
       ownerId: parseInt(fd.ownerId, 10),
       memberIds: fd.memberIds,

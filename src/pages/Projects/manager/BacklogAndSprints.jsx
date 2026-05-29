@@ -48,6 +48,7 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const [permissions, setPermissions] = useState(null);
   const [deleteSprintConfirmOpen, setDeleteSprintConfirmOpen] = useState(false);
   const [sprintIdToDelete, setSprintIdToDelete] = useState(null);
+  const [riskMap, setRiskMap] = useState({});
   const toggleStoryExpand = (storyId) => {
     setExpandedBacklogStories((prev) =>
       prev.includes(storyId)
@@ -388,12 +389,34 @@ const handleSprintStatus = async (sprintId, action) => {
     setDeleteSprintConfirmOpen(true);
   };
 
+  const fetchRiskMap = async () => {
+    const numId = Number(projectId);
+    if (!numId || isNaN(numId)) return;
+    try {
+      const res = await axios.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${numId}/risks/issues`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }, params: { page: 0, size: 5000 } },
+      );
+      const items = Array.isArray(res.data?.content)
+        ? res.data.content
+        : Array.isArray(res.data) ? res.data : [];
+      const map = {};
+      items.forEach((r) => {
+        if (r.linkedType && r.linkedId) map[`${r.linkedType}-${r.linkedId}`] = r.riskCount ?? 1;
+      });
+      setRiskMap(map);
+    } catch {
+      // non-critical
+    }
+  };
+
   useEffect(() => {
     fetchStories();
     fetchTasks();
     fetchSprints();
     fetchEpics();
     fetchPermissions();
+    fetchRiskMap();
   }, [projectId]);
 
   // =======================================
@@ -615,11 +638,18 @@ const handleSprintStatus = async (sprintId, action) => {
         </div>
         {/* Backlog */}
         <BacklogDropWrapper>
-          <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-slate-200">
-            Product Backlog
-          </h2>
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200">
+            <h2 className="text-sm font-semibold text-slate-700">
+              Product Backlog
+            </h2>
+            <span className="text-xs text-slate-400">
+              {backlogStories.length} {backlogStories.length === 1 ? "story" : "stories"}
+              {backlogTasks.filter(t => !t.storyId).length > 0 &&
+                ` · ${backlogTasks.filter(t => !t.storyId).length} independent task${backlogTasks.filter(t => !t.storyId).length > 1 ? "s" : ""}`}
+            </span>
+          </div>
 
-          <div className="space-y-4">
+          <div className="overflow-y-auto max-h-[calc(100vh-250px)] pr-1 space-y-4">
             {/* 1. STORIES AND THEIR NESTED TASKS */}
             {backlogStories.map((story) => {
               // Find tasks that belong to this story
@@ -662,6 +692,9 @@ const handleSprintStatus = async (sprintId, action) => {
                           setSelectedStoryId(story.id);
                           setRightPanelOpen(true);
                         }}
+                        riskCount={riskMap[`Story-${story.id}`] ?? 0}
+                        projectId={projectId}
+                        navigate={navigate}
                       />
                     </div>
                   </div>
@@ -682,6 +715,9 @@ const handleSprintStatus = async (sprintId, action) => {
                             setSelectedTaskId(task.id);
                             setRightPanelOpen(true);
                           }}
+                          riskCount={riskMap[`Task-${task.id}`] ?? 0}
+                          projectId={projectId}
+                          navigate={navigate}
                         />
                       ))}
                     </div>
@@ -714,6 +750,9 @@ const handleSprintStatus = async (sprintId, action) => {
                           setSelectedTaskId(task.id);
                           setRightPanelOpen(true);
                         }}
+                        riskCount={riskMap[`Task-${task.id}`] ?? 0}
+                        projectId={projectId}
+                        navigate={navigate}
                       />
                     ))}
                   </div>
