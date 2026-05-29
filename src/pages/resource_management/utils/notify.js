@@ -20,6 +20,7 @@ const collectMessages = (value) => {
     ...collectMessages(value.detail),
     ...collectMessages(value.title),
     ...collectMessages(value.description),
+    ...collectMessages(value.data),
     ...collectMessages(value.errors),
   ].filter(Boolean);
 };

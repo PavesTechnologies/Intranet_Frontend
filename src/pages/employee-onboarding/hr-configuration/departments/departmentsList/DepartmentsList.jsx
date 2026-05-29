@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import api from "../../../../../api/axiosInstance";
 import Button from "../../../../../components/Button/Button";
 import GenericTable from "../../../../../components/Table/table";
 import Modal from "../../../../../components/Modal/modal";
@@ -18,19 +19,12 @@ export default function DepartmentManagement() {
       setLoading(true);
 
       const res = await api.get(`${BASE}/masters/departments/`, {
-        method: "GET",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
-      if (!res.ok) {
-        throw new Error("Failed to fetch departments");
-      }
-
-      const data = await res.json();
-      setDepartments(data);
+      setDepartments(res.data);
     } catch (error) {
       if (window.showError) window.showError("Failed to load departments");
     } finally {
@@ -46,16 +40,11 @@ export default function DepartmentManagement() {
     if (!window.confirm("Delete department?")) return;
 
     try {
-      const res = await api.get(`${BASE}/masters/departments/${uuid}`, {
-        method: "DELETE",
+      await api.delete(`${BASE}/masters/departments/${uuid}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
-
-      if (!res.ok) {
-        throw new Error("Delete failed");
-      }
 
       setDepartments((prev) => prev.filter((d) => d.department_uuid !== uuid));
 
@@ -185,34 +174,24 @@ function DepartmentModal({ editData, onClose, onSuccess }) {
 
       let res;
 
+      const authHeaders = {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      };
+
       if (editData) {
-        res = await api.get(
+        res = await api.put(
           `${BASE}/masters/departments/${editData.department_uuid}`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify(payload),
-          },
+          payload,
+          authHeaders,
         );
       } else {
-        res = await api.get(`${BASE}/masters/departments/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(payload),
-        });
+        res = await api.post(`${BASE}/masters/departments/`, payload, authHeaders);
       }
 
-      if (!res.ok) {
-        throw new Error("Failed to save department");
-      }
-
-      const data = await res.json();
+      const data = res.data;
 
       if (window.showSuccess) window.showSuccess(
         `Department ${editData ? "updated" : "created"} successfully`,

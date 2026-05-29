@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { X } from "lucide-react";
@@ -68,11 +68,11 @@ const EditEpicForm = ({
     const loadData = async () => {
       try {
         const requests = [
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
             axiosConfig,
           ),
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
             axiosConfig,
           ),
@@ -80,7 +80,7 @@ const EditEpicForm = ({
 
         if (epicId) {
           requests.push(
-            axios.get(
+            api.get(
               `${window.__APP_CONFIG__.PMS_BASE_URL}/api/epics/${epicId}`,
               axiosConfig,
             ),
@@ -171,7 +171,7 @@ const EditEpicForm = ({
 
     try {
       if (epicId) {
-        await axios.put(
+        await api.put(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/epics/${epicId}`,
           updatedPayload,
           axiosConfig,

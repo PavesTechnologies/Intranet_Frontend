@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const CommentBox = ({ entityId, entityType, currentUser }) => {
   const [comments, setComments] = useState([]);
@@ -10,7 +10,7 @@ const CommentBox = ({ entityId, entityType, currentUser }) => {
   const [loading, setLoading] = useState(false);
 
   // Create Axios instance *inside useEffect or function* (not at top level)
-  const axiosInstance = axios.create({
+  const axiosInstance = api.create({
     baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,

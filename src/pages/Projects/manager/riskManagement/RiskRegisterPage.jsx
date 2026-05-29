@@ -9,7 +9,7 @@ import {
   CheckIcon,
   AlertIcon,
 } from "../../../../components/icons";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
 import Button from "../../../../components/Button/Button";
 import CreateRiskModal from "./createRiskModal";
@@ -54,7 +54,7 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
 
   // ✅ TOKEN SAFE AXIOS INSTANCE
   const axiosInstance = useMemo(() => {
-    const instance = axios.create({
+    const instance = api.create({
       baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
       headers: {
         "Content-Type": "application/json",

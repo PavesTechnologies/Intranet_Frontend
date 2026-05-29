@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
 export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
   const [form, setForm] = useState({
@@ -15,7 +15,7 @@ export default function AddMitigationForm({ riskId, members, onAdd, onClose }) {
   const [submitting, setSubmitting] = useState(false);
 
   const axiosInstance = useMemo(() => {
-    const instance = axios.create({
+    const instance = api.create({
       baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
       headers: {
         "Content-Type": "application/json",

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import FormInput from "../../../../components/forms/FormInput";
 import Modal from "../../../../components/Modal/modal";
@@ -53,9 +53,11 @@ const CreateTaskForm = ({
         const [storyRes, userRes] = await Promise.all([
           axios.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/sprint/${defaultSprintId}`,
+          api.get(
+            `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/sprint/${defaultSprintId}`,
             axiosConfig
           ),
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
             axiosConfig,
           ),
@@ -105,7 +107,7 @@ const CreateTaskForm = ({
 
     try {
       setLoading(true);
-      const res = await axios.post(
+      const res = await api.post(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks`,
         payload,
         axiosConfig,

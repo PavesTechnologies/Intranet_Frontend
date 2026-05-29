@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, lazy, Suspense } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { motion } from "framer-motion";
 import { preloadAllWidgets } from "./preloadWidgets";
 
@@ -49,28 +49,28 @@ const Summary = ({ projectId, projectName }) => {
 
     // Fetch all APIs in parallel using Promise.allSettled
     const requests = [
-      axios
+      api
         .get(`${base}/api/projects/${projectId}`, { headers })
         .then((res) => ({ stage: res.data?.currentStage || "INITIATION" })),
-      axios
+      api
         .get(`${base}/api/projects/${projectId}/epics`, { headers })
         .then((res) => ({ epics: res.data || [] })),
-      axios
+      api
         .get(`${base}/api/projects/${projectId}/stories`, { headers })
         .then((res) => ({ stories: res.data || [] })),
-      axios
+      api
         .get(`${base}/api/projects/${projectId}/tasks`, { headers })
         .then((res) => ({ tasks: res.data || [] })),
-      // axios
+      // api
       //   .get(`${base}/api/testing/bugs/projects/${projectId}/summaries`, {
       //     headers,
       //   })
       //   .then((res) => ({ bugs: res.data || [] }))
       //   .catch(() => ({ bugs: [] })),
-      axios
+      api
         .get(`${base}/api/projects/${projectId}/statuses`, { headers })
         .then((res) => ({ statuses: res.data || [] })),
-      axios
+      api
         .get(`${base}/api/projects/${projectId}/members-with-owner`, {
           headers,
         })
