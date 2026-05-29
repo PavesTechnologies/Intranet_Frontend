@@ -1,6 +1,6 @@
 import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
-import { Boxes, Layers, Settings2, Tag, X } from "lucide-react";
+import { Boxes, Layers, Loader2, Settings2, Tag, X } from "lucide-react";
 import { notify, getResourceManagementErrorMessage } from "../../utils/notify";
 import BulkUploadTab from "./BulkUploadTab";
 import SkillTaxonomyTab from "./SkillTaxonomyTab";
@@ -148,6 +148,9 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
   const [taxonomy, setTaxonomy] = useState([]);
   const [initialTaxonomy, setInitialTaxonomy] = useState([]);
   const [stagedCategories, setStagedCategories] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [uploadStatus, setUploadStatus] = useState({ canApply: false, isBusy: false });
   const loadedCategoryIdsRef = useRef(new Set());
 
   const stats = useMemo(
@@ -436,24 +439,51 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
   };
 
   const handleReset = () => {
+    if (isSubmitting || uploadStatus.isBusy) return;
     setTaxonomy(cloneTaxonomy(initialTaxonomy));
     setStagedCategories([]);
     setActiveTab("taxonomy");
+    setSaveError("");
     notify.info("Skill Management reset to loaded category data.");
   };
 
   const handleSave = async () => {
-    const saved = await saveTaxonomy(stagedCategories);
-    if (saved) {
-      onClose();
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setSaveError("");
+
+    try {
+      const saved = await saveTaxonomy(stagedCategories);
+      if (saved) {
+        onClose();
+      } else {
+        setSaveError("Unable to save skill taxonomy. Please review the changes and try again.");
+      }
+    } catch (error) {
+      setSaveError(getResourceManagementErrorMessage(error, "Unable to save skill taxonomy."));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const hasPendingChanges = stagedCategories.length > 0;
+  const isUploadTab = activeTab === "upload";
+  const isBusy = isSubmitting || uploadStatus.isBusy;
+  const isSaveDisabled = isBusy || (isUploadTab ? !uploadStatus.canApply : !hasPendingChanges);
+  const saveLabel = isUploadTab
+    ? uploadStatus.isUploading
+      ? "Uploading..."
+      : uploadStatus.isSaving || isSubmitting
+        ? "Saving..."
+        : "Save"
+    : isSubmitting
+      ? "Saving..."
+      : "Save";
 
   return (
     <Transition.Root show={open} as={Fragment}>
-      <Dialog as="div" className="relative z-[1200]" onClose={onClose}>
+      <Dialog as="div" className="relative z-[1200]" onClose={isBusy ? () => {} : onClose}>
         {/* Backdrop */}
         <Transition.Child
           as={Fragment}
@@ -500,8 +530,9 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
                     <button
                       type="button"
                       onClick={onClose}
+                      disabled={isBusy}
                       aria-label="Close modal"
-                      className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                      className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <X className="h-5 w-5" />
                     </button>
@@ -550,7 +581,10 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
                       initialDraftKey={initialDraftKey}
                     />
                   ) : (
-                    <BulkUploadTab registerApply={(fn) => (uploadApplyRef.current = fn)} />
+                    <BulkUploadTab
+                      registerApply={(fn) => (uploadApplyRef.current = fn)}
+                      registerStatus={setUploadStatus}
+                    />
                   )}
                 </div>
 
@@ -558,7 +592,21 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
                 <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-3.5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs text-gray-400">
-                      {hasPendingChanges ? (
+                      {saveError ? (
+                        <span className="font-medium text-rose-600">{saveError}</span>
+                      ) : isUploadTab ? (
+                        uploadStatus.isBusy ? (
+                          <span className="font-medium text-indigo-600">
+                            Upload workflow is in progress
+                          </span>
+                        ) : uploadStatus.canApply ? (
+                          <span className="font-medium text-emerald-600">
+                            File ready to save
+                          </span>
+                        ) : (
+                          "Select an Excel file to continue"
+                        )
+                      ) : hasPendingChanges ? (
                         <span className="font-medium text-amber-600">
                           {stagedCategories.length} unsaved change{stagedCategories.length !== 1 ? "s" : ""}
                         </span>
@@ -571,27 +619,45 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
                       <button
                         type="button"
                         onClick={handleReset}
-                        className="rounded-lg px-3.5 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
+                        disabled={isBusy}
+                        className="rounded-lg px-3.5 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
                       >
                         Reset
                       </button>
                       <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                        disabled={isBusy}
+                        className="rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
                       >
                         Cancel
                       </button>
                       <button
                         type="button"
+                        disabled={isSaveDisabled}
                         onClick={async () => {
+                          if (isSaveDisabled) return;
+
                           if (activeTab === "upload") {
                             if (uploadApplyRef.current) {
+                              setIsSubmitting(true);
+                              setSaveError("");
                               try {
-                                await uploadApplyRef.current();
-                                onClose();
-                              } catch {
-                                // BulkUploadTab surfaces its own errors.
+                                const result = await uploadApplyRef.current();
+                                if (result) {
+                                  onClose();
+                                } else {
+                                  setSaveError("Unable to save uploaded taxonomy. Please try again.");
+                                }
+                              } catch (error) {
+                                setSaveError(
+                                  getResourceManagementErrorMessage(
+                                    error,
+                                    "Unable to save uploaded taxonomy.",
+                                  ),
+                                );
+                              } finally {
+                                setIsSubmitting(false);
                               }
                             } else {
                               notify.error("Upload handler not ready.");
@@ -600,9 +666,10 @@ const SkillManagementModal = ({ open, onClose, initialDraft = null, initialDraft
                             await handleSave();
                           }
                         }}
-                        className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                        className="inline-flex min-w-[92px] items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:bg-indigo-300 disabled:shadow-none"
                       >
-                        {activeTab === "upload" ? "Upload" : "Save"}
+                        {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        {saveLabel}
                       </button>
                     </div>
                   </div>
