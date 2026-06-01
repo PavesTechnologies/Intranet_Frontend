@@ -155,7 +155,7 @@ export default function OnboardingNavBar() {
       redirect: "/employee-exit",
     }] : []),
 
-    ...(hasRole(["HR", "ADMIN"]) ? [{
+    ...(hasRole(["ADMIN"]) ? [{
       label: "ManageSkillTaxonomy",
       match: ["/employee-onboarding/manage-skill-taxonomy"],
       redirect: "/employee-onboarding/manage-skill-taxonomy",
