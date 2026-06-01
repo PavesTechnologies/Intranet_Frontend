@@ -59,7 +59,8 @@ const mapSubSkillDto = (subSkill) => ({
   active: subSkill.active ?? true,
 });
 
-const REQUESTS_PAGE_SIZE = 5;
+const TAXONOMY_PAGE_SIZE = 10;
+const REQUESTS_PAGE_SIZE = 10;
 
 const formatRequestDate = (value) => {
   if (!value) return "--";
@@ -542,6 +543,7 @@ const ManageSkillTaxonomy = () => {
   const location = useLocation();
   const { hasRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const [taxonomyPage, setTaxonomyPage] = useState(1);
   const [openSkillManagement, setOpenSkillManagement] = useState(false);
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -1363,6 +1365,16 @@ const ManageSkillTaxonomy = () => {
     });
   }, [categories, searchTerm]);
 
+  const taxonomyPageCount = useMemo(
+    () => Math.max(1, Math.ceil(filteredCategories.length / TAXONOMY_PAGE_SIZE)),
+    [filteredCategories.length],
+  );
+
+  const paginatedCategories = useMemo(() => {
+    const start = (taxonomyPage - 1) * TAXONOMY_PAGE_SIZE;
+    return filteredCategories.slice(start, start + TAXONOMY_PAGE_SIZE);
+  }, [filteredCategories, taxonomyPage]);
+
   const filteredRequests = useMemo(() => {
     const query = normalize(requestsSearchTerm);
     if (!query) return requests;
@@ -1399,6 +1411,16 @@ const ManageSkillTaxonomy = () => {
     const start = (requestsPage - 1) * REQUESTS_PAGE_SIZE;
     return groupedRequests.slice(start, start + REQUESTS_PAGE_SIZE);
   }, [groupedRequests, requestsPage]);
+
+  useEffect(() => {
+    setTaxonomyPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (taxonomyPage > taxonomyPageCount) {
+      setTaxonomyPage(taxonomyPageCount);
+    }
+  }, [taxonomyPage, taxonomyPageCount]);
 
   useEffect(() => {
     setRequestsPage(1);
@@ -1549,8 +1571,9 @@ const ManageSkillTaxonomy = () => {
               />
             </div>
           ) : (
+            <>
             <div className="divide-y divide-gray-100">
-              {filteredCategories.map((category) => {
+              {paginatedCategories.map((category) => {
                 const categoryExpanded = Boolean(
                   expandedCategories[category.id],
                 );
@@ -1813,6 +1836,17 @@ const ManageSkillTaxonomy = () => {
                 );
               })}
             </div>
+            {taxonomyPageCount > 1 && (
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={taxonomyPage}
+                  totalPages={taxonomyPageCount}
+                  onPrevious={() => setTaxonomyPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setTaxonomyPage((p) => Math.min(taxonomyPageCount, p + 1))}
+                />
+              </div>
+            )}
+            </>
           )}
         </div>
 
@@ -1875,23 +1909,16 @@ const ManageSkillTaxonomy = () => {
                 ))}
               </div>
 
-              {/* Pagination */}
-              <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-gray-500">
-                  Showing employees {(requestsPage - 1) * REQUESTS_PAGE_SIZE + 1}
-                  {" – "}
-                  {Math.min(requestsPage * REQUESTS_PAGE_SIZE, groupedRequests.length)}
-                  {" of "}
-                  {groupedRequests.length}
-                </p>
-                <Pagination
-                  currentPage={requestsPage}
-                  totalPages={groupsPageCount}
-                  onPrevious={() => setRequestsPage((p) => Math.max(1, p - 1))}
-                  onNext={() => setRequestsPage((p) => Math.min(groupsPageCount, p + 1))}
-                  className="justify-end py-0"
-                />
-              </div>
+              {groupsPageCount > 1 && (
+                <div className="mt-4 flex justify-center">
+                  <Pagination
+                    currentPage={requestsPage}
+                    totalPages={groupsPageCount}
+                    onPrevious={() => setRequestsPage((p) => Math.max(1, p - 1))}
+                    onNext={() => setRequestsPage((p) => Math.min(groupsPageCount, p + 1))}
+                  />
+                </div>
+              )}
             </>
           )}
         </div>
