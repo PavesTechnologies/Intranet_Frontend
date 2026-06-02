@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import api from "../../../../../api/axiosInstance";
 
 export function useSprintBurndown(sprintId) {
   const [data, setData]       = useState(null);
@@ -10,7 +10,7 @@ export function useSprintBurndown(sprintId) {
     if (!sprintId) return;
     setLoading(true);
     setError(null);
-    axios
+    api
       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/burndown`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })

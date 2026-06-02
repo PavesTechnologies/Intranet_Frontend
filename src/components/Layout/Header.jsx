@@ -71,10 +71,18 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
 
   /* ── Dropdown actions ── */
   const handleViewProfile = () => {
-    setDropdownOpen(false);
-    if (!employeeProfile?.employee_uuid) return;
-    navigate(`/employee-onboarding/employeeProfile/${employeeProfile.employee_uuid}`);
-  };
+  console.log("USER:", user);
+  console.log("EMPLOYEE PROFILE:", employeeProfile);
+
+  setDropdownOpen(false);
+
+  if (!employeeProfile?.employee_uuid) {
+    console.log("No employee UUID found");
+    return;
+  }
+
+  navigate(`/employee-onboarding/employeeProfile/${employeeProfile.employee_uuid}`);
+};
 
   const handleOpenPasswordModal = () => {
     setDropdownOpen(false);

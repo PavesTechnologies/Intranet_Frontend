@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useDrag } from "react-dnd";
-import { 
-  MoreHorizontalIcon, 
-  AddIcon, 
+import {
+  MoreHorizontalIcon,
+  AddIcon,
   BookmarkIcon,
   ChevronDownIcon,
   ChevronRightIcon
 } from "../../../../components/icons";
+import RiskBadge from "../RiskBadge";
 
 const StoryCard = ({
   story,
@@ -15,6 +16,9 @@ const StoryCard = ({
   onAddToSprint,
   onSelectEpic,
   onClick,
+  riskCount = 0,
+  projectId,
+  navigate,
 }) => {
   const [{ isDragging }, dragRef] = useDrag({
     type: "STORY",
@@ -71,6 +75,8 @@ const StoryCard = ({
       <p className="flex-1 text-sm text-gray-800 truncate group-hover:text-indigo-700">
         {story.title}
       </p>
+      <RiskBadge count={riskCount} issueType="Story" issueId={story.id} projectId={projectId} navigate={navigate} />
+
       
      <p className="flex-0 text-sm text-gray-500 truncate group-hover:text-indigo-600">
   <span className="font-medium">Epic:</span> {story.epicTitle|| story.epicName || "None"}

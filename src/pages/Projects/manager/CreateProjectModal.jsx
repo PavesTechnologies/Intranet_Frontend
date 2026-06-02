@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { motion, AnimatePresence } from "motion/react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -184,6 +184,7 @@ const DEFAULT_FORM = {
   riskLevel: "",
   priorityLevel: "",
   projectBudget: "",
+  projectBudgetCurrency: "USD",
   ownerId: "",
   clientId: "",
   rmId: "",
@@ -760,22 +761,27 @@ const Step2 = ({ fd, err, onChange }) => (
     <div className="pmw-divider" />
 
     <Field label="Project Budget" optional>
-      <div style={{ position: "relative", maxWidth: 220 }}>
-        <span
+      <div className="flex items-center gap-2">
+        <select
+          name="projectBudgetCurrency"
+          value={fd.projectBudgetCurrency}
+          onChange={onChange}
           style={{
-            position: "absolute",
-            left: 12,
-            top: "50%",
-            transform: "translateY(-50%)",
-            fontSize: 11.5,
+            height: 36,
+            padding: "0 8px",
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
+            fontSize: 12,
             fontWeight: 700,
-            color: "#64748b",
-            letterSpacing: ".04em",
-            pointerEvents: "none",
+            color: "#334155",
+            background: "#f8fafc",
+            cursor: "pointer",
+            outline: "none",
           }}
         >
-          USD
-        </span>
+          <option value="USD">USD</option>
+          <option value="INR">INR</option>
+        </select>
         <Inp
           name="projectBudget"
           type="text"
@@ -783,7 +789,7 @@ const Step2 = ({ fd, err, onChange }) => (
           placeholder="0.00"
           value={fd.projectBudget}
           onChange={onChange}
-          style={{ paddingLeft: 44 }}
+          style={{ maxWidth: 180 }}
         />
       </div>
     </Field>
@@ -1285,11 +1291,11 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
       setKeyAuto(false);
       setLoading(true);
       Promise.all([
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${editingProjectId}/edit`,
           { headers: { Authorization: `Bearer ${token}` } },
         ),
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${editingProjectId}/statuses`,
           { headers: { Authorization: `Bearer ${token}` } },
         ),
@@ -1307,6 +1313,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
             riskLevel: p.riskLevel || "",
             priorityLevel: p.priorityLevel || "",
             projectBudget: p.projectBudget ? String(p.projectBudget) : "",
+            projectBudgetCurrency: p.projectBudgetCurrency || "USD",
             ownerId: p.ownerId ? String(p.ownerId) : "",
             clientId: p.clientId ? String(p.clientId) : "",
             rmId: p.rmId ? String(p.rmId) : "",
@@ -1338,7 +1345,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
   /* ── Fetch users ──────────────────────────────────────────────────────── */
   // useEffect(() => {
   //   if (!isOpen) return;
-  //   axios
+  //   api
   //     .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users?page=0&size=100`, {
   //       headers: { Authorization: `Bearer ${token}` },
   //     })
@@ -1352,7 +1359,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
   /* ── Fetch clients ────────────────────────────────────────────────────── */
   useEffect(() => {
     if (!isOpen) return;
-    axios
+    api
       .get(`${window.__APP_CONFIG__.RMS_BASE_URL}/api/client/get-active-clients`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -1367,7 +1374,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
   useEffect(() => {
   if (!isOpen || !editingProjectId) return;
 
-  axios
+  api
     .get(`${window.__APP_CONFIG__.RMS_BASE_URL}/api/allocation/get-all-resources/${editingProjectId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -1382,15 +1389,15 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
   useEffect(() => {
   if (!isOpen) return;
 
-  axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/project_manager`, { headers: { Authorization: `Bearer ${token}` } })
+  api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/project_manager`, { headers: { Authorization: `Bearer ${token}` } })
     .then(res => setProjectManagers(res.data || []))
     .catch(console.error);
 
-  axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/resource-managers`, { headers: { Authorization: `Bearer ${token}` } })
+  api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/resource-managers`, { headers: { Authorization: `Bearer ${token}` } })
     .then(res => setResourceManagers(res.data || []))
     .catch(console.error);
 
-  axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/delivery-owners`, { headers: { Authorization: `Bearer ${token}` } })
+  api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/delivery-owners`, { headers: { Authorization: `Bearer ${token}` } })
     .then(res => setDeliveryOwners(res.data || []))
     .catch(console.error);
 
@@ -1527,7 +1534,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
       primaryLocation: fd.primaryLocation,
       riskLevel: fd.riskLevel,
       projectBudget: fd.projectBudget ? parseFloat(fd.projectBudget) : null,
-      projectBudgetCurrency: fd.projectBudget ? "USD" : null,
+      projectBudgetCurrency: fd.projectBudget ? fd.projectBudgetCurrency : null,
       priorityLevel: fd.priorityLevel,
       ownerId: parseInt(fd.ownerId, 10),
       memberIds: fd.memberIds,
@@ -1544,13 +1551,13 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
       let pid = editingProjectId;
 
       if (editingProjectId) {
-        await axios.put(
+        await api.put(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${editingProjectId}`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } },
         );
       } else {
-        const res = await axios.post(
+        const res = await api.post(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } },
@@ -1559,7 +1566,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
       }
 
       try {
-        await axios.put(
+        await api.put(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${pid}/statuses`,
           statusPayload,
           { headers: { Authorization: `Bearer ${token}` } },

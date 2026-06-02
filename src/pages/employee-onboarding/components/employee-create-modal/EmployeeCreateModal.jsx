@@ -177,16 +177,13 @@ export default function EmployeeCreateModal({
       const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
         {
-          method: "GET",
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
 
-      const data = await res.json();
-      setDepartments(Array.isArray(data) ? data : data.data || []);
+      setDepartments(Array.isArray(res.data) ? res.data : res.data?.data || []);
     } catch (err) {
       console.error("Failed to fetch departments", err);
     }
@@ -197,21 +194,18 @@ export default function EmployeeCreateModal({
       const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/department/${departmentUuid}`,
         {
-          method: "GET",
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
 
-      const data = await res.json();
-      const designationList = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.data)
-        ? data.data
-        : Array.isArray(data?.designations)
-        ? data.designations
+      const designationList = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray(res.data?.data)
+        ? res.data.data
+        : Array.isArray(res.data?.designations)
+        ? res.data.designations
         : [];
 
       setDesignations(designationList);
@@ -225,16 +219,13 @@ export default function EmployeeCreateModal({
       const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
-          method: "GET",
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
 
-      const data = await res.json();
-      const managers = getArrayPayload(data)
+      const managers = getArrayPayload(res.data)
         .map((employee) => {
           const employeeId = getEmployeeId(employee);
           const fullName = getEmployeeFullName(employee);
@@ -306,7 +297,7 @@ export default function EmployeeCreateModal({
             },
           );
 
-          data = await res.json();
+          data = res.data;
 
           matchedUserUuid =
             data.user_uuid || userUuid;
@@ -324,13 +315,7 @@ export default function EmployeeCreateModal({
             },
           );
 
-          if (offerRes.ok) {
-            offerLetter = await offerRes.json();
-            // const offerData = await offerRes.json();
-            // offerLetter = getArrayPayload(offerData).find(
-            //   (offer) => String(offer.user_uuid) === String(matchedUserUuid),
-            // );
-          }
+          offerLetter = offerRes.data;
         } catch (offerError) {
           console.error("Failed to fetch offer letter details", offerError);
         }
@@ -347,16 +332,11 @@ export default function EmployeeCreateModal({
             },
           );
 
-          if (personalListRes.ok) {
-            const personalRecords =
-              await personalListRes.json();
-
-            personalDetails = personalRecords.find(
-              (item) =>
-                String(item.user_uuid).trim() ===
-                String(matchedUserUuid).trim()
-            );
-          }
+          personalDetails = (personalListRes.data || []).find(
+            (item) =>
+              String(item.user_uuid).trim() ===
+              String(matchedUserUuid).trim()
+          );
         } catch (personalError) {
           console.error(
             "Failed to fetch personal details",
@@ -470,47 +450,37 @@ export default function EmployeeCreateModal({
         return;
       }
 
-      const response = await api.get(
+      const response = await api.post(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
         {
-          method: "POST",
+          user_uuid: userUuid,
+          first_name: form.empFirstName,
+          middle_name: form.empMiddleName || "",
+          last_name: form.empLastName || "",
+          date_of_birth: form.empDob,
+          contact_number: form.contact,
+          department_uuid: form.departmentUuid,
+          designation_uuid: form.designationUuid,
+          reporting_manager_uuid: form.reportingManagerUuid || "",
+          employment_type: form.employeeType || "Full-Time",
+          joining_date: form.joiningDate,
+          location: form.location || "",
+          work_mode: form.workMode || "Office",
+          employment_status: form.employmentStatus || "Probation",
+          blood_group: form.bloodGroup || "",
+          gender: form.gender || "",
+          marital_status: form.maritalStatus || "",
+          total_experience: Number(form.totalExperience) || 0,
+        },
+        {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-          body: JSON.stringify({
-            user_uuid: userUuid,
-            first_name: form.empFirstName,
-            middle_name: form.empMiddleName || "",
-            last_name: form.empLastName || "",
-            date_of_birth: form.empDob,
-            contact_number: form.contact,
-            department_uuid: form.departmentUuid,
-            designation_uuid: form.designationUuid,
-            reporting_manager_uuid: form.reportingManagerUuid || "",
-            employment_type: form.employeeType || "Full-Time",
-            joining_date: form.joiningDate,
-            location: form.location || "",
-            work_mode: form.workMode || "Office",
-            employment_status: form.employmentStatus || "Probation",
-            blood_group: form.bloodGroup || "",
-            gender: form.gender || "",
-            marital_status: form.maritalStatus || "",
-            total_experience: Number(form.totalExperience) || 0,
-          }),
         },
       );
 
-      if (response.status === 422) {
-        setError("Validation error. Please check required fields.");
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to create employee");
-      }
-
-      const data = await response.json();
+      const data = response.data;
 
       setForm((prev) => ({
         ...prev,
@@ -553,39 +523,34 @@ export default function EmployeeCreateModal({
         return;
       }
 
-      const response = await api.get(
+      await api.put(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
         {
-          method: "PUT",
+          first_name: form.empFirstName,
+          middle_name: form.empMiddleName || "",
+          last_name: form.empLastName,
+          date_of_birth: form.empDob,
+          contact_number: form.contact,
+          department_uuid: form.departmentUuid,
+          designation_uuid: form.designationUuid,
+          reporting_manager_uuid: form.reportingManagerUuid || null,
+          employment_type: form.employeeType,
+          joining_date: form.joiningDate,
+          location: form.location || "",
+          work_mode: form.workMode || "",
+          employment_status: form.employmentStatus,
+          blood_group: form.bloodGroup || "",
+          gender: form.gender || "",
+          marital_status: form.maritalStatus || "",
+          total_experience: Number(form.totalExperience) || 0,
+        },
+        {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-          body: JSON.stringify({
-            first_name: form.empFirstName,
-            middle_name: form.empMiddleName || "",
-            last_name: form.empLastName,
-            date_of_birth: form.empDob,
-            contact_number: form.contact,
-            department_uuid: form.departmentUuid,
-            designation_uuid: form.designationUuid,
-            reporting_manager_uuid: form.reportingManagerUuid || null,
-            employment_type: form.employeeType,
-            joining_date: form.joiningDate,
-            location: form.location || "",
-            work_mode: form.workMode || "",
-            employment_status: form.employmentStatus,
-            blood_group: form.bloodGroup || "",
-            gender: form.gender || "",
-            marital_status: form.maritalStatus || "",
-            total_experience: Number(form.totalExperience) || 0,
-          }),
         },
       );
-
-      if (!response.ok) {
-        throw new Error("Update failed");
-      }
 
       showStatusToast("Employee updated successfully", "success");
       onClose();

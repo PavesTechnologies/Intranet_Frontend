@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import Button from "../../../../components/Button/Button";
 
@@ -30,13 +30,13 @@ const CreateUserStory = ({ onClose }) => {
     const loadInitialData = async () => {
       try {
         const [usersRes, projectsRes, sprintsRes] = await Promise.all([
-          axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users`, {
+          api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`, {
+          api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`, {
+          api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -56,7 +56,7 @@ const CreateUserStory = ({ onClose }) => {
   useEffect(() => {
     if (!projectId) return;
 
-    axios
+    api
       .get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
         {
@@ -71,7 +71,7 @@ const CreateUserStory = ({ onClose }) => {
   useEffect(() => {
     if (!projectId) return;
 
-    axios
+    api
       .get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
         {
@@ -100,7 +100,7 @@ const CreateUserStory = ({ onClose }) => {
     };
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories`,
         payload,
         { headers: { Authorization: `Bearer ${token}` } },

@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
   FilterIcon,
@@ -57,10 +57,10 @@ const formatSprintDate = (dateStr) => {
 
 // View toggle — Board | Swimlane
 const ViewToggle = ({ view, onChange }) => (
-  <div className="flex items-center rounded-lg border bg-white overflow-hidden text-sm shadow-sm">
+  <div className="flex items-center h-9 rounded-lg border bg-white overflow-hidden text-sm shadow-sm">
     <button
       onClick={() => onChange("board")}
-      className={`flex items-center gap-1.5 px-3 py-2 transition-colors border-r ${
+      className={`h-full flex items-center gap-1.5 px-3 transition-colors border-r ${
         view === "board"
           ? "bg-indigo-50 text-indigo-600 font-semibold"
           : "text-gray-500 hover:bg-slate-50"
@@ -71,7 +71,7 @@ const ViewToggle = ({ view, onChange }) => (
     </button>
     <button
       onClick={() => onChange("swimlane")}
-      className={`flex items-center gap-1.5 px-3 py-2 transition-colors ${
+      className={`h-full flex items-center gap-1.5 px-3 transition-colors ${
         view === "swimlane"
           ? "bg-indigo-50 text-indigo-600 font-semibold"
           : "text-gray-500 hover:bg-slate-50"
@@ -139,7 +139,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
     try {
       let fetchedSprintId = null;
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${BASE}/api/sprints/active/project/${projectId}`,
           { headers: headersWithToken() }
         );
@@ -152,15 +152,15 @@ const Board = ({ projectId, sprintId, projectName }) => {
         console.error("Sprint fetch:", err?.response?.data || err?.message);
       }
 
-      const statusReq = axios.get(
+      const statusReq = api.get(
         `${BASE}/api/projects/${projectId}/statuses`,
         { headers: headersWithToken() }
       );
       const tasksUrl = fetchedSprintId
         ? `${BASE}/api/projects/sprint/${fetchedSprintId}/tasks`
         : `${BASE}/api/projects/${projectId}/tasks`;
-      const tasksReq = axios.get(tasksUrl, { headers: headersWithToken() });
-      const membersReq = axios
+      const tasksReq = api.get(tasksUrl, { headers: headersWithToken() });
+      const membersReq = api
         .get(`${BASE}/api/projects/${projectId}/members`, { headers: headersWithToken() })
         .catch(() => ({ data: [] }));
 
@@ -298,7 +298,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
     if (!name) { showStatusToast("Column name required", "error"); return; }
     setCreatingStatus(true);
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE}/api/projects/${projectId}/statuses`,
         { name },
         { headers: headersWithToken() }
@@ -340,7 +340,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
 
   const doDirectDelete = async (statusId) => {
     try {
-      await axios.delete(`${BASE}/api/statuses/${statusId}`, { headers: headersWithToken() });
+      await api.delete(`${BASE}/api/statuses/${statusId}`, { headers: headersWithToken() });
       showStatusToast("Column deleted", "success");
       setStatuses((prev) => prev.filter((s) => s.id !== statusId));
       await loadBoard();
@@ -354,7 +354,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
   const confirmDeleteWithMigration = async (newStatusId) => {
     if (!statusToDelete) return;
     try {
-      await axios.delete(`${BASE}/api/statuses/${statusToDelete.id}`, {
+      await api.delete(`${BASE}/api/statuses/${statusToDelete.id}`, {
         params: { newStatusId },
         headers: headersWithToken(),
       });
@@ -372,7 +372,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
 
   const fetchSprintPopup = async (sid) => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE}/api/sprints/${sid}/popup-status`,
         { headers: headersWithToken() }
       );
@@ -390,7 +390,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
     if (!activeSprintId) return;
     setIsFinishingSprint(true);
     try {
-      await axios.post(`${BASE}/api/sprints/${activeSprintId}/finish`, null, {
+      await api.post(`${BASE}/api/sprints/${activeSprintId}/finish`, null, {
         params: { option },
         headers: headersWithToken(),
       });
@@ -415,7 +415,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
     if (!name) { showStatusToast("Name required", "error"); return; }
     try {
       const payload = statuses.map((s) => (s.id === statusId ? { ...s, name } : s));
-      await axios.put(`${BASE}/api/projects/${projectId}/statuses`, payload, {
+      await api.put(`${BASE}/api/projects/${projectId}/statuses`, payload, {
         headers: headersWithToken(),
       });
       setStatuses((prev) => prev.map((s) => (s.id === statusId ? { ...s, name } : s)));
@@ -444,7 +444,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
         const [moved] = newOrder.splice(source.index, 1);
         newOrder.splice(destination.index, 0, moved);
         setStatuses(newOrder);
-        await axios.post(`${BASE}/api/statuses/reorder`, makeReorderPayload(newOrder), {
+        await api.post(`${BASE}/api/statuses/reorder`, makeReorderPayload(newOrder), {
           headers: headersWithToken(),
         });
         showStatusToast("Columns reordered", "success");
@@ -471,7 +471,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
               : t
           )
         );
-        await axios.patch(
+        await api.patch(
           `${BASE}/api/tasks/${taskId}/status`,
           { statusId: Number(destStatusId) },
           { headers: headersWithToken() }
@@ -517,6 +517,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
 
   if (loading)
     return (
+
       <div className="flex justify-center items-center min-h-[200px]">
         <LoadingSpinner text="Loading board..." />
       </div>
@@ -615,14 +616,14 @@ const Board = ({ projectId, sprintId, projectName }) => {
         </div>
 
         {/* Right: toolbar */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           <ViewToggle view={viewMode} onChange={setViewMode} />
 
           {/* Filter */}
           <div className="relative" ref={filterRef}>
             <button
               onClick={() => setFilterOpen((o) => !o)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border text-sm bg-white hover:bg-slate-50 shadow-sm"
+              className="h-9 flex items-center gap-2 px-3 rounded-lg border text-sm bg-white hover:bg-slate-50 shadow-sm"
             >
               <FilterIcon className="w-4 h-4 text-gray-500" />
               <span className="text-gray-600 font-medium">Filter</span>
@@ -731,6 +732,16 @@ const Board = ({ projectId, sprintId, projectName }) => {
             )}
           </div>
 
+          {/* Refresh */}
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="Refresh board"
+            className="h-9 w-9 flex items-center justify-center rounded-lg border bg-white hover:bg-slate-50 shadow-sm text-gray-500 hover:text-indigo-600 disabled:opacity-50 transition-colors"
+          >
+            <RotateCcw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          </button>
+
           {/* Add Column */}
           {showAddInput ? (
             <div className="flex items-center gap-2">
@@ -766,21 +777,12 @@ const Board = ({ projectId, sprintId, projectName }) => {
           ) : (
             <button
               onClick={() => setShowAddInput(true)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-white hover:bg-slate-50 text-sm font-medium text-gray-600 shadow-sm"
+              className="h-9 flex items-center gap-2 px-3 rounded-lg border bg-white hover:bg-slate-50 text-sm font-medium text-gray-600 shadow-sm"
             >
               <Plus className="w-4 h-4" />
               Add Column
             </button>
           )}
-
-          {/* Refresh */}
-          <button
-            onClick={handleRefresh}
-            title="Refresh board"
-            className="p-2 rounded-lg border bg-white hover:bg-slate-50 shadow-sm"
-          >
-            <RotateCcw className={`w-4 h-4 text-gray-500 ${isRefreshing ? "animate-spin" : ""}`} />
-          </button>
         </div>
       </div>
 

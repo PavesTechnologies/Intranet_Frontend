@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import EditTaskForm from "../Backlog/EditTaskForm";
 
 const TaskDetailsPanel = ({ taskId, projectId, onClose, onUpdated }) => {

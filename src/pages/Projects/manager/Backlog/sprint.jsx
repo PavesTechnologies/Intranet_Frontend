@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { X } from "lucide-react";
 import Button from "../../../../components/Button/Button";
@@ -22,7 +22,7 @@ const CreateSprint = ({ onClose }) => {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await axios.get(
+        const response = await api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
           {
             headers: {
@@ -65,7 +65,7 @@ const CreateSprint = ({ onClose }) => {
     };
 
     try {
-      await axios.post(
+      await api.post(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`,
         payload,
         {

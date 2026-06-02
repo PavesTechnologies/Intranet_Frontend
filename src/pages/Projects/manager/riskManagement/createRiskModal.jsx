@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import Select from "react-select";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
@@ -217,13 +217,13 @@ const CreateRiskModal = ({
     const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
     Promise.all([
-      axios.get(`${BASE_URL}/api/projects/${projectId}/members-with-owner`, {
+      api.get(`${BASE_URL}/api/projects/${projectId}/members-with-owner`, {
         headers,
       }),
-      axios.get(`${BASE_URL}/api/projects/${projectId}/risk-statuses`, {
+      api.get(`${BASE_URL}/api/projects/${projectId}/risk-statuses`, {
         headers,
       }),
-      axios.get(`${BASE_URL}/api/risk/category`, {
+      api.get(`${BASE_URL}/api/risk/category`, {
         headers,
       }),
     ])
@@ -344,7 +344,7 @@ const CreateRiskModal = ({
         ? "stories"
         : `${form.linkedType.value.toLowerCase()}s`;
 
-    axios
+    api
       .get(`${BASE_URL}/api/projects/${projectId}/${apiType}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
@@ -474,11 +474,11 @@ const CreateRiskModal = ({
     let riskId = risk?.id;
 
     if (isEditMode) {
-      await axios.put(`${BASE_URL}/api/risks/${riskId}`, payload, {
+      await api.put(`${BASE_URL}/api/risks/${riskId}`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
     } else {
-      const res = await axios.post(`${BASE_URL}/api/risks`, payload, {
+      const res = await api.post(`${BASE_URL}/api/risks`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
@@ -493,7 +493,7 @@ const CreateRiskModal = ({
       };
 
       if (isEditMode && risk?.riskLinkId) {
-        await axios.patch(
+        await api.patch(
           `${BASE_URL}/api/risk-links/${risk.riskLinkId}`,
           linkPayload,
           {
@@ -501,7 +501,7 @@ const CreateRiskModal = ({
           }
         );
       } else {
-        await axios.post(`${BASE_URL}/api/risk-links`, linkPayload, {
+        await api.post(`${BASE_URL}/api/risk-links`, linkPayload, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
       }

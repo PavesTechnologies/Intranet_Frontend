@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import CreateProjectModal from "./CreateProjectModal";
@@ -8,7 +8,6 @@ import Pagination from "../../../components/Pagination/pagination";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import {
-  VerticalMenuIcon,
   SuccessIcon,
   WarningIcon,
   ErrorIcon,
@@ -16,76 +15,309 @@ import {
   TargetIcon,
   EditIcon,
   DeleteIcon,
+  EmployeeIcon,
+  LeaveIcon,
+  AddIcon,
+  ViewIcon,
 } from "../../../components/icons";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import SearchInput from "../../../components/filter/Searchbar";
 import StatusBadge from "../../../components/status/statusbadge";
 import AppCard from "../../../components/Cards/AppCard";
-import {
-  EmployeeIcon,
-  LeaveIcon,
-  AddIcon,
-  ViewIcon,
-
-} from "../../../components/icons";
 
 
-// -------------------- 3 DOTS MENU --------------------
-const ProjectMenu = ({ project, onEdit, onDelete }) => {
-  const [open, setOpen] = useState(false);
+// -------------------- INLINE ICON ACTIONS --------------------
+const ProjectMenu = ({ project, onView, onEdit, onDelete, canEdit }) => (
+  <div className="flex items-center gap-1">
+    <button
+      title="View Details"
+      onClick={(e) => { e.stopPropagation(); onView(project.project); }}
+      className="p-1 rounded hover:bg-indigo-50 transition-colors"
+    >
+      <ViewIcon size={15} className="text-indigo-500" />
+    </button>
 
+    {canEdit && (
+      <>
+        <button
+          title="Edit"
+          onClick={(e) => { e.stopPropagation(); onEdit(project.project); }}
+          className="p-1 rounded hover:bg-blue-50 transition-colors"
+        >
+          <EditIcon size={15} className="text-blue-500" />
+        </button>
+        <button
+          title="Delete"
+          onClick={(e) => { e.stopPropagation(); onDelete(project.project.id); }}
+          className="p-1 rounded hover:bg-red-50 transition-colors"
+        >
+          <DeleteIcon size={15} className="text-red-500" />
+        </button>
+      </>
+    )}
+  </div>
+);
+
+// -------------------- PROJECT DETAIL DRAWER --------------------
+const DetailRow = ({ label, value }) => (
+  value ? (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{label}</span>
+      <span className="text-sm text-slate-700 break-words">{value}</span>
+    </div>
+  ) : null
+);
+
+// helpers for the drawer
+const getInitials = (name) => {
+  if (!name) return "?";
+  return name.trim().split(/\s+/).map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+};
+
+const AVATAR_COLORS = [
+  "bg-indigo-100 text-indigo-700",
+  "bg-violet-100 text-violet-700",
+  "bg-blue-100 text-blue-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-amber-100 text-amber-700",
+  "bg-rose-100 text-rose-700",
+  "bg-teal-100 text-teal-700",
+];
+const avatarColor = (str) => AVATAR_COLORS[(str?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length];
+
+const PersonRow = ({ role, name, email, subtitle }) => {
+  if (!name) return null;
   return (
-    <div className="relative">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((prev) => !prev);
-        }}
-        className="p-1 rounded-full hover:bg-gray-100"
-      >
-        <VerticalMenuIcon className="h-5 w-5 text-gray-600" />
-      </button>
-
-      {open && (
-        <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
-          {/* <button
-  onClick={(e) => {
-    e.stopPropagation();
-    onView(project.project);
-    setOpen(false);
-  }}
-  className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
->
-  <ViewIcon size={16} className="text-gray-500" />
-  View
-</button> */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(project.project);
-              setOpen(false);
-            }}
-            className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <EditIcon size={16} className="text-blue-600" />
-            Edit
-          </button>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(project.project.id);
-              setOpen(false);
-            }}
-            className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-gray-50 transition-colors"
-          >
-            <DeleteIcon size={16} />
-            Delete
-          </button>
-        </div>
+    <div className="flex items-center gap-3 py-2.5 border-b border-slate-50 last:border-0">
+      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(name)}`}>
+        {getInitials(name)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-slate-800 truncate">{name}</p>
+        <p className="text-xs text-slate-400 truncate">{email || subtitle || ""}</p>
+      </div>
+      {role && (
+        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded shrink-0">
+          {role}
+        </span>
       )}
     </div>
+  );
+};
+
+const SectionTitle = ({ children }) => (
+  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{children}</p>
+);
+
+const ProjectDetailDrawer = ({ projectId, onClose, navigate, getStatusStyles, formatDate, formatCurrency, canSeeFinancials }) => {
+  const [detail,  setDetail]  = useState(null);
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!projectId) return;
+    const token   = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+    const base    = window.__APP_CONFIG__.PMS_BASE_URL;
+
+    Promise.all([
+      axios.get(`${base}/api/projects/${projectId}`,                    { headers }),
+      axios.get(`${base}/api/projects/${projectId}/members-with-owner`, { headers }),
+    ])
+      .then(([projRes, membersRes]) => {
+        setDetail(projRes.data);
+        setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
+      })
+      .catch(() => showStatusToast("Failed to load project details.", "error"))
+      .finally(() => setLoading(false));
+  }, [projectId]);
+
+  const p = detail;
+
+  // resolve people from project fields (nested objects) or from members list by role
+  const resolveName = (obj) =>
+    obj?.name ?? (obj?.firstName ? `${obj.firstName} ${obj.lastName ?? ""}`.trim() : null);
+
+  const projectOwner    = resolveName(p?.owner    ?? p?.projectOwner);
+  const ownerEmail      = p?.owner?.email    ?? p?.projectOwner?.email;
+  const resourceManager = resolveName(p?.resourceManager ?? p?.rm);
+  const rmEmail         = p?.resourceManager?.email ?? p?.rm?.email;
+  const deliveryManager = resolveName(p?.deliveryOwner ?? p?.deliveryManager ?? p?.deliveryOwnerId);
+  const dmEmail         = p?.deliveryOwner?.email ?? p?.deliveryManager?.email;
+  const clientName      = p?.client?.clientName ?? p?.clientName ?? p?.client?.name;
+  const clientEmail     = p?.client?.email ?? p?.clientEmail;
+
+  // team members (exclude already-shown key roles to avoid duplication)
+  const keyIds = new Set([
+    p?.owner?.id, p?.projectOwner?.id,
+    p?.resourceManager?.id, p?.rm?.id,
+    p?.deliveryOwner?.id, p?.deliveryManager?.id,
+  ].filter(Boolean));
+
+  const teamMembers = members.filter((m) => !keyIds.has(m.id) && !keyIds.has(m.userId));
+
+  const CloseIcon = () => (
+    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+    </svg>
+  );
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+
+      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white z-50 shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
+          <div>
+            <h2 className="text-base font-semibold text-slate-800">Project Details</h2>
+            {p && <p className="text-xs text-slate-400 font-mono mt-0.5">{p.projectKey}</p>}
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+            <CloseIcon />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="p-5"><LoadingSpinner text="Loading details..." /></div>
+          ) : !p ? (
+            <p className="p-5 text-sm text-slate-400">No data available.</p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+
+              {/* ── Identity ── */}
+              <div className="px-5 py-4 space-y-3">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 leading-tight">{p.name}</h3>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.status && (
+                    <span className={`px-2.5 py-0.5 text-[11px] font-bold uppercase rounded-full border ${getStatusStyles(p.status)}`}>
+                      {p.status.replace(/_/g, " ")}
+                    </span>
+                  )}
+                  {p.riskLevel && (
+                    <span className={`px-2.5 py-0.5 text-[11px] font-bold uppercase rounded-full border ${
+                      p.riskLevel === "HIGH"   ? "bg-red-50 text-red-700 border-red-200" :
+                      p.riskLevel === "MEDIUM" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                                "bg-teal-50 text-teal-700 border-teal-200"}`}>
+                      {p.riskLevel} Risk
+                    </span>
+                  )}
+                  {(p.priority ?? p.priorityLevel) && (
+                    <span className="px-2.5 py-0.5 text-[11px] font-bold uppercase rounded-full border bg-violet-50 text-violet-700 border-violet-200">
+                      {p.priority ?? p.priorityLevel}
+                    </span>
+                  )}
+                </div>
+                {p.description && (
+                  <p className="text-sm text-slate-500 leading-relaxed whitespace-pre-wrap">{p.description}</p>
+                )}
+              </div>
+
+              {/* ── Timeline & Delivery ── */}
+              <div className="px-5 py-4">
+                <SectionTitle>Timeline & Delivery</SectionTitle>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 mt-2">
+                  <DetailRow label="Start Date"   value={formatDate(p.startDate)} />
+                  <DetailRow label="End Date"     value={formatDate(p.endDate)} />
+                  <DetailRow label="Stage"        value={p.currentStage?.replace(/_/g, " ")} />
+                  <DetailRow label="Methodology"  value={p.deliveryModel ?? p.methodology} />
+                  <DetailRow label="Location"     value={p.primaryLocation} />
+                  <DetailRow label="Created"      value={formatDate(p.createdAt)} />
+                </div>
+              </div>
+
+              {/* ── Key People ── */}
+              <div className="px-5 py-4">
+                <SectionTitle>Key People</SectionTitle>
+                <div className="mt-1">
+                  <PersonRow role="Project Owner"     name={projectOwner}    email={ownerEmail} />
+                  <PersonRow role="Resource Manager"  name={resourceManager} email={rmEmail} />
+                  <PersonRow role="Delivery Manager"  name={deliveryManager} email={dmEmail} />
+                  {clientName && (
+                    <PersonRow role="Client" name={clientName} email={clientEmail} />
+                  )}
+                  {!projectOwner && !resourceManager && !deliveryManager && !clientName && (
+                    <p className="text-xs text-slate-400 italic py-1">No key people data available.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Team Members ── */}
+              {members.length > 0 && (
+                <div className="px-5 py-4">
+                  <SectionTitle>Team Members ({members.length})</SectionTitle>
+                  <div className="mt-1">
+                    {members.map((m, i) => {
+                      const name  = resolveName(m) ?? m.email ?? `Member ${i + 1}`;
+                      const email = m.email;
+                      const role  = m.role ?? m.designation ?? m.projectRole ?? m.memberRole;
+                      return <PersonRow key={m.id ?? m.userId ?? i} name={name} email={email} role={role} />;
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Client Details ── */}
+              {(clientName || p.organizationName || clientEmail) && (
+                <div className="px-5 py-4">
+                  <SectionTitle>Client</SectionTitle>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 mt-2">
+                    <DetailRow label="Client Name"   value={clientName} />
+                    <DetailRow label="Organization"  value={p.organizationName} />
+                    <DetailRow label="Client Email"  value={clientEmail} />
+                  </div>
+                </div>
+              )}
+
+              {/* ── Budget (managers only) ── */}
+              {canSeeFinancials && (p.projectBudget != null || p.projectBudgetCurrency) && (
+                <div className="px-5 py-4">
+                  <SectionTitle>Budget</SectionTitle>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 mt-2">
+                    <DetailRow label="Amount"      value={formatCurrency(p.projectBudget, p.projectBudgetCurrency)} />
+                    <DetailRow label="Currency"    value={p.projectBudgetCurrency} />
+                    <DetailRow label="Budget Type" value={p.projectBudgetType} />
+                  </div>
+                </div>
+              )}
+
+              {/* ── Tags ── */}
+              {p.tags?.length > 0 && (
+                <div className="px-5 py-4">
+                  <SectionTitle>Tags</SectionTitle>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {p.tags.map((tag) => (
+                      <span key={tag} className="px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {p && (
+          <div className="px-5 py-4 border-t border-slate-200 shrink-0">
+            <button
+              onClick={() => { navigate(`/projects/${p.id}`); onClose(); }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors"
+            >
+              Open Project
+              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 
@@ -104,6 +336,7 @@ const ProjectDashboard = () => {
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [projectIdToDelete, setProjectIdToDelete] = useState(null);
+  const [viewingProjectId, setViewingProjectId]   = useState(null);
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -167,7 +400,7 @@ const ProjectDashboard = () => {
       let url = `${base}/api/projects/my-projects`;
       if (status && status !== "All") url += `?status=${status}`;
 
-      const { data } = await axios.get(url, { headers });
+      const { data } = await api.get(url, { headers });
       setProjects(data);
     } catch (error) {
       console.error("❌ Failed to load projects", error);
@@ -193,7 +426,7 @@ const ProjectDashboard = () => {
 
   const executeDeleteProject = async () => {
     try {
-      await axios.delete(
+      await api.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectIdToDelete}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -382,21 +615,15 @@ const ProjectDashboard = () => {
                         )}
                       </div>
 
-                      {item.canEdit && item.canDelete ? (
-                        <div className="shrink-0 -mr-2 -mt-1">
-                          <ProjectMenu
-                            project={item}
-                            onEdit={startEdit}
-                            onDelete={handleDelete}
-                          />
-                        </div>
-                      ) : (
-                        <div className="shrink-0 -mr-2 -mt-1 opacity-40 cursor-not-allowed">
-                          <button className="p-1">
-                            <VerticalMenuIcon className="h-5 w-5 text-gray-400" />
-                          </button>
-                        </div>
-                      )}
+                      <div className="shrink-0 -mr-2 -mt-1">
+                        <ProjectMenu
+                          project={item}
+                          canEdit={item.canEdit && item.canDelete}
+                          onView={(proj) => setViewingProjectId(proj.id)}
+                          onEdit={startEdit}
+                          onDelete={handleDelete}
+                        />
+                      </div>
                     </div>
 
                     {/* TITLE & KEY */}
@@ -424,18 +651,6 @@ const ProjectDashboard = () => {
                     </div>
                   </div>
 
-                  {/* FOOTER - RBAC: Only Managers/Admins see Staffing & Budget */}
-                  {canSeeFinancials && (
-                    <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center gap-2 text-xs">
-                      <div className="flex items-center gap-1.5 font-medium">
-                        <SuccessIcon className="h-4 w-4 text-emerald-600" />
-                        <span className="text-emerald-700">Staffing</span>
-                      </div>
-                      <div className="font-bold text-gray-900">
-                        {formatCurrency(p.projectBudget, p.projectBudgetCurrency)}
-                      </div>
-                    </div>
-                  )}
                 </AppCard>
               );
             })}
@@ -482,6 +697,18 @@ const ProjectDashboard = () => {
         variant="danger"
       />
 
+      {/* PROJECT DETAIL DRAWER */}
+      {viewingProjectId && (
+        <ProjectDetailDrawer
+          projectId={viewingProjectId}
+          onClose={() => setViewingProjectId(null)}
+          navigate={navigate}
+          getStatusStyles={getStatusStyles}
+          formatDate={formatDate}
+          formatCurrency={formatCurrency}
+          canSeeFinancials={canSeeFinancials}
+        />
+      )}
     </div>
   );
 };

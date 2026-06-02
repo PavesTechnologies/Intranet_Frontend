@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import api from "../../../api/axiosInstance";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { showStatusToast } from "../../../components/toastfy/toast.jsx";
 import FiltersBar from "./components/FiltersBar";
@@ -38,8 +39,7 @@ export default function HeadcountDemographicsPage() {
         },
       );
 
-      const data = await res.json();
-      setDepartments((data || []).map((department) => department.department_name));
+      setDepartments((res.data || []).map((department) => department.department_name));
     } catch {
       showStatusToast("Failed to load departments", "error");
     }

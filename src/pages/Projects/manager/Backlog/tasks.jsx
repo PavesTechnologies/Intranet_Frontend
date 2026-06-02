@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 
 const CreateTaskModal = ({ onTaskCreated }) => {
@@ -35,16 +35,16 @@ const CreateTaskModal = ({ onTaskCreated }) => {
       try {
         const [usersRes, projectsRes, storiesRes, sprintsRes] =
           await Promise.all([
-            axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users`, {
+            api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
-            axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`, {
+            api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
-            axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories`, {
+            api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
-            axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`, {
+            api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
           ]);
@@ -66,7 +66,7 @@ const CreateTaskModal = ({ onTaskCreated }) => {
 
     const fetchStatuses = async () => {
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${formData.projectId}/statuses`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
@@ -107,7 +107,7 @@ const CreateTaskModal = ({ onTaskCreated }) => {
           : null,
       };
 
-      await axios.post(
+      await api.post(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks`,
         payload,
         {

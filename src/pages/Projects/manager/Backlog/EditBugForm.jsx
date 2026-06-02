@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Modal from "../../../../components/Modal/modal";
@@ -34,23 +34,23 @@ const EditBugForm = ({ bugId, projectId, onClose, onUpdated }) => {
       try {
         const [bugRes, membersRes, sprintsRes, epicsRes, tasksRes] =
           await Promise.all([
-            axios.get(
+            api.get(
               `${window.__APP_CONFIG__.PMS_BASE_URL}/api/bugs/${bugId}`,
               axiosConfig,
             ),
-            axios.get(
+            api.get(
               `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
               axiosConfig,
             ),
-            axios.get(
+            api.get(
               `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
               axiosConfig,
             ),
-            axios.get(
+            api.get(
               `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
               axiosConfig,
             ),
-            axios.get(
+            api.get(
               `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
               axiosConfig,
             ),
@@ -123,7 +123,7 @@ const EditBugForm = ({ bugId, projectId, onClose, onUpdated }) => {
 
     try {
       setLoading(true);
-      await axios.put(
+      await api.put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/bugs/${bugId}`,
         payload,
         axiosConfig,

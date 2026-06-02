@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   AddIcon,
   FilterIcon,
@@ -8,7 +9,7 @@ import {
   CheckIcon,
   AlertIcon,
 } from "../../../../components/icons";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
 import Button from "../../../../components/Button/Button";
 import CreateRiskModal from "./createRiskModal";
@@ -25,6 +26,8 @@ const TYPE_ICON = {
 };
 
 export default function RiskRegisterPage({ projectId = "P-123" }) {
+  const location = useLocation();
+
   const [showCreateRisk, setShowCreateRisk] = useState(false);
   const [showRiskModal, setShowRiskModal] = useState(false);
 
@@ -40,9 +43,18 @@ export default function RiskRegisterPage({ projectId = "P-123" }) {
 
   const [selectedRisk, setSelectedRisk] = useState(null);
 
+  // Pre-select issue type + issue when navigated from a RiskBadge
+  useEffect(() => {
+    const s = location.state;
+    if (!s?.linkedType || !s?.linkedId) return;
+    setActiveIssueType(s.activeLabel ?? "All");
+    setIssuePage(1);
+    setSelectedIssue({ linkedType: s.linkedType, linkedId: s.linkedId });
+  }, [location.state]);
+
   // ✅ TOKEN SAFE AXIOS INSTANCE
   const axiosInstance = useMemo(() => {
-    const instance = axios.create({
+    const instance = api.create({
       baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
       headers: {
         "Content-Type": "application/json",

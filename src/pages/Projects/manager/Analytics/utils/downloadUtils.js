@@ -54,15 +54,21 @@ function scopeRow(sc) {
 
 // ─── Combined canvas (chart + scope changes table) ───────────────────────────
 
-const OUT_W      = 1200;   // fixed output width in px
-const PAD        = 24;
-const GAP        = 28;     // gap between chart and table
-const TITLE_H    = 34;
-const HDR_H      = 34;
-const ROW_H      = 28;
-const FS_TITLE   = 15;
-const FS_HDR     = 11;
-const FS_DATA    = 12;
+const OUT_W        = 1200;
+const PAD          = 24;
+const GAP          = 28;
+const TITLE_H      = 34;
+const HDR_H        = 34;
+const ROW_H        = 28;
+const FS_TITLE     = 15;
+const FS_HDR       = 11;
+const FS_DATA      = 12;
+// Header (title + subtitle + legend strip)
+const FS_CHART_TITLE    = 17;
+const FS_CHART_SUBTITLE = 12;
+const FS_LEGEND_ITEM    = 11;
+const LEGEND_ITEM_H     = 22;
+const LEGEND_ITEM_GAP   = 20;
 
 // column definitions: label, fixedWidth (0 = fill remaining)
 const COLS = [
@@ -90,13 +96,88 @@ function truncate(ctx, text, maxW) {
   return t + "…";
 }
 
-function createCombinedCanvas(chartCanvas, scopeChanges) {
-  const scope   = scopeChanges ?? [];
-  const chartH  = Math.round(OUT_W * chartCanvas.height / chartCanvas.width);
-  const tableH  = scope.length > 0
+/**
+ * Draw title, subtitle and legend strip at the top of the canvas.
+ * Returns the total height consumed (so the chart can be offset below it).
+ */
+function drawChartHeader(ctx, meta) {
+  if (!meta) return 0;
+  const { title, subtitle, legendItems } = meta;
+  let y = PAD;
+
+  // Title
+  ctx.font      = `bold ${FS_CHART_TITLE}px system-ui,sans-serif`;
+  ctx.fillStyle = "#1e293b";
+  ctx.fillText(title, PAD, y + FS_CHART_TITLE);
+  y += FS_CHART_TITLE + 5;
+
+  // Subtitle
+  if (subtitle) {
+    ctx.font      = `${FS_CHART_SUBTITLE}px system-ui,sans-serif`;
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText(subtitle, PAD, y + FS_CHART_SUBTITLE);
+    y += FS_CHART_SUBTITLE + 12;
+  }
+
+  // Legend strip
+  if (legendItems?.length) {
+    let x = PAD;
+    const yMid = y + LEGEND_ITEM_H / 2;
+
+    legendItems.forEach((item) => {
+      const ICON_W = 20;
+
+      if (item.type === "solid-line") {
+        ctx.save();
+        ctx.strokeStyle = item.color;
+        ctx.lineWidth   = 2.5;
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(x, yMid); ctx.lineTo(x + ICON_W, yMid); ctx.stroke();
+        ctx.fillStyle = item.color;
+        ctx.beginPath(); ctx.arc(x + ICON_W / 2, yMid, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        x += ICON_W + 5;
+      } else if (item.type === "dashed-line") {
+        ctx.save();
+        ctx.strokeStyle = item.color;
+        ctx.lineWidth   = 1.5;
+        ctx.setLineDash([5, 3]);
+        ctx.beginPath(); ctx.moveTo(x, yMid); ctx.lineTo(x + ICON_W, yMid); ctx.stroke();
+        ctx.restore();
+        x += ICON_W + 5;
+      } else if (item.type === "box") {
+        ctx.save();
+        ctx.fillStyle = item.color;
+        ctx.fillRect(x, yMid - 6, 14, 12);
+        ctx.restore();
+        x += 14 + 5;
+      }
+      // "text" type → no icon prefix, label drawn in its own color
+
+      ctx.font      = `${FS_LEGEND_ITEM}px system-ui,sans-serif`;
+      ctx.fillStyle = item.type === "text" ? item.color : "#475569";
+      ctx.fillText(item.label, x, yMid + 4);
+      x += ctx.measureText(item.label).width + LEGEND_ITEM_GAP;
+    });
+
+    y += LEGEND_ITEM_H + 12;
+  }
+
+  return y - PAD; // height consumed (excluding the initial PAD)
+}
+
+function createCombinedCanvas(chartCanvas, scopeChanges, meta) {
+  const scope    = scopeChanges ?? [];
+  const headerH  = meta
+    ? PAD + FS_CHART_TITLE + 5
+      + (meta.subtitle ? FS_CHART_SUBTITLE + 12 : 0)
+      + (meta.legendItems?.length ? LEGEND_ITEM_H + 12 : 0)
+    : 0;
+  const chartH   = Math.round(OUT_W * chartCanvas.height / chartCanvas.width);
+  const tableH   = scope.length > 0
     ? TITLE_H + HDR_H + scope.length * ROW_H + PAD
     : 0;
-  const totalH  = PAD + chartH + (tableH > 0 ? GAP + tableH : 0) + PAD;
+  const totalH   = PAD + headerH + chartH + (tableH > 0 ? GAP + tableH : 0) + PAD;
 
   const off = document.createElement("canvas");
   off.width  = OUT_W;
@@ -107,8 +188,11 @@ function createCombinedCanvas(chartCanvas, scopeChanges) {
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, OUT_W, totalH);
 
-  // chart image
-  ctx.drawImage(chartCanvas, 0, PAD, OUT_W, chartH);
+  // header (title + subtitle + legend)
+  const drawnH = drawChartHeader(ctx, meta);
+
+  // chart image — shifted down by header height
+  ctx.drawImage(chartCanvas, 0, PAD + drawnH, OUT_W, chartH);
 
   if (scope.length === 0) return off;
 
@@ -118,7 +202,7 @@ function createCombinedCanvas(chartCanvas, scopeChanges) {
   let xc = PAD;
   cols.forEach((c) => { xs.push(xc); xc += c.w; });
 
-  let y = PAD + chartH + GAP;
+  let y = PAD + drawnH + chartH + GAP;
 
   // section title
   ctx.fillStyle = "#1e293b";
@@ -194,19 +278,19 @@ export async function downloadChartAsPDF(canvasRef, filename) {
   }
 }
 
-/** PNG: chart + scope changes table combined into one image */
-export async function downloadChartWithScopeAsPNG(chartCanvas, scopeChanges, filename) {
+/** PNG: chart + header metrics + scope changes table combined into one image */
+export async function downloadChartWithScopeAsPNG(chartCanvas, scopeChanges, filename, meta) {
   if (!chartCanvas) return;
-  const combined = createCombinedCanvas(chartCanvas, scopeChanges ?? []);
+  const combined = createCombinedCanvas(chartCanvas, scopeChanges ?? [], meta);
   triggerDownload(combined.toDataURL("image/png"), `${filename}.png`);
 }
 
-/** PDF: chart + scope changes table combined on one page */
-export async function downloadChartWithScopeAsPDF(chartCanvas, scopeChanges, filename) {
+/** PDF: chart + header metrics + scope changes table combined on one page */
+export async function downloadChartWithScopeAsPDF(chartCanvas, scopeChanges, filename, meta) {
   if (!chartCanvas) return;
   try {
     const { default: jsPDF } = await import("jspdf");
-    const combined = createCombinedCanvas(chartCanvas, scopeChanges ?? []);
+    const combined = createCombinedCanvas(chartCanvas, scopeChanges ?? [], meta);
     const imgData  = combined.toDataURL("image/png");
     const W = combined.width;
     const H = combined.height;

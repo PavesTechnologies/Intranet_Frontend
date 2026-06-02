@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../../../components/toastfy/toast";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import ConfirmationModal from "../../../../../../components/confirmation_modal/ConfirmationModal";
@@ -41,7 +41,7 @@ const TestPlansList = ({ projectId }) => {
   const fetchTestPlans = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/test-plans`,
         {
           headers: {
@@ -69,7 +69,7 @@ const TestPlansList = ({ projectId }) => {
 
   const executeDeletePlan = async () => {
     try {
-      await axios.delete(
+      await api.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/test-plans/${planIdToDelete}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );

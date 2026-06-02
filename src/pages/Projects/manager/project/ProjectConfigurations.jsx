@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { EditIcon, DeleteIcon, PrevIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { showStatusToast } from "../../../../components/toastfy/toast";
@@ -90,7 +90,7 @@ const ProjectConfigurations = ({ projectId }) => {
 
   const fetchProjectSLAs = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${RMS_BASE_URL}/api/project-sla/project/${projectId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -104,7 +104,7 @@ const ProjectConfigurations = ({ projectId }) => {
 
   const fetchProjectCompliance = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${RMS_BASE_URL}/api/project-compliance/project/${projectId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -118,7 +118,7 @@ const ProjectConfigurations = ({ projectId }) => {
 
   const fetchProjectEscalations = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${RMS_BASE_URL}/api/projects/${projectId}/escalations`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -146,7 +146,7 @@ const ProjectConfigurations = ({ projectId }) => {
 
   const handleInheritClick = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${RMS_BASE_URL}/api/client-sla/clientSLA/${project.clientId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -176,7 +176,7 @@ const ProjectConfigurations = ({ projectId }) => {
         return;
       }
       const promises = selectedClientSlas.map((type) =>
-        axios.post(
+        api.post(
           `${RMS_BASE_URL}/api/project-sla/inherit/${project.pmsProjectId}/type/${type}`,
           {},
           {
@@ -214,7 +214,7 @@ const ProjectConfigurations = ({ projectId }) => {
         }
       }
       const payload = { ...formData, project: { pmsProjectId: projectId } };
-      await axios.post(`${RMS_BASE_URL}/api/project-sla/save`, payload, {
+      await api.post(`${RMS_BASE_URL}/api/project-sla/save`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setOpenConfigModal(false);
@@ -257,14 +257,14 @@ const ProjectConfigurations = ({ projectId }) => {
 
   const handleComplianceInheritClick = async () => {
     try {
-      const projectRes = await axios.get(
+      const projectRes = await api.get(
         `${RMS_BASE_URL}/api/project-compliance/project/${projectId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
       );
       const latestProjectCompliance = projectRes.data.data || [];
-      const clientRes = await axios.get(
+      const clientRes = await api.get(
         `${RMS_BASE_URL}/api/client-compliance/clientCompliance/${project.clientId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -292,7 +292,7 @@ const ProjectConfigurations = ({ projectId }) => {
     try {
       if (selectedClientCompliance.length === 0) return;
       const promises = selectedClientCompliance.map((complianceType) =>
-        axios.post(
+        api.post(
           `${RMS_BASE_URL}/api/project-compliance/inherit/${projectId}/type/${complianceType}`,
           {},
           {
@@ -328,7 +328,7 @@ const ProjectConfigurations = ({ projectId }) => {
         return;
       }
       const payload = { ...formData, project: { pmsProjectId: projectId } };
-      await axios.post(`${RMS_BASE_URL}/api/project-compliance/save`, payload, {
+      await api.post(`${RMS_BASE_URL}/api/project-compliance/save`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setOpenConfigModal(false);
@@ -371,7 +371,7 @@ const ProjectConfigurations = ({ projectId }) => {
 
   const handleEscalationInheritClick = async () => {
     try {
-      const projectRes = await axios.get(
+      const projectRes = await api.get(
         `${RMS_BASE_URL}/api/projects/${projectId}/escalations`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -380,7 +380,7 @@ const ProjectConfigurations = ({ projectId }) => {
       const existingContactIds = (projectRes.data.data || []).map(
         (e) => e.contactId,
       );
-      const clientRes = await axios.get(
+      const clientRes = await api.get(
         `${RMS_BASE_URL}/api/client-contact/clientContact/${project.clientId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -408,7 +408,7 @@ const ProjectConfigurations = ({ projectId }) => {
         type: "inherit",
         contactId: selectedClientEscalations,
       };
-      await axios.post(
+      await api.post(
         `${RMS_BASE_URL}/api/projects/escalations/save`,
         payload,
         {
@@ -428,7 +428,7 @@ const ProjectConfigurations = ({ projectId }) => {
   const handleEscalationManualSave = async () => {
     try {
       const payload = { ...formData, projectId: projectId, type: "manual" };
-      await axios.post(
+      await api.post(
         `${RMS_BASE_URL}/api/projects/escalations/save`,
         payload,
         {
@@ -454,7 +454,7 @@ const ProjectConfigurations = ({ projectId }) => {
         phone: formData.phone,
         activeFlag: formData.activeFlag,
       };
-      await axios.put(
+      await api.put(
         `${RMS_BASE_URL}/api/projects/update-escalation/${formData.projectEscalationId}`,
         payload,
         {
@@ -515,7 +515,7 @@ const ProjectConfigurations = ({ projectId }) => {
     setDeleteLoading(true);
     try {
       if (deleteType === "sla") {
-        await axios.delete(
+        await api.delete(
           `${RMS_BASE_URL}/api/project-sla/${deleteConfigId}`,
           {
             headers: {
@@ -527,7 +527,7 @@ const ProjectConfigurations = ({ projectId }) => {
         showStatusToast("SLA configuration deleted successfully.", "success");
       }
       if (deleteType === "compliance") {
-        await axios.delete(
+        await api.delete(
           `${RMS_BASE_URL}/api/project-compliance/${deleteConfigId}`,
           {
             headers: {
@@ -539,7 +539,7 @@ const ProjectConfigurations = ({ projectId }) => {
         showStatusToast("Compliance configuration deleted successfully.", "success");
       }
       if (deleteType === "escalation") {
-        await axios.delete(
+        await api.delete(
           `${RMS_BASE_URL}/api/projects/delete-escalation/${deleteConfigId}`,
           {
             headers: {
