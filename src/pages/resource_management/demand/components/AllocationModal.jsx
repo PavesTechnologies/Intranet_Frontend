@@ -65,11 +65,11 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                 ...result.data,
                 savedAllocations: (result.data.savedAllocations || []).map((item) => ({
                     ...item,
-                    resourceName: item.resourceName || getResourceNameById(item.resourceId),
+                    resourceName: item.fullName || item.resourceName || getResourceNameById(item.resourceId),
                 })),
                 failedResources: (result.data.failedResources || []).map((item) => ({
                     ...item,
-                    resourceName: item.resourceName || getResourceNameById(item.resourceId),
+                    resourceName: item.fullName || item.resourceName || getResourceNameById(item.resourceId),
                 })),
             },
         };
@@ -103,7 +103,7 @@ const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_A
                 allocationEndDate: toDateInputValue(demand?.demandEndDate),
                 resourceId: initialResourceIds,
                 skipValidation: false,
-                allocationPercentage: 100, // Default or driven by demand if available later
+                allocationPercentage: demand?.allocation || demand?.allocationPercentage || 0, // Default or driven by demand if available later
                 allocationStatus: ''
             }));
 
