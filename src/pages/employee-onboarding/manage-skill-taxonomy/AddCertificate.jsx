@@ -21,6 +21,7 @@ import {
 import { useLocation } from "react-router-dom";
 import Button from "../../../components/Button/Button";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
+import Pagination from "../../../components/Pagination/pagination";
 import { skillService } from "../../../services/skillService";
 import { notify } from "../../resource_management/utils/notify";
 
@@ -32,6 +33,8 @@ const initialForm = {
   validityType: "permanent",
   validityMonths: "",
 };
+
+const CERTIFICATES_PAGE_SIZE = 10;
 
 const normalize = (value) => `${value || ""}`.trim().toLowerCase();
 
@@ -893,6 +896,7 @@ const CertificateLanding = () => {
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editingCertificate, setEditingCertificate] = useState(null);
   const [deleteModal, setDeleteModal] = useState({
@@ -959,6 +963,26 @@ const CertificateLanding = () => {
           .includes(query);
       });
   }, [certificates, isGeneral, searchTerm]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(visibleCertificates.length / CERTIFICATES_PAGE_SIZE)),
+    [visibleCertificates.length],
+  );
+
+  const paginatedCertificates = useMemo(() => {
+    const start = (currentPage - 1) * CERTIFICATES_PAGE_SIZE;
+    return visibleCertificates.slice(start, start + CERTIFICATES_PAGE_SIZE);
+  }, [visibleCertificates, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, isGeneral]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleSaved = (savedCertificate) => {
     setCertificates((current) => {
@@ -1118,7 +1142,7 @@ const CertificateLanding = () => {
           ) : (
             <div className="p-4 sm:p-5">
               <div className="space-y-3 lg:hidden">
-                {visibleCertificates.map((certificate) => (
+                {paginatedCertificates.map((certificate) => (
                   <CertificateCard
                     key={
                       getCertificateId(certificate) ||
@@ -1161,7 +1185,7 @@ const CertificateLanding = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
-                    {visibleCertificates.map((certificate) => {
+                    {paginatedCertificates.map((certificate) => {
                       const validity = getValidityLabel(certificate);
                       return (
                         <tr
@@ -1252,6 +1276,16 @@ const CertificateLanding = () => {
                   </tbody>
                 </table>
               </div>
+              {totalPages > 1 && (
+                <div className="mt-4 flex justify-center">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  />
+                </div>
+              )}
             </div>
           )}
         </section>
