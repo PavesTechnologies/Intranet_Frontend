@@ -3,7 +3,7 @@ export const fetchDashboardAnalytics = async () => {
     const token = localStorage.getItem("token"); // or your auth store
 
     const response = await fetch(
-      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/api/analytics/dashboard`,
+      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/analytics/dashboard`,
       {
         method: "GET",
         headers: {
