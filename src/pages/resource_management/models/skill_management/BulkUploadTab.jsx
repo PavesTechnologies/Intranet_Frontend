@@ -27,6 +27,17 @@ const REQUIRED_COLUMNS = [
 const normalize = (value) => `${value || ""}`.trim().toLowerCase();
 const ACCEPTED_EXTENSIONS = ["xlsx", "xls", "csv"];
 
+const toPascalCase = (value) => {
+  if (!value) return "";
+  return String(value)
+    .trim()
+    .replace(/[_\-]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+};
+
 const normalizeRowKeys = (row) =>
   Object.fromEntries(
     Object.entries(row).map(([key, value]) => [String(key).trim(), value]),
@@ -57,9 +68,14 @@ const buildTaxonomyPayload = (parsedRows) => {
   const categoryMap = new Map();
 
   parsedRows.forEach((row) => {
-    const categoryName = `${row["Category Name"] || ""}`.trim();
-    const skillName = `${row["Skill Name"] || ""}`.trim();
-    const subSkillName = `${row["SubSkill Name"] || ""}`.trim();
+    const rawCategoryName = `${row["Category Name"] || ""}`.trim();
+    const rawSkillName = `${row["Skill Name"] || ""}`.trim();
+    const rawSubSkillName = `${row["SubSkill Name"] || ""}`.trim();
+
+    // Convert display names to PascalCase once on upload
+    const categoryName = toPascalCase(rawCategoryName);
+    const skillName = toPascalCase(rawSkillName);
+    const subSkillName = toPascalCase(rawSubSkillName);
 
     if (!categoryName || !skillName) return;
 
