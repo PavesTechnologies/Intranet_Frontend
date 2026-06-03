@@ -1,18 +1,26 @@
 import React, { useEffect, useState, useCallback } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
+import api from "../../../api/axiosInstance";
+import { showStatusToast } from "../../../components/toastfy/toast";
 import { motion, AnimatePresence } from "motion/react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
-  GripVertical, Trash2, Plus, Check,
-  Search, RotateCcw, ChevronRight, AlertTriangle,
+  GripVertical,
+  Trash2,
+  Plus,
+  Check,
+  Search,
+  RotateCcw,
+  ChevronRight,
+  AlertTriangle,
 } from "lucide-react";
 
 /* ─── Font ────────────────────────────────────────────────────────────────── */
 if (!document.getElementById("pmw-font")) {
   const l = document.createElement("link");
-  l.id = "pmw-font"; l.rel = "stylesheet";
-  l.href = "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap";
+  l.id = "pmw-font";
+  l.rel = "stylesheet";
+  l.href =
+    "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap";
   document.head.appendChild(l);
 }
 
@@ -149,7 +157,8 @@ const CSS = `
 
 if (!document.getElementById("pmw-styles")) {
   const s = document.createElement("style");
-  s.id = "pmw-styles"; s.textContent = CSS;
+  s.id = "pmw-styles";
+  s.textContent = CSS;
   document.head.appendChild(s);
 }
 
@@ -163,12 +172,24 @@ const STEPS = [
 ];
 
 const DEFAULT_FORM = {
-  name: "", projectKey: "", description: "", primaryLocation: "",
-  status: "PLANNING", currentStage: "INITIATION", deliveryModel: "ONSITE",
+  name: "",
+  projectKey: "",
+  description: "",
+  primaryLocation: "",
+  status: "PLANNING",
+  currentStage: "INITIATION",
+  deliveryModel: "ONSITE",
   startDate: new Date().toISOString().split("T")[0],
-  endDate: "", riskLevel: "", priorityLevel: "",
-  projectBudget: "", ownerId: "", clientId: "", rmId: "",
-  deliveryOwnerId: "", memberIds: [],
+  endDate: "",
+  riskLevel: "",
+  priorityLevel: "",
+  projectBudget: "",
+  projectBudgetCurrency: "USD",
+  ownerId: "",
+  clientId: "",
+  rmId: "",
+  deliveryOwnerId: "",
+  memberIds: [],
 };
 
 const DEFAULT_STATUSES = [
@@ -179,22 +200,45 @@ const DEFAULT_STATUSES = [
 
 const STEP_REQ = {
   1: ["name", "projectKey", "primaryLocation"],
-  2: ["status", "currentStage", "deliveryModel", "startDate", "riskLevel", "priorityLevel"],
+  2: [
+    "status",
+    "currentStage",
+    "deliveryModel",
+    "startDate",
+    "riskLevel",
+    "priorityLevel",
+  ],
   3: ["ownerId", "rmId", "deliveryOwnerId"],
-  4: [], 5: [],
+  4: [],
+  5: [],
 };
 
 const FIELD_LABELS = {
-  name: "Project name", projectKey: "Project key",
-  primaryLocation: "Primary location", status: "Status",
-  currentStage: "Current stage", deliveryModel: "Delivery model",
-  startDate: "Start date", riskLevel: "Risk level",
-  priorityLevel: "Priority level", ownerId: "Project owner",
-  rmId: "Resource manager", deliveryOwnerId: "Delivery owner",
+  name: "Project name",
+  projectKey: "Project key",
+  primaryLocation: "Primary location",
+  status: "Status",
+  currentStage: "Current stage",
+  deliveryModel: "Delivery model",
+  startDate: "Start date",
+  riskLevel: "Risk level",
+  priorityLevel: "Priority level",
+  ownerId: "Project owner",
+  rmId: "Resource manager",
+  deliveryOwnerId: "Delivery owner",
 };
 
 const STATUS_OPT = ["PLANNING", "ACTIVE", "ARCHIVED", "COMPLETED"];
-const STAGE_OPT = ["INITIATION", "PLANNING", "DESIGN", "DEVELOPMENT", "TESTING", "DEPLOYMENT", "MAINTENANCE", "COMPLETED"];
+const STAGE_OPT = [
+  "INITIATION",
+  "PLANNING",
+  "DESIGN",
+  "DEVELOPMENT",
+  "TESTING",
+  "DEPLOYMENT",
+  "MAINTENANCE",
+  "COMPLETED",
+];
 const DELIVERY_OPT = ["ONSITE", "OFFSHORE", "HYBRID"];
 const RISK_OPT = ["LOW", "MEDIUM", "HIGH"];
 const PRI_OPT = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
@@ -226,14 +270,21 @@ const genKey = (name) => {
 const isDirtyCheck = (form, statuses) => {
   const df = DEFAULT_FORM;
   return (
-    form.name !== df.name || form.projectKey !== df.projectKey ||
-    form.description !== df.description || form.primaryLocation !== df.primaryLocation ||
-    form.endDate !== df.endDate || form.riskLevel !== df.riskLevel ||
-    form.priorityLevel !== df.priorityLevel || form.projectBudget !== df.projectBudget ||
-    form.ownerId !== df.ownerId || form.clientId !== df.clientId ||
-    form.rmId !== df.rmId || form.deliveryOwnerId !== df.deliveryOwnerId ||
+    form.name !== df.name ||
+    form.projectKey !== df.projectKey ||
+    form.description !== df.description ||
+    form.primaryLocation !== df.primaryLocation ||
+    form.endDate !== df.endDate ||
+    form.riskLevel !== df.riskLevel ||
+    form.priorityLevel !== df.priorityLevel ||
+    form.projectBudget !== df.projectBudget ||
+    form.ownerId !== df.ownerId ||
+    form.clientId !== df.clientId ||
+    form.rmId !== df.rmId ||
+    form.deliveryOwnerId !== df.deliveryOwnerId ||
     form.memberIds.length > 0 ||
-    JSON.stringify(statuses.map(s => s.name)) !== JSON.stringify(DEFAULT_STATUSES.map(s => s.name))
+    JSON.stringify(statuses.map((s) => s.name)) !==
+      JSON.stringify(DEFAULT_STATUSES.map((s) => s.name))
   );
 };
 
@@ -241,12 +292,15 @@ const isDirtyCheck = (form, statuses) => {
 const ErrMsg = ({ msg }) => (
   <AnimatePresence>
     {msg && (
-      <motion.span className="pmw-err"
+      <motion.span
+        className="pmw-err"
         initial={{ opacity: 0, height: 0, marginTop: 0 }}
         animate={{ opacity: 1, height: "auto", marginTop: 4 }}
         exit={{ opacity: 0, height: 0, marginTop: 0 }}
-        transition={{ duration: .18 }}
-      >{msg}</motion.span>
+        transition={{ duration: 0.18 }}
+      >
+        {msg}
+      </motion.span>
     )}
   </AnimatePresence>
 );
@@ -265,32 +319,60 @@ const Field = ({ label, required, optional, error, children }) => (
   </div>
 );
 
-const Inp = ({ error, ...p }) => <input className={`pmw-input${error ? " err" : ""}`}   {...p} />;
-const Sel = ({ error, children, ...p }) => <select className={`pmw-select${error ? " err" : ""}`} {...p}>{children}</select>;
-const Txta = ({ error, ...p }) => <textarea className={`pmw-textarea${error ? " err" : ""}`} {...p} />;
+const Inp = ({ error, ...p }) => (
+  <input className={`pmw-input${error ? " err" : ""}`} {...p} />
+);
+const Sel = ({ error, children, ...p }) => (
+  <select className={`pmw-select${error ? " err" : ""}`} {...p}>
+    {children}
+  </select>
+);
+const Txta = ({ error, ...p }) => (
+  <textarea className={`pmw-textarea${error ? " err" : ""}`} {...p} />
+);
 
 /* ─── Skeleton ────────────────────────────────────────────────────────────── */
-const Skel = ({ h = 40, mb = 14 }) => <div className="pmw-skel" style={{ height: h, marginBottom: mb }} />;
+const Skel = ({ h = 40, mb = 14 }) => (
+  <div className="pmw-skel" style={{ height: h, marginBottom: mb }} />
+);
 const SkelStep = () => (
   <div>
-    <div className="pmw-g2" style={{ marginBottom: 14 }}><Skel h={58} /><Skel h={58} /></div>
-    <Skel h={82} mb={14} /><Skel h={58} mb={14} />
-    <div className="pmw-g3"><Skel h={58} mb={0} /><Skel h={58} mb={0} /><Skel h={58} mb={0} /></div>
+    <div className="pmw-g2" style={{ marginBottom: 14 }}>
+      <Skel h={58} />
+      <Skel h={58} />
+    </div>
+    <Skel h={82} mb={14} />
+    <Skel h={58} mb={14} />
+    <div className="pmw-g3">
+      <Skel h={58} mb={0} />
+      <Skel h={58} mb={0} />
+      <Skel h={58} mb={0} />
+    </div>
   </div>
 );
 
 /* ─── Stepper ─────────────────────────────────────────────────────────────── */
 const Stepper = ({ cur, goTo }) => (
-  <div style={{
-    width: 210, flexShrink: 0, background: "#f8fafc",
-    borderRight: "1px solid #e9eef5",
-    display: "flex", flexDirection: "column",
-    paddingTop: 20, paddingBottom: 20, gap: 1,
-  }}>
+  <div
+    style={{
+      width: 210,
+      flexShrink: 0,
+      background: "#f8fafc",
+      borderRight: "1px solid #e9eef5",
+      display: "flex",
+      flexDirection: "column",
+      paddingTop: 20,
+      paddingBottom: 20,
+      gap: 1,
+    }}
+  >
     {STEPS.map((s) => {
-      const active = cur === s.id, done = cur > s.id;
+      const active = cur === s.id,
+        done = cur > s.id;
       return (
-        <button key={s.id} type="button"
+        <button
+          key={s.id}
+          type="button"
           className={`pmw-sbtn${active ? " active" : ""}${done ? " done" : ""}`}
           onClick={() => done && goTo(s.id)}
         >
@@ -300,21 +382,38 @@ const Stepper = ({ cur, goTo }) => (
                 background: active || done ? "#2563eb" : "#e9eef5",
                 color: active || done ? "#fff" : "#94a3b8",
               }}
-              transition={{ duration: .2 }}
+              transition={{ duration: 0.2 }}
               style={{
-                width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 11, fontWeight: 700,
+                width: 22,
+                height: 22,
+                borderRadius: "50%",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 11,
+                fontWeight: 700,
               }}
             >
               {done ? <Check size={11} strokeWidth={3} /> : s.id}
             </motion.div>
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <span style={{
-                fontSize: 12.5, fontWeight: active ? 700 : 500, lineHeight: 1.3,
-                color: active ? "#111827" : done ? "#374151" : "#94a3b8",
-              }}>{s.label}</span>
-              <span style={{ fontSize: 10.5, color: active ? "#6b7280" : "#b5bec9" }}>
+              <span
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: active ? 700 : 500,
+                  lineHeight: 1.3,
+                  color: active ? "#111827" : done ? "#374151" : "#94a3b8",
+                }}
+              >
+                {s.label}
+              </span>
+              <span
+                style={{
+                  fontSize: 10.5,
+                  color: active ? "#6b7280" : "#b5bec9",
+                }}
+              >
                 {s.desc}
               </span>
             </div>
@@ -326,20 +425,37 @@ const Stepper = ({ cur, goTo }) => (
 );
 
 /* ─── Review helpers ──────────────────────────────────────────────────────── */
-const RBadge = ({ value, s }) => value
-  ? <span className="pmw-badge" style={{ background: s.bg, color: s.text, borderColor: s.border }}>
-    {s.dot && <span style={{ width: 7, height: 7, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />}
-    {value}
-  </span>
-  : <span className="pmw-rempty">—</span>;
+const RBadge = ({ value, s }) =>
+  value ? (
+    <span
+      className="pmw-badge"
+      style={{ background: s.bg, color: s.text, borderColor: s.border }}
+    >
+      {s.dot && (
+        <span
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: s.dot,
+            flexShrink: 0,
+          }}
+        />
+      )}
+      {value}
+    </span>
+  ) : (
+    <span className="pmw-rempty">—</span>
+  );
 
 const RCell = ({ label, value, badge, bs }) => (
   <div className="pmw-rcell">
     <span className="pmw-rlabel">{label}</span>
-    {badge && bs
-      ? <RBadge value={value} s={bs} />
-      : <span className={value ? "pmw-rval" : "pmw-rempty"}>{value || "—"}</span>
-    }
+    {badge && bs ? (
+      <RBadge value={value} s={bs} />
+    ) : (
+      <span className={value ? "pmw-rval" : "pmw-rempty"}>{value || "—"}</span>
+    )}
   </div>
 );
 
@@ -349,19 +465,35 @@ const WarnBar = ({ onKeep, onDiscard }) => (
     initial={{ opacity: 0, y: -12 }}
     animate={{ opacity: 1, y: 0 }}
     exit={{ opacity: 0, y: -10 }}
-    transition={{ duration: .2, ease: "easeOut" }}
+    transition={{ duration: 0.2, ease: "easeOut" }}
     style={{
-      position: "absolute", top: 12, left: 16, right: 16, zIndex: 10,
-      background: "#fff", border: "1.5px solid #fbbf24",
-      borderRadius: 10, padding: "12px 16px",
+      position: "absolute",
+      top: 12,
+      left: 16,
+      right: 16,
+      zIndex: 10,
+      background: "#fff",
+      border: "1.5px solid #fbbf24",
+      borderRadius: 10,
+      padding: "12px 16px",
       boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-      display: "flex", alignItems: "center", gap: 12,
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
     }}
   >
-    <div style={{
-      width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-      background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
+    <div
+      style={{
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        flexShrink: 0,
+        background: "#fffbeb",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       <AlertTriangle size={16} color="#d97706" />
     </div>
     <div style={{ flex: 1 }}>
@@ -373,12 +505,20 @@ const WarnBar = ({ onKeep, onDiscard }) => (
       </p>
     </div>
     <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-      <button type="button" className="pmw-btn-back" onClick={onKeep}
-        style={{ padding: "6px 13px", fontSize: 12.5 }}>
+      <button
+        type="button"
+        className="pmw-btn-back"
+        onClick={onKeep}
+        style={{ padding: "6px 13px", fontSize: 12.5 }}
+      >
         Keep Editing
       </button>
-      <button type="button" className="pmw-btn-discard" onClick={onDiscard}
-        style={{ padding: "6px 13px", fontSize: 12.5 }}>
+      <button
+        type="button"
+        className="pmw-btn-discard"
+        onClick={onDiscard}
+        style={{ padding: "6px 13px", fontSize: 12.5 }}
+      >
         Discard
       </button>
     </div>
@@ -386,28 +526,55 @@ const WarnBar = ({ onKeep, onDiscard }) => (
 );
 
 /* ─── Step 1 ──────────────────────────────────────────────────────────────── */
-const Step1 = ({ fd, err, onChange, onNameChange, onKeyChange, keyAuto, onResetKey }) => (
+const Step1 = ({
+  fd,
+  err,
+  onChange,
+  onNameChange,
+  onKeyChange,
+  keyAuto,
+  onResetKey,
+}) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
     <div className="pmw-g2">
       <Field label="Project Name" required error={err.name}>
-        <Inp name="name" placeholder="e.g. Apollo Redesign"
-          value={fd.name} onChange={onNameChange} error={err.name} />
+        <Inp
+          name="name"
+          placeholder="e.g. Apollo Redesign"
+          value={fd.name}
+          onChange={onNameChange}
+          error={err.name}
+        />
       </Field>
       <Field label="Project Key" required error={err.projectKey}>
         <div style={{ position: "relative" }}>
-          <Inp name="projectKey" placeholder="AUTO"
+          <Inp
+            name="projectKey"
+            placeholder="AUTO"
             value={fd.projectKey}
             onChange={onKeyChange}
             error={err.projectKey}
             style={{ paddingRight: keyAuto ? 12 : 34 }}
           />
           {!keyAuto && (
-            <button type="button" onClick={onResetKey} title="Reset to auto-generate"
+            <button
+              type="button"
+              onClick={onResetKey}
+              title="Reset to auto-generate"
               style={{
-                position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)",
-                background: "none", border: "none", cursor: "pointer",
-                color: "#9ca3af", padding: 0, display: "flex", alignItems: "center",
-              }}>
+                position: "absolute",
+                right: 9,
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#9ca3af",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
               <RotateCcw size={13} />
             </button>
           )}
@@ -421,13 +588,22 @@ const Step1 = ({ fd, err, onChange, onNameChange, onKeyChange, keyAuto, onResetK
     </div>
 
     <Field label="Description" optional>
-      <Txta name="description" placeholder="Brief overview of scope and goals…"
-        value={fd.description} onChange={onChange} />
+      <Txta
+        name="description"
+        placeholder="Brief overview of scope and goals…"
+        value={fd.description}
+        onChange={onChange}
+      />
     </Field>
 
     <Field label="Primary Location" required error={err.primaryLocation}>
-      <Inp name="primaryLocation" placeholder="e.g. New York, USA"
-        value={fd.primaryLocation} onChange={onChange} error={err.primaryLocation} />
+      <Inp
+        name="primaryLocation"
+        placeholder="e.g. New York, USA"
+        value={fd.primaryLocation}
+        onChange={onChange}
+        error={err.primaryLocation}
+      />
     </Field>
   </div>
 );
@@ -437,18 +613,39 @@ const Step2 = ({ fd, err, onChange }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
     <div className="pmw-g3">
       <Field label="Status" required error={err.status}>
-        <Sel name="status" value={fd.status} onChange={onChange} error={err.status}>
-          {STATUS_OPT.map(v => <option key={v}>{v}</option>)}
+        <Sel
+          name="status"
+          value={fd.status}
+          onChange={onChange}
+          error={err.status}
+        >
+          {STATUS_OPT.map((v) => (
+            <option key={v}>{v}</option>
+          ))}
         </Sel>
       </Field>
       <Field label="Current Stage" required error={err.currentStage}>
-        <Sel name="currentStage" value={fd.currentStage} onChange={onChange} error={err.currentStage}>
-          {STAGE_OPT.map(v => <option key={v}>{v}</option>)}
+        <Sel
+          name="currentStage"
+          value={fd.currentStage}
+          onChange={onChange}
+          error={err.currentStage}
+        >
+          {STAGE_OPT.map((v) => (
+            <option key={v}>{v}</option>
+          ))}
         </Sel>
       </Field>
       <Field label="Delivery Model" required error={err.deliveryModel}>
-        <Sel name="deliveryModel" value={fd.deliveryModel} onChange={onChange} error={err.deliveryModel}>
-          {DELIVERY_OPT.map(v => <option key={v}>{v}</option>)}
+        <Sel
+          name="deliveryModel"
+          value={fd.deliveryModel}
+          onChange={onChange}
+          error={err.deliveryModel}
+        >
+          {DELIVERY_OPT.map((v) => (
+            <option key={v}>{v}</option>
+          ))}
         </Sel>
       </Field>
     </div>
@@ -457,10 +654,22 @@ const Step2 = ({ fd, err, onChange }) => (
 
     <div className="pmw-g2">
       <Field label="Start Date" required error={err.startDate}>
-        <Inp type="date" name="startDate" value={fd.startDate} onChange={onChange} error={err.startDate} />
+        <Inp
+          type="date"
+          name="startDate"
+          value={fd.startDate}
+          onChange={onChange}
+          error={err.startDate}
+        />
       </Field>
       <Field label="End Date" optional error={err.endDate}>
-        <Inp type="date" name="endDate" value={fd.endDate} onChange={onChange} error={err.endDate} />
+        <Inp
+          type="date"
+          name="endDate"
+          value={fd.endDate}
+          onChange={onChange}
+          error={err.endDate}
+        />
       </Field>
     </div>
 
@@ -468,15 +677,29 @@ const Step2 = ({ fd, err, onChange }) => (
 
     <div className="pmw-g2">
       <Field label="Risk Level" required error={err.riskLevel}>
-        <Sel name="riskLevel" value={fd.riskLevel} onChange={onChange} error={err.riskLevel}>
+        <Sel
+          name="riskLevel"
+          value={fd.riskLevel}
+          onChange={onChange}
+          error={err.riskLevel}
+        >
           <option value="">Select risk level</option>
-          {RISK_OPT.map(v => <option key={v}>{v}</option>)}
+          {RISK_OPT.map((v) => (
+            <option key={v}>{v}</option>
+          ))}
         </Sel>
       </Field>
       <Field label="Priority Level" required error={err.priorityLevel}>
-        <Sel name="priorityLevel" value={fd.priorityLevel} onChange={onChange} error={err.priorityLevel}>
+        <Sel
+          name="priorityLevel"
+          value={fd.priorityLevel}
+          onChange={onChange}
+          error={err.priorityLevel}
+        >
           <option value="">Select priority level</option>
-          {PRI_OPT.map(v => <option key={v}>{v}</option>)}
+          {PRI_OPT.map((v) => (
+            <option key={v}>{v}</option>
+          ))}
         </Sel>
       </Field>
     </div>
@@ -484,25 +707,53 @@ const Step2 = ({ fd, err, onChange }) => (
     <AnimatePresence>
       {(fd.riskLevel || fd.priorityLevel) && (
         <motion.div
-          initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }} transition={{ duration: .2 }}
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.2 }}
           style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
         >
-          {fd.riskLevel && (() => {
-            const s = RISK_B[fd.riskLevel]; return (
-              <span className="pmw-badge" style={{ background: s.bg, color: s.text, borderColor: s.border }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
-                Risk: {fd.riskLevel}
-              </span>
-            );
-          })()}
-          {fd.priorityLevel && (() => {
-            const s = PRI_B[fd.priorityLevel]; return (
-              <span className="pmw-badge" style={{ background: s.bg, color: s.text, borderColor: s.border }}>
-                Priority: {fd.priorityLevel}
-              </span>
-            );
-          })()}
+          {fd.riskLevel &&
+            (() => {
+              const s = RISK_B[fd.riskLevel];
+              return (
+                <span
+                  className="pmw-badge"
+                  style={{
+                    background: s.bg,
+                    color: s.text,
+                    borderColor: s.border,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: s.dot,
+                      flexShrink: 0,
+                    }}
+                  />
+                  Risk: {fd.riskLevel}
+                </span>
+              );
+            })()}
+          {fd.priorityLevel &&
+            (() => {
+              const s = PRI_B[fd.priorityLevel];
+              return (
+                <span
+                  className="pmw-badge"
+                  style={{
+                    background: s.bg,
+                    color: s.text,
+                    borderColor: s.border,
+                  }}
+                >
+                  Priority: {fd.priorityLevel}
+                </span>
+              );
+            })()}
         </motion.div>
       )}
     </AnimatePresence>
@@ -510,129 +761,194 @@ const Step2 = ({ fd, err, onChange }) => (
     <div className="pmw-divider" />
 
     <Field label="Project Budget" optional>
-      <div style={{ position: "relative", maxWidth: 220 }}>
-        <span style={{
-          position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
-          fontSize: 11.5, fontWeight: 700, color: "#64748b",
-          letterSpacing: ".04em", pointerEvents: "none",
-        }}>USD</span>
-        <Inp name="projectBudget" type="text" inputMode="decimal"
-          placeholder="0.00" value={fd.projectBudget} onChange={onChange}
-          style={{ paddingLeft: 44 }} />
+      <div className="flex items-center gap-2">
+        <select
+          name="projectBudgetCurrency"
+          value={fd.projectBudgetCurrency}
+          onChange={onChange}
+          style={{
+            height: 36,
+            padding: "0 8px",
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
+            fontSize: 12,
+            fontWeight: 700,
+            color: "#334155",
+            background: "#f8fafc",
+            cursor: "pointer",
+            outline: "none",
+          }}
+        >
+          <option value="USD">USD</option>
+          <option value="INR">INR</option>
+        </select>
+        <Inp
+          name="projectBudget"
+          type="text"
+          inputMode="decimal"
+          placeholder="0.00"
+          value={fd.projectBudget}
+          onChange={onChange}
+          style={{ maxWidth: 180 }}
+        />
       </div>
     </Field>
   </div>
 );
 
 /* ─── Step 3 ──────────────────────────────────────────────────────────────── */
-const Step3 = ({ fd, err, users, onChange, onOwner, toggleMember, search, setSearch }) => {
-  const filtered = users.filter(u => u?.name?.toLowerCase().includes(search.toLowerCase()));
+const Step3 = ({
+  fd,
+  err,
+   users,
+  projectManagers,
+  resourceManagers,
+  deliveryOwners,
+  clients,
+  resources,
+  onChange,
+  onOwner,
+  toggleMember,
+  search,
+  setSearch,
+  editingProjectId,
+}) => {
+  const allUsers = [...projectManagers, ...resourceManagers, ...deliveryOwners];
+  const filtered = resources.filter((r) =>
+  r?.resourceName?.toLowerCase().includes(search.toLowerCase())
+);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div className="pmw-g2">
         <Field label="Project Owner" required error={err.ownerId}>
-          <Sel name="ownerId" value={fd.ownerId} onChange={onOwner} error={err.ownerId}>
+          <Sel
+            name="ownerId"
+            value={fd.ownerId}
+            onChange={onOwner}
+            error={err.ownerId}
+          >
             <option value="">Select owner</option>
-            {users.map(u => u && <option key={u.id} value={u.id}>
-              {u.name}{u.roles?.length ? ` · ${u.roles.join(", ")}` : ""}</option>)}
+            {projectManagers.map((u) => (
+  <option key={u.id} value={u.id}>
+    {u.name}
+  </option>
+))}
           </Sel>
         </Field>
-        <Field label="Client" optional>
-          <Sel name="clientId" value={fd.clientId} onChange={onChange}>
+        <Field label="Client" required error={err.clientId}>
+          <Sel name="clientId" value={fd.clientId} onChange={onChange} error={err.clientId}>
             <option value="">Select client</option>
-            {users.map(u => u && <option key={u.id} value={u.id}>
-              {u.name}{u.roles?.length ? ` · ${u.roles.join(", ")}` : ""}</option>)}
+           {clients.map((c) => (
+  <option key={c.clientId} value={c.clientId}>
+    {c.clientName}
+  </option>
+))}
           </Sel>
         </Field>
         <Field label="Resource Manager" required error={err.rmId}>
           <Sel name="rmId" value={fd.rmId} onChange={onChange} error={err.rmId}>
             <option value="">Select resource manager</option>
-            {users.map(u => u && <option key={u.id} value={u.id}>
-              {u.name}{u.roles?.length ? ` · ${u.roles.join(", ")}` : ""}</option>)}
+           {resourceManagers.map((u) => (
+  <option key={u.id} value={u.id}>
+    {u.name}
+  </option>
+))}
           </Sel>
         </Field>
         <Field label="Delivery Owner" required error={err.deliveryOwnerId}>
-          <Sel name="deliveryOwnerId" value={fd.deliveryOwnerId} onChange={onChange} error={err.deliveryOwnerId}>
+          <Sel
+            name="deliveryOwnerId"
+            value={fd.deliveryOwnerId}
+            onChange={onChange}
+            error={err.deliveryOwnerId}
+          >
             <option value="">Select delivery owner</option>
-            {users.map(u => u && <option key={u.id} value={u.id}>
-              {u.name}{u.roles?.length ? ` · ${u.roles.join(", ")}` : ""}</option>)}
+            {deliveryOwners.map((u) => (
+  <option key={u.id} value={u.id}>
+    {u.name}
+  </option>
+))}
           </Sel>
         </Field>
       </div>
 
-      <div className="pmw-divider" />
+      {editingProjectId && (
+        <>
+          <div className="pmw-divider" />
 
-      <div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <label className="pmw-label" style={{ margin: 0 }}>
-            Team Members{" "}
-            <span style={{ color: "#9ca3af", fontWeight: 400, textTransform: "none", letterSpacing: 0, fontSize: 10.5 }}>
-              (optional)
-            </span>
-          </label>
-          <AnimatePresence>
-            {fd.memberIds.length > 0 && (
-              <motion.span initial={{ opacity: 0, scale: .8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .8 }}
-                style={{
-                  fontSize: 11, fontWeight: 700, background: "#eff6ff", color: "#1d4ed8",
-                  border: "1px solid #bfdbfe", borderRadius: 20, padding: "2px 9px"
-                }}>
-                {fd.memberIds.length} selected
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </div>
+          <div>
+            <label className="pmw-label" style={{ margin: 0 }}>
+              Team Members
+            </label>
 
-        <div style={{ position: "relative", marginBottom: 10 }}>
-          <Search size={14} style={{
-            position: "absolute", left: 11, top: "50%",
-            transform: "translateY(-50%)", color: "#9ca3af", pointerEvents: "none"
-          }} />
-          <input className="pmw-srch" placeholder="Search members…"
-            value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-
-        <div className="pmw-scroll" style={{
-          border: "1.5px solid #e9eef5", borderRadius: 9,
-          maxHeight: 156, overflowY: "auto", background: "#fff"
-        }}>
-          {filtered.length === 0
-            ? <div style={{ padding: 16, textAlign: "center", fontSize: 13, color: "#94a3b8" }}>No users found</div>
-            : filtered.map(user => {
-              const isOwner = fd.ownerId?.toString() === user.id?.toString();
-              const isSel = fd.memberIds.includes(user.id);
-              return (
-                <div key={user.id}
-                  className={`pmw-mrow${isSel ? " sel" : ""}${isOwner ? " dis" : ""}`}
-                  onClick={() => !isOwner && toggleMember(user.id)}
+            <div
+              className="pmw-scroll"
+              style={{
+                border: "1.5px solid #e9eef5",
+                borderRadius: 9,
+                maxHeight: 200,
+                overflowY: "auto",
+                background: "#fff",
+                marginTop: 10,
+              }}
+            >
+              {resources.length === 0 ? (
+                <div
+                  style={{
+                    padding: 16,
+                    textAlign: "center",
+                    fontSize: 13,
+                    color: "#94a3b8",
+                  }}
                 >
-                  <div style={{
-                    width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                    border: isSel ? "none" : "1.5px solid #d1d5db",
-                    background: isSel ? "#2563eb" : "#fff",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    transition: "background .15s",
-                  }}>
-                    {isSel && <Check size={10} color="#fff" strokeWidth={3} />}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-                    <span style={{
-                      fontSize: 13, color: "#111827", fontWeight: isSel ? 500 : 400,
-                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
-                    }}>
-                      {user.name}
-                      {isOwner && <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 5 }}>(owner)</span>}
-                    </span>
-                    {user.roles?.length > 0 && (
-                      <span style={{ fontSize: 11, color: "#94a3b8" }}>{user.roles.join(", ")}</span>
-                    )}
-                  </div>
+                  No team members found
                 </div>
-              );
-            })
-          }
-        </div>
-      </div>
+              ) : (
+                resources.map((res) => (
+                  <div
+                    key={res.resourceId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 16px",
+                      borderBottom: "1px solid #f8fafc",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                        minWidth: 0,
+                        flex: 1,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 14,
+                          color: "#111827",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {res.resourceName}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "#6b7280",
+                        }}
+                      >
+                        {res.resourceRole}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -640,7 +956,7 @@ const Step3 = ({ fd, err, users, onChange, onOwner, toggleMember, search, setSea
 /* ─── Step 4 — Workflow ───────────────────────────────────────────────────── */
 const Step4 = ({ statuses, setStatuses, statusError }) => {
   const [newName, setNewName] = useState("");
-  const [dupError, setDupError] = useState("");  // FIX: was missing
+  const [dupError, setDupError] = useState(""); // FIX: was missing
 
   const normalize = (str) => str.trim().replace(/\s+/g, " ").toLowerCase();
 
@@ -651,7 +967,7 @@ const Step4 = ({ statuses, setStatuses, statusError }) => {
     // This version treats "to do" and "todo" as duplicates
     const normalize = (str) => str.trim().replace(/\s+/g, "").toLowerCase();
     const isDuplicate = statuses.some(
-      (s) => normalize(s.name) === normalize(trimmed)
+      (s) => normalize(s.name) === normalize(trimmed),
     );
 
     if (isDuplicate) {
@@ -660,11 +976,14 @@ const Step4 = ({ statuses, setStatuses, statusError }) => {
     }
 
     setDupError("");
-    setStatuses(p => [...p, { id: `new-${Date.now()}`, name: trimmed, color: "#9ca3af" }]);
+    setStatuses((p) => [
+      ...p,
+      { id: `new-${Date.now()}`, name: trimmed, color: "#9ca3af" },
+    ]);
     setNewName("");
   };
 
-  const handleRemove = (id) => setStatuses(p => p.filter(s => s.id !== id));
+  const handleRemove = (id) => setStatuses((p) => p.filter((s) => s.id !== id));
 
   const onDragEnd = ({ source, destination }) => {
     if (!destination || destination.index === source.index) return;
@@ -676,16 +995,23 @@ const Step4 = ({ statuses, setStatuses, statusError }) => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <p style={{ margin: 0, fontSize: 13, color: "#6b7280", lineHeight: 1.55 }}>
-        Define the task statuses your team will use. Drag to reorder. You can change these later.
+      <p
+        style={{ margin: 0, fontSize: 13, color: "#6b7280", lineHeight: 1.55 }}
+      >
+        Define the task statuses your team will use. Drag to reorder. You can
+        change these later.
       </p>
 
       <div style={{ display: "flex", gap: 8 }}>
-        <input className="pmw-add-inp"
+        <input
+          className="pmw-add-inp"
           placeholder="New status name, e.g. 'In Review'"
           value={newName}
-          onChange={e => { setNewName(e.target.value); setDupError(""); }} // FIX: clear error on type
-          onKeyDown={e => e.key === "Enter" && handleAdd()}
+          onChange={(e) => {
+            setNewName(e.target.value);
+            setDupError("");
+          }} // FIX: clear error on type
+          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
         />
         <button type="button" className="pmw-add-btn" onClick={handleAdd}>
           <Plus size={14} /> Add
@@ -703,41 +1029,91 @@ const Step4 = ({ statuses, setStatuses, statusError }) => {
               ref={droppableProvided.innerRef}
               {...droppableProvided.droppableProps}
               className="pmw-scroll"
-              style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto" }}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                maxHeight: 260,
+                overflowY: "auto",
+              }}
             >
               {statuses.map((status, index) => (
-                <Draggable key={status.id} draggableId={String(status.id)} index={index}>
+                <Draggable
+                  key={status.id}
+                  draggableId={String(status.id)}
+                  index={index}
+                >
                   {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
                       {...provided.draggableProps}
-                      {...provided.dragHandleProps}  // FIX: entire card is drag target
+                      {...provided.dragHandleProps} // FIX: entire card is drag target
                       className="pmw-srow"
                       style={{
                         ...provided.draggableProps.style,
                         cursor: snapshot.isDragging ? "grabbing" : "grab",
-                        boxShadow: snapshot.isDragging ? "0 8px 24px rgba(0,0,0,0.12)" : "none",
-                        borderColor: snapshot.isDragging ? "#93c5fd" : undefined,
+                        boxShadow: snapshot.isDragging
+                          ? "0 8px 24px rgba(0,0,0,0.12)"
+                          : "none",
+                        borderColor: snapshot.isDragging
+                          ? "#93c5fd"
+                          : undefined,
                         background: snapshot.isDragging ? "#f8fafc" : "#fff",
                       }}
                     >
-                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: status.color, flexShrink: 0 }} />
+                      <span
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          background: status.color,
+                          flexShrink: 0,
+                        }}
+                      />
                       {/* grip icon is now decorative only */}
-                      <div style={{ color: "#c4cdd9", display: "flex", alignItems: "center", flexShrink: 0 }}>
+                      <div
+                        style={{
+                          color: "#c4cdd9",
+                          display: "flex",
+                          alignItems: "center",
+                          flexShrink: 0,
+                        }}
+                      >
                         <GripVertical size={15} />
                       </div>
-                      <span style={{ flex: 1, fontSize: 13.5, color: "#111827", fontWeight: 500 }}>
+                      <span
+                        style={{
+                          flex: 1,
+                          fontSize: 13.5,
+                          color: "#111827",
+                          fontWeight: 500,
+                        }}
+                      >
                         {status.name}
                       </span>
-                      <button type="button"
-                        onClick={e => { e.stopPropagation(); handleRemove(status.id); }}
-                        style={{
-                          background: "none", border: "none", cursor: "pointer",
-                          color: "#c4cdd9", padding: 4, borderRadius: 5,
-                          display: "flex", alignItems: "center", transition: "color .15s"
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemove(status.id);
                         }}
-                        onMouseEnter={e => e.currentTarget.style.color = "#ef4444"}
-                        onMouseLeave={e => e.currentTarget.style.color = "#c4cdd9"}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          color: "#c4cdd9",
+                          padding: 4,
+                          borderRadius: 5,
+                          display: "flex",
+                          alignItems: "center",
+                          transition: "color .15s",
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.color = "#ef4444")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.color = "#c4cdd9")
+                        }
                       >
                         <Trash2 size={14} />
                       </button>
@@ -755,12 +1131,23 @@ const Step4 = ({ statuses, setStatuses, statusError }) => {
 };
 
 /* ─── Step 5 — Review ─────────────────────────────────────────────────────── */
-const Step5 = ({ fd, statuses, users }) => {
-  const getName = id => users.find(u => u?.id?.toString() === id?.toString())?.name;
+const Step5 = ({ fd, statuses, users, clients, resources }) => {
+  const getName = (id) => {
+    const user = users.find((u) => u?.id?.toString() === id?.toString());
+    if (user) return user.name;
+    const client = clients.find((c) => c?.clientId?.toString() === id?.toString());
+    if (client) return client.clientName;
+    const resource = resources.find(
+  (r) => r?.resourceId?.toString() === id?.toString()
+);
+if (resource) return resource.resourceName;
+    return id;
+  };
   const memberNames = fd.memberIds.map(getName).filter(Boolean).join(", ");
-  const fmtBudget = v => v
-    ? `USD ${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-    : null;
+  const fmtBudget = (v) =>
+    v
+      ? `USD ${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+      : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -771,7 +1158,9 @@ const Step5 = ({ fd, statuses, users }) => {
           <RCell label="Project Key" value={fd.projectKey} />
           <RCell label="Primary Location" value={fd.primaryLocation} />
           {fd.description && (
-            <div style={{ gridColumn: "1/-1" }}><RCell label="Description" value={fd.description} /></div>
+            <div style={{ gridColumn: "1/-1" }}>
+              <RCell label="Description" value={fd.description} />
+            </div>
           )}
         </div>
       </section>
@@ -785,8 +1174,18 @@ const Step5 = ({ fd, statuses, users }) => {
           <RCell label="Start Date" value={fd.startDate} />
           <RCell label="End Date" value={fd.endDate} />
           <RCell label="Budget" value={fmtBudget(fd.projectBudget)} />
-          <RCell label="Risk" value={fd.riskLevel} badge bs={fd.riskLevel ? RISK_B[fd.riskLevel] : null} />
-          <RCell label="Priority" value={fd.priorityLevel} badge bs={fd.priorityLevel ? PRI_B[fd.priorityLevel] : null} />
+          <RCell
+            label="Risk"
+            value={fd.riskLevel}
+            badge
+            bs={fd.riskLevel ? RISK_B[fd.riskLevel] : null}
+          />
+          <RCell
+            label="Priority"
+            value={fd.priorityLevel}
+            badge
+            bs={fd.priorityLevel ? PRI_B[fd.priorityLevel] : null}
+          />
         </div>
       </section>
       <div className="pmw-divider" />
@@ -799,7 +1198,10 @@ const Step5 = ({ fd, statuses, users }) => {
           <RCell label="Delivery Owner" value={getName(fd.deliveryOwnerId)} />
           {memberNames && (
             <div style={{ gridColumn: "1/-1" }}>
-              <RCell label={`Members (${fd.memberIds.length})`} value={memberNames} />
+              <RCell
+                label={`Members (${fd.memberIds.length})`}
+                value={memberNames}
+              />
             </div>
           )}
         </div>
@@ -809,15 +1211,33 @@ const Step5 = ({ fd, statuses, users }) => {
         <p className="pmw-sec">Workflow Statuses</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
           {statuses.map((s, i) => (
-            <span key={s.id} style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              fontSize: 12, fontWeight: 500,
-              border: "1.5px solid #e9eef5", borderRadius: 6,
-              padding: "4px 10px", background: "#fff", color: "#374151",
-            }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color }} />
+            <span
+              key={s.id}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                fontWeight: 500,
+                border: "1.5px solid #e9eef5",
+                borderRadius: 6,
+                padding: "4px 10px",
+                background: "#fff",
+                color: "#374151",
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: s.color,
+                }}
+              />
               {s.name}
-              <span style={{ fontSize: 10, color: "#c4cdd9", marginLeft: 2 }}>#{i + 1}</span>
+              <span style={{ fontSize: 10, color: "#c4cdd9", marginLeft: 2 }}>
+                #{i + 1}
+              </span>
             </span>
           ))}
         </div>
@@ -828,12 +1248,18 @@ const Step5 = ({ fd, statuses, users }) => {
 
 /* ─── Main Modal ──────────────────────────────────────────────────────────── */
 const CreateProjectModal = ({
-  isOpen, onClose, onProjectCreated, editingProjectId,
+  isOpen,
+  onClose,
+  onProjectCreated,
+  editingProjectId,
   // FIX: removed formData/initialFormData — modal fetches its own data via API
 }) => {
   const [fd, setFd] = useState(DEFAULT_FORM);
   const [statuses, setStatuses] = useState(DEFAULT_STATUSES);
   const [users, setUsers] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [resources, setResources] = useState([]);
+  
   const [step, setStep] = useState(1);
   const [dir, setDir] = useState(1);
   const [errors, setErrors] = useState({});
@@ -843,26 +1269,35 @@ const CreateProjectModal = ({
   const [search, setSearch] = useState("");
   const [keyAuto, setKeyAuto] = useState(true);
   const [showWarn, setShowWarn] = useState(false);
+
+const [projectManagers, setProjectManagers] = useState([]);
+const [resourceManagers, setResourceManagers] = useState([]);
+const [deliveryOwners, setDeliveryOwners] = useState([]);
+
   const token = localStorage.getItem("token");
 
   /* ── Open / reset ─────────────────────────────────────────────────────── */
   // FIX: replaced old initialFormData reference with proper API fetch
   useEffect(() => {
     if (!isOpen) return;
-    setStep(1); setDir(1); setErrors({}); setStatusErr("");
-    setSearch(""); setShowWarn(false);
+    setStep(1);
+    setDir(1);
+    setErrors({});
+    setStatusErr("");
+    setSearch("");
+    setShowWarn(false);
 
     if (editingProjectId) {
       setKeyAuto(false);
       setLoading(true);
       Promise.all([
-        axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${editingProjectId}/edit`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        api.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${editingProjectId}/edit`,
+          { headers: { Authorization: `Bearer ${token}` } },
         ),
-        axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${editingProjectId}/statuses`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        api.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${editingProjectId}/statuses`,
+          { headers: { Authorization: `Bearer ${token}` } },
         ),
       ])
         .then(([projectRes, statusRes]) => {
@@ -878,6 +1313,7 @@ const CreateProjectModal = ({
             riskLevel: p.riskLevel || "",
             priorityLevel: p.priorityLevel || "",
             projectBudget: p.projectBudget ? String(p.projectBudget) : "",
+            projectBudgetCurrency: p.projectBudgetCurrency || "USD",
             ownerId: p.ownerId ? String(p.ownerId) : "",
             clientId: p.clientId ? String(p.clientId) : "",
             rmId: p.rmId ? String(p.rmId) : "",
@@ -886,77 +1322,142 @@ const CreateProjectModal = ({
             startDate: p.startDate ? p.startDate.split("T")[0] : "",
             endDate: p.endDate ? p.endDate.split("T")[0] : "",
           });
-          const sorted = (statusRes.data || []).sort((a, b) => a.sortOrder - b.sortOrder);
+          const sorted = (statusRes.data || []).sort(
+            (a, b) => a.sortOrder - b.sortOrder,
+          );
           setStatuses(sorted.length ? sorted : DEFAULT_STATUSES);
         })
         .catch(() => {
-          toast.error("Failed to load project data.");
+          showStatusToast("Failed to load project data.", "error");
           setStatuses(DEFAULT_STATUSES);
         })
         .finally(() => setLoading(false));
     } else {
       setKeyAuto(true);
-      setFd({ ...DEFAULT_FORM, startDate: new Date().toISOString().split("T")[0] });
+      setFd({
+        ...DEFAULT_FORM,
+        startDate: new Date().toISOString().split("T")[0],
+      });
       setStatuses(DEFAULT_STATUSES);
     }
   }, [isOpen, editingProjectId]);
 
   /* ── Fetch users ──────────────────────────────────────────────────────── */
+  // useEffect(() => {
+  //   if (!isOpen) return;
+  //   api
+  //     .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users?page=0&size=100`, {
+  //       headers: { Authorization: `Bearer ${token}` },
+  //     })
+  //     .then((res) => {
+  //       const list = Array.isArray(res.data) ? res.data : res.data?.content;
+  //       if (Array.isArray(list)) setUsers(list.filter(Boolean));
+  //     })
+  //     .catch(console.error);
+  // }, [isOpen, token]);
+
+  /* ── Fetch clients ────────────────────────────────────────────────────── */
   useEffect(() => {
     if (!isOpen) return;
-    axios.get(
-      `${import.meta.env.VITE_PMS_BASE_URL}/api/users?page=0&size=100`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-      .then(res => {
-        const list = Array.isArray(res.data) ? res.data : res.data?.content;
-        if (Array.isArray(list)) setUsers(list.filter(Boolean));
+    api
+      .get(`${window.__APP_CONFIG__.RMS_BASE_URL}/api/client/get-active-clients`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => {
+         const list = res.data?.data;
+        if (Array.isArray(list)) setClients(list.filter(Boolean));
       })
       .catch(console.error);
   }, [isOpen, token]);
 
+  /* ── Fetch resources ──────────────────────────────────────────────────── */
+  useEffect(() => {
+  if (!isOpen || !editingProjectId) return;
+
+  api
+    .get(`${window.__APP_CONFIG__.RMS_BASE_URL}/api/allocation/get-all-resources/${editingProjectId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    .then((res) => {
+      const list = res.data?.data;
+      if (Array.isArray(list)) setResources(list.filter(Boolean));
+    })
+    .catch(console.error);
+}, [isOpen, editingProjectId]);
+
+
+  useEffect(() => {
+  if (!isOpen) return;
+
+  api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/project_manager`, { headers: { Authorization: `Bearer ${token}` } })
+    .then(res => setProjectManagers(res.data || []))
+    .catch(console.error);
+
+  api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/resource-managers`, { headers: { Authorization: `Bearer ${token}` } })
+    .then(res => setResourceManagers(res.data || []))
+    .catch(console.error);
+
+  api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/delivery-owners`, { headers: { Authorization: `Bearer ${token}` } })
+    .then(res => setDeliveryOwners(res.data || []))
+    .catch(console.error);
+
+}, [isOpen, token]);
   /* ── Handlers ─────────────────────────────────────────────────────────── */
-  const handleChange = useCallback((e) => {
-    const { name, value } = e.target;
-    if (errors[name]) setErrors(p => ({ ...p, [name]: "" }));
-    if (name === "projectBudget") {
-      if (value === "" || /^\d*\.?\d{0,2}$/.test(value))
-        setFd(p => ({ ...p, projectBudget: value }));
-      return;
-    }
-    setFd(p => ({ ...p, [name]: value }));
-  }, [errors]);
+  const handleChange = useCallback(
+    (e) => {
+      const { name, value } = e.target;
+      if (errors[name]) setErrors((p) => ({ ...p, [name]: "" }));
+      if (name === "projectBudget") {
+        if (value === "" || /^\d*\.?\d{0,2}$/.test(value))
+          setFd((p) => ({ ...p, projectBudget: value }));
+        return;
+      }
+      setFd((p) => ({ ...p, [name]: value }));
+    },
+    [errors],
+  );
 
   const handleNameChange = (e) => {
     const raw = e.target.value;
-    if (errors.name) setErrors(p => ({ ...p, name: "" }));
-    setFd(p => ({ ...p, name: raw, projectKey: keyAuto ? genKey(raw) : p.projectKey }));
+    if (errors.name) setErrors((p) => ({ ...p, name: "" }));
+    setFd((p) => ({
+      ...p,
+      name: raw,
+      projectKey: keyAuto ? genKey(raw) : p.projectKey,
+    }));
   };
 
   // FIX: properly wired — disables auto-gen on manual edit
   const handleKeyChange = (e) => {
     setKeyAuto(false);
-    if (errors.projectKey) setErrors(p => ({ ...p, projectKey: "" }));
-    setFd(p => ({ ...p, projectKey: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "") }));
+    if (errors.projectKey) setErrors((p) => ({ ...p, projectKey: "" }));
+    setFd((p) => ({
+      ...p,
+      projectKey: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""),
+    }));
   };
 
   const resetKeyAuto = () => {
     setKeyAuto(true);
-    setFd(p => ({ ...p, projectKey: genKey(p.name) }));
+    setFd((p) => ({ ...p, projectKey: genKey(p.name) }));
   };
 
   const handleOwner = (e) => {
     const id = e.target.value;
-    if (errors.ownerId) setErrors(p => ({ ...p, ownerId: "" }));
-    setFd(p => ({ ...p, ownerId: id, memberIds: p.memberIds.filter(m => m.toString() !== id) }));
+    if (errors.ownerId) setErrors((p) => ({ ...p, ownerId: "" }));
+    setFd((p) => ({
+      ...p,
+      ownerId: id,
+      memberIds: p.memberIds.filter((m) => m.toString() !== id),
+    }));
   };
 
   const toggleMember = (uid) => {
     if (uid?.toString() === fd.ownerId?.toString()) return;
-    setFd(p => ({
+    setFd((p) => ({
       ...p,
       memberIds: p.memberIds.includes(uid)
-        ? p.memberIds.filter(id => id !== uid)
+        ? p.memberIds.filter((id) => id !== uid)
         : [...p.memberIds, uid],
     }));
   };
@@ -969,28 +1470,54 @@ const CreateProjectModal = ({
       onClose();
     }
   };
-  const confirmDiscard = () => { setShowWarn(false); onClose(); };
+  const confirmDiscard = () => {
+    setShowWarn(false);
+    onClose();
+  };
   const keepEditing = () => setShowWarn(false);
 
   /* ── Validate ─────────────────────────────────────────────────────────── */
   const validate = (s) => {
     const errs = {};
-    STEP_REQ[s].forEach(f => {
+    STEP_REQ[s].forEach((f) => {
       if (!fd[f]?.toString().trim()) errs[f] = `${FIELD_LABELS[f]} is required`;
     });
-    if (s === 2 && fd.startDate && fd.endDate && new Date(fd.endDate) < new Date(fd.startDate))
+    if (
+      s === 2 &&
+      fd.startDate &&
+      fd.endDate &&
+      new Date(fd.endDate) < new Date(fd.startDate)
+    )
       errs.endDate = "End date cannot be before start date";
     setErrors(errs);
     if (s === 4) {
-      if (statuses.length === 0) { setStatusErr("Add at least one status to continue."); return false; }
+      if (statuses.length === 0) {
+        setStatusErr("Add at least one status to continue.");
+        return false;
+      }
       setStatusErr("");
     }
     return Object.keys(errs).length === 0;
   };
 
-  const next = () => { if (validate(step)) { setDir(1); setStep(s => s + 1); } };
-  const back = () => { setErrors({}); setStatusErr(""); setDir(-1); setStep(s => s - 1); };
-  const goTo = (s) => { if (s < step) { setDir(-1); setStep(s); } };
+  const next = () => {
+    if (validate(step)) {
+      setDir(1);
+      setStep((s) => s + 1);
+    }
+  };
+  const back = () => {
+    setErrors({});
+    setStatusErr("");
+    setDir(-1);
+    setStep((s) => s - 1);
+  };
+  const goTo = (s) => {
+    if (s < step) {
+      setDir(-1);
+      setStep(s);
+    }
+  };
 
   /* ── Submit ───────────────────────────────────────────────────────────── */
   const handleSubmit = async () => {
@@ -1001,48 +1528,62 @@ const CreateProjectModal = ({
       status: fd.status,
       currentStage: fd.currentStage,
       deliveryModel: fd.deliveryModel,
-      clientId: "a54bcfd3-0368-48ba-a495-9386dca8ae7f",
+      clientId: fd.clientId,
       rmId: parseInt(fd.rmId, 10) || 120,
       deliveryOwnerId: parseInt(fd.deliveryOwnerId, 10) || 120,
       primaryLocation: fd.primaryLocation,
       riskLevel: fd.riskLevel,
       projectBudget: fd.projectBudget ? parseFloat(fd.projectBudget) : null,
-      projectBudgetCurrency: fd.projectBudget ? "USD" : null,
+      projectBudgetCurrency: fd.projectBudget ? fd.projectBudgetCurrency : null,
       priorityLevel: fd.priorityLevel,
       ownerId: parseInt(fd.ownerId, 10),
       memberIds: fd.memberIds,
       startDate: fd.startDate ? `${fd.startDate}T00:00:00` : null,
       endDate: fd.endDate ? `${fd.endDate}T23:59:59` : null,
     };
-    const statusPayload = statuses.map((s, i) => ({ name: s.name, sortOrder: i }));
+    const statusPayload = statuses.map((s, i) => ({
+      name: s.name,
+      sortOrder: i,
+    }));
 
     try {
       setSubmitting(true);
       let pid = editingProjectId;
 
       if (editingProjectId) {
-        await axios.put(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${editingProjectId}`,
-          payload, { headers: { Authorization: `Bearer ${token}` } }
+        await api.put(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${editingProjectId}`,
+          payload,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       } else {
-        const res = await axios.post(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects`,
-          payload, { headers: { Authorization: `Bearer ${token}` } }
+        const res = await api.post(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
+          payload,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         pid = res.data?.id;
       }
 
       try {
-        await axios.put(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${pid}/statuses`,
-          statusPayload, { headers: { Authorization: `Bearer ${token}` } }
+        await api.put(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${pid}/statuses`,
+          statusPayload,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       } catch {
-        toast.warn("Project saved, but statuses could not be saved — configure them in project settings.");
+        showStatusToast(
+          "Project saved, but statuses could not be saved — configure them in project settings.",
+          "warn",
+        );
       }
 
-      toast.success(editingProjectId ? "Project updated successfully." : "Project created successfully.");
+      showStatusToast(
+        editingProjectId
+          ? "Project updated successfully."
+          : "Project created successfully.",
+        "success",
+      );
 
       // FIX: call onProjectCreated BEFORE onClose to avoid calling setState on unmounted component
       if (editingProjectId) {
@@ -1054,7 +1595,10 @@ const CreateProjectModal = ({
       onClose();
     } catch (err) {
       const b = err.response?.data;
-      toast.error(b?.errors?.[0] || b?.message || "Submission failed. Please try again.");
+      showStatusToast(
+        b?.errors?.[0] || b?.message || "Submission failed. Please try again.",
+        "error",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -1063,110 +1607,216 @@ const CreateProjectModal = ({
   if (!isOpen) return null;
 
   const variants = {
-    enter: d => ({ opacity: 0, x: d > 0 ? 20 : -20 }),
+    enter: (d) => ({ opacity: 0, x: d > 0 ? 20 : -20 }),
     center: { opacity: 1, x: 0 },
-    exit: d => ({ opacity: 0, x: d > 0 ? -20 : 20 }),
+    exit: (d) => ({ opacity: 0, x: d > 0 ? -20 : 20 }),
   };
 
   const stepTitles = {
     1: { title: "Core Details", sub: "Start with the project's identity." },
     2: { title: "Lifecycle", sub: "Set dates, stages, risk, and budget." },
-    3: { title: "Stakeholders & Team", sub: "Assign ownership and team members." },
-    4: { title: "Workflow Setup", sub: "Configure the task statuses your team will use." },
-    5: { title: "Review & Submit", sub: "Verify everything before creating the project." },
+    3: {
+      title: "Stakeholders & Team",
+      sub: "Assign ownership and team members.",
+    },
+    4: {
+      title: "Workflow Setup",
+      sub: "Configure the task statuses your team will use.",
+    },
+    5: {
+      title: "Review & Submit",
+      sub: "Verify everything before creating the project.",
+    },
   };
 
   const stepContent = {
-    1: <Step1 fd={fd} err={errors} onChange={handleChange}
-      onNameChange={handleNameChange} onKeyChange={handleKeyChange}
-      keyAuto={keyAuto} onResetKey={resetKeyAuto} />,
+    1: (
+      <Step1
+        fd={fd}
+        err={errors}
+        onChange={handleChange}
+        onNameChange={handleNameChange}
+        onKeyChange={handleKeyChange}
+        keyAuto={keyAuto}
+        onResetKey={resetKeyAuto}
+      />
+    ),
     2: <Step2 fd={fd} err={errors} onChange={handleChange} />,
-    3: <Step3 fd={fd} err={errors} users={users}
-      onChange={handleChange} onOwner={handleOwner}
-      toggleMember={toggleMember} search={search} setSearch={setSearch} />,
-    4: <Step4 statuses={statuses} setStatuses={setStatuses} statusError={statusErr} />,
-    5: <Step5 fd={fd} statuses={statuses} users={users} />,
+    3: (
+      <Step3
+        fd={fd}
+        err={errors}
+         users={users}
+        clients={clients}
+        resources={resources}
+        onChange={handleChange}
+        onOwner={handleOwner}
+        toggleMember={toggleMember}
+        search={search}
+        setSearch={setSearch}
+         projectManagers={projectManagers}
+  resourceManagers={resourceManagers}
+  deliveryOwners={deliveryOwners}
+  editingProjectId={editingProjectId}
+        
+      />
+    ),
+    4: (
+      <Step4
+        statuses={statuses}
+        setStatuses={setStatuses}
+        statusError={statusErr}
+      />
+    ),
+    5: <Step5 fd={fd} statuses={statuses} users={users} clients={clients} resources={resources} />,
   };
 
   return (
     <motion.div
       className="pmw"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       style={{
-        position: "fixed", inset: 0,
+        position: "fixed",
+        inset: 0,
         background: "rgba(0,0,0,0.48)",
         backdropFilter: "blur(3px)",
         zIndex: 50,
-        display: "flex", alignItems: "center", justifyContent: "center",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         padding: 16,
       }}
       onClick={requestClose}
     >
       <motion.div
-        initial={{ opacity: 0, scale: .97, y: 10 }}
+        initial={{ opacity: 0, scale: 0.97, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: .97, y: 8 }}
-        transition={{ duration: .22, ease: "easeOut" }}
+        exit={{ opacity: 0, scale: 0.97, y: 8 }}
+        transition={{ duration: 0.22, ease: "easeOut" }}
         style={{
-          background: "#fff", borderRadius: 14,
+          background: "#fff",
+          borderRadius: 14,
           boxShadow: "0 24px 64px rgba(0,0,0,0.18),0 0 0 1px rgba(0,0,0,0.06)",
-          width: "100%", maxWidth: 860, height: 580,
-          display: "flex", flexDirection: "column",
+          width: "100%",
+          maxWidth: 860,
+          height: 580,
+          display: "flex",
+          flexDirection: "column",
           overflow: "hidden",
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-
           <Stepper cur={step} goTo={goTo} />
 
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+            }}
+          >
             {/* Header */}
-            <div style={{
-              padding: "18px 26px 14px", borderBottom: "1px solid #f1f5f9",
-              flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
+            <div
+              style={{
+                padding: "18px 26px 14px",
+                borderBottom: "1px solid #f1f5f9",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
               <div>
-                <h2 style={{ margin: 0, fontSize: 15.5, fontWeight: 700, color: "#0f172a", letterSpacing: "-.02em" }}>
-                  {editingProjectId ? `Edit: ${stepTitles[step].title}` : stepTitles[step].title}
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: 15.5,
+                    fontWeight: 700,
+                    color: "#0f172a",
+                    letterSpacing: "-.02em",
+                  }}
+                >
+                  {editingProjectId
+                    ? `Edit: ${stepTitles[step].title}`
+                    : stepTitles[step].title}
                 </h2>
-                <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94a3b8" }}>
+                <p
+                  style={{ margin: "2px 0 0", fontSize: 12, color: "#94a3b8" }}
+                >
                   {stepTitles[step].sub}
                 </p>
               </div>
-              <button type="button" onClick={requestClose}
+              <button
+                type="button"
+                onClick={requestClose}
                 style={{
-                  width: 28, height: 28, borderRadius: 7, border: "none", background: "transparent",
-                  cursor: "pointer", color: "#94a3b8", fontSize: 20, lineHeight: 1,
-                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 28,
+                  height: 28,
+                  borderRadius: 7,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  color: "#94a3b8",
+                  fontSize: 20,
+                  lineHeight: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   transition: "background .15s,color .15s",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#f1f5f9"; e.currentTarget.style.color = "#374151"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94a3b8"; }}
-              >×</button>
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#f1f5f9";
+                  e.currentTarget.style.color = "#374151";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "#94a3b8";
+                }}
+              >
+                ×
+              </button>
             </div>
 
             {/* Body */}
-            <div className="pmw-scroll"
-              style={{ flex: 1, overflowY: "auto", padding: "22px 26px", position: "relative" }}
+            <div
+              className="pmw-scroll"
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "22px 26px",
+                position: "relative",
+              }}
             >
               <AnimatePresence>
-                {showWarn && <WarnBar onKeep={keepEditing} onDiscard={confirmDiscard} />}
+                {showWarn && (
+                  <WarnBar onKeep={keepEditing} onDiscard={confirmDiscard} />
+                )}
               </AnimatePresence>
 
               <AnimatePresence mode="wait" custom={dir}>
                 {loading ? (
-                  <motion.div key="skel"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    transition={{ duration: .2 }}>
+                  <motion.div
+                    key="skel"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
                     <SkelStep />
                   </motion.div>
                 ) : (
-                  <motion.div key={step}
-                    custom={dir} variants={variants}
-                    initial="enter" animate="center" exit="exit"
-                    transition={{ duration: .2, ease: "easeOut" }}
+                  <motion.div
+                    key={step}
+                    custom={dir}
+                    variants={variants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.2, ease: "easeOut" }}
                   >
                     {stepContent[step]}
                   </motion.div>
@@ -1177,36 +1827,56 @@ const CreateProjectModal = ({
         </div>
 
         {/* Footer */}
-        <div style={{
-          height: 52, padding: "0 22px",
-          borderTop: "1px solid #e9eef5", background: "#f8fafc",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          flexShrink: 0,
-        }}>
+        <div
+          style={{
+            height: 52,
+            padding: "0 22px",
+            borderTop: "1px solid #e9eef5",
+            background: "#f8fafc",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexShrink: 0,
+          }}
+        >
           <span style={{ fontSize: 11.5, color: "#94a3b8", fontWeight: 500 }}>
             Step {step} of {STEPS.length}
           </span>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button type="button" className="pmw-btn-cancel" onClick={requestClose}>
+            <button
+              type="button"
+              className="pmw-btn-cancel"
+              onClick={requestClose}
+            >
               Cancel
             </button>
             {step > 1 && (
-              <button type="button" className="pmw-btn-back" onClick={back}>Back</button>
+              <button type="button" className="pmw-btn-back" onClick={back}>
+                Back
+              </button>
             )}
-            {step < STEPS.length
-              ? <button type="button" className="pmw-btn-primary" onClick={next}>
+            {step < STEPS.length ? (
+              <button type="button" className="pmw-btn-primary" onClick={next}>
                 Next <ChevronRight size={14} />
               </button>
-              : <button type="button" className="pmw-btn-primary"
-                onClick={handleSubmit} disabled={submitting}>
+            ) : (
+              <button
+                type="button"
+                className="pmw-btn-primary"
+                onClick={handleSubmit}
+                disabled={submitting}
+              >
                 {submitting
-                  ? (editingProjectId ? "Updating…" : "Creating…")
-                  : (editingProjectId ? "Update Project" : "Create Project")}
+                  ? editingProjectId
+                    ? "Updating…"
+                    : "Creating…"
+                  : editingProjectId
+                    ? "Update Project"
+                    : "Create Project"}
               </button>
-            }
+            )}
           </div>
         </div>
-
       </motion.div>
     </motion.div>
   );

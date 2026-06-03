@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, User } from "lucide-react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const AddEmployeeModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
@@ -15,12 +16,23 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
     role: "",
     managerId: "",
     password: "",
-    jobTitle:"",
+    jobTitle: "",
+    status: "ACTIVE",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const token = localStorage.getItem("token");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    document.body.style.overflow = "hidden";
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handler);
+    };
+  }, [isOpen, onClose]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,7 +49,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
       hireDate: formData.hireDate,
       role: formData.role,
       password: formData.password,
-
+      status: formData.status,
     };
 
     // 🔥 FIX: send as nested object
@@ -46,8 +58,8 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
     }
 
     try {
-      await axios.post(`${BASE_URL}/api/employee/register`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
+      await api.post(`${BASE_URL}/api/employee/register`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setSuccess("Employee added successfully!");
       setLoading(false);
@@ -65,13 +77,14 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
         role: "",
         managerId: "",
         password: "",
+        status: "ACTIVE",
       });
     } catch (err) {
       setLoading(false);
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Failed to add employee. Please try again!"
+          "Failed to add employee. Please try again!",
       );
     }
   };
@@ -141,18 +154,18 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Gender *
               </label>
-              <select
-                name="gender"
+              <FilterListbox
+                options={[
+                  { value: "", label: "Select gender" },
+                  { value: "Male", label: "Male" },
+                  { value: "Female", label: "Female" },
+                  { value: "Other", label: "Other" },
+                ]}
                 value={formData.gender}
-                onChange={handleChange}
-                required
-                className="input"
-              >
-                <option value="">Select gender</option>
-                <option>Male</option>
-                <option>Female</option>
-                <option>Other</option>
-              </select>
+                onChange={(val) =>
+                  handleChange({ target: { name: "gender", value: val } })
+                }
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

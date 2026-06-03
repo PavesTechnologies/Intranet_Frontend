@@ -1,13 +1,30 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
+import api from "../../../../../../api/axiosInstance";
+import { showStatusToast } from "../../../../../../components/toastfy/toast";
 import { Plus, Edit, Trash2 } from "lucide-react";
+import ConfirmationModal from "../../../../../../components/confirmation_modal/ConfirmationModal";
+import Button from "../../../../../../components/Button/Button";
 
 import CreateTestPlan from "./CreateTestPlan";
 import EditTestPlan from "./EditTestPlan";
 import TestPlanTableRow from "../../components/TestPlanTableRow";
 import Loader from "../../../../components/ui/Loader";
 import Modal from "../../../../components/ui/Modal";
+import { jwtDecode } from "jwt-decode";
+const token = localStorage.getItem("token");
+
+let canCreateTestPlan = false;
+
+if (token) {
+  const decoded = jwtDecode(token);
+
+  const roles = decoded?.roles || [];
+
+  canCreateTestPlan =
+    roles.includes("Tester") ||
+    roles.includes("Project_Manager");
+}
+
 
 const TestPlansList = ({ projectId }) => {
   const [testPlans, setTestPlans] = useState([]);
@@ -15,6 +32,8 @@ const TestPlansList = ({ projectId }) => {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editPlanData, setEditPlanData] = useState(null);
+  const [deletePlanConfirmOpen, setDeletePlanConfirmOpen] = useState(false);
+  const [planIdToDelete, setPlanIdToDelete] = useState(null);
 
   const token = localStorage.getItem("token");
 
@@ -22,17 +41,17 @@ const TestPlansList = ({ projectId }) => {
   const fetchTestPlans = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/test-plans`,
+      const res = await api.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/test-plans`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
       setTestPlans(res.data);
     } catch (err) {
-      toast.error("Failed to fetch Test Plans.");
+      showStatusToast("Failed to fetch Test Plans.", "error");
     } finally {
       setLoading(false);
     }
@@ -43,34 +62,49 @@ const TestPlansList = ({ projectId }) => {
   }, [projectId]);
 
   // Handle delete
-  const handleDelete = async (planId) => {
-    if (!window.confirm("Are you sure you want to delete this Test Plan?")) return;
+  const handleDelete = (planId) => {
+    setPlanIdToDelete(planId);
+    setDeletePlanConfirmOpen(true);
+  };
+
+  const executeDeletePlan = async () => {
     try {
-      await axios.delete(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/test-plans/${planId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      await api.delete(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/test-plans/${planIdToDelete}`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success("Test Plan deleted successfully.");
+      showStatusToast("Test Plan deleted successfully.", "success");
       fetchTestPlans();
     } catch (err) {
-      toast.error("Failed to delete Test Plan.");
+      showStatusToast("Failed to delete Test Plan.", "error");
+    } finally {
+      setDeletePlanConfirmOpen(false);
+      setPlanIdToDelete(null);
     }
   };
 
   return (
+    <>
+    <ConfirmationModal
+      isOpen={deletePlanConfirmOpen}
+      title="Delete Test Plan"
+      message="Are you sure you want to delete this Test Plan? This action cannot be undone."
+      onConfirm={executeDeletePlan}
+      onCancel={() => { setDeletePlanConfirmOpen(false); setPlanIdToDelete(null); }}
+      confirmText="Delete"
+      variant="danger"
+    />
     <div className="p-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Test Plans</h2>
-        <button
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-          onClick={() => setShowCreateModal(true)}
-        >
-          <Plus size={16} />
-          Create Test Plan
-        </button>
+
+        {canCreateTestPlan && (
+          <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+            <Plus size={16} />
+            Create Test Plan
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -122,10 +156,7 @@ const TestPlansList = ({ projectId }) => {
 
       {/* Edit Modal */}
       {editPlanData && (
-        <Modal
-          title="Edit Test Plan"
-          onClose={() => setEditPlanData(null)}
-        >
+        <Modal title="Edit Test Plan" onClose={() => setEditPlanData(null)}>
           <EditTestPlan
             projectId={projectId}
             planData={editPlanData}
@@ -137,6 +168,7 @@ const TestPlansList = ({ projectId }) => {
         </Modal>
       )}
     </div>
+    </>
   );
 };
 

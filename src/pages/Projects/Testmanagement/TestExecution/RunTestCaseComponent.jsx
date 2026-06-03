@@ -1,38 +1,41 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import BugReportModal from "./BugReportModal";
-import { se } from "date-fns/locale";
 
-export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
+export default function RunTestCaseComponent({ runId, runCaseId, testCaseId, onClose }) {
   const [isLoading, setIsLoading] = useState(false);
-  const [testCase, setTestCase] = useState(null);
+  const [testCase, setTestCase] = useState({ title: `Test Case #${testCaseId || runCaseId}` });
   const [steps, setSteps] = useState([]);
   const [stepResults, setStepResults] = useState({});
-  const [selectedSteps, setSelectedSteps] = useState([]);
   const [showBugModal, setShowBugModal] = useState(false);
   const [failingStep, setFailingStep] = useState(null);
+  const [failedStepId, setFailedStepId] = useState(null);
 
   // Load steps
   const fetchTestCaseExecution = async () => {
     try {
       setIsLoading(true);
       const res = await axiosInstance.get(
-        `${
-          import.meta.env.VITE_PMS_BASE_URL
-        }/api/test-execution/run-cases/${testCaseId}/steps`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/run-cases/${runCaseId}/steps`,
       );
-      setSteps(res.data);
-      setTestCase({ title: `Executing Test Case ${testCaseId}` });
+      const stepsData = Array.isArray(res.data) ? res.data : res.data?.steps || [];
+      setSteps(stepsData);
+      if (res.data?.testCase?.title) {
+        setTestCase(res.data.testCase);
+      }
       setIsLoading(false);
     } catch (err) {
-      toast.error("Failed to load steps");
+      console.error("Failed to load test case execution:", err);
+      showStatusToast("Failed to load test case execution", "error");
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    if (!runCaseId) return;
     fetchTestCaseExecution();
-  }, []);
+  }, [runCaseId]);
 
   // -----------------------------------------------------
   // Single Step Update
@@ -44,80 +47,63 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
     if (action === "FAIL") {
       const stepObj = steps.find((s) => s.id === stepId);
       setFailingStep(stepObj);
+      setFailedStepId(stepId);
       setShowBugModal(true);
-    //   return;
     }
 
     try {
       await axiosInstance.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-execution/steps/execute`,
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/steps/execute`,
         {
-          runCaseId: testCaseId,
+          runCaseId,
           stepId,
           status: apiStatus,
           actualResult: "",
-        }
+        },
       );
 
       setSteps((prev) =>
-        prev.map((s) => (s.id === stepId ? { ...s, status: apiStatus } : s))
+        prev.map((s) => (s.id === stepId ? { ...s, status: apiStatus } : s)),
       );
 
       setStepResults((prev) => ({ ...prev, [stepId]: apiStatus }));
-      toast.success(`Step updated: ${apiStatus}`);
+      showStatusToast(`Step updated: ${apiStatus}`, "success");
     } catch (err) {
-      toast.error("Failed to update step");
+      console.error("Failed to update step:", err);
+      showStatusToast("Failed to update step", "error");
     }
   };
 
   // -----------------------------------------------------
-  // BULK UPDATE
+  // SUBMIT RUN CASE RESULT
   // -----------------------------------------------------
-  const bulkUpdate = async (action) => {
-    if (selectedSteps.length === 0) return;
+  const submitRunCaseResult = async (action) => {
+    if (action === "FAIL" && !failedStepId) {
+      showStatusToast("Please mark the failing step before failing the test case.", "error");
+      return;
+    }
 
     try {
-      let endpoint = "";
-      let apiStatus = "";
+      const url =
+        action === "PASS"
+          ? `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/cases/pass`
+          : action === "FAIL"
+            ? `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/cases/fail`
+            : `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/cases/block`;
 
-      if (action === "PASS") {
-        endpoint =`${
-          import.meta.env.VITE_PMS_BASE_URL
-        }/api/test-execution/test-runs/${runId}/bulk-pass`;
-        apiStatus = "PASSED";
-      } else if (action === "SKIP") {
-        endpoint = `${
-          import.meta.env.VITE_PMS_BASE_URL
-        }/api/test-execution/test-runs/${runId}/bulk-skip`;
-        apiStatus = "SKIPPED";
-      }
+      const body = { runCaseId, notes: "" };
+      if (action === "FAIL") body.stepId = failedStepId;
 
-      await axiosInstance.post(endpoint, {
-        testCaseIds: testCaseId,
-      });
+      await axiosInstance.post(url, body);
 
-      toast.success(`${selectedSteps.length} steps updated`);
-
-      setSteps((prev) =>
-        prev.map((s) =>
-          selectedSteps.includes(s.id) ? { ...s, status: apiStatus } : s
-        )
-      );
-
-      setSelectedSteps([]);
+      const apiStatus = action === "PASS" ? "PASSED" : action === "FAIL" ? "FAILED" : "BLOCKED";
+      showStatusToast(`Test case marked as ${apiStatus}`, "success");
+      if (onClose) onClose();
     } catch (err) {
-      toast.error("Bulk update failed");
+      console.error("Failed to submit result:", err);
+      showStatusToast("Failed to submit test result", "error");
     }
   };
-
-  // -----------------------------------------------------
-  // SELECT ALL CHECKBOX
-  // -----------------------------------------------------
-  const allSelected = selectedSteps.length === steps.length;
-  const partiallySelected =
-    selectedSteps.length > 0 && selectedSteps.length < steps.length;
-
-  if (!testCase) return null;
 
   return (
     <div className="fixed inset-0 bg-black/40 flex justify-center items-center p-4 z-50">
@@ -125,17 +111,11 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
       {showBugModal && failingStep && (
         <BugReportModal
           step={failingStep}
-          runCaseId={testCaseId}
+          runCaseId={runCaseId}
           onClose={() => {
             setShowBugModal(false);
             setFailingStep(null);
-            // updateStepResult(failingStep.id, "FAIL"); // instant UI update
-            // fetchTestCaseExecution(); // sync with backend
           }}
-
-          // onSuccess={() => {
-          //     updateStepResult(failingStep.id, "FAIL");
-          // }}
         />
       )}
 
@@ -151,89 +131,68 @@ export default function RunTestCaseComponent({ runId, testCaseId, onClose }) {
           </button>
         </div>
 
-        {/* BULK BAR */}
-        {selectedSteps.length > 0 && (
-          <div className="p-3 flex gap-4 bg-yellow-50 border-b border-yellow-300">
-            <span className="font-semibold text-gray-700">
-              {selectedSteps.length} step(s) selected
-            </span>
-
+        {/* COMPLETION ACTIONS */}
+        <div className="p-4 bg-gray-50 border-t flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            Execute all steps above, then mark the test case as complete.
+          </div>
+          <div className="flex gap-2">
             <button
-              onClick={() => bulkUpdate("PASS")}
-              className="px-3 py-1 bg-green-600 text-white rounded"
+              onClick={() => submitRunCaseResult("PASS")}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
             >
-              ✔ Pass Selected
+              ✅ Pass Test Case
             </button>
-
             <button
-              onClick={() => bulkUpdate("SKIP")}
-              className="px-3 py-1 bg-blue-600 text-white rounded"
+              onClick={() => submitRunCaseResult("FAIL")}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
             >
-              ➖ Skip Selected
+              ❌ Fail Test Case
+            </button>
+            <button
+              onClick={() => submitRunCaseResult("BLOCK")}
+              className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+            >
+              🚫 Block Test Case
             </button>
           </div>
-        )}
-
-        <div className="p-4 flex items-center gap-2 border-b">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            ref={(el) => {
-              if (el) el.indeterminate = partiallySelected;
-            }}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setSelectedSteps(steps.map((s) => s.id));
-              } else {
-                setSelectedSteps([]);
-              }
-            }}
-          />
-          <span className="text-gray-700 font-medium">Select All Steps</span>
         </div>
 
         {/* STEPS LIST */}
         <div className="max-h-[70vh] overflow-y-auto p-6 space-y-6">
-          {steps.map((step) => {
-            const effectiveStatus = stepResults[step.id] || step.status;
+          {isLoading ? (
+            <div className="text-center text-gray-500 py-10">
+              <p className="text-lg">Loading steps...</p>
+            </div>
+          ) : steps.length === 0 ? (
+            /* NO STEPS FALLBACK MESSAGE */
+            <div className="text-center text-gray-500 py-10">
+              <p className="text-lg font-medium">No test steps found for this test case.</p>
+            </div>
+          ) : 
+            steps.map((step) => {
+              const effectiveStatus = stepResults[step.id] || step.status;
 
-            return (
-              <div
-                key={step.id}
-                className={`p-4 border rounded-xl shadow-sm ${
-                  effectiveStatus === "PASSED"
-                    ? "bg-green-50 border-green-300"
-                    : effectiveStatus === "FAILED"
-                    ? "bg-red-50 border-red-300"
-                    : effectiveStatus === "SKIPPED"
-                    ? "bg-blue-50 border-blue-300"
-                    : "bg-gray-50 border-gray-200"
-                }`}
-              >
+              return (
+                <div
+                  key={step.id}
+                  className={`p-4 border rounded-xl shadow-sm ${
+                    effectiveStatus === "PASSED"
+                      ? "bg-green-50 border-green-300"
+                      : effectiveStatus === "FAILED"
+                      ? "bg-red-50 border-red-300"
+                      : effectiveStatus === "SKIPPED"
+                      ? "bg-blue-50 border-blue-300"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
                 {/* STEP HEADER */}
                 <div className="flex justify-between mb-3">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedSteps.includes(step.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedSteps((prev) => [...prev, step.id]);
-                        } else {
-                          setSelectedSteps((prev) =>
-                            prev.filter((id) => id !== step.id)
-                          );
-                        }
-                      }}
-                      className="mt-1"
-                    />
-
-                    <div>
-                      <p className="text-xs text-gray-500">
-                        #{step.stepNumber} ACTION
-                      </p>
-                      <p className="text-md font-semibold">{step.action}</p>
-                    </div>
+                  <div>
+                    <p className="text-xs text-gray-500">
+                      #{step.stepNumber} ACTION
+                    </p>
+                    <p className="text-md font-semibold">{step.action}</p>
                   </div>
 
                   <div className="text-right">

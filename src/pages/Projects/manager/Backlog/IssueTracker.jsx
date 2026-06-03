@@ -1,21 +1,31 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
-import { FiEdit, FiTrash, FiX, FiFilter } from "react-icons/fi";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import { ChevronDown, ChevronRight, ArrowLeft, LayoutList } from "lucide-react";
+import api from "../../../../api/axiosInstance";
+import {
+  EditIcon,
+  DeleteIcon,
+} from "../../../../components/icons";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
+import {
+  ChevronDown,
+  ChevronRight,
+  ArrowLeft,
+  LayoutList,
+  Search,
+  RotateCcw,
+} from "lucide-react";
 import EditStoryForm from "./EditStoryForm";
 import EditTaskForm from "./EditTaskForm";
 import EditEpicForm from "./EditEpicForm";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
+import Button from "../../../../components/Button/Button";
+import RiskBadge from "../RiskBadge";
 
 const IssueTracker = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { projectId: paramProjectId } = useParams(); // 2. Keep this for fallback
-  
-
 
   // 3. Extract your variables from the router state
   const projectId = location.state?.projectId || paramProjectId;
@@ -26,13 +36,29 @@ const IssueTracker = () => {
     storiesData: [],
     tasksData: [],
   });
+  const [riskMap, setRiskMap] = useState({});
 
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
-  const [editModal, setEditModal] = useState({ visible: false, type: null, id: null });
+  const [editModal, setEditModal] = useState({
+    visible: false,
+    type: null,
+    id: null,
+  });
 
   const [openEpics, setOpenEpics] = useState([]);
   const [openStories, setOpenStories] = useState([]);
+  // Delete confirmation state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [issueToDelete, setIssueToDelete] = useState(null);
+
+  const [filters, setFilters] = useState({
+    search: "",
+    type: "ALL",
+    priority: "ALL",
+    status: "ALL",
+    assignee: "ALL",
+  });
 
   const token = localStorage.getItem("token");
   const headers = {
@@ -40,33 +66,22 @@ const IssueTracker = () => {
     "Content-Type": "application/json",
   };
 
-  // Filter state
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterRef = useRef(null);
-
-  const [filters, setFilters] = useState({
-    types: [],
-    statuses: [],
-    priorities: [],
-  });
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (filterRef.current && !filterRef.current.contains(e.target)) {
-        setFilterOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   const fetchIssues = async () => {
     try {
       setLoading(true);
       const [epicsRes, storiesRes, tasksRes] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`, { headers }),
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`, { headers }),
-        axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/tasks`, { headers }),
+        api.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+          { headers },
+        ),
+        api.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
+          { headers },
+        ),
+        api.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
+          { headers },
+        ),
       ]);
 
       const epicsData = epicsRes.data.map((e) => ({
@@ -76,7 +91,7 @@ const IssueTracker = () => {
         reporterName: e.reporterName || e.reporter?.name || "Not Applicable",
         assigneeName: e.assigneeName || e.assignee?.name || "Not Applicable",
         priority: (e.priority || "MEDIUM").toUpperCase(),
-        status: e.status  || e.statusName || "BACKLOG",
+        status: e.status || e.statusName || "BACKLOG",
       }));
 
       const storiesData = storiesRes.data.map((s) => ({
@@ -94,8 +109,8 @@ const IssueTracker = () => {
         const normalizedStatus = t.statusName
           ? String(t.statusName).toUpperCase().replace(/\s+/g, "_")
           : t.status
-          ? String(t.status).toUpperCase().replace(/\s+/g, "_")
-          : "BACKLOG";
+            ? String(t.status).toUpperCase().replace(/\s+/g, "_")
+            : "BACKLOG";
 
         return {
           ...t,
@@ -114,7 +129,7 @@ const IssueTracker = () => {
 
       setIssues({ epicsData, storiesData, tasksData });
     } catch (err) {
-      toast.error("Failed to load issues");
+      showStatusToast("Failed to load issues", "error");
     } finally {
       setLoading(false);
     }
@@ -122,10 +137,34 @@ const IssueTracker = () => {
 
   const fetchProjects = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`, { headers });
+      const res = await api.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
+        { headers },
+      );
       setProjects(res.data || []);
     } catch (err) {
-      toast.error("Failed to load projects");
+      showStatusToast("Failed to load projects", "error");
+    }
+  };
+
+  const fetchRiskMap = async () => {
+    const numId = Number(projectId);
+    if (!numId || isNaN(numId)) return;
+    try {
+      const res = await axios.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${numId}/risks/issues`,
+        { headers, params: { page: 0, size: 5000 } },
+      );
+      const items = Array.isArray(res.data?.content)
+        ? res.data.content
+        : Array.isArray(res.data) ? res.data : [];
+      const map = {};
+      items.forEach((r) => {
+        if (r.linkedType && r.linkedId) map[`${r.linkedType}-${r.linkedId}`] = r.riskCount ?? 1;
+      });
+      setRiskMap(map);
+    } catch {
+      // non-critical
     }
   };
 
@@ -133,6 +172,7 @@ const IssueTracker = () => {
     if (projectId) {
       fetchIssues();
       fetchProjects();
+      fetchRiskMap();
     }
   }, [projectId]);
 
@@ -144,53 +184,23 @@ const IssueTracker = () => {
     if (issue.type === "Task") endpoint = `/api/tasks/${issue.id}`;
 
     try {
-      await axios.delete(`${import.meta.env.VITE_PMS_BASE_URL}${endpoint}`, { headers });
+      await api.delete(`${window.__APP_CONFIG__.PMS_BASE_URL}${endpoint}`, {
+        headers,
+      });
       fetchIssues();
-      toast.success(`${issue.type} deleted successfully!`);
+      showStatusToast(`${issue.type} deleted successfully!`, "success");
     } catch (err) {
-      toast.error(`Failed to delete ${issue.type}`);
+      showStatusToast(`Failed to delete ${issue.type}`, "error");
     }
   };
 
   const handleDelete = (issue) => {
-    // Custom UI injected directly into the Toast
-    const ConfirmToast = ({ closeToast }) => (
-      <div className="flex flex-col gap-3 py-1">
-        <p className="text-sm text-gray-800 font-medium">
-          Are you sure you want to delete this {issue.type}?
-        </p>
-        <div className="flex justify-end gap-2 mt-1">
-          <button
-            onClick={closeToast}
-            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-200 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              executeDelete(issue);
-              closeToast();
-            }}
-            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    );
-
-    // Trigger the custom toast
-    toast.warn(<ConfirmToast />, {
-      position: "top-center",
-      autoClose: false,      // Stays open until they click a button
-      closeOnClick: false,   // Clicking the toast body won't close it
-      draggable: false,      // Prevents accidental swiping
-      closeButton: false,    // Hides the default 'X' button
-      icon: false,           // Hides the default warning icon to save space
-    });
+    setIssueToDelete(issue);
+    setDeleteConfirmOpen(true);
   };
 
-  const handleEdit = (issue) => setEditModal({ visible: true, type: issue.type, id: issue.id });
+  const handleEdit = (issue) =>
+    setEditModal({ visible: true, type: issue.type, id: issue.id });
 
   const handleUpdated = (msg) => {
     setEditModal({ visible: false });
@@ -202,9 +212,12 @@ const IssueTracker = () => {
   };
 
   const handleView = (issue) => {
-    navigate(`/projects/${projectId}/issues/${issue.type.toLowerCase()}/${issue.id}/view`, {
-      state: { issue },
-    });
+    navigate(
+      `/projects/${projectId}/issues/${issue.type.toLowerCase()}/${issue.id}/view`,
+      {
+        state: { issue },
+      },
+    );
   };
 
   // const currentProject = projects.find((p) => p.id === Number(projectId));
@@ -233,25 +246,53 @@ const IssueTracker = () => {
   };
 
   const toggleEpic = (id) =>
-    setOpenEpics((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+    setOpenEpics((p) =>
+      p.includes(id) ? p.filter((x) => x !== id) : [...p, id],
+    );
 
   const toggleStory = (id) =>
-    setOpenStories((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+    setOpenStories((p) =>
+      p.includes(id) ? p.filter((x) => x !== id) : [...p, id],
+    );
 
-  const isFiltersEmpty = () =>
-    filters.types.length === 0 && filters.statuses.length === 0 && filters.priorities.length === 0;
+  const allAssignees = Array.from(
+    new Set([
+      ...issues.epicsData.map((e) => e.assigneeName),
+      ...issues.storiesData.map((s) => s.assigneeName),
+      ...issues.tasksData.map((t) => t.assigneeName),
+    ].filter(Boolean)),
+  ).sort();
 
   const matchesFilters = (issue) => {
-    if (isFiltersEmpty()) return true;
-    if (filters.types.length > 0 && !filters.types.includes(issue.type)) return false;
-    if (filters.priorities.length > 0) {
-      const pr = (issue.priority || "").toUpperCase();
-      if (!filters.priorities.includes(pr)) return false;
+    // Search
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      const match =
+        issue.title?.toLowerCase().includes(q) ||
+        issue.reporterName?.toLowerCase().includes(q) ||
+        issue.assigneeName?.toLowerCase().includes(q);
+      if (!match) return false;
     }
-    if (filters.statuses.length > 0) {
-      const st = String(issue.status || "").toUpperCase().replace(/\s+/g, "_");
-      if (!filters.statuses.includes(st)) return false;
+
+    // Type
+    if (filters.type !== "ALL" && issue.type !== filters.type) return false;
+
+    // Priority
+    if (filters.priority !== "ALL" && issue.priority !== filters.priority)
+      return false;
+
+    // Status
+    if (filters.status !== "ALL") {
+      const st = String(issue.status || "")
+        .toUpperCase()
+        .replace(/\s+/g, "_");
+      if (st !== filters.status) return false;
     }
+
+    // Assignee
+    if (filters.assignee !== "ALL" && issue.assigneeName !== filters.assignee)
+      return false;
+
     return true;
   };
 
@@ -281,16 +322,20 @@ const IssueTracker = () => {
   const TableRow = ({ issue, level }) => {
     const isEpic = issue.type === "Epic";
     const isStory = issue.type === "Story";
-    const rowBg = level === 0 ? "bg-white" : level === 1 ? "bg-slate-50/50" : "bg-white";
-
+    const rowBg =
+      level === 0 ? "bg-white" : level === 1 ? "bg-slate-50/50" : "bg-white";
+    const riskCount = riskMap[`${issue.type}-${issue.id}`] ?? 0;
     return (
-      <tr 
-        className={`${rowBg} hover:bg-indigo-50/60 border-b border-gray-100 cursor-pointer transition-all duration-200 group`} 
+      <tr
+        className={`${rowBg} hover:bg-indigo-50/60 border-b border-gray-100 cursor-pointer transition-all duration-200 group`}
         onClick={() => handleView(issue)}
       >
         <td className="py-3 px-4">
-          <div className="flex items-center gap-2" style={{ paddingLeft: `${level * 28}px` }}>
-            {(isEpic || isStory) ? (
+          <div
+            className="flex items-center gap-2"
+            style={{ paddingLeft: `${level * 28}px` }}
+          >
+            {isEpic || isStory ? (
               <button
                 className="p-1 rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors focus:outline-none"
                 onClick={(e) => {
@@ -308,35 +353,54 @@ const IssueTracker = () => {
             ) : (
               <div className="w-6" /> // spacer
             )}
-            <span className={`truncate text-gray-800 group-hover:text-indigo-700 transition-colors ${level === 0 ? "font-semibold" : "font-medium"}`}>
+            <span
+              className={`truncate text-gray-800 group-hover:text-indigo-700 transition-colors ${level === 0 ? "font-semibold" : "font-medium"}`}
+            >
               {issue.title}
             </span>
+            <RiskBadge
+              count={riskCount}
+              issueType={issue.type}
+              issueId={issue.id}
+              projectId={Number(projectId) || projectId}
+              navigate={navigate}
+            />
           </div>
         </td>
 
         <td className="px-3">
-          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${typeColors[issue.type]}`}>
+          <span
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${typeColors[issue.type]}`}
+          >
             {issue.type}
           </span>
         </td>
 
         <td className="px-3">
-          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${priorityColors[issue.priority] || "bg-gray-100 text-gray-700"}`}>
+          <span
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${priorityColors[issue.priority] || "bg-gray-100 text-gray-700"}`}
+          >
             {issue.priority}
           </span>
         </td>
 
         <td className="px-3">
-          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase whitespace-nowrap ${statusColors[issue.status] || "bg-gray-100 text-gray-700"}`}>
+          <span
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase whitespace-nowrap ${statusColors[issue.status] || "bg-gray-100 text-gray-700"}`}
+          >
             {String(issue.status).replace("_", " ")}
           </span>
         </td>
 
-        <td className="px-3 text-sm text-gray-600 truncate max-w-[130px]">{issue.assigneeName}</td>
-        <td className="px-3 text-sm text-gray-600 truncate max-w-[130px]">{issue.reporterName}</td>
+        <td className="px-3 text-sm text-gray-600 truncate max-w-[130px]">
+          {issue.assigneeName}
+        </td>
+        <td className="px-3 text-sm text-gray-600 truncate max-w-[130px]">
+          {issue.reporterName}
+        </td>
 
         <td className="px-4 py-3">
-          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-2">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -345,7 +409,7 @@ const IssueTracker = () => {
               className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 rounded-md transition-colors"
               title="Edit"
             >
-              <FiEdit size={16} />
+              <EditIcon size={16} />
             </button>
             <button
               onClick={(e) => {
@@ -355,7 +419,7 @@ const IssueTracker = () => {
               className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
               title="Delete"
             >
-              <FiTrash size={16} />
+              <DeleteIcon size={16} />
             </button>
           </div>
         </td>
@@ -397,7 +461,11 @@ const IssueTracker = () => {
                             .filter((t) => t.storyId === story.id)
                             .filter((t) => matchesFilters(t))
                             .map((task) => (
-                              <TableRow key={`T-${task.id}`} issue={task} level={2} />
+                              <TableRow
+                                key={`T-${task.id}`}
+                                issue={task}
+                                level={2}
+                              />
                             ))}
                       </React.Fragment>
                     ))}
@@ -413,7 +481,10 @@ const IssueTracker = () => {
             return (
               <React.Fragment>
                 <tr className="bg-slate-50">
-                  <td colSpan={7} className="px-4 py-3 border-y border-gray-200">
+                  <td
+                    colSpan={7}
+                    className="px-4 py-3 border-y border-gray-200"
+                  >
                     <div className="flex items-center gap-2 text-sm font-semibold text-gray-500 uppercase tracking-wider">
                       Stories Unassigned to Epics
                     </div>
@@ -426,7 +497,13 @@ const IssueTracker = () => {
                       issues.tasksData
                         .filter((t) => t.storyId === story.id)
                         .filter((t) => matchesFilters(t))
-                        .map((task) => <TableRow key={`T2-${task.id}`} issue={task} level={1} />)}
+                        .map((task) => (
+                          <TableRow
+                            key={`T2-${task.id}`}
+                            issue={task}
+                            level={1}
+                          />
+                        ))}
                   </React.Fragment>
                 ))}
               </React.Fragment>
@@ -442,7 +519,10 @@ const IssueTracker = () => {
             return (
               <React.Fragment>
                 <tr className="bg-slate-50">
-                  <td colSpan={7} className="px-4 py-3 border-y border-gray-200">
+                  <td
+                    colSpan={7}
+                    className="px-4 py-3 border-y border-gray-200"
+                  >
                     <div className="flex items-center gap-2 text-sm font-semibold text-gray-500 uppercase tracking-wider">
                       Tasks Unassigned to Stories
                     </div>
@@ -479,122 +559,103 @@ const IssueTracker = () => {
     });
   };
 
-  const clearFilters = () => setFilters({ types: [], statuses: [], priorities: [] });
+  // No-op for unused function clean up
+  // const clearFilters = () =>
+  //   setFilters({ types: [], statuses: [], priorities: [] });
 
   return (
     <div className="max-w-7xl mx-auto mt-8 px-6 pb-12 space-y-6">
-      <ToastContainer position="top-right" autoClose={3000} />
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <LayoutList className="text-indigo-600" size={26} />
-            Issue Tracker
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Project: <span className="font-medium text-gray-800">{projectName}</span>
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="relative" ref={filterRef}>
-            <button
-              onClick={() => setFilterOpen((s) => !s)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-indigo-600 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            >
-              <FiFilter size={16} />
-              Filter
-              {(filters.types.length > 0 || filters.statuses.length > 0 || filters.priorities.length > 0) && (
-                <span className="flex items-center justify-center w-5 h-5 ml-1 text-xs text-white bg-indigo-600 rounded-full">
-                  {filters.types.length + filters.statuses.length + filters.priorities.length}
-                </span>
-              )}
-            </button>
-
-            {filterOpen && (
-              <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-4 z-30">
-                <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-                  <strong className="text-sm font-semibold text-gray-800">Filter Issues</strong>
-                  <button
-                    onClick={clearFilters}
-                    className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
-                  >
-                    Clear All
-                  </button>
-                </div>
-
-                <div className="space-y-4 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
-                  <div>
-                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Issue Type</div>
-                    <div className="space-y-2">
-                      {TYPE_OPTIONS.map((t) => (
-                        <label key={t} className="flex items-center gap-3 cursor-pointer group">
-                          <input
-                            type="checkbox"
-                            checked={filters.types.includes(t)}
-                            onChange={() => toggleFilterValue("types", t)}
-                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                          />
-                          <span className="text-sm text-gray-700 group-hover:text-gray-900">{t}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Status</div>
-                    <div className="space-y-2">
-                      {STATUS_OPTIONS.map((s) => (
-                        <label key={s.value} className="flex items-center gap-3 cursor-pointer group">
-                          <input
-                            type="checkbox"
-                            checked={filters.statuses.includes(s.value)}
-                            onChange={() => toggleFilterValue("statuses", s.value)}
-                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                          />
-                          <span className="text-sm text-gray-700 group-hover:text-gray-900">{s.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Priority</div>
-                    <div className="space-y-2">
-                      {PRIORITY_OPTIONS.map((p) => (
-                        <label key={p} className="flex items-center gap-3 cursor-pointer group">
-                          <input
-                            type="checkbox"
-                            checked={filters.priorities.includes(p)}
-                            onChange={() => toggleFilterValue("priorities", p)}
-                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                          />
-                          <span className="text-sm text-gray-700 group-hover:text-gray-900 capitalize">{p.toLowerCase()}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-gray-100 flex justify-end">
-                  <button
-                    onClick={() => setFilterOpen(false)}
-                    className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
-                  >
-                    Apply Filters
-                  </button>
-                </div>
-              </div>
-            )}
+      <div className="flex flex-col gap-4 pb-6 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <LayoutList className="text-indigo-600" size={26} />
+              Issue Tracker
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Project:{" "}
+              <span className="font-medium text-gray-800">{projectName}</span>
+            </p>
           </div>
-
           <button
             onClick={() => navigate(-1)}
             className="flex items-center justify-center p-2.5 text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-800 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             title="Go Back"
           >
             <ArrowLeft size={18} />
+          </button>
+        </div>
+
+        {/* HORIZONTAL FILTER BAR */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[280px]">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              size={18}
+            />
+            <input
+              type="text"
+              placeholder="Search by title, key or assignee..."
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm"
+              value={filters.search}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, search: e.target.value }))
+              }
+            />
+          </div>
+
+          <InlineFilter
+            label="Type"
+            value={filters.type}
+            options={["ALL", "Epic", "Story", "Task"]}
+            onChange={(v) => setFilters((f) => ({ ...f, type: v }))}
+          />
+
+          <InlineFilter
+            label="Priority"
+            value={filters.priority}
+            options={["ALL", "LOW", "MEDIUM", "HIGH", "CRITICAL"]}
+            onChange={(v) => setFilters((f) => ({ ...f, priority: v }))}
+          />
+
+          <InlineFilter
+            label="Status"
+            value={filters.status}
+            options={[
+              { label: "All", value: "ALL" },
+              { label: "Backlog", value: "BACKLOG" },
+              { label: "In Progress", value: "IN_PROGRESS" },
+              { label: "Review", value: "REVIEW" },
+              { label: "Done", value: "DONE" },
+              { label: "To Do", value: "TO_DO" },
+            ]}
+            onChange={(v) => setFilters((f) => ({ ...f, status: v }))}
+          />
+
+          <InlineFilter
+            label="Assignee"
+            value={filters.assignee}
+            options={["ALL", ...allAssignees]}
+            onChange={(v) => setFilters((f) => ({ ...f, assignee: v }))}
+          />
+
+          <button
+            onClick={() =>
+              setFilters({
+                search: "",
+                type: "ALL",
+                priority: "ALL",
+                status: "ALL",
+                assignee: "ALL",
+              })
+            }
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-transparent hover:border-indigo-100 rounded-xl transition-all"
+          >
+            <RotateCcw size={16} />
+            Reset
           </button>
         </div>
       </div>
@@ -641,6 +702,16 @@ const IssueTracker = () => {
           )}
         </Modal>
       )}
+
+      <ConfirmationModal
+        isOpen={deleteConfirmOpen}
+        title={`Delete ${issueToDelete?.type || "Issue"}`}
+        message={`Are you sure you want to delete this ${issueToDelete?.type?.toLowerCase() || "issue"}? This action cannot be undone.`}
+        onConfirm={() => { setDeleteConfirmOpen(false); executeDelete(issueToDelete); setIssueToDelete(null); }}
+        onCancel={() => { setDeleteConfirmOpen(false); setIssueToDelete(null); }}
+        confirmText="Delete"
+        variant="danger"
+      />
     </div>
   );
 };
@@ -661,5 +732,63 @@ const Modal = ({ children, onClose }) => (
     </div>
   </div>
 );
+
+// --- Inline Filter Component ---
+const InlineFilter = ({ label, value, options, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const displayValue = typeof options[0] === 'object' 
+    ? options.find(o => o.value === value)?.label || value
+    : value;
+
+  return (
+    <div className="relative w-fit" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium transition-all shadow-sm hover:border-gray-300 focus:ring-2 focus:ring-indigo-500/10"
+      >
+        <span className="text-slate-500 font-normal">{label}</span>
+        <span className="text-slate-900">{displayValue === "ALL" ? "All" : displayValue}</span>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 mt-2 min-w-full w-max max-w-[280px] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1.5 overflow-hidden">
+          {options.map((opt) => {
+            const val = typeof opt === 'object' ? opt.value : opt;
+            const lab = typeof opt === 'object' ? opt.label : opt;
+            const isSelected = value === val;
+
+            return (
+              <button
+                key={val}
+                onClick={() => {
+                  onChange(val);
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                  isSelected 
+                    ? "bg-indigo-50 text-indigo-700 font-semibold" 
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {lab === "ALL" ? "All" : lab}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default IssueTracker;

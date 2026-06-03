@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
+import api from "../../../../api/axiosInstance";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import { X } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import FormTextArea from "../../../../components/forms/FormTextArea";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
+import Button from "../../../../components/Button/Button";
 
 // 🔥 Moved Wrapper OUTSIDE to prevent focus loss on re-render
 const Wrapper = ({ children, mode, onClose }) => {
@@ -25,11 +26,7 @@ const Wrapper = ({ children, mode, onClose }) => {
       </div>
     );
   }
-  return (
-    <div className="w-full h-full flex flex-col bg-white">
-      {children}
-    </div>
-  );
+  return <div className="w-full h-full flex flex-col bg-white">{children}</div>;
 };
 
 const EditTaskForm = ({
@@ -78,25 +75,25 @@ const EditTaskForm = ({
       try {
         const [taskRes, userRes, storyRes, sprintRes, statusRes] =
           await Promise.all([
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/tasks/${taskId}`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/stories`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/statuses`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
+              axiosConfig,
             ),
           ]);
 
@@ -113,7 +110,7 @@ const EditTaskForm = ({
           sprintId: task.sprintId ? String(task.sprintId) : "",
           assigneeId: task.assigneeId ? String(task.assigneeId) : "",
           reporterId: task.reporterId ? String(task.reporterId) : "",
-          
+
           startDate: task.startDate ? task.startDate.split("T")[0] : "",
           dueDate: task.dueDate ? task.dueDate.split("T")[0] : "",
           billable: task.billable ? "true" : "false",
@@ -128,7 +125,7 @@ const EditTaskForm = ({
         setStatuses(statusRes.data || []);
       } catch (err) {
         console.error(err);
-        toast.error("Failed to load task details");
+        showStatusToast("Failed to load task details", "error");
       } finally {
         setLoading(false);
       }
@@ -147,43 +144,49 @@ const EditTaskForm = ({
   };
 
   // 🔥 Build Changed Fields Only
-//   const buildUpdatedPayload = () => {
+  //   const buildUpdatedPayload = () => {
 
-//     const dateKeys = ["startDate", "dueDate"];
-//     if (!originalData) return formData;
-//     const payload = {};
+  //     const dateKeys = ["startDate", "dueDate"];
+  //     if (!originalData) return formData;
+  //     const payload = {};
 
-//     const numericKeys = [
-//       "statusId",
-//       "sprintId",
-//       "assigneeId",
-//       "reporterId",
-//       "storyId",
-//     ];
+  //     const numericKeys = [
+  //       "statusId",
+  //       "sprintId",
+  //       "assigneeId",
+  //       "reporterId",
+  //       "storyId",
+  //     ];
 
-//     Object.keys(formData).forEach((key) => {
-//       if (String(formData[key]) !== String(originalData[key])) {
-//         if (key === "billable") {
-//           payload[key] = formData[key] === "true";
-//         } else if (numericKeys.includes(key)) {
-//           // Convert to Number, or send null if cleared out
-//           payload[key] = formData[key] !== "" ? Number(formData[key]) : null;
-//         } else if (dateKeys.includes(key)) {
-//   payload[key] = formData[key] ? `${formData[key]}T00:00:00` : null;
-// } else {
-//   payload[key] = formData[key];
-// }
-//       }
-//     });
+  //     Object.keys(formData).forEach((key) => {
+  //       if (String(formData[key]) !== String(originalData[key])) {
+  //         if (key === "billable") {
+  //           payload[key] = formData[key] === "true";
+  //         } else if (numericKeys.includes(key)) {
+  //           // Convert to Number, or send null if cleared out
+  //           payload[key] = formData[key] !== "" ? Number(formData[key]) : null;
+  //         } else if (dateKeys.includes(key)) {
+  //   payload[key] = formData[key] ? `${formData[key]}T00:00:00` : null;
+  // } else {
+  //   payload[key] = formData[key];
+  // }
+  //       }
+  //     });
 
-//     return payload;
-//   };
+  //     return payload;
+  //   };
 
   // 🔥 Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const numericKeys = ["statusId", "sprintId", "assigneeId", "reporterId", "storyId"];
+    const numericKeys = [
+      "statusId",
+      "sprintId",
+      "assigneeId",
+      "reporterId",
+      "storyId",
+    ];
 
     const updatedPayload = {
       ...formData,
@@ -210,28 +213,27 @@ const EditTaskForm = ({
     // date validation
     if (formData.startDate && formData.dueDate) {
       if (new Date(formData.dueDate) < new Date(formData.startDate)) {
-        toast.error("Due date cannot be earlier than the start date.");
+        showStatusToast("Due date cannot be earlier than the start date.", "error");
         return;
       }
     }
 
     try {
-      await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/tasks/${taskId}`,
+      await api.put(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}`,
         updatedPayload,
-        axiosConfig
+        axiosConfig,
       );
 
-      toast.success("Task updated successfully!");
+      showStatusToast("Task updated successfully!", "success");
 
       setTimeout(() => {
         onUpdated?.();
         onClose?.();
       }, 500);
-
     } catch (error) {
       console.error(error);
-      toast.error(error.response?.data?.message || "Failed to update task");
+      showStatusToast(error.response?.data?.message || "Failed to update task", "error");
     }
   };
 
@@ -246,23 +248,24 @@ const EditTaskForm = ({
   // UI
   return (
     <Wrapper mode={mode} onClose={onClose}>
-      {/* HEADER */}
-      <div className="flex justify-between items-center p-6 border-b">
-        <h2 className="text-xl font-semibold">Edit Task</h2>
-        <button onClick={onClose}>
-          <X className="text-gray-600 hover:text-gray-900" />
-        </button>
-      </div>
+      <form onSubmit={handleSubmit} className="flex flex-col min-h-full">
+        {/* HEADER */}
+        <div className="flex justify-between items-center p-6 border-b">
+          <h2 className="text-xl font-semibold">Edit Task</h2>
+          <button type="button" onClick={onClose}>
+            <X className="text-gray-600 hover:text-gray-900" />
+          </button>
+        </div>
 
-      {/* BODY (scrollable) */}
-      <div className="p-6 overflow-y-auto flex-1 space-y-6">
-        <FormInput
-          label="Title *"
-          name="title"
-          value={formData.title}
-          onChange={handleChange}
-          required
-        />
+        {/* BODY (scrollable) */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          <FormInput
+            label="Title *"
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
+            required
+          />
 
         <FormTextArea
           label="Description"
@@ -390,24 +393,13 @@ const EditTaskForm = ({
         />
       </div>
 
-      {/* STICKY FOOTER */}
-      <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
-        >
-          Cancel
-        </button>
+        {/* STICKY FOOTER */}
+        <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3">
+          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
 
-        <button
-          type="button"
-          onClick={handleSubmit}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-        >
-          Save Changes
-        </button>
-      </div>
+          <Button variant="primary" type="submit">Save Changes</Button>
+        </div>
+      </form>
     </Wrapper>
   );
 };

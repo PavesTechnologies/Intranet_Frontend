@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
+import api from "../../../../../api/axiosInstance";
+import { showStatusToast } from "../../../../../components/toastfy/toast";
+import LoadingSpinner from "../../../../../components/LoadingSpinner";
+import StatusBadge from "../../../../../components/status/statusbadge";
 
 const ViewTestPlan = ({ projectId, planId, onClose }) => {
   const [plan, setPlan] = useState(null);
@@ -12,16 +14,16 @@ const ViewTestPlan = ({ projectId, planId, onClose }) => {
     const fetchPlan = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/test-plans/${planId}`,
+        const res = await api.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/test-plans/${planId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
         setPlan(res.data);
       } catch (err) {
         console.error(err);
-        toast.error("Failed to fetch Test Plan details.");
+        showStatusToast("Failed to fetch Test Plan details.", "error");
       } finally {
         setLoading(false);
       }
@@ -33,7 +35,7 @@ const ViewTestPlan = ({ projectId, planId, onClose }) => {
   }, [projectId, planId, token]);
 
   if (loading) {
-    return <div className="p-6 text-slate-500">Loading Test Plan...</div>;
+    return <LoadingSpinner size="md" text="Loading Test Plan..." />;
   }
 
   if (!plan) {
@@ -60,17 +62,9 @@ const ViewTestPlan = ({ projectId, planId, onClose }) => {
           <p className="text-gray-800 mt-1">{plan.description || "-"}</p>
         </div>
 
-        <div>
+        <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-700">Status:</span>
-          <span
-            className={`ml-2 px-2 py-1 rounded-full text-sm font-semibold ${
-              plan.status === "Active"
-                ? "bg-green-100 text-green-800"
-                : "bg-gray-100 text-gray-800"
-            }`}
-          >
-            {plan.status}
-          </span>
+          <StatusBadge label={plan.status} size="md" />
         </div>
 
         <div>

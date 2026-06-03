@@ -2,24 +2,23 @@ import React, { useEffect, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 const Calendar = ({ projectId }) => {
   const [events, setEvents] = useState([]);
- 
 
   // ===========================
   // FETCH TASKS
   // ===========================
   const fetchTasks = async () => {
     try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/tasks`,
+      const res = await api.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       // Convert backend tasks → FullCalendar events
@@ -47,7 +46,7 @@ const Calendar = ({ projectId }) => {
     return (
       <div
         style={{
-          background: "#4F46E5", 
+          background: "#4F46E5",
           color: "white",
           padding: "4px 6px",
           borderRadius: "6px",
@@ -56,7 +55,7 @@ const Calendar = ({ projectId }) => {
           boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
           overflow: "hidden",
           whiteSpace: "nowrap",
-          textOverflow: "ellipsis"
+          textOverflow: "ellipsis",
         }}
       >
         {eventInfo.event.title}
@@ -70,7 +69,7 @@ const Calendar = ({ projectId }) => {
         plugins={[dayGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
         events={events}
-        eventContent={renderEventContent}   // ⭐ added
+        eventContent={renderEventContent} // ⭐ added
         height="80vh"
       />
     </div>

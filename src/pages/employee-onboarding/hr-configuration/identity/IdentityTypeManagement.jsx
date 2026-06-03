@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
+import api from "../../../../api/axiosInstance" ;
 import AddEditIdentityModal from "./AddEditIdentityModal";
 import { useNavigate } from "react-router-dom";
+import Button from "../../../../components/Button/Button";
+import GenericTable from "../../../../components/Table/table";
+import Modal from "../../../../components/Modal/modal";
+import StatusBadge from "../../../../components/status/statusbadge";
+import { PageCard } from "../../../../components/Cards/PageCard";
 
 export default function IdentityTypeManagement() {
   const [identities, setIdentities] = useState([]);
@@ -12,21 +16,19 @@ export default function IdentityTypeManagement() {
   const [editData, setEditData] = useState(null);
 
   const [deleteBlocked, setDeleteBlocked] = useState(null);
-
-  const token = localStorage.getItem("token");
   const navigate = useNavigate();
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   /* ---------------- FETCH ALL IDENTITIES ---------------- */
   const fetchIdentities = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${BASE_URL}/identity`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await api.get(`${BASE_URL}/identity`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setIdentities(res.data);
     } catch {
-      toast.error("Failed to load identity types");
+      if (window.showError) window.showError("Failed to load identity types");
     } finally {
       setLoading(false);
     }
@@ -49,32 +51,63 @@ export default function IdentityTypeManagement() {
 
   /* ---------------- DELETE ---------------- */
   const handleDelete = async (uuid) => {
-    if (!window.confirm("Are you sure you want to delete this identity type?")) return;
+    if (!window.confirm("Are you sure you want to delete this identity type?"))
+      return;
 
     try {
-      await axios.delete(`${BASE_URL}/identity/${uuid}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      await api.delete(`${BASE_URL}/identity/${uuid}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
-      toast.success("Identity type deleted");
+      if (window.showSuccess) window.showSuccess("Identity type deleted");
       setIdentities((prev) =>
-        prev.filter((i) => i.identity_type_uuid !== uuid)
+        prev.filter((i) => i.identity_type_uuid !== uuid),
       );
     } catch (err) {
       const detail = err?.response?.data?.detail;
 
       // 🔥 BUSINESS RULE: used in country mappings
-      if (err?.response?.status === 500 ) {
+      if (err?.response?.status === 500) {
         setDeleteBlocked({
           message:
             detail?.message ||
             "This identity type is already used in country identity mappings. Please remove it from country mappings first.",
         });
       } else {
-        toast.error("Failed to delete identity type");
+        if (window.showError) window.showError("Failed to delete identity type");
       }
     }
   };
+
+  const tableHeaders = ["Name", "Description", "Status", "Actions"];
+  const tableColumns = ["identity_type_name", "description", "status_badge", "actions"];
+  const tableRows = identities.map((item) => ({
+    identity_type_name: item.identity_type_name,
+    description: item.description || "—",
+    status_badge: <StatusBadge label={item.is_active ? "Active" : "Inactive"} size="sm" />,
+    actions: (
+      <div className="flex items-center gap-4">
+        <Button
+          variant="link"
+          size="small"
+          onClick={() => {
+            setEditData(item);
+            setShowModal(true);
+          }}
+        >
+          Edit
+        </Button>
+        <Button
+          variant="link"
+          size="small"
+          className="!text-red-600 hover:!underline"
+          onClick={() => handleDelete(item.identity_type_uuid)}
+        >
+          Delete
+        </Button>
+      </div>
+    ),
+  }));
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -89,119 +122,53 @@ export default function IdentityTypeManagement() {
           </p>
         </div>
 
-        <button
+        <Button
           onClick={() => {
             setEditData(null);
             setShowModal(true);
           }}
-          className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg"
+          variant="primary"
         >
           + Add Identity Type
-        </button>
+        </Button>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-        {loading ? (
-          <div className="p-6 text-center">Loading...</div>
-        ) : (
-          <table className="w-full border-collapse">
-            <thead className="bg-blue-900 text-white">
-              <tr>
-                <th className="px-6 py-3 text-left">Name</th>
-                <th className="px-6 py-3 text-center">Description</th>
-                <th className="px-6 py-3 text-center">Status</th>
-                <th className="px-6 py-3 text-left">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {identities.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-6 py-6 text-center text-gray-500">
-                    No identity types found
-                  </td>
-                </tr>
-              ) : (
-                identities.map((item) => (
-                  <tr
-                    key={item.identity_type_uuid}
-                    className="border-b hover:bg-gray-50"
-                  >
-                    <td className="px-6 py-3 font-medium">
-                      {item.identity_type_name}
-                    </td>
-                    <td className="px-6 py-3">
-                      {item.description || "—"}
-                    </td>
-                    <td className="px-6 py-3">
-                      <span
-                        className={`px-2 py-1 rounded text-sm ${
-                          item.is_active
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {item.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 flex gap-3">
-                      <button
-                        onClick={() => {
-                          setEditData(item);
-                          setShowModal(true);
-                        }}
-                        className="text-blue-700 hover:underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.identity_type_uuid)}
-                        className="text-red-700 hover:underline"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <PageCard>
+        <GenericTable
+          headers={tableHeaders}
+          columns={tableColumns}
+          rows={tableRows}
+          loading={loading}
+        />
+      </PageCard>
 
       {/* 🔴 DELETE BLOCKED MODAL */}
       {deleteBlocked && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-[440px]">
-            <h3 className="text-lg font-semibold text-red-600 mb-3">
-              Cannot Delete Identity Type
-            </h3>
-
-            <p className="text-gray-700 mb-6">
-              {deleteBlocked.message}
-            </p>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setDeleteBlocked(null)}
-                className="px-4 py-2 bg-gray-300 rounded-lg"
-              >
+        <Modal
+          isOpen={true}
+          onClose={() => setDeleteBlocked(null)}
+          title="Cannot Delete Identity Type"
+          size="md"
+          footer={
+            <div className="flex justify-end gap-3 w-full">
+              <Button onClick={() => setDeleteBlocked(null)} variant="outline">
                 Cancel
-              </button>
-
-              <button
+              </Button>
+              <Button
                 onClick={() => {
                   setDeleteBlocked(null);
                   navigate("/employee-onboarding/hr-configuration/mapping");
                 }}
-                className="px-4 py-2 bg-blue-700 text-white rounded-lg"
+                variant="primary"
               >
                 Go to Country Mapping
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+          }
+        >
+          <p className="text-gray-700">{deleteBlocked.message}</p>
+        </Modal>
       )}
 
       {/* ADD / EDIT MODAL */}
@@ -212,13 +179,13 @@ export default function IdentityTypeManagement() {
           onSuccess={(savedItem) => {
             setIdentities((prev) => {
               const exists = prev.some(
-                (i) => i.identity_type_uuid === savedItem.identity_type_uuid
+                (i) => i.identity_type_uuid === savedItem.identity_type_uuid,
               );
               return exists
                 ? prev.map((i) =>
                     i.identity_type_uuid === savedItem.identity_type_uuid
                       ? savedItem
-                      : i
+                      : i,
                   )
                 : [savedItem, ...prev];
             });

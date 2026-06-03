@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import api from "../../../api/axiosInstance";
 
 // Get token from localStorage (or wherever you store it)
-const token = localStorage.getItem('token');
+const token = localStorage.getItem("token");
 
 const CommentBox = ({ entityId, entityType, currentUser }) => {
   const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState('');
+  const [newComment, setNewComment] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
   const [loading, setLoading] = useState(false);
-   
+
   // Create Axios instance with Authorization header
-  const axiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_PMS_BASE_URL,
+  const axiosInstance = api.create({
+    baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -22,17 +22,19 @@ const CommentBox = ({ entityId, entityType, currentUser }) => {
   const fetchComments = async () => {
     try {
       setLoading(true);
-      const response = await axiosInstance.get(`/api/comments/${entityType}/${entityId}`);
+      const response = await axiosInstance.get(
+        `/api/comments/${entityType}/${entityId}`,
+      );
       const data = response.data;
 
       if (Array.isArray(data)) {
         setComments(data);
       } else {
-        console.error('Invalid comments data format:', data);
+        console.error("Invalid comments data format:", data);
         setComments([]);
       }
     } catch (error) {
-      console.error('Failed to fetch comments:', error);
+      console.error("Failed to fetch comments:", error);
     } finally {
       setLoading(false);
     }
@@ -47,8 +49,11 @@ const CommentBox = ({ entityId, entityType, currentUser }) => {
     if (!newComment.trim()) return;
 
     const userId = currentUser.user_id;
-    console.log('Submitting comment:', { content: newComment, userId, parentId: replyingTo });
-    
+    console.log("Submitting comment:", {
+      content: newComment,
+      userId,
+      parentId: replyingTo,
+    });
 
     const payload = {
       content: newComment,
@@ -57,24 +62,30 @@ const CommentBox = ({ entityId, entityType, currentUser }) => {
     };
 
     try {
-      await axiosInstance.post(`/api/comments/${entityType}/${entityId}`, payload);
-      setNewComment('');
+      await axiosInstance.post(
+        `/api/comments/${entityType}/${entityId}`,
+        payload,
+      );
+      setNewComment("");
       setReplyingTo(null);
       fetchComments();
     } catch (error) {
-      console.error('Failed to submit comment:', error);
+      console.error("Failed to submit comment:", error);
     }
   };
 
   // Recursive rendering of comments and replies
   const renderComments = (parentId = null) => {
     return comments
-      .filter(comment => comment.parentId === parentId)
-      .map(comment => (
-        <div key={comment.id} className={`ml-${parentId ? 6 : 0} mb-3 border-l pl-4`}>
+      .filter((comment) => comment.parentId === parentId)
+      .map((comment) => (
+        <div
+          key={comment.id}
+          className={`ml-${parentId ? 6 : 0} mb-3 border-l pl-4`}
+        >
           <div className="bg-gray-100 p-3 rounded">
             <p className="text-sm text-gray-600 font-semibold">
-              {comment.userName}{' '}
+              {comment.userName}{" "}
               <span className="text-xs text-gray-400">
                 ({new Date(comment.createdAt).toLocaleString()})
               </span>
@@ -84,7 +95,7 @@ const CommentBox = ({ entityId, entityType, currentUser }) => {
               className="text-blue-500 text-sm mt-1 hover:underline"
               onClick={() => {
                 setReplyingTo(comment.id);
-                setNewComment('');
+                setNewComment("");
               }}
             >
               Reply
@@ -130,7 +141,7 @@ const CommentBox = ({ entityId, entityType, currentUser }) => {
           onClick={handleSubmit}
           className="mt-2 px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
-          {replyingTo ? 'Post Reply' : 'Add Comment'}
+          {replyingTo ? "Post Reply" : "Add Comment"}
         </button>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import Pagination from "../../../components/Pagination/pagination";
 
 export default function AdminApprovalView() {
@@ -12,20 +12,18 @@ export default function AdminApprovalView() {
 
   const totalPages = Math.ceil(requests.length / PAGE_SIZE);
 
-const paginatedRequests = requests.slice(
-  (currentPage - 1) * PAGE_SIZE,
-  currentPage * PAGE_SIZE
-);
+  const paginatedRequests = requests.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
   useEffect(() => {
-    const token = localStorage.getItem("token");
-
     const fetchApprovals = async () => {
       try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offer-approval/pending`,
+        const res = await api.get(
+          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offer-approval/pending`,
           {
-            headers: { Authorization: `Bearer ${token}` },
-          }
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          },
         );
         setRequests(res.data || []);
         setCurrentPage(1);
@@ -52,12 +50,8 @@ const paginatedRequests = requests.slice(
           className="bg-white p-4 rounded-lg shadow flex justify-between items-center"
         >
           <div>
-            <h3 className="font-semibold">
-              {req.candidate_name}
-            </h3>
-            <p className="text-sm text-gray-500">
-              {req.designation}
-            </p>
+            <h3 className="font-semibold">{req.candidate_name}</h3>
+            <p className="text-sm text-gray-500">{req.designation}</p>
           </div>
 
           <div className="flex gap-2">
@@ -72,18 +66,13 @@ const paginatedRequests = requests.slice(
             </button>
           </div>
           <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPrevious={() =>
-            setCurrentPage((p) => Math.max(p - 1, 1))
-          }
-          onNext={() =>
-            setCurrentPage((p) => Math.min(p + 1, totalPages))
-          }
-        />
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+            onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+          />
         </div>
       ))}
     </div>
-    
   );
 }

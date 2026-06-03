@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
 // Component imports
 import Summary from "./UserSummary";
@@ -31,10 +31,13 @@ const ProjectTabs = () => {
   // Fetch project name with token
   useEffect(() => {
     if (projectId) {
-      axios
-        .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+      api
+        .get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        )
         .then((res) => {
           setProjectName(res.data.name);
           setNotFound(false);

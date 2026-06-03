@@ -1,4 +1,6 @@
 import React, { useState, useRef } from "react";
+import FilterListbox from "../../../components/filter/FilterListbox";
+import api from "../../../api/axiosInstance";
 import {
   FileText,
   FileSignature,
@@ -27,11 +29,11 @@ const TEMPLATES = [
     id: "joining_letter",
     title: "Joining Letter",
     category: "Onboarding",
-    description: "Official offer and joining confirmation with compensation and role details.",
+    description: "Official joining confirmation with reporting details, onboarding documents, and acknowledgement.",
     icon: <FileSignature className="text-blue-500" size={28} />,
     color: "from-blue-500/20 to-blue-500/5",
     accent: "bg-blue-500",
-    fields: ["firstName", "lastName", "contactNumber", "email", "designation", "totalCtc", "employeeType"]
+    fields: ["firstName", "lastName", "contactNumber", "email", "designation", "department", "joiningDate", "reportingTime", "location", "reportingManager", "customMessage", "date"]
   },
   {
     id: "nda",
@@ -106,6 +108,33 @@ export default function DocumentTemplates() {
   const [formData, setFormData] = useState({});
   const iframeRef = useRef(null);
 
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
+
+  const downloadBulkTemplate = async () => {
+    try {
+      setBulkLoading(true);
+      const response = await api.get(
+        `${BASE_URL}/permanent-employee/core-employee-details/bulk-template/`,
+        {
+          responseType: "blob",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        }
+      );
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "employee_bulk_template.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Download error:", error);
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   const filteredTemplates = TEMPLATES.filter(t => 
     t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -148,81 +177,75 @@ export default function DocumentTemplates() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const renderInputField = (field) => {
-    const commonClasses = "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all";
+  // const renderInputField = (field) => {
+  //   const commonClasses = "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all";
     
-    switch(field) {
-      case "firstName":
-      case "lastName":
-        return (
-          <div className="relative">
-            <User className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-            <input required type="text" placeholder="e.g. John" className={`pl-10 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
-          </div>
-        );
-      case "contactNumber":
-        return (
-          <div className="relative">
-             <span className="absolute left-4 top-3.5 text-slate-400 font-medium text-sm">+</span>
-            <input required type="text" placeholder="91 XXXXX XXXXX" className={`pl-8 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
-          </div>
-        )
-      case "email":
-        return (
-          <div className="relative">
-            <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-            <input required type="email" placeholder="john.doe@example.com" className={`pl-10 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
-          </div>
-        );
-      case "designation":
-        return (
-          <div className="relative">
-            <Briefcase className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-            <input required type="text" placeholder="e.g. Senior Software Engineer" className={`pl-10 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
-          </div>
-        );
-      case "employeeType":
-        return (
-          <div className="relative">
-            <Shield className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-            <select required className={`pl-10 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)}>
-              <option value="" disabled hidden>Select Employment Type</option>
-              <option value="Full-Time">Full-Time</option>
-              <option value="Part-Time">Part-Time</option>
-              <option value="Contract">Contract</option>
-              <option value="Internship">Internship</option>
-            </select>
-          </div>
-        );
-      case "date":
-      case "joiningDate":
-      case "relievingDate":
-        return (
-          <div className="relative">
-            <Calendar className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-            <input required type="date" className={`pl-10 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
-          </div>
-        );
-      case "totalCtc":
-      case "grossSalary":
-      case "taxDeducted":
-        return (
-          <div className="relative">
-            <span className="absolute left-4 top-3.5 text-slate-400 font-medium text-sm">₹</span>
-            <input required type="text" placeholder="12,00,000" className={`pl-8 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
-          </div>
-        );
-      case "financialYear":
-        return (
-          <div className="relative">
-             <span className="absolute left-4 top-3.5 text-slate-400 font-medium text-sm">#</span>
-             <input required type="text" placeholder="e.g. 2025-2026" className={`pl-8 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
-          </div>
-        );
-      default:
-        return <input required type="text" className={commonClasses} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />;
-    }
-  };
+  //   switch(field) {
+  //     case "firstName":
+  //     case "lastName":
+  //       return (
+  //         <div className="relative">
+  //           <User className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+  //           <input required type="text" placeholder="e.g. John" className={`pl-10 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
+  //         </div>
+  //       );
+  //     case "contactNumber":
+  //       return (
+  //         <div className="relative">
+  //            <span className="absolute left-4 top-3.5 text-slate-400 font-medium text-sm">+</span>
+  //           <input required type="text" placeholder="91 XXXXX XXXXX" className={`pl-8 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
+  //         </div>
+  //       )
+  //     case "email":
+  //       return (
+  //         <div className="relative">
+  //           <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+  //           <input required type="email" placeholder="john.doe@example.com" className={`pl-10 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
+  //         </div>
+  //       );
+  //     case "designation":
+  //       return (
+  //         <div className="relative">
+  //           <Briefcase className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+  //           <input required type="text" placeholder="e.g. Senior Software Engineer" className={`pl-10 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
+  //         </div>
+  //       );
+  //     case "employeeType":
+  //       return (
+  //         <div className="relative">
+  //           <Shield className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+  //           <FilterListbox options={[{value:"",label:"Select Employment Type"},{value:"Full-Time",label:"Full-Time"},{value:"Part-Time",label:"Part-Time"},{value:"Contract",label:"Contract"},{value:"Internship",label:"Internship"}]} value={formData[field] || ""} onChange={(val) => handleInputChange(field, val)} />
+  //         </div>
+  //       );
+  //     case "date":
+  //     case "joiningDate":
+  //     case "relievingDate":
+  //       return (
+  //         <div className="relative">
+  //           <Calendar className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+  //           <input required type="date" className={`pl-10 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
+  //         </div>
+  //       );
+  //     case "totalCtc":
+  //     case "grossSalary":
+  //     case "taxDeducted":
+  //       return (
+  //         <div className="relative">
+  //           <span className="absolute left-4 top-3.5 text-slate-400 font-medium text-sm">₹</span>
+  //           <input required type="text" placeholder="12,00,000" className={`pl-8 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
+  //         </div>
+  //       );
+  //     case "financialYear":
+  //       return (
+  //         <div className="relative">
+  //            <span className="absolute left-4 top-3.5 text-slate-400 font-medium text-sm">#</span>
+  //            <input required type="text" placeholder="e.g. 2025-2026" className={`pl-8 ${commonClasses}`} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />
+  //         </div>
+  //       );
+  //     default:
+  //       return <input required type="text" className={commonClasses} value={formData[field] || ""} onChange={(e) => handleInputChange(field, e.target.value)} />;
+  //   }
+  // };
 
   const formatFieldLabel = (field) => {
     const spaced = field.replace(/([A-Z])/g, ' $1');
@@ -248,7 +271,7 @@ export default function DocumentTemplates() {
             </p>
           </div>
 
-          <div className="relative w-full md:max-w-md">
+          {/* <div className="relative w-full md:max-w-md">
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -257,11 +280,11 @@ export default function DocumentTemplates() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-12 pr-4 text-sm shadow-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
             />
-          </div>
+          </div> */}
         </div>
 
         {/* Templates Grid */}
-        {filteredTemplates.length > 0 ? (
+        {/* {filteredTemplates.length > 0 ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {filteredTemplates.map((template) => (
               <div
@@ -304,7 +327,49 @@ export default function DocumentTemplates() {
             <h3 className="mb-2 text-xl font-bold text-slate-900">No templates found</h3>
             <p className="text-sm text-slate-500 max-w-sm">Try adjusting your search to find what you're looking for or clear the search field.</p>
           </div>
-        )}
+        )} */}
+
+        {/* Bulk Employee Upload Template Section */}
+        <div className="mt-10">
+          {/* <div className="mb-4 flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+              <Download size={16} />
+            </span>
+            <h2 className="text-lg font-bold text-slate-900">Employee Document Templates</h2>
+          </div> */}
+
+          <div className="inline-flex flex-col gap-4 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm w-[340px] hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <FileText size={22} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Bulk Employee Upload Template</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Download Excel template to upload employees in bulk</p>
+              </div>
+            </div>
+            <button
+              onClick={downloadBulkTemplate}
+              disabled={bulkLoading}
+              className="flex items-center justify-center gap-2 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all disabled:opacity-70 disabled:cursor-wait"
+            >
+              {bulkLoading ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Downloading...</span>
+                </>
+              ) : (
+                <>
+                  <Download size={16} />
+                  <span>Download Template</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
 
         {/* Dynamic Modals / Overlays */}
         {viewState !== "gallery" && selectedTemplate && (
@@ -342,7 +407,13 @@ export default function DocumentTemplates() {
                       totalCtc: "18,00,000",
                       employeeType: "Full-Time",
                       date: new Date().toISOString().split('T')[0],
-                      relievingDate: "2026-05-08"
+                      relievingDate: "2026-05-08",
+                      department: "Engineering",
+                      joiningDate: "2026-05-21",
+                      reportingTime: "10:00 AM",
+                      location: "Hyderabad",
+                      reportingManager: "Paves HR",
+                      customMessage: "Welcome aboard."
                     })} 
                     className="w-full h-full bg-white rounded-xl shadow-sm border border-slate-200"
                   />
@@ -428,3 +499,6 @@ export default function DocumentTemplates() {
     </div>
   );
 }
+
+
+

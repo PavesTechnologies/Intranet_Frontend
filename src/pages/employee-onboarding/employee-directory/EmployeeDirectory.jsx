@@ -1,8 +1,27 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import api from "../../../api/axiosInstance";
+import { Search } from "lucide-react";
 
+import Button from "../../../components/Button/Button";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import FilterListbox from "../../../components/filter/FilterListbox";
+import { Fonts } from "../../../components/Fonts/Fonts";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import EmployeeCard from "../components/EmployeeCard";
-import { Search, Loader2 } from "lucide-react";
-import axios from "axios";
+
+function SectionHeaderCard({ title, description }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
+      <div className="flex items-start gap-4">
+        <span className="mt-0.5 h-14 w-1.5 shrink-0 rounded-full bg-indigo-600" />
+        <div className="min-w-0">
+          <h1 className={Fonts.heading3}>{title}</h1>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const EmployeeDirectory = () => {
   const [employees, setEmployees] = useState([]);
@@ -10,161 +29,215 @@ const EmployeeDirectory = () => {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("All");
+
   const [departmentsList, setDepartmentsList] = useState([]);
   const [designationsList, setDesignationsList] = useState([]);
 
-  const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
 
-        // Fetch employees, departments, and designations in parallel
         const [empRes, deptRes, desigRes] = await Promise.all([
-          axios.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
-            headers: { Authorization: `Bearer ${token}` }
+          api.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }),
-          axios.get(`${BASE_URL}/masters/departments/`, {
-            headers: { Authorization: `Bearer ${token}` }
+
+          api.get(`${BASE_URL}/masters/departments/`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }),
-          axios.get(`${BASE_URL}/masters/designations/`, {
-            headers: { Authorization: `Bearer ${token}` }
-          })
+
+          api.get(`${BASE_URL}/masters/designations/`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }),
         ]);
 
-        const depts = Array.isArray(deptRes.data) ? deptRes.data : (deptRes.data.data || []);
-        const desigs = Array.isArray(desigRes.data) ? desigRes.data : (desigRes.data.data || []);
+        const depts = Array.isArray(deptRes.data)
+          ? deptRes.data
+          : deptRes.data.data || [];
+
+        const desigs = Array.isArray(desigRes.data)
+          ? desigRes.data
+          : desigRes.data.data || [];
 
         setDepartmentsList(depts);
-        setDesignationsList(desigs);
 
-        const deptMap = Object.fromEntries(depts.map(d => [d.department_uuid, d.department_name]));
-        const desigMap = Object.fromEntries(desigs.map(d => [d.designation_uuid, d.designation_name]));
+        const deptMap = Object.fromEntries(
+          depts.map((d) => [d.department_uuid, d.department_name])
+        );
 
-        const mappedEmployees = (Array.isArray(empRes.data) ? empRes.data : (empRes.data.data || [])).map(emp => ({
-          ...emp,
-          name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
-          email: emp.work_email || emp.email || "N/A",
-          contact: emp.contact_number || emp.contact || "N/A",
-          role: desigMap[emp.designation_uuid] || emp.role || "N/A",
-          department: deptMap[emp.department_uuid] || emp.department || "N/A",
-          location: emp.location || "Hyderabad Office",
-          initials: ((emp.first_name?.[0] || "") + (emp.last_name?.[0] || "")).toUpperCase(),
-          // Additional fields for Profile Modal
-          employeeId: emp.employee_id || "N/A",
-          gender: emp.gender || "N/A",
-          employeeType: emp.employment_status || "Full-Time",
-          dateOfJoining: emp.joining_date || "N/A",
-          reportingManager: emp.reporting_manager || "N/A"
-        }));
+        const desigMap = Object.fromEntries(
+          desigs.map((designation) => [designation.designation_uuid, designation.designation_name])
+        );
 
+     const employeeData = Array.isArray(empRes.data)
+  ? empRes.data
+  : empRes.data.data || [];
+
+const employeeMap = Object.fromEntries(
+  employeeData.map((employee) => [
+    String(employee.employee_id),
+    `${employee.first_name || ""} ${employee.last_name || ""}`.trim(),
+  ])
+);
+
+const mappedEmployees = employeeData.map((emp) => {
+  console.log("Raw Employee Data:", emp);
+
+  return {
+    ...emp,
+
+    // Employee Card Data
+    name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
+
+    email: emp.work_email || emp.email || "N/A",
+
+    contact: emp.contact_number || emp.contact || "N/A",
+
+    role:
+      desigMap[emp.designation_uuid] ||
+      emp.role ||
+      "N/A",
+
+    department:
+      deptMap[emp.department_uuid] ||
+      emp.department ||
+      "N/A",
+
+    location: emp.location || "Hyderabad Office",
+
+    initials: (
+      (emp.first_name?.[0] || "") +
+      (emp.last_name?.[0] || "")
+    ).toUpperCase(),
+
+    // Profile Modal Fields
+    employeeId: emp.employee_id || "N/A",
+
+    gender: emp.gender || "N/A",
+
+    employeeType: emp.employment_status || "Full-Time",
+
+    dateOfJoining: emp.joining_date || "N/A",
+
+    // Reporting Manager Name Mapping
+    reportingManager:
+      employeeMap[String(emp.reporting_manager_uuid)] || "N/A",
+  };
+});
+
+
+        
         setEmployees(mappedEmployees);
         setError(null);
       } catch (err) {
         console.error("Error fetching employee directory data:", err);
-        setError("Failed to load employee directory. Please try again later.");
+
+        setError(
+          "Failed to load employee directory. Please try again later."
+        );
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [BASE_URL, token]);
+  }, [BASE_URL]);
 
-  // Departments for the filter chips
-  const departments = ["All", ...departmentsList.map(d => d.department_name)];
+  const departments = ["All", ...departmentsList.map((dept) => dept.department_name)];
 
-  // Filter Logic
-  const filteredEmployees = employees.filter((emp) => {
+  const filteredEmployees = employees.filter((employee) => {
+    const searchValue = search.toLowerCase();
     const matchesSearch =
-      emp.name.toLowerCase().includes(search.toLowerCase()) ||
-      emp.role.toLowerCase().includes(search.toLowerCase());
+      employee.name.toLowerCase().includes(searchValue) ||
+      employee.role.toLowerCase().includes(searchValue);
 
-    const matchesDepartment =
-      department === "All" || emp.department === department;
+    const matchesDepartment = department === "All" || employee.department === department;
 
     return matchesSearch && matchesDepartment;
   });
 
-
   return (
-
-    <div className="p-0.5 overflow-x-hidden">
-
-      {/* Header */}
-      <div className="flex justify-between items-center mb-2">
-        <div>
-          <h2 className="text-4xl font-semibold text-gray-900">
-            Employee Directory
-          </h2>
-          <p className="text-gray-500 text-sm">
-            Manage and browse organizational talent.
-          </p>
-        </div>
-      </div>
-
-      {/* Search + Filters */}
-      <div className="flex flex-wrap items-center gap-4 mb-6">
-
-        {/* Search Bar */}
-        <div className="relative flex-1 min-w-[150px]">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by name or role..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-3/4 pl-9 pr-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    <div className="p-6">
+      <PageCard className="border-slate-200">
+        <PageCardContent className="space-y-6 p-6 md:p-8">
+          <SectionHeaderCard
+            title="Employee Directory"
+            description="Manage and browse organizational talent across the onboarding workflow."
           />
-        </div>
 
-        {/* Department Filter Dropdown */}
-        <div className="min-w-[150px]">
-          <select
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-gray-700 font-medium cursor-pointer shadow-sm hover:border-gray-400 transition"
-          >
-            {departments.map((dept) => (
-              <option key={dept} value={dept}>
-                {dept === "All" ? "All Departments" : dept}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-end">
+            <div className="relative w-full">
+              <label htmlFor="employeeDirectorySearch" className={`${Fonts.label} mb-1 block`}>
+                Search
+              </label>
+              <Search className="pointer-events-none absolute left-5 top-[calc(50%+12px)] h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <input
+                id="employeeDirectorySearch"
+                type="text"
+                placeholder="Search by name or role..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 py-2 pr-4 pl-12 text-sm shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
+              />
+            </div>
 
-      {/* Employee Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
-        {loading ? (
-          <div className="col-span-full flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-            <p className="text-gray-500 font-medium">Loading employees...</p>
+            <div className="w-full">
+              <label className={`${Fonts.label} mb-1 block`}>Department</label>
+              <FilterListbox
+                options={departments.map((dept) => ({
+                  value: dept,
+                  label: dept === "All" ? "All Departments" : dept,
+                }))}
+                value={department}
+                onChange={setDepartment}
+              />
+            </div>
           </div>
-        ) : error ? (
-          <div className="col-span-full text-center py-20">
-            <p className="text-red-500 font-medium">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 text-indigo-600 hover:underline font-medium"
-            >
-              Try Again
-            </button>
+
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            {loading ? (
+              <div className="col-span-full rounded-2xl border border-slate-200 bg-slate-50 py-20">
+                <LoadingSpinner text="Loading employees..." />
+              </div>
+            ) : error ? (
+              <div className="col-span-full rounded-2xl border border-red-100 bg-red-50 px-6 py-16 text-center">
+                <p className="font-medium text-red-600">{error}</p>
+                <Button
+                  onClick={() => window.location.reload()}
+                  variant="outline"
+                  size="medium"
+                  className="mt-4"
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : filteredEmployees.length > 0 ? (
+              filteredEmployees.map((employee, index) => (
+                <EmployeeCard
+                  key={employee.employee_uuid || employee.employeeId || index}
+                  employee={employee}
+                  index={index}
+                />
+              ))
+            ) : (
+              <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-20 text-center text-slate-500">
+                No employees found.
+              </div>
+            )}
           </div>
-        ) : filteredEmployees.length > 0 ? (
-          filteredEmployees.map((emp, index) => (
-            <EmployeeCard key={index} employee={emp} index={index} />
-          ))
-        ) : (
-          <p className="text-gray-500 col-span-full text-center py-20">No employees found.</p>
-        )}
-      </div>
+        </PageCardContent>
+      </PageCard>
     </div>
   );
-
 };
 
 export default EmployeeDirectory;
-

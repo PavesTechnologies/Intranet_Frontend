@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import {
   PieChart,
   Pie,
@@ -18,9 +18,16 @@ import {
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const COLORS = [
-  "#312e81", "#4338ca", "#4f46e5", "#6366f1",
-  "#831843", "#9d174d", "#be185d", "#db2777",
-  "#e879f9", "#c026d3",
+  "#312e81",
+  "#4338ca",
+  "#4f46e5",
+  "#6366f1",
+  "#831843",
+  "#9d174d",
+  "#be185d",
+  "#db2777",
+  "#e879f9",
+  "#c026d3",
 ];
 
 // Stage hierarchy → percentage mapping
@@ -65,11 +72,17 @@ const Summary = ({ projectId, projectName }) => {
       setLoading(true);
       try {
         const headers = { Authorization: `Bearer ${token}` };
-        const base = import.meta.env.VITE_PMS_BASE_URL;
+        const base = window.__APP_CONFIG__.PMS_BASE_URL;
 
         // Fetch project details (to get stage)
-        const projectRes = await axios.get(`${base}/api/projects/${projectId}`, { headers });
-        const stage = projectRes.data.currentStage || projectRes.data.currentStage || "INITIATION";
+        const projectRes = await api.get(
+          `${base}/api/projects/${projectId}`,
+          { headers },
+        );
+        const stage =
+          projectRes.data.currentStage ||
+          projectRes.data.currentStage ||
+          "INITIATION";
         const upperStage = stage?.toUpperCase();
 
         setProjectStage(upperStage);
@@ -77,10 +90,10 @@ const Summary = ({ projectId, projectName }) => {
 
         // Fetch related entities
         const [epicRes, storyRes, taskRes, bugRes] = await Promise.all([
-          axios.get(`${base}/api/projects/${projectId}/epics`, { headers }),
-          axios.get(`${base}/api/projects/${projectId}/stories`, { headers }),
-          axios.get(`${base}/api/projects/${projectId}/tasks`, { headers }),
-          axios.get(`${base}/api/bugs/project/${projectId}`, { headers }),
+          api.get(`${base}/api/projects/${projectId}/epics`, { headers }),
+          api.get(`${base}/api/projects/${projectId}/stories`, { headers }),
+          api.get(`${base}/api/projects/${projectId}/tasks`, { headers }),
+          api.get(`${base}/api/bugs/project/${projectId}`, { headers }),
         ]);
 
         setEpics(epicRes.data);
@@ -96,8 +109,10 @@ const Summary = ({ projectId, projectName }) => {
               type,
               id: i.id,
               name: i.name || i.title || `Unnamed ${type}`,
-              request: axios.get(`${base}/api/comments/${type}/${i.id}`, { headers }),
-            })
+              request: api.get(`${base}/api/comments/${type}/${i.id}`, {
+                headers,
+              }),
+            }),
           );
         };
 
@@ -105,7 +120,9 @@ const Summary = ({ projectId, projectName }) => {
         addRequests(storyRes.data, "story");
         addRequests(taskRes.data, "task");
 
-        const results = await Promise.allSettled(commentPromises.map(c => c.request));
+        const results = await Promise.allSettled(
+          commentPromises.map((c) => c.request),
+        );
         const allComments = [];
 
         results.forEach((r, idx) => {
@@ -123,9 +140,10 @@ const Summary = ({ projectId, projectName }) => {
           }
         });
 
-        allComments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        allComments.sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+        );
         setComments(allComments);
-
       } catch (err) {
         console.error("Failed to fetch project summary:", err);
       } finally {
@@ -169,7 +187,11 @@ const Summary = ({ projectId, projectName }) => {
     const bugData = groupByPriority(bugs);
 
     const allPriorities = Array.from(
-      new Set([...Object.keys(taskData), ...Object.keys(storyData), ...Object.keys(bugData)])
+      new Set([
+        ...Object.keys(taskData),
+        ...Object.keys(storyData),
+        ...Object.keys(bugData),
+      ]),
     );
 
     return allPriorities.map((p) => ({
@@ -190,9 +212,7 @@ const Summary = ({ projectId, projectName }) => {
   };
 
   const filteredComments =
-    filter === "All"
-      ? comments
-      : comments.filter((c) => c.type === filter);
+    filter === "All" ? comments : comments.filter((c) => c.type === filter);
 
   if (loading) {
     return (
@@ -202,7 +222,8 @@ const Summary = ({ projectId, projectName }) => {
     );
   }
 
-  const progressBarColor = stageColorMap[projectStage] || "linear-gradient(90deg, #4f46e5, #818cf8)";
+  const progressBarColor =
+    stageColorMap[projectStage] || "linear-gradient(90deg, #4f46e5, #818cf8)";
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -231,16 +252,20 @@ const Summary = ({ projectId, projectName }) => {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {[{ label: "Epics", value: epics.length },
+        {[
+          { label: "Epics", value: epics.length },
           { label: "Stories", value: stories.length },
           { label: "Tasks", value: tasks.length },
-          { label: "Bugs", value: bugs.length }].map((item, i) => (
+          { label: "Bugs", value: bugs.length },
+        ].map((item, i) => (
           <div
             key={i}
             className="bg-white shadow rounded-lg p-4 text-center hover:shadow-lg transition"
           >
             <div className="text-gray-500 font-medium">{item.label}</div>
-            <div className="text-3xl font-bold text-indigo-900">{item.value}</div>
+            <div className="text-3xl font-bold text-indigo-900">
+              {item.value}
+            </div>
           </div>
         ))}
       </div>
@@ -249,7 +274,9 @@ const Summary = ({ projectId, projectName }) => {
       <div className="grid grid-cols-1  md:grid-cols-2 xl:grid-cols-3 gap-6 mb-10">
         {/* Priority Distribution */}
         <div className="bg-white rounded-lg shadow p-5 hover:shadow-xl transition">
-          <h4 className="font-semibold text-indigo-900 mb-3">Priority Distribution</h4>
+          <h4 className="font-semibold text-indigo-900 mb-3">
+            Priority Distribution
+          </h4>
           <ResponsiveContainer width="100%" height={320}>
             <BarChart data={preparePriorityData()}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -257,9 +284,9 @@ const Summary = ({ projectId, projectName }) => {
               <YAxis />
               <Tooltip />
               <Legend />
-             <Bar dataKey="Tasks" fill="#312e81" />
-             <Bar dataKey="Stories" fill="#831843" />
-             <Bar dataKey="Bugs" fill="#1d4ed8" /> 
+              <Bar dataKey="Tasks" fill="#312e81" />
+              <Bar dataKey="Stories" fill="#831843" />
+              <Bar dataKey="Bugs" fill="#1d4ed8" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -288,41 +315,42 @@ const Summary = ({ projectId, projectName }) => {
 
         {/* Tasks by Assignee */}
         <div className="bg-white rounded-lg shadow p-5 hover:shadow-xl transition">
-  <h4 className="font-semibold text-indigo-900 mb-3">Tasks by Assignee</h4>
+          <h4 className="font-semibold text-indigo-900 mb-3">
+            Tasks by Assignee
+          </h4>
 
-  <ResponsiveContainer width="100%" height={300}>
-    <PieChart>
-      <Pie
-        data={prepareTasksByAssigneeData()}
-        cx="50%"
-        cy="50%"
-        outerRadius={120}
-        labelLine={false}
-        label={({ name }) => name}
-        dataKey="value"
-      >
-        {prepareTasksByAssigneeData().map((_, i) => (
-          <Cell key={i} fill={COLORS[i % COLORS.length]} />
-        ))}
-      </Pie>
-      <Tooltip formatter={(value) => `${value} Tasks`} />
-    </PieChart>
-  </ResponsiveContainer>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={prepareTasksByAssigneeData()}
+                cx="50%"
+                cy="50%"
+                outerRadius={120}
+                labelLine={false}
+                label={({ name }) => name}
+                dataKey="value"
+              >
+                {prepareTasksByAssigneeData().map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => `${value} Tasks`} />
+            </PieChart>
+          </ResponsiveContainer>
 
-  {/* Custom legend below chart */}
-  <div className="flex flex-wrap justify-center gap-3 mt-4">
-    {prepareTasksByAssigneeData().map((entry, i) => (
-      <div key={i} className="flex items-center space-x-2">
-        <div
-          className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: COLORS[i % COLORS.length] }}
-        />
-        <span className="text-sm text-gray-700">{entry.name}</span>
-      </div>
-    ))}
-  </div>
-</div>
-
+          {/* Custom legend below chart */}
+          <div className="flex flex-wrap justify-center gap-3 mt-4">
+            {prepareTasksByAssigneeData().map((entry, i) => (
+              <div key={i} className="flex items-center space-x-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                />
+                <span className="text-sm text-gray-700">{entry.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Comments Section */}
@@ -356,24 +384,43 @@ const Summary = ({ projectId, projectName }) => {
                 className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition"
               >
                 <div className="flex justify-between items-center mb-1">
-                  <span className="font-semibold text-indigo-800">{comment.userName || "Anonymous"}</span>
-                  <span className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleString()}</span>
+                  <span className="font-semibold text-indigo-800">
+                    {comment.userName || "Anonymous"}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(comment.createdAt).toLocaleString()}
+                  </span>
                 </div>
                 <div className="text-sm text-gray-600 mb-1">
-                  <span className="font-medium text-pink-700">[{comment.type}] </span>
-                  <span className="text-indigo-800 font-medium">{comment.parentItemName}</span>
+                  <span className="font-medium text-pink-700">
+                    [{comment.type}]{" "}
+                  </span>
+                  <span className="text-indigo-800 font-medium">
+                    {comment.parentItemName}
+                  </span>
                 </div>
-                <p className="text-gray-800 whitespace-pre-line mb-2">{comment.content || "(No content)"}</p>
+                <p className="text-gray-800 whitespace-pre-line mb-2">
+                  {comment.content || "(No content)"}
+                </p>
 
                 {comment.replies?.length > 0 && (
                   <div className="ml-4 border-l-2 border-indigo-300 pl-3 space-y-2">
                     {comment.replies.map((reply) => (
-                      <div key={reply.id} className="p-2 bg-indigo-50 rounded-md">
+                      <div
+                        key={reply.id}
+                        className="p-2 bg-indigo-50 rounded-md"
+                      >
                         <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm font-medium text-indigo-700">{reply.userName || "Anonymous"}</span>
-                          <span className="text-xs text-gray-500">{new Date(reply.createdAt).toLocaleString()}</span>
+                          <span className="text-sm font-medium text-indigo-700">
+                            {reply.userName || "Anonymous"}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(reply.createdAt).toLocaleString()}
+                          </span>
                         </div>
-                        <p className="text-sm text-gray-700 whitespace-pre-line">{reply.content || "(No content)"}</p>
+                        <p className="text-sm text-gray-700 whitespace-pre-line">
+                          {reply.content || "(No content)"}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -382,7 +429,9 @@ const Summary = ({ projectId, projectName }) => {
             ))}
           </div>
         ) : (
-          <div className="text-gray-500 text-sm italic">No comments found for this selection.</div>
+          <div className="text-gray-500 text-sm italic">
+            No comments found for this selection.
+          </div>
         )}
       </div>
     </div>

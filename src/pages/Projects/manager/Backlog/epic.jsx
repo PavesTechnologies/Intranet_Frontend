@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import Button from "../../../../components/Button/Button";
 
 const CreateEpic = ({ onClose }) => {
   const [projects, setProjects] = useState([]);
@@ -18,11 +20,11 @@ const CreateEpic = ({ onClose }) => {
   const token = localStorage.getItem("token");
 
   // Axios default header for Authorization
-  axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
   useEffect(() => {
-    axios
-      .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`)
+    api
+      .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`)
       .then((response) => {
         const content = response.data.content || response.data;
         if (Array.isArray(content)) {
@@ -55,8 +57,8 @@ const CreateEpic = ({ onClose }) => {
       dueDate: formData.dueDate ? formData.dueDate + "T00:00:00" : null,
     };
 
-    axios
-      .post(`${import.meta.env.VITE_PMS_BASE_URL}/api/epics`, payload)
+    api
+      .post(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/epics`, payload)
       .then((res) => {
         console.log("Epic created:", res.data);
         setShowSuccess(true);
@@ -128,17 +130,11 @@ const CreateEpic = ({ onClose }) => {
           <label htmlFor="status" className="block font-semibold mb-1">
             Status
           </label>
-          <select
-            name="status"
-            id="status"
+          <FilterListbox
+            options={[{value:"TODO",label:"TODO"},{value:"IN_PROGRESS",label:"IN_PROGRESS"},{value:"DONE",label:"DONE"}]}
             value={formData.status}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          >
-            <option value="TODO">TODO</option>
-            <option value="IN_PROGRESS">IN_PROGRESS</option>
-            <option value="DONE">DONE</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+          />
         </div>
 
         {/* Priority */}
@@ -146,23 +142,19 @@ const CreateEpic = ({ onClose }) => {
           <label htmlFor="priority" className="block font-semibold mb-1">
             Priority
           </label>
-          <select
-            name="priority"
-            id="priority"
+          <FilterListbox
+            options={[{value:"LOW",label:"LOW"},{value:"MEDIUM",label:"MEDIUM"},{value:"HIGH",label:"HIGH"},{value:"CRITICAL",label:"CRITICAL"}]}
             value={formData.priority}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          >
-            <option value="LOW">LOW</option>
-            <option value="MEDIUM">MEDIUM</option>
-            <option value="HIGH">HIGH</option>
-            <option value="CRITICAL">CRITICAL</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "priority", value: val } })}
+          />
         </div>
 
         {/* Progress Percentage */}
         <div>
-          <label htmlFor="progressPercentage" className="block font-semibold mb-1">
+          <label
+            htmlFor="progressPercentage"
+            className="block font-semibold mb-1"
+          >
             Progress (%)
           </label>
           <input
@@ -198,33 +190,18 @@ const CreateEpic = ({ onClose }) => {
           <label htmlFor="projectId" className="block font-semibold mb-1">
             Project
           </label>
-          <select
-            name="projectId"
-            id="projectId"
+          <FilterListbox
+            options={[{value:0,label:"Select Project"},...projects.map(project=>({value:project.id,label:project.name}))]}
             value={formData.projectId}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            required
-          >
-            <option value={0} disabled>
-              Select Project
-            </option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleChange({ target: { name: "projectId", value: val } })}
+          />
         </div>
 
         {/* Submit Button */}
         <div className="text-right">
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
+          <Button variant="primary" type="submit">
             Create Epic
-          </button>
+          </Button>
         </div>
       </form>
     </div>

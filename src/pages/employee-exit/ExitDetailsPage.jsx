@@ -9,9 +9,11 @@ import {
   ClipboardCheck,
   CreditCard,
   MessageSquare,
-  ClipboardList
+  ClipboardList,
+  CalendarDays
 } from 'lucide-react';
 import { exit_list, employees } from './data/mockData';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 import ApprovalsTab from './tabs/ApprovalsTab';
 import ClearanceTab from './tabs/ClearanceTab';
@@ -19,9 +21,11 @@ import DocumentsTab from './tabs/DocumentsTab';
 import SettlementTab from './tabs/SettlementTab';
 import InterviewTab from './tabs/InterviewTab';
 import FeedbackSurveyTab from './tabs/FeedbackSurveyTab';
+import NoticePeriodTab from './tabs/NoticePeriodTab';
 
 const TABS = [
   { id: 'approvals', label: 'Approvals', icon: UserCheck },
+  { id: 'notice_period', label: 'Notice Period', icon: CalendarDays },
   { id: 'clearance', label: 'Clearance', icon: ClipboardCheck },
   { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'settlement', label: 'Settlement', icon: CreditCard },
@@ -43,11 +47,12 @@ export default function ExitDetailsPage() {
     }
   }, [exit_uuid]);
 
-  if (!exitData) return <div className="p-8 text-center text-gray-500">Loading exit details...</div>;
+  if (!exitData) return <LoadingSpinner text="Loading exit details..." />;
 
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'approvals': return <ApprovalsTab exit_uuid={exit_uuid} employee_uuid={exitData.employee_uuid} />;
+      case 'notice_period': return <NoticePeriodTab exit_uuid={exit_uuid} employee_uuid={exitData.employee_uuid} />;
       case 'clearance': return <ClearanceTab exit_uuid={exit_uuid} employee_uuid={exitData.employee_uuid} />;
       case 'documents': return <DocumentsTab exit_uuid={exit_uuid} employee_uuid={exitData.employee_uuid} />;
       case 'settlement': return <SettlementTab exit_uuid={exit_uuid} employee_uuid={exitData.employee_uuid} />;

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axiosInstance from "../api/axiosInstance";
-import { toast } from "react-toastify";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Button from "../../../../components/Button/Button";
 
 export default function CreateTestCycleForm({
   projectId,
@@ -54,7 +56,7 @@ export default function CreateTestCycleForm({
     const fetchSprints = async () => {
       try {
         const res = await axiosInstance.get(
-          `/projects/${projectId}/sprints`  // ✅ correct
+          `/api/projects/${projectId}/sprints`  // ✅ correct
         );
         setSprints(res.data || []);
       } catch (err) {
@@ -84,7 +86,7 @@ export default function CreateTestCycleForm({
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.cycleType || !form.startDate) {
-      toast.error("Please fill all required fields");
+      showStatusToast("Please fill all required fields", "error");
       return;
     }
 
@@ -102,24 +104,25 @@ export default function CreateTestCycleForm({
       setLoading(true);
       if (isEditMode) {
         await axiosInstance.put(
-          `/test-execution/test-cycles/${editingCycle.id}`, // ✅ correct
+          `/api/test-execution/test-cycles/${editingCycle.id}`, // ✅ correct
           payload
         );
-        toast.success("Test Cycle Updated Successfully!");
+        showStatusToast("Test Cycle Updated Successfully!", "success");
       } else {
         await axiosInstance.post(
-          `/test-execution/test-cycles`, // ✅ correct
+          `/api/test-execution/test-cycles`, // ✅ correct
           payload
         );
-        toast.success("Test Cycle Created Successfully!");
+        showStatusToast("Test Cycle Created Successfully!", "success");
       }
       onSuccess && onSuccess();
     } catch (error) {
       console.error(error);
-      toast.error(
+      showStatusToast(
         isEditMode
           ? "Failed to update test cycle"
-          : "Failed to create test cycle"
+          : "Failed to create test cycle",
+        "error"
       );
     } finally {
       setLoading(false);
@@ -162,38 +165,21 @@ export default function CreateTestCycleForm({
         {/* Cycle Type */}
         <div>
           <label className="block text-sm font-medium mb-1">Cycle Type *</label>
-          <select
-            name="cycleType"
+          <FilterListbox
+            options={[{value:"",label:"Select Type"},{value:"REGRESSION",label:"REGRESSION"},{value:"SMOKE",label:"SMOKE"},{value:"UAT",label:"UAT"},{value:"SIT",label:"SIT"},{value:"PERFORMANCE",label:"PERFORMANCE"},{value:"OTHER",label:"OTHER"}]}
             value={form.cycleType}
-            onChange={handleChange}
-            className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            required
-          >
-            <option value="">Select Type</option>
-            <option value="REGRESSION">REGRESSION</option>
-            <option value="SMOKE">SMOKE</option>
-            <option value="UAT">UAT</option>
-            <option value="SIT">SIT</option>
-            <option value="PERFORMANCE">PERFORMANCE</option>
-            <option value="OTHER">OTHER</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "cycleType", value: val } })}
+          />
         </div>
 
         {/* Status */}
         <div>
           <label className="block text-sm font-medium mb-1">Status</label>
-          <select
-            name="status"
+          <FilterListbox
+            options={[{value:"",label:"Select Status"},{value:"PLANNED",label:"PLANNED"},{value:"IN_PROGRESS",label:"IN_PROGRESS"},{value:"COMPLETED",label:"COMPLETED"},{value:"CANCELLED",label:"CANCELLED"}]}
             value={form.status}
-            onChange={handleChange}
-            className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">Select Status</option>
-            <option value="PLANNED">PLANNED</option>
-            <option value="IN_PROGRESS">IN_PROGRESS</option>
-            <option value="COMPLETED">COMPLETED</option>
-            <option value="CANCELLED">CANCELLED</option>
-          </select>
+            onChange={(val) => handleChange({ target: { name: "status", value: val } })}
+          />
         </div>
 
         {/* Sprint */}
@@ -204,19 +190,11 @@ export default function CreateTestCycleForm({
           {loadingSprints ? (
             <p className="text-gray-400 text-sm">Loading sprints...</p>
           ) : (
-            <select
-              name="sprintId"
+            <FilterListbox
+              options={[{value:"",label:"No Sprint"},...sprints.map(sprint=>({value:sprint.id,label:sprint.name}))]}
               value={form.sprintId ?? ""}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-              <option value="">No Sprint</option>
-              {sprints.map((sprint) => (
-                <option key={sprint.id} value={sprint.id}>
-                  {sprint.name}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => handleChange({ target: { name: "sprintId", value: val } })}
+            />
           )}
         </div>
 
@@ -247,19 +225,16 @@ export default function CreateTestCycleForm({
 
         {/* Submit */}
         <div className="md:col-span-2">
-          <button
+          <Button
             type="submit"
+            variant="primary"
+            className="w-full"
             disabled={loading}
-            className="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:opacity-60 transition"
+            loading={loading}
+            loadingText={isEditMode ? "Updating..." : "Creating..."}
           >
-            {loading
-              ? isEditMode
-                ? "Updating..."
-                : "Creating..."
-              : isEditMode
-              ? "Update Cycle"
-              : "Create Cycle"}
-          </button>
+            {isEditMode ? "Update Cycle" : "Create Cycle"}
+          </Button>
         </div>
       </form>
     </div>

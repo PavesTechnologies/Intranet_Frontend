@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import SockJS from "sockjs-client";
 import { over } from "stompjs";
@@ -7,11 +7,13 @@ import { over } from "stompjs";
 let stompClient = null;
 
 const useLeaveConsumption = (employeeId, refreshKey, year) => {
-  const token = localStorage.getItem("token");
-  const [leaveData, setLeaveData] = useState({regular:[], genderBasedLeaveBalances: []});
+  const [leaveData, setLeaveData] = useState({
+    regular: [],
+    genderBasedLeaveBalances: [],
+  });
   const [loading, setLoading] = useState(true);
 
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
   // ---------------------------
   // FUNCTION TO FETCH LEAVE DATA
@@ -20,8 +22,9 @@ const useLeaveConsumption = (employeeId, refreshKey, year) => {
     if (!employeeId) return;
 
     setLoading(true);
-    axios.get(`${BASE_URL}/api/leave-balance/employee/${employeeId}/${year}`, {
-        headers: { Authorization: `Bearer ${token}` },
+    api
+      .get(`${BASE_URL}/api/leave-balance/employee/${employeeId}/${year}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       .then((res) => {
         // console.log(res.data);

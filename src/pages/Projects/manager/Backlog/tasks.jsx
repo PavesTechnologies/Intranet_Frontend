@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 
 const CreateTaskModal = ({ onTaskCreated }) => {
   const [showForm, setShowForm] = useState(true);
@@ -32,12 +33,21 @@ const CreateTaskModal = ({ onTaskCreated }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [usersRes, projectsRes, storiesRes, sprintsRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/stories`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/sprints`, { headers: { Authorization: `Bearer ${token}` } }),
-        ]);
+        const [usersRes, projectsRes, storiesRes, sprintsRes] =
+          await Promise.all([
+            api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ]);
 
         setUsers(usersRes.data.content || []);
         setProjects(projectsRes.data.content || []);
@@ -56,9 +66,9 @@ const CreateTaskModal = ({ onTaskCreated }) => {
 
     const fetchStatuses = async () => {
       try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${formData.projectId}/statuses`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const res = await api.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${formData.projectId}/statuses`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         setStatuses(res.data);
@@ -72,7 +82,10 @@ const CreateTaskModal = ({ onTaskCreated }) => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -89,12 +102,18 @@ const CreateTaskModal = ({ onTaskCreated }) => {
         sprintId: formData.sprintId ? Number(formData.sprintId) : null,
         storyId: formData.storyId ? Number(formData.storyId) : null,
         statusId: Number(formData.statusId),
-        dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+        dueDate: formData.dueDate
+          ? new Date(formData.dueDate).toISOString()
+          : null,
       };
 
-      await axios.post(`${import.meta.env.VITE_PMS_BASE_URL}/api/tasks`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.post(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       alert("Task created successfully!");
       onTaskCreated && onTaskCreated();
@@ -124,7 +143,9 @@ const CreateTaskModal = ({ onTaskCreated }) => {
         ×
       </button>
 
-      <h2 className="text-2xl font-bold text-center text-gray-800">Create New Task</h2>
+      <h2 className="text-2xl font-bold text-center text-gray-800">
+        Create New Task
+      </h2>
 
       {/* Title */}
       <input
@@ -147,46 +168,25 @@ const CreateTaskModal = ({ onTaskCreated }) => {
       />
 
       {/* Project */}
-      <select
-        name="projectId"
+      <FilterListbox
+        options={[{value:"",label:"Select Project *"},...projects.map(p=>({value:p.id,label:p.name}))]}
         value={formData.projectId}
-        onChange={handleChange}
-        required
-        className="w-full border rounded px-4 py-2"
-      >
-        <option value="">Select Project *</option>
-        {projects.map((p) => (
-          <option key={p.id} value={p.id}>{p.name}</option>
-        ))}
-      </select>
+        onChange={(val) => handleChange({ target: { name: "projectId", value: val } })}
+      />
 
       {/* Status (dynamic) */}
-      <select
-        name="statusId"
+      <FilterListbox
+        options={[{value:"",label:"Select Status *"},...statuses.map(s=>({value:s.id,label:s.name}))]}
         value={formData.statusId}
-        onChange={handleChange}
-        required
-        className="w-full border rounded px-4 py-2"
-      >
-        <option value="">Select Status *</option>
-        {statuses.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
+        onChange={(val) => handleChange({ target: { name: "statusId", value: val } })}
+      />
 
       {/* Priority */}
-      <select
-        name="priority"
+      <FilterListbox
+        options={["LOW","MEDIUM","HIGH","CRITICAL"].map(p=>({value:p,label:p}))}
         value={formData.priority}
-        onChange={handleChange}
-        className="w-full border rounded px-4 py-2"
-      >
-        {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((p) => (
-          <option key={p} value={p}>{p}</option>
-        ))}
-      </select>
+        onChange={(val) => handleChange({ target: { name: "priority", value: val } })}
+      />
 
       {/* Story Points + Due Date */}
       <div className="grid grid-cols-2 gap-4">
@@ -209,57 +209,32 @@ const CreateTaskModal = ({ onTaskCreated }) => {
       </div>
 
       {/* Reporter */}
-      <select
-        name="reporterId"
+      <FilterListbox
+        options={[{value:"",label:"Select Reporter *"},...users.map(u=>({value:u.id,label:u.name}))]}
         value={formData.reporterId}
-        onChange={handleChange}
-        required
-        className="w-full border rounded px-4 py-2"
-      >
-        <option value="">Select Reporter *</option>
-        {users.map((u) => (
-          <option key={u.id} value={u.id}>{u.name}</option>
-        ))}
-      </select>
+        onChange={(val) => handleChange({ target: { name: "reporterId", value: val } })}
+      />
 
       {/* Assignee */}
-      <select
-        name="assigneeId"
+      <FilterListbox
+        options={[{value:"",label:"Select Assignee (Optional)"},...users.map(u=>({value:u.id,label:u.name}))]}
         value={formData.assigneeId}
-        onChange={handleChange}
-        className="w-full border rounded px-4 py-2"
-      >
-        <option value="">Select Assignee (Optional)</option>
-        {users.map((u) => (
-          <option key={u.id} value={u.id}>{u.name}</option>
-        ))}
-      </select>
+        onChange={(val) => handleChange({ target: { name: "assigneeId", value: val } })}
+      />
 
       {/* Story */}
-      <select
-        name="storyId"
+      <FilterListbox
+        options={[{value:"",label:"Select Story"},...stories.map(s=>({value:s.id,label:s.title}))]}
         value={formData.storyId}
-        onChange={handleChange}
-        className="w-full border rounded px-4 py-2"
-      >
-        <option value="">Select Story</option>
-        {stories.map((s) => (
-          <option key={s.id} value={s.id}>{s.title}</option>
-        ))}
-      </select>
+        onChange={(val) => handleChange({ target: { name: "storyId", value: val } })}
+      />
 
       {/* Sprint */}
-      <select
-        name="sprintId"
+      <FilterListbox
+        options={[{value:"",label:"Select Sprint"},...sprints.map(s=>({value:s.id,label:s.name}))]}
         value={formData.sprintId}
-        onChange={handleChange}
-        className="w-full border rounded px-4 py-2"
-      >
-        <option value="">Select Sprint</option>
-        {sprints.map((s) => (
-          <option key={s.id} value={s.id}>{s.name}</option>
-        ))}
-      </select>
+        onChange={(val) => handleChange({ target: { name: "sprintId", value: val } })}
+      />
 
       {/* Billable */}
       <label className="flex items-center space-x-2">

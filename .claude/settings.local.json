@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Swarnaraj.Alwala\\\\paves\\\\intranet-fe\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"DIR\"}else{\"FILE\"}}} | Sort-Object Type, Name)",
+      "Bash(Get-ChildItem -Path . -Recurse -Filter \"App.jsx\")",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Swarnaraj.Alwala\\\\paves\\\\intranet-fe\\\\src\\\\pages\" -Filter \"*ashboard*\" -Recurse)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

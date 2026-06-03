@@ -1,64 +1,43 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { Users, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import Table from "../../../components/Table/table";
 import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
+import { DeleteIcon, EditIcon } from "../../../components/icons/ActionIcons";
 import EmployeeCreateModal from "../components/employee-create-modal/EmployeeCreateModal";
 import ExcelPreviewModal from "./components/ExcelPreviewModal";
 import * as XLSX from "xlsx";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import { KPICard } from "../../../components/kpi/KPI";
+import api from "../../../api/axiosInstance";
 
 const PAGE_SIZE = 5;
 
 function ActionMenu({ onEdit, onDelete }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   return (
-    <div className="relative inline-block" ref={ref}>
+    <div className="flex items-center justify-center gap-2">
       <button
-        onClick={() => setOpen((p) => !p)}
-        className="px-2 py-1 text-xl font-bold text-gray-600 hover:text-gray-900"
+        type="button"
+        onClick={onEdit}
+        className="rounded-md bg-amber-50 p-1.5 text-amber-700 transition hover:bg-amber-100 hover:text-amber-800"
+        aria-label="Edit employee"
+        title="Edit employee"
       >
-        &#8942;
+        <EditIcon className="h-4 w-4" />
       </button>
 
-      {open && (
-        <div className="absolute right-full mr-2 top-0 w-32 bg-white border rounded-md shadow-lg z-50">
-          <button
-            onClick={() => {
-              onEdit();
-              setOpen(false);
-            }}
-            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => {
-              onDelete();
-              setOpen(false);
-            }}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-          >
-            Delete
-          </button>
-        </div>
-      )}
+      <button
+        type="button"
+        onClick={onDelete}
+        className="rounded-md bg-red-50 p-1.5 text-red-700 transition hover:bg-red-100 hover:text-red-800"
+        aria-label="Delete employee"
+        title="Delete employee"
+      >
+        <DeleteIcon className="h-4 w-4" />
+      </button>
     </div>
   );
 }
@@ -78,6 +57,7 @@ export default function EmployeeOnboardingPage() {
   const [designations, setDesignations] = useState([]);
 
   const [editEmployeeUuid, setEditEmployeeUuid] = useState(null);
+  const [editEmployee, setEditEmployee] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -86,8 +66,17 @@ export default function EmployeeOnboardingPage() {
 
   const [exportLoading, setExportLoading] = useState(false);
 
-  const [exportedEmails, setExportedEmails] = useState([]);
+  const fileInputRef = useRef(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  
+ const failedCount = useMemo(() => {
 
+  return excelPreview.filter(
+    (emp) =>
+      emp.export_status === "FAILED"
+  ).length;
+
+}, [excelPreview]);
   
 
   /* ============================
@@ -95,80 +84,172 @@ export default function EmployeeOnboardingPage() {
   ============================ */
 
   const fetchEmployees = async () => {
-    try {
-      setLoading(true);
+  try {
 
-      const token = localStorage.getItem("token");
+    setLoading(true);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+    const response = await api.get(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`
+    );
 
-      const data = await response.json();
+    console.log(
+      "Employees API Response:",
+      response.data
+    );
 
-      setEmployees(data || []);
-    } catch (err) {
-      console.error("Failed to fetch employees", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const data = response.data;
 
+    setEmployees(
+      Array.isArray(data)
+        ? data
+        : Array.isArray(data.data)
+        ? data.data
+        : []
+    );
+
+  } catch (err) {
+
+    console.error(
+      "Failed to fetch employees",
+      err
+    );
+
+    setEmployees([]);
+
+  } finally {
+
+    setLoading(false);
+
+  }
+};
   /* ============================
      FETCH DEPARTMENTS
   ============================ */
 
   const fetchDepartments = async () => {
   try {
-    const token = localStorage.getItem("token");
 
-    const response = await fetch(
-      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      }
+    const response = await api.get(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`
     );
 
-    const data = await response.json();
+    console.log(
+      "Departments API Response:",
+      response.data
+    );
 
-    setDepartments(Array.isArray(data) ? data : data.data || []);
+    const data = response.data;
+
+    setDepartments(
+      Array.isArray(data)
+        ? data
+        : data.data || []
+    );
 
   } catch (error) {
-    console.error("Failed to fetch departments", error);
+
+    console.error(
+      "Failed to fetch departments",
+      error
+    );
+
   }
 };
 
-const fetchDesignations = async () => {
+  const fetchDesignations = async () => {
   try {
-    const token = localStorage.getItem("token");
 
-    const res = await fetch(
-      `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/masters/designations/`,
+    const response = await api.get(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/`
+    );
+
+    console.log(
+      "Designations API Response:",
+      response.data
+    );
+
+    const data = response.data;
+
+    setDesignations(
+      Array.isArray(data)
+        ? data
+        : data.data || []
+    );
+
+  } catch (err) {
+
+    console.error(
+      "Failed to fetch designations",
+      err
+    );
+
+  }
+};
+  const handleBulkUpload = async (event) => {
+  try {
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    const formData = new FormData();
+
+    formData.append("file", file);
+
+    setUploadLoading(true);
+
+    const response = await api.post(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/bulk-direct-upload`,
+      formData,
       {
-        method: "GET",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "multipart/form-data",
         },
       }
     );
 
-    const data = await res.json();
-    setDesignations(data || []);
+    const data = response.data;
 
-  } catch (err) {
-    console.error("Failed to fetch designations", err);
+    if (response.status === 200) {
+
+      if (data.success_count > 0) {
+        showStatusToast(
+          `${data.success_count} employees uploaded successfully`,
+          "success"
+        );
+      }
+
+      if (data.failed_records?.length > 0) {
+
+        data.failed_records.forEach((item) => {
+
+          showStatusToast(
+            `Row ${item.row}: ${formatError(item.reason)}`,
+            "error"
+          );
+
+        });
+
+      }
+
+      fetchEmployees();
+
+    } else {
+
+      showStatusToast("Upload failed", "error");
+
+    }
+
+  } catch (error) {
+
+    console.error(error);
+
+    showStatusToast("Upload failed", "error");
+
+  } finally {
+
+    setUploadLoading(false);
+
   }
 };
 
@@ -176,23 +257,30 @@ const fetchDesignations = async () => {
     fetchEmployees();
     fetchDepartments();
     fetchDesignations();
+    handleBulkUpload;
   }, []);
-  
-   /* ============================
+
+  /* ============================
      CREATE UUID → NAME MAPS
   ============================ */
-   const departmentMap = Object.fromEntries(
-    departments.map((d) => [d.department_uuid, d.department_name])
-    );
+  const departmentMap = Object.fromEntries(
+    departments.map((d) => [d.department_uuid, d.department_name]),
+  );
+  // const designationMap = Object.fromEntries(
+  //   designations.map((d) => [d.designation_uuid, d.designation_name]),
+  // );
   const designationMap = Object.fromEntries(
-      designations.map((d) => [d.designation_uuid, d.designation_name])
-    );
-
+  (Array.isArray(designations) ? designations : []).map((d) => [
+    d.designation_uuid,
+    d.designation_name,
+  ]),
+);
 
   const handleCloseModal = () => {
     setIsCreateOpen(false);
     setSelectedUserUuid(null);
     setEditEmployeeUuid(null);
+    setEditEmployee(null);
     fetchEmployees();
   };
 
@@ -203,15 +291,15 @@ const fetchDesignations = async () => {
   const totalEmployees = employees.length;
 
   const probation = employees.filter(
-    (e) => e.employment_status === "Probation"
+    (e) => e.employment_status === "Probation",
   ).length;
 
   const active = employees.filter(
-    (e) => e.employment_status === "Active"
+    (e) => e.employment_status === "Active",
   ).length;
 
   const noticePeriod = employees.filter(
-    (e) => e.employment_status === "Notice Period"
+    (e) => e.employment_status === "Notice Period",
   ).length;
 
   /* ============================
@@ -234,8 +322,7 @@ const fetchDesignations = async () => {
 
       const status = (emp.employment_status || "").toUpperCase();
 
-      const statusMatch =
-        statusFilter === "ALL" || status === statusFilter;
+      const statusMatch = statusFilter === "ALL" || status === statusFilter;
 
       const departmentMatch =
         departmentFilter === "ALL" ||
@@ -243,74 +330,227 @@ const fetchDesignations = async () => {
 
       return matchesSearch && statusMatch && departmentMatch;
     });
-  }, [employees, searchTerm, statusFilter, departmentFilter,]);
+  }, [employees, searchTerm, statusFilter, departmentFilter]);
+
 
 const handleExportPreview = async () => {
-  setExportLoading(true);
 
   try {
 
-    // const excelData = filteredEmployees.map(emp => ({
-    //   "Employee ID": emp.employee_id,
-    //   "Name": `${emp.first_name} ${emp.last_name}`,
-    //   "Email": emp.work_email,
-    //   "Contact": emp.contact_number,
-    //   "Department": departmentMap[emp.department_uuid],
-    //   "Designation": designationMap[emp.designation_uuid],
-    //   "Joining Date": emp.joining_date,
-    //   "Status": emp.employment_status
-    // }));
+    setExportLoading(true);
 
-  const newEmployees = filteredEmployees.filter(
-  emp => !exportedEmails.includes(emp.work_email?.toLowerCase())
-); 
+    const response = await api.get(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/export-preview`
+    );
 
-if (newEmployees.length === 0) {
-  showStatusToast("No new employees to export", "info");
-  setExportLoading(false);
-  return;
-}
+    console.log(
+      "Export Preview Response:",
+      response.data
+    );
 
-const excelData = newEmployees.map(emp => ({
-  "Employee ID": emp.employee_id,
-  "Name": `${emp.first_name} ${emp.last_name}`,
-  "Email": emp.work_email,
-  "Contact": emp.contact_number,
-  "Department": departmentMap[emp.department_uuid],
-  "Designation": designationMap[emp.designation_uuid],
-  "Joining Date": emp.joining_date,
-  "Status": emp.employment_status
-}));
-    setExcelPreview(excelData);
+    const result = response.data;
+
+    const previewData =
+      result.data || [];
+
+    if (previewData.length === 0) {
+
+      showStatusToast(
+        "No employees available for export",
+        "info"
+      );
+
+      return;
+    }
+
+    const formattedData =
+      previewData.map((emp) => ({
+
+        user_uuid: emp.employee_uuid,
+
+        employee_id: emp.employee_id,
+
+        first_name: emp.first_name,
+
+        last_name: emp.last_name,
+
+        mail: emp.mail,
+
+        contact: emp.contact,
+
+        Department:
+          departmentMap[
+            emp.department_uuid
+          ] || "—",
+
+        Designation:
+          designationMap[
+            emp.designation_uuid
+          ] || "—",
+
+        Status:
+          emp.employment_status,
+
+        export_status:
+          emp.export_status,
+
+        export_error:
+          emp.export_error
+
+      }));
+
+    setExcelPreview(
+      formattedData
+    );
+
     setShowPreview(true);
 
   } catch (error) {
-    console.error("Excel preview error", error);
+
+    console.error(error);
+
+    showStatusToast(
+      "Failed to fetch export preview",
+      "error"
+    );
+
   } finally {
+
     setExportLoading(false);
+
   }
 };
+const downloadExcel = async () => {
+console.log(
+  "calling ums api"
+);
+  try {
 
-const downloadExcel = () => {
+ 
 
-  const worksheet = XLSX.utils.json_to_sheet(excelPreview);
+    // =========================
+    // REMOVE BACKEND META FIELDS
+    // =========================
 
-  const workbook = XLSX.utils.book_new();
+    const exportData = excelPreview.map(
+      ({
+        export_status,
+        export_error,
+        ...rest
+      }) => rest
+    );
 
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
+    // =========================
+    // CREATE EXCEL
+    // =========================
 
-  // Auto column width
-  const cols = Object.keys(excelPreview[0]).map(() => ({ wch: 25 }));
-  worksheet["!cols"] = cols;
+    const worksheet =
+      XLSX.utils.json_to_sheet(
+        exportData
+      );
 
-  XLSX.writeFile(workbook, "Employee_Report.xlsx");
+    const workbook =
+      XLSX.utils.book_new();
 
-  const newEmails = excelPreview.map(emp => emp.Email.toLowerCase());
-  setExportedEmails(prev => [
-  ...new Set([...prev, ...newEmails])
-]);
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "Employees"
+    );
 
-  setShowPreview(false);
+    const excelBuffer =
+      XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+console.log(
+  "calling ums api"
+);
+    const blob = new Blob(
+      [excelBuffer],
+      {
+        type:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }
+    );
+
+    const file = new File(
+      [blob],
+      "Employee_Report.xlsx",
+      {
+        type:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }
+    );
+
+    // =========================
+    // CREATE FORM DATA
+    // =========================
+
+    const formData = new FormData();
+
+    formData.append("file", file);
+
+    // =========================
+    // SEND TO UMS
+    // =========================
+
+    const response = await api.post(
+
+      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/admin/users/multiple-users`,
+
+      formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+    );
+    
+
+    const data = response.data;
+
+    // =========================
+    // UPDATE EXPORT STATUS
+    // =========================
+
+    await api.post(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/update-export-status`,
+      data,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+
+    // =========================
+    // SUCCESS UI
+    // =========================
+
+    showStatusToast(
+      data.message || "Employees exported successfully",
+      "success"
+    );
+
+    setShowPreview(false);
+
+    // Refresh latest employees
+    fetchEmployees();
+
+    // Refresh preview queue
+    setExcelPreview([]);
+
+  } catch (error) {
+
+    console.error(error);
+
+    showStatusToast(
+      "Failed to send excel",
+      "error"
+    );
+  }
 };
   /* ============================
      TABLE CONFIG
@@ -348,13 +588,11 @@ const downloadExcel = () => {
     return filteredEmployees
       .slice(startIndex, startIndex + PAGE_SIZE)
       .map((emp) => ({
-
         employee_id: emp.employee_id || "—",
 
-        name:
-          `${emp.first_name || ""} ${emp.middle_name || ""} ${emp.last_name || ""}`
-            .toLowerCase()
-            .replace(/\b\w/g, (c) => c.toUpperCase()),
+        name: `${emp.first_name || ""} ${emp.middle_name || ""} ${emp.last_name || ""}`
+          .toLowerCase()
+          .replace(/\b\w/g, (c) => c.toUpperCase()),
 
         email: emp.work_email || "—",
 
@@ -374,39 +612,56 @@ const downloadExcel = () => {
 
         action: (
           <ActionMenu
-            onEdit={() =>
-            {
+            onEdit={() => {
+              setEditEmployee(emp);
               setEditEmployeeUuid(emp.employee_uuid);
               setSelectedUserUuid(emp.user_uuid);
               setIsCreateOpen(true);
-            }
-            }
+            }}
             onDelete={() => handleDelete(emp.employee_uuid)}
           />
         ),
       }));
-
-  }, [employees, currentPage, filteredEmployees, departments, designations, designationMap]);
+  }, [
+    employees,
+    currentPage,
+    filteredEmployees,
+    departments,
+    designations,
+    designationMap,
+  ]);
 
   return (
     <div className="p-6 space-y-6">
-
       {/* HEADER */}
 
       <div className="flex justify-between items-center">
-
-      <div>
-        <h1 className="text-2xl font-bold">
-          Employee Dashboard
-        </h1>
+        <div>
+          <h1 className="text-2xl font-bold">Employee Dashboard</h1>
 
         <p className="text-gray-500">
           Manage employee records
         </p>
       </div>
 
+
       {/* Buttons Section */}
       <div className="flex gap-3">
+        {/* Upload Button */}
+  <button
+    onClick={() => fileInputRef.current.click()}
+    className="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700"
+  >
+    {uploadLoading ? "Uploading..." : "Upload Excel"}
+  </button>
+
+  <input
+    type="file"
+    accept=".xlsx, .xls"
+    ref={fileInputRef}
+    onChange={handleBulkUpload}
+    hidden
+  />
 
         <button
         onClick={handleExportPreview}
@@ -423,6 +678,38 @@ const downloadExcel = () => {
           "Export Excel"
         )}
       </button>
+      {failedCount > 0 && (
+
+  <button
+    onClick={handleExportPreview}
+    className="
+      px-4 py-2
+      bg-red-600
+      hover:bg-red-700
+      text-white
+      rounded-lg
+      shadow-sm
+      flex items-center gap-2
+    "
+  >
+
+    Retry Failed
+
+    <span
+      className="
+        bg-white
+        text-red-600
+        px-2 py-0.5
+        rounded-full
+        text-xs
+        font-semibold
+      "
+    >
+      {failedCount}
+    </span>
+
+  </button>
+)}
 
       </div>
 
@@ -430,21 +717,22 @@ const downloadExcel = () => {
     {/* SUMMARY CARDS */}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-
         <StatCard title="Total Employees" value={totalEmployees} icon={Users} />
 
         <StatCard title="Probation" value={probation} icon={Clock} />
 
         <StatCard title="Active" value={active} icon={CheckCircle} />
 
-        <StatCard title="Notice Period" value={noticePeriod} icon={AlertCircle} />
-
+        <StatCard
+          title="Notice Period"
+          value={noticePeriod}
+          icon={AlertCircle}
+        />
       </div>
 
       {/* SEARCH + FILTERS */}
 
       <div className="flex flex-col md:flex-row gap-4">
-
         <input
           placeholder="Search by Name, Email or Employee ID..."
           value={searchTerm}
@@ -455,42 +743,22 @@ const downloadExcel = () => {
           className="w-full md:w-1/3 px-3 py-2 border rounded-lg"
         />
 
-        <select
+        <FilterListbox
+          options={[{value:"ALL",label:"All Status"},{value:"ACTIVE",label:"Active"},{value:"PROBATION",label:"Probation"},{value:"NOTICE PERIOD",label:"Notice Period"}]}
           value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-full md:w-48 px-3 py-2 border rounded-lg bg-white"
-        >
-          <option value="ALL">All Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="PROBATION">Probation</option>
-          <option value="NOTICE PERIOD">Notice Period</option>
-        </select>
+          onChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}
+        />
 
-        <select
+        <FilterListbox
+          options={[{value:"ALL",label:"All Departments"}, ...departments.map((dept) => ({value: dept.department_name, label: dept.department_name}))]}
           value={departmentFilter}
-          onChange={(e) => {
-            setDepartmentFilter(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-full md:w-48 px-3 py-2 border rounded-lg bg-white"
-        >
-          <option value="ALL">All Departments</option>
-
-          {departments.map((dept) => (
-          <option key={dept.department_uuid} value={dept.department_name}>
-            {dept.department_name}
-          </option>
-        ))}
-        </select>
+          onChange={(val) => { setDepartmentFilter(val); setCurrentPage(1); }}
+        />
       </div>
 
       {/* TABLE */}
 
       <div className="bg-white rounded-xl shadow-sm relative overflow-visible">
-
         <Table
           headers={headers}
           columns={columns}
@@ -502,29 +770,26 @@ const downloadExcel = () => {
           <Pagination
             currentPage={currentPage}
             totalPages={Math.ceil(filteredEmployees.length / PAGE_SIZE)}
-            onPrevious={() =>
-              setCurrentPage((p) => Math.max(p - 1, 1))
-            }
+            onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
             onNext={() =>
               setCurrentPage((p) =>
-                Math.min(p + 1, Math.ceil(employees.length / PAGE_SIZE))
+                Math.min(p + 1, Math.ceil(employees.length / PAGE_SIZE)),
               )
             }
           />
         )}
-
       </div>
 
       {/* ============================
    EXCEL PREVIEW
 ============================ */}
 
-<ExcelPreviewModal
-  showPreview={showPreview}
-  excelPreview={excelPreview}
-  onClose={() => setShowPreview(false)}
-  onSend={downloadExcel}
-/>
+      <ExcelPreviewModal
+        showPreview={showPreview}
+        excelPreview={excelPreview}
+        onClose={() => setShowPreview(false)}
+        onSend={downloadExcel}
+      />
 
       {/* MODAL */}
 
@@ -533,8 +798,10 @@ const downloadExcel = () => {
         onClose={handleCloseModal}
         userUuid={selectedUserUuid}
         employeeUuid={editEmployeeUuid}
+        initialEmployee={editEmployee}
+        initialDepartments={departments}
+        initialDesignations={designations}
       />
-
     </div>
   );
 }
@@ -542,25 +809,33 @@ const downloadExcel = () => {
 /* ============================
    STAT CARD
 ============================ */
+const formatError = (error) => {
+
+  if (!error) return "Unknown error";
+
+  if (error.includes("Duplicate entry")) {
+    return "Email already exists";
+  }
+
+  if (error.includes("IntegrityError")) {
+    return "Duplicate record found";
+  }
+
+  if (error.includes("NOT NULL")) {
+    return "Required field missing";
+  }
+
+  return "Upload failed";
+};
 
 function StatCard({ title, value, icon: Icon }) {
   return (
-    <div
-      className="bg-white p-4 rounded-xl border border-black/20 shadow-sm 
-                 flex gap-4 transition-all duration-300 
-                 hover:-translate-y-1 hover:shadow-xl"
-    >
-      <Icon className="text-indigo-600" />
-
-      <div>
-        <p className="text-sm text-gray-500">
-          {title}
-        </p>
-
-        <p className="text-xl font-semibold text-gray-900">
-          {value}
-        </p>
-      </div>
-    </div>
+    <KPICard
+      label={title}
+      value={value}
+      icon={<Icon className="h-5 w-5" />}
+      color="bg-indigo-50 text-indigo-600"
+      className="bg-white border-black/20 shadow-sm hover:-translate-y-1 hover:shadow-xl"
+    />
   );
 }

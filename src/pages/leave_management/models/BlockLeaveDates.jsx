@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import {
   ChevronDownIcon,
   FunnelIcon,
@@ -7,14 +8,14 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import DateRangePicker from "./DateRangePicker";
 import { format } from "date-fns";
 
 const skeleton = "animate-pulse bg-gray-400 rounded hover:cursor-wait";
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-const PMS_BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+const PMS_BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 
 const Toggle = ({ checked, onChange, label, hint, id }) => (
   <div className="flex items-start gap-3">
@@ -241,17 +242,17 @@ export default function BlockLeaveDates({ employeeId }) {
         setLoading(true);
         // Replace with your endpoints
         const [projRes, ltRes, ltIdsRes] = await Promise.all([
-          axios.get(`${PMS_BASE_URL}/api/projects/owner/${employeeId}`, {
+          api.get(`${PMS_BASE_URL}/api/projects/owner/${employeeId}`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           }),
-          axios.get(`${BASE_URL}/api/leave/types`, {
+          api.get(`${BASE_URL}/api/leave/types`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           }),
-          axios.get(`${BASE_URL}/api/leave/get-all-leave-type-ids`, {
+          api.get(`${BASE_URL}/api/leave/get-all-leave-type-ids`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
@@ -263,7 +264,7 @@ export default function BlockLeaveDates({ employeeId }) {
 
         if (!active) return;
         const leaveIdMap = new Map(
-          ltIdsJson.map((item) => [item.leaveName, item.leaveTypeId])
+          ltIdsJson.map((item) => [item.leaveName, item.leaveTypeId]),
         );
         const mergedLeaveTypes = ltJson
           .filter((leaveType) => leaveIdMap.get(leaveType.name) !== undefined)
@@ -285,12 +286,17 @@ export default function BlockLeaveDates({ employeeId }) {
       try {
         const year = new Date().getFullYear();
         console.log("yeaer", year);
-        const res = await axios.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
-          params: { state: "All", country: "India" }, // Adjust params if needed
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        const res = await api.get(
+          `${BASE_URL}/api/holidays/by-location/${year}`,
+          {
+            params: { state: "All", country: "India" }, // Adjust params if needed
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
+        );
         const holidayDates = res.data.map(
-          (holiday) => new Date(holiday.holidayDate + "T00:00:00")
+          (holiday) => new Date(holiday.holidayDate + "T00:00:00"),
         );
         setHolidays(holidayDates);
       } catch (err) {
@@ -313,18 +319,18 @@ export default function BlockLeaveDates({ employeeId }) {
       setSelectedMembers([]);
       if (!projectId) return;
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${PMS_BASE_URL}/api/projects/${projectId}/members`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         );
         const json = await res.data;
         if (!active) return;
         setMembers(
-          (json || []).map((m) => ({ value: m.id, label: `${m.name}` }))
+          (json || []).map((m) => ({ value: m.id, label: `${m.name}` })),
         );
       } catch (e) {
         toast.error(e.message || "Failed to fetch project members");
@@ -363,14 +369,14 @@ export default function BlockLeaveDates({ employeeId }) {
         reason: reason,
         year: new Date().getFullYear(),
       };
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE_URL}/api/leave-block/block`,
         payload,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
       if (!res.data.success) {
         throw new Error(res.data.message || "Failed to create leave block");
@@ -383,7 +389,7 @@ export default function BlockLeaveDates({ employeeId }) {
       toast.success(res.data.message || "Leave block created successfully");
     } catch (err) {
       toast.error(
-        err?.response?.data?.message || "Could not save. Please try again."
+        err?.response?.data?.message || "Could not save. Please try again.",
       );
     } finally {
       setSubmitting(false);
@@ -511,19 +517,14 @@ export default function BlockLeaveDates({ employeeId }) {
                       {loading ? (
                         <div className={`${skeleton} h-10 w-full`} />
                       ) : (
-                        <select
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "Select a project" },
+                            ...projectOptions,
+                          ]}
                           value={projectId}
-                          onChange={(e) => setProjectId(e.target.value)}
-                          required
-                          className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                          <option value="">Select a project</option>
-                          {projectOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setProjectId}
+                        />
                       )}
                     </div>
 
@@ -669,7 +670,7 @@ export default function BlockLeaveDates({ employeeId }) {
                   </span>
                   <span className=" ">
                     {projectOptions.find(
-                      (p) => p.value.toString() === projectId
+                      (p) => p.value.toString() === projectId,
                     )?.label || "—"}
                   </span>
                 </div>

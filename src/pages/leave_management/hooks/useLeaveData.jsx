@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import SockJS from "sockjs-client";
 import { over } from "stompjs";
@@ -11,7 +11,7 @@ const useLeaveData = (employeeId, refreshKey, year) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
   // ---------------------------
   // SHARED FUNCTION (used by both effects)
@@ -19,25 +19,19 @@ const useLeaveData = (employeeId, refreshKey, year) => {
   const fetchLeaveData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
 
-      if (!token) {
-        toast.error("Authentication token not found.");
-        return;
-      }
-
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/api/leave-requests/employee/${employeeId}/${year}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       const allLeaves = response.data?.data || [];
       const approvedLeaves = allLeaves.filter(
-        (leave) => leave.status === "APPROVED" || leave.status === "PENDING"
+        (leave) => leave.status === "APPROVED" || leave.status === "PENDING",
       );
 
       setLeaveData(approvedLeaves);

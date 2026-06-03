@@ -9,25 +9,27 @@ import { itemVariants, DASHBOARD_COLORS } from "../uiConfig";
 
 const { Title, Text } = Typography;
 
-const EpicTooltipContent = ({ epic }) => (
+const EpicTooltipContent = ({ epic, sortedStatuses }) => (
   <div className="text-xs">
     <Text strong className="text-white text-sm block mb-1">{epic.name}</Text>
-    <div className="flex items-center">
-      <span className="w-2.5 h-2.5 bg-green-300 rounded-sm mr-2" />
-      <Text className="text-gray-200">Done: {epic.done}</Text>
-    </div>
-    <div className="flex items-center">
-      <span className="w-2.5 h-2.5 bg-blue-300 rounded-sm mr-2" />
-      <Text className="text-gray-200">In progress: {epic.inProgress}</Text>
-    </div>
-    <div className="flex items-center">
-      <span className="w-2.5 h-2.5 bg-gray-500 rounded-sm mr-2" />
-      <Text className="text-gray-200">To do: {epic.todo}</Text>
-    </div>
+    {epic.statusDistribution
+      .filter(dist => dist.count > 0)
+      .map(dist => {
+        const status = sortedStatuses.find(s => s.id === dist.id);
+        return (
+          <div key={dist.id} className="flex items-center">
+            <span
+              className="w-2.5 h-2.5 rounded-sm mr-2"
+              style={{ backgroundColor: status?.color || '#gray' }}
+            />
+            <Text className="text-gray-200">{dist.name}: {dist.count}</Text>
+          </div>
+        );
+      })}
   </div>
 );
 
-const EpicProgress = ({ epics, stories, tasks, bugs, statuses }) => {
+const EpicProgress = ({ epics, stories, tasks, statuses /*, bugs */ }) => {
   const [epicProgressData, setEpicProgressData] = useState([]);
   const [sortedStatuses, setSortedStatuses] = useState([]);
 
@@ -36,43 +38,47 @@ const EpicProgress = ({ epics, stories, tasks, bugs, statuses }) => {
       setEpicProgressData([]);
       return;
     }
+
     const localSortedStatuses = [...statuses]
-      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       .map((status, index) => ({
         ...status,
         color: DASHBOARD_COLORS[index % DASHBOARD_COLORS.length],
       }));
     setSortedStatuses(localSortedStatuses);
 
-    const allWorkItems = [...stories, ...tasks, ...bugs];
+    const allWorkItems = [...(stories || []), ...(tasks || []) /*, ...(bugs || [])*/].filter(
+      Boolean,
+    );
 
-    const processed = epics.map((epic) => {
-      const children = allWorkItems.filter(
-        (item) => item.epicId === epic.id || item.epic?.id === epic.id
-      );
+    const processed = (epics || []).map((epic) => {
+      const children = allWorkItems.filter((item) => {
+        const epicId = item.epicId ?? item.epic?.id ?? item.epic_id;
+        return epicId === epic.id;
+      });
+
       const statusCounts = new Map(localSortedStatuses.map((s) => [s.id, 0]));
       children.forEach((child) => {
-        if (child.status?.id)
-          statusCounts.set(
-            child.status.id,
-            (statusCounts.get(child.status.id) || 0) + 1
-          );
+        const statusId = child.status?.id ?? child.statusId;
+        if (statusId) {
+          statusCounts.set(statusId, (statusCounts.get(statusId) || 0) + 1);
+        }
       });
+
       const total = children.length;
-      const dist = localSortedStatuses.map((s, index) => ({
+      const dist = localSortedStatuses.map((s) => ({
         id: s.id,
         name: s.name,
         color: s.color,
         count: statusCounts.get(s.id) || 0,
         percentage: total > 0 ? ((statusCounts.get(s.id) || 0) / total) * 100 : 0,
       }));
+
       return { ...epic, total, statusDistribution: dist };
     });
 
-    setEpicProgressData(processed.filter((e) => e.total > 0));
-  }, [epics, stories, tasks, bugs, statuses]);
-
-  if (!epicProgressData.length) return null;
+    setEpicProgressData(processed);
+  }, [epics, stories, tasks, statuses /*, bugs*/]);
 
   return (
     <motion.div variants={itemVariants} initial="hidden" animate="visible">
@@ -106,7 +112,7 @@ const EpicProgress = ({ epics, stories, tasks, bugs, statuses }) => {
           {epicProgressData.map((epic) => (
             <div key={epic.id}>
               <Tooltip
-                title={<EpicTooltipContent epic={epic} />}
+                title={<EpicTooltipContent epic={epic} sortedStatuses={sortedStatuses} />}
                 placement="top"
                 arrow={false}
                 styles={{
@@ -125,7 +131,7 @@ const EpicProgress = ({ epics, stories, tasks, bugs, statuses }) => {
                   <Text className="text-sm">{epic.name}</Text>
                 </div>
               </Tooltip>
-              <div className="w-full h-6 flex rounded overflow-hidden text-gray-800">
+              <div className="w-full h-6 flex rounded overflow-hidden text-gray-800 bg-slate-100">
                 {epic.statusDistribution.map((status, index) => (
                   <motion.div
                     key={status.id}

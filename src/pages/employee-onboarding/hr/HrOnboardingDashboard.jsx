@@ -1,15 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Users,
-  XCircle,
-  ShieldCheck,
-  Clock,
-  MailCheck,
-} from "lucide-react";
+import { Search, FileText, ShieldCheck, CheckCircle2, XCircle, MailCheck, Clock, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
 import Table from "../../../components/Table/table";
@@ -28,12 +22,34 @@ import ActionMenu from "./components/ActionMenu";
 import JoinModal from "./components/JoinModal";
 import OfferStatusCell from "./components/OfferStatusCell";
 import ReassignJoiningModal from "./components/ReassignJoiningModal";
-import StatCard from "./components/StatCard";
+import FilterListbox from "../../../components/filter/FilterListbox";
+import GroupedKPISection from "../components/GroupedKPISection";
+
+const HR_CATEGORY_GROUPS = [
+  {
+    key: "EmployeeOnboarding",
+    title: "Employee Onboarding",
+    statusDefs: [
+      { status: "SUBMITTED", label: "Submitted",  icon: FileText,    iconBg: "bg-blue-50",    iconColor: "text-blue-600"    },
+      { status: "VERIFIED",  label: "Verified",   icon: ShieldCheck, iconBg: "bg-green-50",   iconColor: "text-green-600"   },
+      { status: "COMPLETED", label: "Completed",  icon: CheckCircle2,iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
+      { status: "REJECTED",  label: "Rejected",   icon: XCircle,     iconBg: "bg-red-50",     iconColor: "text-red-600"     },
+    ],
+  },
+  {
+    key: "JoiningProcess",
+    title: "Joining Process",
+    statusDefs: [
+      { status: "JOINING",         label: "Joining",         icon: MailCheck,  iconBg: "bg-teal-50",   iconColor: "text-teal-600"   },
+      { status: "JOINING_PENDING", label: "Joining Pending", icon: Clock,      iconBg: "bg-amber-50",  iconColor: "text-amber-600"  },
+      { status: "RESCHEDULED",     label: "Rescheduled",     icon: RefreshCw,  iconBg: "bg-orange-50", iconColor: "text-orange-600" },
+    ],
+  },
+];
 
 export default function HrOnboardingDashboard() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const [data, setData] = useState([]);
   const [employeeUserIds, setEmployeeUserIds] = useState([]);
@@ -45,6 +61,7 @@ export default function HrOnboardingDashboard() {
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [sending, setSending] = useState(false);
+  const [previewingJoinLetter, setPreviewingJoinLetter] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [loadingEditDetails, setLoadingEditDetails] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -75,6 +92,31 @@ export default function HrOnboardingDashboard() {
     joining_comments: "",
   });
 
+  const getManagerDisplayName = (manager) =>
+    `${manager.first_name || ""} ${manager.last_name || ""}`.trim();
+
+  const getManagerPayloadValue = (manager) =>
+    String(manager.employee_id || manager.user_uuid || manager.uuid || "").trim();
+
+  const resolveReportingManager = (value) => {
+    const normalizedValue = String(value || "").trim();
+    if (!normalizedValue) return "";
+
+    const manager = managerOptions.find((option) => {
+      const optionValue = String(option.value || "").trim();
+      const optionLabel = String(option.label || "").trim();
+      const optionName = String(option.name || "").trim();
+
+      return (
+        optionValue === normalizedValue ||
+        optionLabel === normalizedValue ||
+        optionName === normalizedValue
+      );
+    });
+
+    return manager?.value || normalizedValue;
+  };
+
   const handleKpiClick = (status) => {
     setStatusFilter(status);
     setCurrentPage(1);
@@ -83,7 +125,7 @@ export default function HrOnboardingDashboard() {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const offers = await fetchOfferDetailsList(BASE_URL, token);
+      const offers = await fetchOfferDetailsList(BASE_URL, localStorage.getItem("token"));
       setData(offers);
     } catch (err) {
       console.error(err);
@@ -94,13 +136,13 @@ export default function HrOnboardingDashboard() {
 
   const fetchCoreEmployees = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/permanent-employee/core-employee-details/`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       const ids = (res.data || []).map((emp) => emp.user_uuid);
@@ -140,32 +182,30 @@ export default function HrOnboardingDashboard() {
     try {
       setLoadingEditDetails(true);
 
-      const res = await axios.get(
+      const res = await api.get(
         `${BASE_URL}/hr/offerletters/${employee.user_uuid}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       const detail = res.data || {};
 
       setEditJoinForm({
         joining_date: String(
-          detail.joining_date || employee.joining_date || ""
+          detail.joining_date || employee.joining_date || "",
         ).trim(),
         reporting_time: String(
-          detail.reporting_time || employee.reporting_time || ""
+          detail.reporting_time || employee.reporting_time || "",
         ).trim(),
-        location: String(
-          detail.location || employee.location || ""
-        ).trim(),
+        location: String(detail.location || employee.location || "").trim(),
         department: String(
-          detail.department || employee.department || ""
+          detail.department || employee.department || "",
         ).trim(),
         reporting_manager: String(
-          detail.reporting_manager || employee.reporting_manager || ""
+          detail.reporting_manager || employee.reporting_manager || "",
         ).trim(),
         joining_comments: String(
           detail.joining_comments || employee.joining_comments || ""
@@ -204,15 +244,24 @@ export default function HrOnboardingDashboard() {
     setLoadingManagers(true);
 
     try {
-      const res = await axios.get(
-        `${BASE_URL}/offer-approval/admin-users`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await api.get(`${BASE_URL}/permanent-employee/core-employee-details/`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
 
-      const managers = (res.data || []).map((u) => ({
-        value: String(u.name || "").trim(),
-        label: `${String(u.name || "").trim()} (${u.mail})`,
-      }));
+      const managers = (res.data || [])
+        .map((u) => {
+          const displayName = getManagerDisplayName(u);
+          const payloadValue = getManagerPayloadValue(u);
+
+          if (!displayName || !payloadValue) return null;
+
+          return {
+            value: payloadValue,
+            label: displayName,
+            name: displayName,
+          };
+        })
+        .filter(Boolean);
 
       setManagerOptions(managers);
     } catch (err) {
@@ -226,53 +275,52 @@ export default function HrOnboardingDashboard() {
     fetchManagers();
   }, []);
 
-const fetchJoiningCommentForUser = async (userUuid) => {
-  if (!userUuid) return;
+  const fetchJoiningCommentForUser = async (userUuid) => {
+    if (!userUuid) return;
 
-  // ✅ prevent duplicate calls while loading
-  if (loadingStatusCommentUserId === userUuid) return;
+    // ✅ prevent duplicate calls while loading
+    if (loadingStatusCommentUserId === userUuid) return;
 
-  try {
-    setLoadingStatusCommentUserId(userUuid);
+    try {
+      setLoadingStatusCommentUserId(userUuid);
 
-    const res = await axios.get(
-      `${BASE_URL}/hr/offerletters/${userUuid}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+      const res = await api.get(
+        `${BASE_URL}/hr/offerletters/${userUuid}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
 
-    setJoiningCommentsByUser((prev) => ({
-      ...prev,
-      [userUuid]: res.data?.joining_comments || "",
-    }));
-  } catch (err) {
-    console.error("Failed to fetch joining comments", err);
-  } finally {
-    setLoadingStatusCommentUserId(null);
-  }
-};
+      setJoiningCommentsByUser((prev) => ({
+        ...prev,
+        [userUuid]: res.data?.joining_comments || "",
+      }));
+    } catch (err) {
+      console.error("Failed to fetch joining comments", err);
+    } finally {
+      setLoadingStatusCommentUserId(null);
+    }
+  };
 
   // const getHrDisplayStatus = (offer) =>
   //   getOfferDisplayStatus(offer, employeeUserIds);
   const getHrDisplayStatus = (offer) =>
-  getNormalizedStatus(getOfferDisplayStatus(offer, employeeUserIds));
+    getNormalizedStatus(getOfferDisplayStatus(offer, employeeUserIds));
 
   const pageData = useMemo(() => {
-    return data.filter((emp) =>
-      editDisabledUserIds.includes(emp?.user_uuid) ||
-      isTrackedOnboardingStatus(emp, employeeUserIds)
+    return data.filter(
+      (emp) =>
+        editDisabledUserIds.includes(emp?.user_uuid) ||
+        isTrackedOnboardingStatus(emp, employeeUserIds),
     );
   }, [data, employeeUserIds, editDisabledUserIds]);
 
   const filteredData = useMemo(() => {
     return pageData.filter((emp) => {
-      const searchText = `${emp.first_name} ${emp.last_name} ${emp.designation}`
-        .toLowerCase();
+      const searchText =
+        `${emp.first_name} ${emp.last_name} ${emp.designation}`.toLowerCase();
 
-      const matchesSearch = searchText.includes(
-        searchTerm.toLowerCase()
-      );
+      const matchesSearch = searchText.includes(searchTerm.toLowerCase());
 
       const status = getHrDisplayStatus(emp);
       const filter = statusFilter.trim().toUpperCase();
@@ -283,13 +331,32 @@ const fetchJoiningCommentForUser = async (userUuid) => {
 
       return matchesSearch && status === filter;
     });
-  }, [pageData, searchTerm, statusFilter, employeeUserIds, editDisabledUserIds]);
+  }, [
+    pageData,
+    searchTerm,
+    statusFilter,
+    employeeUserIds,
+    editDisabledUserIds,
+  ]);
+
+  const categoryData = useMemo(() => {
+    return HR_CATEGORY_GROUPS.map((group) => ({
+      key: group.key,
+      title: group.title,
+      cards: group.statusDefs.map((def) => ({
+        status:    def.status,
+        label:     def.label,
+        count:     pageData.filter((e) => getHrDisplayStatus(e) === def.status).length,
+        icon:      def.icon,
+        iconBg:    def.iconBg,
+        iconColor: def.iconColor,
+      })),
+    }));
+  }, [pageData, employeeUserIds]);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
-      prev.includes(id)
-        ? prev.filter((x) => x !== id)
-        : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -314,7 +381,7 @@ const fetchJoiningCommentForUser = async (userUuid) => {
       location,
       department,
       reporting_manager,
-      joining_comments,
+      
     } = joinForm;
 
     if (
@@ -322,15 +389,15 @@ const fetchJoiningCommentForUser = async (userUuid) => {
       !reporting_time ||
       !location ||
       !department ||
-      !reporting_manager ||
-      !joining_comments
+      !reporting_manager 
+      
     ) {
       showStatusToast("Please fill all required fields");
       return;
     }
 
     const selectedEmployees = filteredData.filter((e) =>
-      selectedIds.includes(e.user_uuid)
+      selectedIds.includes(e.user_uuid),
     );
 
     const emails = selectedEmployees
@@ -342,17 +409,25 @@ const fetchJoiningCommentForUser = async (userUuid) => {
       return;
     }
 
+    const normalizedReportingManager =
+      resolveReportingManager(reporting_manager);
+
     const payload = {
       user_emails_list: emails,
       ...joinForm,
+      reporting_manager: normalizedReportingManager,
+    };
+    const joiningDetails = {
+      ...joinForm,
+      reporting_manager: normalizedReportingManager,
     };
 
     try {
       setSending(true);
 
-      await axios.post(`${BASE_URL}/hr/offerletters/bulk-join`, payload, {
+      await api.post(`${BASE_URL}/hr/offerletters/bulk-join`, payload, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
         },
       });
@@ -361,23 +436,23 @@ const fetchJoiningCommentForUser = async (userUuid) => {
         prev.map((emp) =>
           selectedIds.includes(emp.user_uuid)
             ? {
-                ...emp,
-                ...joinForm,
-                status:
-                  getNormalizedStatus(emp.status) === "VERIFIED"
-                    ? "JOINING"
-                    : emp.status,
-              }
-            : emp
-        )
+              ...emp,
+              ...joiningDetails,
+              status:
+                getNormalizedStatus(emp.status) === "VERIFIED"
+                  ? "JOINING"
+                  : emp.status,
+            }
+            : emp,
+        ),
       );
 
       selectedEmployees.forEach((employee) =>
         persistJoiningStatus({
           ...employee,
-          ...joinForm,
+          ...joiningDetails,
           status: "JOINING",
-        })
+        }),
       );
 
       await fetchEmployees();
@@ -392,6 +467,88 @@ const fetchJoiningCommentForUser = async (userUuid) => {
       showStatusToast("Failed to send emails");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handlePreviewJoiningLetter = async () => {
+    const {
+      joining_date,
+      reporting_time,
+      location,
+      department,
+      reporting_manager,
+      custom_message,
+    } = joinForm;
+
+    if (
+      !joining_date ||
+      !reporting_time ||
+      !location ||
+      !department ||
+      !reporting_manager
+    ) {
+      showStatusToast("Please fill all required fields");
+      return;
+    }
+
+    const selectedEmployees = filteredData.filter((e) =>
+      selectedIds.includes(e.user_uuid),
+    );
+
+    const previewEmail = selectedEmployees[0]?.mail;
+
+    if (!previewEmail) {
+      showStatusToast("Please select a candidate to preview");
+      return;
+    }
+
+    const normalizedReportingManager =
+      resolveReportingManager(reporting_manager);
+
+    const payload = {
+      user_emails_list: [previewEmail],
+      joining_date,
+      reporting_time,
+      location,
+      department,
+      reporting_manager: normalizedReportingManager,
+      custom_message: custom_message || "",
+    };
+
+    try {
+      setPreviewingJoinLetter(true);
+
+      const res = await api.post(
+        `${BASE_URL}/hr/offerletters/bulk-join`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+          params: { preview: true },
+          responseType: "blob",
+        },
+      );
+
+      const contentType = res.headers?.["content-type"] || "";
+
+      if (!contentType.includes("application/pdf")) {
+        const errorText = await res.data.text();
+        console.error("Joining preview returned non-PDF response:", errorText);
+        showStatusToast("Failed to generate joining letter PDF");
+        return;
+      }
+
+      const file = new Blob([res.data], { type: "application/pdf" });
+      window.open(URL.createObjectURL(file), "_blank");
+    } catch (err) {
+      const errorBlob = err.response?.data;
+      const errorText = errorBlob?.text ? await errorBlob.text() : "";
+      console.error("Failed to preview joining letter", err, errorText);
+      showStatusToast("Failed to preview joining letter");
+    } finally {
+      setPreviewingJoinLetter(false);
     }
   };
 
@@ -419,10 +576,13 @@ const fetchJoiningCommentForUser = async (userUuid) => {
       return;
     }
 
+    const normalizedReportingManager =
+      resolveReportingManager(reporting_manager);
+
     const payload = {
       user_uuid: editingEmployee.user_uuid,
       new_joining_date: joining_date,
-      reporting_manager,
+      reporting_manager: normalizedReportingManager,
       reporting_time,
       location,
       department,
@@ -432,9 +592,9 @@ const fetchJoiningCommentForUser = async (userUuid) => {
     try {
       setSavingEdit(true);
 
-      const res =await axios.put(`${BASE_URL}/hr/offerletters/reassign-joining`, payload, {
+      const res = await api.put(`${BASE_URL}/hr/offerletters/reassign-joining`, payload, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
         },
       });
@@ -448,7 +608,7 @@ const fetchJoiningCommentForUser = async (userUuid) => {
         reporting_time,
         location,
         department,
-        reporting_manager,
+        reporting_manager: normalizedReportingManager,
         joining_comments,
       });
 
@@ -456,25 +616,25 @@ const fetchJoiningCommentForUser = async (userUuid) => {
         prev.map((emp) =>
           emp.user_uuid === editingEmployee.user_uuid
             ? {
-                ...emp,
-                status: updatedStatus,
-                joining_date,
-                reporting_time,
-                location,
-                department,
-                reporting_manager,
-                joining_comments,
-              }
-            : emp
-        )
+              ...emp,
+              status: updatedStatus,
+              joining_date,
+              reporting_time,
+              location,
+              department,
+              reporting_manager: normalizedReportingManager,
+              joining_comments,
+            }
+            : emp,
+        ),
       );
-      console.log("UPDATED STATUS:",updatedStatus);
+      console.log("UPDATED STATUS:", updatedStatus);
       fetchEmployees();
 
       setEditDisabledUserIds((prev) =>
         prev.includes(editingEmployee.user_uuid)
           ? prev
-          : [...prev, editingEmployee.user_uuid]
+          : [...prev, editingEmployee.user_uuid],
       );
 
       showStatusToast("Joining date updated");
@@ -488,14 +648,35 @@ const fetchJoiningCommentForUser = async (userUuid) => {
   };
 
   const headers = [
-    bulkJoinMode ? "Select" : null,
-    "Name",
-    "Email",
-    "Contact",
-    "Role",
-    "Status",
-    "Action",
-  ].filter(Boolean);
+  bulkJoinMode ? (
+    <input
+      type="checkbox"
+      className="h-4 w-4 cursor-pointer"
+      onChange={(e) => {
+        if (e.target.checked) {
+          // Select only IDs of candidates who are VERIFIED
+          const verifiedIds = filteredData
+            .filter((emp) => getHrDisplayStatus(emp) === "VERIFIED")
+            .map((emp) => emp.user_uuid);
+          setSelectedIds(verifiedIds);
+        } else {
+          setSelectedIds([]);
+        }
+      }}
+      // Check if all available verified candidates are selected
+      checked={
+        selectedIds.length > 0 &&
+        selectedIds.length === filteredData.filter(e => getHrDisplayStatus(e) === "VERIFIED").length
+      }
+    />
+  ) : null,
+  "Name",
+  "Email",
+  "Contact",
+  "Role",
+  "Status",
+  "Action",
+].filter(Boolean);
 
   const columns = [
     bulkJoinMode ? "select" : null,
@@ -520,287 +701,205 @@ const fetchJoiningCommentForUser = async (userUuid) => {
     }
   }, [currentPage, totalPages]);
 
-const rows = useMemo(() => {
-  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const rows = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
 
-  return filteredData
-    .slice(startIndex, startIndex + PAGE_SIZE)
-    .map((emp) => {
-      const displayStatus = getHrDisplayStatus(emp);
-      const isEmployeeCreated = displayStatus === "COMPLETED";
-      const isVerified = displayStatus === "VERIFIED";
-      const isJoining = displayStatus === "JOINING";
-      const isJoiningPending = displayStatus === "JOINING_PENDING";
-      const isRescheduled = displayStatus === OFFER_STATUS.RESCHEDULED;
+    return filteredData
+      .slice(startIndex, startIndex + PAGE_SIZE)
+      .map((emp) => {
+        const displayStatus = getHrDisplayStatus(emp);
+        const isEmployeeCreated = displayStatus === "COMPLETED";
+        const isVerified = displayStatus === "VERIFIED";
+        const isJoining = displayStatus === "JOINING";
+        const isJoiningPending = displayStatus === "JOINING_PENDING";
+        const isRescheduled = displayStatus === OFFER_STATUS.RESCHEDULED;
 
-      const isEditDisabled = editDisabledUserIds.includes(emp.user_uuid);
+        const isEditDisabled = editDisabledUserIds.includes(emp.user_uuid);
 
-      return {
-        rowClass: isEmployeeCreated ? "bg-green-100" : "",
+        return {
+          rowClass: isEmployeeCreated ? "bg-green-100" : "",
+          select: bulkJoinMode ? (
+    <input
+      type="checkbox"
+      className="h-4 w-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+      checked={selectedIds.includes(emp.user_uuid)}
+      onChange={() => toggleSelect(emp.user_uuid)}
+      // Only allow clicking if the status is VERIFIED
+      disabled={!isVerified}
+      title={!isVerified ? "Only verified candidates can be selected" : ""}
+    />
+  ) : null,
 
-        name: `${emp.first_name} ${emp.last_name}`,
-        mail: emp.mail || "—",
-        contact: emp.contact_number || "—",
-        designation: emp.designation || "—",
+          name: `${emp.first_name} ${emp.last_name}`,
+          mail: emp.mail || "—",
+          contact: emp.contact_number || "—",
+          designation: emp.designation || "—",
 
-        status: (
-          <OfferStatusCell
-            employee={emp}
-            displayStatus={displayStatus}
-            joiningCommentsByUser={joiningCommentsByUser}
-            loadingStatusCommentUserId={loadingStatusCommentUserId}
-            fetchJoiningCommentForUser={fetchJoiningCommentForUser}
-          />
-        ),
-        action: (
-          <ActionMenu
-            onView={() =>
-              navigate(`/employee-onboarding/hr/profile/${emp.user_uuid}`)
-            }
-            onCreate={() => handleOpenCreateModal(emp)}
-            onEdit={() => handleOpenEditModal(emp)}
-            showCreate={
-              (isVerified || isJoining || isJoiningPending || isRescheduled) &&
-              !isEmployeeCreated
-            }
-            showEdit={(isJoiningPending || isRescheduled) && !isEditDisabled}
-          />
-        ),
-      };
-    });
-}, [
-  filteredData,
-  currentPage,
-  selectedIds,
-  navigate,
-  employeeUserIds,
-  editDisabledUserIds,
-  joiningCommentsByUser,
-  loadingStatusCommentUserId,
-]);
+          status: (
+            <OfferStatusCell
+              employee={emp}
+              displayStatus={displayStatus}
+              joiningCommentsByUser={joiningCommentsByUser}
+              loadingStatusCommentUserId={loadingStatusCommentUserId}
+              fetchJoiningCommentForUser={fetchJoiningCommentForUser}
+            />
+          ),
+          action: (
+            <ActionMenu
+              onView={() =>
+                navigate(`/employee-onboarding/hr/profile/${emp.user_uuid}`)
+              }
+              onCreate={() => handleOpenCreateModal(emp)}
+              onEdit={() => handleOpenEditModal(emp)}
+              showCreate={
+                (isVerified || isJoining || isJoiningPending || isRescheduled) &&
+                !isEmployeeCreated
+              }
+              showEdit={(isJoiningPending || isRescheduled) && !isEditDisabled}
+            />
+          ),
+        };
+      });
+  }, [
+    filteredData,
+    currentPage,
+    selectedIds,
+    navigate,
+    employeeUserIds,
+    editDisabledUserIds,
+    joiningCommentsByUser,
+    loadingStatusCommentUserId,
+  ]);
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">
+    <div className="min-h-screen bg-slate-50/50 p-6 space-y-8 font-sans">
+      {/* Header */}
+      <div className="px-1">
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
           HR Onboarding Dashboard
         </h1>
-
-        <p className="text-gray-500">
+        <p className="text-sm font-medium text-slate-500 mt-1">
           Verify employee documents & profiles
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-        <StatCard
-          title="Total Profiles"
-          value={loading ? "0" : pageData.length}
-          icon={Users}
-          onClick={() => handleKpiClick("ALL")}
-        />
+      {/* Grouped KPI Section */}
+      <GroupedKPISection
+        groups={categoryData}
+        statusFilter={statusFilter}
+        onStatusClick={handleKpiClick}
+      />
 
-        <StatCard
-          title="Verified"
-          value={
-            loading
-              ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "VERIFIED"
-                ).length
-          }
-          icon={ShieldCheck}
-          onClick={() => handleKpiClick("VERIFIED")}
-        />
+      {/* Search & Table Section */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        {/* Toolbar */}
+        <div className="bg-slate-50/50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-3 flex-1">
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by candidate name or role…"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 text-slate-900 text-sm rounded-xl shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium"
+              />
+            </div>
 
-        <StatCard
-          title="Joining"
-          value={
-            loading
-              ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "JOINING"
-                ).length
-          }
-          icon={MailCheck}
-          onClick={() => handleKpiClick("JOINING")}
-        />
-
-        <StatCard
-          title="Joining Pending"
-          value={
-            loading
-              ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "JOINING_PENDING"
-                ).length
-          }
-          icon={Clock}
-          onClick={() => handleKpiClick("JOINING_PENDING")}
-        />
-
-        <StatCard
-          title="Completed"
-          value={
-            loading
-              ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "COMPLETED"
-                ).length
-          }
-          icon={Users}
-          onClick={() => handleKpiClick("COMPLETED")}
-        />
-
-        <StatCard
-          title="Rescheduled"
-          value={
-            loading
-              ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "RESCHEDULED"
-                ).length
-          }
-          icon={Clock}
-          onClick={() => handleKpiClick("RESCHEDULED")}
-        />
-
-        <StatCard
-          title="Rejected"
-          value={
-            loading
-              ? "0"
-              : pageData.filter(
-                  (e) =>
-                    getHrDisplayStatus(e) ===
-                    "REJECTED"
-                ).length
-          }
-          icon={XCircle}
-          onClick={() => handleKpiClick("REJECTED")}
-        />
-      </div>
-
-      <div className="flex flex-col md:flex-row gap-4">
-        <input
-          placeholder="Search by candidate name... or Role"
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-full md:w-1/3 px-3 py-2 border rounded-lg"
-        />
-
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-full md:w-48 px-3 py-2 border rounded-lg bg-white"
-        >
-          <option value="ALL">All Status</option>
-          <option value="SUBMITTED">Submitted</option>
-          <option value="VERIFIED">Verified</option>
-          <option value="JOINING">Joining</option>
-          <option value="JOINING_PENDING">Joining Pending</option>
-          <option value="COMPLETED">Completed</option>
-          <option value="RESCHEDULED">Rescheduled</option>
-          <option value="REJECTED">Rejected</option>
-        </select>
-      </div>
-
-      <div className="bg-white p-4 rounded-xl shadow-sm flex justify-between">
-        <h2 className="font-semibold text-gray-700">
-          Recent Offer Letters
-        </h2>
-
-        {!bulkJoinMode ? (
-          <Button
-            varient="primary"
-            size="small"
-            onClick={() => {
-              const hasVerified = filteredData.some(
-                (e) =>
-                  getHrDisplayStatus(e) ===
-                  "VERIFIED"
-              );
-
-              if (!hasVerified) {
-                showStatusToast(
-                  "No verified candidates available for bulk join"
-                );
-                return;
-              }
-
-              setBulkJoinMode(true);
-            }}
-          >
-            Bulk Join
-          </Button>
-        ) : (
-          <div className="flex gap-3">
-            <Button
-              varient="primary"
-              size="small"
-              disabled={selectedIds.length === 0}
-              onClick={() => setShowModal(true)}
-            >
-              Send ({selectedIds.length})
-            </Button>
-
-            <Button
-              varient="secondary"
-              size="small"
-              onClick={resetBulk}
-            >
-              Cancel
-            </Button>
+            <div className="w-full md:w-48">
+              <FilterListbox
+                options={[
+                  { value: "ALL", label: "All Status" },
+                  { value: "SUBMITTED", label: "Submitted" },
+                  { value: "VERIFIED", label: "Verified" },
+                  { value: "JOINING", label: "Joining" },
+                  { value: "JOINING_PENDING", label: "Joining Pending" },
+                  { value: "COMPLETED", label: "Completed" },
+                  { value: "RESCHEDULED", label: "Rescheduled" },
+                  { value: "REJECTED", label: "Rejected" },
+                ]}
+                value={statusFilter}
+                onChange={(val) => {
+                  setStatusFilter(val);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
           </div>
-        )}
-      </div>
 
-      <div className="bg-white rounded-xl shadow-sm relative overflow-visible">
-        <Table
-          headers={headers}
-          columns={columns}
-          rows={rows}
-          loading={loading}
-        />
+          <div className="flex items-center gap-3">
+            {!bulkJoinMode ? (
+             // FIND THE "Bulk Join" BUTTON AND UPDATE onClick:
+<Button
+  varient="primary"
+  size="small"
+  onClick={() => {
+    const hasVerified = filteredData.some(
+      (e) => getHrDisplayStatus(e) === "VERIFIED",
+    );
 
-        {filteredData.length > PAGE_SIZE && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPrevious={() =>
-              setCurrentPage((p) =>
-                Math.max(p - 1, 1)
-              )
-            }
-            onNext={() =>
-              setCurrentPage((p) =>
-                Math.min(p + 1, totalPages)
-              )
-            }
+    if (!hasVerified) {
+      showStatusToast("No verified candidates available for bulk join");
+      return;
+    }
+
+    setBulkJoinMode(true);
+    // OPTIONAL: Automatically filter to Verified to show selectable users
+    setStatusFilter("VERIFIED"); 
+    setCurrentPage(1);
+  }}
+>
+  Bulk Join
+</Button>
+            ) : (
+              <div className="flex gap-3">
+                <Button
+                  varient="primary"
+                  size="small"
+                  disabled={selectedIds.length === 0}
+                  onClick={() => setShowModal(true)}
+                >
+                  Send ({selectedIds.length})
+                </Button>
+
+                <Button varient="secondary" size="small" onClick={resetBulk}>
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="relative overflow-visible">
+          <Table
+            headers={headers}
+            columns={columns}
+            rows={rows}
+            loading={loading}
           />
-        )}
+
+          {filteredData.length > PAGE_SIZE && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+              onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+            />
+          )}
+        </div>
       </div>
 
       <JoinModal
         open={showModal}
         onClose={() => setShowModal(false)}
         onSubmit={handleSendJoinEmail}
+        onPreview={handlePreviewJoiningLetter}
         loading={sending}
+        previewLoading={previewingJoinLetter}
         form={joinForm}
         setForm={setJoinForm}
         managerOptions={managerOptions}
@@ -830,3 +929,5 @@ const rows = useMemo(() => {
     </div>
   );
 }
+
+

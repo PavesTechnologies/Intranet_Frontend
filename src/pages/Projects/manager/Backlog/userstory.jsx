@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useEffect, useState } from "react";
+import api from "../../../../api/axiosInstance";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import Button from "../../../../components/Button/Button";
 
 const CreateUserStory = ({ onClose }) => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
   const [storyPoints, setStoryPoints] = useState(1);
-  const [priority, setPriority] = useState('MEDIUM');
+  const [priority, setPriority] = useState("MEDIUM");
 
   const [projectId, setProjectId] = useState(null);
   const [epicId, setEpicId] = useState(null);
@@ -28,9 +30,15 @@ const CreateUserStory = ({ onClose }) => {
     const loadInitialData = async () => {
       try {
         const [usersRes, projectsRes, sprintsRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_PMS_BASE_URL}/api/sprints`, { headers: { Authorization: `Bearer ${token}` } }),
+          api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
 
         setUsers(usersRes.data?.content ?? usersRes.data ?? []);
@@ -48,10 +56,13 @@ const CreateUserStory = ({ onClose }) => {
   useEffect(() => {
     if (!projectId) return;
 
-    axios
-      .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+    api
+      .get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      )
       .then((res) => setEpics(res.data?.content ?? res.data ?? []))
       .catch(() => setEpics([]));
   }, [projectId, token]);
@@ -60,10 +71,13 @@ const CreateUserStory = ({ onClose }) => {
   useEffect(() => {
     if (!projectId) return;
 
-    axios
-      .get(`${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/statuses`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+    api
+      .get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      )
       .then((res) => setStatuses(res.data?.content ?? res.data ?? []))
       .catch(() => setStatuses([]));
   }, [projectId, token]);
@@ -86,10 +100,10 @@ const CreateUserStory = ({ onClose }) => {
     };
 
     try {
-      const res = await axios.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/stories`,
+      const res = await api.post(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories`,
         payload,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       console.log("Story created:", res.data);
@@ -139,97 +153,51 @@ const CreateUserStory = ({ onClose }) => {
         />
 
         {/* Project Selection */}
-        <select
-          className="w-full border px-3 py-2 rounded"
+        <FilterListbox
+          options={[{value:"",label:"Select Project"},...projects.map(p=>({value:p.id,label:p.name}))]}
           value={projectId ?? ""}
-          onChange={(e) => setProjectId(Number(e.target.value))}
-          required
-        >
-          <option value="">Select Project</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+          onChange={setProjectId}
+        />
 
         {/* Epic */}
-        <select
-          className="w-full border px-3 py-2 rounded"
+        <FilterListbox
+          options={[{value:"",label:"Select Epic"},...epics.map(epic=>({value:epic.id,label:epic.name}))]}
           value={epicId ?? ""}
-          onChange={(e) => setEpicId(Number(e.target.value))}
-          required
-        >
-          <option value="">Select Epic</option>
-          {epics.map((epic) => (
-            <option key={epic.id} value={epic.id}>{epic.name}</option>
-          ))}
-        </select>
+          onChange={setEpicId}
+        />
 
         {/* Reporter */}
-        <select
-          className="w-full border px-3 py-2 rounded"
+        <FilterListbox
+          options={[{value:"",label:"Select Reporter"},...users.map(u=>({value:u.id,label:u.name}))]}
           value={reporterId ?? ""}
-          onChange={(e) => setReporterId(Number(e.target.value))}
-          required
-        >
-          <option value="">Select Reporter</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>{u.name}</option>
-          ))}
-        </select>
+          onChange={setReporterId}
+        />
 
         {/* Assignee */}
-        <select
-          className="w-full border px-3 py-2 rounded"
+        <FilterListbox
+          options={[{value:"",label:"Select Assignee"},...users.map(u=>({value:u.id,label:u.name}))]}
           value={assigneeId ?? ""}
-          onChange={(e) => setAssigneeId(Number(e.target.value))}
-          required
-        >
-          <option value="">Select Assignee</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>{u.name}</option>
-          ))}
-        </select>
+          onChange={setAssigneeId}
+        />
 
         {/* Sprint */}
-        <select
-          className="w-full border px-3 py-2 rounded"
+        <FilterListbox
+          options={[{value:"",label:"Select Sprint (Optional)"},...sprints.map(s=>({value:s.id,label:s.name}))]}
           value={sprintId ?? ""}
-          onChange={(e) => setSprintId(Number(e.target.value))}
-        >
-          <option value="">Select Sprint (Optional)</option>
-          {sprints.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
+          onChange={setSprintId}
+        />
 
         {/* Status */}
-        <select
-          className="w-full border px-3 py-2 rounded"
+        <FilterListbox
+          options={[{value:"",label:"Select Status"},...statuses.map(s=>({value:s.id,label:s.name}))]}
           value={statusId ?? ""}
-          onChange={(e) => setStatusId(Number(e.target.value))}
-          required
-        >
-          <option value="">Select Status</option>
-          {statuses.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
+          onChange={setStatusId}
+        />
 
         {/* Buttons */}
         <div className="flex justify-end gap-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
-          >
-            Create
-          </button>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" type="submit">Create</Button>
         </div>
       </form>
     </div>

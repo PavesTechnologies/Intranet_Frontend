@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useMemo, Fragment } from "react";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { jwtDecode } from "jwt-decode";
+import { KPICard } from "../../../components/kpi/KPI";
 
 import { useNavigate, useParams } from "react-router-dom";
 import { getAssetsByClient } from "../services/clientservice";
+import { projectResourceDetails } from "../services/resource";
 import { getAvailableSerialsByAssetId } from "../services/clientservice";
 import {
   ArrowLeft,
@@ -28,11 +31,12 @@ import {
   deleteClientAssignment,
   getProjectsByClient,
 } from "../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { Listbox, Transition } from "@headlessui/react";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import Pagination from "../../../components/Pagination/pagination";
+import GenericTable from "../../../components/Table/table";
 
 /* ---------------- CONSTANTS & STYLES ---------------- */
 
@@ -44,31 +48,6 @@ const STATUS_COLORS = {
   LOST: "bg-red-100 text-red-700",
 };
 
-const COLOR_STYLES = {
-  indigo: {
-    bg: "bg-indigo-50",
-    text: "text-indigo-600",
-    border: "border-indigo-100",
-  },
-  emerald: {
-    bg: "bg-emerald-50",
-    text: "text-emerald-600",
-    border: "border-emerald-100",
-  },
-  amber: {
-    bg: "bg-amber-50",
-    text: "text-amber-600",
-    border: "border-amber-100",
-  },
-  blue: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-100" },
-  rose: { bg: "bg-rose-50", text: "text-rose-600", border: "border-rose-100" },
-  yellow: {
-    bg: "bg-yellow-50",
-    text: "text-yellow-600",
-    border: "border-yellow-100",
-  },
-};
-
 /* ---------------- SUB-COMPONENTS ---------------- */
 
 const Stat = ({ title, value, icon: Icon, color = "indigo" }) => {
@@ -78,7 +57,7 @@ const Stat = ({ title, value, icon: Icon, color = "indigo" }) => {
       className={`bg-white border rounded-xl p-5 shadow-sm flex justify-between items-center transition-all hover:shadow-md ${theme.border}`}
     >
       <div>
-        <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">
+        <p className="text-xs text-gray-400 font-bold tracking-wider">
           {title}
         </p>
         <p className={`text-2xl font-bold mt-1 ${theme.text}`}>{value}</p>
@@ -169,6 +148,35 @@ const AssetDetail = () => {
 
   const [availableSerials, setAvailableSerials] = useState([]);
   const [serialLoading, setSerialLoading] = useState(false);
+  const [projectResources, setProjectResources] = useState([]);
+  const [projectResourcesLoading, setProjectResourcesLoading] = useState(false);
+
+  const availableProjectResources = useMemo(() => {
+    const currentlyAssignedNames = assignments
+      .filter((a) => a.assignmentStatus === "ASSIGNED")
+      .map((a) => a.resourceName);
+
+    return projectResources.filter((res) => {
+      // Allow the currently selected resource in edit mode to remain available
+      if (editingAssignment && editingAssignment.resourceName === res.resourceName) {
+        return true;
+      }
+      return !currentlyAssignedNames.includes(res.resourceName);
+    });
+  }, [projectResources, assignments, editingAssignment]);
+
+  const fetchProjectResources = async () => {
+    setProjectResourcesLoading(true);
+    try {
+      const res = await projectResourceDetails(formData.projectId);
+      setProjectResources(res?.data || []);
+    } catch (err) {
+      console.error("Failed to load project resources", err);
+      notify.error(err, "Failed to load project resources");
+    } finally {
+      setProjectResourcesLoading(false);
+    }
+  };
 
   const getLoggedInUserName = () => {
     const token = localStorage.getItem("token");
@@ -192,7 +200,7 @@ const AssetDetail = () => {
       setAvailableSerials(filtered);
     } catch (err) {
       console.error("Failed to fetch serial numbers", err);
-      toast.error("Failed to load available serial numbers");
+      notify.error("Failed To Load Available Serial Numbers");
     } finally {
       setSerialLoading(false);
     }
@@ -200,7 +208,7 @@ const AssetDetail = () => {
 
   const [formData, setFormData] = useState({
     resourceName: "",
-    // projectId: "",
+    projectId: "",
     projectName: "",
     assignedDate: today,
     expectedReturnDate: "",
@@ -212,8 +220,14 @@ const AssetDetail = () => {
     serialNumber: "",
   });
 
+  useEffect(() => {
+    if (formData.projectId) {
+      fetchProjectResources();
+    }
+  }, [formData.projectId]);
+
   const [returnData, setReturnData] = useState({
-    conditionOnReturn: "Good",
+    conditionOnReturn: "",
     returnNotes: "",
   });
   const [clientProjects, setClientProjects] = useState([]);
@@ -241,8 +255,7 @@ const AssetDetail = () => {
         }
       }
     } catch (err) {
-      console.error("Fetch Error:", err);
-      toast.error("Failed to load asset details");
+      notify.error(err, "Failed to load asset details");
     } finally {
       setLoading(false);
     }
@@ -260,7 +273,7 @@ const AssetDetail = () => {
       const res = await getAssignmentKPI(assetId);
       setKPIData(res.data);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to load KPI data");
+      notify.error(err, "Failed to load KPI data");
     } finally {
       setKPILoading(false);
     }
@@ -280,9 +293,15 @@ const AssetDetail = () => {
   const utilization = kpiData?.utilization;
 
   const getUtilizationColor = (rate) => {
-    if (rate >= 80) return "emerald";
-    if (rate >= 50) return "yellow";
-    return "rose";
+    if (rate >= 80) return "bg-emerald-100 text-emerald-600";
+    if (rate >= 50) return "bg-amber-100 text-amber-600";
+    return "bg-rose-100 text-rose-600";
+  };
+
+  const getUtilizationIconColor = (rate) => {
+    if (rate >= 80) return "text-emerald-600";
+    if (rate >= 50) return "text-amber-600";
+    return "text-rose-600";
   };
 
   const filteredAssignments = useMemo(() => {
@@ -339,6 +358,7 @@ const AssetDetail = () => {
       },
       serialNumber: formData.serialNumber,
       resourceName: formData.resourceName,
+      projectId: formData.projectId,
       projectName: formData.projectName,
       assignedDate: formData.assignedDate,
       expectedReturnDate: formData.expectedReturnDate,
@@ -353,18 +373,20 @@ const AssetDetail = () => {
     setUpdateLoading(true);
     try {
       if (editingAssignment) {
-        await assignUpdateClientAsset(editingAssignment.assignmentId, payload);
-        toast.success("Assignment updated successfully");
+        const res = await assignUpdateClientAsset(editingAssignment.assignmentId, payload);
       } else {
-        await assignClientAsset(payload);
-        toast.success("Assignment created successfully");
+        const res = await assignClientAsset(payload);
       }
-
+      if (editingAssignment) {
+        notify.success("Assignment Updated Successfully");
+      } else {
+        notify.success("Assignment Created Successfully");
+      }
       await fetchData();
       fetchKPI();
       closeModal();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to save record");
+      notify.error(err, "Failed to save record");
     } finally {
       setUpdateLoading(false);
     }
@@ -372,6 +394,10 @@ const AssetDetail = () => {
 
   const handleReturnSubmit = async (e) => {
     e.preventDefault();
+    if (!returnData.conditionOnReturn) {
+      notify.warning("Please select the condition on return.");
+      return;
+    }
     setReturnLoading(true);
     try {
       const res = await returnAssetAssignment(
@@ -379,12 +405,13 @@ const AssetDetail = () => {
         today,
         returnData.returnNotes,
       );
-      toast.success(res.message || "Asset marked as returned");
+      notify.success(res.message || "Asset marked as returned");
       await fetchData();
+      fetchKPI();
       setReturnModal(false);
       setReturnItem(null);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to return asset");
+      notify.error(err, "Failed to return asset");
     } finally {
       setReturnLoading(false);
     }
@@ -394,11 +421,11 @@ const AssetDetail = () => {
     setDeleteLoading(true);
     try {
       const res = await deleteClientAssignment(deleteTarget.assignmentId);
-      toast.success(res.message || "Record deleted");
+      notify.success(res.message || "Record deleted");
       await fetchData();
     } catch (err) {
       console.log(err);
-      toast.error(err.response?.data || "Failed to delete record");
+      notify.error(err, "Failed to delete record");
     } finally {
       setDeleteLoading(false);
       setDeleteTarget(null);
@@ -410,11 +437,13 @@ const AssetDetail = () => {
 
     setFormData({
       resourceName: a.resourceName || "",
+      projectId: a.projectId || "",
       projectName: a.projectName || "",
       assignedDate: a.assignedDate ? new Date(a.assignedDate).toISOString().split("T")[0] : today,
       expectedReturnDate: a.expectedReturnDate || "",
       assignmentStatus: a.assignmentStatus || "ASSIGNED",
       assignedBy: a.assignedBy || getLoggedInUserName(), // 🔥 fallback
+      locationType: a.locationType || "",
       locationDetails: a.locationDetails || "",
       description: a.description || "",
       serialNumber: a.serialNumber || "",
@@ -429,6 +458,7 @@ const AssetDetail = () => {
     setEditingAssignment(null);
     setFormData({
       resourceName: "",
+      projectId: "",
       projectName: "",
       assignedDate: today,
       expectedReturnDate: "",
@@ -494,28 +524,28 @@ const AssetDetail = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Stat
-            title="Total Stock"
+          <KPICard
+            label="Total Stock"
             value={totalStock}
-            icon={Box}
-            color="blue"
+            icon={<Box className="w-5 h-5 text-blue-600" />}
+            color="bg-blue-100 text-blue-600"
           />
-          <Stat
-            title="Active Assignments"
+          <KPICard
+            label="Active Assignments"
             value={assignedCount}
-            icon={Users}
-            color="emerald"
+            icon={<Users className="w-5 h-5 text-emerald-600" />}
+            color="bg-emerald-100 text-emerald-600"
           />
-          <Stat
-            title="Available"
+          <KPICard
+            label="Available"
             value={availableCount}
-            icon={Laptop}
-            color="amber"
+            icon={<Laptop className="w-5 h-5 text-amber-600" />}
+            color="bg-amber-100 text-amber-600"
           />
-          <Stat
-            title="Utilization"
+          <KPICard
+            label="Utilization"
             value={`${utilization}%`}
-            icon={Percent}
+            icon={<Percent className={`w-5 h-5 ${getUtilizationIconColor(utilization)}`} />}
             color={getUtilizationColor(utilization)}
           />
         </div>
@@ -558,127 +588,93 @@ const AssetDetail = () => {
       </div>
 
       {/* TABLE */}
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-gray-500 border-b bg-gray-50/50">
-              <tr>
-                <th className="py-3 px-4 text-center w-[15%]">Resource</th>
-                <th className="py-3 px-4 text-center w-[15%]">Project</th>
-                <th className="py-3 px-4 text-center w-[15%]">Serial</th>
-                <th className="py-3 px-4 text-center w-[15%]">Location</th>
-                <th className="py-3 px-4 text-center w-[15%]">Assigned</th>
-                {activeTab === "HISTORY" && (
-                  <th className="py-3 px-4 text-center w-[15%]">Returned</th>
+      <div className="bg-white border rounded-xl shadow-sm overflow-hidden no-scrollbar">
+        <GenericTable
+          headers={[
+            "Resource",
+            "Project",
+            "Serial",
+            "Location",
+            "Assigned",
+            ...(activeTab === "HISTORY" ? ["Returned"] : []),
+            "Status",
+            "Actions",
+          ]}
+          columns={[
+            "resourceName",
+            "projectName",
+            "serial_info",
+            "location_info",
+            "assigned_info",
+            ...(activeTab === "HISTORY" ? ["returned_info"] : []),
+            "status_info",
+            "actions",
+          ]}
+          rows={paginatedAssignments.map((a) => ({
+            ...a,
+            serial_info: <div className="text-xs font-mono text-slate-500 text-center">{a.serialNumber || "-"}</div>,
+            location_info: <div className="text-slate-600 text-center">{a.locationDetails || "-"}</div>,
+            assigned_info: (
+              <div className="text-slate-600 text-center">
+                {new Date(a.assignedDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </div>
+            ),
+            returned_info: a.actualReturnDate ? (
+              <div className="text-slate-600 text-center">
+                {new Date(a.actualReturnDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </div>
+            ) : "-",
+            status_info: (
+              <div className="text-center">
+                <span
+                  className={`inline-flex items-center justify-center min-w-[80px] py-1 px-2 rounded-full text-[10px] font-bold uppercase tracking-wide ${STATUS_COLORS[a.assignmentStatus] || "bg-gray-100 text-gray-600"}`}
+                >
+                  {a.assignmentStatus}
+                </span>
+              </div>
+            ),
+            actions: (
+              <div className="text-center">
+                {activeTab === "ACTIVE" ? (
+                  <div className="flex justify-center gap-2">
+                    <button
+                      onClick={() => openEditModal(a)}
+                      className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setReturnData({
+                          conditionOnReturn: "",
+                          returnNotes: "",
+                        });
+                        setReturnItem(a);
+                        setReturnModal(true);
+                      }}
+                      className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      title="Return"
+                    >
+                      <Undo2 size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400 italic">Read Only</span>
                 )}
-                <th className="py-3 px-4 text-center w-[10%]">Status</th>
-                <th className="py-3 px-4 text-center w-[15%]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan="7" className="py-8 text-center text-gray-400">
-                    Loading data...
-                  </td>
-                </tr>
-              ) : paginatedAssignments.length > 0 ? (
-                paginatedAssignments.map((a) => (
-                  <tr
-                    key={a.assignmentId}
-                    className="hover:bg-slate-50/80 transition-colors"
-                  >
-                    <td className="py-3 px-4 font-medium text-slate-700">
-                      {a.resourceName}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      {a.projectName}
-                    </td>
-                    <td className="py-3 px-4 text-xs font-mono text-slate-500 text-center">
-                      {a.serialNumber || "-"}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {a.locationDetails || "-"}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 text-center">
-                      {new Date(a.assignedDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </td>
-                    {activeTab === "HISTORY" && (
-                      <td className="py-3 px-4 text-slate-600 text-center">
-                        {new Date(a.actualReturnDate).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          },
-                        )}
-                      </td>
-                    )}
-                    <td className="py-3 px-4 text-center">
-                      <span
-                        className={`inline-flex items-center justify-center min-w-[80px] py-1 px-2 rounded-full text-[10px] font-bold uppercase tracking-wide ${STATUS_COLORS[a.assignmentStatus] || "bg-gray-100 text-gray-600"}`}
-                      >
-                        {a.assignmentStatus}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      {activeTab === "ACTIVE" ? (
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={() => openEditModal(a)}
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setReturnItem(a);
-                              setReturnModal(true);
-                            }}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Return"
-                          >
-                            <Undo2 size={16} />
-                          </button>
-                          {/* <button
-                            onClick={() => setDeleteTarget(a)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 size={16} />
-                          </button> */}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">
-                          Read Only
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="py-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-400 gap-3">
-                      <div className="bg-slate-50 p-3 rounded-full">
-                        <Box size={24} className="opacity-40" />
-                      </div>
-                      <p className="text-sm">No assignments found.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </div>
+            )
+          }))}
+          loading={loading}
+        />
       </div>
 
       {/* PAGINATION */}
@@ -704,40 +700,38 @@ const AssetDetail = () => {
           <form onSubmit={handleAssignSave} className="flex flex-col h-full max-h-[calc(80vh-60px)]">
             <div className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="Resource Name"
-                  name="resourceName"
-                  value={formData.resourceName}
-                  onChange={handleFormChange}
-                  required
-                />
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
                     Project
                   </label>
-                  <select
-                    name="projectId"
-                    // value={formData.projectId || ""}
-                    onChange={(e) =>
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select Project" },
+                      ...clientProjects.map((p) => ({ value: p.pmsProjectId, label: p.projectName }))
+                    ]}
+                    value={formData.projectId || ""}
+                    onChange={(val) =>
                       setFormData((prev) => ({
                         ...prev,
-                        // projectId: e.target.value,
-                        projectName:
-                          clientProjects.find(
-                            (p) => p.pmsProjectId == e.target.value,
-                          )?.name || "",
+                        projectId: val,
+                        projectName: clientProjects.find((p) => p.pmsProjectId == val)?.projectName || "",
                       }))
                     }
-                    required
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">Select Project</option>
-                    {clientProjects.map((p) => (
-                      <option key={p.pmsProjectId} value={p.pmsProjectId}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
+                    Resource Name
+                  </label>
+                  <FilterListbox
+                    options={[
+                      { value: "", label: !formData.projectId ? "Select Resource" : projectResourcesLoading ? "Loading resources..." : availableProjectResources.length === 0 ? "No resources allocated to this project" : "Select Resource" },
+                      ...availableProjectResources.map((res) => ({ value: res.resourceName, label: `${res.resourceName} - ${res.resourceRole}` }))
+                    ]}
+                    value={formData.resourceName || ""}
+                    onChange={(val) => handleFormChange({ target: { name: "resourceName", value: val } })}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -745,33 +739,15 @@ const AssetDetail = () => {
                     Serial Number
                   </label>
 
-                  <select
-                    name="serialNumber"
+                  <FilterListbox
+                    options={[
+                      { value: "", label: serialLoading ? "Loading serials..." : "Select Serial Number" },
+                      ...(editingAssignment && formData.serialNumber ? [{ value: formData.serialNumber, label: `${formData.serialNumber} (Current)` }] : []),
+                      ...availableSerials.map((s) => ({ value: s.serialNumber, label: s.serialNumber }))
+                    ]}
                     value={formData.serialNumber}
-                    onChange={handleFormChange}
-                    required
-                    disabled={serialLoading}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">
-                      {serialLoading
-                        ? "Loading serials..."
-                        : "Select Serial Number"}
-                    </option>
-
-                    {/* Keep current serial visible in edit mode */}
-                    {editingAssignment && formData.serialNumber && (
-                      <option value={formData.serialNumber}>
-                        {formData.serialNumber} (Current)
-                      </option>
-                    )}
-
-                    {availableSerials.map((s) => (
-                      <option key={s.serialNumber} value={s.serialNumber}>
-                        {s.serialNumber}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => handleFormChange({ target: { name: "serialNumber", value: val } })}
+                  />
                 </div>
                 <Input
                   label="Assigned By"
@@ -801,7 +777,7 @@ const AssetDetail = () => {
                   name="assignmentStatus"
                   value={formData.assignmentStatus}
                   onChange={handleFormChange}
-                  options={["ASSIGNED", "REQUESTED", "RETURNED", "REJECTED"]}
+                  options={["ASSIGNED", "REQUESTED", "REJECTED"]}
                 />
                 <Input
                   label="Location"
@@ -814,25 +790,16 @@ const AssetDetail = () => {
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
                     Work Type
                   </label>
-                  <select
-                    id="locationType"
-                    name="locationType"
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        locationType: e.target.value,
-                      }))
-                    }
-                    required
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="" disabled selected>
-                      Select work mode
-                    </option>
-                    <option value="HYBRID">Hybrid</option>
-                    <option value="ON_SITE">On Site</option>
-                    <option value="CLIENT_LOCATION">Client Location</option>
-                  </select>
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select work mode" },
+                      { value: "HYBRID", label: "Hybrid" },
+                      { value: "ON_SITE", label: "On Site" },
+                      { value: "CLIENT_LOCATION", label: "Client Location" },
+                    ]}
+                    value={formData.locationType || ""}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, locationType: val }))}
+                  />
                 </div>
               </div>
               <div>
@@ -907,8 +874,8 @@ const AssetDetail = () => {
                 >
                   <div className="relative">
                     <Listbox.Button className="relative w-full cursor-pointer bg-slate-50 border border-slate-200 rounded-xl py-2 pl-3 pr-10 text-left text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
-                      <span className="block truncate text-slate-700">
-                        {returnData.conditionOnReturn}
+                      <span className={`block truncate ${!returnData.conditionOnReturn ? "text-slate-400 italic" : "text-slate-700"}`}>
+                        {returnData.conditionOnReturn || "Select Condition Type"}
                       </span>
                       <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                         <ChevronDown

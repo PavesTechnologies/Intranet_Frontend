@@ -1,20 +1,20 @@
-export default function StatCard({ title, value, icon: Icon, onClick }) {
+import { KPICard } from "../../../../components/kpi/KPI";
+
+export default function StatCard({ title, value, icon: Icon, onClick, isActive, iconBg = "bg-indigo-50", iconColor = "text-indigo-600" }) {
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className="bg-white p-4 rounded-xl border border-black/20 shadow-sm 
-                 flex gap-4 transition-all duration-300 
-                 hover:-translate-y-1 hover:shadow-xl cursor-pointer"
+      className="flex-1 min-w-[140px] text-left transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
     >
-      <Icon className="text-indigo-600" />
-      <div>
-        <p className="text-sm text-gray-500">
-          {title}
-        </p>
-        <p className="text-xl font-semibold text-gray-900">
-          {value}
-        </p>
-      </div>
-    </div>
+      <KPICard
+        label={title}
+        value={value}
+        icon={<Icon className="h-5 w-5" />}
+        color={`${iconBg} ${iconColor}`}
+        active={isActive}
+        className="h-full w-full bg-white border-gray-200 shadow-sm"
+      />
+    </button>
   );
 }

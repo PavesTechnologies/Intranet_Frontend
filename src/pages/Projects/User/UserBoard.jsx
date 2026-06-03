@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
@@ -27,7 +28,9 @@ const KanbanCard = ({ task }) => {
         isDragging ? "opacity-50" : "opacity-100"
       }`}
     >
-      <p className="text-xs text-indigo-500 uppercase tracking-wide mb-1">Task</p>
+      <p className="text-xs text-indigo-500 uppercase tracking-wide mb-1">
+        Task
+      </p>
       <p className="font-semibold text-gray-800">{task.title}</p>
     </div>
   );
@@ -74,20 +77,20 @@ const Board = ({ projectId, projectName }) => {
     const fetchBoardData = async () => {
       try {
         // Load statuses dynamically
-        const statusRes = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/statuses`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const statusRes = await api.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         const sortedStatuses = statusRes.data.sort(
-          (a, b) => a.sortOrder - b.sortOrder
+          (a, b) => a.sortOrder - b.sortOrder,
         );
         setStatuses(sortedStatuses);
 
         // Load tasks
-        const taskRes = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/tasks`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const taskRes = await api.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         setTasks(taskRes.data);
@@ -108,21 +111,19 @@ const Board = ({ projectId, projectName }) => {
     const updatedTask = { ...task, statusId: newStatusId };
 
     try {
-      await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/tasks/${taskId}`,
+      await api.put(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}`,
         updatedTask,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? updatedTask : t))
-      );
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
     } catch (err) {
       console.error("Failed to update task:", err);
     }
   };
 
-  if (loading) return <div className="p-6">Loading board...</div>;
+  if (loading) return <LoadingSpinner size="md" text="Loading board..." />;
 
   // Group tasks by backend statusId
   const groupedTasks = {};

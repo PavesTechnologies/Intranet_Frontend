@@ -1,12 +1,13 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import axios from "axios";
+// import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import useLeaveConsumption from "../hooks/useLeaveConsumption";
 import LeaveUsageChart from "./LeaveUsageChart";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 const CARD_ACCENTS = {
   EARNED_LEAVE: "border-l-emerald-400",
@@ -46,7 +47,7 @@ export default function LeaveDashboard({ employeeId, refreshKey, year }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    axios
+    api
       .get(`${BASE_URL}/api/leave/types`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
@@ -109,7 +110,7 @@ export default function LeaveDashboard({ employeeId, refreshKey, year }) {
       </div>
     );
 
-    // console.log("special leaves", specialLeaves);
+  // console.log("special leaves", specialLeaves);
 
   const isEmpty =
     leaveData?.regular?.length === 0 &&
@@ -205,8 +206,8 @@ export default function LeaveDashboard({ employeeId, refreshKey, year }) {
                       {displayName}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {remaining} days remaining · {leave.totalEntitledDays ?? "-"}{" "}
-                      total
+                      {remaining} days remaining ·{" "}
+                      {leave.totalEntitledDays ?? "-"} total
                     </p>
                   </div>
                   <div

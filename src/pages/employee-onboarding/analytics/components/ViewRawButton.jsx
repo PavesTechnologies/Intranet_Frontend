@@ -1,15 +1,13 @@
-export default function ViewRawButton() {
+import Button from "../../../../components/Button/Button";
+
+export default function ViewRawButton({ onClick }) {
   return (
-    <button
-      style={{
-        border: "none",
-        background: "transparent",
-        color: "#6c5ce7",
-        cursor: "pointer",
-        fontSize: 13,
-      }}
+    <Button
+      onClick={onClick}
+      variant="primary"
+      size="small"
     >
-      👁 View Raw Data
-    </button>
+      View Raw Data
+    </Button>
   );
 }

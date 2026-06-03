@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { useAuth } from "../../../contexts/AuthContext";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { toast, ToastContainer } from "react-toastify";
+import { showStatusToast } from "../../../components/toastfy/toast";
 import { useNavigate } from "react-router-dom";
-import "react-toastify/dist/ReactToastify.css";
 import Button from "../../../components/Button/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const ReadOnlyDashboard = () => {
   const { user } = useAuth();
@@ -30,8 +31,8 @@ const ReadOnlyDashboard = () => {
 
   const token = localStorage.getItem("token");
 
-  const axiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_PMS_BASE_URL,
+  const axiosInstance = api.create({
+    baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
     headers: { "Content-Type": "application/json" },
   });
 
@@ -62,7 +63,7 @@ const ReadOnlyDashboard = () => {
       } catch (err) {
         console.error("Error fetching data:", err.response || err);
         setError("Failed to load user data");
-        toast.error("Failed to load user data");
+        showStatusToast("Failed to load user data", "error");
       } finally {
         setLoading(false);
       }
@@ -72,8 +73,10 @@ const ReadOnlyDashboard = () => {
   }, [userId]);
 
   const toggleExpand = (id, type) => {
-    if (type === "project") setExpandedProjects(expandedProjects === id ? null : id);
-    if (type === "story") setExpandedStories(expandedStories === id ? null : id);
+    if (type === "project")
+      setExpandedProjects(expandedProjects === id ? null : id);
+    if (type === "story")
+      setExpandedStories(expandedStories === id ? null : id);
     if (type === "task") setExpandedTasks(expandedTasks === id ? null : id);
   };
 
@@ -111,19 +114,22 @@ const ReadOnlyDashboard = () => {
 
           {project.members?.length > 0 && (
             <p>
-              <strong>Members:</strong> {project.members.map((m) => m.name).join(", ")}
+              <strong>Members:</strong>{" "}
+              {project.members.map((m) => m.name).join(", ")}
             </p>
           )}
 
           {project.createdAt && (
             <p>
-              <strong>Created At:</strong> {new Date(project.createdAt).toLocaleString()}
+              <strong>Created At:</strong>{" "}
+              {new Date(project.createdAt).toLocaleString()}
             </p>
           )}
 
           {project.updatedAt && (
             <p>
-              <strong>Updated At:</strong> {new Date(project.updatedAt).toLocaleString()}
+              <strong>Updated At:</strong>{" "}
+              {new Date(project.updatedAt).toLocaleString()}
             </p>
           )}
 
@@ -144,9 +150,7 @@ const ReadOnlyDashboard = () => {
   // 🔹 STORY RENDER
   const renderStory = (story) => {
     const projectId =
-      story?.project?.id ||
-      story?.epic?.project?.id ||
-      story?.epic?.projectId;
+      story?.project?.id || story?.epic?.project?.id || story?.epic?.projectId;
 
     return (
       <li key={story.id} className="bg-white rounded-xl shadow p-4">
@@ -205,9 +209,7 @@ const ReadOnlyDashboard = () => {
   // 🔹 TASK RENDER
   const renderTask = (task) => {
     const projectId =
-      task?.story?.project?.id ||
-      task?.project?.id ||
-      task?.story?.projectId;
+      task?.story?.project?.id || task?.project?.id || task?.story?.projectId;
 
     return (
       <li key={task.id} className="bg-white rounded-xl shadow p-4">
@@ -265,7 +267,7 @@ const ReadOnlyDashboard = () => {
 
   // 🔹 FILTERING — FIXED & CLEANED
   const filteredProjects = projects.filter(
-    (p) => projectFilter === "ALL" || p.status === projectFilter
+    (p) => projectFilter === "ALL" || p.status === projectFilter,
   );
 
   const filteredStories = stories.filter((s) => {
@@ -292,30 +294,23 @@ const ReadOnlyDashboard = () => {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <ToastContainer />
 
       <h1 className="text-2xl font-bold mb-4 text-indigo-900">
         {userName} — Your Projects
       </h1>
 
-      {loading && <p className="text-gray-600">Loading data...</p>}
+      {loading && <LoadingSpinner size="md" text="Loading data..." />}
       {error && <p className="text-red-500">{error}</p>}
 
       {/* PROJECTS */}
       <section className="mb-6">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-xl font-semibold">Projects</h2>
-          <select
-            className="border rounded px-2 py-1 text-sm"
+          <FilterListbox
+            options={[{value:"ALL",label:"All"},{value:"ACTIVE",label:"Active"},{value:"ARCHIVED",label:"Archived"},{value:"COMPLETED",label:"Completed"},{value:"ON_HOLD",label:"On Hold"}]}
             value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-          >
-            <option value="ALL">All</option>
-            <option value="ACTIVE">Active</option>
-            <option value="ARCHIVED">Archived</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="ON_HOLD">On Hold</option>
-          </select>
+            onChange={setProjectFilter}
+          />
         </div>
 
         {filteredProjects.length === 0 ? (
@@ -329,17 +324,11 @@ const ReadOnlyDashboard = () => {
       <section className="mb-6">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-xl font-semibold">Stories</h2>
-          <select
-            className="border rounded px-2 py-1 text-sm"
+          <FilterListbox
+            options={[{value:"ALL",label:"All"},{value:"BACKLOG",label:"Backlog"},{value:"TO_DO",label:"To Do"},{value:"IN_PROGRESS",label:"In Progress"},{value:"DONE",label:"Done"}]}
             value={storyFilter}
-            onChange={(e) => setStoryFilter(e.target.value)}
-          >
-            <option value="ALL">All</option>
-            <option value="BACKLOG">Backlog</option>
-            <option value="TO_DO">To Do</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="DONE">Done</option>
-          </select>
+            onChange={setStoryFilter}
+          />
         </div>
 
         {filteredStories.length === 0 ? (
@@ -353,17 +342,11 @@ const ReadOnlyDashboard = () => {
       <section className="mb-6">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-xl font-semibold">Tasks</h2>
-          <select
-            className="border rounded px-2 py-1 text-sm"
+          <FilterListbox
+            options={[{value:"ALL",label:"All"},{value:"BACKLOG",label:"Backlog"},{value:"TO_DO",label:"To Do"},{value:"IN_PROGRESS",label:"In Progress"},{value:"DONE",label:"Done"}]}
             value={taskFilter}
-            onChange={(e) => setTaskFilter(e.target.value)}
-          >
-            <option value="ALL">All</option>
-            <option value="BACKLOG">Backlog</option>
-            <option value="TO_DO">To Do</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="DONE">Done</option>
-          </select>
+            onChange={setTaskFilter}
+          />
         </div>
 
         {filteredTasks.length === 0 ? (

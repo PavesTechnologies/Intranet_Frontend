@@ -1,11 +1,24 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import Select from "react-select";
-import { X, ChevronRight, ChevronLeft, AlertTriangle, Info, Link, Check } from "lucide-react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import {
+  X,
+  ChevronRight,
+  ChevronLeft,
+  AlertTriangle,
+  Info,
+  Link,
+  Check,
+} from "lucide-react";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
 const ISSUE_TYPES = ["Epic", "Story", "Task"];
-const SCORE_OPTIONS = [1, 2, 3, 4, 5].map((v) => ({ value: v, label: `${v}` }));
+
+const SCORE_OPTIONS = [1, 2, 3, 4, 5].map((v) => ({
+  value: v,
+  label: `${v}`,
+}));
 
 const selectStyles = (hasError) => ({
   control: (base, state) => ({
@@ -21,7 +34,11 @@ const selectStyles = (hasError) => ({
   option: (base, state) => ({
     ...base,
     fontSize: "0.875rem",
-    backgroundColor: state.isSelected ? "#6366f1" : state.isFocused ? "#eef2ff" : "white",
+    backgroundColor: state.isSelected
+      ? "#6366f1"
+      : state.isFocused
+        ? "#eef2ff"
+        : "white",
     color: state.isSelected ? "white" : "#1e293b",
   }),
   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
@@ -32,11 +49,14 @@ const selectStyles = (hasError) => ({
 const ScorePicker = ({ value, onChange, label, required, error }) => (
   <div>
     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-      {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+      {label}
+      {required && <span className="text-red-400 ml-0.5">*</span>}
     </label>
+
     <div className="flex gap-1.5 sm:gap-2">
       {[1, 2, 3, 4, 5].map((n) => {
         const selected = value?.value === n;
+
         const colors = [
           "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100",
           "bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100",
@@ -44,6 +64,7 @@ const ScorePicker = ({ value, onChange, label, required, error }) => (
           "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100",
           "bg-red-50 border-red-200 text-red-700 hover:bg-red-100",
         ];
+
         const selectedColors = [
           "bg-emerald-500 border-emerald-500 text-white",
           "bg-sky-500 border-sky-500 text-white",
@@ -51,6 +72,7 @@ const ScorePicker = ({ value, onChange, label, required, error }) => (
           "bg-orange-500 border-orange-500 text-white",
           "bg-red-500 border-red-500 text-white",
         ];
+
         return (
           <button
             key={n}
@@ -64,9 +86,12 @@ const ScorePicker = ({ value, onChange, label, required, error }) => (
         );
       })}
     </div>
+
     <div className="flex justify-between text-[10px] text-slate-400 mt-1 px-1">
-      <span>Low</span><span>Critical</span>
+      <span>Low</span>
+      <span>Critical</span>
     </div>
+
     {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
   </div>
 );
@@ -75,9 +100,12 @@ const ScorePicker = ({ value, onChange, label, required, error }) => (
 const Field = ({ label, required, error, children }) => (
   <div className="space-y-1.5">
     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">
-      {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+      {label}
+      {required && <span className="text-red-400 ml-0.5">*</span>}
     </label>
+
     {children}
+
     {error && <p className="text-xs text-red-500">{error}</p>}
   </div>
 );
@@ -107,18 +135,47 @@ const Textarea = ({ rows = 3, ...props }) => (
 
 /* ── Steps config ── */
 const STEPS = [
-  { id: 0, label: "Details",   icon: Info,          desc: "Title, description & triggers" },
-  { id: 1, label: "Risk",      icon: AlertTriangle, desc: "Status, category & scoring" },
-  { id: 2, label: "People",    icon: Check,         desc: "Owner & reporter" },
-  { id: 3, label: "Link",      icon: Link,          desc: "Optional issue link" },
+  {
+    id: 0,
+    label: "Details",
+    icon: Info,
+    desc: "Title, description & triggers",
+  },
+  {
+    id: 1,
+    label: "Risk",
+    icon: AlertTriangle,
+    desc: "Status, category & scoring",
+  },
+  {
+    id: 2,
+    label: "People",
+    icon: Check,
+    desc: "Owner & reporter",
+  },
+  {
+    id: 3,
+    label: "Link",
+    icon: Link,
+    desc: "Optional issue link",
+  },
 ];
 
 /* ════════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════════ */
-const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk = null }) => {
+const CreateRiskModal = ({
+  isOpen,
+  onClose,
+  projectId,
+  onSuccess,
+  onCreate,
+  risk = null,
+  onEdit = false,
+}) => {
   const isEditMode = Boolean(risk?.id);
-  const BASE_URL = import.meta.env.VITE_PMS_BASE_URL;
+  // {console.log("Risk data in modal:", risk)}; // Debug log
+  const BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
   const token = localStorage.getItem("token");
 
   const [step, setStep] = useState(0);
@@ -131,10 +188,17 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
   const [loadingMeta, setLoadingMeta] = useState(false);
 
   const [form, setForm] = useState({
-    title: "", description: "", triggers: "",
-    probability: null, impact: null,
-    statusId: "", owner: null, reporter: null,
-    category: null, linkedType: null, linkedIssue: null,
+    title: "",
+    description: "",
+    triggers: "",
+    probability: null,
+    impact: null,
+    statusId: "",
+    owner: null,
+    reporter: null,
+    category: null,
+    linkedType: null,
+    linkedIssue: null,
   });
 
   const set = (field, value) => {
@@ -142,135 +206,372 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
     setErrors((e) => ({ ...e, [field]: undefined }));
   };
 
-  /* Pre-fetch master data as soon as projectId is known — NOT waiting for modal open */
+  /* =========================
+     Fetch master data
+  ========================= */
   useEffect(() => {
     if (!projectId) return;
-    setLoadingMeta(true);
-    const headers = { Authorization: `Bearer ${token}` };
-    Promise.all([
-      axios.get(`${BASE_URL}/api/projects/${projectId}/members`, { headers }),
-      axios.get(`${BASE_URL}/api/projects/${projectId}/risk-statuses`, { headers }),
-      axios.get(`${BASE_URL}/api/risk/category`, { headers }),
-    ]).then(([m, s, c]) => {
-      setMembers(m.data || []);
-      setStatuses(s.data || []);
-      setCategories(c.data || []);
-    }).catch(console.error)
-    .finally(() => setLoadingMeta(false));
-  }, [projectId]);
 
-  /* Reset step + errors each time modal opens */
+    setLoadingMeta(true);
+
+    const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+
+    Promise.all([
+      api.get(`${BASE_URL}/api/projects/${projectId}/members-with-owner`, {
+        headers,
+      }),
+      api.get(`${BASE_URL}/api/projects/${projectId}/risk-statuses`, {
+        headers,
+      }),
+      api.get(`${BASE_URL}/api/risk/category`, {
+        headers,
+      }),
+    ])
+      .then(([m, s, c]) => {
+        setMembers(m.data || []);
+        setStatuses(s.data || []);
+        setCategories(c.data || []);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingMeta(false));
+  }, [projectId, BASE_URL, token]);
+
+  /* =========================
+     Reset modal state on open
+  ========================= */
   useEffect(() => {
     if (!isOpen) return;
+
     setStep(0);
     setErrors({});
-  }, [isOpen]);
 
-  /* prefill edit */
+    if (!isEditMode) {
+      setForm({
+        title: "",
+        description: "",
+        triggers: "",
+        probability: null,
+        impact: null,
+        statusId: "",
+        owner: null,
+        reporter: null,
+        category: null,
+        linkedType: null,
+        linkedIssue: null,
+      });
+      setIssues([]);
+    }
+  }, [isOpen, isEditMode]);
+
+  /* =========================
+     Prefill edit data
+  ========================= */
   useEffect(() => {
     if (!risk || !members.length || !categories.length) return;
+
+    const ownerMember = members.find((m) => m.id === risk.ownerId);
+    const reporterMember = members.find((m) => m.id === risk.reporterId);
+    const categoryObj = categories.find((c) => c.id === risk.categoryId);
+
+    const linkedTypeValue = risk.linkedType
+      ? {
+          value: risk.linkedType,
+          label: risk.linkedType,
+        }
+      : null;
+
+    const linkedIssueValue = risk.linkedId
+      ? {
+          value: risk.linkedId,
+          label:
+            risk.linkedName ||
+            risk.linkedTitle ||
+            risk.issueName ||
+            risk.issueTitle ||
+            risk.titleOfLinkedIssue ||
+            `${risk.linkedType || "Issue"} #${risk.linkedId}`,
+        }
+      : null;
+
     setForm({
-      title: risk.title ?? "", description: risk.description ?? "",
-      triggers: risk.triggers ?? "", statusId: risk.statusId ?? "",
-      probability: SCORE_OPTIONS.find((p) => p.value === risk.probability) || null,
+      title: risk.title ?? "",
+      description: risk.description ?? "",
+      triggers: risk.triggers ?? "",
+      statusId: risk.statusId ?? "",
+
+      probability:
+        SCORE_OPTIONS.find((p) => p.value === risk.probability) || null,
+
       impact: SCORE_OPTIONS.find((i) => i.value === risk.impact) || null,
-      owner: members.find((m) => m.id === risk.ownerId)
-        ? { value: risk.ownerId, label: members.find((m) => m.id === risk.ownerId).name } : null,
-      reporter: members.find((m) => m.id === risk.reporterId)
-        ? { value: risk.reporterId, label: members.find((m) => m.id === risk.reporterId).name } : null,
-      category: categories.find((c) => c.id === risk.categoryId)
-        ? { value: risk.categoryId, label: categories.find((c) => c.id === risk.categoryId).name } : null,
-      linkedType: null, linkedIssue: null,
+
+      owner: ownerMember
+        ? {
+            value: risk.ownerId,
+            label: ownerMember.name,
+          }
+        : null,
+
+      reporter: reporterMember
+        ? {
+            value: risk.reporterId,
+            label: reporterMember.name,
+          }
+        : null,
+
+      category: categoryObj
+        ? {
+            value: risk.categoryId,
+            label: categoryObj.name,
+          }
+        : null,
+
+      linkedType: linkedTypeValue,
+      linkedIssue: linkedIssueValue,
     });
   }, [risk, members, categories]);
 
-  /* load issues */
+  /* =========================
+     Load issues based on linked type
+  ========================= */
   useEffect(() => {
-    if (!form.linkedType || !projectId) return;
-    const apiType = form.linkedType.value === "Story" ? "stories" : `${form.linkedType.value.toLowerCase()}s`;
-    axios.get(`${BASE_URL}/api/projects/${projectId}/${apiType}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then((res) => setIssues(res.data || [])).catch(console.error);
-  }, [form.linkedType, projectId]);
+    if (!form.linkedType || !projectId) {
+      setIssues([]);
+      return;
+    }
+
+    const apiType =
+      form.linkedType.value === "Story"
+        ? "stories"
+        : `${form.linkedType.value.toLowerCase()}s`;
+
+    api
+      .get(`${BASE_URL}/api/projects/${projectId}/${apiType}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
+      .then((res) => {
+        const list = res.data || [];
+        setIssues(list);
+
+        /*
+          In edit mode, we initially prefill linkedIssue with temporary label.
+          Once issue list is loaded, replace it with real title/name from API.
+        */
+        if (isEditMode && form.linkedIssue?.value) {
+          const matched = list.find((i) => i.id === form.linkedIssue.value);
+
+          if (matched) {
+            setForm((prev) => ({
+              ...prev,
+              linkedIssue: {
+                value: matched.id,
+                label:
+                  matched.title ||
+                  matched.name ||
+                  `${form.linkedType.value} #${matched.id}`,
+              },
+            }));
+          }
+        }
+      })
+      .catch(console.error);
+  }, [form.linkedType, projectId, BASE_URL, token, isEditMode]);
 
   if (!isOpen) return null;
 
-  /* validate per step */
+  /* =========================
+     Validation
+  ========================= */
   const validateStep = (s) => {
     const e = {};
-    if (s === 0 && !form.title.trim()) e.title = "Title is required";
-    if (s === 1 && !form.statusId) e.statusId = "Status is required";
-    if (s === 1 && !form.category) e.category = "Category is required";
-    if (s === 1 && !form.probability) e.probability = "Probability is required";
-    if (s === 1 && !form.impact) e.impact = "Impact is required";
-    if (s === 2 && !form.owner) e.owner = "Owner is required";
-    if (s === 2 && !form.reporter) e.reporter = "Reporter is required";
-    if (s === 3 && !form.linkedType) e.linkedType = "Link type is required";
-    if (s === 3 && !form.linkedIssue) e.linkedIssue = "Linked item is required";
+
+    if (s === 0 && !form.title.trim()) {
+      e.title = "Title is required";
+    }
+
+    if (s === 1 && !form.statusId) {
+      e.statusId = "Status is required";
+    }
+
+    if (s === 1 && !form.category) {
+      e.category = "Category is required";
+    }
+
+    if (s === 1 && !form.probability) {
+      e.probability = "Probability is required";
+    }
+
+    if (s === 1 && !form.impact) {
+      e.impact = "Impact is required";
+    }
+
+    if (s === 2 && !form.owner) {
+      e.owner = "Owner is required";
+    }
+
+    if (s === 2 && !form.reporter) {
+      e.reporter = "Reporter is required";
+    }
+
+    if (s === 3 && !form.linkedType) {
+      e.linkedType = "Link type is required";
+    }
+
+    if (s === 3 && !form.linkedIssue) {
+      e.linkedIssue = "Linked item is required";
+    }
+
     return e;
   };
 
   const goNext = () => {
     const e = validateStep(step);
-    if (Object.keys(e).length) { setErrors(e); return; }
-    setStep((s) => Math.min(s + 1, STEPS.length - 1));
-  };
-  const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
-  const handleSubmit = async () => {
-    // validate all required steps
-    const allErrors = { ...validateStep(0), ...validateStep(1), ...validateStep(2), ...validateStep(3) };
-    if (Object.keys(allErrors).length) {
-      showStatusToast("Please fill all required fields", "error");
+    if (Object.keys(e).length) {
+      setErrors(e);
       return;
     }
-    setSubmitting(true);
-    try {
-      const payload = {
-        projectId, title: form.title, description: form.description,
-        probability: form.probability?.value, impact: form.impact?.value,
-        triggers: form.triggers, statusId: form.statusId,
-        ownerId: form.owner.value, reporterId: form.reporter.value,
-        categoryId: form.category.value,
-      };
-      let riskId = risk?.id;
-      if (isEditMode) {
-        await axios.put(`${BASE_URL}/api/risks/${riskId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
-      } else {
-        const res = await axios.post(`${BASE_URL}/api/risks`, payload, { headers: { Authorization: `Bearer ${token}` } });
-        riskId = res.data.id;
-      }
-      if (form.linkedType && form.linkedIssue) {
-        await axios.post(`${BASE_URL}/api/risk-links`,
-          { riskId, linkedType: form.linkedType.value, linkedId: form.linkedIssue.value },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      }
-      showStatusToast(isEditMode ? "Risk updated successfully" : "Risk created successfully", "success");
-      onSuccess?.();
-      onCreate?.();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      showStatusToast("Operation failed", "error");
-    } finally {
-      setSubmitting(false);
-    }
+
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
-  const memberOptions   = members.map((m) => ({ value: m.id, label: m.name }));
-  const categoryOptions = categories.map((c) => ({ value: c.id, label: c.name }));
-  const issueOptions    = issues.map((i) => ({ value: i.id, label: i.title || i.name }));
+  const goBack = () => {
+    setStep((s) => Math.max(s - 1, 0));
+  };
 
-  /* ── Risk score matrix display ── */
+  /* =========================
+     Submit
+  ========================= */
+ const handleSubmit = async () => {
+  const allErrors = {
+    ...validateStep(0),
+    ...validateStep(1),
+    ...validateStep(2),
+    ...validateStep(3),
+  };
+
+  if (Object.keys(allErrors).length) {
+    setErrors(allErrors);
+    showStatusToast("Please fill all required fields", "error");
+    return;
+  }
+
+  setSubmitting(true);
+
+  try {
+    const payload = {
+      projectId,
+      title: form.title,
+      description: form.description,
+      probability: form.probability?.value,
+      impact: form.impact?.value,
+      triggers: form.triggers,
+      statusId: form.statusId,
+      ownerId: form.owner.value,
+      reporterId: form.reporter.value,
+      categoryId: form.category.value,
+    };
+
+    let riskId = risk?.id;
+
+    if (isEditMode) {
+      await api.put(`${BASE_URL}/api/risks/${riskId}`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+    } else {
+      const res = await api.post(`${BASE_URL}/api/risks`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+
+      riskId = res.data.id;
+    }
+
+    if (form.linkedType && form.linkedIssue) {
+      const linkPayload = {
+        riskId,
+        linkedType: form.linkedType.value,
+        linkedId: form.linkedIssue.value,
+      };
+
+      if (isEditMode && risk?.riskLinkId) {
+        await api.patch(
+          `${BASE_URL}/api/risk-links/${risk.riskLinkId}`,
+          linkPayload,
+          {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          }
+        );
+      } else {
+        await api.post(`${BASE_URL}/api/risk-links`, linkPayload, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+      }
+    }
+
+    showStatusToast(
+      isEditMode ? "Risk updated successfully" : "Risk created successfully",
+      "success"
+    );
+
+    onSuccess?.();
+    onCreate?.();
+    onClose();
+  } catch (err) {
+    console.error(err);
+    showStatusToast("Operation failed", "error");
+  } finally {
+    setSubmitting(false);
+  }
+};
+
+  /* =========================
+     Options
+  ========================= */
+  const memberOptions = members.map((m) => ({
+    value: m.id,
+    label: m.name,
+  }));
+
+  const categoryOptions = categories.map((c) => ({
+    value: c.id,
+    label: c.name,
+  }));
+
+  const issueOptions = issues.map((i) => ({
+    value: i.id,
+    label: i.title || i.name || `${form.linkedType?.value || "Issue"} #${i.id}`,
+  }));
+
+  /* =========================
+     Risk score display
+  ========================= */
   const riskScore = (form.probability?.value ?? 0) * (form.impact?.value ?? 0);
-  const riskLevel = riskScore >= 20 ? { label: "Critical", cls: "bg-red-100 text-red-700 border-red-200" }
-    : riskScore >= 12 ? { label: "High", cls: "bg-orange-100 text-orange-700 border-orange-200" }
-    : riskScore >= 6  ? { label: "Medium", cls: "bg-amber-100 text-amber-700 border-amber-200" }
-    : riskScore > 0   ? { label: "Low", cls: "bg-emerald-100 text-emerald-700 border-emerald-200" }
-    : null;
 
-  /* ── Step content panels ── */
+  const riskLevel =
+    riskScore >= 20
+      ? {
+          label: "Critical",
+          cls: "bg-red-100 text-red-700 border-red-200",
+        }
+      : riskScore >= 12
+        ? {
+            label: "High",
+            cls: "bg-orange-100 text-orange-700 border-orange-200",
+          }
+        : riskScore >= 6
+          ? {
+              label: "Medium",
+              cls: "bg-amber-100 text-amber-700 border-amber-200",
+            }
+          : riskScore > 0
+            ? {
+                label: "Low",
+                cls: "bg-emerald-100 text-emerald-700 border-emerald-200",
+              }
+            : null;
+
+  /* =========================
+     Step panels
+  ========================= */
   const panels = [
     /* Step 0 — Details */
     <div key={0} className="space-y-4">
@@ -282,6 +583,7 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
           onChange={(e) => set("title", e.target.value)}
         />
       </Field>
+
       <Field label="Description">
         <Textarea
           placeholder="What could go wrong? Provide context…"
@@ -290,7 +592,8 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
           onChange={(e) => set("description", e.target.value)}
         />
       </Field>
-      <Field label="Triggers" >
+
+      <Field label="Triggers">
         <Textarea
           placeholder="Early warning signs to watch for…"
           rows={2}
@@ -309,35 +612,42 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
               <div className="h-3 w-16 bg-slate-200 rounded mb-2" />
               <div className="h-10 bg-slate-100 rounded-lg" />
             </div>
+
             <div>
               <div className="h-3 w-16 bg-slate-200 rounded mb-2" />
               <div className="h-10 bg-slate-100 rounded-lg" />
             </div>
           </div>
+
           <div>
             <div className="h-3 w-24 bg-slate-200 rounded mb-2" />
-            <div className="flex gap-1.5 sm:gap-2">{[1,2,3,4,5].map(n=><div key={n} className="flex-1 h-10 bg-slate-100 rounded-lg"/>)}</div>
+            <div className="flex gap-1.5 sm:gap-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <div key={n} className="flex-1 h-10 bg-slate-100 rounded-lg" />
+              ))}
+            </div>
           </div>
+
           <div>
             <div className="h-3 w-16 bg-slate-200 rounded mb-2" />
-            <div className="flex gap-1.5 sm:gap-2">{[1,2,3,4,5].map(n=><div key={n} className="flex-1 h-10 bg-slate-100 rounded-lg"/>)}</div>
+            <div className="flex gap-1.5 sm:gap-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <div key={n} className="flex-1 h-10 bg-slate-100 rounded-lg" />
+              ))}
+            </div>
           </div>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Field label="Status" required error={errors.statusId}>
-              <select
+              <FilterListbox
+                options={[{value:"",label:"Select status…"},...statuses.map(s=>({value:s.id,label:s.name}))]}
                 value={form.statusId}
-                onChange={(e) => set("statusId", e.target.value)}
-                className={`w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800
-                  focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all
-                  ${errors.statusId ? "border-red-400 bg-red-50" : "border-slate-200"}`}
-              >
-                <option value="">Select status…</option>
-                {statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+                onChange={(val) => set("statusId", val)}
+              />
             </Field>
+
             <Field label="Category" required error={errors.category}>
               <Select
                 styles={selectStyles(!!errors.category)}
@@ -349,10 +659,27 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
               />
             </Field>
           </div>
-          <ScorePicker label="Probability" required error={errors.probability} value={form.probability} onChange={(v) => set("probability", v)} />
-          <ScorePicker label="Impact" required error={errors.impact} value={form.impact} onChange={(v) => set("impact", v)} />
+
+          <ScorePicker
+            label="Probability"
+            required
+            error={errors.probability}
+            value={form.probability}
+            onChange={(v) => set("probability", v)}
+          />
+
+          <ScorePicker
+            label="Impact"
+            required
+            error={errors.impact}
+            value={form.impact}
+            onChange={(v) => set("impact", v)}
+          />
+
           {riskLevel && (
-            <div className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-semibold ${riskLevel.cls}`}>
+            <div
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-semibold ${riskLevel.cls}`}
+            >
               <AlertTriangle size={15} />
               Risk Score: {riskScore} — {riskLevel.label}
             </div>
@@ -364,8 +691,12 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
     /* Step 2 — People */
     <div key={2} className="space-y-4">
       <div className="p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-200 mb-2">
-        <p className="text-xs text-slate-500">Assign responsibility for this risk. The owner is accountable for mitigation; the reporter tracks and escalates it.</p>
+        <p className="text-xs text-slate-500">
+          Assign responsibility for this risk. The owner is accountable for
+          mitigation; the reporter tracks and escalates it.
+        </p>
       </div>
+
       <Field label="Risk Owner" required error={errors.owner}>
         <Select
           styles={selectStyles(!!errors.owner)}
@@ -376,6 +707,7 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
           placeholder="Who owns this risk?"
         />
       </Field>
+
       <Field label="Reporter" required error={errors.reporter}>
         <Select
           styles={selectStyles(!!errors.reporter)}
@@ -391,21 +723,29 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
     /* Step 3 — Link */
     <div key={3} className="space-y-4">
       <div className="p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-200 mb-2">
-        <p className="text-xs text-slate-500">Link this risk to an Epic, Story, or Task to track it alongside your work items. This is required.</p>
+        <p className="text-xs text-slate-500">
+          Link this risk to an Epic, Story, or Task to track it alongside your
+          work items. This is required.
+        </p>
       </div>
+
       <Field label="Link Type" required error={errors.linkedType}>
         <Select
-          styles={selectStyles(false)}
+          styles={selectStyles(!!errors.linkedType)}
           options={ISSUE_TYPES.map((t) => ({ value: t, label: t }))}
           value={form.linkedType}
-          onChange={(v) => { set("linkedType", v); set("linkedIssue", null); }}
+          onChange={(v) => {
+            set("linkedType", v);
+            set("linkedIssue", null);
+          }}
           menuPortalTarget={document.body}
           placeholder="Epic / Story / Task…"
         />
       </Field>
+
       <Field label="Linked Item" required error={errors.linkedIssue}>
         <Select
-          styles={selectStyles(false)}
+          styles={selectStyles(!!errors.linkedIssue)}
           options={issueOptions}
           value={form.linkedIssue}
           onChange={(v) => set("linkedIssue", v)}
@@ -424,14 +764,16 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
         className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
         style={{ maxHeight: "100dvh", height: "auto" }}
       >
-        {/* ── Top bar ── */}
+        {/* Top bar */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-slate-100">
           <div>
             <h2 className="text-base font-bold text-slate-800">
               {isEditMode ? "Edit Risk" : "Create Risk"}
             </h2>
+
             <p className="text-xs text-slate-400 mt-0.5">{STEPS[step].desc}</p>
           </div>
+
           <button
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
@@ -440,12 +782,13 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
           </button>
         </div>
 
-        {/* ── Step indicator ── */}
+        {/* Step indicator */}
         <div className="flex px-4 sm:px-6 pt-3 sm:pt-4 pb-2 gap-1.5 sm:gap-2 items-center">
           {STEPS.map((s, i) => {
             const done = i < step;
             const active = i === step;
             const Icon = s.icon;
+
             return (
               <button
                 key={s.id}
@@ -454,18 +797,25 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
                   if (i < step) setStep(i);
                 }}
                 className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-semibold transition-all duration-200 border
-                  ${active  ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                  : done    ? "bg-indigo-50 text-indigo-600 border-indigo-200"
-                  :           "bg-slate-50 text-slate-400 border-slate-200"}`}
+                  ${
+                    active
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                      : done
+                        ? "bg-indigo-50 text-indigo-600 border-indigo-200"
+                        : "bg-slate-50 text-slate-400 border-slate-200"
+                  }`}
               >
-                {done
-                  ? <Check size={10} strokeWidth={3} />
-                  : <Icon size={10} strokeWidth={2.5} />}
+                {done ? (
+                  <Check size={10} strokeWidth={3} />
+                ) : (
+                  <Icon size={10} strokeWidth={2.5} />
+                )}
+
                 <span className="hidden xs:inline sm:inline">{s.label}</span>
               </button>
             );
           })}
-          {/* progress line */}
+
           <div className="flex-1 flex items-center">
             <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
               <div
@@ -476,12 +826,12 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
           </div>
         </div>
 
-        {/* ── Panel body ── */}
+        {/* Panel body */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4">
           {panels[step]}
         </div>
 
-        {/* ── Footer nav ── */}
+        {/* Footer nav */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-100 bg-slate-50/60">
           <button
             type="button"
@@ -497,7 +847,11 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
               <div
                 key={i}
                 className={`rounded-full transition-all duration-200 ${
-                  i === step ? "w-5 h-2 bg-indigo-500" : i < step ? "w-2 h-2 bg-indigo-300" : "w-2 h-2 bg-slate-200"
+                  i === step
+                    ? "w-5 h-2 bg-indigo-500"
+                    : i < step
+                      ? "w-2 h-2 bg-indigo-300"
+                      : "w-2 h-2 bg-slate-200"
                 }`}
               />
             ))}
@@ -520,14 +874,33 @@ const CreateRiskModal = ({ isOpen, onClose, projectId, onSuccess, onCreate, risk
             >
               {submitting ? (
                 <span className="flex items-center gap-2">
-                  <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  <svg
+                    className="animate-spin w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8z"
+                    />
                   </svg>
                   Saving…
                 </span>
               ) : (
-                <><Check size={14} /> {isEditMode ? "Update Risk" : "Create Risk"}</>
+                <>
+                  <Check size={14} />{" "}
+                  {isEditMode ? "Update Risk" : "Create Risk"}
+                </>
               )}
             </button>
           )}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { useAuth } from "../../../contexts/AuthContext";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import PhoneInput from "react-phone-input-2";
@@ -48,10 +48,15 @@ export default function EditProfile() {
   // Load user profile on mount
   useEffect(() => {
     if (user?.email) {
-      axios
-        .get(`${import.meta.env.VITE_USER_MANAGEMENT_URL}/general_user/profile`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        })
+      api
+        .get(
+          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/general_user/profile`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
+        )
         .then((res) => setForm(res.data))
         .catch((err) => {
           console.error("Failed to fetch profile", err);
@@ -72,12 +77,12 @@ export default function EditProfile() {
     try {
       setSaving(true);
       console.log("Payload:", payload);
-      const response = await axios.put(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/general_user/profile`,
+      const response = await api.put(
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/general_user/profile`,
         payload,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        },
       );
       console.log("Response:", response.data);
       showStatusToast("Profile updated!", "success");
@@ -86,7 +91,7 @@ export default function EditProfile() {
       console.error("Update failed:", err);
       showStatusToast(
         "Update failed: " + (err.response?.data?.detail || err.message),
-        "error"
+        "error",
       );
     } finally {
       setSaving(false);

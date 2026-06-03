@@ -1,9 +1,10 @@
 // src/pages/Projects/manager/Sprint/CreateSprintModal.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
-import { X } from "lucide-react";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import api from "../../../../api/axiosInstance";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Button from "../../../../components/Button/Button";
+import Modal from "../../../../components/Modal/modal";
 
 const getCurrentDateTime = () => {
   const now = new Date();
@@ -13,13 +14,11 @@ const getCurrentDateTime = () => {
 };
 const CreateSprintModal = ({
   isOpen,
-  sprint,            // <-- EDIT MODE sprint object
+  sprint, // <-- EDIT MODE sprint object
   projectId,
   onClose,
   onCreated,
 }) => {
-  if (!isOpen) return null;
-
   const token = localStorage.getItem("token");
 
   // ---------------------------
@@ -53,13 +52,13 @@ const CreateSprintModal = ({
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const res = await api.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         setProjectName(res.data.name);
       } catch (e) {
-        toast.error("Failed to load project details");
+        showStatusToast("Failed to load project details", "error");
       }
     };
     load();
@@ -73,12 +72,8 @@ const CreateSprintModal = ({
       setFormData({
         name: sprint.name || "",
         goal: sprint.goal || "",
-        startDate: sprint.startDate
-          ? sprint.startDate.slice(0, 16)
-          : "",
-        endDate: sprint.endDate
-          ? sprint.endDate.slice(0, 16)
-          : "",
+        startDate: sprint.startDate ? sprint.startDate.slice(0, 16) : "",
+        endDate: sprint.endDate ? sprint.endDate.slice(0, 16) : "",
         status: sprint.status || "PLANNING",
         projectId: projectId.toString(),
       });
@@ -95,8 +90,7 @@ const CreateSprintModal = ({
   // ---------------------------
   // Helpers
   // ---------------------------
-  const toLocalDateTime = (val) =>
-    val.length === 16 ? `${val}:00` : val;
+  const toLocalDateTime = (val) => (val.length === 16 ? `${val}:00` : val);
 
   const calculateEndDate = (start, weeks) => {
     if (!start || !weeks) return "";
@@ -111,7 +105,7 @@ const CreateSprintModal = ({
   const handleStartDateChange = (e) => {
     const newStart = e.target.value;
     if (!sprint && new Date(newStart) < new Date()) {
-      toast.error("Start date cannot be in the past");
+      showStatusToast("Start date cannot be in the past", "error");
       return;
     }
     let newEnd = formData.endDate;
@@ -170,37 +164,37 @@ const CreateSprintModal = ({
     try {
       let res;
 
-      if (sprint) {
+  if (sprint) {
         // -------------------------
         // EDIT MODE
         // -------------------------
-        res = await axios.put(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/sprints/${sprint.id}`,
+        res = await api.put(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprint.id}`,
           payload,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
-        toast.success("Sprint updated successfully!");
+        showStatusToast("Sprint updated successfully!", "success");
       } else {
         // -------------------------
         // CREATE MODE
         // -------------------------
-        res = await axios.post(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/sprints`,
+        res = await api.post(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints`,
           payload,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
-        toast.success("Sprint created successfully!");
+        showStatusToast("Sprint created successfully!", "success");
       }
 
       onCreated(res.data);
+      onClose(); // ← close immediately, toast will show on top of nothing
 
-      setTimeout(() => onClose(), 600);
     } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Error saving sprint"
-      );
+      console.log('[sprint-modal] handleSubmit - caught error', { err: err?.response?.data || err?.message, ts: Date.now() });
+
+      showStatusToast(err.response?.data?.message || "Error saving sprint", "error");
     }
   };
 
@@ -208,22 +202,12 @@ const CreateSprintModal = ({
   // Render
   // ---------------------------
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex justify-center items-center">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto relative">
-        <ToastContainer />
-
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
-        >
-          <X size={20} />
-        </button>
-
-        <h2 className="text-2xl font-semibold text-center mb-6">
-          {sprint ? "Edit Sprint" : "Create New Sprint"}
-        </h2>
-
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={sprint ? "Edit Sprint" : "Create Sprint"}
+      className="max-w-xl"
+    >
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Sprint Name */}
           <div>
@@ -276,16 +260,11 @@ const CreateSprintModal = ({
               <label className="block text-gray-700 mb-1 font-medium">
                 Duration
               </label>
-              <select
+              <FilterListbox
+                options={[{value:"1W",label:"1 Week"},{value:"2W",label:"2 Weeks"},{value:"3W",label:"3 Weeks"},{value:"CUSTOM",label:"Custom"}]}
                 value={duration}
-                onChange={handleDurationChange}
-                className="border rounded-lg w-full p-2"
-              >
-                <option value="1W">1 Week</option>
-                <option value="2W">2 Weeks</option>
-                <option value="3W">3 Weeks</option>
-                <option value="CUSTOM">Custom</option>
-              </select>
+                onChange={(val) => handleDurationChange({ target: { value: val } })}
+              />
             </div>
           )}
 
@@ -315,14 +294,10 @@ const CreateSprintModal = ({
                     setShowDecimalWarning(false);
                     setCustomWeeks(value);
 
-                    if (
-                      value !== "" &&
-                      value !== "0" &&
-                      formData.startDate
-                    ) {
+                    if (value !== "" && value !== "0" && formData.startDate) {
                       const end = calculateEndDate(
                         formData.startDate,
-                        Number(value)
+                        Number(value),
                       );
                       setFormData({ ...formData, endDate: end });
                     }
@@ -363,24 +338,12 @@ const CreateSprintModal = ({
 
           {/* Buttons */}
           <div className="flex justify-end gap-4 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2 bg-gray-200 rounded-lg text-gray-700"
-            >
-              Cancel
-            </button>
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
 
-            <button
-              type="submit"
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg"
-            >
-              {sprint ? "Update Sprint" : "Create Sprint"}
-            </button>
+            <Button variant="primary" type="submit">{sprint ? "Update Sprint" : "Create Sprint"}</Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

@@ -1,17 +1,21 @@
 import React, { useEffect, useState, useRef } from "react";
 // import ManagerApprovalTable from "../ManagerApproval/ManagerApprovalTable";
-// import Button from "../../../components/Button/Button";
+import Button from "../../../components/Button/Button";
+import FilterListbox from "../../../components/filter/FilterListbox";
 // import ManagerDashboard from "../ManagerDashboard";
 import AdminApprovalTable from "./AdminApprovalTable";
 import TimesheetHeader from "../TimesheetHeader";
 // import { getManagerDashboardData } from "../api";
 import { useMemo } from "react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const AdminApprovalPage = () => {
+  const navigate = useNavigate();
   const [groupedTimesheets, setGroupedTimesheets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
@@ -39,20 +43,12 @@ const AdminApprovalPage = () => {
   // ✅ Fetch Timesheets
   const fetchGroupedTimesheets = async () => {
     try {
-      const response = await fetch(
-        `${
-          import.meta.env.VITE_TIMESHEET_API_ENDPOINT
+      const response = await api.get(
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheets/internal/summary`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
       );
 
-      if (!response.ok) throw new Error("Failed to fetch timesheets");
-
-      const data = await response.json();
+      const data = response.data;
       setGroupedTimesheets(data);
       setFilteredTimesheets(data);
       setLoading(false);
@@ -75,13 +71,8 @@ const AdminApprovalPage = () => {
 
   const fetchEmailUsers = async () => {
     try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/users`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+      const res = await api.get(
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/users`,
       );
       setEmailOptions(res.data);
     } catch (err) {
@@ -92,13 +83,8 @@ const AdminApprovalPage = () => {
 
   const fetchEmail = async () => {
     try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/emailSettings`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+      const res = await api.get(
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/emailSettings`,
       );
       console.log(res);
       setEmailData(res.data[0]);
@@ -129,6 +115,12 @@ const AdminApprovalPage = () => {
     let filtered = [...groupedTimesheets];
 
     filtered = filtered.filter((user) => {
+      // 🔹 0️⃣ Hide users with no actionable weeks — every week is APPROVED
+      const hasActionableWeek = user.weeklySummary?.some(
+        (w) => w.weeklyStatus?.toUpperCase() !== "APPROVED",
+      );
+      if (!hasActionableWeek) return false;
+
       // 🔹 1️⃣ User Filter — show all users if "All Users" selected
       if (
         userFilter &&
@@ -152,9 +144,9 @@ const AdminApprovalPage = () => {
                 entry.otherDescription?.toLowerCase().includes(lowerSearch) ||
                 entry.workLocation?.toLowerCase().includes(lowerSearch) ||
                 entry.projectName?.toLowerCase().includes(lowerSearch) ||
-                entry.taskName?.toLowerCase().includes(lowerSearch)
-            )
-          )
+                entry.taskName?.toLowerCase().includes(lowerSearch),
+            ),
+          ),
         );
 
         if (!userMatch && !nestedMatch) return false;
@@ -163,7 +155,7 @@ const AdminApprovalPage = () => {
       // 🔹 3️⃣ Date Filter — match selected date exactly
       if (selectedDate) {
         const hasDate = user.weeklySummary?.some((week) =>
-          week.timesheets?.some((ts) => ts.workDate === selectedDate)
+          week.timesheets?.some((ts) => ts.workDate === selectedDate),
         );
         if (!hasDate) return false;
       }
@@ -177,9 +169,9 @@ const AdminApprovalPage = () => {
               (ts) =>
                 ts.status?.toLowerCase() === statusFilter.toLowerCase() ||
                 ts.actionStatus?.some(
-                  (a) => a.status?.toLowerCase() === statusFilter.toLowerCase()
-                )
-            )
+                  (a) => a.status?.toLowerCase() === statusFilter.toLowerCase(),
+                ),
+            ),
         );
         if (!hasStatus) return false;
       }
@@ -208,16 +200,10 @@ const AdminApprovalPage = () => {
       return;
     }
     try {
-      await axios.put(
-        `${import.meta.env.VITE_TIMESHEET_API_ENDPOINT}/api/emailSettings/${
-          emailData.id
+      await api.put(
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/emailSettings/${emailData.id
         }`,
         { email: editValue },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
       );
       setIsEditing(false);
       setEmailData({ ...emailData, email: editValue });
@@ -256,9 +242,17 @@ const AdminApprovalPage = () => {
         </div>
       )} */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Admin Approvals
-        </h1>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Admin Approvals
+          </h1>
+        </div>
         <h3 className="flex items-center text-lg text-gray-500 font-semibold">
           Finance Report Email:&nbsp;
           {!isEditing ? (
@@ -280,17 +274,11 @@ const AdminApprovalPage = () => {
                 className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring focus:ring-blue-300"
                 autoFocus
               /> */}
-              <select
+              <FilterListbox
+                options={emailOptions.map((m) => ({ value: m.email, label: m.name }))}
                 value={selectedEmail}
-                onChange={(e) => {setSelectedEmail(e.target.value), setEditValue(e.target.value)}}
-                className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring focus:ring-blue-300"
-              >
-                {emailOptions.map((m) => (
-                  <option key={m.id} value={m.email}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => { setSelectedEmail(val); setEditValue(val); }}
+              />
 
               <CheckCircle
                 className="text-green-600 hover:text-green-800 w-5 h-5 cursor-pointer"
@@ -307,8 +295,7 @@ const AdminApprovalPage = () => {
       </div>
 
       {/* ✅ Filter Header */}
-      <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm flex flex-wrap items-center gap-3 mb-6">
-        {/* Search */}
+      {/* <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm flex flex-wrap items-center gap-3 mb-6">
         <input
           type="text"
           placeholder="Search by user,description,location..."
@@ -317,7 +304,6 @@ const AdminApprovalPage = () => {
           className="flex-1 min-w-[220px] px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 placeholder-gray-400"
         />
 
-        {/* Date */}
         <input
           type="date"
           value={selectedDate}
@@ -325,41 +311,87 @@ const AdminApprovalPage = () => {
           className="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
         />
 
-        {/* Status Dropdown */}
-        <select
+        <FilterListbox
+          options={[
+            { value: "All", label: "All" },
+            { value: "Submitted", label: "Submitted" },
+            { value: "Approved", label: "Approved" },
+            { value: "Rejected", label: "Rejected" },
+          ]}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
-        >
-          <option>All</option>
-          <option>Submitted</option>
-          <option>Approved</option>
-          <option>Rejected</option>
-        </select>
+          onChange={setStatusFilter}
+        />
 
-        {/* User Dropdown */}
-        <select
+        <FilterListbox
+          options={[
+            { value: "All Users", label: "All Users" },
+            ...[...new Set(groupedTimesheets.map((item) => item.userName?.trim()))].filter(Boolean).map((user) => ({ value: user, label: user })),
+          ]}
           value={userFilter}
-          onChange={(e) => setUserFilter(e.target.value)}
-          className="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
-        >
-          <option value="All Users">All Users</option>
-          {[...new Set(groupedTimesheets.map((item) => item.userName?.trim()))]
-            .filter(Boolean)
-            .map((user) => (
-              <option key={user} value={user}>
-                {user}
-              </option>
-            ))}
-        </select>
+          onChange={setUserFilter}
+        />
 
-        {/* Reset Button */}
-        <button
+        <Button
+          variant="destructive"
+          size="medium"
           onClick={handleResetFilters}
-          className="bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-full transition-colors"
+        // className="bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-full transition-colors"
         >
           Reset
-        </button>
+        </Button>
+      </div> */}
+      <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm flex flex-row items-center gap-3 mb-6">
+        <input
+          type="text"
+          placeholder="Search by user, description, location..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1 min-w-[100px] px-2 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 placeholder-gray-400"
+        />
+
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="shrink-0 px-2 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+        />
+
+        {/* Status Dropdown - Set a fixed or minimum width */}
+        <div className="shrink-0 min-w-[120px]">
+          <FilterListbox
+            options={[
+              { value: "All", label: "All Statuses" },
+              { value: "Submitted", label: "Submitted" },
+              { value: "Approved", label: "Approved" },
+              { value: "Rejected", label: "Rejected" },
+            ]}
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
+        </div>
+
+        {/* User Dropdown - Set a larger minimum width for names */}
+        <div className="shrink-0 min-w-[150px]">
+          <FilterListbox
+            options={[
+              { value: "All Users", label: "All Users" },
+              ...[...new Set(groupedTimesheets.map((item) => item.userName?.trim()))]
+                .filter(Boolean)
+                .map((user) => ({ value: user, label: user })),
+            ]}
+            value={userFilter}
+            onChange={setUserFilter}
+          />
+        </div>
+
+        <Button
+          variant="destructive"
+          size="medium"
+          onClick={handleResetFilters}
+          className="shrink-0"
+        >
+          Reset
+        </Button>
       </div>
 
       {/* ✅ Timesheet Table */}

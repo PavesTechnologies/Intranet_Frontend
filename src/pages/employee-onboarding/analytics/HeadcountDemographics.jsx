@@ -1,156 +1,135 @@
-import  { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import api from "../../../api/axiosInstance";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import { showStatusToast } from "../../../components/toastfy/toast.jsx";
 import FiltersBar from "./components/FiltersBar";
 import SectionTabs from "./components/SectionTabs";
 import ChartCard from "./components/ChartCard";
 import CardContainer from "./components/CardContainer";
-import { fetchDashboardAnalytics  } from "./analyticsapi";
+import { fetchDashboardAnalytics } from "./analyticsapi";
 import BarChartCard from "./components/BarChartCard";
 import DeptBarChartCard from "./components/DeptBarChartCard";
 
-
 export default function HeadcountDemographicsPage() {
-
   const [analytics, setAnalytics] = useState(null);
-  const [filters, setFilters] = useState({});
-const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    dept: "",
+    date: "",
+    worker: "",
+  });
+  const [departments, setDepartments] = useState([]);
 
   useEffect(() => {
-    loadAnalytics();
     fetchDepartments();
   }, []);
 
+  useEffect(() => {
+    loadAnalytics();
+  }, [filters]);
+
   const fetchDepartments = async () => {
-  const token = localStorage.getItem("token");
+    try {
+      const res = await api.get(
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
 
-  const res = await fetch(
-    `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/masters/departments/`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      setDepartments((res.data || []).map((department) => department.department_name));
+    } catch {
+      showStatusToast("Failed to load departments", "error");
     }
-  );
+  };
 
-  const data = await res.json();
+  const loadAnalytics = async () => {
+    setLoading(true);
+    const data = await fetchDashboardAnalytics();
 
-  setDepartments(data.map(d => d.department_name));
-};
+    if (data) {
+      let demographicsData = data.demographics || data;
+      let workerDeptData = data.workerDept || [];
+      let genderDeptData = data.genderDept || [];
+      let employmentDeptData = data.employmentDept || [];
 
-//  const loadAnalytics = async () => {
-//   const data = await fetchDashboardAnalytics();
+      if (filters.dept) {
+        workerDeptData = workerDeptData.filter((item) => item.dept === filters.dept);
+        genderDeptData = genderDeptData.filter((item) => item.dept === filters.dept);
+        employmentDeptData = employmentDeptData.filter(
+          (item) => item.dept === filters.dept,
+        );
+      }
 
-//   console.log("API DATA:", data); // 👈 DEBUG
+      if (filters.worker) {
+        const workerKey =
+          filters.worker === "Permanent"
+            ? "permanent"
+            : filters.worker === "Contract"
+              ? "contingent"
+              : "";
 
-//   if (data) {
-//     const demographicsData = data.demographics || data; // 🔥 KEY FIX
+        if (workerKey) {
+          workerDeptData = workerDeptData.map((item) => ({
+            ...item,
+            permanent: workerKey === "permanent" ? item.permanent || 0 : 0,
+            contingent: workerKey === "contingent" ? item.contingent || 0 : 0,
+          }));
+        }
+      }
 
-//     const genderWithColor = (demographicsData.gender || []).map(item => ({
-//       ...item,
-//       color: item.label === "Female" ? "#b57bb5" : "#5b8def"
-//     }));
+      const genderWithColor = (demographicsData.gender || []).map((item) => ({
+        ...item,
+        color: item.label === "Female" ? "#b57bb5" : "#5b8def",
+      }));
 
-//     const nationalityWithColor = (demographicsData.nationality || []).map(item => ({
-//       ...item,
-//       color: item.label === "India" ? "#5b8def" : "#d97b7b"
-//     }));
-
-//     setAnalytics({
-//       demographics: {
-//         ...demographicsData,
-//         gender: genderWithColor,
-//         nationality: nationalityWithColor
-//       },
-//       workerDept: data.workerDept || [],
-//       genderDept: data.genderDept || [],
-//       employmentDept: data.employmentDept || []
-//     });
-//   }
-// };
-const loadAnalytics = async () => {
-  const data = await fetchDashboardAnalytics();
-
-  if (data) {
-    let demographicsData = data.demographics || data;
-
-    let workerDeptData = data.workerDept || [];
-    let genderDeptData = data.genderDept || [];
-    let employmentDeptData = data.employmentDept || [];
-
-    // 🔥 APPLY DEPARTMENT FILTER
-    if (filters.dept && filters.dept !== "All") {
-      workerDeptData = workerDeptData.filter(
-        (d) => d.dept === filters.dept
+      const nationalityWithColor = (demographicsData.nationality || []).map(
+        (item) => ({
+          ...item,
+          color: item.label === "India" ? "#5b8def" : "#d97b7b",
+        }),
       );
 
-      genderDeptData = genderDeptData.filter(
-        (d) => d.dept === filters.dept
-      );
-
-      employmentDeptData = employmentDeptData.filter(
-        (d) => d.dept === filters.dept
-      );
-
-      // 🔥 update total dynamically
-      const totalFromDept = workerDeptData.reduce(
-        (sum, d) => sum + (d.permanent || 0) + (d.contingent || 0),
-        0
-      );
-
-      demographicsData = {
-        ...demographicsData,
-        total: totalFromDept,
-      };
+      setAnalytics({
+        demographics: {
+          ...demographicsData,
+          gender: genderWithColor,
+          nationality: nationalityWithColor,
+        },
+        workerDept: workerDeptData,
+        genderDept: genderDeptData,
+        employmentDept: employmentDeptData,
+      });
+    } else {
+      showStatusToast("Failed to load analytics data", "error");
     }
 
-    // 🎨 COLORS
-    const genderWithColor = (demographicsData.gender || []).map((item) => ({
-      ...item,
-      color: item.label === "Female" ? "#b57bb5" : "#5b8def",
-    }));
+    setLoading(false);
+  };
 
-    const nationalityWithColor = (demographicsData.nationality || []).map((item) => ({
-      ...item,
-      color: item.label === "India" ? "#5b8def" : "#d97b7b",
-    }));
-
-    setAnalytics({
-      demographics: {
-        ...demographicsData,
-        gender: genderWithColor,
-        nationality: nationalityWithColor,
-      },
-      workerDept: workerDeptData,
-      genderDept: genderDeptData,
-      employmentDept: employmentDeptData,
-    });
-  }
-};
-  if (!analytics) {
-    return <div style={{ padding: 20 }}>Loading analytics...</div>;
+  if (loading && !analytics) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <LoadingSpinner text="Loading analytics..." />
+      </div>
+    );
   }
 
+  if (!analytics) return null;
 
   const { demographics, workerDept, genderDept, employmentDept } = analytics;
 
   return (
-    <div
-      style={{
-        padding: 20,
-        background: "#f6f7fb",
-        fontFamily: "Inter, sans-serif",
-        minHeight: "100vh",
-      }}
-    >
+    <div className="min-h-screen bg-slate-50 p-4 md:p-6 lg:p-8">
       <SectionTabs />
-
-      <h2 style={{ marginTop: 20 }}>
-        Headcount Distribution by Demographics
-      </h2>
 
       <FiltersBar
         filters={filters}
         setFilters={setFilters}
-        departments={departments} />
+        departments={departments}
+      />
 
       <CardContainer>
         <ChartCard
@@ -158,36 +137,37 @@ const loadAnalytics = async () => {
           data={demographics?.gender || []}
           total={demographics?.total || 0}
           colors={["#b57bb5", "#5b8def"]}
+          accentColor="#b57bb5"
         />
-
         <ChartCard
           title="Employment Type"
           data={demographics?.employmentType || []}
           total={demographics?.total || 0}
           colors={["#c06dbf", "#5b8def"]}
+          accentColor="#c06dbf"
         />
-
         <ChartCard
           title="Worker Type"
           data={demographics?.workerType || []}
           total={demographics?.total || 0}
           colors={["#7b6ed6", "#5b8def"]}
+          accentColor="#7b6ed6"
         />
-
         <ChartCard
           title="Nationality"
           data={demographics?.nationality || []}
           total={demographics?.total || 0}
           colors={["#d97b7b", "#5b8def"]}
+          accentColor="#d97b7b"
         />
-        </CardContainer>
+      </CardContainer>
 
-
-        <CardContainer>
+      <CardContainer>
         <BarChartCard
           title="Age of Employees (in Years)"
           data={demographics?.ageGroups || []}
           xKey="group"
+          accentColor="#5b8def"
           bars={[
             { key: "female", color: "#5b8def" },
             { key: "male", color: "#c06dbf" },
@@ -197,38 +177,46 @@ const loadAnalytics = async () => {
           title="Years in Organisation"
           data={demographics?.experience || []}
           xKey="range"
+          accentColor="#e3b52e"
           bars={[{ key: "value", color: "#e3b52e" }]}
         />
       </CardContainer>
+
       <DeptBarChartCard
-  title="Headcount by Worker Type Across Department"
-  data={workerDept || [] }
-  xKey="dept"
-  bars={[
-    { key: "contingent", color: "#7b6ed6" },
-    { key: "permanent", color: "#e26a47" },
-  ]}
-/>
+        title="Headcount by Worker Type Across Department"
+        data={workerDept || []}
+        xKey="dept"
+        accentColor="#7b6ed6"
+        bars={[
+          { key: "contingent", color: "#7b6ed6" },
+          { key: "permanent", color: "#e26a47" },
+        ]}
+      />
 
-<DeptBarChartCard
-  title="Headcount by Gender Across Department"
-  data={genderDept || []}
-  xKey="dept"
-  bars={[
-    { key: "female", color: "#5b8def" },
-    { key: "male", color: "#c06dbf" },
-  ]}
-/>
+      <DeptBarChartCard
+        title="Headcount by Gender Across Department"
+        data={genderDept || []}
+        xKey="dept"
+        accentColor="#5b8def"
+        bars={[
+          { key: "female", color: "#5b8def" },
+          { key: "male", color: "#c06dbf" },
+        ]}
+      />
 
-<DeptBarChartCard
-  title="Headcount by Employment Type Across Department"
-  data={employmentDept || []}
-  xKey="dept"
-  bars={[
-    { key: "full", color: "#59b3b8" },
-  ]}
-/>
-
+      <DeptBarChartCard
+        title="Headcount by Employment Type Across Department"
+        data={employmentDept || []}
+        xKey="dept"
+        accentColor="#59b3b8"
+        bars={[
+          { key: "full", color: "#59b3b8" },
+          { key: "partTime", color: "#8b5cf6" },
+          { key: "intern", color: "#f59e0b" },
+          { key: "contract", color: "#ef4444" },
+          { key: "freelance", color: "#14b8a6" },
+        ]}
+      />
     </div>
   );
 }

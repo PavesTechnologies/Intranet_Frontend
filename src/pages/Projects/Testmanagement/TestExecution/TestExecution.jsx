@@ -4,11 +4,27 @@ import CreateTestCycleForm from "./CreateCycle";
 import CreateTestRunForm from "./CreateRun";
 import RunListForCycle from "./RunListForCycle";
 import { useParams } from "react-router-dom";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import StatusBadge from "../../../../components/status/statusbadge";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
-
+import SearchInput from "../../../../components/filter/Searchbar";
+import Button from "../../../../components/Button/Button";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
+import{jwtDecode} from "jwt-decode";
+const token = localStorage.getItem("token");
+  
+  let canCreateTest = false;
+  
+  if (token) {
+    const decoded = jwtDecode(token);
+  
+    const roles = decoded?.roles || [];
+  
+    canCreateTest =
+      roles.includes("Tester") ||
+      roles.includes("Project_Manager");
+  }
 export default function TestExecution() {
   const { projectId } = useParams();
 
@@ -26,10 +42,28 @@ export default function TestExecution() {
   const [selectedRunId, setSelectedRunId] = useState(null);
   const [runsRefreshKey, setRunsRefreshKey] = useState(0);
   const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [cycleName, setCycleName] = useState("");
+  const [deleteCycleConfirmOpen, setDeleteCycleConfirmOpen] = useState(false);
+  const [cycleIdToDelete, setCycleIdToDelete] = useState(null);
+
+  useEffect(() => {
+    const selectedCycle = cycles.find((c) => c.id === selectedCycleId);
+    setCycleName(selectedCycle?.name || "");
+  }, [selectedCycleId, cycles]);
 
   const dropdownRef = useRef(null);
 
-  // ── Close dropdown on outside click ──────────────────────────────────────
+  const executeDeleteCycle = async (cycleId) => {
+    try {
+      await axiosInstance.delete(`api/test-execution/test-cycles/${cycleId}`);
+      showStatusToast("Cycle deleted successfully!", "success");
+      loadCycles();
+    } catch (err) {
+      console.error("Failed to delete cycle:", err);
+      showStatusToast("Failed to delete cycle.", "error");
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -40,7 +74,6 @@ export default function TestExecution() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ── Util ──────────────────────────────────────────────────────────────────
   const formatDate = (date) => {
     if (!date) return "No Date";
     const d = new Date(date);
@@ -54,12 +87,11 @@ export default function TestExecution() {
     );
   };
 
-  // ── Load Cycles ───────────────────────────────────────────────────────────
   const loadCycles = async () => {
     setLoadingCycles(true);
     try {
       const res = await axiosInstance.get(
-        `/test-execution/test-cycles/projects/${projectId}`
+        `api/test-execution/test-cycles/projects/${projectId}`,
       );
       setCycles(res.data || []);
       if (!selectedCycleId && res.data?.length) {
@@ -67,15 +99,13 @@ export default function TestExecution() {
       }
     } catch (err) {
       console.error("Error loading cycles:", err);
-      toast.error("Failed to load cycles");
+      showStatusToast("Failed to load cycles", "error");
     } finally {
       setLoadingCycles(false);
     }
   };
 
-  useEffect(() => {
-    loadCycles();
-  }, [projectId]);
+  useEffect(() => { loadCycles(); }, [projectId]);
 
   const filteredCycles = cycles.filter((c) => {
     const term = search.toLowerCase();
@@ -85,28 +115,11 @@ export default function TestExecution() {
     );
   });
 
-  // ── Delete ────────────────────────────────────────────────────────────────
-  const handleDeleteCycle = async (cycleId) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this cycle? All test runs inside it will also be deleted."
-      )
-    )
-      return;
-    try {
-      await axiosInstance.delete(
-        `/test-execution/test-cycles/${cycleId}`
-      );
-      toast.success("Cycle deleted successfully");
-      setOpenDropdownId(null);
-      loadCycles();
-    } catch (err) {
-      console.error("Error deleting cycle:", err);
-      toast.error("Failed to delete cycle");
-    }
+  const handleDeleteCycle = (cycleId) => {
+    setCycleIdToDelete(cycleId);
+    setDeleteCycleConfirmOpen(true);
   };
 
-  // ── Edit ──────────────────────────────────────────────────────────────────
   const handleEditClick = (e, cycle) => {
     e.stopPropagation();
     setEditingCycle(cycle);
@@ -118,10 +131,9 @@ export default function TestExecution() {
     setShowEditModal(false);
     setEditingCycle(null);
     loadCycles();
-    toast.success("Cycle updated successfully");
+    showStatusToast("Cycle updated successfully", "success");
   };
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleCycleCreated = () => {
     setShowCycleModal(false);
     loadCycles();
@@ -132,151 +144,169 @@ export default function TestExecution() {
     setRunsRefreshKey((k) => k + 1);
   };
 
-  if (loadingCycles) return <LoadingSpinner text="Loading cycles..." />;
-
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xl font-bold">Test Execution</h1>
-
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200 flex-shrink-0">
+        <div>
+          <h1 className="text-base font-semibold text-slate-900">Test Execution</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Manage test cycles and execution runs.</p>
+        </div>
         {showCyclesView ? (
-          <div className="flex items-center gap-4">
-            <input
-              type="text"
+          <div className="flex items-center gap-3">
+            <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search cycles by name or status..."
-              className="px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 w-64 outline-none"
+              placeholder="Search cycles..."
+              className="w-56"
             />
-            <button
-              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-              onClick={() => setShowCycleModal(true)}
-            >
-              + Create Cycle
-            </button>
+            {canCreateTest && (
+              <Button variant="primary" size="small" onClick={() => setShowCycleModal(true)}>
+                + Create Cycle
+              </Button>
+            )}
           </div>
         ) : (
-          <div className="flex items-center gap-4">
-            <button
-              className="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
-              onClick={() => setShowCyclesView(true)}
-            >
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" size="small" onClick={() => setShowCyclesView(true)}>
               ← Back to Cycles
-            </button>
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              onClick={() => setShowRunModal(true)}
-            >
-              + Create Run
-            </button>
+            </Button>
+            {canCreateTest && (
+              <Button variant="primary" size="small" onClick={() => setShowRunModal(true)}>
+                + Create Run
+              </Button>
+            )}
           </div>
         )}
       </div>
 
-      {/* CYCLE CARDS */}
-      {showCyclesView ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {filteredCycles.length === 0 && (
-            <p className="text-gray-400 col-span-2 text-center mt-10">
-              No cycles found.
-            </p>
-          )}
-
-          {filteredCycles.map((cycle) => (
-            <div
-              key={cycle.id}
-              className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between min-h-[140px]"
-              onClick={() => {
-                setSelectedCycleId(cycle.id);
-                setShowCyclesView(false);
-              }}
-            >
-              {/* ROW 1 — name + 3 dots */}
-              <div className="flex justify-between items-start">
-                <h2 className="font-semibold text-base text-gray-800 pr-4">
-                  {cycle.name}
-                </h2>
-
-                {/* 3 DOTS DROPDOWN */}
+      {/* Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+        {loadingCycles ? (
+          <div className="flex items-center justify-center h-32">
+            <LoadingSpinner text="Loading cycles..." />
+          </div>
+        ) : showCyclesView ? (
+          filteredCycles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 text-slate-400">
+              <p className="text-sm">No cycles found.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCycles.map((cycle) => (
                 <div
-                  className="relative flex-shrink-0"
-                  ref={openDropdownId === cycle.id ? dropdownRef : null}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full p-1 transition"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenDropdownId(
-                        openDropdownId === cycle.id ? null : cycle.id
-                      );
-                    }}
-                  >
-                    <MoreVertical size={18} />
-                  </button>
-
-                  {openDropdownId === cycle.id && (
-                    <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
-                      <button
-                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
-                        onClick={(e) => handleEditClick(e, cycle)}
-                      >
-                        <Pencil size={13} />
-                        Edit
-                      </button>
-                      <button
-                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenDropdownId(null);
-                          handleDeleteCycle(cycle.id);
-                        }}
-                      >
-                        <Trash2 size={13} />
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* ROW 2 — date */}
-              <p className="text-sm text-gray-400 mt-1">
-                {formatDate(cycle.startDate)} - {formatDate(cycle.endDate)}
-              </p>
-
-              {/* ROW 3 — status + create run */}
-              <div className="flex justify-between items-center mt-6">
-                <StatusBadge label={cycle.status} />
-                <button
-                  className="bg-blue-600 text-white px-4 py-1 text-sm rounded hover:bg-blue-700"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  key={cycle.id}
+                  className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between min-h-[140px]"
+                  onClick={() => {
                     setSelectedCycleId(cycle.id);
-                    setShowRunModal(true);
+                    setShowCyclesView(false);
                   }}
                 >
-                  + Create Run
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <RunListForCycle
-          projectId={projectId}
-          cycleId={selectedCycleId}
-          onAddCases={(runId) => setSelectedRunId(runId)}
-          refreshKey={runsRefreshKey}
-        />
-      )}
+                  {/* Name + 3-dot menu */}
+                  <div className="flex justify-between items-start">
+                    <h2 className="font-semibold text-sm text-slate-800 pr-3 leading-snug">
+                      {cycle.name}
+                    </h2>
+                    <div
+                      className="relative flex-shrink-0"
+                      ref={openDropdownId === cycle.id ? dropdownRef : null}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                     {canCreateTest && (
+                      <button
+                        className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full p-1 transition"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDropdownId(openDropdownId === cycle.id ? null : cycle.id);
+                        }}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                     )}
+                      {openDropdownId === cycle.id && (
+                        <div className="absolute right-0 mt-1 w-32 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                          {canCreateTest && (
+                            <>
+                          <button
+                            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition"
+                            onClick={(e) => handleEditClick(e, cycle)}
+                          >
+                            <Pencil size={13} /> Edit
+                          </button>
+                          <button
+                            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDropdownId(null);
+                              handleDeleteCycle(cycle.id);
+                            }}
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                          </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-      {/* CREATE CYCLE MODAL */}
+                  {/* Date range */}
+                  <p className="text-xs text-slate-400 mt-1">
+                    {formatDate(cycle.startDate)} — {formatDate(cycle.endDate)}
+                  </p>
+
+                  {/* Status + Create Run */}
+                  <div className="flex justify-between items-center mt-4">
+                    <StatusBadge label={cycle.status} />
+                    {canCreateTest && (
+                      <Button
+                        variant="primary"
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCycleId(cycle.id);
+                          setShowRunModal(true);
+                        }}
+                      >
+                        + Create Run
+                      </Button>
+                    )}  
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        ) : (
+          <RunListForCycle
+            projectId={projectId}
+            cycleId={selectedCycleId}
+            onAddCases={(runId) => setSelectedRunId(runId)}
+            refreshKey={runsRefreshKey}
+          />
+        )}
+      </div>
+
+      {/* Delete Cycle Confirmation */}
+      <ConfirmationModal
+        isOpen={deleteCycleConfirmOpen}
+        title="Delete Cycle"
+        message="Are you sure you want to delete this cycle? All test runs inside it will also be deleted."
+        onConfirm={() => {
+          executeDeleteCycle(cycleIdToDelete);
+          setDeleteCycleConfirmOpen(false);
+          setCycleIdToDelete(null);
+        }}
+        onCancel={() => {
+          setDeleteCycleConfirmOpen(false);
+          setCycleIdToDelete(null);
+        }}
+        confirmText="Delete"
+        variant="danger"
+      />
+
+      {/* Create Cycle Modal */}
       {showCycleModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
           <CreateTestCycleForm
             projectId={projectId}
             onSuccess={handleCycleCreated}
@@ -285,27 +315,25 @@ export default function TestExecution() {
         </div>
       )}
 
-      {/* EDIT CYCLE MODAL */}
+      {/* Edit Cycle Modal */}
       {showEditModal && editingCycle && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
           <CreateTestCycleForm
             projectId={projectId}
             onSuccess={handleEditSuccess}
-            onClose={() => {
-              setShowEditModal(false);
-              setEditingCycle(null);
-            }}
+            onClose={() => { setShowEditModal(false); setEditingCycle(null); }}
             editingCycle={editingCycle}
           />
         </div>
       )}
 
-      {/* CREATE RUN MODAL */}
+      {/* Create Run Modal */}
       {showRunModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
           <CreateTestRunForm
             projectId={projectId}
             cycleId={selectedCycleId}
+            cycleName={cycleName}
             onSuccess={handleRunCreated}
             onClose={() => setShowRunModal(false)}
           />

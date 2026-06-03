@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import FilterListbox from "../../components/filter/FilterListbox";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { XCircle, ArrowLeft } from "lucide-react";
@@ -8,12 +9,12 @@ import DayOfWeekBarChart from "./DayOfWeekBarChart";
 import WeeklySummaryCard from "./WeeklySummaryCard";
 import "./MonthlyTSReport.css";
 import LoadingSpinner from "../../components/LoadingSpinner.jsx";
-import axios from "axios";
+import api from "../../api/axiosInstance";
 import { toast } from "react-toastify";
 import Button from "../../components/Button/Button.jsx";
 import { useNavigate } from "react-router-dom";
 
-const TS_BASE_URL = import.meta.env.VITE_TIMESHEET_API_ENDPOINT;
+const TS_BASE_URL = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
 
 const MonthlyTSReport = () => {
   const [apiData, setApiData] = useState(null);
@@ -55,25 +56,15 @@ const MonthlyTSReport = () => {
   const yearOptions = [currentYear, currentYear - 1];
 
   const filteredMonths =
-  selectedYear === currentYear
-    ? monthOptions.filter((m) => m.value <= month)
-    : monthOptions;
+    selectedYear === currentYear
+      ? monthOptions.filter((m) => m.value <= month)
+      : monthOptions;
 
   useEffect(() => {
     const loadProjectInfo = async () => {
       try {
-        const res = await fetch(`${TS_BASE_URL}/api/project-info`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const data = await res.json();
-        setProjectInfo(data);
+        const res = await api.get(`${TS_BASE_URL}/api/project-info`);
+        setProjectInfo(res.data);
       } catch (err) {
         console.error("Failed to load project info", err);
       }
@@ -98,14 +89,8 @@ const MonthlyTSReport = () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await axios.get(
+      const res = await api.get(
         `${TS_BASE_URL}/api/report/user_monthly?month=${month}&year=${year}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
       );
       const data = await res.data;
       setApiData(data);
@@ -204,7 +189,7 @@ const MonthlyTSReport = () => {
     const pageWidth = doc.internal.pageSize.getWidth();
 
     const monthLabel = new Date(
-      `${year}-${String(month).padStart(2, "0")}-01`
+      `${year}-${String(month).padStart(2, "0")}-01`,
     ).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
     const totalHours = Number(apiData.totalHoursWorked || 0);
@@ -213,7 +198,7 @@ const MonthlyTSReport = () => {
     const activeProjects = Number(apiData.activeProjectsCount || 0);
     const leavesDays = Number(apiData.leavesAndHolidays?.totalLeavesDays || 0);
     const leavesHours = Number(
-      apiData.leavesAndHolidays?.totalLeavesHours || 0
+      apiData.leavesAndHolidays?.totalLeavesHours || 0,
     );
     const holidaysDays = Number(apiData.leavesAndHolidays?.totalHolidays || 0);
 
@@ -303,19 +288,19 @@ const MonthlyTSReport = () => {
     doc.text(
       `Non-Billable Hours: ${nonBillableHours.toFixed(2)}`,
       cardX + 6,
-      textY
+      textY,
     );
 
-// ------------- Divider (MUST COME AFTER ACTIVE PROJECTS) -------------
-textY += 6;
-doc.text(`Active Projects: ${activeProjects}`, cardX + 6, textY);
+    // ------------- Divider (MUST COME AFTER ACTIVE PROJECTS) -------------
+    textY += 6;
+    doc.text(`Active Projects: ${activeProjects}`, cardX + 6, textY);
 
-textY += 6;
-doc.text(
-  `Total Working Days: ${apiData.leavesAndHolidays?.totalWorkingDays || 0} days`,
-  cardX + 6,
-  textY
-);
+    textY += 6;
+    doc.text(
+      `Total Working Days: ${apiData.leavesAndHolidays?.totalWorkingDays || 0} days`,
+      cardX + 6,
+      textY,
+    );
 
     // Divider line
     const dividerY = textY + 4;
@@ -329,7 +314,7 @@ doc.text(
     doc.text(
       `Total Leaves: ${leavesDays} days (${leavesHours} hrs)`,
       cardX + 6,
-      bottomY
+      bottomY,
     );
 
     bottomY += 6;
@@ -444,7 +429,7 @@ doc.text(
       }
       if (week.startDate && week.endDate) {
         weekLabelParts.push(
-          `(${formatDate(week.startDate)} to ${formatDate(week.endDate)})`
+          `(${formatDate(week.startDate)} to ${formatDate(week.endDate)})`,
         );
       }
       const hoursPart = `— ${Number(week.totalHours || 0).toFixed(2)} hrs`;
@@ -472,7 +457,7 @@ doc.text(
         timesheets.some(
           (ts) =>
             ts.defaultHolidayTimesheet ||
-            (Array.isArray(ts.entries) && ts.entries.length > 0)
+            (Array.isArray(ts.entries) && ts.entries.length > 0),
         ) && Number(week.totalHours || 0) > 0;
 
       if (!hasEntries) {
@@ -503,9 +488,9 @@ doc.text(
             weeklyRows.push([
               formatDate(ts.workDate),
               getProjectName(e.projectId) ||
-                (e.projectId ? `Project ${e.projectId}` : ""),
+              (e.projectId ? `Project ${e.projectId}` : ""),
               getTaskName(e.projectId, e.taskId) ||
-                (e.taskId != null ? String(e.taskId) : ""),
+              (e.taskId != null ? String(e.taskId) : ""),
               formatDateTime(e.startTime || ""),
               formatDateTime(e.endTime || ""),
               Number(e.hoursWorked || 0).toFixed(2),
@@ -630,7 +615,7 @@ doc.text(
     doc.text(
       `Report generated on ${new Date().toISOString().slice(0, 10)}.`,
       notesX + 10,
-      y + notesHeight - 6
+      y + notesHeight - 6,
     );
 
     doc.save(`User_Monthly_Report_${monthLabel.replace(" ", "_")}.pdf`);
@@ -639,10 +624,7 @@ doc.text(
   const sendMailPDF = async () => {
     setMailLoading(true);
     try {
-      const res = await axios.get(`${TS_BASE_URL}/api/report/userMonthlyPdf`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+      const res = await api.get(`${TS_BASE_URL}/api/report/userMonthlyPdf`, {
         params: {
           month: month,
           year: year,
@@ -699,37 +681,23 @@ doc.text(
                       className="ml-15 report-filters"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <select
+                      <FilterListbox
+                        options={filteredMonths.map((m) => ({ value: m.value, label: m.name }))}
                         value={selectedMonth}
-                        onChange={(e) =>
-                          setSelectedMonth(Number(e.target.value))
-                        }
-                      >
-                        {filteredMonths.map((m) => (
-                          <option key={m.value} value={m.value}>
-                            {m.name}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setSelectedMonth}
+                      />
 
-                      <select
+                      <FilterListbox
+                        options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
                         value={selectedYear}
-                        onChange={(e) =>
-                          setSelectedYear(Number(e.target.value))
-                        }
-                      >
-                        {yearOptions.map((y) => (
-                          <option key={y} value={y}>
-                            {y}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setSelectedYear}
+                      />
 
-                      <button className="apply-btn" onClick={handleFilterApply}>
+                      <Button variant="primary" size="small" onClick={handleFilterApply}>
                         Apply
-                      </button>
+                      </Button>
                       <XCircle
-                        className="close-icon"
+                        className="text-red-600"
                         onClick={() => setIsFilterOpen(false)}
                       />
                     </div>
@@ -745,26 +713,30 @@ doc.text(
               </p>
               <p className="employee-name">Employee: {apiData.employeeName}</p>
             </div>
-            <div>
+            <div className="flex gap-2">
               <Button
-                className={`download-btn ${
-                  pdfLoading ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                // className={`download-btn ${
+                //   pdfLoading ? "opacity-50 cursor-not-allowed" : ""
+                // }`}
                 onClick={handleDownloadPDF}
                 variant="primary"
-                size="small"
+                size="medium"
                 disabled={pdfLoading}
+                loading={pdfLoading}
+                loadingText={pdfLoading ? "Downloading..." : ""}
               >
-                {pdfLoading ? "Downloading..." : "Download PDF Report"}
+                Download PDF Report
               </Button>
               <Button
                 variant="secondary"
-                size="small"
-                className={`ml-3 ${mailLoading ? "is-sending" : ""}`}
+                size="medium"
+                // className={`ml-3 ${mailLoading ? "is-sending" : ""}`}
                 onClick={sendMailPDF}
                 disabled={mailLoading}
+                loading={mailLoading}
+                loadingText={mailLoading ? "Sending..." : ""}
               >
-                {mailLoading ? "Sending..." : "Send Report via Email"}
+                Send Report via Email
               </Button>
             </div>
           </div>

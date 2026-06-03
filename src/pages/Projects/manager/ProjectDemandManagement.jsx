@@ -3,18 +3,65 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import DemandDetailPage from '../../resource_management/demand/pages/DemandDetailPage';
 import DemandKPIStrip from '../../resource_management/demand/components/DemandKPIStrip';
-import DemandList from '../../resource_management/demand/components/DemandList';
 import DemandFilters from '../../resource_management/demand/components/DemandFilters';
 import demandService from '../../resource_management/demand/services/demandService';
-import { Search, Filter, Plus, FilePlus, Layers, Calendar } from "lucide-react";
+import {
+    SearchIcon, FilterIcon, AddIcon, FileAddIcon, CalendarIcon,
+    ProjectsIcon, UserIcon, PendingIcon, EditIcon, DeleteIcon
+} from "@/components/icons";
 import { cn } from "@/lib/utils";
-import { toast } from "react-toastify";
-import { getProjectById, checkDemandCreation } from '../../resource_management/services/projectService';
+import { showStatusToast } from "../../../components/toastfy/toast";
+import { getProjectById, checkDemandCreation, updateDemandStatus } from '../../resource_management/services/projectService';
 import { getSkillCategoriesTree, getProficiencyLevels } from "../../resource_management/services/workforceService";
 import DemandModal from "../../resource_management/models/DemandModal";
+import DeleteDemandModal from "../../resource_management/demand/components/DeleteDemandModal";
 import AddDeliverableRoleModal from "../../resource_management/models/AddDeliverableRoleModal";
 import Pagination from '../../../components/Pagination/pagination';
+import Button from '../../../components/Button/Button';
+import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { useAuth } from "../../../contexts/AuthContext";
+import GenericTable from "../../../components/Table/table";
+import {
+    DemandTypeBadge,
+    PriorityBadge,
+    SLABadge,
+    StateBadge,
+} from "../../resource_management/demand/components/FormalBadges";
+import {
+    canProjectManagerEditDemand,
+    canProjectManagerMutateDemand,
+    PM_EDITABLE_DEMAND_MESSAGE,
+    PM_REQUESTED_DEMAND_ONLY_MESSAGE,
+} from '../../resource_management/demand/utils/demandPermissions';
+
+const normalizeRole = (role = "") =>
+    String(role)
+        .toUpperCase()
+        .replace(/^ROLE[-_]/, "")
+        .replace(/[^A-Z0-9]/g, "");
+
+const getDemandActionErrorMessage = (error, fallback) =>
+    error?.response?.data?.message ||
+    error?.message ||
+    fallback;
+
+const getDemandCommitment = (demand = {}) =>
+    String(
+        demand.demandCommitment ||
+        demand.commitment ||
+        demand.demand_commitment ||
+        ""
+    ).toUpperCase();
+
+const isSoftDemand = (demand) => getDemandCommitment(demand) === "SOFT";
+
+const getDemandType = (demand = {}) =>
+    demand.demandType ||
+    demand.type ||
+    demand.demand_type ||
+    demand.type_of_demand ||
+    "";
+
 
 const ProjectDemandManagement = ({ projectId, projectName }) => {
     const { user } = useAuth();
@@ -55,10 +102,93 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
     // Edit Modal State
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingDemand, setEditingDemand] = useState(null);
+    const [deletingDemand, setDeletingDemand] = useState(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+
+    const effectiveRole = useMemo(() => {
+        const roles = user?.roles || user?.role || [];
+        const roleList = Array.isArray(roles) ? roles : String(roles).split(",");
+        const matchedRole = roleList.find((role) =>
+            ["PROJECTMANAGER", "MANAGER", "DELIVERYMANAGER", "RESOURCEMANAGER"].includes(normalizeRole(role))
+        );
+
+        return matchedRole || "";
+    }, [user]);
 
     const handleEdit = (demand) => {
+        if (["PROJECTMANAGER", "MANAGER"].includes(normalizeRole(effectiveRole)) && !canProjectManagerEditDemand(demand)) {
+            showStatusToast(PM_EDITABLE_DEMAND_MESSAGE, "error");
+            return;
+        }
         setEditingDemand(demand);
         setEditModalOpen(true);
+    };
+
+    const applyDemandUpdate = useCallback((updatedDemand) => {
+        if (!updatedDemand) return;
+
+        const updatedId = updatedDemand.demandId || updatedDemand.id;
+        if (!updatedId) return;
+
+        setAllDemands((prev) => prev.map((demand) => {
+            const demandId = demand.demandId || demand.id;
+            if (String(demandId) !== String(updatedId)) return demand;
+
+            return {
+                ...demand,
+                ...updatedDemand,
+                demandId: updatedId,
+                demandName: updatedDemand.demandName || demand.demandName,
+                demandPriority: updatedDemand.demandPriority || updatedDemand.priority || demand.demandPriority,
+                priority: updatedDemand.priority || updatedDemand.demandPriority || demand.priority,
+                demandCommitment: updatedDemand.demandCommitment || updatedDemand.commitment || demand.demandCommitment,
+                demandStatus: updatedDemand.demandStatus || updatedDemand.lifecycleState || demand.demandStatus,
+                lifecycleState: updatedDemand.lifecycleState || updatedDemand.demandStatus || demand.lifecycleState,
+                demandType: updatedDemand.demandType || updatedDemand.type || updatedDemand.demand_type || updatedDemand.type_of_demand || demand.demandType,
+                type: updatedDemand.type || updatedDemand.demandType || demand.type,
+                demand_type: updatedDemand.demand_type || updatedDemand.demandType || demand.demand_type,
+                type_of_demand: updatedDemand.type_of_demand || updatedDemand.demandType || demand.type_of_demand,
+                deliveryModel: updatedDemand.deliveryModel || demand.deliveryModel,
+                deliveryRole: updatedDemand.deliveryRole || demand.deliveryRole,
+                allocationPercentage: updatedDemand.allocationPercentage ?? demand.allocationPercentage,
+                resourcesRequired: updatedDemand.resourcesRequired ?? updatedDemand.resourceRequired ?? demand.resourcesRequired,
+                resourceRequired: updatedDemand.resourceRequired ?? updatedDemand.resourcesRequired ?? demand.resourceRequired,
+                minExp: updatedDemand.minExp ?? updatedDemand.experience ?? demand.minExp,
+                experience: updatedDemand.experience ?? updatedDemand.minExp ?? demand.experience,
+                demandJustification: updatedDemand.demandJustification || updatedDemand.justification || demand.demandJustification,
+                justification: updatedDemand.justification || updatedDemand.demandJustification || demand.justification,
+            };
+        }));
+    }, []);
+
+    const handleDelete = (demand) => {
+        if (["PROJECTMANAGER", "MANAGER"].includes(normalizeRole(effectiveRole)) && !canProjectManagerMutateDemand(demand)) {
+            showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+            return;
+        }
+        setDeletingDemand(demand);
+    };
+
+    const handleDeleteRequestedDemand = async () => {
+        const id = deletingDemand?.demandId || deletingDemand?.id;
+        if (!id) return;
+
+        if (!canProjectManagerMutateDemand(deletingDemand)) {
+            showStatusToast(PM_REQUESTED_DEMAND_ONLY_MESSAGE, "error");
+            return;
+        }
+
+        setDeleteLoading(true);
+        try {
+            const response = await demandService.deleteDemandByPM(id, deletingDemand);
+            showStatusToast(response?.message || "Demand Deleted Successfully", "success");
+            setDeletingDemand(null);
+            await fetchContext();
+        } catch (error) {
+            showStatusToast(getDemandActionErrorMessage(error, "Failed To Delete Demand"), "error");
+        } finally {
+            setDeleteLoading(false);
+        }
     };
 
     // Pagination
@@ -86,7 +216,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
             setKpiData(kpis);
         } catch (err) {
             console.error("Failed to fetch project context", err);
-            toast.error("Failed to load project details for demand creation");
+            showStatusToast("Failed To Load Project Details For Demand Creation", "error");
         } finally {
             setLoadingProject(false);
         }
@@ -189,7 +319,12 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
     const handleViewDetail = (demand) => {
         const id = demand.id || demand.demandId;
         searchParams.set('demandId', id);
-        setSearchParams(searchParams, { state: { clientName: demand.clientName || demand.client } });
+        setSearchParams(searchParams, {
+            state: {
+                clientName: demand.clientName || demand.client,
+                demand,
+            }
+        });
     };
 
     const handleBackToList = () => {
@@ -206,8 +341,15 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
             ...d,
             id: d.demandId || d.id,
             client: d.clientName || d.client,
-            role: d.demandName || d.role,
+            role: d.deliveryRoleName || d.role,
+            demandName: d.demandName,
             priority: d.demandPriority || d.priority,
+            demandCommitment: d.demandCommitment || d.commitment || d.demand_commitment,
+            demandType: d.demandType || d.type || d.demand_type || d.type_of_demand,
+            type: d.type || d.demandType || d.demand_type || d.type_of_demand,
+            deliveryRole: d.deliveryRole,
+            resourcesRequired: d.resourcesRequired || d.resourceRequired || d.resource_required,
+            resourceRequired: d.resourceRequired || d.resourcesRequired || d.resource_required,
             slaDueAt: d.slaDueAt, // New field from response
             slaDays: d.remainingDays !== undefined ? d.remainingDays : d.slaDays,
             lifecycleState: d.demandStatus || d.lifecycleState,
@@ -220,17 +362,17 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
         if (!kpiData) return [];
 
         const total = kpiData.total || projectDemands.length;
-        const active = kpiData.active || projectDemands.filter(d => ['ACTIVE', 'OPEN', 'APPROVED'].includes(d.lifecycleState?.toUpperCase())).length;
+        const active = kpiData.active || projectDemands.filter(d => ['REQUESTED', 'APPROVED'].includes(d.lifecycleState?.toUpperCase())).length;
         const fulfilled = kpiData.fulfilled || projectDemands.filter(d => d.lifecycleState?.toUpperCase() === 'FULFILLED').length;
-        const soft = kpiData.soft || projectDemands.filter(d => ['SOFT', 'REQUESTED'].includes(d.lifecycleState?.toUpperCase())).length;
-        const pending = kpiData.pending || projectDemands.filter(d => d.lifecycleState?.toUpperCase() === 'PENDING').length;
+        const soft = projectDemands.filter(isSoftDemand).length;
+        const pending = kpiData.pending || projectDemands.filter(d => ['DRAFT', 'REQUESTED'].includes(d.lifecycleState?.toUpperCase())).length;
 
         if (total === 0 && kpiData) {
             return [
                 { label: "Total", count: kpiData.total || 0, color: "bg-slate-50 text-slate-600" },
                 { label: "Active", count: (kpiData.active || 0) + (kpiData.approved || 0), color: "bg-indigo-50 text-indigo-600" },
                 { label: "Fulfilled", count: kpiData.fulfilled || 0, color: "bg-emerald-50 text-emerald-600" },
-                { label: "Soft", count: kpiData.soft || 0, color: "bg-amber-50 text-amber-600" },
+                { label: "Soft", count: soft, color: "bg-amber-50 text-amber-600" },
                 { label: "Pending", count: kpiData.pending || 0, color: "bg-blue-50 text-blue-600" }
             ];
         }
@@ -276,14 +418,14 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
             );
         }
 
-        list = list.filter(d => !['CANCELLED', 'CLOSED'].includes(d.lifecycleState?.toUpperCase()));
+        list = list.filter(d => !['CANCELLED', 'REJECTED'].includes(d.lifecycleState?.toUpperCase()));
 
         if (activeTab === 'fulfilled') {
             list = list.filter(d => d.lifecycleState?.toUpperCase() === 'FULFILLED');
         } else if (activeTab === 'active') {
-            list = list.filter(d => ['ACTIVE', 'APPROVED', 'OPEN'].includes(d.lifecycleState?.toUpperCase()));
+            list = list.filter(d => ['REQUESTED', 'APPROVED'].includes(d.lifecycleState?.toUpperCase()));
         } else if (activeTab === 'soft') {
-            list = list.filter(d => ['SOFT', 'REQUESTED'].includes(d.lifecycleState?.toUpperCase()));
+            list = list.filter(isSoftDemand);
         }
 
         if (filters.client?.length > 0) {
@@ -344,11 +486,16 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
         });
     };
 
+    const selectedDemand = demandId
+        ? projectDemands.find((demand) => String(demand.id || demand.demandId) === String(demandId))
+        : null;
+
     if (demandId) {
         return (
             <DemandDetailPage
                 demandId={demandId}
                 onBack={handleBackToList}
+                initialDemand={selectedDemand}
             />
         );
     }
@@ -366,7 +513,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                                     <div className="flex items-center gap-2">
                                         <span className="h-3 w-[1px] bg-slate-300 mx-1" />
                                         <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100 shadow-sm">
-                                            <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                                            <CalendarIcon className="w-3.5 h-3.5 text-indigo-500" />
                                             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">
                                                 {new Date(project.startDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                 <span className="mx-1 text-slate-300">—</span>
@@ -379,28 +526,27 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <button
+                            <Button
                                 onClick={() => setDeliverableModalOpen(true)}
-                                className="flex items-center gap-2 bg-white border border-indigo-600 text-indigo-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-50 transition-all active:scale-[0.98] shadow-sm"
+                                variant="outline"
+                                size="small"
+                                className="!border-indigo-600 !text-indigo-600 hover:!bg-indigo-50 !rounded-xl !font-bold active:scale-[0.98]"
                             >
-                                <Plus className="w-3.5 h-3.5" />
+                                <AddIcon className="w-3.5 h-3.5" />
                                 Add Deliverable Role
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
                                 disabled={!demandResponse?.create || loadingDemand}
                                 onClick={() => setDemandModalOpen(true)}
                                 title={!demandResponse?.create ? demandResponse?.reason : ""}
-                                className={cn(
-                                    "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] shadow-sm",
-                                    demandResponse?.create
-                                        ? "bg-indigo-600 hover:bg-indigo-700"
-                                        : "bg-slate-300 cursor-not-allowed opacity-70"
-                                )}
+                                variant="primary"
+                                size="small"
+                                className="!bg-indigo-600 hover:!bg-indigo-700 !rounded-xl active:scale-[0.98]"
                             >
-                                <FilePlus className="w-3.5 h-3.5" />
+                                <FileAddIcon className="w-3.5 h-3.5" />
                                 Create Demand
-                            </button>
+                            </Button>
                         </div>
                     </div>
 
@@ -411,19 +557,19 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                             <h3 className="text-sm font-bold text-slate-900">
                                 Project Demand Pipeline
                             </h3>
-                            <span className="text-[11px] text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
-                                {totalElements} records
+                            <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                {totalElements} Records
                             </span>
                         </div>
 
                         <div className="flex items-center gap-3">
                             <div className="relative group">
-                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 group-focus-within:text-indigo-600 transition-colors" />
+                                <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 group-focus-within:text-indigo-600 transition-colors" />
                                 <input
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search project demands..."
+                                    placeholder="Search Project Demands..."
                                     className="w-72 pl-10 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 shadow-sm transition-all placeholder:text-slate-400"
                                 />
                             </div>
@@ -438,7 +584,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                                         : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
                                 )}
                             >
-                                <Filter className={cn("h-3.5 w-3.5", !filterCollapsed ? "text-white" : "text-slate-500")} />
+                                <FilterIcon className={cn("h-3.5 w-3.5", !filterCollapsed ? "text-white" : "text-slate-500")} />
                                 Filters
                                 {activeFilterCount > 0 && (
                                     <span className={cn(
@@ -452,67 +598,200 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-start gap-1 border-b -mx-4 px-4 pt-2">
-                        {[
-                            { id: 'all', label: 'All Demands' },
-                            { id: 'active', label: 'Active & Approved' },
-                            { id: 'fulfilled', label: 'Fulfilled' },
-                            { id: 'soft', label: 'Soft Demands' }
-                        ].map((tab) => {
-                            const isActive = activeTab === tab.id;
-                            return (
-                                <button
+                    <Tabs
+                        value={activeTab}
+                        onValueChange={setActiveTab}
+                        className="border-b -mx-4"
+                    >
+                        <TabsList className="!flex !h-auto !w-full !justify-start !bg-transparent !p-0 !pl-4 !rounded-none items-center gap-1">
+                            {[
+                                { id: 'all', label: 'All Demands' },
+                                { id: 'active', label: 'Active & Approved' },
+                                { id: 'fulfilled', label: 'Fulfilled' },
+                                { id: 'soft', label: 'Soft Demands' }
+                            ].map((tab, index) => (
+                                <TabsTrigger
                                     key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
+                                    value={tab.id}
                                     className={cn(
-                                        "px-6 py-3 text-xs font-bold transition-all border-b-2 relative -mb-px flex-shrink-0",
-                                        isActive
-                                            ? "text-indigo-600 border-indigo-600 bg-indigo-50/30"
-                                            : "text-slate-400 border-transparent hover:text-slate-700 hover:bg-slate-50/50"
+                                        "py-3 pr-6 text-xs font-bold transition-all border-b-2 relative -mb-px flex-shrink-0 !rounded-none !bg-transparent !shadow-none",
+                                        index === 0 ? "pl-0" : "pl-6",
+                                        "data-[state=active]:!text-indigo-600 data-[state=active]:!border-indigo-600 data-[state=active]:!bg-indigo-50/30",
+                                        "data-[state=inactive]:text-slate-400 data-[state=inactive]:border-transparent hover:text-slate-700 hover:!bg-slate-50/50"
                                     )}
                                 >
                                     {tab.label}
-                                </button>
-                            );
-                        })}
-                    </div>
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </Tabs>
                 </div>
             </div>
 
             {/* List Content Area */}
             <div className="p-0 relative">
-                <div className="grid grid-cols-10 items-center gap-4 px-6 py-3 bg-slate-50 border-b">
-                    <div className="col-span-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">Demand Specifications & Context</div>
-                    <div className="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left pl-2">Score</div>
-                    <div className="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Priority</div>
-                    <div className="col-span-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">SLA Compliance</div>
-                    <div className="col-span-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</div>
-                    <div className="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Actions</div>
-                </div>
-
                 <div className="flex flex-col">
-                    {paginatedDemands.length > 0 ? (
-                        <div className="flex flex-col">
-                            <DemandList
-                                demands={paginatedDemands}
-                                onViewDetail={handleViewDetail}
-                                onEdit={handleEdit}
-                                activeTab={activeTab}
+                    <div className="overflow-x-auto">
+                        <GenericTable
+                            headers={[
+                                "Demand Details",
+                                "Score",
+                                "Priority",
+                                "SLA Compliance",
+                                "Status",
+                                "Actions",
+                            ]}
+                            columns={[
+                                "demand_details",
+                                "score",
+                                "priority",
+                                "sla_compliance",
+                                "status",
+                                "actions",
+                            ]}
+                            loading={loadingProject}
+                            rows={paginatedDemands.map((demand) => {
+                                const status = String(demand.lifecycleState || demand.demandStatus || "").toUpperCase();
+                                const demandCommitment = getDemandCommitment(demand);
+                                const normalizedViewerRole = normalizeRole(effectiveRole);
+                                const isDMView = normalizedViewerRole === "DELIVERYMANAGER";
+                                const isPMView = normalizedViewerRole === "PROJECTMANAGER" || normalizedViewerRole === "MANAGER";
+                                const canPMEditDemand = isPMView && canProjectManagerEditDemand(demand);
+                                const canDeleteDemand = isPMView && canProjectManagerMutateDemand(demand);
+                                const isFulfilled = status === "FULFILLED";
+                                const isRejected = status === "REJECTED";
+                                const isEditDisabled =
+                                    isFulfilled ||
+                                    isRejected ||
+                                    (isDMView && status === "APPROVED") ||
+                                    (isPMView && !canPMEditDemand);
+
+                                return {
+                                    ...demand,
+                                    onRowClick: () => handleViewDetail(demand),
+                                    rowClass: "group cursor-pointer",
+                                    demand_details: (
+                                        <div className="flex flex-col gap-1 text-left px-2">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-[13px] font-bold text-slate-900 truncate tracking-tight group-hover:text-indigo-600 transition-colors">
+                                                    {demand.projectName || projectName}
+                                                </h3>
+                                                <div className="px-1.5 py-0.5 bg-slate-100 rounded text-[8px] font-black text-slate-500 tracking-tighter">
+                                                    ID: {String(demand.id || demand.demandId || "-").split("-")[0]}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="flex items-center gap-1 min-w-0">
+                                                    <ProjectsIcon className="h-3 w-3 text-slate-400" />
+                                                    <span className="text-[11px] font-semibold text-slate-500 truncate">
+                                                        {demand.client || "-"}
+                                                    </span>
+                                                </div>
+                                                <div className="h-2.5 w-[1px] bg-slate-200" />
+                                                <div className="flex items-center gap-1 min-w-0">
+                                                    <UserIcon className="h-3 w-3 text-slate-400" />
+                                                    <span className="text-[11px] text-slate-400 truncate">
+                                                        {demand.role || "-"}
+                                                    </span>
+                                                </div>
+                                                <DemandTypeBadge type={getDemandType(demand)} />
+                                            </div>
+                                        </div>
+                                    ),
+                                    score: (
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-base font-black text-slate-900 tracking-tighter leading-none">
+                                                {demand.priorityScore || 0}
+                                            </span>
+                                            <div className="text-[8px] font-bold text-slate-400 tracking-widest mt-0.5 uppercase">
+                                                Score
+                                            </div>
+                                        </div>
+                                    ),
+                                    priority: (
+                                        <div className="flex justify-center">
+                                            <PriorityBadge priority={demand.priority} />
+                                        </div>
+                                    ),
+                                    sla_compliance: (
+                                        <div className="flex justify-center w-full">
+                                            {(demand.demandSlaId || demand.slaId) ? (
+                                                <SLABadge
+                                                    days={demand.slaDays}
+                                                    isSoft={
+                                                        !demand.demandSlaId && (
+                                                            activeTab === "soft" ||
+                                                            demandCommitment === "SOFT" ||
+                                                            demand.lifecycleState?.toUpperCase() === "SOFT"
+                                                        )
+                                                    }
+                                                />
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-0.5 px-2 py-0.5 rounded-lg border min-w-[80px] bg-slate-50 border-slate-100 text-slate-400">
+                                                    <div className="flex items-center gap-1">
+                                                        <PendingIcon className="h-2 w-2 opacity-40" />
+                                                        <span className="text-[8px] font-black tracking-widest uppercase">SLA</span>
+                                                    </div>
+                                                    <span className="text-[11px] font-black">No SLA</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ),
+                                    status: (
+                                        <div className="flex justify-center">
+                                            <StateBadge state={demand.lifecycleState} />
+                                        </div>
+                                    ),
+                                    actions: (
+                                        <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                                type="button"
+                                                title={
+                                                    isFulfilled
+                                                        ? "Cannot edit fulfilled demand"
+                                                        : isRejected
+                                                            ? "Cannot edit rejected demand"
+                                                            : (isDMView && status === "APPROVED")
+                                                                ? "Cannot edit approved demand"
+                                                                : (isPMView && !canPMEditDemand)
+                                                                    ? PM_EDITABLE_DEMAND_MESSAGE
+                                                                    : "Edit Demand"
+                                                }
+                                                onClick={() => handleEdit(demand)}
+                                                disabled={isEditDisabled}
+                                                className={cn(
+                                                    "p-1.5 rounded-lg transition-colors",
+                                                    isEditDisabled
+                                                        ? "cursor-not-allowed text-slate-300"
+                                                        : "text-blue-600 hover:bg-blue-50"
+                                                )}
+                                            >
+                                                <EditIcon className="h-4 w-4" />
+                                            </button>
+                                            {canDeleteDemand && (
+                                                <button
+                                                    type="button"
+                                                    title="Delete Requested Demand"
+                                                    onClick={() => handleDelete(demand)}
+                                                    className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                                                >
+                                                    <DeleteIcon className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ),
+                                };
+                            })}
+                        />
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="py-6 border-t border-slate-100">
+                            <Pagination
+                                currentPage={page}
+                                totalPages={totalPages}
+                                onPrevious={() => setPage(p => Math.max(1, p - 1))}
+                                onNext={() => setPage(p => Math.min(totalPages, p + 1))}
                             />
-                            {totalPages > 1 && (
-                                <div className="py-6 border-t border-slate-100">
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={totalPages}
-                                        onPrevious={() => setPage(p => Math.max(1, p - 1))}
-                                        onNext={() => setPage(p => Math.min(totalPages, p + 1))}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="py-24 text-center">
-                            <p className="text-sm font-medium text-slate-400">No demands found for this project matching criteria.</p>
                         </div>
                     )}
                 </div>
@@ -569,10 +848,10 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                     open={demandModalOpen}
                     onClose={() => setDemandModalOpen(false)}
                     projectDetails={project}
-                    userRole={user?.roles?.map(r => r.toUpperCase().replace(/^ROLE[-_]/, "").replace(/_/g, "-")).find(r => ["RESOURCE-MANAGER", "DELIVERY-MANAGER", "PROJECT-MANAGER", "MANAGER"].includes(r)) || ""}
-                    onSuccess={() => {
+                    userRole={effectiveRole}
+                    onSuccess={async () => {
                         setDemandModalOpen(false);
-                        fetchContext(); // Reload data after creation
+                        await fetchContext(); // Reload data after creation
                     }}
                 />
             )}
@@ -586,10 +865,16 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                     }}
                     initialData={editingDemand}
                     mode="edit"
-                    userRole={user?.roles?.map(r => r.toUpperCase().replace(/^ROLE[-_]/, "").replace(/_/g, "-")).find(r => ["RESOURCE-MANAGER", "DELIVERY-MANAGER", "PROJECT-MANAGER", "MANAGER"].includes(r)) || ""}
-                    onSuccess={() => {
+                    userRole={effectiveRole}
+                    onSuccess={async (response, submittedDemand) => {
+                        const responseData = response?.data;
+                        const responseDemand = (responseData?.demandId || responseData?.id)
+                            ? responseData
+                            : response?.demand || response?.payload;
                         setEditModalOpen(false);
-                        fetchContext(); // Reload data after update
+                        setEditingDemand(null);
+                        await fetchContext(); // Reload data after update
+                        applyDemandUpdate(responseDemand || submittedDemand);
                     }}
                 />
             )}
@@ -599,6 +884,16 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                 onClose={() => setDeliverableModalOpen(false)}
                 categories={categories}
                 proficiencyLevels={proficiencyLevels}
+            />
+
+            <DeleteDemandModal
+                open={!!deletingDemand}
+                demand={deletingDemand}
+                loading={deleteLoading}
+                onClose={() => {
+                    if (!deleteLoading) setDeletingDemand(null);
+                }}
+                onSubmit={handleDeleteRequestedDemand}
             />
         </div>
     );

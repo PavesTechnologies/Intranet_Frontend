@@ -1,55 +1,18 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ConfirmationModal from "./ConfirmationModal";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-
+import Button from "../../../components/Button/Button";
 const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
   const [year, setYear] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
-  const queryClient = useQueryClient();
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+
+  // ❗ Hooks ABOVE return
 
   if (!isOpen) return null;
-
-  // 🔥 Mutation Function
-  const mutation = useMutation({
-    mutationFn: async (year) => {
-      const response = await axios.post(
-        `${BASE_URL}/api/leave-balance/process-carry-forwards/${year}`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-      return response.data;
-    },
-
-    // ✅ On Success → update UI + invalidate cache
-    onSuccess: (data) => {
-      if (data.success) {
-        toast.success(data.message);
-      } else {
-        toast.error(data.message);
-      }
-
-      // 🔥 VERY IMPORTANT: refresh cached data
-      queryClient.invalidateQueries(["leaveBalance"]);
-      queryClient.invalidateQueries(["leaveRequests"]);
-      queryClient.invalidateQueries(["dashboardStats"]);
-
-      setIsModalOpen(false);
-      onClose();
-      onSuccess();
-    },
-
-    onError: () => {
-      toast.error("Failed to process carry forward");
-    },
-  });
 
   const handleConfirmClick = () => {
     if (!year) {
@@ -59,12 +22,48 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
     setIsModalOpen(true);
   };
 
+  // useEffect(() => {
+  //   if (isModalOpen) {
+  //     document.body.style.overflow = "hidden";
+  //   } else {
+  //     document.body.style.overflow = "auto";
+  //   }
+  // }, [isModalOpen]);
+
   const handleCancel = () => {
     setIsModalOpen(false);
   };
 
-  const handleConfirm = () => {
-    mutation.mutate(year); // 🔥 trigger mutation
+  const handleConfirm = async () => {
+    setIsLoading(true);
+
+    try {
+      const response = await api.post(
+        `${BASE_URL}/api/leave-balance/process-carry-forwards/${year}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
+
+      const data = response.data;
+
+      if (data.success) {
+        toast.success(data.message);
+      } else {
+        toast.error(data.message);
+      }
+
+      setIsModalOpen(false);
+      onClose();
+      onSuccess(); // 🔥 parent will refresh data
+    } catch (err) {
+      toast.error("Failed to process carry forward");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -81,16 +80,13 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
         />
 
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 bg-gray-300 rounded">
+          <Button variant="secondary" onClick={onClose} size="medium">
             Close
-          </button>
+          </Button>
 
-          <button
-            onClick={handleConfirmClick}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
+          <Button onClick={handleConfirmClick} variant="primary" size="medium">
             Confirm
-          </button>
+          </Button>
         </div>
 
         <ConfirmationModal
@@ -99,7 +95,7 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
           message={`Are you sure you want to process carry forward for year ${year}?`}
           onConfirm={handleConfirm}
           onCancel={handleCancel}
-          isLoading={mutation.isPending} // ✅ from react query
+          isLoading={isLoading}
           confirmText="Process"
         />
       </div>

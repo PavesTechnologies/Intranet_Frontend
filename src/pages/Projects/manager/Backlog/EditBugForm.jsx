@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import { X } from "lucide-react";
+import api from "../../../../api/axiosInstance";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import Modal from "../../../../components/Modal/modal";
+import Button from "../../../../components/Button/Button";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
@@ -33,25 +34,25 @@ const EditBugForm = ({ bugId, projectId, onClose, onUpdated }) => {
       try {
         const [bugRes, membersRes, sprintsRes, epicsRes, tasksRes] =
           await Promise.all([
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/bugs/${bugId}`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/bugs/${bugId}`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/tasks`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
+              axiosConfig,
             ),
           ]);
 
@@ -82,7 +83,7 @@ const EditBugForm = ({ bugId, projectId, onClose, onUpdated }) => {
         setTasks(tasksRes.data || []);
       } catch (error) {
         console.error("Error loading bug data:", error);
-        toast.error("❌ Failed to load bug details.");
+        showStatusToast("Failed to load bug details.", "error");
       } finally {
         setLoading(false);
       }
@@ -96,7 +97,13 @@ const EditBugForm = ({ bugId, projectId, onClose, onUpdated }) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: ["assignedTo", "reporter", "sprintId", "epicId", "taskId"].includes(name)
+      [name]: [
+        "assignedTo",
+        "reporter",
+        "sprintId",
+        "epicId",
+        "taskId",
+      ].includes(name)
         ? value
           ? Number(value)
           : null
@@ -116,55 +123,29 @@ const EditBugForm = ({ bugId, projectId, onClose, onUpdated }) => {
 
     try {
       setLoading(true);
-      await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/bugs/${bugId}`,
+      await api.put(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/bugs/${bugId}`,
         payload,
-        axiosConfig
+        axiosConfig,
       );
-      toast.success("✅ Bug updated successfully!");
+      showStatusToast("Bug updated successfully!", "success");
       setTimeout(() => {
         onUpdated?.();
         onClose?.();
       }, 1000);
     } catch (error) {
       console.error("Error updating bug:", error.response || error);
-      toast.error(error.response?.data?.message || "❌ Failed to update bug.");
+      showStatusToast(error.response?.data?.message || "Failed to update bug.", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading)
-    return <p className="text-gray-600 text-center">Loading bug details...</p>;
+  if (loading) return <LoadingSpinner size="md" text="Loading bug details..." />;
 
   // 🟩 Render
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="w-full max-w-3xl bg-white p-8 rounded-2xl shadow-2xl relative max-h-[85vh] overflow-y-auto scrollbar-hide">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
-        >
-          <X size={20} />
-        </button>
-
-        {/* Toast notifications */}
-        <ToastContainer
-          position="top-right"
-          autoClose={2000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          pauseOnHover
-          draggable
-          theme="colored"
-        />
-
-        <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">
-          Edit Bug
-        </h2>
-
+    <Modal isOpen={true} onClose={onClose} title="Edit Bug" className="max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-6">
           <FormInput
             label="Title *"
@@ -316,16 +297,11 @@ const EditBugForm = ({ bugId, projectId, onClose, onUpdated }) => {
             onChange={handleChange}
           />
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
-          >
+          <Button variant="primary" type="submit" disabled={loading} className="w-full">
             {loading ? "Updating..." : "Update Bug"}
-          </button>
+          </Button>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

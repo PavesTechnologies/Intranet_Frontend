@@ -1,7 +1,7 @@
 // src/pages/Profile.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { useAuth } from "../../../contexts/AuthContext";
 import Button from "../../../components/Button/Button"; // ✅ global Button
 
@@ -11,17 +11,16 @@ export default function Profile() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
 
-    if (token) {
-      axios
+    if (localStorage.getItem("token")) {
+      api
         .get(
-          `${import.meta.env.VITE_USER_MANAGEMENT_URL}/general_user/profile`,
+          `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/general_user/profile`,
           {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-          }
+          },
         )
         .then((res) => {
           setProfile(res.data);

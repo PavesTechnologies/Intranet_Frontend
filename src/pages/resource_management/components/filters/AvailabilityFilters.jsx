@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Filter, X, ChevronDown, Check } from "lucide-react";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
@@ -67,7 +67,7 @@ function SearchableDropdown({ label, value, options, onChange, placeholder }) {
   }, [isOpen]);
 
   const filteredOptions = options.filter((opt) =>
-    opt.toLowerCase().includes(search.toLowerCase())
+    opt != null && opt.toLowerCase().includes((search || "").toLowerCase())
   );
 
   const handleSelect = (option) => {
@@ -83,7 +83,7 @@ function SearchableDropdown({ label, value, options, onChange, placeholder }) {
       </label>
       <div className="relative" ref={inputRef}>
         <Input
-          value={search}
+          value={search || ""}
           onChange={(e) => {
             setSearch(e.target.value);
             setIsOpen(true);
@@ -188,7 +188,7 @@ export function FilterPanel({
       setFiltersRes(res.data);
     } catch (err) {
       console.error("Failed to load filters", err);
-      toast.error(err.response?.data?.message || "Failed to load filters");
+      notify.error(err, "Failed to load filters");
     } finally {
       setLoadingFilters(false);
     }
@@ -275,7 +275,7 @@ export function FilterPanel({
 
         <div>
           <label className="text-[10px] font-heading font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">
-            Experience: {filters.experienceRange[0]}+ yrs
+            Experience: {filters.experienceRange[0]}{">"} yrs
           </label>
           <Slider
             value={[filters.experienceRange[0]]}
@@ -291,7 +291,7 @@ export function FilterPanel({
 
         <div>
           <label className="text-[10px] font-heading font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">
-            Allocation: {filters.allocationPercentage}+ %
+            Allocation: {filters.allocationPercentage}{"<"} %
           </label>
           <Slider
             value={[filters.allocationPercentage]}
@@ -313,7 +313,7 @@ export function FilterPanel({
           onChange={(value) => onFiltersChange({ ...filters, project: value })}
         />
 
-        <SearchableDropdown
+        {/* <SearchableDropdown
           label="Employment Type"
           value={filters.employmentType}
           options={EMPLOYMENT_TYPES}
@@ -321,7 +321,7 @@ export function FilterPanel({
           onChange={(value) =>
             onFiltersChange({ ...filters, employmentType: value })
           }
-        />
+        /> */}
 
         <div className="grid grid-cols-2 gap-2">
           <div>

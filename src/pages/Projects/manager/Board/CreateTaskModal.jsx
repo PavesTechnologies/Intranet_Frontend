@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
+import api from "../../../../api/axiosInstance";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Button from "../../../../components/Button/Button";
+import Modal from "../../../../components/Modal/modal";
+import FormDatePicker from "../../../../components/forms/FormDatePicker";
+
 
 export const CreateTaskModal = ({
   open,
@@ -11,29 +15,33 @@ export const CreateTaskModal = ({
 }) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     if (open) {
       setTitle("");
       setDescription("");
+      setStartDate("");
+      setDueDate("");
     }
   }, [open]);
-
-  if (!open) return null;
 
   const handleCreate = async (e) => {
     e?.preventDefault();
 
     if (!title.trim()) {
-      toast.error("Title required");
+      showStatusToast("Title required", "error");
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE}/api/tasks`,
         {
           title: title.trim(),
@@ -47,62 +55,58 @@ export const CreateTaskModal = ({
       );
 
       onCreated(res.data);
-      toast.success("Task created");
+      showStatusToast("Task created", "success");
       onClose();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to create task");
+      showStatusToast("Failed to create task", "error");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-lg w-full max-w-lg p-5">
-        <h3 className="text-lg font-semibold mb-3">Create Task</h3>
+    <Modal isOpen={open} onClose={onClose} title="Create Task">
+      <form onSubmit={handleCreate}>
+        <label className="block mb-3">
+          <div className="text-sm font-medium">Title</div>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="mt-1 block w-full border rounded px-3 py-2"
+            placeholder="Enter task title"
+          />
+        </label>
 
-        <form onSubmit={handleCreate}>
-          <label className="block mb-3">
-            <div className="text-sm font-medium">Title</div>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 block w-full border rounded px-3 py-2"
-              placeholder="Enter task title"
-            />
-          </label>
+        <label className="block mb-3">
+          <div className="text-sm font-medium">Description</div>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="mt-1 block w-full border rounded px-3 py-2"
+            rows={4}
+            placeholder="Enter description"
+          />
+        </label>
+        <FormDatePicker label="Start Date" name="startDate" value={startDate} onChange={setStartDate} min={today} />
 
-          <label className="block mb-3">
-            <div className="text-sm font-medium">Description</div>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="mt-1 block w-full border rounded px-3 py-2"
-              rows={4}
-              placeholder="Enter description"
-            />
-          </label>
+        <FormDatePicker label="Due Date" name="dueDate" value={dueDate} onChange={setDueDate} min={today} />
 
-          <div className="flex justify-end gap-2 mt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-2 rounded border"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-4 py-2 rounded bg-indigo-600 text-white"
-            >
-              {submitting ? "Creating..." : "Create"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button type="button" variant="outline" size="small" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="small"
+            loading={submitting}
+            loadingText="Creating..."
+          >
+            Create
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 };

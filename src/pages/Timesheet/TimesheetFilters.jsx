@@ -2,6 +2,7 @@ import React from "react";
 
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import FilterListbox from "../../components/filter/FilterListbox";
 
 const TimesheetFilters = ({
   searchText,
@@ -13,6 +14,22 @@ const TimesheetFilters = ({
   filterStatus,
   setFilterStatus,
 }) => {
+  const today = new Date();
+  const currentMonthStart = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    1,
+  );
+  const currentMonthEnd = new Date(
+    today.getFullYear(),
+    today.getMonth() + 1,
+    0,
+  );
+
+  const isCurrentMonthDate = (date) =>
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth();
+
   const handleDateChange = (update) => {
     const [start, end] = update;
     setFilterStartDate(start ? start.toLocaleDateString("en-CA") : "");
@@ -102,11 +119,16 @@ const TimesheetFilters = ({
           startDate={filterStartDate ? new Date(filterStartDate) : null}
           endDate={filterEndDate ? new Date(filterEndDate) : null}
           onChange={handleDateChange}
+          minDate={currentMonthStart}
+          maxDate={currentMonthEnd}
+          filterDate={isCurrentMonthDate}
+          openToDate={today}
           isClearable
           placeholderText="Select date range"
           dateFormat="yyyy-MM-dd"
           className="date-range-input"
           wrapperClassName="date-range-wrapper"
+          calendarClassName="timesheet-range-datepicker"
           style={{
             border: "none",
             fontSize: 15,
@@ -116,23 +138,18 @@ const TimesheetFilters = ({
         />
       </div>
 
-      <select
-        value={filterStatus}
-        onChange={(e) => setFilterStatus(e.target.value)}
-        style={{
-          border: "1px solid #d0d6de",
-          borderRadius: 4,
-          padding: "8px 10px",
-          fontSize: 15,
-          background: "#f9fafb",
-        }}
-      >
-        <option>All Status</option>
-        {/* <option value={"Pending"}>Pending</option> */}
-        <option value={"Submitted"}>Submitted</option>
-        <option value={"Approved"}>Approved</option>
-        <option value={"Rejected"}>Rejected</option>
-      </select>
+      <div className="w-44">
+        <FilterListbox
+          options={[
+            { value: "All Status", label: "All Status" },
+            { value: "Submitted", label: "Submitted" },
+            { value: "Approved", label: "Approved" },
+            { value: "Rejected", label: "Rejected" },
+          ]}
+          value={filterStatus}
+          onChange={setFilterStatus}
+        />
+      </div>
     </div>
   );
 };

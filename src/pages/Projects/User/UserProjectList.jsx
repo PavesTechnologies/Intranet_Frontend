@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import {
   ChevronDown,
   ChevronRight,
@@ -10,9 +10,12 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { showStatusToast } from "../../../components/toastfy/toast";
+import SearchInput from "../../../components/filter/Searchbar";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 const ProjectList = () => {
   const [projects, setProjects] = useState([]);
@@ -25,6 +28,8 @@ const ProjectList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [projectsPerPage] = useState(5);
+  const [deleteProjectConfirmOpen, setDeleteProjectConfirmOpen] = useState(false);
+  const [projectIdToDelete, setProjectIdToDelete] = useState(null);
 
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
@@ -33,9 +38,9 @@ const ProjectList = () => {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      const res = await api.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       const data = Array.isArray(res.data) ? res.data : res.data.content || [];
       setProjects(data);
@@ -47,12 +52,12 @@ const ProjectList = () => {
   };
 
   // Fetch all users
-  
+
   const fetchUsers = async () => {
     try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/users?page=0&size=100`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      const res = await api.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/users?page=0&size=100`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       const data = Array.isArray(res.data) ? res.data : res.data.content || [];
       setUsers(data);
@@ -97,9 +102,9 @@ const ProjectList = () => {
     const { name, value } = e.target;
 
     if (formData.status === "ARCHIVED" && name !== "status") {
-      toast.warn(
+      showStatusToast(
         "Archived projects can only have their status changed to ACTIVE.",
-        { position: "top-right" }
+        "warn",
       );
       return;
     }
@@ -113,9 +118,9 @@ const ProjectList = () => {
 
   const handleMemberToggle = (userId) => {
     if (formData.status === "ARCHIVED") {
-      toast.warn(
+      showStatusToast(
         "Archived projects can only have their status changed to ACTIVE.",
-        { position: "top-right" }
+        "warn",
       );
       return;
     }
@@ -130,16 +135,16 @@ const ProjectList = () => {
   const submitEdit = async (projectId) => {
     try {
       setIsSubmitting(true);
-      await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`,
+      await api.put(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
         {
           ...formData,
           ownerId: formData.ownerId ? parseInt(formData.ownerId) : null,
           memberIds: formData.memberIds || [],
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success("Project updated successfully!", { position: "top-right" });
+      showStatusToast("Project updated successfully!", "success");
       setEditingProjectId(null);
       fetchProjects();
     } catch (err) {
@@ -149,24 +154,31 @@ const ProjectList = () => {
     }
   };
 
-  const handleDelete = async (projectId) => {
-    if (!window.confirm("Are you sure you want to delete this project?")) return;
+  const handleDelete = (projectId) => {
+    setProjectIdToDelete(projectId);
+    setDeleteProjectConfirmOpen(true);
+  };
+
+  const executeDeleteProject = async () => {
     try {
-      await axios.delete(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      await api.delete(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectIdToDelete}`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success("Project deleted successfully!", { position: "top-right" });
+      showStatusToast("Project deleted successfully!", "success");
       fetchProjects();
     } catch (err) {
       console.error("Failed to delete project", err);
+    } finally {
+      setDeleteProjectConfirmOpen(false);
+      setProjectIdToDelete(null);
     }
   };
 
   const filteredProjects = projects.filter(
     (p) =>
       p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.projectKey?.toLowerCase().includes(searchTerm.toLowerCase())
+      p.projectKey?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   // Pagination
@@ -174,26 +186,34 @@ const ProjectList = () => {
   const indexOfFirstProject = indexOfLastProject - projectsPerPage;
   const currentProjects = filteredProjects.slice(
     indexOfFirstProject,
-    indexOfLastProject
+    indexOfLastProject,
   );
   const totalPages = Math.ceil(filteredProjects.length / projectsPerPage);
 
   return (
+    <>
+    <ConfirmationModal
+      isOpen={deleteProjectConfirmOpen}
+      title="Delete Project"
+      message="Are you sure you want to delete this project? This action cannot be undone."
+      onConfirm={executeDeleteProject}
+      onCancel={() => { setDeleteProjectConfirmOpen(false); setProjectIdToDelete(null); }}
+      confirmText="Delete"
+      variant="danger"
+    />
     <div className="p-6 bg-gray-50 min-h-screen">
       <h1 className="text-2xl font-bold text-black mb-6">Projects</h1>
 
       <div className="flex justify-between items-center mb-6">
-        <input
-          type="text"
-          placeholder="Search by name or key"
-          className="border px-3 py-2 rounded-xl"
+        <SearchInput
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search by name or key"
         />
       </div>
 
       {loading ? (
-        <p className="text-gray-600">Loading projects...</p>
+        <LoadingSpinner size="md" text="Loading projects..." />
       ) : currentProjects.length === 0 ? (
         <p className="text-gray-600">No projects found.</p>
       ) : (
@@ -205,7 +225,11 @@ const ProjectList = () => {
                 onClick={() => toggleExpand(project.id)}
               >
                 <div className="flex items-center gap-2">
-                  {expandedId === project.id ? <ChevronDown /> : <ChevronRight />}
+                  {expandedId === project.id ? (
+                    <ChevronDown />
+                  ) : (
+                    <ChevronRight />
+                  )}
                   <h2 className="text-xl font-semibold">{project.name}</h2>
                   <span className="text-gray-500 text-sm">
                     ({project.projectKey})
@@ -265,30 +289,23 @@ const ProjectList = () => {
                         placeholder="Project Description"
                         disabled={formData.status === "ARCHIVED"}
                       />
-                      <select
-                        name="status"
+                      <FilterListbox
+                        options={[
+                          { value: "ACTIVE", label: "ACTIVE" },
+                          { value: "PLANNING", label: "PLANNING" },
+                          { value: "ARCHIVED", label: "ARCHIVED" },
+                        ]}
                         value={formData.status || ""}
-                        onChange={handleStatusChange}
-                        className="w-full border px-3 py-2 rounded-xl"
-                      >
-                        <option value="ACTIVE">ACTIVE</option>
-                        <option value="PLANNING">PLANNING</option>
-                        <option value="ARCHIVED">ARCHIVED</option>
-                      </select>
-                      <select
-                        name="ownerId"
+                        onChange={(val) => handleStatusChange({ target: { value: val } })}
+                      />
+                      <FilterListbox
+                        options={[
+                          { value: "", label: "Select Owner" },
+                          ...users.map((u) => ({ value: u.id, label: `${u.name} (${u.role})` })),
+                        ]}
                         value={formData.ownerId || ""}
-                        onChange={handleInputChange}
-                        className="w-full border px-3 py-2 rounded-xl"
-                        disabled={formData.status === "ARCHIVED"}
-                      >
-                        <option value="">Select Owner</option>
-                        {users.map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.name} ({u.role})
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => handleInputChange({ target: { name: "ownerId", value: val } })}
+                      />
                       <div className="grid grid-cols-2 gap-2">
                         {users.map((user) => (
                           <label
@@ -369,12 +386,14 @@ const ProjectList = () => {
           currentPage={currentPage}
           totalPages={totalPages}
           onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          onNext={() =>
+            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+          }
         />
       )}
 
-      <ToastContainer position="top-right" />
     </div>
+    </>
   );
 };
 

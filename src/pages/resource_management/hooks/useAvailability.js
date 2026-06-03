@@ -19,6 +19,27 @@ export const defaultFilters = {
   endDate: null,
 };
 
+const normalizeTimelineResponse = (response) => {
+  const pageData = response?.data ?? response;
+  const contentSource = Array.isArray(pageData)
+    ? pageData
+    : Array.isArray(pageData?.content)
+      ? pageData.content
+      : Array.isArray(pageData?.data)
+        ? pageData.data
+        : Array.isArray(pageData?.data?.content)
+          ? pageData.data.content
+          : [];
+
+  const paginationSource = pageData?.data?.content ? pageData.data : pageData;
+
+  return {
+    resources: contentSource,
+    totalPages: paginationSource?.totalPages ?? 1,
+    totalElements: paginationSource?.totalElements ?? contentSource.length,
+  };
+};
+
 export function useAvailability() {
   const [filters, setFilters] = useState(defaultFilters);
   const [statusFilter, setStatusFilter] = useState(null);
@@ -48,7 +69,7 @@ export function useAvailability() {
     try {
       const payload = {
         page: page - 1,
-        size: 10,
+        size: 8,
       };
 
       // If no explicit date filters are set, pass the current view month as window
@@ -69,20 +90,72 @@ export function useAvailability() {
       }
       const response = await getAvailabilityTimeline(currentFilters, payload);
 
-      if (response && response.data) {
-        const mappedData = response.data.map((r) => ({
-          ...r,
-          id: r.resourceId,
-          status: computeStatus(r.currentAllocation || 0),
-          availableFrom:
-            r.availableFrom || new Date().toISOString().split("T")[0],
-          currentProject: Array.isArray(r.currentProject)
-            ? r.currentProject.join(", ")
-            : r.currentProject,
-        }));
-        setFilteredResources(mappedData);
-        setTotalPages(response.totalPages);
-        setTotalElements(response.totalElements);
+      if (response) {
+        const {
+          resources,
+          totalPages: responseTotalPages,
+          totalElements: responseTotalElements,
+        } = normalizeTimelineResponse(response);
+        const todayStr = new Date().toLocaleDateString("en-CA");
+        const mappedData = resources.map((r) => {
+          const timeline = r.allocationTimeline || r.allocations || [];
+          let currentAllocation = 0;
+          let currentProjects = [];
+
+          timeline.forEach((block) => {
+            if (
+              todayStr >= block.startDate &&
+              todayStr <= block.endDate &&
+              !block.tentative &&
+              block.status !== "ROLLED_OFF"
+            ) {
+              currentAllocation += block.allocation;
+              if (block.project) currentProjects.push(block.project);
+            }
+          });
+
+          // Trust timeline for current state if available, else fallback to backend fields
+          const finalAllocation = timeline.length > 0 ? currentAllocation : (r.currentAllocation || 0);
+          const finalProject = timeline.length > 0
+            ? (currentProjects.length > 0 ? [...new Set(currentProjects)].join(", ") : "Bench")
+            : (Array.isArray(r.currentProject) ? r.currentProject.join(", ") : (r.currentProject || "Bench"));
+
+          const resourceId = r.resourceId || r.employeeId || r.userId || r.id;
+
+          return {
+            ...r,
+            id: resourceId,
+            resourceId,
+            employeeId: r.employeeId || resourceId,
+            currentAllocation: finalAllocation,
+            status: computeStatus(finalAllocation),
+            availableFrom: r.availableFrom || todayStr,
+            currentProject: finalProject,
+          };
+        }).filter((r) => {
+          // If filtering by project, ensure the resource actually has an active allocation to that project today
+          if (filters.project && filters.project !== "All Projects") {
+            const timeline = r.allocationTimeline || r.allocations || [];
+            return timeline.some(block => 
+              block.project === filters.project && 
+              todayStr >= block.startDate && 
+              todayStr <= block.endDate && 
+              !block.tentative
+            );
+          }
+          return true;
+        });
+
+        const visibleData = mappedData.filter((r) => {
+          // Exclude resources with ROLLED_OFF allocationStatus or FULFILLED roleOffStatus
+          const allocStatus = String(r.allocationStatus || r.status || "").toUpperCase();
+          const roStatus = String(r.roleOffStatus || "").toUpperCase();
+          return allocStatus !== "ROLLED_OFF" && roStatus !== "FULFILLED";
+        });
+
+        setFilteredResources(visibleData);
+        setTotalPages(responseTotalPages);
+        setTotalElements(responseTotalElements);
       }
     } catch (error) {
       console.error("Failed to fetch timeline data", error);

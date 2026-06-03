@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
+import api from "../../../../api/axiosInstance" ;
+import Button from "../../../../components/Button/Button";
+import Modal from "../../../../components/Modal/modal";
 
 export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
   const [name, setName] = useState("");
@@ -8,8 +9,7 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const token = localStorage.getItem("token");
-  const BASE_URL = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
+  const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   useEffect(() => {
     if (editData) {
@@ -21,7 +21,7 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("Identity name is required");
+      if (window.showError) window.showError("Identity name is required");
       return;
     }
 
@@ -32,85 +32,103 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
         identity_type_name: name.trim(),
         description: description?.trim() || "",
         is_active: Boolean(isActive),
-        identity_type_uuid: editData?.identity_type_uuid, // Keep UUID for updates
+        identity_type_uuid: editData?.identity_type_uuid,
       };
 
       let savedItem;
 
       if (editData) {
-        await axios.put(`${BASE_URL}/identity/${editData.identity_type_uuid}`, payload, {
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        });
-        toast.success("Identity type updated");
+        await api.put(
+          `${BASE_URL}/identity/${editData.identity_type_uuid}`,
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+        if (window.showSuccess) window.showSuccess("Identity type updated");
         savedItem = payload;
       } else {
-        const res = await axios.post(`${BASE_URL}/identity`, payload, {
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        const res = await api.post(`${BASE_URL}/identity`, payload, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
         });
-        toast.success("Identity type created");
-        savedItem = { ...payload, identity_type_uuid: res.data.identity_type_uuid || crypto.randomUUID() };
+        if (window.showSuccess) window.showSuccess("Identity type created");
+        savedItem = {
+          ...payload,
+          identity_type_uuid:
+            res.data.identity_type_uuid || crypto.randomUUID(),
+        };
       }
 
-      onSuccess(savedItem); // ✅ Update table immediately
+      onSuccess(savedItem);
       onClose();
     } catch (error) {
       console.error("Save identity failed:", error.response?.data);
-      toast.error(error.response?.data?.detail || "Failed to save identity type");
+      if (window.showError) window.showError(
+        error.response?.data?.detail || "Failed to save identity type",
+      );
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
-        <h2 className="text-xl font-semibold mb-4">
-          {editData ? "Edit Identity Type" : "Add Identity Type"}
-        </h2>
-
-        <label className="block text-sm font-medium mb-1">Identity Name</label>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 mb-3"
-        />
-
-        <label className="block text-sm font-medium mb-1">Description</label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 mb-3"
-        />
-
-        <label className="flex items-center gap-2 mb-4">
-          <input type="checkbox" checked={isActive} onChange={() => setIsActive(!isActive)} />
-          Active
-        </label>
-
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-2 py-2 bg-gray-200 rounded-lg transition-all duration-100 ease-in-out
-            active:translate-y-[1px]
-            disabled:opacity-60 disabled:cursor-not-allowed
-            flex items-center justify-center gap-2"
-          >
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={editData ? "Edit Identity Type" : "Add Identity Type"}
+      size="md"
+      footer={
+        <div className="flex justify-end gap-3 w-full">
+          <Button onClick={onClose} variant="outline" disabled={saving}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSave}
+            variant="primary"
             disabled={saving || !name.trim()}
-            className={`px-4 py-2 rounded-lg text-white transition-all duration-100 ease-in-out
-            active:translate-y-[1px]
-            disabled:opacity-60 disabled:cursor-not-allowed
-            flex items-center justify-center gap-2 ${
-              saving || !name.trim() ? "bg-gray-400" : "bg-blue-700 hover:bg-blue-800"
-            }`}
+            loading={saving}
           >
-            {saving ? "Saving..." : "Save"}
-          </button>
+            Save
+          </Button>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Identity Name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            rows={3}
+          />
+        </div>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isActive}
+            onChange={() => setIsActive(!isActive)}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="text-sm font-medium text-gray-700">Active</span>
+        </label>
       </div>
-    </div>
+    </Modal>
   );
 }

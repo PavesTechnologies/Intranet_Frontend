@@ -5,7 +5,6 @@ export default function ProfileForm({
   form,
   handleChange,
   isGenerated,
-  isEditMode,
 }) {
   return (
     <div className="grid grid-cols-2 gap-4">
@@ -34,21 +33,20 @@ export default function ProfileForm({
         name="empFirstName"
         value={form.empFirstName || ""}
         onChange={handleChange}
-        disabled={isEditMode}
       />
       <FormInput
         label="Middle Name"
         name="empMiddleName"
         value={form.empMiddleName || ""}
         onChange={handleChange}
-        disabled={isEditMode}
+        
       />
       <FormInput
         label="Last Name"
         name="empLastName"
         value={form.empLastName || ""}
         onChange={handleChange}
-        disabled={isEditMode}
+        
       />
       <FormInput
         label="Date of Birth"
@@ -56,7 +54,6 @@ export default function ProfileForm({
         name="empDob"
         value={form.empDob || ""}
         onChange={handleChange}
-        disabled={isEditMode}
       />
       <FormSelect
         label="Gender"
@@ -70,13 +67,14 @@ export default function ProfileForm({
         name="contact"
         value={form.contact || ""}
         onChange={handleChange}
+        
       />
       <FormInput
         label="Blood Group"
         name="bloodGroup"
         value={form.bloodGroup || ""}
         onChange={handleChange}
-        disabled={isEditMode}
+
       />
       <FormSelect
         label="Marital Status"

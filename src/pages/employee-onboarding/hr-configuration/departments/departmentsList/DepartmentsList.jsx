@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { toast } from "react-toastify";
+import api from "../../../../../api/axiosInstance";
+import Button from "../../../../../components/Button/Button";
+import GenericTable from "../../../../../components/Table/table";
+import Modal from "../../../../../components/Modal/modal";
+import { PageCard } from "../../../../../components/Cards/PageCard";
 
 export default function DepartmentManagement() {
   const [departments, setDepartments] = useState([]);
@@ -7,72 +11,82 @@ export default function DepartmentManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState(null);
 
-  const BASE = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
+  const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   /* -------------------- FETCH -------------------- */
- const fetchDepartments = async () => {
-  try {
-    setLoading(true);
+  const fetchDepartments = async () => {
+    try {
+      setLoading(true);
 
-    const res = await fetch(`${BASE}/masters/departments/`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
+      const res = await api.get(`${BASE}/masters/departments/`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-    if (!res.ok) {
-      throw new Error("Failed to fetch departments");
+      setDepartments(res.data);
+    } catch (error) {
+      if (window.showError) window.showError("Failed to load departments");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const data = await res.json();
-    setDepartments(data);
-
-  } catch (error) {
-    toast.error("Failed to load departments");
-  } finally {
-    setLoading(false);
-  }
-};
-
-useEffect(() => {
-  fetchDepartments();
-}, []);
+  useEffect(() => {
+    fetchDepartments();
+  }, []);
   /* -------------------- DELETE -------------------- */
   const deleteDepartment = async (uuid) => {
-  if (!window.confirm("Delete department?")) return;
+    if (!window.confirm("Delete department?")) return;
 
-  try {
-    const res = await fetch(`${BASE}/masters/departments/${uuid}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    try {
+      await api.delete(`${BASE}/masters/departments/${uuid}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-    if (!res.ok) {
-      throw new Error("Delete failed");
+      setDepartments((prev) => prev.filter((d) => d.department_uuid !== uuid));
+
+      if (window.showSuccess) window.showSuccess("Department deleted");
+    } catch (error) {
+      if (window.showError) window.showError("Failed to delete department");
     }
+  };
 
-    setDepartments((prev) =>
-      prev.filter((d) => d.department_uuid !== uuid)
-    );
-
-    toast.success("Department deleted");
-
-  } catch (error) {
-    toast.error("Failed to delete department");
-  }
-};
+  const tableHeaders = ["Department Name", "Description", "Action"];
+  const tableColumns = ["department_name", "description", "actions"];
+  const tableRows = departments.map((d) => ({
+    department_name: d.department_name,
+    description: d.description || "—",
+    actions: (
+      <div className="flex justify-center items-center gap-4">
+        <Button
+          variant="link"
+          size="small"
+          onClick={() => {
+            setEditData(d);
+            setShowModal(true);
+          }}
+        >
+          Edit
+        </Button>
+        <Button
+          variant="link"
+          size="small"
+          className="!text-red-600 hover:!underline"
+          onClick={() => deleteDepartment(d.department_uuid)}
+        >
+          Delete
+        </Button>
+      </div>
+    ),
+  }));
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">
             Department Management
@@ -83,103 +97,26 @@ useEffect(() => {
           </p>
         </div>
 
-        <button
+        <Button
           onClick={() => {
             setEditData(null);
             setShowModal(true);
           }}
-          className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg"
+          variant="primary"
         >
           + Add Department
-        </button>
-
+        </Button>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-
-        {loading ? (
-          <div className="p-6 text-center text-gray-600">
-            Loading departments...
-          </div>
-        ) : (
-          <table className="w-full border-collapse">
-
-            <thead className="bg-blue-900 text-white">
-              <tr>
-                <th className="px-6 py-3 text-center">
-                  Department Name
-                </th>
-
-                <th className="px-6 py-3 text-center">
-                  Description
-                </th>
-
-                <th className="px-6 py-3 text-center">
-                  Action
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-
-              {departments.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan="4"
-                    className="px-6 py-6 text-center text-gray-500"
-                  >
-                    No departments found
-                  </td>
-                </tr>
-              ) : (
-                departments.map((d) => (
-                  <tr
-                    key={d.department_uuid}
-                    className="border-b hover:bg-gray-50"
-                  >
-                    <td className="px-6 py-3">
-                      {d.department_name}
-                    </td>
-
-                    <td className="px-6 py-3">
-                      {d.description || "—"}
-                    </td>
-
-
-                    <td className="px-6 py-3 text-center space-x-4">
-
-                      <button
-                        className="text-blue-700 hover:underline"
-                        onClick={() => {
-                          setEditData(d);
-                          setShowModal(true);
-                        }}
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        className="text-red-600 hover:underline"
-                        onClick={() =>
-                          deleteDepartment(d.department_uuid)
-                        }
-                      >
-                        Delete
-                      </button>
-
-                    </td>
-
-                  </tr>
-                ))
-              )}
-
-            </tbody>
-
-          </table>
-        )}
-
-      </div>
+      <PageCard>
+        <GenericTable
+          headers={tableHeaders}
+          columns={tableColumns}
+          rows={tableRows}
+          loading={loading}
+        />
+      </PageCard>
 
       {/* Modal */}
       {showModal && (
@@ -187,25 +124,22 @@ useEffect(() => {
           editData={editData}
           onClose={() => setShowModal(false)}
           onSuccess={(savedDept) => {
-
             setDepartments((prev) => {
               const exists = prev.some(
-                (d) => d.department_uuid === savedDept.department_uuid
+                (d) => d.department_uuid === savedDept.department_uuid,
               );
 
               return exists
                 ? prev.map((d) =>
                     d.department_uuid === savedDept.department_uuid
                       ? savedDept
-                      : d
+                      : d,
                   )
                 : [savedDept, ...prev];
             });
-
           }}
         />
       )}
-
     </div>
   );
 }
@@ -213,28 +147,19 @@ useEffect(() => {
 /* ======================== MODAL ======================== */
 
 function DepartmentModal({ editData, onClose, onSuccess }) {
+  const [name, setName] = useState(editData?.department_name || "");
 
-  const [name, setName] = useState(
-    editData?.department_name || ""
-  );
+  const [desc, setDesc] = useState(editData?.description || "");
 
-  const [desc, setDesc] = useState(
-    editData?.description || ""
-  );
-
-  const [isActive, setIsActive] = useState(
-    editData?.is_active ?? true
-  );
+  const [isActive, setIsActive] = useState(editData?.is_active ?? true);
 
   const [saving, setSaving] = useState(false);
 
-  const BASE = import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL;
-  const token = localStorage.getItem("token");
+  const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
   const save = async () => {
-
     if (!name.trim()) {
-      toast.error("Department name is required");
+      if (window.showError) window.showError("Department name is required");
       return;
     }
 
@@ -249,116 +174,81 @@ function DepartmentModal({ editData, onClose, onSuccess }) {
 
       let res;
 
-      if (editData) {
-
-         res = await fetch(
-        `${BASE}/masters/departments/${editData.department_uuid}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      } else {
-
-       res = await fetch(`${BASE}/masters/departments/`, {
-        method: "POST",
+      const authHeaders = {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify(payload),
-      });
+      };
+
+      if (editData) {
+        res = await api.put(
+          `${BASE}/masters/departments/${editData.department_uuid}`,
+          payload,
+          authHeaders,
+        );
+      } else {
+        res = await api.post(`${BASE}/masters/departments/`, payload, authHeaders);
       }
 
-      if (!res.ok) {
-        throw new Error("Failed to save department");
-      }
+      const data = res.data;
 
-      const data = await res.json();
-
-      toast.success(
-        `Department ${
-          editData ? "updated" : "created"
-        } successfully`
+      if (window.showSuccess) window.showSuccess(
+        `Department ${editData ? "updated" : "created"} successfully`,
       );
 
       onSuccess({
-        department_uuid:
-          editData?.department_uuid || crypto.randomUUID(),
+        department_uuid: editData?.department_uuid || crypto.randomUUID(),
         ...payload,
       });
 
       onClose();
-
     } catch {
-      toast.error("Failed to save department");
+      if (window.showError) window.showError("Failed to save department");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
-
-        <h2 className="text-xl font-semibold mb-4">
-          {editData ? "Edit" : "Add"} Department
-        </h2>
-
-        <label className="block text-sm font-medium mb-1">
-          Department Name
-        </label>
-
-        <input
-          className="w-full border rounded-lg px-3 py-2 mb-3"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-
-        <label className="block text-sm font-medium mb-1">
-          Description
-        </label>
-
-        <textarea
-          className="w-full border rounded-lg px-3 py-2 mb-3"
-          value={desc}
-          onChange={(e) => setDesc(e.target.value)}
-        />
-
-       
-
-        <div className="flex justify-end gap-3">
-
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 bg-gray-200 rounded-lg transition-all duration-100 ease-in-out
-            active:translate-y-[1px]
-            disabled:opacity-60 disabled:cursor-not-allowed"
-          >
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={`${editData ? "Edit" : "Add"} Department`}
+      size="md"
+      footer={
+        <div className="flex justify-end gap-3 w-full">
+          <Button onClick={onClose} variant="outline" disabled={saving}>
             Cancel
-          </button>
-
-          <button
+          </Button>
+          <Button
             onClick={save}
+            variant="primary"
             disabled={saving}
-            className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-all duration-100 ease-in-out
-            active:translate-y-[1px]
-            disabled:opacity-60 disabled:cursor-not-allowed"
+            loading={saving}
           >
-            {saving ? "Saving..." : "Save"}
-          </button>
-
+            Save
+          </Button>
         </div>
+      }
+    >
+      <label className="block text-sm font-medium mb-1">
+        Department Name
+      </label>
 
-      </div>
+      <input
+        className="w-full border rounded-lg px-3 py-2 mb-3"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
 
-    </div>
+      <label className="block text-sm font-medium mb-1">Description</label>
+
+      <textarea
+        className="w-full border rounded-lg px-3 py-2"
+        value={desc}
+        onChange={(e) => setDesc(e.target.value)}
+      />
+    </Modal>
   );
 }

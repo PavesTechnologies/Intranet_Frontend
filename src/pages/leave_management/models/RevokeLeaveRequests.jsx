@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-const RMS_BASE_URL = import.meta.env.VITE_RMS_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 const formatted = new Date().toISOString().slice(0, 7);
 
 const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
@@ -13,7 +14,7 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
 
   const handleResourceCalculate = async (resourceId) => {
     try {
-      const res = axios.post(
+      const res = api.post(
         `${RMS_BASE_URL}/api/availability/recalculate/resource/${resourceId}`,
         {},
         {
@@ -33,25 +34,27 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
 
   const handleApprove = async (leaveId, employeeId, year) => {
     setLoading(true);
+
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE_URL}/api/leave-revoke/approve/${leaveId}`,
         {
-          payload:{
-            employeeId: employeeId,
-            year: year
-          }
-        },
+          employeeId: employeeId,
+          year: year,
+        }, // ✅ correct body
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         },
       );
+
       toast.success(
         res?.data?.message || "Leave request revoked successfully.",
       );
+
       if (onActionSuccess) onActionSuccess();
+
       handleResourceCalculate(employeeId);
     } catch (err) {
       toast.error(
@@ -65,13 +68,13 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
   const handleReject = async (leaveId, employeeId, year) => {
     try {
       setLoading(true);
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE_URL}/api/leave-revoke/reject/${leaveId}`,
         {
           payload: {
             employeeId: employeeId,
-            year: year
-          }
+            year: year,
+          },
         },
         {
           headers: {
@@ -91,6 +94,14 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
   // useEffect(() => {
   //   if (managerId) fetchCompOffs();
   // }, [managerId]);
+
+  // ✅ When employee submits a new revoke → manager's list refreshes
+    useLeaveWebSocket(
+        "manager-update",
+        ["REVOKE_REQUESTED"],   // employee filed a revoke → show it in manager's list
+        onActionSuccess         // this already calls fetchRevokeRequests in AdminPanel
+    );
+
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500 mb-6">
@@ -138,11 +149,14 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
                   </td>
                   <td className="p-3">
                     {req.days <= 1 ? `${req.days} Day` : `${req.days} Days`}
+                    {console.log("Days requested:", req)}
                   </td>
                   <td className="p-3">{req.reason}</td>
                   <td className="p-3 flex justify-center gap-2">
                     <button
-                      onClick={() => handleApprove(req.revokeId, req.employeeId, req.year)}
+                      onClick={() =>
+                        handleApprove(req.revokeId, req.employeeId, req.year)
+                      }
                       className="p-1 pr-2 text-green-600 hover:text-green-800 transition-colors"
                       title="Approve"
                       disabled={loading}
@@ -150,7 +164,9 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
                       <Check className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleReject(req.revokeId, req.employeeId, req.year)}
+                      onClick={() =>
+                        handleReject(req.revokeId, req.employeeId, req.year)
+                      }
                       className="p-1 pl-4 text-red-600 hover:text-red-800 transition-colors"
                       title="Reject"
                       disabled={loading}

@@ -1,5 +1,5 @@
 import React from "react";
-import { Layers3, Loader2 } from "lucide-react";
+import { LayersIcon, SpinnerIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 
 const BulkActionBar = ({ count, title, description, actions = [], onClear }) => {
@@ -9,7 +9,7 @@ const BulkActionBar = ({ count, title, description, actions = [], onClear }) => 
     <div className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-white text-blue-700 shadow-sm">
-          <Layers3 className="h-4 w-4" />
+          <LayersIcon className="h-4 w-4" />
         </div>
         <div>
           <p className="text-sm font-semibold text-[#081534]">
@@ -36,7 +36,7 @@ const BulkActionBar = ({ count, title, description, actions = [], onClear }) => 
             disabled={action.disabled}
             className={action.className || "h-9 bg-[#081534] text-xs hover:bg-[#10214f]"}
           >
-            {action.loading ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+            {action.loading ? <SpinnerIcon className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
             {action.label}
           </Button>
         ))}

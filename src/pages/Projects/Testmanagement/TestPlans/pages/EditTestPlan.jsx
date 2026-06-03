@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
+import api from "../../../../../api/axiosInstance";
+import { showStatusToast } from "../../../../../components/toastfy/toast";
 import { X } from "lucide-react";
 
 import FormInput from "../../../../../components/forms/FormInput";
 import FormTextArea from "../../../../../components/forms/FormTextArea";
+import Button from "../../../../../components/Button/Button";
 
 // Wrapper component
 const Wrapper = ({ mode, onClose, children }) => {
@@ -12,10 +13,7 @@ const Wrapper = ({ mode, onClose, children }) => {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         {/* Overlay */}
-        <div
-          className="absolute inset-0 bg-black/50"
-          onClick={onClose}
-        />
+        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
         {/* Modal content */}
         <div
@@ -28,14 +26,16 @@ const Wrapper = ({ mode, onClose, children }) => {
     );
   }
 
-  return (
-    <div className="w-full h-full flex flex-col bg-white">
-      {children}
-    </div>
-  );
+  return <div className="w-full h-full flex flex-col bg-white">{children}</div>;
 };
 
-const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" }) => {
+const EditTestPlan = ({
+  projectId,
+  planId,
+  onClose,
+  onSuccess,
+  mode = "modal",
+}) => {
   const token = localStorage.getItem("token");
 
   const [formData, setFormData] = useState({
@@ -51,9 +51,9 @@ const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" })
 
     const fetchPlan = async () => {
       try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/plans/${planId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const response = await api.get(
+          `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/${planId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         const plan = response.data;
@@ -64,7 +64,7 @@ const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" })
         });
       } catch (err) {
         console.error(err);
-        toast.error("Failed to load test plan details");
+        showStatusToast("Failed to load test plan details", "error");
       } finally {
         setInitialLoading(false);
       }
@@ -84,7 +84,7 @@ const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" })
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      toast.error("Test Plan Name is required.");
+      showStatusToast("Test Plan Name is required.", "error");
       return;
     }
 
@@ -97,23 +97,23 @@ const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" })
     };
 
     try {
-      await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/plans/update/${planId}`,
+      await api.put(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/plans/update/${planId}`,
         payload,
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
-      toast.success("Test Plan updated successfully");
+      showStatusToast("Test Plan updated successfully", "success");
       onSuccess?.();
       onClose?.();
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || "Failed to update Test Plan");
+      showStatusToast(err.response?.data?.message || "Failed to update Test Plan", "error");
     } finally {
       setLoading(false);
     }
@@ -160,23 +160,9 @@ const EditTestPlan = ({ projectId, planId, onClose, onSuccess, mode = "modal" })
 
         {/* FOOTER */}
         <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
-          >
-            Cancel
-          </button>
+          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className={`px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 ${
-              loading ? "opacity-60" : ""
-            }`}
-          >
-            {loading ? "Updating..." : "Update Plan"}
-          </button>
+          <Button variant="primary" type="submit" disabled={loading} loading={loading} loadingText="Updating...">Update Plan</Button>
         </div>
       </form>
     </Wrapper>

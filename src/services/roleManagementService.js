@@ -1,22 +1,6 @@
-import axios from "axios";
+import api from "../api/axiosInstance";
 
-// Create axios instance with base configuration
-const axiosInstance = axios.create({
-  baseURL: `${import.meta.env.VITE_USER_MANAGEMENT_URL}`,
-  timeout: 10000,
-});
-
-// Request interceptor to add auth token
-axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+const axiosInstance = api;
 
 const ROLE_URL = "/admin/roles";
 
@@ -56,7 +40,8 @@ export const removeAccessPointFromRole = (roleId, accessId) =>
   axiosInstance.delete(`${ROLE_URL}/${roleId}/access-points/${accessId}`);
 // export const getAllAccessPoints = () =>
 //   axiosInstance.get(`${ROLE_URL}/access-points/all`);
-export const removePermissionGroupsFromRole = (roleId,groupIds) =>{
+export const removePermissionGroupsFromRole = (roleId, groupIds) => {
   axiosInstance.post(`${ROLE_URL}/uuid/${roleId}/groups/remove`, {
     group_uuids: groupIds,
-  })};
+  });
+};

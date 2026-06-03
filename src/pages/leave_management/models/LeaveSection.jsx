@@ -1,13 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import LeaveDashboard from "../charts/LeaveDashboard";
 import ProjectMembersOnLeave from "./ProjectMembersOnLeave";
 import { YearDropdown } from "./EmployeeLeaveBalances";
 
-export default function LeaveSection({ employeeId, leaveId }) {
+export default function LeaveSection({ employeeId, leaveId, onClose }) {
   const [activeTab, setActiveTab] = useState("dashboard"); // "dashboard" or "projectMembers"
   console.log("leave section", employeeId, leaveId);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+
+  useEffect(() => {
+    if (!onClose) return;
+    document.body.style.overflow = "hidden";
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handler);
+    };
+  }, [onClose]);
+
 
   return (
     <div className="w-full">

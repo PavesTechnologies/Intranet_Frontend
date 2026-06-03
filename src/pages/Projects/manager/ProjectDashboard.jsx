@@ -1,101 +1,410 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import CreateProjectModal from "./CreateProjectModal";
 import Button from "../../../components/Button/Button";
 import Pagination from "../../../components/Pagination/pagination";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import { MoreVertical } from "lucide-react";
+import { showStatusToast } from "../../../components/toastfy/toast";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
+import {
+  SuccessIcon,
+  WarningIcon,
+  ErrorIcon,
+  CalendarIcon,
+  TargetIcon,
+  EditIcon,
+  DeleteIcon,
+  EmployeeIcon,
+  LeaveIcon,
+  AddIcon,
+  ViewIcon,
+} from "../../../components/icons";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import FilterListbox from "../../../components/filter/FilterListbox";
+import SearchInput from "../../../components/filter/Searchbar";
+import StatusBadge from "../../../components/status/statusbadge";
+import AppCard from "../../../components/Cards/AppCard";
 
-// -------------------- 3 DOTS MENU --------------------
-const ProjectMenu = ({ project, onEdit, onDelete }) => {
-  const [open, setOpen] = useState(false);
 
+// -------------------- INLINE ICON ACTIONS --------------------
+const ProjectMenu = ({ project, onView, onEdit, onDelete, canEdit }) => (
+  <div className="flex items-center gap-1">
+    <button
+      title="View Details"
+      onClick={(e) => { e.stopPropagation(); onView(project.project); }}
+      className="p-1 rounded hover:bg-indigo-50 transition-colors"
+    >
+      <ViewIcon size={15} className="text-indigo-500" />
+    </button>
+
+    {canEdit && (
+      <>
+        <button
+          title="Edit"
+          onClick={(e) => { e.stopPropagation(); onEdit(project.project); }}
+          className="p-1 rounded hover:bg-blue-50 transition-colors"
+        >
+          <EditIcon size={15} className="text-blue-500" />
+        </button>
+        <button
+          title="Delete"
+          onClick={(e) => { e.stopPropagation(); onDelete(project.project.id); }}
+          className="p-1 rounded hover:bg-red-50 transition-colors"
+        >
+          <DeleteIcon size={15} className="text-red-500" />
+        </button>
+      </>
+    )}
+  </div>
+);
+
+// -------------------- PROJECT DETAIL DRAWER --------------------
+const DetailRow = ({ label, value }) => (
+  value ? (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{label}</span>
+      <span className="text-sm text-slate-700 break-words">{value}</span>
+    </div>
+  ) : null
+);
+
+// helpers for the drawer
+const getInitials = (name) => {
+  if (!name) return "?";
+  return name.trim().split(/\s+/).map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+};
+
+const AVATAR_COLORS = [
+  "bg-indigo-100 text-indigo-700",
+  "bg-violet-100 text-violet-700",
+  "bg-blue-100 text-blue-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-amber-100 text-amber-700",
+  "bg-rose-100 text-rose-700",
+  "bg-teal-100 text-teal-700",
+];
+const avatarColor = (str) => AVATAR_COLORS[(str?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length];
+
+const PersonRow = ({ role, name, email, subtitle }) => {
+  if (!name) return null;
   return (
-    <div className="absolute top-3 right-3">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((prev) => !prev);
-        }}
-        className="p-1 rounded-full hover:bg-gray-100"
-      >
-        <MoreVertical className="h-5 w-5 text-gray-600" />
-      </button>
-
-      {open && (
-        <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(project.project);
-              setOpen(false);
-            }}
-            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-          >
-            Edit
-          </button>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(project.project.id);
-              setOpen(false);
-            }}
-            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-          >
-            Delete
-          </button>
-        </div>
+    <div className="flex items-center gap-3 py-2.5 border-b border-slate-50 last:border-0">
+      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(name)}`}>
+        {getInitials(name)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-slate-800 truncate">{name}</p>
+        <p className="text-xs text-slate-400 truncate">{email || subtitle || ""}</p>
+      </div>
+      {role && (
+        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded shrink-0">
+          {role}
+        </span>
       )}
     </div>
   );
 };
 
+const SectionTitle = ({ children }) => (
+  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{children}</p>
+);
+
+const ProjectDetailDrawer = ({ projectId, onClose, navigate, getStatusStyles, formatDate, formatCurrency, canSeeFinancials }) => {
+  const [detail,  setDetail]  = useState(null);
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!projectId) return;
+    const token   = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+    const base    = window.__APP_CONFIG__.PMS_BASE_URL;
+
+    Promise.all([
+      axios.get(`${base}/api/projects/${projectId}`,                    { headers }),
+      axios.get(`${base}/api/projects/${projectId}/members-with-owner`, { headers }),
+    ])
+      .then(([projRes, membersRes]) => {
+        setDetail(projRes.data);
+        setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
+      })
+      .catch(() => showStatusToast("Failed to load project details.", "error"))
+      .finally(() => setLoading(false));
+  }, [projectId]);
+
+  const p = detail;
+
+  // resolve people from project fields (nested objects) or from members list by role
+  const resolveName = (obj) =>
+    obj?.name ?? (obj?.firstName ? `${obj.firstName} ${obj.lastName ?? ""}`.trim() : null);
+
+  const projectOwner    = resolveName(p?.owner    ?? p?.projectOwner);
+  const ownerEmail      = p?.owner?.email    ?? p?.projectOwner?.email;
+  const resourceManager = resolveName(p?.resourceManager ?? p?.rm);
+  const rmEmail         = p?.resourceManager?.email ?? p?.rm?.email;
+  const deliveryManager = resolveName(p?.deliveryOwner ?? p?.deliveryManager ?? p?.deliveryOwnerId);
+  const dmEmail         = p?.deliveryOwner?.email ?? p?.deliveryManager?.email;
+  const clientName      = p?.client?.clientName ?? p?.clientName ?? p?.client?.name;
+  const clientEmail     = p?.client?.email ?? p?.clientEmail;
+
+  // team members (exclude already-shown key roles to avoid duplication)
+  const keyIds = new Set([
+    p?.owner?.id, p?.projectOwner?.id,
+    p?.resourceManager?.id, p?.rm?.id,
+    p?.deliveryOwner?.id, p?.deliveryManager?.id,
+  ].filter(Boolean));
+
+  const teamMembers = members.filter((m) => !keyIds.has(m.id) && !keyIds.has(m.userId));
+
+  const CloseIcon = () => (
+    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+    </svg>
+  );
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+
+      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white z-50 shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
+          <div>
+            <h2 className="text-base font-semibold text-slate-800">Project Details</h2>
+            {p && <p className="text-xs text-slate-400 font-mono mt-0.5">{p.projectKey}</p>}
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+            <CloseIcon />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="p-5"><LoadingSpinner text="Loading details..." /></div>
+          ) : !p ? (
+            <p className="p-5 text-sm text-slate-400">No data available.</p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+
+              {/* ── Identity ── */}
+              <div className="px-5 py-4 space-y-3">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 leading-tight">{p.name}</h3>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.status && (
+                    <span className={`px-2.5 py-0.5 text-[11px] font-bold uppercase rounded-full border ${getStatusStyles(p.status)}`}>
+                      {p.status.replace(/_/g, " ")}
+                    </span>
+                  )}
+                  {p.riskLevel && (
+                    <span className={`px-2.5 py-0.5 text-[11px] font-bold uppercase rounded-full border ${
+                      p.riskLevel === "HIGH"   ? "bg-red-50 text-red-700 border-red-200" :
+                      p.riskLevel === "MEDIUM" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                                "bg-teal-50 text-teal-700 border-teal-200"}`}>
+                      {p.riskLevel} Risk
+                    </span>
+                  )}
+                  {(p.priority ?? p.priorityLevel) && (
+                    <span className="px-2.5 py-0.5 text-[11px] font-bold uppercase rounded-full border bg-violet-50 text-violet-700 border-violet-200">
+                      {p.priority ?? p.priorityLevel}
+                    </span>
+                  )}
+                </div>
+                {p.description && (
+                  <p className="text-sm text-slate-500 leading-relaxed whitespace-pre-wrap">{p.description}</p>
+                )}
+              </div>
+
+              {/* ── Timeline & Delivery ── */}
+              <div className="px-5 py-4">
+                <SectionTitle>Timeline & Delivery</SectionTitle>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 mt-2">
+                  <DetailRow label="Start Date"   value={formatDate(p.startDate)} />
+                  <DetailRow label="End Date"     value={formatDate(p.endDate)} />
+                  <DetailRow label="Stage"        value={p.currentStage?.replace(/_/g, " ")} />
+                  <DetailRow label="Methodology"  value={p.deliveryModel ?? p.methodology} />
+                  <DetailRow label="Location"     value={p.primaryLocation} />
+                  <DetailRow label="Created"      value={formatDate(p.createdAt)} />
+                </div>
+              </div>
+
+              {/* ── Key People ── */}
+              <div className="px-5 py-4">
+                <SectionTitle>Key People</SectionTitle>
+                <div className="mt-1">
+                  <PersonRow role="Project Owner"     name={projectOwner}    email={ownerEmail} />
+                  <PersonRow role="Resource Manager"  name={resourceManager} email={rmEmail} />
+                  <PersonRow role="Delivery Manager"  name={deliveryManager} email={dmEmail} />
+                  {clientName && (
+                    <PersonRow role="Client" name={clientName} email={clientEmail} />
+                  )}
+                  {!projectOwner && !resourceManager && !deliveryManager && !clientName && (
+                    <p className="text-xs text-slate-400 italic py-1">No key people data available.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Team Members ── */}
+              {members.length > 0 && (
+                <div className="px-5 py-4">
+                  <SectionTitle>Team Members ({members.length})</SectionTitle>
+                  <div className="mt-1">
+                    {members.map((m, i) => {
+                      const name  = resolveName(m) ?? m.email ?? `Member ${i + 1}`;
+                      const email = m.email;
+                      const role  = m.role ?? m.designation ?? m.projectRole ?? m.memberRole;
+                      return <PersonRow key={m.id ?? m.userId ?? i} name={name} email={email} role={role} />;
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Client Details ── */}
+              {(clientName || p.organizationName || clientEmail) && (
+                <div className="px-5 py-4">
+                  <SectionTitle>Client</SectionTitle>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 mt-2">
+                    <DetailRow label="Client Name"   value={clientName} />
+                    <DetailRow label="Organization"  value={p.organizationName} />
+                    <DetailRow label="Client Email"  value={clientEmail} />
+                  </div>
+                </div>
+              )}
+
+              {/* ── Budget (managers only) ── */}
+              {canSeeFinancials && (p.projectBudget != null || p.projectBudgetCurrency) && (
+                <div className="px-5 py-4">
+                  <SectionTitle>Budget</SectionTitle>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 mt-2">
+                    <DetailRow label="Amount"      value={formatCurrency(p.projectBudget, p.projectBudgetCurrency)} />
+                    <DetailRow label="Currency"    value={p.projectBudgetCurrency} />
+                    <DetailRow label="Budget Type" value={p.projectBudgetType} />
+                  </div>
+                </div>
+              )}
+
+              {/* ── Tags ── */}
+              {p.tags?.length > 0 && (
+                <div className="px-5 py-4">
+                  <SectionTitle>Tags</SectionTitle>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {p.tags.map((tag) => (
+                      <span key={tag} className="px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {p && (
+          <div className="px-5 py-4 border-t border-slate-200 shrink-0">
+            <button
+              onClick={() => { navigate(`/projects/${p.id}`); onClose(); }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors"
+            >
+              Open Project
+              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
 // ------------------ MAIN COMPONENT ------------------
 const ProjectDashboard = () => {
-  const [projects,         setProjects]         = useState([]);
+  const [projects, setProjects] = useState([]);
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
-  const [loading,          setLoading]          = useState(true);
-  const [searchTerm,       setSearchTerm]       = useState("");
-  const [filterStatus,     setFilterStatus]     = useState("All");
-  const [currentPage,      setCurrentPage]      = useState(1);
-  const [projectsPerPage]                       = useState(6);
-  const [roleFilter,       setRoleFilter]       = useState("ALL");
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [projectsPerPage] = useState(6);
+  const [roleFilter, setRoleFilter] = useState("ALL");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [projectIdToDelete, setProjectIdToDelete] = useState(null);
+  const [viewingProjectId, setViewingProjectId]   = useState(null);
 
   const { user } = useAuth();
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
-  const userRole = user?.roles?.includes("Manager")
+  const userRole = user?.roles?.includes("Project_Manager")
     ? "MANAGER"
     : user?.roles?.includes("Admin")
-    ? "ADMIN"
-    : "EMPLOYEE";
+      ? "ADMIN"
+      : user?.roles?.includes("General")
+        ? "GENERAL"
+        : "EMPLOYEE";
 
   const canManageProjects = userRole === "MANAGER" || userRole === "ADMIN";
+  const canmywork = userRole === "EMPLOYEE" || userRole === "GENERAL";
+  const canSeeFinancials = userRole === "MANAGER" || userRole === "ADMIN";
+
+  // ------------------- HELPERS -------------------
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "TBD";
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const getStatusStyles = (status) => {
+    switch (status) {
+      case "ACTIVE":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "APPROVED":
+        return "bg-indigo-50 text-indigo-700 border-indigo-200";
+      case "ARCHIVED":
+        return "bg-slate-50 text-slate-700 border-slate-200";
+      case "PLANNING":
+        return "bg-blue-50 text-blue-700 border-blue-200";
+      case "COMPLETED":
+        return "bg-gray-50 text-gray-700 border-gray-200";
+      default:
+        return "bg-gray-50 text-gray-700 border-gray-200";
+    }
+  };
+
+  const formatCurrency = (amount, currency) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency || "USD",
+      maximumFractionDigits: 0,
+    }).format(amount || 0);
+  };
 
   // ------------------- FETCH PROJECTS -------------------
   const fetchProjects = async (status) => {
     setLoading(true);
     try {
-      const base = import.meta.env.VITE_PMS_BASE_URL;
+      const base = window.__APP_CONFIG__.PMS_BASE_URL;
       const headers = { Authorization: `Bearer ${token}` };
 
       let url = `${base}/api/projects/my-projects`;
       if (status && status !== "All") url += `?status=${status}`;
 
-      const { data } = await axios.get(url, { headers });
+      const { data } = await api.get(url, { headers });
       setProjects(data);
     } catch (error) {
       console.error("❌ Failed to load projects", error);
-      toast.error("Failed to load projects.");
+      showStatusToast("Failed to load projects.", "error");
     } finally {
       setLoading(false);
     }
@@ -110,42 +419,26 @@ const ProjectDashboard = () => {
   }, [filterStatus]);
 
   // ------------------ DELETE PROJECT ------------------
-  const confirmDeleteToast = (onConfirm) => {
-    toast.warn(
-      ({ closeToast }) => (
-        <div className="flex flex-col gap-3">
-          <p className="font-semibold text-red-600">Delete this project?</p>
-          <div className="flex justify-end gap-2">
-            <button className="px-3 py-1 rounded bg-gray-200" onClick={closeToast}>
-              Cancel
-            </button>
-            <button
-              className="px-3 py-1 rounded bg-red-600 text-white"
-              onClick={() => { onConfirm(); closeToast(); }}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      ),
-      { closeOnClick: false, autoClose: false, position: "top-center" }
-    );
+  const handleDelete = (projectId) => {
+    setProjectIdToDelete(projectId);
+    setDeleteConfirmOpen(true);
   };
 
-  const handleDelete = (projectId) => {
-    confirmDeleteToast(async () => {
-      try {
-        await axios.delete(
-          `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setProjects((prev) => prev.filter((p) => p.project.id !== projectId));
-        toast.success("Project deleted successfully!");
-      } catch (err) {
-        console.error("❌ Delete failed", err);
-        toast.error("Failed to delete project.");
-      }
-    });
+  const executeDeleteProject = async () => {
+    try {
+      await api.delete(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectIdToDelete}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setProjects((prev) => prev.filter((p) => p.project.id !== projectIdToDelete));
+      showStatusToast("Project deleted successfully!", "success");
+    } catch (err) {
+      console.error("❌ Delete failed", err);
+      showStatusToast("Failed to delete project.", "error");
+    } finally {
+      setDeleteConfirmOpen(false);
+      setProjectIdToDelete(null);
+    }
   };
 
   // FIX: startEdit no longer builds formData — modal fetches its own data
@@ -162,7 +455,8 @@ const ProjectDashboard = () => {
       p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.projectKey?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = filterStatus === "All" ? true : p.status === filterStatus;
+    const matchesStatus =
+      filterStatus === "All" ? true : p.status === filterStatus;
 
     let matchesRole = true;
     if (roleFilter === "OWNER") {
@@ -174,10 +468,10 @@ const ProjectDashboard = () => {
     return matchesSearch && matchesStatus && matchesRole;
   });
 
-  const indexOfLast    = currentPage * projectsPerPage;
-  const indexOfFirst   = indexOfLast - projectsPerPage;
+  const indexOfLast = currentPage * projectsPerPage;
+  const indexOfFirst = indexOfLast - projectsPerPage;
   const currentProjects = filteredProjects.slice(indexOfFirst, indexOfLast);
-  const totalPages     = Math.ceil(filteredProjects.length / projectsPerPage);
+  const totalPages = Math.ceil(filteredProjects.length / projectsPerPage);
 
   // ------------------ RENDER ------------------
   return (
@@ -187,33 +481,49 @@ const ProjectDashboard = () => {
         <h1 className="text-3xl font-bold">Dashboard</h1>
 
         <div className="flex gap-3">
+          {canmywork && (
+            <Button
+              onClick={() => navigate("/my-work")}
+              variant="secondary"
+              size="medium"
+              className="flex items-center gap-2"
+            >
+              <EmployeeIcon size={16} />
+              My Work
+            </Button>
+          )}
           {canManageProjects && (
             <>
               <Button
                 onClick={() => navigate("/my-work")}
                 variant="secondary"
                 size="medium"
+                className="flex items-center gap-2"
               >
+                <EmployeeIcon size={16} />
                 My Work
               </Button>
-
               <Button
                 onClick={() => navigate(`/block-leave-dates/${user?.user_id}`)}
                 variant="secondary"
                 size="medium"
+                className="flex items-center gap-2"
               >
+                <LeaveIcon size={16} />
                 Manage Leave Blocks
               </Button>
 
               <Button
                 variant="primary"
                 size="medium"
+                className="flex items-center gap-2 bg-[#0a0a4a] hover:bg-[#1a1a5a]"
                 onClick={() => {
                   setEditingProjectId(null);
                   setIsCreateModalOpen(true);
                 }}
               >
-                + Create Project
+                <AddIcon size={18} />
+                Create Project
               </Button>
             </>
           )}
@@ -222,40 +532,49 @@ const ProjectDashboard = () => {
 
       {/* PROJECT SECTION */}
       <div className="bg-gray-50 rounded-2xl p-6">
-        <h2 className="text-2xl font-semibold mb-4">All Projects</h2>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900 shrink-0">All Projects</h2>
+            <p className="text-sm text-gray-500 mt-1">Track and manage all your active and upcoming project portfolio.</p>
+          </div>
 
-        {/* SEARCH + FILTER */}
-        <div className="flex justify-between items-center mb-6">
-          <input
-            type="text"
-            placeholder="Search by name or key"
-            className="border px-3 py-2 rounded-xl w-64"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          <div className="flex flex-col sm:flex-row items-center gap-4 flex-1 justify-end">
+            <div className="w-full sm:w-64">
+              <SearchInput
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by name or key"
+                className="w-full"
+              />
+            </div>
 
-          <div className="flex items-center gap-3">
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="border w-40 h-10 px-3 py-2 rounded-xl"
-            >
-              <option value="All">All</option>
-              <option value="ACTIVE">Active</option>
-              <option value="PLANNING">Planning</option>
-              <option value="ARCHIVED">Archived</option>
-              <option value="COMPLETED">Completed</option>
-            </select>
+            <div className="flex items-center gap-3">
+              <div className="w-40">
+                <FilterListbox
+                  options={[
+                    { value: "All", label: "All Status" },
+                    { value: "ACTIVE", label: "Active" },
+                    { value: "PLANNING", label: "Planning" },
+                    { value: "ARCHIVED", label: "Archived" },
+                    { value: "COMPLETED", label: "Completed" },
+                  ]}
+                  value={filterStatus}
+                  onChange={setFilterStatus}
+                />
+              </div>
 
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="border w-40 h-10 px-3 py-2 rounded-xl"
-            >
-              <option value="ALL">All</option>
-              <option value="OWNER">Managed by me</option>
-              <option value="MEMBER">I am a member</option>
-            </select>
+              <div className="w-40">
+                <FilterListbox
+                  options={[
+                    { value: "ALL", label: "All" },
+                    { value: "OWNER", label: "Managed by me" },
+                    { value: "MEMBER", label: "I am a member" },
+                  ]}
+                  value={roleFilter}
+                  onChange={setRoleFilter}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -270,49 +589,69 @@ const ProjectDashboard = () => {
               const p = item.project;
 
               return (
-                <div
+                <AppCard
                   key={p.id}
                   onClick={() => navigate(`/projects/${p.id}`)}
-                  className="relative bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow p-5 border border-gray-100 flex flex-col justify-between"
+                  className="group hover:border-blue-300 !p-0"
                 >
-                  {item.canEdit && item.canDelete ? (
-                    <ProjectMenu
-                      project={item}
-                      onEdit={startEdit}
-                      onDelete={handleDelete}
-                    />
-                  ) : (
-                    <div className="absolute top-3 right-3 opacity-40 cursor-not-allowed">
-                      <MoreVertical className="h-5 w-5 text-gray-400" />
+                  <div className="p-4 flex-1 min-w-0 flex flex-col relative">
+                    {/* TOP BADGES & MENU */}
+                    <div className="flex justify-between items-start mb-3 gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase rounded-full border ${getStatusStyles(p.status)}`}>
+                          {p.status?.replace(/_/g, " ") || "UNKNOWN"}
+                        </span>
+                        {p.riskLevel && (
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase rounded-full border ${p.riskLevel === "HIGH"
+                                ? "bg-red-50 text-red-700 border-red-200"
+                                : p.riskLevel === "MEDIUM"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : "bg-teal-50 text-teal-700 border-teal-200"
+                              }`}
+                          >
+                            {p.riskLevel} Risk
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="shrink-0 -mr-2 -mt-1">
+                        <ProjectMenu
+                          project={item}
+                          canEdit={item.canEdit && item.canDelete}
+                          onView={(proj) => setViewingProjectId(proj.id)}
+                          onEdit={startEdit}
+                          onDelete={handleDelete}
+                        />
+                      </div>
                     </div>
-                  )}
 
-                  <h3 className="text-xl font-semibold text-indigo-700 mb-1">
-                    {p.name}
-                  </h3>
+                    {/* TITLE & KEY */}
+                    <h3 className="font-bold text-gray-900 text-lg group-hover:text-blue-700 line-clamp-2 leading-tight mb-0.5 break-words">
+                      {p.name}
+                    </h3>
+                    <p className="text-xs text-gray-500 truncate mb-4">
+                      {p.projectKey}
+                    </p>
 
-                  <p className="text-sm text-gray-500 mb-3">Key: {p.projectKey}</p>
-
-                  <p className="text-gray-700 text-sm line-clamp-3">
-                    {p.description || "No description available."}
-                  </p>
-
-                  <div className="mt-4 flex justify-between items-center">
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full font-medium ${
-                        p.status === "ACTIVE"
-                          ? "bg-green-100 text-green-700"
-                          : p.status === "PLANNING"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : p.status === "COMPLETED"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {p.status}
-                    </span>
+                    {/* MIDDLE INFO */}
+                    <div className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-3 text-[11px] text-gray-600">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <TargetIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <span className="capitalize truncate">
+                          {p.currentStage?.toLowerCase()?.replace(/_/g, " ") || "Initiation"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <CalendarIcon className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                        <span className="truncate">
+                          {formatDate(p.startDate)} - {formatDate(p.endDate)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+
+                </AppCard>
               );
             })}
           </div>
@@ -348,7 +687,28 @@ const ProjectDashboard = () => {
         }}
       />
 
-      <ToastContainer position="top-right" />
+      <ConfirmationModal
+        isOpen={deleteConfirmOpen}
+        title="Delete Project"
+        message="Are you sure you want to delete this project? This action cannot be undone."
+        onConfirm={executeDeleteProject}
+        onCancel={() => { setDeleteConfirmOpen(false); setProjectIdToDelete(null); }}
+        confirmText="Delete"
+        variant="danger"
+      />
+
+      {/* PROJECT DETAIL DRAWER */}
+      {viewingProjectId && (
+        <ProjectDetailDrawer
+          projectId={viewingProjectId}
+          onClose={() => setViewingProjectId(null)}
+          navigate={navigate}
+          getStatusStyles={getStatusStyles}
+          formatDate={formatDate}
+          formatCurrency={formatCurrency}
+          canSeeFinancials={canSeeFinancials}
+        />
+      )}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { X, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import { quickAllocate, getOpenDemands, getBenchMatches } from "../services/benchService";
 
 const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
@@ -13,13 +14,17 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
 
   useEffect(() => {
     if (open) {
+      if (resource?.preSelectedDemandId) {
+        setSelectedDemandId(resource.preSelectedDemandId);
+      } else {
+        setSelectedDemandId("");
+      }
       fetchDemands();
       setSuccess(false);
       setError("");
-      setSelectedDemandId("");
       setAllocationPercentage(100);
     }
-  }, [open]);
+  }, [open, resource]);
 
   const fetchDemands = async () => {
     setLoadingDemands(true);
@@ -64,6 +69,16 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
           });
         }
       });
+
+      // Ensure pre-selected demand is in the list
+      if (resource.preSelectedDemandId && !seen.has(resource.preSelectedDemandId)) {
+        unique.push({
+          demandId: resource.preSelectedDemandId,
+          displayName: resource.preSelectedDemandName || "Selected Demand",
+          score: "N/A",
+          projectInfo: "Pre-selected"
+        });
+      }
 
       setDemands(unique);
     } catch (err) {
@@ -110,7 +125,7 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <div>
             <h3 className="text-lg font-bold text-[#081534]">Quick Allocate</h3>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Streamlined Staffing</p>
+            <p className="text-[11px] font-bold capitalize tracking-widest text-slate-400">Streamlined Staffing</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
             <X className="h-5 w-5" />
@@ -131,7 +146,7 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
           ) : (
             <div className="space-y-6">
               <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 scale-100 transition-transform hover:scale-[1.01]">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Target Resource</p>
+                <p className="text-[10px] font-bold capitalize tracking-widest text-slate-400">Target Resource</p>
                 <div className="mt-2 flex items-center gap-3">
                    <div className="h-10 w-10 rounded-full bg-[#081534] flex items-center justify-center text-white font-bold">
                       {resource.name?.charAt(0)}
@@ -145,30 +160,33 @@ const QuickAllocateModal = ({ open, resource, onClose, onRefresh }) => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Select Demand <span className="text-rose-500">*</span></label>
-                  {loadingDemands ? (
+                  <label className="text-[10px] font-bold capitalize tracking-widest text-slate-500 mb-2 block">Select Demand <span className="text-rose-500">*</span></label>
+                  {loadingDemands && demands.length === 0 ? (
                     <div className="flex h-11 items-center justify-center rounded-lg border border-dashed border-slate-200">
                       <Loader2 className="h-4 w-4 animate-spin text-slate-300" />
                     </div>
                   ) : (
-                    <select
-                      value={selectedDemandId}
-                      onChange={(e) => setSelectedDemandId(e.target.value)}
-                      className="w-full h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50/50 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.5rem_center] bg-no-repeat"
-                    >
-                      <option value="">Choose a demand...</option>
-                      {demands.map(demand => (
-                        <option key={demand.demandId} value={demand.demandId}>
-                          {demand.displayName} ({demand.projectInfo})
-                        </option>
-                      ))}
-                    </select>
+                    <div className={`relative ${resource?.preSelectedDemandId ? "opacity-90 grayscale-[20%]" : ""}`}>
+                      <FilterListbox
+                        options={[
+                          { value: "", label: "Choose a demand..." },
+                          ...demands.map(demand => ({ value: demand.demandId, label: `${demand.displayName} (${demand.projectInfo})` }))
+                        ]}
+                        value={selectedDemandId}
+                        onChange={setSelectedDemandId}
+                      />
+                      {resource?.preSelectedDemandId && (
+                        <div className="absolute inset-y-0 right-10 flex items-center pr-2 pointer-events-none">
+                          <CheckCircle className="h-4 w-4 text-emerald-500" />
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 
                 <div>
                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Allocation Percentage</label>
+                      <label className="text-[10px] font-bold capitalize tracking-widest text-slate-500">Allocation Percentage</label>
                       <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{allocationPercentage}%</span>
                    </div>
                    <input

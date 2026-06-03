@@ -40,6 +40,8 @@ import BenchPage from "./pages/resource_management/bench/pages/BenchPage.jsx";
 import RoleOffDashboard from "./pages/resource_management/pages/roleoff/RoleOffDashboard.jsx";
 import BenchPoolDashboard from "./pages/resource_management/bench/pages/BenchPoolDashboard.jsx";
 import UtilizationPerformanceDashboard from "./pages/resource_management/bench/pages/UtilizationPerformanceDashboard.jsx";
+import OperationalProjectDetailPage from "./pages/resource_management/bench/pages/OperationalProjectDetailPage.jsx";
+import UtilizationReportingDashboard from "./pages/resource_management/bench/pages/UtilizationReportingDashboard.jsx";
 
 // Timesheets
 
@@ -92,6 +94,8 @@ import EducationDashboard from "./pages/employee-onboarding/hr-configuration/edu
 import EducationLevelManagement from "./pages/employee-onboarding/hr-configuration/education/levels/EducationLevelManagement.jsx";
 import EducationDocumentManagement from "./pages/employee-onboarding/hr-configuration/education/documents/EducationDocumentManagement.jsx";
 import CountryEducationMapping from "./pages/employee-onboarding/hr-configuration/education/mapping/CountryEducationMapping.jsx";
+import DegreeMasterManagement from "./pages/employee-onboarding/hr-configuration/education/degrees/DegreeMasterManagement.jsx";
+
 // import AdminApprovalActions from "./pages/employee-onboarding/admin/AdminApprovalActions.jsx";
 import AdminApprovalDashboard from "./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx";
 import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
@@ -116,6 +120,8 @@ import DepartmentsList from "./pages/employee-onboarding/hr-configuration/depart
 import DesignationsList from "./pages/employee-onboarding/hr-configuration/departments/designationsList/DesignationsList.jsx";
 import WeeklyJoiningDashboard from "./pages/employee-onboarding/weekly-joining-report-dashboard/WeeklyJoiningDashboard.jsx";
 import DocumentTemplates from "./pages/employee-onboarding/document-templates/DocumentTemplates.jsx";
+import ManageSkillTaxonomy from "./pages/employee-onboarding/manage-skill-taxonomy/ManageSkillTaxonomy.jsx";
+import AddCertificate from "./pages/employee-onboarding/manage-skill-taxonomy/AddCertificate.jsx";
 
 import EmployeeDocuments from "./pages/employee-onboarding/employeedocuments/EmployeeDocuments.jsx";
 
@@ -146,7 +152,7 @@ import Profile from "./pages/UserManagement/user/Profile";
 import EditProfile from "./pages/UserManagement/user/EditProfile";
 
 import Register from "./pages/UserManagement/auth/Register";
-import ForgotPassword from "./pages/UserManagement/auth/ForgotPassword";
+
 
 // ✅ Leave Management
 import EmployeePanel from "./pages/leave_management/EmployeePanel";
@@ -163,6 +169,9 @@ import ManageBlockLeave from "./pages/leave_management/models/ManageBlockLeave";
 import ApprovalRulesPage from "./pages/leave_management/models/ApprovalRulesPage.jsx";
 import RiskRegisterPage from "./pages/Projects/manager/riskManagement/RiskRegisterPage.jsx";
 import LeaveUploadWizard from "./pages/leave_management/models/LeaveUploadWizard.jsx";
+import ApplyLeaveOnBehalf from "./pages/leave_management/models/ApplyLeaveOnBehalf.jsx";
+import { JobProgressProvider, useJobProgress } from "./contexts/JobProgressContext.jsx";
+import LeaveBalanceJobProgress from "./pages/leave_management/models/LeaveBalanceJobProgress.jsx";
 
 import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.jsx";
 import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
@@ -196,7 +205,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   // ✅ Role-based restriction check
   if (allowedRoles && allowedRoles.length > 0) {
-    const hasRole = user?.roles?.some((role) => allowedRoles.includes(role));
+    const normalizedAllowedRoles = allowedRoles.map((role) => role.toUpperCase());
+    const hasRole = user?.roles?.some((role) =>
+      normalizedAllowedRoles.includes(role.toUpperCase())
+    );
     console.log("ProtectedRoute check:", {
       isAuthenticated,
       user,
@@ -249,11 +261,11 @@ const ProjectManager = () => {
 const RoleOffEntry = () => {
   const { user } = useAuth();
 
-  if (user?.roles?.includes("DELIVERY-MANAGER")) {
+  if (user?.roles?.includes("Delivery_Manager")) {
     return <Navigate to="/resource-management/roleoff/dm" replace />;
   }
 
-  if (user?.roles?.includes("RESOURCE-MANAGER")) {
+  if (user?.roles?.includes("Resource_Manager")) {
     return <Navigate to="/resource-management/roleoff/rm" replace />;
   }
 
@@ -280,7 +292,7 @@ const AppRoutes = () => {
         navigate(lastPath, { replace: true });
       }
       else if (currentPath === "/") {
-        if (user?.roles?.includes("DELIVERY-MANAGER")) {
+        if (user?.roles?.includes("Delivery_Manager")) {
           navigate("/resource-management/demand", { replace: true });
         } else {
           navigate("/dashboard", { replace: true });
@@ -295,7 +307,7 @@ const AppRoutes = () => {
         {/* Public Route */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/reset-password" element={<ForgotPassword />} />
+
         {/* Unauthorized should be here */}
         <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="/change-password" element={<InitialPasswordSetup />} />
@@ -341,18 +353,20 @@ const AppRoutes = () => {
           <Route path="/profile/edit" element={<EditProfile />} />
           {/* Projects */}
           {/* <Route path="/projects/dashboard" element={<AdminDashboard />} /> */}
-          <Route path="/projects/developer" element={<ReadOnlyDashboard />} />
+          
           <Route
             path="/projects"
             element={
-              // <ProtectedRoute allowedRoles={["Manager"]}>
+             
               <ProjectDashboard />
-              // </ProtectedRoute>
+            
             }
           />
+
           <Route path="/projects" element={<ProjectManager />} />
           <Route path="/projects/:projectId" element={<ProjectTabs />} />
           <Route path="/projects/list" element={<ProjectList />} />
+          
           <Route
             path="/projects/:projectId/issuetracker"
             element={<IssueTracker />}
@@ -361,30 +375,16 @@ const AppRoutes = () => {
             path="/projects/:projectId/cycles/runs/:runId/test-runs"
             element={<AddCasesFromProjectModal />}
           />
-          <Route
-            path="/projects/performance"
-            element={<EmployeePerformance />}
-          />
+          
           <Route
             path="/projects/:projectId/cycles/:cycleId/runs"
             element={<CycleRunsPage />}
           />
-          <Route path="/projects/user/myprofile" element={<Userprofile />} />
-          <Route path="/projects/userlist" element={<UserProjectList />} />
-          {/* <Route path="/projects/user/:userId" element={<UserProjectDashboard />} /> */}
-          <Route
-            path="/projects/userbacklog/:projectId"
-            element={<UserBacklog />}
-          />
+         
+          
           <Route path="/projects/admin" element={<ProjectManager />} />
-          <Route
-            path="/projects/user/:projectId"
-            element={<UserProjectTabs />}
-          />
-          <Route
-            path="/projects/:projectId/user/userissuetracker"
-            element={<UserIssueTracker />}
-          />
+          
+          
           <Route
             path="/projects/:projectId/issues/:type/:id/view"
             element={<ViewSheet />}
@@ -437,56 +437,68 @@ const AppRoutes = () => {
           <Route path="/employee-onboarding/core-employee" element={<CoreEmployeeDetails/>}/> */}
 
           {/* Employee Onboarding */}
+          <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/employee-onboarding/*" element={<EmployeeOnboardingLayout />}>
 
-            <Route index element={<EmpDashboard />} />
+            <Route index element={
+              <ProtectedRoute roles={["HR", "MANAGER"]}>
+                <EmpDashboard />
+              </ProtectedRoute>
+            }
+            />
 
-            <Route path="create" element={<CreateOffer />} />
-            <Route path="bulk-upload" element={<BulkUpload />} />
-            <Route path="onboarding-task" element={<OnboardingTask />} />
+            <Route path="create" element={<ProtectedRoute roles={["HR"]}><CreateOffer /></ProtectedRoute>} />
+            <Route path="bulk-upload" element={<ProtectedRoute roles={["HR"]}><BulkUpload /></ProtectedRoute>} />
+            <Route path="onboarding-task" element={<ProtectedRoute roles={["HR", "MANAGER", "ADMIN"]}><OnboardingTask /></ProtectedRoute>} />
 
-            <Route path="hr-configuration" element={<HrConfiguration />} />
-            <Route path="hr-configuration/country" element={<CountryManagement />} />
-            <Route path="hr-configuration/identity" element={<IdentityTypeManagement />} />
-            <Route path="hr-configuration/mapping" element={<CountryIdentityMapping />} />
-            <Route path="hr-configuration/education" element={<EducationDashboard />} />
-            <Route path="hr-configuration/education/levels" element={<EducationLevelManagement />} />
-            <Route path="hr-configuration/education/documents" element={<EducationDocumentManagement />} />
-            <Route path="hr-configuration/education/mapping" element={<CountryEducationMapping />} />
-            <Route path="hr-configuration/departments" element={< DepartmentsMappingDashboard />} />
-            <Route path="hr-configuration/departments/departmentsList" element={< DepartmentsList />} />
-            <Route path="hr-configuration/departments/designationsList" element={< DesignationsList />} />
+            <Route path="hr-configuration" element={<ProtectedRoute roles={["HR", "ADMIN"]}><HrConfiguration /></ProtectedRoute>} />
+            <Route path="hr-configuration/country" element={<ProtectedRoute roles={["HR", "ADMIN"]}><CountryManagement /></ProtectedRoute>} />
+            <Route path="hr-configuration/identity" element={<ProtectedRoute roles={["HR", "ADMIN"]}><IdentityTypeManagement /></ProtectedRoute>} />
+            <Route path="hr-configuration/mapping" element={<ProtectedRoute roles={["HR", "ADMIN"]}><CountryIdentityMapping /></ProtectedRoute>} />
+            <Route path="hr-configuration/education" element={<ProtectedRoute roles={["HR", "ADMIN"]}><EducationDashboard /></ProtectedRoute>} />
+            <Route path="hr-configuration/education/levels" element={<ProtectedRoute roles={["HR", "ADMIN"]}><EducationLevelManagement /></ProtectedRoute>} />
+            <Route path="hr-configuration/education/documents" element={<ProtectedRoute roles={["HR", "ADMIN"]}><EducationDocumentManagement /></ProtectedRoute>} />
+            <Route path="hr-configuration/education/mapping" element={<ProtectedRoute roles={["HR", "ADMIN"]}><CountryEducationMapping /></ProtectedRoute>} />
+            <Route path="hr-configuration/departments" element={<ProtectedRoute roles={["HR", "ADMIN"]}><DepartmentsMappingDashboard /></ProtectedRoute>} />
+            <Route path="hr-configuration/departments/departmentsList" element={<ProtectedRoute roles={["HR", "ADMIN"]}><DepartmentsList /></ProtectedRoute>} />
+            <Route path="hr-configuration/departments/designationsList" element={<ProtectedRoute roles={["HR", "ADMIN"]}><DesignationsList /></ProtectedRoute>} />
+            <Route path="hr-configuration/education/degrees" element={<ProtectedRoute roles={["HR", "ADMIN"]}><DegreeMasterManagement /></ProtectedRoute>} />
+            
 
-            <Route path="hr" element={<HrOnboardingDashboard />} />
-            <Route path="hr/profile/:user_uuid" element={<HrProfileView />} />
-            <Route path="backgroundcheck" element={<BackgroundCheckPage />} />
+            <Route path="hr" element={<ProtectedRoute roles={["HR"]}><HrOnboardingDashboard /></ProtectedRoute>} />
+            <Route path="hr/profile/:user_uuid" element={<ProtectedRoute roles={["HR"]}><HrProfileView /></ProtectedRoute>} />
+            <Route path="backgroundcheck" element={<ProtectedRoute roles={["HR"]}><BackgroundCheckPage /></ProtectedRoute>} />
 
-            <Route path="admin/approval-dashboard" element={<AdminApprovalDashboard />} />
-            <Route path="admin/offer/:user_uuid" element={<AdminOfferView />} />
+            <Route path="admin/approval-dashboard" element={<ProtectedRoute roles={["ADMIN", "HR"]}><AdminApprovalDashboard /></ProtectedRoute>} />
+            <Route path="admin/offer/:user_uuid" element={<ProtectedRoute roles={["ADMIN", "HR"]}><AdminOfferView /></ProtectedRoute>} />
 
-            <Route path="employee-directory" element={<EmployeeDirectory />} />
-            <Route path="employeelist" element={<EmployeeListPage />} />
-            <Route path="organization-tree" element={<OrganizationTree />} />
+            <Route path="employee-directory" element={<ProtectedRoute ><EmployeeDirectory /></ProtectedRoute>} />
+            <Route path="employeelist" element={<ProtectedRoute ><EmployeeListPage /></ProtectedRoute>} />
+            <Route path="organization-tree" element={<ProtectedRoute ><OrganizationTree /></ProtectedRoute>} />
 
-            <Route path="employee-verification" element={<EmployeeVerification />} />
-            <Route path="employee-documents-template" element={<EmployeeDocumentsTemplate />} />
-            <Route path="employeedocuments" element={<EmployeeDocumentsPage />} />
-            <Route path="employee-credentials" element={<EmployeeCredentials />} />
-            <Route path="employeeProfile" element={<EmployeeProfileView />} />
-            <Route path="employeeProfile/:employee_uuid" element={<EmployeeProfileView />}></Route>
-            <Route path="core-employee" element={<CoreEmployeeDetails />} />
+            <Route path="employee-verification" element={<ProtectedRoute roles={["HR", "MANAGER"]}><EmployeeVerification /></ProtectedRoute>} />
+            <Route path="employee-documents-template" element={<ProtectedRoute roles={["HR"]}><EmployeeDocumentsTemplate /></ProtectedRoute>} />
+            <Route path="employeedocuments" element={<ProtectedRoute roles={["HR", "MANAGER"]}><EmployeeDocumentsPage /></ProtectedRoute>} />
+            {/* <Route path="employee-credentials" element={<ProtectedRoute roles={["HR","MANAGER"]}><EmployeeCredentials /></ProtectedRoute>} /> */}
+            <Route path="employeeProfile" element={<ProtectedRoute ><EmployeeProfileView /></ProtectedRoute>} />
+            <Route path="employeeProfile/:employee_uuid" element={<ProtectedRoute ><EmployeeProfileView /></ProtectedRoute>}></Route>
+            <Route path="core-employee" element={<ProtectedRoute roles={["HR", "MANAGER"]}><CoreEmployeeDetails /></ProtectedRoute>} />
             <Route path="employee-onboarding/core-employee/create/:userUuid" element={<CoreEmployeeDetails />} />
 
-            <Route path="summary-page" element={<SummaryPage />} />
+            <Route path="summary-page" element={<ProtectedRoute roles={["HR", "MANAGER", "ADMIN"]}><SummaryPage /></ProtectedRoute>} />
             <Route path="onboarding-summary" element={<OnboardingSummary />} />
-            <Route path="analytics" element={<HeadcountDemographicsPage />} />
+            <Route path="analytics" element={<ProtectedRoute roles={["HR", "MANAGER"]}><HeadcountDemographicsPage /></ProtectedRoute>} />
 
-            <Route path="weekly-joining-report-dashboard" element={< WeeklyJoiningDashboard/>} />
-            <Route path="document-templates" element={< DocumentTemplates/>} />
+            <Route path="weekly-joining-report-dashboard" element={<ProtectedRoute roles={["HR", "MANAGER"]}><WeeklyJoiningDashboard /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy" element={<ProtectedRoute allowedRoles={["ADMIN"]}><ManageSkillTaxonomy /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy/requests" element={<ProtectedRoute allowedRoles={["ADMIN"]}><ManageSkillTaxonomy /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy/certificates" element={<ProtectedRoute allowedRoles={["ADMIN"]}><AddCertificate /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy/certificates/general" element={<ProtectedRoute allowedRoles={["ADMIN"]}><AddCertificate /></ProtectedRoute>} />
+            <Route path="document-templates" element={<ProtectedRoute roles={["HR"]}><DocumentTemplates /></ProtectedRoute>} />
             <Route path="offer/:user_uuid" element={<ViewEmpDetails />} />
-            <Route path ="offer-preview/:offerId" element ={<OfferPreview/>} />
-            <Route path ="final-offer-preview/:offerId" element={<FinalOfferPreview/>} />
-            <Route path ="offer-generated-preview/:offerId" element={<OfferGeneratedPreview/>} />
+            <Route path="offer-preview/:offerId" element={<OfferPreview />} />
+            <Route path="final-offer-preview/:offerId" element={<FinalOfferPreview />} />
+            <Route path="offer-generated-preview/:offerId" element={<OfferGeneratedPreview />} />
 
 
 
@@ -553,7 +565,7 @@ const AppRoutes = () => {
           {/* <Route
             path="/user-management/users"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <UsersTable />
               </ProtectedRoute>
             }
@@ -561,7 +573,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/users/create"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <CreateUser />
               </ProtectedRoute>
             }
@@ -569,7 +581,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/users/edit/:id"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <EditUser />
               </ProtectedRoute>
             }
@@ -577,7 +589,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/users/roles"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <UpdateUserRoles />
               </ProtectedRoute>
             }
@@ -585,7 +597,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/roles/edit-role/:userId"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <EditUserRoleForm />
               </ProtectedRoute>
             }
@@ -593,7 +605,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/roles"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <RoleManagement />
               </ProtectedRoute>
             }
@@ -601,7 +613,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/permissions"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <PermissionManagement />
               </ProtectedRoute>
             }
@@ -609,7 +621,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/groups"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <PermissionGroupManagement />
               </ProtectedRoute>
             }
@@ -617,7 +629,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/groups/:groupId"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <GroupDetails />
               </ProtectedRoute>
             }
@@ -625,7 +637,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/access-points"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <AccessPointManagement />
               </ProtectedRoute>
             }
@@ -633,7 +645,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/access-points/create"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <AccessPointForm />
               </ProtectedRoute>
             }
@@ -641,7 +653,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/access-points/:access_id"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <AccessPointDetails />
               </ProtectedRoute>
             }
@@ -649,7 +661,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/access-points/edit/:access_id"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <AccessPointEdit />
               </ProtectedRoute>
             }
@@ -657,7 +669,7 @@ const AppRoutes = () => {
           <Route
             path="/user-management/access-points/admin/access-point-mapping"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "Super Admin"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}>
                 <AccessPointMapping />
               </ProtectedRoute>
             }
@@ -667,7 +679,7 @@ const AppRoutes = () => {
             path="/leave-management"
             element={
               <ProtectedRoute
-                allowedRoles={["General", "HR", "Manager", "Hr-Manager"]}
+                allowedRoles={["General", "HR", "Manager", "Hr-Manager", "Super_Admin", "Admin"]}
               >
                 <EmployeePanel />
               </ProtectedRoute>
@@ -684,7 +696,7 @@ const AppRoutes = () => {
           <Route
             path="/leave-management/hr"
             element={
-              <ProtectedRoute allowedRoles={["HR"]}>
+              <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin"]}>
                 <HRManageTools />
               </ProtectedRoute>
             }
@@ -708,7 +720,7 @@ const AppRoutes = () => {
           <Route
             path={`/block-leave-dates/:employeeId`}
             element={
-              <ProtectedRoute allowedRoles={["Manager"]}>
+              <ProtectedRoute allowedRoles={["Manager", "Super_Admin", "Admin"]}>
                 <ManageBlockLeave />
               </ProtectedRoute>
             }
@@ -716,7 +728,7 @@ const AppRoutes = () => {
           <Route
             path={`/leave-upload`}
             element={
-              <ProtectedRoute allowedRoles={["HR"]}>
+              <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin"]}>
                 <LeaveUploadWizard />
               </ProtectedRoute>
             }
@@ -724,7 +736,7 @@ const AppRoutes = () => {
           <Route
             path="/leave-policy"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin"]}>
                 <LeavePolicy />
               </ProtectedRoute>
             }
@@ -733,7 +745,7 @@ const AppRoutes = () => {
           <Route
             path={`/leave-details/:employeeId/:leaveName`}
             element={
-              <ProtectedRoute allowedRoles={["General"]}>
+              <ProtectedRoute allowedRoles={["General", "Super_Admin", "Admin"]}>
                 <LeaveDetailsPage />
               </ProtectedRoute>
             }
@@ -741,11 +753,21 @@ const AppRoutes = () => {
           <Route
             path="/approval-rules"
             element={
-              <ProtectedRoute allowedRoles={["HR", "Hr-Manager"]}>
+              <ProtectedRoute allowedRoles={["HR", "Hr-Manager", "Super_Admin", "Admin"]}>
                 <ApprovalRulesPage />
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/behalf-leave"
+            element={
+              <ProtectedRoute allowedRoles={["HR", "Hr-Manager", "Manager", "Super_Admin", "Admin"]}>
+                <ApplyLeaveOnBehalf />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/leave-policies"
             element={
@@ -759,7 +781,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
                 <AdminPannel />
               </ProtectedRoute>
             }
@@ -767,7 +789,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/bench"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
                 <BenchPage />
               </ProtectedRoute>
             }
@@ -775,7 +797,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/bench/report"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
                 <BenchPoolDashboard />
               </ProtectedRoute>
             }
@@ -783,8 +805,24 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/bench/utilization-performance"
             element={
-              <ProtectedRoute allowedRoles={["Admin", "RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
                 <UtilizationPerformanceDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resource-management/bench/utilization-performance/projects/:projectId"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <OperationalProjectDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resource-management/bench/utilization-reporting"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <UtilizationReportingDashboard />
               </ProtectedRoute>
             }
           />
@@ -837,7 +875,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/demand"
             element={
-              <ProtectedRoute allowedRoles={["RESOURCE-MANAGER", "DELIVERY-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Resource_Manager", "Delivery_Manager", "Admin", "Super_Admin"]}>
                 <DemandWorkspacePage />
               </ProtectedRoute>
             }
@@ -845,7 +883,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/demand/:demandId"
             element={
-              <ProtectedRoute allowedRoles={["RESOURCE-MANAGER", "DELIVERY-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Resource_Manager", "Delivery_Manager", "Admin", "Super_Admin"]}>
                 <DemandDetailPage />
               </ProtectedRoute>
             }
@@ -853,7 +891,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff"
             element={
-              <ProtectedRoute allowedRoles={["PROJECT-MANAGER", "RESOURCE-MANAGER", "DELIVERY-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Project_Manager", "Resource_Manager", "Delivery_Manager", "Admin", "Super_Admin"]}>
                 <RoleOffEntry />
               </ProtectedRoute>
             }
@@ -861,7 +899,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff/pm"
             element={
-              <ProtectedRoute allowedRoles={["PROJECT-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Project_Manager"]}>
                 <PMRoleOffPage />
               </ProtectedRoute>
             }
@@ -869,7 +907,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff/rm"
             element={
-              <ProtectedRoute allowedRoles={["RESOURCE-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Resource_Manager"]}>
                 <RMRoleOffPage />
               </ProtectedRoute>
             }
@@ -877,7 +915,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff/dm"
             element={
-              <ProtectedRoute allowedRoles={["DELIVERY-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Delivery_Manager"]}>
                 <DMRoleOffPage />
               </ProtectedRoute>
             }
@@ -886,7 +924,7 @@ const AppRoutes = () => {
           <Route
             path="/resource-management/roleoff/report"
             element={
-              <ProtectedRoute allowedRoles={["PROJECT-MANAGER", "RESOURCE-MANAGER", "DELIVERY-MANAGER"]}>
+              <ProtectedRoute allowedRoles={["Project_Manager", "Resource_Manager", "Delivery_Manager"]}>
                 <RoleOffDashboard />
               </ProtectedRoute>
             }
@@ -903,18 +941,34 @@ const AppRoutes = () => {
   );
 };
 
+// add this just above the App function at the bottom of the file
+const AppJobProgress = () => {
+  const { activeJobId, clearJob } = useJobProgress();
+
+  if (!activeJobId) return null;
+
+  return (
+    <LeaveBalanceJobProgress
+      jobId={activeJobId}
+      onClose={clearJob}
+    />
+  );
+};
+
 // 🚀 App Entry Point
 function App() {
   return (
     <>
-      <ToastContainer position="top-right" autoClose={3000} />
-      <Router>
+      <ToastContainer position="top-right" autoClose={3000} style={{ zIndex: 999999 }}  />
+      <Router basename={window.__APP_CONFIG__.basePath}>
         <></>
         <AuthProvider>
           <NotificationProvider>
+            <JobProgressProvider>
             <div className="min-h-screen bg-gray-50">
               <AppRoutes />
             </div>
+            </JobProgressProvider>
           </NotificationProvider>
         </AuthProvider>
       </Router>

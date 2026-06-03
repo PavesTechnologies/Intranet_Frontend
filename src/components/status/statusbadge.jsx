@@ -18,17 +18,20 @@ const StatusBadge = ({ label, size = "md" }) => {
     bgColor = "bg-blue-100";
     textColor = "text-blue-700";
   } else if (
+    normalized === "active" ||
+    normalized === "done" ||
     normalized.includes("approve") ||
     normalized.includes("complete") ||
-    normalized.includes("release") ||
-    normalized.includes("active") 
+    normalized.includes("release")
   ) {
     bgColor = "bg-green-100";
     textColor = "text-green-700";
   } else if (
     normalized.includes("pending") ||
     normalized.includes("hold") ||
-    normalized.includes("progress")
+    normalized.includes("progress") ||
+    normalized.includes("planning") ||
+    normalized.includes("blocked")
   ) {
     bgColor = "bg-yellow-100";
     textColor = "text-yellow-700";
@@ -57,7 +60,7 @@ const StatusBadge = ({ label, size = "md" }) => {
     textColor = "text-red-700";
   }
 
-  if (raw === "verified") {
+  if (raw === "verified" || raw === "passed" || normalized.includes("pass")) {
     bgColor = "bg-green-100";
     textColor = "text-green-700";
   }

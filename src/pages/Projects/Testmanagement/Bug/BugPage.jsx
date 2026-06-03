@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   createBug,
   updateBugStatus,
@@ -7,14 +8,68 @@ import {
   bugSummaries,
 } from "../api/bugApi";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
-import axios from "axios";
+import Pagination from "../../../../components/Pagination/pagination";
+import Button from "../../../../components/Button/Button";
+import api from "../../../../api/axiosInstance";
 import Select from "react-select";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import Modal from "../../../../components/Modal/modal";
+
+import {jwtDecode} from "jwt-decode";
+
+const token = localStorage.getItem("token");
+
+let canCreateTestPlan = false;
+
+if (token) {
+  const decoded = jwtDecode(token);
+
+  const roles = decoded?.roles || [];
+
+  canCreateTestPlan =
+    roles.includes("Tester") ||
+    roles.includes("Project_Manager");
+}
+const severityColors = {
+  LOW:      "bg-emerald-50 text-emerald-700",
+  MEDIUM:   "bg-amber-50 text-amber-700",
+  HIGH:     "bg-orange-50 text-orange-700",
+  CRITICAL: "bg-red-100 text-red-700",
+};
+
+const priorityColors = {
+  NORMAL: "bg-slate-100 text-slate-700",
+  HIGH:   "bg-orange-50 text-orange-700",
+  URGENT: "bg-red-100 text-red-700",
+};
+
+const selectStyles = {
+  control: (base) => ({
+    ...base,
+    minHeight: "32px",
+    height: "32px",
+    fontSize: "13px",
+    borderRadius: "0.5rem",
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
+    boxShadow: "none",
+    "&:hover": { borderColor: "#94a3b8" },
+  }),
+  menu: (base) => ({ ...base, width: "180px", zIndex: 9999, position: "absolute" }),
+  menuList: (base) => ({ ...base, maxHeight: "160px" }),
+};
+
+const STATUS_OPTIONS = [
+  { value: "NEW",               label: "New" },
+  { value: "IN_PROGRESS",       label: "In Progress" },
+  { value: "READY_FOR_RETEST",  label: "Ready For Retest" },
+  { value: "REOPENED",          label: "Reopened" },
+  { value: "CLOSED",            label: "Closed" },
+];
 
 const BugPage = () => {
   const { projectId } = useParams();
   const [bugs, setBugs] = useState([]);
-  const [summaries, setSummaries] = useState([]);
   const [page, setPage] = useState(0);
   const [size] = useState(10);
   const [loading, setLoading] = useState(false);
@@ -39,7 +94,6 @@ const BugPage = () => {
     assignedTo: "",
   });
 
-  // Fetch Bugs
   const fetchBugs = async () => {
     try {
       setLoading(true);
@@ -53,51 +107,32 @@ const BugPage = () => {
     }
   };
 
-  // Fetch Summaries
-  const fetchSummaries = async () => {
-    try {
-      const res = await bugSummaries(projectId);
-      setSummaries(res.data);
-    } catch (err) {
-      console.error("Failed to load summaries", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchBugs();
-    fetchSummaries();
-  }, [projectId, page]);
+  useEffect(() => { fetchBugs(); }, [projectId, page]);
 
   const loadEmployees = async () => {
     try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+      const res = await api.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
       setEmployees(res.data);
-      console.log("Loaded employees:", res);
     } catch (err) {
       console.error("Error loading employees:", err);
     }
   };
 
+  useEffect(() => { loadEmployees(); }, []);
+
+  const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
+
   const openBugDetails = async (bugId) => {
     setSelectedBug(bugId);
     setLoadingBugDetails(true);
     setBugDetails(null);
-
     try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/testing/bugs/${bugId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+      const res = await api.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/testing/bugs/${bugId}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
       setBugDetails(res.data);
     } catch (err) {
@@ -107,16 +142,6 @@ const BugPage = () => {
     }
   };
 
-  useEffect(() => {
-    loadEmployees();
-  }, []);
-
-  const options = employees.map((option) => ({
-    value: option.user_id,
-    label: option.name,
-  }));
-
-  // Create Bug Handler
   const handleCreateBug = async () => {
     try {
       const payload = {
@@ -125,7 +150,6 @@ const BugPage = () => {
         runCaseStepId: form.runCaseStepId ? Number(form.runCaseStepId) : null,
         assignedTo: form.assignedTo ? Number(form.assignedTo) : null,
       };
-
       await createBug(payload);
       setShowModal(false);
       fetchBugs();
@@ -134,53 +158,23 @@ const BugPage = () => {
     }
   };
 
-  const addAssignee = async ( bugId, userId) => {
+  const addAssignee = async (bugId, userId) => {
     setAssignLoading(true);
     try {
-      const res = await axios.put(
-        `${
-          import.meta.env.VITE_PMS_BASE_URL
-        }/api/testing/bugs/${bugId}/assign`,
-        {
-          assigneeId: userId,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+      await api.put(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/testing/bugs/${bugId}/assign`,
+        { assigneeId: userId },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );
-      toast.success("Assignee added successfully");
-      // fetchBugs();
+      showStatusToast("Assignee added successfully", "success");
     } catch (err) {
-      toast.error("Failed to add assignee");
+      showStatusToast("Failed to add assignee", "error");
       console.error("Error adding assignee:", err);
     } finally {
       setAssignLoading(false);
     }
   };
 
-  const customStyles = {
-    control: (base) => ({
-      ...base,
-      minHeight: "32px",
-      height: "32px",
-      fontSize: "14px",
-      width: "180px",
-    }),
-    menu: (base) => ({
-      ...base,
-      width: "180px",
-      zIndex: 9999,
-      position: "absolute",
-    }),
-    menuList: (base) => ({
-      ...base,
-      maxHeight: "160px", // controls dropdown height
-    }),
-  };
-
-  // Update Status Handler
   const handleStatusChange = async (bugId, status) => {
     try {
       await updateBugStatus(bugId, { status });
@@ -191,417 +185,268 @@ const BugPage = () => {
   };
 
   return (
-    <div className="p-6">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Bug Management</h2>
-        {/* <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700"
-        >
-          + Create Bug
-        </button> */}
+      <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200 flex-shrink-0">
+        <div>
+          <h1 className="text-base font-semibold text-slate-900">Bug Management</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Track and resolve bugs reported during test execution.</p>
+        </div>
       </div>
 
-      {/* Summary Cards */}
-      {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        {summaries.map((s) => (
-          <div key={s.id} className="p-4 bg-white shadow rounded-lg border">
-            <div className="font-semibold">{s.title}</div>
-            <div className="text-gray-500">{s.status.label}</div>
-            <div className="text-sm">Priority: {s.priority}</div>
+      {/* Table area */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+          <div className="px-5 py-3 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-blue-50 flex-shrink-0">
+            <h2 className="font-semibold text-slate-900 text-sm">Bug Registry</h2>
           </div>
-        ))}
-      </div> */}
 
-      {/* Bug List Table */}
-      <div className="bg-white shadow border rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-2 text-center text-sm font-semibold">
-                Title
-              </th>
-              <th className="px-4 py-2 text-center text-sm font-semibold">
-                Priority
-              </th>
-              <th className="px-4 py-2 text-center text-sm font-semibold">
-                Status
-              </th>
-              <th className="px-4 py-2 text-center text-sm font-semibold">
-                Assigned To
-              </th>
-              <th className="px-4 py-2 text-center text-sm font-semibold">
-                Details
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td className="px-4 py-4 text-center" colSpan={5}>
-                  <LoadingSpinner text="Loading..." />
-                </td>
-              </tr>
-            ) : bugs.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="px-4 py-4 text-center text-gray-500 italic font-semibold"
-                >
-                  No bugs found.
-                </td>
-              </tr>
-            ) : (
-              bugs.map((bug) => (
-                <tr key={bug.id} className="border-b">
-                  <td className="px-4 py-2 text-center">{bug.title}</td>
-                  <td className="px-4 py-2 text-center">{bug.priority}</td>
-
-                  {/* Status Dropdown */}
-                  <td className="px-4 py-2 text-center">
-                    <select
-                      className="border px-2 py-1 rounded"
-                      value={bug.status}
-                      onChange={(e) =>
-                        handleStatusChange(bug.id, e.target.value)
-                      }
+          <div className="overflow-x-auto flex-1">
+            <table className="min-w-full divide-y divide-slate-100">
+              <thead className="bg-slate-50">
+                <tr>
+                  {["Title", "Priority", "Severity", "Raised By", "Status", "Assigned To", "Details"].map((col) => (
+                    <th
+                      key={col}
+                      className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
                     >
-                      <option value="NEW">New</option>
-                      <option value="IN_PROGRESS">In Progress</option>
-                      <option value="READY_FOR_RETEST">Ready For Retest</option>
-                      <option value="REOPENED">Reopened</option>
-                      <option value="CLOSED">Closed</option>
-                    </select>
-                  </td>
-
-                  <td className="px-4 py-2 text-center">
-                    <Select
-                      styles={customStyles}
-                      options={options}
-                      placeholder="Select Employee"
-                      isSearchable
-                      onChange={(selected) => {
-                        addAssignee(bug.id, selected.value);
-                      }}
-                      value={options.find(
-                        (option) => option.value === bug.assignedTo
-                      )}
-                      isDisabled={assignLoading}
-                    />
-                  </td>
-
-                  <td className="px-4 py-2 text-center">
-                    <button
-                      onClick={() => openBugDetails(bug.id)}
-                      className="text-blue-600 hover:underline"
-                    >
-                      View
-                    </button>
-                  </td>
+                      {col}
+                    </th>
+                  ))}
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center">
+                      <LoadingSpinner text="Loading bugs..." />
+                    </td>
+                  </tr>
+                ) : bugs.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-slate-400 text-sm">
+                      No bugs found.
+                    </td>
+                  </tr>
+                ) : (
+                  bugs.map((bug) => (
+                    <tr key={bug.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 text-sm font-medium text-slate-800 max-w-xs truncate">
+                        {bug.title}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${priorityColors[bug.priority] || "bg-slate-100 text-slate-600"}`}>
+                          {bug.priority}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${severityColors[bug.severity] || "bg-slate-100 text-slate-600"}`}>
+                          {bug.severity}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
+                        {employees.find((e) => e.id === bug.reporterId)?.name || "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {canCreateTestPlan ? (
+                          <FilterListbox
+                            options={STATUS_OPTIONS}
+                            value={bug.status}
+                            onChange={(val) => handleStatusChange(bug.id, val)}
+                          />
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded font-medium bg-slate-100 text-slate-700">
+                            {bug.status}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {canCreateTestPlan ? (
+                          <Select
+                            styles={selectStyles}
+                            options={employeeOptions}
+                            placeholder="Assign..."
+                            isSearchable
+                            onChange={(selected) => addAssignee(bug.id, selected.value)}
+                            value={employeeOptions.find((o) => o.value === bug.assignedTo) || null}
+                            isDisabled={assignLoading}
+                            menuPortalTarget={document.body}
+                          />
+                        ) : (
+                          <span className="text-sm text-slate-700">
+                            {employeeOptions.find((o) => o.value === bug.assignedTo)?.label || "—"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => openBugDetails(bug.id)}
+                          className="text-xs text-indigo-600 hover:text-indigo-800 font-medium hover:underline"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        {/* Pagination */}
-        <div className="flex justify-between p-4">
-          <button
-            disabled={page === 0}
-            onClick={() => setPage(page - 1)}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-40"
-          >
-            Prev
-          </button>
-          <span className="text-sm">
-            Page {page + 1} of {totalPages}
-          </span>
-          <button
-            disabled={page + 1 >= totalPages}
-            onClick={() => setPage(page + 1)}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-40"
-          >
-            Next
-          </button>
+          <div className="border-t border-slate-200 flex-shrink-0">
+            <Pagination
+              currentPage={page + 1}
+              totalPages={totalPages}
+              onPrevious={() => setPage((p) => Math.max(p - 1, 0))}
+              onNext={() => setPage((p) => p + 1)}
+            />
+          </div>
         </div>
       </div>
 
-      {/* CREATE BUG MODAL */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center p-4">
-          <div className="bg-white rounded-lg p-6 shadow-xl w-full max-w-2xl">
-            <h3 className="text-xl font-semibold mb-4">Create Bug</h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Form Inputs */}
-              {[
-                "runCaseId",
-                "runCaseStepId",
-                "title",
-                "description",
-                "expected",
-                "actual",
-                "reproductionSteps",
-                "assignedTo",
-              ].map((field) => (
-                <div className="col-span-2" key={field}>
-                  <label className="block text-sm font-medium capitalize">
-                    {field.replace(/([A-Z])/g, " $1")}
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full border rounded px-3 py-2 mt-1"
-                    value={form[field]}
-                    onChange={(e) =>
-                      setForm({ ...form, [field]: e.target.value })
-                    }
-                  />
-                </div>
-              ))}
-
-              {/* Severity */}
-              <div>
-                <label className="block text-sm font-medium">Severity</label>
-                <select
-                  className="w-full border rounded px-3 py-2 mt-1"
-                  value={form.severity}
-                  onChange={(e) =>
-                    setForm({ ...form, severity: e.target.value })
-                  }
-                >
-                  <option>LOW</option>
-                  <option>MEDIUM</option>
-                  <option>HIGH</option>
-                  <option>CRITICAL</option>
-                </select>
-              </div>
-
-              {/* Priority */}
-              <div>
-                <label className="block text-sm font-medium">Priority</label>
-                <select
-                  className="w-full border rounded px-3 py-2 mt-1"
-                  value={form.priority}
-                  onChange={(e) =>
-                    setForm({ ...form, priority: e.target.value })
-                  }
-                >
-                  <option>NORMAL</option>
-                  <option>HIGH</option>
-                  <option>URGENT</option>
-                </select>
-              </div>
+      {/* Create Bug Modal */}
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Create Bug"
+        size="2xl"
+      >
+        <div className="grid grid-cols-2 gap-4">
+          {["runCaseId", "runCaseStepId", "title", "description", "expected", "actual", "reproductionSteps", "assignedTo"].map((field) => (
+            <div className="col-span-2" key={field}>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                {field.replace(/([A-Z])/g, " $1")}
+              </label>
+              <input
+                type="text"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all"
+                value={form[field]}
+                onChange={(e) => setForm({ ...form, [field]: e.target.value })}
+              />
             </div>
-
-            {/* Button Row */}
-            <div className="flex justify-end mt-6 space-x-3">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-gray-300 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateBug}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow"
-              >
-                Create Bug
-              </button>
-            </div>
+          ))}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Severity</label>
+            <FilterListbox
+              options={[{value:"LOW",label:"LOW"},{value:"MEDIUM",label:"MEDIUM"},{value:"HIGH",label:"HIGH"},{value:"CRITICAL",label:"CRITICAL"}]}
+              value={form.severity}
+              onChange={(val) => setForm({ ...form, severity: val })}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Priority</label>
+            <FilterListbox
+              options={[{value:"NORMAL",label:"NORMAL"},{value:"HIGH",label:"HIGH"},{value:"URGENT",label:"URGENT"}]}
+              value={form.priority}
+              onChange={(val) => setForm({ ...form, priority: val })}
+            />
           </div>
         </div>
-      )}
+        <div className="flex justify-end gap-2 mt-6">
+          <Button variant="secondary" size="small" onClick={() => setShowModal(false)}>Cancel</Button>
+          <Button variant="primary" size="small" onClick={handleCreateBug}>Create Bug</Button>
+        </div>
+      </Modal>
 
-      {selectedBug && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-slate-900/60 backdrop-blur-sm">
-          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white/90 shadow-2xl border border-slate-200">
-            {/* Top accent bar */}
-            <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-400 rounded-t-2xl" />
+      {/* Bug Detail Modal */}
+      <Modal
+        isOpen={!!selectedBug}
+        onClose={() => { setSelectedBug(null); setBugDetails(null); }}
+        title="Bug Details"
+        subtitle="Full context, links and reproduction steps"
+        size="3xl"
+        maxHeight="max-h-[88vh]"
+        footer={
+          <div className="flex justify-end w-full">
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => { setSelectedBug(null); setBugDetails(null); }}
+            >
+              Close
+            </Button>
+          </div>
+        }
+      >
+        {loadingBugDetails && (
+          <div className="py-10 text-center">
+            <LoadingSpinner text="Loading Bug Details..." />
+          </div>
+        )}
 
-            {/* Header */}
-            <div className="flex items-start justify-between px-6 pt-4 pb-3">
-              <div>
-                <h3 className="text-xl font-semibold text-slate-900">
-                  Bug Details
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Review the full context, links and reproduction steps for this
-                  bug.
-                </p>
+        {!loadingBugDetails && bugDetails && (
+          <div className="space-y-5 text-sm text-slate-800">
+            {/* Primary info */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Title</span>
+                <div className="rounded-lg bg-slate-50 px-3 py-2 font-semibold text-slate-900 border border-slate-100">
+                  {bugDetails.title}
+                </div>
               </div>
-              <button
-                onClick={() => {
-                  setSelectedBug(null);
-                  setBugDetails(null);
-                }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 hover:shadow-sm transition"
-              >
-                ✕
-              </button>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</span>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-50 text-emerald-700`}>
+                    {bugDetails.status}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Severity</span>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${severityColors[bugDetails.severity] || "bg-slate-100 text-slate-700"}`}>
+                    {bugDetails.severity}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Priority</span>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${priorityColors[bugDetails.priority] || "bg-slate-100 text-slate-700"}`}>
+                    {bugDetails.priority}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            {/* Divider */}
-            <div className="border-t border-slate-100" />
-
-            {/* Loading */}
-            {loadingBugDetails && (
-              <div className="py-12 text-center">
-                <LoadingSpinner text="Loading Bug Details..." />
+            {/* Long text */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
+                {[["Description", bugDetails.description], ["Expected Result", bugDetails.expectedResult]].map(([label, val]) => (
+                  <div key={label}>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+                    <div className="mt-1 rounded-lg bg-slate-50 px-3 py-2 text-slate-700 border border-slate-100">{val || "—"}</div>
+                  </div>
+                ))}
               </div>
-            )}
-
-            {/* Details */}
-            {!loadingBugDetails && bugDetails && (
-              <div className="px-6 pb-6 pt-4 space-y-6 text-sm text-slate-800">
-                {/* Primary info */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                      Title
-                    </span>
-                    <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
-                      {bugDetails.title}
-                    </div>
+              <div className="space-y-3">
+                {[["Actual Result", bugDetails.actualResult], ["Reproduction Steps", bugDetails.reproductionSteps]].map(([label, val]) => (
+                  <div key={label}>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+                    <div className="mt-1 rounded-lg bg-slate-50 px-3 py-2 text-slate-700 whitespace-pre-line border border-slate-100">{val || "—"}</div>
                   </div>
-
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        Status
-                      </span>
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                        {bugDetails.status}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        Severity
-                      </span>
-                      <span className="inline-flex items-center rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
-                        {bugDetails.severity}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        Priority
-                      </span>
-                      <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-                        {bugDetails.priority}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Long text section */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-3">
-                    <div>
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        Description
-                      </span>
-                      <div className="mt-1 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                        {bugDetails.description || "—"}
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        Expected Result
-                      </span>
-                      <div className="mt-1 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                        {bugDetails.expectedResult || "—"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        Actual Result
-                      </span>
-                      <div className="mt-1 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                        {bugDetails.actualResult || "—"}
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        Reproduction Steps
-                      </span>
-                      <div className="mt-1 whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                        {bugDetails.reproductionSteps || "—"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Linked entities */}
-                <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Linked Items
-                  </h4>
-                  <div className="mt-3 grid gap-3 md:grid-cols-3 lg:grid-cols-5 text-xs">
-                    <div>
-                      <p className="text-[11px] font-medium text-slate-500">
-                        Story
-                      </p>
-                      <p className="mt-1 font-medium text-slate-800">
-                        {bugDetails.testStory?.title || "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-medium text-slate-500">
-                        Scenario
-                      </p>
-                      <p className="mt-1 font-medium text-slate-800">
-                        {bugDetails.testScenario?.title || "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-medium text-slate-500">
-                        Test Case
-                      </p>
-                      <p className="mt-1 font-medium text-slate-800">
-                        {bugDetails.testCase?.title || "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-medium text-slate-500">
-                        Run Case
-                      </p>
-                      <p className="mt-1 font-medium text-slate-800">
-                        {bugDetails.runCase?.title || "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-medium text-slate-500">
-                        Run Case Step
-                      </p>
-                      <p className="mt-1 font-medium text-slate-800">
-                        {bugDetails.runCaseStep?.stepDescription || "—"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-end pt-2 border-t border-slate-100 mt-2">
-                  <button
-                    onClick={() => {
-                      setSelectedBug(null);
-                      setBugDetails(null);
-                    }}
-                    className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1 focus:ring-offset-slate-900 transition"
-                  >
-                    Close
-                  </button>
-                </div>
+                ))}
               </div>
-            )}
+            </div>
+
+            {/* Linked items */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Linked Items</h4>
+              <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5 text-xs">
+                {[
+                  ["Story",         bugDetails.testStory?.title],
+                  ["Scenario",      bugDetails.testScenario?.title],
+                  ["Test Case",     bugDetails.testCase?.title],
+                  ["Run Case",      bugDetails.runCase?.title],
+                  ["Run Case Step", bugDetails.runCaseStep?.stepDescription],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
+                    <p className="mt-1 font-medium text-slate-800">{value || "—"}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 };

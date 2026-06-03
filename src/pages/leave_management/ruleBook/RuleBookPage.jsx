@@ -1,19 +1,18 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-  const SECOND_URL = "/api/workflow/admin";
-  const token = localStorage.getItem("token");
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+const SECOND_URL = "/api/workflow/admin";
 
-  // Axios instance with baseURL and token
-  const api = axios.create({
-    baseURL: BASE_URL,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+// Axios instance with baseURL and token
+const api = api.create({
+  baseURL: BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },
+});
 
 const RuleBookPage = () => {
   const [rules, setRules] = useState([]);
@@ -87,7 +86,8 @@ const RuleBookPage = () => {
 
   // Add new action type locally
   const handleAddActionType = () => {
-    if (!newActionType.trim()) return showToast("Enter a valid action type", "error");
+    if (!newActionType.trim())
+      return showToast("Enter a valid action type", "error");
 
     const formatted = newActionType.toUpperCase().replaceAll(" ", "_");
     if (actionTypes.includes(formatted)) {
@@ -104,7 +104,10 @@ const RuleBookPage = () => {
   const handleAddCondition = () => {
     setNewRule({
       ...newRule,
-      conditions: [...newRule.conditions, { attribute: "", operator: "==", value: "" }],
+      conditions: [
+        ...newRule.conditions,
+        { attribute: "", operator: "==", value: "" },
+      ],
     });
   };
 
@@ -130,7 +133,10 @@ const RuleBookPage = () => {
       };
 
       if (editing) {
-        await api.put(`${BASE_URL}${SECOND_URL}/rulesets/${newRule.id}`, payload);
+        await api.put(
+          `${BASE_URL}${SECOND_URL}/rulesets/${newRule.id}`,
+          payload,
+        );
         showToast("Rule updated successfully");
       } else {
         await api.post(`${BASE_URL}${SECOND_URL}/rulesets`, payload);
@@ -189,7 +195,9 @@ const RuleBookPage = () => {
       {/* Rule Creation Panel */}
       <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-lg p-8 space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-indigo-700">Rule Book Configuration</h1>
+          <h1 className="text-2xl font-bold text-indigo-700">
+            Rule Book Configuration
+          </h1>
           {editing && (
             <button
               onClick={handleResetForm}
@@ -206,18 +214,16 @@ const RuleBookPage = () => {
             Action Type
           </label>
           <div className="flex gap-2">
-            <select
-              value={newRule.name}
-              onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
-              className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Select Action Type</option>
-              {actionTypes.map((type, i) => (
-                <option key={i} value={type}>
-                  {type.replaceAll("_", " ")}
-                </option>
-              ))}
-            </select>
+            <div className="flex-1">
+              <FilterListbox
+                options={[
+                  { value: "", label: "Select Action Type" },
+                  ...actionTypes.map((type) => ({ value: type, label: type.replaceAll("_", " ") })),
+                ]}
+                value={newRule.name}
+                onChange={(val) => setNewRule({ ...newRule, name: val })}
+              />
+            </div>
 
             {!showAddActionType ? (
               <button
@@ -260,7 +266,9 @@ const RuleBookPage = () => {
           <input
             type="text"
             value={newRule.description}
-            onChange={(e) => setNewRule({ ...newRule, description: e.target.value })}
+            onChange={(e) =>
+              setNewRule({ ...newRule, description: e.target.value })
+            }
             className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500"
             placeholder="Enter rule description"
           />
@@ -297,18 +305,20 @@ const RuleBookPage = () => {
                   }}
                   className="flex-1 border border-gray-300 rounded px-2 py-1"
                 />
-                <select
-                  value={condition.operator}
-                  onChange={(e) => {
-                    const updated = [...newRule.conditions];
-                    updated[index].operator = e.target.value;
-                    setNewRule({ ...newRule, conditions: updated });
-                  }}
-                  className="w-28 border border-gray-300 rounded px-2 py-1"
-                >
-                  <option value="==">==</option>
-                  <option value="!=">!=</option>
-                </select>
+                <div className="w-28">
+                  <FilterListbox
+                    options={[
+                      { value: "==", label: "==" },
+                      { value: "!=", label: "!=" },
+                    ]}
+                    value={condition.operator}
+                    onChange={(val) => {
+                      const updated = [...newRule.conditions];
+                      updated[index].operator = val;
+                      setNewRule({ ...newRule, conditions: updated });
+                    }}
+                  />
+                </div>
                 <input
                   type="text"
                   placeholder="Value"
@@ -328,7 +338,9 @@ const RuleBookPage = () => {
         {/* Approval Steps */}
         <div>
           <div className="flex justify-between items-center mb-2">
-            <h2 className="text-lg font-medium text-gray-700">Approval Steps</h2>
+            <h2 className="text-lg font-medium text-gray-700">
+              Approval Steps
+            </h2>
             <button
               onClick={handleAddStep}
               className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
@@ -338,7 +350,9 @@ const RuleBookPage = () => {
           </div>
 
           {newRule.approvalSteps.length === 0 ? (
-            <p className="text-gray-400 text-sm">No approval steps added yet.</p>
+            <p className="text-gray-400 text-sm">
+              No approval steps added yet.
+            </p>
           ) : (
             newRule.approvalSteps.map((step, index) => (
               <div
@@ -355,22 +369,20 @@ const RuleBookPage = () => {
                   }}
                   className="w-20 border border-gray-300 rounded px-2 py-1"
                 />
-                <select
-                  value={step.approverType}
-                  onChange={(e) => {
-                    const updated = [...newRule.approvalSteps];
-                    updated[index].approverType = e.target.value;
-                    setNewRule({ ...newRule, approvalSteps: updated });
-                  }}
-                  className="flex-1 border border-gray-300 rounded px-2 py-1"
-                >
-                  <option value="">Select Approver Type</option>
-                  {approverTypes.map((type, i) => (
-                    <option key={i} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex-1">
+                  <FilterListbox
+                    options={[
+                      { value: "", label: "Select Approver Type" },
+                      ...approverTypes.map((type) => ({ value: type, label: type })),
+                    ]}
+                    value={step.approverType}
+                    onChange={(val) => {
+                      const updated = [...newRule.approvalSteps];
+                      updated[index].approverType = val;
+                      setNewRule({ ...newRule, approvalSteps: updated });
+                    }}
+                  />
+                </div>
                 <input
                   type="text"
                   value={step.approverValue}
@@ -382,18 +394,20 @@ const RuleBookPage = () => {
                   className="flex-1 border border-gray-300 rounded px-2 py-1"
                   placeholder="Approver Value"
                 />
-                <select
-                  value={step.mode}
-                  onChange={(e) => {
-                    const updated = [...newRule.approvalSteps];
-                    updated[index].mode = e.target.value;
-                    setNewRule({ ...newRule, approvalSteps: updated });
-                  }}
-                  className="w-32 border border-gray-300 rounded px-2 py-1"
-                >
-                  <option value="SEQUENTIAL">Sequential</option>
-                  <option value="PARALLEL">Parallel</option>
-                </select>
+                <div className="w-32">
+                  <FilterListbox
+                    options={[
+                      { value: "SEQUENTIAL", label: "Sequential" },
+                      { value: "PARALLEL", label: "Parallel" },
+                    ]}
+                    value={step.mode}
+                    onChange={(val) => {
+                      const updated = [...newRule.approvalSteps];
+                      updated[index].mode = val;
+                      setNewRule({ ...newRule, approvalSteps: updated });
+                    }}
+                  />
+                </div>
               </div>
             ))
           )}
@@ -451,9 +465,13 @@ const RuleBookPage = () => {
                     </td>
                     <td className="p-3 border text-center">
                       {rule.active ? (
-                        <span className="text-green-600 font-semibold">✅ Active</span>
+                        <span className="text-green-600 font-semibold">
+                          ✅ Active
+                        </span>
                       ) : (
-                        <span className="text-red-500 font-semibold">❌ Inactive</span>
+                        <span className="text-red-500 font-semibold">
+                          ❌ Inactive
+                        </span>
                       )}
                     </td>
                     <td className="p-3 border text-center">

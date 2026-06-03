@@ -1,37 +1,37 @@
-import axios from 'axios';
+import api from "../../../api/axiosInstance";
+import { useJobProgress } from "../../../contexts/JobProgressContext";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 // Get token from localStorage (or sessionStorage if you're using that)
 const getAuthHeader = () => {
-  const token = localStorage.getItem("token"); // change if you stored it differently
-  return token
-    ? { Authorization: `Bearer ${token}` }
-    : {};
+  return localStorage.getItem("token") ? { Authorization: `Bearer ${localStorage.getItem("token")}` } : {};
 };
 
 export const approvalService = {
   getPendingApprovals: async () => {
-    const response = await axios.get(
-      `${BASE_URL}/api/approvals/pending`,
-      { headers: getAuthHeader() }
-    );
+    const response = await api.get(`${BASE_URL}/api/approvals/pending`, {
+      headers: getAuthHeader(),
+    });
     return response.data;
   },
 
   approveRequest: async (requestId, comment) => {
-    await axios.post(
+    const response = await api.post(
       `${BASE_URL}/api/approvals/${requestId}/approve`,
       { comment },
-      { headers: getAuthHeader() }
+      { headers: getAuthHeader() },
     );
+      {
+          startJob(response.data.data.jobId);
+        }
   },
 
   rejectRequest: async (requestId, reason) => {
-    await axios.post(
+    await api.post(
       `${BASE_URL}/api/approvals/${requestId}/reject`,
       { reason },
-      { headers: getAuthHeader() }
+      { headers: getAuthHeader() },
     );
-  }
+  },
 };

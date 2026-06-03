@@ -2,303 +2,418 @@
 
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useEffect, useRef, useState } from "react";
 
 export default function OnboardingNavBar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { hasRole } = useAuth();
+  const [certificateMenuOpen, setCertificateMenuOpen] = useState(false);
+  const certificateCloseTimer = useRef(null);
 
-  /* ================= HIDE NAVBAR FOR THESE ROUTES ================= */
+  const isAdmin = hasRole(["ADMIN"]);
+  const isManager = hasRole(["REPORTING_MANAGER"]);
+  const isGeneral = hasRole(["GENERAL"]);
+  const isHR = hasRole(["HR"]);
+  
+  const isOnlyGeneral =
+    hasRole(["GENERAL"]) &&
+    !hasRole(["HR"]) &&
+    !hasRole(["Reporting_Manager"]) &&
+    !hasRole(["ADMIN"]);
+
+  useEffect(() => {
+    if (
+      isOnlyGeneral &&
+      location.pathname === "/employee-onboarding"
+    ) {
+      navigate("/employee-onboarding/employee-directory", { replace: true });
+    }
+  }, [isOnlyGeneral, location.pathname, navigate]);
+
+  useEffect(() => {
+    return () => {
+      if (certificateCloseTimer.current) {
+        clearTimeout(certificateCloseTimer.current);
+      }
+    };
+  }, []);
+
+  const openCertificateMenu = () => {
+    if (certificateCloseTimer.current) {
+      clearTimeout(certificateCloseTimer.current);
+    }
+    setCertificateMenuOpen(true);
+  };
+
+  const closeCertificateMenu = () => {
+    if (certificateCloseTimer.current) {
+      clearTimeout(certificateCloseTimer.current);
+    }
+    certificateCloseTimer.current = setTimeout(() => {
+      setCertificateMenuOpen(false);
+    }, 120);
+  };
+
+  const toggleCertificateMenu = () => {
+    if (certificateCloseTimer.current) {
+      clearTimeout(certificateCloseTimer.current);
+    }
+    setCertificateMenuOpen((open) => !open);
+  };
+
+  /* ================= HIDE NAVBAR ================= */
 
   const hideNavbarRoutes = [
-    "/employee-onboarding/employee-credentials"
-    // "/employee-onboarding/core-employee",
+    "/employee-onboarding/employee-credentials",
+    "/employee-onboarding/employeeProfile",
   ];
 
-  const shouldHideNavbar = hideNavbarRoutes.some((route) =>
-    location.pathname.startsWith(route)
-  );
-
-  if (shouldHideNavbar) return null;
-
-  /* ================= PERMISSIONS ================= */
-
-  const permissions = user?.permissions || [];
-  const canViewAdminView = permissions.includes("VIEW_ADMIN_PAGE");
-
-  /* ================= PARENT TOP NAV ================= */
-
-const parentNav = [
-  {
-    label: "Onboarding Dashboard",
-    match: ["/employee-onboarding/onboarding-summary", "/employee-onboarding/analytics"],
-    redirect: "/employee-onboarding/onboarding-summary",
-  },
-  {
-    label: "Onboarding Task",
-    match: [
-      "/employee-onboarding",
-      "/employee-onboarding/create",
-      "/employee-onboarding/bulk-upload",
-      "/employee-onboarding/onboarding-task",
-      "/employee-onboarding/hr-configuration",
-      "/employee-onboarding/admin",
-    ],
-    exactRoot: true,
-    redirect: "/employee-onboarding",
-  },
-  {
-    label: "Employee Directory",
-    match: [
-      "/employee-onboarding/employee-directory",
-      "/employee-onboarding/employeelist",
-      "/employee-onboarding/organization-tree",
-    ],
-    redirect: "/employee-onboarding/employee-directory",
-  },
-  {
-    label: "Employee Verification",
-    match: [
-      "/employee-onboarding/hr",
-      "/employee-onboarding/backgroundcheck",
-      "/employee-onboarding/core-employee",
-    ],
-    redirect: "/employee-onboarding/hr",
-  },
-  {
-    label: "Employee Documents",
-    match: [
-      "/employee-onboarding/employeedocuments",
-      "/employee-onboarding/document-templates",
-      "/employee-onboarding/organization-documents",
-      "/employee-onboarding/hr/backgroundcheck"
-    ],
-    redirect: "/employee-onboarding/employeedocuments",
-  },
-  {
-    label: "Weekly Workforce Summary",
-    match: [
-      "/employee-onboarding/weekly-joining-report-dashboard"
-    ],
-    redirect: "/employee-onboarding/weekly-joining-report-dashboard",
-  },
-  {
-    label: "Employee Exit",
-    match: [
-      "/employee-exit"
-    ],
-    redirect: "/employee-exit",
+  if (hideNavbarRoutes.some((route) => location.pathname.startsWith(route))) {
+    return null;
   }
-];
 
-  /* ================= MAIN TASK NAV ================= */
+  /* ================= PARENT NAV ================= */
 
-  const taskNav = [
-    { label: "Task Dashboard", path: "/employee-onboarding" },
+  const parentNav = [
+    // ✅ Insights & Analytics → HR, MANAGER
+    ...(hasRole(["HR", "Reporting_Manager"]) ? [{
+      label: "Insights & Analytics",
+      match: [
+        "/employee-onboarding/onboarding-summary",
+        "/employee-onboarding/analytics"
+      ],
+      redirect: "/employee-onboarding/onboarding-summary",
+    }] : []),
 
-    ...(canViewAdminView
-      ? [
-          {
-            label: "Admin View",
-            path: "/employee-onboarding/admin/approval-dashboard",
-          },
-        ]
+    // ✅ Onboarding Management → HR, ADMIN, MANAGER
+    ...((isHR || isAdmin || isManager) ? [{
+      label: "Onboarding Management",
+      match: [
+        "/employee-onboarding",
+        "/employee-onboarding/create",
+        "/employee-onboarding/bulk-upload",
+        "/employee-onboarding/onboarding-task",
+        "/employee-onboarding/hr-configuration",
+      ],
+      exactRoot: true,
+      redirect: isManager && isGeneral
+        ? "/employee-onboarding/admin/approval-dashboard"
+        : "/employee-onboarding",
+    }] : []),
+
+    // ✅ People Directory → ALL
+    {
+      label: "Employee Directory",
+      match: [
+        "/employee-onboarding/employee-directory",
+        "/employee-onboarding/employeelist",
+        "/employee-onboarding/organization-tree",
+      ],
+      redirect: "/employee-onboarding/employee-directory",
+    },
+
+    // ✅ Document Center → HR, MANAGER
+    ...(hasRole(["HR", "Reporting_Manager"]) ? [{
+      label: "Document Center",
+      match: [
+        "/employee-onboarding/employeedocuments",
+        // "/employee-onboarding/document-templates",
+        // "/employee-onboarding/organization-documents",
+      ],
+      redirect: "/employee-onboarding/employeedocuments",
+    }] : []),
+
+    // ✅ Workforce Reports → HR, MANAGER
+    ...(hasRole(["HR", "Reporting_Manager"]) ? [{
+      label: "Workforce Reports",
+      match: ["/employee-onboarding/weekly-joining-report-dashboard"],
+      redirect: "/employee-onboarding/weekly-joining-report-dashboard",
+    }] : []),
+
+    // ✅ Compliance & Verification (Parent → HR + MANAGER)
+    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
+      label: "Compliance & Verification",
+      redirect: hasRole(["HR"])
+        ? "/employee-onboarding/hr"
+        : "/employee-onboarding/core-employee",
+      children: [
+        ...(hasRole(["HR"]) ? [
+          { label: "Internal Audit", path: "/employee-onboarding/hr" },
+          { label: "BGC Screening", path: "/employee-onboarding/backgroundcheck" },
+        ] : []),
+        ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [
+          { label: "Profile Hub", path: "/employee-onboarding/core-employee" }
+        ] : []),
+      ]
+    }] : []),
+
+    // ✅ Offboarding → HR, MANAGER
+    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
+      label: "Offboarding",
+      match: ["/employee-exit"],
+      redirect: "/employee-exit",
+    }] : []),
+
+    ...(hasRole(["ADMIN"]) ? [{
+      label: "ManageSkillTaxonomy",
+      match: ["/employee-onboarding/manage-skill-taxonomy"],
+      redirect: "/employee-onboarding/manage-skill-taxonomy",
+    }] : []),
+  ];
+
+  /* ================= SUB-NAV DEFINITIONS ================= */
+
+  const managementNav = [
+    ...(!isOnlyGeneral
+      ? [{ label: "Workflow Overview", path: "/employee-onboarding" }]
       : []),
-
-    { label: "Create Offer", path: "/employee-onboarding/create" },
-    { label: "Bulk Upload", path: "/employee-onboarding/bulk-upload" },
-    { label: "Add Tasks", path: "/employee-onboarding/onboarding-task" },
-    { label: "HR Configuration", path: "/employee-onboarding/hr-configuration" },
+    ...(hasRole(["HR"]) ? [
+      { label: "Offer Management", path: "/employee-onboarding/create" },
+      { label: "Data Import", path: "/employee-onboarding/bulk-upload" }
+    ] : []),
+    ...(hasRole(["HR", "ADMIN"]) ? [
+      { label: "Task Configuration", path: "/employee-onboarding/onboarding-task" }
+    ] : []),
+    ...(hasRole(["HR", "ADMIN"]) ? [
+      { label: "System Settings", path: "/employee-onboarding/hr-configuration" }
+    ] : []),
+    ...(isManager && !isAdmin ? [
+      { label: "Pending Approvals", path: "/employee-onboarding/admin/approval-dashboard" }
+    ] : []),
   ];
 
-  /* ================= DASHBOARD NAV ================= */
-
-  const dashboardNav = [
-    { label: "Summary", path: "/employee-onboarding/onboarding-summary" },
-    { label: "Analytics", path: "/employee-onboarding/analytics" },
+  const insightsNav = [
+    { label: "Executive Summary", path: "/employee-onboarding/onboarding-summary" },
+    { label: "Operational Metrics", path: "/employee-onboarding/analytics" },
   ];
-
-  /* ================= DIRECTORY NAV ================= */
 
   const directoryNav = [
     { label: "Employee Directory", path: "/employee-onboarding/employee-directory" },
-    { label: "Employee List", path: "/employee-onboarding/employeelist" },
-    { label: "Organization Tree", path: "/employee-onboarding/organization-tree" },
+    ...(isHR || isManager ? [{ label: "Member Records", path: "/employee-onboarding/employeelist" }] : []),
+    { label: "Org Chart", path: "/employee-onboarding/organization-tree" },
   ];
 
   const documentsNav = [
-    { label: "Employee Documents", path: "/employee-onboarding/employeedocuments" },
-    { label: "Document Templates", path: "/employee-onboarding/document-templates" },
-    { label: "Organization Documents", path: "/employee-onboarding/organization-documents" },
+    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{ label: "Personnel Files", path: "/employee-onboarding/employeedocuments" }] : []),
+    ...(hasRole(["HR"]) ? [
+      { label: "e-Form Templates", path: "/employee-onboarding/document-templates" },
+      // { label: "Corporate Policies", path: "/employee-onboarding/organization-documents" }
+    ] : []),
   ];
 
-  const hrverificationNav = [
-    { label: "HR Verification", path: "/employee-onboarding/hr" },
-    { label: "Background Check", path: "/employee-onboarding/backgroundcheck" },
-
-    { label: "Core Employee", path: "/employee-onboarding/core-employee" },
-
+  const complianceNav = [
+    ...(hasRole(["HR"]) ? [
+      { label: "Internal Audit", path: "/employee-onboarding/hr" },
+      { label: "BGC Screening", path: "/employee-onboarding/backgroundcheck" }
+    ] : []),
+    ...(hasRole(["HR", "ADMIN", "REPORTING_MANAGER"]) ? [{ label: "Profile Hub", path: "/employee-onboarding/core-employee" }] : []),
   ];
 
-  const weeklyJoiningDashboardNav = [
-    { label: "Weekly Joining Dashboard", path: "/employee-onboarding/weekly-joining-report-dashboard" },
+  const reportsNav = [
+    { label: "Reporting Dashboard", path: "/employee-onboarding/weekly-joining-report-dashboard" },
   ];
 
-  /* ================= EMPLOYEE EXIT NAV ================= */
-
-  const employeeExitNav = [
-    { label: "Exit Dashboard", path: "/employee-exit" },
+  const offboardingNav = [
+    { label: "Offboarding Overview", path: "/employee-exit" },
   ];
 
-  /* ================= SELECT NAV TO RENDER ================= */
+  const certificateNavOptions = [
+    {
+      label: "Skill Certifications",
+      path: "/employee-onboarding/manage-skill-taxonomy/certificates",
+    },
+    {
+      label: "General Certifications",
+      path: "/employee-onboarding/manage-skill-taxonomy/certificates/general",
+    },
+  ];
 
-  let navToRender = null;
+  const skillTaxonomyNav = [
+    { label: "Skill Taxonomy", path: "/employee-onboarding/manage-skill-taxonomy" },
+    { label: "Requests", path: "/employee-onboarding/manage-skill-taxonomy/requests" },
+    {
+      label: "Certificates",
+      path: "/employee-onboarding/manage-skill-taxonomy/certificates",
+      children: certificateNavOptions,
+    },
+  ];
 
-  if (
-    location.pathname.startsWith("/employee-onboarding/onboarding-summary") ||
-    location.pathname.startsWith("/employee-onboarding/analytics")
-  ) {
-    navToRender = dashboardNav;
-  } else if (
-    location.pathname.startsWith("/employee-onboarding/employee-directory") ||
-    location.pathname.startsWith("/employee-onboarding/employeelist") ||
-    location.pathname.startsWith("/employee-onboarding/organization-tree")
-  ) {
+  /* ================= NAV SWITCH LOGIC ================= */
+
+  let navToRender = managementNav; // Default
+
+  const path = location.pathname;
+
+  if (path.startsWith("/employee-onboarding/onboarding-summary") || path.startsWith("/employee-onboarding/analytics")) {
+    navToRender = insightsNav;
+  } 
+  else if (path.startsWith("/employee-onboarding/employee-directory") || path.startsWith("/employee-onboarding/employeelist") || path.startsWith("/employee-onboarding/organization-tree")) {
     navToRender = directoryNav;
-  } else if (
-    location.pathname.startsWith("/employee-onboarding/employeedocuments") ||
-    location.pathname.startsWith("/employee-onboarding/document-templates") ||
-    location.pathname.startsWith("/employee-onboarding/organization-documents")
-  ) {
+  } 
+  else if (path.startsWith("/employee-onboarding/employeedocuments") || path.startsWith("/employee-onboarding/document-templates") || path.startsWith("/employee-onboarding/organization-documents")) {
     navToRender = documentsNav;
   } 
-    else if (
-    location.pathname.startsWith("/employee-onboarding/hr-configuration")
-  ) {
-    navToRender = taskNav;
-  }
-  else if (
-    location.pathname.startsWith("/employee-onboarding/hr") ||
-    location.pathname.startsWith("/employee-onboarding/backgroundcheck") ||
-    location.pathname.startsWith("/employee-onboarding/core-employee")
-  ) {
-    navToRender = hrverificationNav;
+  else if (path.startsWith("/employee-onboarding/hr") || path.startsWith("/employee-onboarding/backgroundcheck") || path.startsWith("/employee-onboarding/core-employee")) {
+    // 💡 This block handles compliance. Since 'hr-configuration' starts with 'hr', 
+    // we explicitly check to ensure hr-configuration stays in Management Nav.
+    if (path.startsWith("/employee-onboarding/hr-configuration")) {
+        navToRender = managementNav;
+    } else {
+        navToRender = complianceNav;
+    }
   } 
-  else if (
-    location.pathname.startsWith("/employee-onboarding/weekly-joining-report-dashboard")
-  ) {
-    navToRender = weeklyJoiningDashboardNav;
+  else if (path.startsWith("/employee-onboarding/weekly-joining-report-dashboard")) {
+    navToRender = reportsNav;
+  } 
+  else if (path.startsWith("/employee-exit")) {
+    navToRender = offboardingNav;
+  } 
+  else if (path.startsWith("/employee-onboarding/manage-skill-taxonomy")) {
+    navToRender = skillTaxonomyNav;
   }
-  else if (
-    location.pathname.startsWith("/employee-exit")
-  ) {
-    navToRender = employeeExitNav;
-  }
-  else {
-    navToRender = taskNav;
+  else if (path.startsWith("/employee-onboarding")) {
+    navToRender = managementNav;
   }
 
   /* ================= RENDER ================= */
-
   return (
     <div>
+      {/* PARENT NAVBAR */}
+      <div className="relative border-b bg-white z-30">
+        <div className="flex gap-6 px-6 py-1">
+          {parentNav.map((item) => {
+            const isActive = (() => {
+              if (item.match) {
+                return item.match.some((p) => {
+                  if (item.exactRoot && p === "/employee-onboarding") return path === "/employee-onboarding";
+                  if (path.startsWith("/employee-onboarding/admin")) return p === "/employee-onboarding/admin";
+                  return path === p || path.startsWith(p + "/");
+                });
+              }
+              if (item.children) {
+                return item.children.some((child) => path === child.path || path.startsWith(child.path + "/"));
+              }
+              return false;
+            })();
 
-    {/* ================= PARENT NAVBAR (TOP) ================= */}
-
-    <div className="relative border-b bg-white z-30">
-      <div className="flex gap-12 px-6 pt-3">
-
-        {parentNav.map((item) => {
-
-          // const isActive = item.match.some((path) =>
-          //   location.pathname === path ||
-          //   location.pathname.startsWith(path)
-          // );
-          const isActive = item.match.some((path) => {
-            if (item.exactRoot && path === "/employee-onboarding") {
-              return location.pathname === "/employee-onboarding";
-            }
             return (
-              location.pathname === path ||
-              location.pathname.startsWith(path + "/")
+              <div key={item.label} onClick={() => navigate(item.redirect)} className="relative cursor-pointer py-1 text-sm font-semibold">
+                <span className={isActive ? "text-gray-900" : "text-gray-500 hover:text-gray-900"}>{item.label}</span>
+                {isActive && (
+                  <span className="absolute left-1/2 -bottom-[6px] -translate-x-1/2 h-0 w-0 z-40 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent border-b-blue-700" />
+                )}
+              </div>
             );
-          });
-
-          return (
-            <div
-              key={item.label}
-              onClick={() => navigate(item.redirect)}
-              className="relative cursor-pointer pb-3 text-sm font-semibold"
-            >
-              <span
-                className={
-                  isActive
-                    ? "text-gray-900"
-                    : "text-gray-500 hover:text-gray-900"
-                }
-              >
-                {item.label}
-              </span>
-
-              {/* Green triangle indicator */}
-              {isActive && (
-                <span
-                 className="absolute left-1/2 -bottom-[10px] -translate-x-1/2
-                  h-0 w-0 z-40
-                  border-l-8 border-r-8 border-b-8
-                  border-l-transparent border-r-transparent border-b-blue-700"
-                />
-              )}
-            </div>
-          );
-        })}
+          })}
+        </div>
       </div>
-    </div>
 
-    <div className="relative border-b bg-gray-200 mt-4 z-10">
-      <div className="flex gap-10 px-6">
-        {navToRender.map((item) => {
+      {/* SECONDARY NAVBAR */}
+      <div className="relative border-b bg-gray-200 mt-4 z-10">
+        <div className="flex gap-6 px-6">
+          {navToRender.map((item) => {
+            let isActive = (() => {
+              if (item.path === "/employee-onboarding") return path === "/employee-onboarding";
+              if (item.children) {
+                return item.children.some((child) => path === child.path || path.startsWith(child.path + "/"));
+              }
+              const directMatch = path === item.path || path.startsWith(item.path + "/");
+              if (!directMatch) return false;
+              // Yield to a more specific sibling that also matches (e.g. /requests beats /manage-skill-taxonomy)
+              const moreSpecificSiblingMatches = navToRender.some(
+                (other) =>
+                  other.path !== item.path &&
+                  other.path.startsWith(item.path) &&
+                  (path === other.path || path.startsWith(other.path + "/")),
+              );
+              return !moreSpecificSiblingMatches;
+            })();
 
-          let isActive = false;
+            if (item.children) {
+              return (
+                <div
+                  key={item.label}
+                  className="relative flex h-8 items-center"
+                  onMouseEnter={openCertificateMenu}
+                  onMouseLeave={closeCertificateMenu}
+                >
+                  <button
+                    type="button"
+                    onClick={toggleCertificateMenu}
+                    aria-expanded={certificateMenuOpen}
+                    aria-haspopup="menu"
+                    className="group inline-flex h-full items-center gap-1.5 text-sm font-medium outline-none"
+                  >
+                    <span className={isActive ? "text-gray-900" : "text-gray-500 group-hover:text-gray-900"}>{item.label}</span>
+                    <span
+                      className={`mt-0.5 h-1.5 w-1.5 rotate-45 border-b border-r transition-transform duration-150 ${
+                        isActive ? "border-gray-900" : "border-gray-500 group-hover:border-gray-900"
+                      } ${certificateMenuOpen ? "rotate-[225deg]" : ""}`}
+                    />
+                  </button>
 
-          // 🔴 FIX: First tab should match EXACTLY only
-          if (item.path === "/employee-onboarding") {
-            isActive = location.pathname === "/employee-onboarding";
-          } else {
-            isActive =
-              location.pathname === item.path ||
-              location.pathname.startsWith(item.path + "/");
-          }
+                  {isActive && (
+                    <span className="absolute left-1/2 -bottom-1 h-0 w-0 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-green-500" />
+                  )}
 
-          return (
-            <div
-              key={item.label}
-              onClick={() => navigate(item.path)}
-              className="relative cursor-pointer py-3 text-sm font-medium"
-            >
-              <span
-                className={
-                  isActive
-                    ? "text-gray-900"
-                    : "text-gray-500 hover:text-gray-900"
-                }
-              >
-                {item.label}
-              </span>
+                  <div
+                    className={`absolute left-0 top-full z-40 mt-2 w-56 rounded-lg border border-gray-200 bg-white p-1 shadow-lg shadow-slate-900/10 transition-[opacity,transform,visibility] duration-150 before:absolute before:-top-2 before:left-0 before:h-2 before:w-full before:content-[''] ${
+                      certificateMenuOpen
+                        ? "visible translate-y-0 opacity-100"
+                        : "invisible -translate-y-1 opacity-0"
+                    }`}
+                    role="menu"
+                  >
+                    {item.children.map((child) => {
+                      const childActive = (() => {
+                        const directMatch = path === child.path || path.startsWith(child.path + "/");
+                        if (!directMatch) return false;
+                        return !item.children.some(
+                          (other) =>
+                            other.path !== child.path &&
+                            other.path.startsWith(child.path) &&
+                            (path === other.path || path.startsWith(other.path + "/")),
+                        );
+                      })();
+                      return (
+                        <button
+                          key={child.path}
+                          type="button"
+                          onClick={() => {
+                            if (certificateCloseTimer.current) {
+                              clearTimeout(certificateCloseTimer.current);
+                            }
+                            setCertificateMenuOpen(false);
+                            navigate(child.path);
+                          }}
+                          className={`flex h-9 w-full items-center rounded-md px-3 text-left text-sm transition-colors duration-150 ${
+                            childActive
+                              ? "bg-indigo-50 text-indigo-700"
+                              : "text-gray-700 hover:bg-gray-50 hover:text-gray-950"
+                          }`}
+                          role="menuitem"
+                        >
+                          {child.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
 
-              {isActive && (
-                <span
-                  className="absolute left-1/2 -bottom-1 h-0 w-0 
-                  -translate-x-1/2 
-                  border-l-8 border-r-8 border-t-8
-                  border-l-transparent border-r-transparent border-t-green-500"
-                />
-              )}
-            </div>
-          );
-        })}
+            return (
+              <div key={item.label} onClick={() => navigate(item.path)} className="relative cursor-pointer py-1 text-sm font-medium">
+                <span className={isActive ? "text-gray-900" : "text-gray-500 hover:text-gray-900"}>{item.label}</span>
+                {isActive && (
+                  <span className="absolute left-1/2 -bottom-1 h-0 w-0 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-green-500" />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
     </div>
   );
 }

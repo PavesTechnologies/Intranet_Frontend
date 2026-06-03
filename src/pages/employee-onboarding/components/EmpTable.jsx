@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Table from "../../../components/Table/table";
 import Pagination from "../../../components/Pagination/pagination";
 import Button from "../../../components/Button/Button";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import StatusBadge from "../../../components/status/statusbadge";
+import { CheckIcon, ViewIcon } from "../../../components/icons/ActionIcons";
 import {
   formatOfferStatusLabel,
   getNormalizedStatus,
@@ -16,56 +17,29 @@ import {
 
 const PAGE_SIZE = 5;
 
-function ActionMenu({ onView, onVerify, showVerify }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
+function ActionButtons({ onView, onVerify, showVerify }) {
   return (
-    <div className="relative inline-block" ref={ref}>
+    <div className="flex items-center justify-center gap-2">
       <button
-        onClick={() => setOpen((p) => !p)}
-        className="px-2 py-1 text-xl font-bold text-gray-600 hover:text-gray-900"
+        type="button"
+        onClick={onView}
+        className="rounded-md bg-gray-100 p-1.5 text-gray-700 transition hover:bg-gray-200 hover:text-gray-900"
+        aria-label="View offer"
+        title="View offer"
       >
-        &#8942;
+        <ViewIcon className="h-4 w-4" />
       </button>
 
-      {open && (
-        <div className="absolute right-full mr-2 top-0 w-32 bg-white border rounded-md shadow-lg z-50">
-          <button
-            onClick={() => {
-              onView();
-              setOpen(false);
-            }}
-            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-          >
-            View
-          </button>
-
-          {showVerify && (
-            <button
-              onClick={() => {
-                onVerify();
-                setOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-            >
-              Verify
-            </button>
-          )}
-        </div>
+      {showVerify && (
+        <button
+          type="button"
+          onClick={onVerify}
+          className="rounded-md bg-emerald-50 p-1.5 text-emerald-700 transition hover:bg-emerald-100 hover:text-emerald-800"
+          aria-label="Verify offer"
+          title="Verify offer"
+        >
+          <CheckIcon className="h-4 w-4" />
+        </button>
       )}
     </div>
   );
@@ -77,8 +51,6 @@ export default function OffersTable({
   loading = false,
 }) {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
-
   const [currentPage, setCurrentPage] = useState(1);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -90,7 +62,7 @@ export default function OffersTable({
     setSelectedIds((prev) =>
       prev.includes(userUuid)
         ? prev.filter((id) => id !== userUuid)
-        : [...prev, userUuid]
+        : [...prev, userUuid],
     );
   };
 
@@ -105,21 +77,21 @@ export default function OffersTable({
     try {
       setSending(true);
 
-      const res = await axios.post(
-        `${import.meta.env.VITE_EMPLOYEE_ONBOARDING_URL}/offerletters/bulk-send`,
+      const res = await api.post(
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/bulk-send`,
         {
           user_uuid_list: selectedIds,
         },
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       showStatusToast(
-        `Bulk Send Complete\n\nSuccessful: ${res.data.successful}\nFailed: ${res.data.failed}`
+        `Bulk Send Complete\n\nSuccessful: ${res.data.successful}\nFailed: ${res.data.failed}`,
       );
       cancelBulk();
     } catch (error) {
@@ -172,11 +144,10 @@ export default function OffersTable({
               onChange={() =>
                 isCheckboxEnabled && toggleSelect(offer.user_uuid)
               }
-              className={`h-4 w-4 ${
-                isCheckboxEnabled
+              className={`h-4 w-4 ${isCheckboxEnabled
                   ? "cursor-pointer"
                   : "cursor-not-allowed opacity-40"
-              }`}
+                }`}
             />
           ),
         }),
@@ -191,8 +162,8 @@ export default function OffersTable({
         contact: offer.contact_number || "—",
         designation: offer.designation
           ? offer.designation
-              .toLowerCase()
-              .replace(/\b\w/g, (c) => c.toUpperCase())
+            .toLowerCase()
+            .replace(/\b\w/g, (c) => c.toUpperCase())
           : "—",
         employee_type: offer.employee_type || "—",
         status: displayStatus ? (
@@ -204,7 +175,7 @@ export default function OffersTable({
           "—"
         ),
         action: (
-          <ActionMenu
+          <ActionButtons
             onView={() =>
               navigate(`/employee-onboarding/offer/${offer.user_uuid}`)
             }
@@ -216,21 +187,12 @@ export default function OffersTable({
         ),
       };
     });
-  }, [
-    offers,
-    currentPage,
-    bulkMode,
-    selectedIds,
-    navigate,
-    employeeUserIds,
-  ]);
+  }, [offers, currentPage, bulkMode, selectedIds, navigate, employeeUserIds]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm relative overflow-visible">
       <div className="p-4 border-b flex justify-between items-center">
-        <h2 className="font-semibold text-gray-800">
-          Recent Offer Letters
-        </h2>
+        <h2 className="font-semibold text-gray-800">Recent Offer Letters</h2>
 
         <div className="flex items-center gap-3">
           {!bulkMode ? (
@@ -249,16 +211,10 @@ export default function OffersTable({
                 disabled={selectedIds.length === 0 || sending}
                 onClick={handleBulkSend}
               >
-                {sending
-                  ? "Sending..."
-                  : `Send (${selectedIds.length})`}
+                {sending ? "Sending..." : `Send (${selectedIds.length})`}
               </Button>
 
-              <Button
-                varient="secondary"
-                size="small"
-                onClick={cancelBulk}
-              >
+              <Button varient="secondary" size="small" onClick={cancelBulk}>
                 Cancel
               </Button>
             </div>
@@ -277,12 +233,8 @@ export default function OffersTable({
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          onPrevious={() =>
-            setCurrentPage((p) => Math.max(p - 1, 1))
-          }
-          onNext={() =>
-            setCurrentPage((p) => Math.min(p + 1, totalPages))
-          }
+          onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+          onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
         />
       )}
     </div>

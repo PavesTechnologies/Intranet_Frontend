@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 
 /**
  * TestCaseResultComponent
@@ -48,13 +48,13 @@ export default function TestCaseResultComponent({
     try {
       const res = await axiosInstance.get(
         `${
-          import.meta.env.VITE_PMS_BASE_URL
-        }/api/test-execution/test-runs/${runId}/cases/${testCaseId}/results`
+          window.__APP_CONFIG__.PMS_BASE_URL
+        }/api/test-execution/test-runs/${runId}/cases/${testCaseId}/results`,
       );
       setData(res.data);
     } catch (err) {
       console.error("Error fetching case results", err);
-      toast.error("Failed to load results");
+      showStatusToast("Failed to load results", "error");
     } finally {
       setLoading(false);
     }
@@ -138,8 +138,8 @@ export default function TestCaseResultComponent({
                           stepRes?.status === "PASS"
                             ? "text-green-600"
                             : stepRes?.status === "FAIL"
-                            ? "text-red-600"
-                            : "text-gray-500"
+                              ? "text-red-600"
+                              : "text-gray-500"
                         }`}
                       >
                         {stepRes?.status || "NOT RUN"}
@@ -193,7 +193,7 @@ export default function TestCaseResultComponent({
                   <div className="mt-3 grid grid-cols-1 gap-2">
                     {(exec.stepResults || []).map((sr) => {
                       const stepMeta = (data.steps || []).find(
-                        (s) => s.id === sr.stepId
+                        (s) => s.id === sr.stepId,
                       );
                       return (
                         <div key={sr.stepId} className="flex items-start gap-3">
@@ -202,8 +202,8 @@ export default function TestCaseResultComponent({
                               sr.status === "PASS"
                                 ? "bg-green-500"
                                 : sr.status === "FAIL"
-                                ? "bg-red-500"
-                                : "bg-gray-300"
+                                  ? "bg-red-500"
+                                  : "bg-gray-300"
                             }`}
                           />
                           <div className="flex-1">
@@ -219,8 +219,8 @@ export default function TestCaseResultComponent({
                               sr.status === "PASS"
                                 ? "text-green-600"
                                 : sr.status === "FAIL"
-                                ? "text-red-600"
-                                : "text-gray-500"
+                                  ? "text-red-600"
+                                  : "text-gray-500"
                             }`}
                           >
                             {sr.status}

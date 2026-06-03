@@ -10,7 +10,7 @@
 // import { useAuth } from "../../../contexts/AuthContext";
 // import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 
-// const BASE_URL = import.meta.env.VITE_BASE_URL;
+// const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 // // --- Helper 1: Maps leave balances to dropdown options with user-friendly labels ---
 // // function mapLeaveBalancesToDropdown(balances, leaveTypes) {
@@ -277,7 +277,7 @@
 //         setLoadingData(true);
 //         try {
 //           const [balancesRes, typesRes, holidays] = await Promise.all([
-//             axios.get(
+//             api.get(
 //               `${BASE_URL}/api/leave-balance/employee/${requestDetails.employeeId}/${year}`,
 //               {
 //                 headers: {
@@ -285,12 +285,12 @@
 //                 },
 //               },
 //             ),
-//             axios.get(`${BASE_URL}/api/leave/types`, {
+//             api.get(`${BASE_URL}/api/leave/types`, {
 //               headers: {
 //                 Authorization: `Bearer ${localStorage.getItem("token")}`,
 //               },
 //             }),
-//             axios.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
+//             api.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
 //               params: { state: "All", country: "India" },
 //               headers: {
 //                 Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -607,20 +607,28 @@
 //   );
 // }
 
-
 import React, { useEffect, useState, Fragment, useMemo } from "react";
-import axios from "axios";
-import { X, Lock, CalendarDays, AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import api from "../../../api/axiosInstance";
+import {
+  X,
+  Lock,
+  CalendarDays,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+} from "lucide-react";
 import { toast } from "react-toastify";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { format } from "date-fns";
 import DateRangePicker from "./DateRangePicker";
 import { useRecordLock } from "../hooks/useRecordLock";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
+import Button from "../../../components/Button/Button";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 // --- Helper 1: Date Formatting ---
 function formatDateForDisplay(dateStr) {
@@ -639,7 +647,7 @@ function countWeekdaysBetween(
   toDate,
   halfDayConfig,
   holidays = [],
-  includeWeekendsAndHolidays = false
+  includeWeekendsAndHolidays = false,
 ) {
   if (!fromDate || !toDate || !halfDayConfig) return 0;
 
@@ -655,7 +663,7 @@ function countWeekdaysBetween(
         if (typeof h === "string") return h;
         return null;
       })
-      .filter(Boolean)
+      .filter(Boolean),
   );
 
   let total = 0;
@@ -719,8 +727,8 @@ function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
                 sel?.isInfinite
                   ? "bg-blue-50 text-blue-600"
                   : sel?.disabled
-                  ? "bg-red-50 text-red-400"
-                  : "bg-green-50 text-green-600"
+                    ? "bg-red-50 text-red-400"
+                    : "bg-green-50 text-green-600"
               }`}
             >
               {sel?.availableText}
@@ -762,8 +770,8 @@ function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
                         option.isInfinite
                           ? "bg-blue-50 text-blue-500"
                           : option.disabled
-                          ? "bg-red-50 text-red-400"
-                          : "bg-green-50 text-green-600"
+                            ? "bg-red-50 text-red-400"
+                            : "bg-green-50 text-green-600"
                       }`}
                     >
                       {option.availableText}
@@ -797,12 +805,20 @@ export default function ManagerEditLeaveRequest({
   const [managerComment, setManagerComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [balances, setBalances] = useState({ regular: [], genderBasedLeaveBalances: [] }); // ✅ correct initial state
+  const [balances, setBalances] = useState({
+    regular: [],
+    genderBasedLeaveBalances: [],
+  }); // ✅ correct initial state
   const [holidays, setHolidays] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [balanceWarning, setBalanceWarning] = useState("");
   const [showCustomHalfDay, setShowCustomHalfDay] = useState(false);
-  const [halfDayConfig, setHalfDayConfig] = useState({ start: "none", end: "none" });
+  const [halfDayConfig, setHalfDayConfig] = useState({
+    start: "none",
+    end: "none",
+  });
+
+  const [initialSnapshot, setInitialSnapshot] = useState(null);
 
   const { user } = useAuth();
   const { locked, lockedBy, lockMessage, manualReleaseLock } = useRecordLock({
@@ -834,31 +850,50 @@ export default function ManagerEditLeaveRequest({
       end: isCustom ? requestDetails.endSession || "fullday" : "none",
     });
 
+    setInitialSnapshot({
+      startDate: requestDetails.startDate || "",
+      endDate: requestDetails.endDate || "",
+      leaveTypeId: requestDetails.leaveTypeId || "",
+      managerComment: requestDetails.managerComment || "",
+      halfDayConfig: {
+        start: isCustom ? requestDetails.startSession || "fullday" : "none",
+        end: isCustom ? requestDetails.endSession || "fullday" : "none",
+      },
+    });
+
     const fetchData = async () => {
       setLoadingData(true);
       try {
         // ✅ Use flat employeeId from DTO with fallback
-        const empId = requestDetails.employeeId || requestDetails.employee?.employeeId;
+        const empId =
+          requestDetails.employeeId || requestDetails.employee?.employeeId;
 
         const [balancesRes, holidaysRes] = await Promise.all([
-          axios.get(`${BASE_URL}/api/leave-balance/employee/${empId}/${year}`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          api.get(`${BASE_URL}/api/leave-balance/employee/${empId}/${year}`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }),
-          axios.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
+          api.get(`${BASE_URL}/api/holidays/by-location/${year}`, {
             params: { state: "All", country: "India" },
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }),
         ]);
 
         if (isMounted) {
           // ✅ Fix 1: store .data.data — not .data
           setBalances(
-            balancesRes.data?.data || { regular: [], genderBasedLeaveBalances: [] }
+            balancesRes.data?.data || {
+              regular: [],
+              genderBasedLeaveBalances: [],
+            },
           );
 
           // ✅ Fix 2: correct holiday path .data.data
           const holidayDates = (holidaysRes.data?.data || []).map(
-            (h) => new Date(h.holidayDate + "T00:00:00")
+            (h) => new Date(h.holidayDate + "T00:00:00"),
           );
           setHolidays(holidayDates);
         }
@@ -870,7 +905,9 @@ export default function ManagerEditLeaveRequest({
     };
 
     fetchData();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [isOpen, requestDetails]);
 
   // ✅ Fix 3: correct memo — no extra .data
@@ -879,11 +916,13 @@ export default function ManagerEditLeaveRequest({
       ...(balances?.regular ?? []),
       ...(balances?.genderBasedLeaveBalances ?? []),
     ],
-    [balances]
+    [balances],
   );
 
   const leaveTypeOptions = useLeaveDropdownOptions(allBalances);
-  const selectedLeaveType = leaveTypeOptions.find((o) => o.leaveTypeId === leaveTypeId);
+  const selectedLeaveType = leaveTypeOptions.find(
+    (o) => o.leaveTypeId === leaveTypeId,
+  );
   const isMultiDay = startDate && endDate && startDate !== endDate;
   const isMaternityLeave = selectedLeaveType?.leaveTypeId === "L-ML";
 
@@ -892,22 +931,32 @@ export default function ManagerEditLeaveRequest({
     endDate,
     halfDayConfig,
     holidays,
-    selectedLeaveType?.weekendsAndHolidaysAllowed ?? isMaternityLeave
+    selectedLeaveType?.weekendsAndHolidaysAllowed ?? isMaternityLeave,
   );
 
   // Balance warning
   useEffect(() => {
-    if (!leaveTypeId || leaveTypeOptions.length === 0) { setBalanceWarning(""); return; }
-    const selected = leaveTypeOptions.find((o) => o.leaveTypeId === leaveTypeId);
-    if (!selected) { setBalanceWarning(""); return; }
+    if (!leaveTypeId || leaveTypeOptions.length === 0) {
+      setBalanceWarning("");
+      return;
+    }
+    const selected = leaveTypeOptions.find(
+      (o) => o.leaveTypeId === leaveTypeId,
+    );
+    if (!selected) {
+      setBalanceWarning("");
+      return;
+    }
 
     if (selected.isInfinite) {
       setBalanceWarning("");
     } else if (selected.availableDays <= 0) {
-      setBalanceWarning(`No balance available for ${selected.leaveName}. You have 0 days remaining.`);
+      setBalanceWarning(
+        `No balance available for ${selected.leaveName}. You have 0 days remaining.`,
+      );
     } else if (weekdays > 0 && selected.availableDays < weekdays) {
       setBalanceWarning(
-        `Insufficient balance. You have ${selected.availableDays} day(s) available but requested ${weekdays} day(s).`
+        `Insufficient balance. You have ${selected.availableDays} day(s) available but requested ${weekdays} day(s).`,
       );
     } else {
       setBalanceWarning("");
@@ -917,7 +966,9 @@ export default function ManagerEditLeaveRequest({
   const handleHalfDayModeChange = (isCustom) => {
     setShowCustomHalfDay(isCustom);
     setHalfDayConfig(
-      isCustom ? { start: "fullday", end: "fullday" } : { start: "none", end: "none" }
+      isCustom
+        ? { start: "fullday", end: "fullday" }
+        : { start: "none", end: "none" },
     );
   };
 
@@ -925,7 +976,8 @@ export default function ManagerEditLeaveRequest({
     if (!date) return;
     const dateString = format(date, "yyyy-MM-dd");
     setStartDate(dateString);
-    if (!endDate || new Date(endDate) < new Date(dateString)) setEndDate(dateString);
+    if (!endDate || new Date(endDate) < new Date(dateString))
+      setEndDate(dateString);
   };
 
   const handleEndDateChange = (date) => {
@@ -938,7 +990,14 @@ export default function ManagerEditLeaveRequest({
     onClose();
   };
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e) => { if (e.key === "Escape") handleClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSubmitting(true);
@@ -948,17 +1007,28 @@ export default function ManagerEditLeaveRequest({
       startDate,
       endDate,
       daysRequested: weekdays,
+      leaveName: selectedLeaveType.leaveName,
       managerComment,
       startSession: halfDayConfig.start,
       endSession: isMultiDay ? halfDayConfig.end : "none",
-      year
+      year,
     };
 
-    onSave(requestDetails.leaveId, updatedData);
-    setSubmitting(false);
+    try {
+      await onSave(requestDetails.leaveId, updatedData);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const hasBalanceError = balanceWarning !== "" && !selectedLeaveType?.isInfinite;
+  const hasBalanceError =
+    balanceWarning !== "" && !selectedLeaveType?.isInfinite;
+
+
+  const hasChanges = initialSnapshot
+  ? JSON.stringify({ startDate, endDate, leaveTypeId, managerComment, halfDayConfig }) !==
+    JSON.stringify(initialSnapshot)
+  : false;
 
   if (!isOpen) return null;
 
@@ -979,8 +1049,12 @@ export default function ManagerEditLeaveRequest({
               <Lock className="w-8 h-8 text-yellow-500" />
             </div>
             <h3 className="text-xl font-bold text-gray-800">Record Locked</h3>
-            {lockMessage && <p className="text-gray-500 mt-2 text-sm">{lockMessage}</p>}
-            <p className="text-gray-400 text-xs mt-1">Please try again later.</p>
+            {lockMessage && (
+              <p className="text-gray-500 mt-2 text-sm">{lockMessage}</p>
+            )}
+            <p className="text-gray-400 text-xs mt-1">
+              Please try again later.
+            </p>
             <button
               type="button"
               onClick={onClose}
@@ -997,7 +1071,9 @@ export default function ManagerEditLeaveRequest({
             <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
               <CalendarDays className="w-4 h-4 text-indigo-600" />
             </div>
-            <h2 className="text-base font-bold text-gray-900">Edit Leave Request</h2>
+            <h2 className="text-base font-bold text-gray-900">
+              Edit Leave Request
+            </h2>
           </div>
           <button
             onClick={handleClose}
@@ -1018,7 +1094,6 @@ export default function ManagerEditLeaveRequest({
           )}
 
           <fieldset disabled={isLockedByOther} className="space-y-4">
-
             {/* Employee Reason — read only */}
             <div>
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
@@ -1054,7 +1129,9 @@ export default function ManagerEditLeaveRequest({
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
                   <p className="text-amber-700 text-xs">{balanceWarning}</p>
                 </div>
-              ) : selectedLeaveType && !selectedLeaveType.isInfinite && selectedLeaveType.availableDays > 0 ? (
+              ) : selectedLeaveType &&
+                !selectedLeaveType.isInfinite &&
+                selectedLeaveType.availableDays > 0 ? (
                 <div className="mt-2 flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
                   <p className="text-green-600 text-xs font-medium">
@@ -1072,9 +1149,13 @@ export default function ManagerEditLeaveRequest({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <DateRangePicker
                   label="Start Date"
-                  defaultDate={startDate ? new Date(startDate + "T00:00:00") : null}
+                  defaultDate={
+                    startDate ? new Date(startDate + "T00:00:00") : null
+                  }
                   onChange={handleStartDateChange}
-                  defaultMonth={startDate ? new Date(startDate + "T00:00:00") : undefined}
+                  defaultMonth={
+                    startDate ? new Date(startDate + "T00:00:00") : undefined
+                  }
                   disabledDays={
                     isMaternityLeave ? [] : [{ dayOfWeek: [0, 6] }, ...holidays]
                   }
@@ -1085,10 +1166,16 @@ export default function ManagerEditLeaveRequest({
                   align="right"
                   defaultDate={endDate ? new Date(endDate + "T00:00:00") : null}
                   onChange={handleEndDateChange}
-                  defaultMonth={endDate ? new Date(endDate + "T00:00:00") : undefined}
+                  defaultMonth={
+                    endDate ? new Date(endDate + "T00:00:00") : undefined
+                  }
                   disabledDays={[
-                    ...(isMaternityLeave ? [] : [{ dayOfWeek: [0, 6] }, ...holidays]),
-                    startDate ? { before: new Date(startDate + "T00:00:00") } : {},
+                    ...(isMaternityLeave
+                      ? []
+                      : [{ dayOfWeek: [0, 6] }, ...holidays]),
+                    startDate
+                      ? { before: new Date(startDate + "T00:00:00") }
+                      : {},
                   ]}
                   year={year}
                 />
@@ -1145,17 +1232,15 @@ export default function ManagerEditLeaveRequest({
                       <label className="text-xs font-medium text-gray-500">
                         Start — {formatDateForDisplay(startDate)}
                       </label>
-                      <select
+                      <FilterListbox
+                        options={[
+                          { value: "fullday", label: "Full Day" },
+                          { value: "first", label: "First Half" },
+                          { value: "second", label: "Second Half" },
+                        ]}
                         value={halfDayConfig.start}
-                        onChange={(e) =>
-                          setHalfDayConfig((p) => ({ ...p, start: e.target.value }))
-                        }
-                        className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
-                      >
-                        <option value="fullday">Full Day</option>
-                        <option value="first">First Half</option>
-                        <option value="second">Second Half</option>
-                      </select>
+                        onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                      />
                     </div>
                     {isMultiDay && (
                       <>
@@ -1164,17 +1249,15 @@ export default function ManagerEditLeaveRequest({
                           <label className="text-xs font-medium text-gray-500">
                             End — {formatDateForDisplay(endDate)}
                           </label>
-                          <select
+                          <FilterListbox
+                            options={[
+                              { value: "fullday", label: "Full Day" },
+                              { value: "first", label: "First Half" },
+                              { value: "second", label: "Second Half" },
+                            ]}
                             value={halfDayConfig.end}
-                            onChange={(e) =>
-                              setHalfDayConfig((p) => ({ ...p, end: e.target.value }))
-                            }
-                            className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
-                          >
-                            <option value="fullday">Full Day</option>
-                            <option value="first">First Half</option>
-                            <option value="second">Second Half</option>
-                          </select>
+                            onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                          />
                         </div>
                       </>
                     )}
@@ -1204,28 +1287,31 @@ export default function ManagerEditLeaveRequest({
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-            <button
+            <Button
               type="button"
               onClick={handleClose}
               disabled={submitting || isLockedByOther}
-              className="px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+              variant="ghost"
+              size="medium"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              disabled={submitting || loadingData || isLockedByOther || hasBalanceError}
-              className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={
+                submitting ||
+                loadingData ||
+                isLockedByOther ||
+                hasBalanceError ||
+                !hasChanges
+              }
+              variant="primary"
+              size="medium"
+              loading={submitting}
+              loadingText="Saving..."
             >
-              {submitting ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </button>
+              Save Changes
+            </Button>
           </div>
         </form>
       </div>

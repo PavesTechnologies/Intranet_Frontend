@@ -1,16 +1,18 @@
 import React, { useState, useEffect, Fragment, useMemo } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { X } from "lucide-react";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import { useAuth } from "../../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import { format } from "date-fns";
 import DateRangePicker from "./DateRangePicker";
 // import {useLeaveConsumption} from "../hooks/useLeaveConsumption";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
+import Button from "../../../components/Button/Button";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 // const token = localStorage.getItem("token");
 
 // -- Helper: Massage leaves to dropdown options --
@@ -19,7 +21,7 @@ const BASE_URL = import.meta.env.VITE_BASE_URL;
 //   const [leaveTypes, setLeaveTypes] = useState([]);
 //   const fetchLeaveTypes = async () => {
 //     try {
-//       const res = await axios.get(`${BASE_URL}/api/leave/types`, {
+//       const res = await api.get(`${BASE_URL}/api/leave/types`, {
 //         headers: {
 //           Authorization: `Bearer ${localStorage.getItem("token")}`,
 //         },
@@ -94,7 +96,7 @@ function formatDateForDisplay(dateStr) {
 
 // --- MODIFIED ---
 // Updated function signature to accept leaveTypeId
-function countWeekdaysBetween(
+export function countWeekdaysBetween(
   fromDate,
   toDate,
   halfDayConfig,
@@ -170,7 +172,7 @@ function countWeekdaysBetween(
 }
 
 // -- The HeadlessUI Leave Type Dropdown -- (Unchanged)
-function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
+export function LeaveTypeDropdown({ options, selectedId, setSelectedId }) {
   const sel = options.find((o) => o.leaveTypeId === selectedId) ?? null;
   return (
     <Listbox value={sel} onChange={(opt) => setSelectedId(opt.leaveTypeId)}>
@@ -281,6 +283,7 @@ export default function RequestLeaveModal({
   const [balanceError, setBalanceError] = useState("");
   const [driveLink, setDriveLink] = useState("");
   // const leaveTypeOptions = mapLeaveBalancesToDropdown(balances);
+  // console.log("allBalances",allBalances);
   const leaveTypeOptions = useLeaveDropdownOptions(allBalances);
   const selectedLeaveType = leaveTypeOptions.find(
     (o) => o.leaveTypeId === leaveTypeId,
@@ -298,7 +301,16 @@ export default function RequestLeaveModal({
     leaveTypeId,
   );
 
- 
+  useEffect(() => {
+    if (!isOpen) return;
+    document.body.style.overflow = "hidden";
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handler);
+    };
+  }, [isOpen, onClose]);
 
   const shouldShowDriveLink = () => {
     if (!selectedLeaveType) return false;
@@ -331,8 +343,6 @@ export default function RequestLeaveModal({
     }
   }, [isOpen]);
 
-  
-
   useEffect(() => {
     if (!shouldShowDriveLink()) {
       setDriveLink("");
@@ -349,7 +359,7 @@ export default function RequestLeaveModal({
   useEffect(() => {
     if (!isOpen) return;
     setLoadingBalances(true);
-    axios
+    api
       .get(`${BASE_URL}/api/leave-balance/employee/${employeeId}/${year}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
@@ -365,7 +375,7 @@ export default function RequestLeaveModal({
     const fetchHolidays = async () => {
       try {
         // Replace with your actual holiday API endpoint
-        const res = await axios.get(
+        const res = await api.get(
           `${BASE_URL}/api/holidays/by-location/${year}`,
           {
             params: { state: "All", country: "India" },
@@ -449,7 +459,7 @@ export default function RequestLeaveModal({
     };
 
     try {
-      await axios.post(`${BASE_URL}/api/leave-requests/apply`, payload, {
+      await api.post(`${BASE_URL}/api/leave-requests/apply`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setSuccess("Leave request submitted!");
@@ -484,14 +494,15 @@ export default function RequestLeaveModal({
         <div className="sticky top-0 bg-white z-10 p-3 border-b border-gray-200 ">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-900">Request Leave</h2>
-            <button
+            <Button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              variant=" hover:bg-accent hover:text-accent-foreground hover:bg-gray-200 "
               type="button"
               aria-label="Close"
+              size="icon"
             >
               <X className="w-6 h-6" />
-            </button>
+            </Button>
           </div>
         </div>
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
@@ -612,20 +623,15 @@ export default function RequestLeaveModal({
                     <label className="text-xs font-medium text-gray-600">
                       Start Day {formatDateForDisplay(startDate)}
                     </label>
-                    <select
+                    <FilterListbox
+                      options={[
+                        { value: "fullday", label: "Full Day" },
+                        { value: "first", label: "First Half" },
+                        { value: "second", label: "Second Half" },
+                      ]}
                       value={halfDayConfig.start}
-                      onChange={(e) =>
-                        setHalfDayConfig((p) => ({
-                          ...p,
-                          start: e.target.value,
-                        }))
-                      }
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="fullday">Full Day</option>
-                      <option value="first">First Half</option>
-                      <option value="second">Second Half</option>
-                    </select>
+                      onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                    />
                   </div>
 
                   {/* End Date Section */}
@@ -636,20 +642,15 @@ export default function RequestLeaveModal({
                         <label className="text-xs font-medium text-gray-600">
                           End Day {formatDateForDisplay(endDate)}
                         </label>
-                        <select
+                        <FilterListbox
+                          options={[
+                            { value: "fullday", label: "Full Day" },
+                            { value: "first", label: "First Half" },
+                            { value: "second", label: "Second Half" },
+                          ]}
                           value={halfDayConfig.end}
-                          onChange={(e) =>
-                            setHalfDayConfig((p) => ({
-                              ...p,
-                              end: e.target.value,
-                            }))
-                          }
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                        >
-                          <option value="fullday">Full Day</option>
-                          <option value="first">First Half</option>
-                          <option value="second">Second Half</option>
-                        </select>
+                          onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                        />
                       </div>
                     </>
                   )}
@@ -697,33 +698,27 @@ export default function RequestLeaveModal({
           )}
 
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-5 border-t border-gray-200">
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="px-5 py-3 rounded-lg font-medium text-gray-800 border border-gray-300 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              variant="ghost"
+              size="medium"
               disabled={submitting}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="px-5 py-3 rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
+              variant="primary"
+              size="medium"
+              loading={submitting}
+              loadingText="Requesting..."
               disabled={
-                submitting ||
-                loadingBalances ||
-                !startDate ||
-                !endDate ||
-                !leaveTypeId
+                loadingBalances || !startDate || !endDate || !leaveTypeId
               }
             >
-              {submitting ? (
-                <span className="flex items-center justify-center">
-                  <span className="animate-spin mr-2">⟳</span> Requesting...
-                </span>
-              ) : (
-                "Request Leave"
-              )}
-            </button>
+              Request Leave
+            </Button>
           </div>
         </form>
         <style>{`

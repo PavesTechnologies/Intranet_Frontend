@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, Fragment } from "react";
 import { X, Plus, Trash2, Edit2, ChevronDown, Search, Check, Loader2, AlertCircle } from "lucide-react";
 import { Combobox, Transition } from "@headlessui/react";
@@ -202,6 +203,48 @@ const SearchableMultiSelect = ({ label, value = [], onChange, options, placehold
   );
 };
 
+const modeTabs = [
+  { id: "existing", label: "Existing" },
+  { id: "new", label: "New" },
+];
+
+const ModeTabs = ({ value, onChange }) => (
+  <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+    {modeTabs.map((tab) => {
+      const isActive = tab.id === value;
+      return (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => onChange(tab.id)}
+          className={`rounded-md px-3 py-1 text-xs font-bold transition ${
+            isActive
+              ? "bg-white text-indigo-700 shadow-sm"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          {tab.label}
+        </button>
+      );
+    })}
+  </div>
+);
+
+const createEmptyFormState = () => ({
+  categoryId: "",
+  skillId: "",
+  skillProficiencyId: "",
+  otherCategoryName: "",
+  otherSkillName: "",
+  subSkills: []
+});
+
+const getSkillModalErrorMessage = (error, fallback) =>
+  error?.response?.data?.message ||
+  error?.response?.data?.error ||
+  error?.message ||
+  fallback;
+
 /* ===================== MAIN MODAL ===================== */
 
 export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveSuccess }) {
@@ -218,61 +261,36 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
 
   const [draftSkills, setDraftSkills] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
+  const [categoryMode, setCategoryMode] = useState("existing");
+  const [skillMode, setSkillMode] = useState("existing");
+  const [subSkillMode, setSubSkillMode] = useState("existing");
 
-  const [formState, setFormState] = useState({
-    categoryId: "",
-    skillId: "",
-    skillProficiencyId: "",
-    otherSkillName: "",
-    subSkills: []
-  });
+  const [formState, setFormState] = useState(createEmptyFormState());
 
-  // useEffect(() => {
-  // const fetchData = async () => {
-  //   try {
-  //     const [treeRes, profRes] = await Promise.all([
-  //       skillService.getSkillTree(),
-  //       skillService.getProficiencies(),
-  //     ]);
-
-
-
-  //     const profData = profRes?.data || profRes || [];
-  //     setProficiencies(
-  //       Array.isArray(profData) 
-  //         ? profData.map(p => ({
-  //             id: p.proficiencyId || p.id,
-  //             name: p.proficiencyName || p.name || p.levelName
-  //           }))
-  //         : []
-  //     );
-  //   } catch (err) {
-  //     console.error("Error fetching skill data:", err);
-  //     setError("Failed to load skill data.");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-  //   fetchData();
-  // }, []);
+ 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
+      setError(null);
       try {
         const [catRes, profRes] = await Promise.all([
-          skillService.getSkillTree(),
+          skillService.getCategoryDtos(),
           skillService.getProficiencies()
         ]);
 
-        // 1. Map Categories
-        const categories = catRes?.data || [];
-        setTree(categories);
+        const categories = Array.isArray(catRes?.data) ? catRes.data : [];
+        setTree(categories.map(category => ({
+          id: String(category.id),
+          name: category.name,
+          description: category.description || "",
+          active: category.active ?? true
+        })));
 
-        // 2. Map Proficiencies
-        const profData = profRes?.data || [];
+        const profData = Array.isArray(profRes?.data) ? profRes.data : [];
         setProficiencies(
           profData.map(p => ({
-            id: String(p.proficiencyId),
-            name: p.proficiencyName
+            id: String(p.proficiencyId || p.id || p.proficiencyCode || ""),
+            name: p.proficiencyName || p.name || p.levelName || ""
           }))
         );
 
@@ -291,13 +309,19 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
     if (!selectedSkill || !tree.length || !proficiencies.length) return;
 
     setIsHydrating(true);
+    setCategoryMode("existing");
+    setSkillMode("existing");
+    setSubSkillMode("existing");
 
     setFormState({
       categoryId: String(selectedSkill.categoryId || ""),
       skillId: String(selectedSkill.skillId || ""),
       skillProficiencyId: String(selectedSkill.skillProficiencyId || ""),
+      otherCategoryName: "",
+      otherSkillName: "",
       subSkills: (selectedSkill.subSkills || []).map(ss => ({
         subSkillId: String(ss.id),
+        otherSubSkillName: "",
         proficiencyId: String(ss.proficiencyId || "")
       }))
     });
@@ -308,16 +332,23 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
   }, [selectedSkill, tree, proficiencies]);
   useEffect(() => {
     const fetchSkills = async () => {
-      if (!formState.categoryId) {
+      if (categoryMode === "new" || !formState.categoryId) {
         setAvailableSkills([]);
         return;
       }
       try {
-        const res = await skillService.getSkillsByCategory(formState.categoryId);
-        const skillsData = res?.data || res || [];
+        const res = await skillService.getSkillsByCategoryDto(formState.categoryId);
+        const skillsData = res?.data || [];
         const mappedSkills = Array.isArray(skillsData) ? skillsData : [];
-        // Append "Other" option
-        setAvailableSkills([...mappedSkills, { id: "OTHER", name: "Other", subSkills: [] }]);
+        setAvailableSkills([
+          ...mappedSkills.map(skill => ({
+            id: String(skill.id),
+            name: skill.name,
+            description: skill.description || "",
+            active: skill.active ?? true,
+            subSkills: Array.isArray(skill.subSkills) ? skill.subSkills : []
+          }))
+        ]);
 
         // Clear skill if it's not in the new list (ONLY if not hydrating and list is not empty)
         if (!isHydrating && mappedSkills.length > 0 && !mappedSkills.find(s => String(s.id) === String(formState.skillId)) && formState.skillId !== "OTHER") {
@@ -325,21 +356,51 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
         }
       } catch (err) {
         console.error("Error fetching skills by category:", err);
+        setError("Failed to load skills for the selected category.");
+        setAvailableSkills([]);
       }
     };
     fetchSkills();
-  }, [formState.categoryId]);
+  }, [formState.categoryId, categoryMode]);
 
   useEffect(() => {
-    const skill = availableSkills.find(s => String(s.id) === String(formState.skillId));
-    const rawSubs = skill?.subSkills || skill?.sub_skills || [];
-    setAvailableSubSkills([...rawSubs, { id: "OTHER", name: "Other" }]);
+    const fetchSubSkills = async () => {
+      const skill = availableSkills.find(s => String(s.id) === String(formState.skillId));
+      if (skillMode === "new" || !formState.skillId || !skill) {
+        setAvailableSubSkills([]);
+        if (!isHydrating && formState.skillId && editingIndex === null) {
+          setFormState(prev => ({ ...prev, subSkills: [] }));
+        }
+        return;
+      }
 
-    // ✅ ONLY RESET WHEN USER CHANGES (NOT PREFILL)
-    if (!isHydrating && formState.skillId && editingIndex === null) {
-      setFormState(prev => ({ ...prev, subSkills: [] }));
-    }
-  }, [formState.skillId, availableSkills, isHydrating]);
+      try {
+        const inlineSubs = skill?.subSkills || skill?.sub_skills || [];
+        const subSkills = inlineSubs.length
+          ? inlineSubs
+          : (await skillService.getSubSkillsBySkillDto(formState.skillId))?.data || [];
+
+        setAvailableSubSkills([
+          ...subSkills.map(subSkill => ({
+            id: String(subSkill.id),
+            name: subSkill.name,
+            description: subSkill.description || "",
+            active: subSkill.active ?? true
+          }))
+        ]);
+      } catch (err) {
+        console.error("Error fetching subskills by skill:", err);
+        setError("Failed to load related subskills for the selected skill.");
+        setAvailableSubSkills([]);
+      }
+
+      if (!isHydrating && formState.skillId && editingIndex === null) {
+        setFormState(prev => ({ ...prev, subSkills: [] }));
+      }
+    };
+
+    fetchSubSkills();
+  }, [formState.skillId, availableSkills, isHydrating, skillMode]);
 
   const addSubSkillRow = () => {
     setFormState(prev => ({
@@ -364,37 +425,112 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
     }));
   };
 
+  const handleCategoryModeChange = (mode) => {
+    setCategoryMode(mode);
+    setSkillMode(mode === "new" ? "new" : skillMode);
+    if (mode === "new") setSubSkillMode("new");
+    setFormState(prev => ({
+      ...prev,
+      categoryId: "",
+      skillId: "",
+      skillProficiencyId: "",
+      otherCategoryName: "",
+      otherSkillName: "",
+      subSkills: []
+    }));
+  };
+
+  const handleSkillModeChange = (mode) => {
+    setSkillMode(mode);
+    if (mode === "new") setSubSkillMode("new");
+    setFormState(prev => ({
+      ...prev,
+      skillId: "",
+      skillProficiencyId: "",
+      otherSkillName: "",
+      subSkills: []
+    }));
+  };
+
+  const handleSubSkillModeChange = (mode) => {
+    setSubSkillMode(mode);
+    setFormState(prev => ({
+      ...prev,
+      subSkills: prev.subSkills.map(row => ({
+        ...row,
+        subSkillId: "",
+        otherSubSkillName: "",
+        proficiencyId: ""
+      }))
+    }));
+  };
+
   const handleAddToDraft = () => {
     setError(null);
-    if (!formState.categoryId || !formState.skillId || !formState.skillProficiencyId) {
+    const isNewCategory = categoryMode === "new";
+    const isNewSkill = skillMode === "new";
+    const categoryName = isNewCategory
+      ? formState.otherCategoryName?.trim()
+      : tree.find(c => String(c.id) === String(formState.categoryId))?.name || "";
+    const skillName = isNewSkill
+      ? formState.otherSkillName?.trim()
+      : availableSkills.find(s => String(s.id) === String(formState.skillId))?.name || "";
+
+    if (
+      (!isNewCategory && !formState.categoryId) ||
+      (isNewCategory && !categoryName) ||
+      (!isNewSkill && !formState.skillId) ||
+      (isNewSkill && !skillName) ||
+      !formState.skillProficiencyId
+    ) {
       setError("Please fill all required fields marked with *");
       return;
     }
+    const hasIncompleteSubSkill = formState.subSkills.some(ss => {
+      const hasName = subSkillMode === "new"
+        ? Boolean(ss.otherSubSkillName?.trim())
+        : Boolean(ss.subSkillId);
+      return (hasName && !ss.proficiencyId) || (!hasName && Boolean(ss.proficiencyId));
+    });
+    if (hasIncompleteSubSkill) {
+      setError("Please complete each selected subskill and proficiency.");
+      return;
+    }
 
-    const categoryObj = tree.find(c => String(c.id) === String(formState.categoryId));
-    const skillObj = availableSkills.find(s => String(s.id) === String(formState.skillId));
     const profObj = proficiencies.find(p => String(p.id) === String(formState.skillProficiencyId));
 
     // Filter out incomplete rows and map names
     const subSkillNamesList = formState.subSkills
-      .filter(ss => (ss.subSkillId && ss.proficiencyId))
+      .filter(ss => (
+        subSkillMode === "new"
+          ? ss.otherSubSkillName?.trim() && ss.proficiencyId
+          : ss.subSkillId && ss.proficiencyId
+      ))
       .map(ss => {
+        const isNewSubSkill = subSkillMode === "new";
         const found = availableSubSkills.find(s => String(s.id) === String(ss.subSkillId));
-        const isOther = ss.subSkillId === "OTHER";
+        const subProfObj = proficiencies.find(p => String(p.id) === String(ss.proficiencyId));
         return {
-          id: isOther ? null : ss.subSkillId,
-          name: isOther ? ss.otherSubSkillName : (found?.name || ""),
-          isCustom: isOther
+          id: isNewSubSkill ? null : ss.subSkillId,
+          name: isNewSubSkill ? ss.otherSubSkillName.trim() : (found?.name || ""),
+          proficiencyId: ss.proficiencyId,
+          proficiencyName: subProfObj?.name || "",
+          isCustom: isNewSubSkill
         };
       });
 
-    const isOtherSkill = formState.skillId === "OTHER";
     const newDraftItem = {
       ...formState,
-      categoryName: categoryObj?.name || "",
-      skillName: isOtherSkill ? formState.otherSkillName : (skillObj?.name || ""),
-      skillId: isOtherSkill ? null : formState.skillId,
-      isCustomSkill: isOtherSkill,
+      categoryId: isNewCategory ? null : formState.categoryId,
+      categoryName,
+      skillName,
+      skillId: isNewSkill ? null : formState.skillId,
+      categoryMode,
+      skillMode,
+      subSkillMode,
+      hasNewTaxonomy: isNewCategory || isNewSkill || subSkillMode === "new",
+      isCustomCategory: isNewCategory,
+      isCustomSkill: isNewSkill,
       proficiencyName: profObj?.name || "",
       subSkillNames: subSkillNamesList
     };
@@ -406,21 +542,20 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
       setDraftSkills(prev => [...prev, newDraftItem]);
     }
 
-    setFormState({
-      categoryId: "",
-      skillId: "",
-      skillProficiencyId: "",
-      subSkills: []
-    });
+    setFormState(createEmptyFormState());
   };
 
   const handleEditDraft = (index) => {
     setIsHydrating(true);
     const item = draftSkills[index];
+    setCategoryMode(item.categoryMode || "existing");
+    setSkillMode(item.skillMode || (item.isCustomSkill ? "new" : "existing"));
+    setSubSkillMode(item.subSkillMode || "existing");
     setFormState({
       categoryId: item.categoryId,
-      skillId: item.skillId || "OTHER",
+      skillId: item.skillId || "",
       skillProficiencyId: item.skillProficiencyId,
+      otherCategoryName: item.isCustomCategory ? item.categoryName : "",
       otherSkillName: item.isCustomSkill ? item.skillName : "",
       subSkills: item.subSkills || []
     });
@@ -434,29 +569,88 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
     if (editingIndex === index) setEditingIndex(null);
   };
 
+  const resetModalState = () => {
+    setDraftSkills([]);
+    setEditingIndex(null);
+    setCategoryMode("existing");
+    setSkillMode("existing");
+    setSubSkillMode("existing");
+    setFormState(createEmptyFormState());
+  };
+
+  const buildSkillTaxonomyRequestPayload = () => {
+    const categoryMap = new Map();
+
+    draftSkills.forEach((item) => {
+      const categoryName = item.categoryName?.trim();
+      const skillName = item.skillName?.trim();
+      if (!categoryName || !skillName) return;
+
+      const categoryKey = categoryName.toLowerCase();
+      if (!categoryMap.has(categoryKey)) {
+        categoryMap.set(categoryKey, {
+          categoryName,
+          skills: []
+        });
+      }
+
+      categoryMap.get(categoryKey).skills.push({
+        skillName,
+        proficiencyId: item.skillProficiencyId,
+        status: "ACTIVE",
+        subSkills: (item.subSkillNames || [])
+          .filter(ss => ss.name?.trim() && ss.proficiencyId)
+          .map(ss => ({
+            subSkillName: ss.name.trim(),
+            proficiencyId: ss.proficiencyId,
+            status: "ACTIVE"
+          }))
+      });
+    });
+
+    return {
+      resourceId: String(employeeId),
+      categories: Array.from(categoryMap.values())
+    };
+  };
+
+  const buildExistingSkillsPayload = () => ({
+    resourceId: String(employeeId),
+    skills: draftSkills.map(item => ({
+      skillId: item.skillId || null,
+      skillName: item.skillName,
+      proficiencyId: item.skillProficiencyId,
+      status: "ACTIVE",
+      subSkills: (item.subSkillNames || []).map((ss, idx) => ({
+        subSkillId: ss.id || null,
+        subSkillName: ss.name,
+        proficiencyId: ss.proficiencyId || item.subSkills[idx]?.proficiencyId,
+        status: "ACTIVE"
+      }))
+    }))
+  });
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     try {
-      const payload = {
-        resourceId: Number(employeeId),
-        skills: draftSkills.map(item => ({
-          skillId: item.skillId === "OTHER" ? null : item.skillId,
-          skillName: item.skillId === "OTHER" ? item.skillName : null,
-          proficiencyId: item.skillProficiencyId,
-          subSkills: (item.subSkillNames || []).map((ss, idx) => ({
-            subSkillId: ss.id === "OTHER" || !ss.id ? null : ss.id,
-            subSkillName: ss.isCustom ? ss.name : null,
-            proficiencyId: item.subSkills[idx]?.proficiencyId
-          }))
-        }))
-      };
-      console.log("Saving Skill Payload:", JSON.stringify(payload, null, 2));
-      await skillService.saveBulkSkills(payload);
+      const hasNewTaxonomy = draftSkills.some(item => item.hasNewTaxonomy);
+      const payload = hasNewTaxonomy
+        ? buildSkillTaxonomyRequestPayload()
+        : buildExistingSkillsPayload();
+
+      if (hasNewTaxonomy) {
+        await skillService.saveSkillTaxonomyRequest(payload);
+      } else {
+        await skillService.saveEmployeeSkills(payload);
+      }
+
       showStatusToast("Skills saved to profile successfully", "success");
-      onSaveSuccess();
+      resetModalState();
+      await onSaveSuccess?.();
+      onClose?.();
     } catch (err) {
-      showStatusToast(err.message || "Failed to save skills", "error");
+      showStatusToast(getSkillModalErrorMessage(err, "Failed to save skills"), "error");
     } finally {
       setSaving(false);
     }
@@ -464,18 +658,11 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]">
-        <div className="bg-white ...">
-          <div className="relative">
-            <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
-            </div>
-          </div>
-          <p className="text-sm font-bold text-gray-700 tracking-wide">Loading Skill Data...</p>
-        </div>
-      </div>
-    );
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
+      <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+    </div>
+  );
+
   }
 
   return (
@@ -506,34 +693,54 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
             </div>
 
             <div className="space-y-6">
-              <SearchableSelect
-                label="Category *"
-                placeholder="Search category (e.g. Backend, Frontend)"
-                value={formState.categoryId}
-                options={tree}
-                onChange={(val) => setFormState(p => ({ ...p, categoryId: val }))}
-                icon={Briefcase}
-              />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Category *</label>
+                  <ModeTabs value={categoryMode} onChange={handleCategoryModeChange} />
+                </div>
+                {categoryMode === "existing" ? (
+                  <SearchableSelect
+                    placeholder="Search category (e.g. Backend, Frontend)"
+                    value={formState.categoryId}
+                    options={tree}
+                    onChange={(val) => setFormState(p => ({ ...p, categoryId: val, skillId: "", skillProficiencyId: "", subSkills: [] }))}
+                    icon={Briefcase}
+                  />
+                ) : (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <input
+                      type="text"
+                      placeholder="Enter new category name"
+                      value={formState.otherCategoryName}
+                      onChange={(e) => setFormState(p => ({ ...p, otherCategoryName: e.target.value }))}
+                      className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium placeholder:text-gray-300"
+                    />
+                  </div>
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <SearchableSelect
-                    label="Skill *"
-                    placeholder="Select core skill"
-                    value={formState.skillId}
-                    options={availableSkills}
-                    disabled={!formState.categoryId}
-                    onChange={(val) => setFormState(p => ({ ...p, skillId: val }))}
-                    icon={Plus}
-                  />
-                  {formState.skillId === "OTHER" && (
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Skill *</label>
+                    <ModeTabs value={skillMode} onChange={handleSkillModeChange} />
+                  </div>
+                  {skillMode === "existing" ? (
+                    <SearchableSelect
+                      placeholder="Select core skill"
+                      value={formState.skillId}
+                      options={availableSkills}
+                      disabled={categoryMode === "new" || !formState.categoryId}
+                      onChange={(val) => setFormState(p => ({ ...p, skillId: val, subSkills: [] }))}
+                      icon={Plus}
+                    />
+                  ) : (
                     <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                      <label className="block text-[10px] font-bold text-indigo-500 mb-1.5 uppercase tracking-wider ml-1">Other Skill Name *</label>
                       <input
                         type="text"
-                        placeholder="Enter custom skill name"
+                        placeholder="Enter new skill name"
                         value={formState.otherSkillName}
-                        onChange={(e) => setFormState(p => ({ ...p, otherSkillName: e.target.value }))}
+                        onChange={(e) => setFormState(p => ({ ...p, otherSkillName: e.target.value, skillId: "" }))}
                         className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium placeholder:text-gray-300"
                       />
                     </div>
@@ -544,7 +751,11 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
                   label="Skill Proficiency *"
                   value={formState.skillProficiencyId}
                   options={proficiencies}
-                  disabled={!formState.skillId || (formState.skillId === "OTHER" && !formState.otherSkillName)}
+                  disabled={
+                    skillMode === "existing"
+                      ? !formState.skillId
+                      : !formState.otherSkillName?.trim()
+                  }
                   onChange={(val) =>
                     setFormState(p => ({ ...p, skillProficiencyId: val }))
                   }
@@ -554,13 +765,20 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
 
               <div className="space-y-4 pt-4 border-t border-gray-50">
                 <div className="flex justify-between items-center">
-                  <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                    Sub Skills Configuration
-                  </label>
+                  <div className="flex items-center gap-3">
+                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      Sub Skills Configuration
+                    </label>
+                    <ModeTabs value={subSkillMode} onChange={handleSubSkillModeChange} />
+                  </div>
                   <button
                     type="button"
                     onClick={addSubSkillRow}
-                    disabled={!formState.skillId}
+                    disabled={
+                      skillMode === "existing"
+                        ? !formState.skillId
+                        : !formState.otherSkillName?.trim()
+                    }
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus size={14} />
@@ -577,7 +795,7 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
                   <div className="space-y-4">
                     {formState.subSkills.map((row, index) => {
                       // Filter options to exclude already selected sub-skills (except current row)
-                      const selectedIds = formState.subSkills.map(s => String(s.subSkillId)).filter(id => id !== "" && id !== "OTHER");
+                      const selectedIds = formState.subSkills.map(s => String(s.subSkillId)).filter(id => id !== "");
                       const rawFiltered = availableSubSkills.filter(opt =>
                         !selectedIds.includes(String(opt.id)) || String(opt.id) === String(row.subSkillId)
                       );
@@ -586,14 +804,27 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
                         <div key={index} className="space-y-3 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 animate-in fade-in slide-in-from-top-1 duration-200">
                           <div className="grid grid-cols-12 gap-4 items-end">
                             <div className="col-span-5">
-                              <SearchableSelect
-                                label="Select Sub-skill"
-                                placeholder="Choose sub-skill"
-                                options={rawFiltered}
-                                value={row.subSkillId}
-                                onChange={(val) => updateSubSkillRow(index, "subSkillId", val)}
-                                icon={List}
-                              />
+                              {subSkillMode === "existing" ? (
+                                <SearchableSelect
+                                  label="Select Sub-skill"
+                                  placeholder="Choose sub-skill"
+                                  options={rawFiltered}
+                                  value={row.subSkillId}
+                                  onChange={(val) => updateSubSkillRow(index, "subSkillId", val)}
+                                  icon={List}
+                                />
+                              ) : (
+                                <div>
+                                  <label className="block text-[11px] font-bold text-gray-400 mb-1.5 uppercase tracking-wider">New Sub-skill</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Enter new sub-skill"
+                                    value={row.otherSubSkillName}
+                                    onChange={(e) => updateSubSkillRow(index, "otherSubSkillName", e.target.value)}
+                                    className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/5 transition-all font-medium placeholder:text-gray-300"
+                                  />
+                                </div>
+                              )}
                             </div>
                             <div className="col-span-5">
                               <SearchableSelect
@@ -601,7 +832,11 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
                                 placeholder="Select level"
                                 options={proficiencies}
                                 value={row.proficiencyId}
-                                disabled={!row.subSkillId || (row.subSkillId === "OTHER" && !row.otherSubSkillName)}
+                                disabled={
+                                  subSkillMode === "existing"
+                                    ? !row.subSkillId
+                                    : !row.otherSubSkillName?.trim()
+                                }
                                 onChange={(val) => updateSubSkillRow(index, "proficiencyId", val)}
                                 icon={Check}
                               />
@@ -617,18 +852,6 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
                             </div>
                           </div>
 
-                          {row.subSkillId === "OTHER" && (
-                            <div className="animate-in fade-in slide-in-from-left-2 duration-300 pl-2 border-l-2 border-indigo-200 ml-1">
-                              <label className="block text-[10px] font-bold text-indigo-500 mb-1 uppercase tracking-wider">Other Sub-skill Name *</label>
-                              <input
-                                type="text"
-                                placeholder="Enter custom sub-skill name"
-                                value={row.otherSubSkillName}
-                                onChange={(e) => updateSubSkillRow(index, "otherSubSkillName", e.target.value)}
-                                className="w-full bg-white border border-indigo-100 rounded-lg px-3 py-2 text-xs outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/5 transition-all font-medium"
-                              />
-                            </div>
-                          )}
                         </div>
                       );
                     })}
@@ -743,10 +966,13 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
             className={`px-10 py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-black tracking-wide shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 flex items-center gap-3 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none
               ${saving || draftSkills.length === 0 ? "grayscale cursor-not-allowed" : ""}`}
           >
-            {saving ? <><Loader2 size={18} className="animate-spin" /> Saving Changes...</> : "Finalize & Save"}
+            {saving ? <><Loader2 size={18} className="animate-spin" /> Saving Changes...</> : "Save Changes"}
           </button>
         </div>
       </div>
     </div>
   );
 }
+
+
+

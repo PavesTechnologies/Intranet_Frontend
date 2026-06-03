@@ -1,10 +1,10 @@
 import React, { useState, useEffect, Fragment, useMemo } from "react";
 import { useEnums } from "@/pages/resource_management/hooks/useEnums";
 import { Listbox, Combobox, Transition } from "@headlessui/react";
-import { ChevronUpDownIcon, CheckIcon } from "@heroicons/react/20/solid";
+import { ChevronDownIcon, CheckIcon } from "@/components/icons";
 import ct from "countries-and-timezones";
 import { createClient, updateClient, getProjectsByClient } from "../services/clientservice";
-import { toast } from "react-toastify";
+import { notify } from "../utils/notify";
 import Button from "../../../components/Button/Button";
 
 // Updated CustomListbox to accept an 'error' prop
@@ -32,7 +32,7 @@ const CustomListbox = ({
               {value || "Default time zone (editable)"}
             </span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <ChevronUpDownIcon
+              <ChevronDownIcon
                 className="h-5 w-5 text-gray-400"
                 aria-hidden="true"
               />
@@ -113,7 +113,7 @@ const SearchableCombobox = ({
               placeholder="Search country..."
             />
             <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
-              <ChevronUpDownIcon
+              <ChevronDownIcon
                 className="h-5 w-5 text-gray-400"
                 aria-hidden="true"
               />
@@ -278,41 +278,40 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
 
     if (newErrors.length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill in all mandatory fields.");
+      notify.error("Please fill in all mandatory fields.");
       return;
     }
 
     setIsSubmitting(true);
 
     // If changing status from ACTIVE to INACTIVE, check for active projects
-    if (mode === "edit" && formData.status === "INACTIVE" && initialData.status === "ACTIVE") {
-      try {
-        const projectsResponse = await getProjectsByClient(formData.clientId);
-        if (projectsResponse.success && Array.isArray(projectsResponse.data)) {
-          const hasActiveProjects = projectsResponse.data.some(
-            (project) => project.projectStatus === "ACTIVE"
-          );
-          if (hasActiveProjects) {
-            toast.error(
-              "Cannot deactivate: This client still has active projects. Please complete or reassign them first."
-            );
-            setIsSubmitting(false);
-            return;
-          }
-        }
-      } catch (error) {
-        console.error("Error checking client projects:", error);
-        // If we fail to check projects, it might be safer to stop, 
-        // but here we'll let it proceed unless the backend also blocks it.
-      }
-    }
-
+    // if (mode === "edit" && formData.status === "INACTIVE" && initialData.status === "ACTIVE") {
+    //   try {
+    //     const projectsResponse = await getProjectsByClient(formData.clientId);
+    //     if (projectsResponse.success && Array.isArray(projectsResponse.data)) {
+    //       const hasActiveProjects = projectsResponse.data.some(
+    //         (project) => project.projectStatus === "ACTIVE"
+    //       );
+    //       if (hasActiveProjects) {
+    //         toast.error(
+    //           "Cannot deactivate: This client still has active projects. Please complete or reassign them first."
+    //         );
+    //         setIsSubmitting(false);
+    //         onSuccess?.();
+    //       }
+    //     }
+    //   } catch (error) {
+    //     console.error("Error checking client projects:", error);
+    //     // toast.error("Failed To Check Client Projects.");
+    //     // setIsSubmitting(false);
+    //   }
+    // } else {
     try {
       const clientCreation =
         mode === "create"
           ? await createClient(formData)
           : await updateClient(formData);
-      toast.success(
+      notify.success(
         clientCreation.message ||
         (mode === "create"
           ? "Client created successfully."
@@ -320,7 +319,7 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
       );
       onSuccess?.();
     } catch (error) {
-      toast.error(
+      notify.error(
         error.response?.data?.message ||
         (mode === "create"
           ? "Failed to create client."
@@ -329,6 +328,7 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
     } finally {
       setIsSubmitting(false);
     }
+    // }
   };
 
   return (
@@ -375,7 +375,7 @@ const CreateClient = ({ mode, initialData, onSuccess, isEditable }) => {
         <CustomListbox
           label="Status"
           value={formData.status}
-          options={STATUS_OPTIONS}
+          options={mode !== "edit" ? STATUS_OPTIONS.filter(opt => opt !== "INACTIVE") : STATUS_OPTIONS}
           onChange={(val) => handleGenericListboxChange("status", val)}
           error={errors.includes("status")}
         />

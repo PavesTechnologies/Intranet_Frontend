@@ -19,7 +19,8 @@ import {
 import { cn } from "@/lib/utils"
 import { getUtilization } from "../services/workforceService"
 import { useSkillGapAnalysis } from "../hooks/useSkillGapAnalysis"
-import { toast } from "react-toastify"
+import { notify } from "../utils/notify"
+import GenericTable from "../../../components/Table/table"
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHARED SUB-COMPONENTS
@@ -55,7 +56,7 @@ function SectionHeader({ icon: Icon, title, badge }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function TimelineBar({ resource }) {
-  const blocks = resource.allocationTimeline || []
+  const blocks = (resource.allocationTimeline || []).filter(b => b.status !== "ROLLED_OFF")
   if (blocks.length === 0) return null
 
   const earliest = new Date(blocks[0].startDate).getTime()
@@ -240,7 +241,7 @@ function DemandDropdown({
         <span className={cn("truncate", !selectedDemand && "text-muted-foreground")}>
           {selectedDemand
             ? `${selectedDemand.demandName} — ${selectedDemand.projectName}`
-            : "Choose a demand to analyze..."}
+            : "Choose A Demand To Analyze..."}
         </span>
         <ChevronDown className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", open && "rotate-180")} />
       </button>
@@ -253,7 +254,7 @@ function DemandDropdown({
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search demands..."
+                placeholder="Search Demands..."
                 value={search}
                 onChange={(e) => onSearchChange(e.target.value)}
                 className="w-full pl-8 pr-3 py-2 text-sm rounded-md border bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -268,7 +269,7 @@ function DemandDropdown({
               <div className="p-4 text-center">
                 <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
                   <div className="h-3.5 w-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                  Loading demands...
+                  Loading Demands...
                 </div>
               </div>
             ) : error ? (
@@ -278,7 +279,7 @@ function DemandDropdown({
               </div>
             ) : filteredDemands.length === 0 ? (
               <div className="p-4 text-center text-xs text-muted-foreground">
-                No demands found
+                No Demands Found
               </div>
             ) : (
               filteredDemands.map((d) => (
@@ -390,72 +391,62 @@ function SkillComparisonTable({ comparisons }) {
         <Activity className="h-8 w-8 text-muted-foreground/30 mb-2" />
         <p className="text-xs text-muted-foreground font-medium">No Skill Data Found</p>
         <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-          No skill comparisons available for this demand
+          No Skill Comparisons Available For This Demand
         </p>
       </div>
     )
   }
 
   return (
-    <div className="rounded-lg border overflow-hidden">
-      <table className="w-full text-[11px]">
-        <thead>
-          <tr className="bg-muted/50 text-muted-foreground">
-            <th className="text-left px-2.5 py-2 font-semibold">Skill</th>
-            <th className="text-center px-2 py-2 font-semibold">Required</th>
-            <th className="text-center px-2 py-2 font-semibold">Actual</th>
-            <th className="text-center px-2 py-2 font-semibold">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {comparisons.map((skill, i) => (
-            <tr
-              key={`${skill.skillName}-${skill.subSkillName}-${i}`}
-              className={cn(
-                "border-t transition-colors",
-                skill.status === "GAP" ? "bg-red-50/40" : "bg-green-50/30"
+    <div className="rounded-lg border overflow-hidden no-scrollbar">
+      <GenericTable
+        headers={["Skill", "Required", "Actual", "Status"]}
+        columns={["skill_info", "required_info", "actual_info", "status_info"]}
+        rows={comparisons.map((skill, i) => ({
+          ...skill,
+          skill_info: (
+            <div className="text-left">
+              <div className="font-medium text-foreground">{skill.subSkillName || skill.skillName}</div>
+              {skill.subSkillName && (
+                <div className="text-[9px] text-muted-foreground">{skill.skillName}</div>
               )}
-            >
-              <td className="px-2.5 py-2">
-                <div className="font-medium text-foreground">{skill.subSkillName || skill.skillName}</div>
-                {skill.subSkillName && (
-                  <div className="text-[9px] text-muted-foreground">{skill.skillName}</div>
-                )}
-                {skill.mandatory && (
-                  <Badge variant="outline" className="text-[8px] h-3.5 px-1 mt-0.5 bg-purple-50 text-purple-600 border-purple-200">
-                    Required
-                  </Badge>
-                )}
-              </td>
-              <td className="text-center px-2 py-2">
-                <span className="text-muted-foreground">{skill.requiredProficiency || "—"}</span>
-              </td>
-              <td className="text-center px-2 py-2">
-                <span className={cn(
-                  skill.resourceProficiency
-                    ? "text-foreground font-medium"
-                    : "text-muted-foreground/50 italic"
-                )}>
-                  {skill.resourceProficiency || "N/A"}
+              {skill.mandatory && (
+                <Badge variant="outline" className="text-[8px] h-3.5 px-1 mt-0.5 bg-purple-50 text-purple-600 border-purple-200">
+                  Required
+                </Badge>
+              )}
+            </div>
+          ),
+          required_info: <div className="text-center text-muted-foreground">{skill.requiredProficiency || "—"}</div>,
+          actual_info: (
+            <div className="text-center">
+              <span className={cn(
+                skill.resourceProficiency
+                  ? "text-foreground font-medium"
+                  : "text-muted-foreground/50 italic"
+              )}>
+                {skill.resourceProficiency || "N/A"}
+              </span>
+            </div>
+          ),
+          status_info: (
+            <div className="text-center">
+              {skill.status === "MATCH" ? (
+                <span className="inline-flex items-center gap-0.5 text-green-700 font-semibold">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Match
                 </span>
-              </td>
-              <td className="text-center px-2 py-2">
-                {skill.status === "MATCH" ? (
-                  <span className="inline-flex items-center gap-0.5 text-green-700 font-semibold">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Match
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-0.5 text-red-600 font-semibold">
-                    <XCircle className="h-3 w-3" />
-                    Gap
-                  </span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              ) : (
+                <span className="inline-flex items-center gap-0.5 text-red-600 font-semibold">
+                  <XCircle className="h-3 w-3" />
+                  Gap
+                </span>
+              )}
+            </div>
+          ),
+          rowClass: skill.status === "GAP" ? "bg-red-50/40" : "bg-green-50/30"
+        }))}
+      />
     </div>
   )
 }
@@ -492,9 +483,9 @@ function RecencyWarnings({ warnings }) {
               <div className="text-muted-foreground mt-0.5">
                 {w.lastUsedDate
                   ? `Last used: ${w.lastUsedDate}`
-                  : "Never used"}
+                  : "Never Used"}
                 {w.yearsUnused && w.yearsUnused < 999 && (
-                  <span className="ml-1">• {w.yearsUnused}y unused</span>
+                  <span className="ml-1">• {w.yearsUnused}Y Unused</span>
                 )}
               </div>
             </div>
@@ -563,7 +554,7 @@ function AnalysisEmptyState() {
       </div>
       <h4 className="text-sm font-semibold text-foreground mb-1">Skill Intelligence</h4>
       <p className="text-xs text-muted-foreground max-w-[220px] leading-relaxed">
-        Select a demand and click <strong>"Get Match Score"</strong> to analyze skill alignment for this resource.
+        Select A Demand And Click <strong>"Get Match Score"</strong> To Analyze Skill Alignment For This Resource.
       </p>
     </div>
   )
@@ -607,7 +598,7 @@ export function ResourceDetailPanel({ resource, open, onOpenChange }) {
       setUtilizationData(response)
     } catch (error) {
       console.error("Error fetching utilization:", error)
-      toast.error(error.response?.data?.message || "Failed to fetch utilization data.")
+      notify.error(error, "Failed To Fetch Utilization Data.")
       setUtilizationData({ monthlySummary: {} })
     } finally {
       setUtilizationLoading(false)
@@ -712,7 +703,7 @@ export function ResourceDetailPanel({ resource, open, onOpenChange }) {
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Briefcase className="h-3.5 w-3.5 shrink-0" />
-                  {resource.experience} years exp
+                  {resource.experience} Years Exp
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Calendar className="h-3.5 w-3.5 shrink-0" />
@@ -763,7 +754,9 @@ export function ResourceDetailPanel({ resource, open, onOpenChange }) {
                 <SectionHeader icon={TrendingUp} title="Allocation Timeline" />
                 <TimelineBar resource={resource} />
                 <div className="mt-2 flex flex-col gap-1">
-                  {(resource.allocationTimeline || []).map((block, i) => (
+                  {(resource.allocationTimeline || [])
+                    .filter(block => block.status !== "ROLLED_OFF")
+                    .map((block, i) => (
                     <div key={i} className="flex items-center justify-between text-[10px]">
                       <span className={cn("text-muted-foreground", block.tentative && "italic")}>
                         {block.project}{block.tentative ? " (T)" : ""}
@@ -876,7 +869,7 @@ export function ResourceDetailPanel({ resource, open, onOpenChange }) {
                     <SectionHeader
                       icon={Activity}
                       title="Skill Comparison"
-                      badge={`${analysisResult.skillComparisons?.length || 0} skills`}
+                      badge={`${analysisResult.skillComparisons?.length || 0} Skills`}
                     />
                     <SkillComparisonTable comparisons={analysisResult.skillComparisons} />
                   </div>

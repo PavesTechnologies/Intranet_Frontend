@@ -1,6 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useDrag } from "react-dnd";
-import { MoreHorizontal, Plus, CheckSquare } from "lucide-react";
+import {
+  MoreHorizontalIcon,
+  AddIcon,
+  ApprovedIcon
+} from "../../../../components/icons";
+import RiskBadge from "../RiskBadge";
 
 const TaskCard = ({
   task,
@@ -9,6 +14,9 @@ const TaskCard = ({
   onAddToSprint,
   onSelectParentStory,
   onClick,
+  riskCount = 0,
+  projectId,
+  navigate,
 }) => {
   const [{ isDragging }, dragRef] = useDrag({
     type: "TASK",
@@ -60,7 +68,7 @@ const TaskCard = ({
     >
       {/* TASK label */}
       <div className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold shrink-0">
-        <CheckSquare size={12} />
+        <ApprovedIcon size={12} />
         TASK
       </div>
 
@@ -68,6 +76,7 @@ const TaskCard = ({
       <p className="flex-1 text-sm text-gray-800 truncate">
         {task.title}
       </p>
+      <RiskBadge count={riskCount} issueType="Task" issueId={task.id} projectId={projectId} navigate={navigate} />
 
       {/* Status */}
       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200 shrink-0">
@@ -84,7 +93,7 @@ const TaskCard = ({
           }}
           className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 shrink-0"
         >
-          <Plus size={13} /> Story
+          <AddIcon size={13} /> Story
         </button>
       )}
 
@@ -101,7 +110,7 @@ const TaskCard = ({
           }}
           className="p-1 text-gray-500 hover:text-gray-800"
         >
-          <MoreHorizontal size={16} />
+          <MoreHorizontalIcon size={16} />
         </button>
 
         {showMenu && (

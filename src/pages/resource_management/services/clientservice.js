@@ -1,12 +1,6 @@
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 
-const RMS_BASE_URL = import.meta.env.VITE_RMS_BASE_URL;
-
-const getAuthHeader = () => ({
-  headers: {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-  },
-});
+const RMS_BASE_URL = window.__APP_CONFIG__?.RMS_BASE_URL;
 
 /**
  * Fetches High-Level KPI data for the Admin Dashboard
@@ -14,12 +8,14 @@ const getAuthHeader = () => ({
  */
 export const getAdminKPI = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client/get-admin-kpi`,
-      getAuthHeader(),
-    );
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}`,
+     },
+    });
     return response.data;
   } catch (error) {
+    console.log(error);
     console.error("KPI Fetch Error:", error);
     throw error;
   }
@@ -31,13 +27,18 @@ export const getAdminKPI = async () => {
 
 export const getClientPageData = async (clientId) => {
   // Assuming you have an axios instance or fetch wrapper
-  // const response = await axios.get(`api/client/${clientId}/page-data`);
-  // return response.data; 
+  // const response = await api.get(`api/client/${clientId}/page-data`);
+  // return response.data;
 
   // Mocking the call based on your request for now:
   // return fetch(`/api/client/${clientId}/page-data`).then(res => res.json());
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/client/${clientId}/page-data`, getAuthHeader());
+    const response = await api.get(
+      `${RMS_BASE_URL}/api/client/${clientId}/page-data`,
+      {headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },}
+    );
     return response.data;
   } catch (error) {
     throw error;
@@ -46,8 +47,10 @@ export const getClientPageData = async (clientId) => {
 
 export const searchClients = async (filters, page = 0, size = 10) => {
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/client/search`, {
-      ...getAuthHeader(),
+    const response = await api.get(`${RMS_BASE_URL}/api/client/search`, {
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },
       params: {
         // Mapping Frontend Filter state -> Backend ClientFilterDTO
         clientName: filters.search,
@@ -70,10 +73,12 @@ export const searchClients = async (filters, page = 0, size = 10) => {
 
 export const createClient = async (clientData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client/create`,
       clientData,
-      getAuthHeader(),
+      {headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },}
     );
     return response.data;
   } catch (error) {
@@ -83,7 +88,7 @@ export const createClient = async (clientData) => {
 
 export const getClients = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client/get-all-clients`,
       {
         headers: {
@@ -99,7 +104,7 @@ export const getClients = async () => {
 
 export const getClientById = async (clientId) => {
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/client/${clientId}`, {
+    const response = await api.get(`${RMS_BASE_URL}/api/client/${clientId}`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -112,7 +117,7 @@ export const getClientById = async (clientId) => {
 
 export const createClientSLA = async (slaData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client-sla/create`,
       slaData,
       {
@@ -129,7 +134,7 @@ export const createClientSLA = async (slaData) => {
 
 export const updateClientSLA = async (slaData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-sla/update`,
       slaData,
       {
@@ -146,7 +151,7 @@ export const updateClientSLA = async (slaData) => {
 
 export const deleteClientSLA = async (slaId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/client-sla/delete/${slaId}`,
       {
         headers: {
@@ -162,7 +167,7 @@ export const deleteClientSLA = async (slaId) => {
 
 export const getClientSLA = async (clientId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-sla/clientSLA/${clientId}`,
       {
         headers: {
@@ -178,7 +183,7 @@ export const getClientSLA = async (clientId) => {
 
 export const createClientCompliance = async (complianceData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client-compliance/create`,
       complianceData,
       {
@@ -195,7 +200,7 @@ export const createClientCompliance = async (complianceData) => {
 
 export const updateClientCompliance = async (complianceData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-compliance/update`,
       complianceData,
       {
@@ -212,7 +217,7 @@ export const updateClientCompliance = async (complianceData) => {
 
 export const deleteClientCompliance = async (complianceId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/client-compliance/delete/${complianceId}`,
       {
         headers: {
@@ -228,7 +233,7 @@ export const deleteClientCompliance = async (complianceId) => {
 
 export const getClientCompliance = async (clientId) => {
   try {
-    const responce = await axios.get(
+    const responce = await api.get(
       `${RMS_BASE_URL}/api/client-compliance/clientCompliance/${clientId}`,
       {
         headers: {
@@ -244,7 +249,7 @@ export const getClientCompliance = async (clientId) => {
 
 export const createClientEscalation = async (escalationData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client-contact/create`,
       escalationData,
       {
@@ -261,7 +266,7 @@ export const createClientEscalation = async (escalationData) => {
 
 export const updateClientContact = async (complianceData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-contact/update`,
       complianceData,
       {
@@ -278,11 +283,14 @@ export const updateClientContact = async (complianceData) => {
 
 export const deleteClientContact = async (contactId) => {
   try {
-    const response = await axios.delete(`${RMS_BASE_URL}/api/client-contact/delete/${contactId}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
+    const response = await api.delete(
+      `${RMS_BASE_URL}/api/client-contact/delete/${contactId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       },
-    });
+    );
     return response.data;
   } catch (error) {
     throw error;
@@ -291,7 +299,7 @@ export const deleteClientContact = async (contactId) => {
 
 export const getClientEscalation = async (clientId) => {
   try {
-    const responce = await axios.get(
+    const responce = await api.get(
       `${RMS_BASE_URL}/api/client-contact/clientContact/${clientId}`,
       {
         headers: {
@@ -307,7 +315,7 @@ export const getClientEscalation = async (clientId) => {
 
 export const createClientAsset = async (assetData, clientId) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client-assets/clients/${clientId}/assets`,
       assetData,
       {
@@ -315,7 +323,7 @@ export const createClientAsset = async (assetData, clientId) => {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "multipart/form-data",
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -328,16 +336,16 @@ export const createClientAsset = async (assetData, clientId) => {
    =============================== */
 export const updateClientAsset = async (assetId, assetData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-assets/${assetId}`,
       assetData,
       {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -350,7 +358,7 @@ export const updateClientAsset = async (assetId, assetData) => {
    =============================== */
 export const deleteClientAsset = async (assetId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/client-assets/${assetId}`,
       {
         headers: {
@@ -369,7 +377,7 @@ export const deleteClientAsset = async (assetId) => {
    =============================== */
 export const getAssetsByClient = async (clientId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-assets/client/${clientId}`,
       {
         headers: {
@@ -384,7 +392,7 @@ export const getAssetsByClient = async (clientId) => {
 };
 // export const getAssetById = async (assetId) => {
 //   try {
-//     const response = await axios.get(
+//     const response = await api.get(
 //       `${RMS_BASE_URL}/api/client-assets/${assetId}`,
 //       {
 //         headers: {
@@ -403,11 +411,15 @@ export const getAssetsByClient = async (clientId) => {
 export const getClientAssetAssignments = async (assetId) => {
   try {
     // 1. Ensure this URL matches your @GetMapping in Java EXACTLY
-    // 2. Double check if your backend expects /api/client-assets/54 
+    // 2. Double check if your backend expects /api/client-assets/54
     //    or perhaps /api/assets/54
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-asset-assignments/by-asset/${assetId}`,
-      getAuthHeader()
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -418,13 +430,13 @@ export const getClientAssetAssignments = async (assetId) => {
 
 export const getAssetById = async (assetId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-assets/${assetId}`,
       {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -433,20 +445,23 @@ export const getAssetById = async (assetId) => {
   }
 };
 
-
 /* ===============================
    ASSIGN ASSET TO RESOURCE
    =============================== */
 export const assignClientAsset = async (assignmentData) => {
-  console.log("Assignment Data:", assignmentData);
   try {
-    // FIX: Using the nested ID safely
-    const id = assignmentData.asset?.assetId || assignmentData.asset?.id || assignmentData.assetId;
+    const id =
+      assignmentData.asset?.assetId ||
+      assignmentData.assetId;
 
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/client-asset-assignments/${id}`,
       assignmentData,
-      getAuthHeader()
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -456,12 +471,14 @@ export const assignClientAsset = async (assignmentData) => {
 };
 export const updateClient = async (clientData) => {
   try {
-    const response = await axios.put(`${RMS_BASE_URL}/api/client/update-client`, clientData,
+    const response = await api.put(
+      `${RMS_BASE_URL}/api/client/update-client`,
+      clientData,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        }
-      }
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -474,25 +491,36 @@ export const updateClient = async (clientData) => {
  */
 export const updateClientStatus = async (clientId, clientData) => {
   try {
-    const response = await axios.put(`${RMS_BASE_URL}/api/client/update-client`, {
-      clientId: clientId,
-      ...clientData
-    }, getAuthHeader());
+    const response = await api.put(
+      `${RMS_BASE_URL}/api/client/update-client`,
+      {
+        clientId: clientId,
+        ...clientData,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
+    );
 
     return response.data;
   } catch (error) {
-    console.error('Error updating client status:', error);
+    console.error("Error updating client status:", error);
     throw error;
   }
 };
 
-
 export const assignUpdateClientAsset = async (assignmentId, assignmentData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-asset-assignments/${assignmentId}`,
       assignmentData,
-      getAuthHeader()
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -501,9 +529,13 @@ export const assignUpdateClientAsset = async (assignmentId, assignmentData) => {
   }
 };
 
-export const returnAssetAssignment = async (assignmentId, actualReturnDate, remarks) => {
+export const returnAssetAssignment = async (
+  assignmentId,
+  actualReturnDate,
+  remarks,
+) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/client-asset-assignments/return/${assignmentId}`,
       {},
       {
@@ -514,7 +546,7 @@ export const returnAssetAssignment = async (assignmentId, actualReturnDate, rema
           actualReturnDate: actualReturnDate,
           remarks: remarks,
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -524,12 +556,13 @@ export const returnAssetAssignment = async (assignmentId, actualReturnDate, rema
 
 export const getAssignmentKPI = async (assetId) => {
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/client-asset-assignments/kpi/${assetId}`,
+    const response = await api.get(
+      `${RMS_BASE_URL}/api/client-asset-assignments/kpi/${assetId}`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -539,7 +572,7 @@ export const getAssignmentKPI = async (assetId) => {
 
 export const deleteClient = async (clientId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/client/delete-client/${clientId}`,
       {
         headers: {
@@ -558,9 +591,13 @@ export const deleteClient = async (clientId) => {
    =============================== */
 export const deleteClientAssignment = async (assignmentId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/client-asset-assignments/${assignmentId}`,
-      getAuthHeader()
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -570,22 +607,26 @@ export const deleteClientAssignment = async (assignmentId) => {
 };
 
 export const getAssetDashboard = async () => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/client-assets/dashboard`,
-    getAuthHeader()
+    {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    },
   );
   return res.data;
 };
 
 export const getAssetDashboardByClient = async (clientId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-assets/dashboard/client/${clientId}`,
       {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data.data;
   } catch (error) {
@@ -598,13 +639,13 @@ export const getAssetDashboardByClient = async (clientId) => {
    =============================== */
 export const getProjectOverlaps = async (projectId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/projects/${projectId}/overlaps`,
       {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data;
   } catch (error) {
@@ -614,65 +655,62 @@ export const getProjectOverlaps = async (projectId) => {
 };
 
 export const getProjectsByClient = async (clientId) => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/projects/get-project-by-client-id/${clientId}`,
     {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
 
   return res.data; // { success, message, data: [...] }
 };
 
 export const getProjectSLA = async (projectId) => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/project-sla/project/${projectId}`,
     {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
   return res.data;
 };
 
-
-
 export const getProjectCompliance = async (projectId) => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/project-compliance/project/${projectId}`,
     {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
   return res.data;
 };
 
-
 export const getProjectEscalations = async (projectId) => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/projects/${projectId}/escalations`,
     {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
   return res.data;
 };
 //GET ASSETS BY PROJECT ID
 export const getAssetsByProjectId = async (projectId) => {
-  const res = await axios.get(
+  const res = await api.get(
     `${RMS_BASE_URL}/api/client-asset-assignments/project/${projectId}`,
     {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-    }
+    },
   );
 
   return res.data;
@@ -680,10 +718,10 @@ export const getAssetsByProjectId = async (projectId) => {
 
 export const getSkills = async () => {
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/skills/active`, {
+    const response = await api.get(`${RMS_BASE_URL}/api/skills/active`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
-      }
+      },
     });
     return response.data;
   } catch (error) {
@@ -693,10 +731,10 @@ export const getSkills = async () => {
 
 export const getCertificates = async () => {
   try {
-    const response = await axios.get(`${RMS_BASE_URL}/api/certificates`, {
+    const response = await api.get(`${RMS_BASE_URL}/api/certificates`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
-      }
+      },
     });
     return response.data;
   } catch (error) {
@@ -704,19 +742,18 @@ export const getCertificates = async () => {
   }
 };
 
-
 /* ===============================
    GET AVAILABLE SERIAL NUMBERS BY ASSET ID
    =============================== */
 export const getAvailableSerialsByAssetId = async (assetId) => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/client-assets/${assetId}/available-serials`,
       {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
+      },
     );
     return response.data; // [{ serialNumber, status }]
   } catch (error) {
@@ -732,7 +769,7 @@ export function formatCurrency(value) {
     notation: "compact",
     maximumFractionDigits: 2,
   }).format(value);
-};
+}
 
 /**
  * ===============================
@@ -742,10 +779,14 @@ export function formatCurrency(value) {
  */
 export const createCompanyContact = async (companyContactData) => {
   try {
-    const response = await axios.post(
+    const response = await api.post(
       `${RMS_BASE_URL}/api/company-contact/create`,
       companyContactData,
-      getAuthHeader()
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -761,9 +802,13 @@ export const createCompanyContact = async (companyContactData) => {
  */
 export const getCompanyContactsByCompanyId = async () => {
   try {
-    const response = await axios.get(
+    const response = await api.get(
       `${RMS_BASE_URL}/api/company-contact/all`,
-      getAuthHeader()
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -779,10 +824,14 @@ export const getCompanyContactsByCompanyId = async () => {
  */
 export const updateCompanyContact = async (companyContactData) => {
   try {
-    const response = await axios.put(
+    const response = await api.put(
       `${RMS_BASE_URL}/api/company-contact/update/${companyContactData.contactId}`,
       companyContactData,
-      getAuthHeader()
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {
@@ -798,9 +847,13 @@ export const updateCompanyContact = async (companyContactData) => {
  */
 export const deleteCompanyContact = async (contactId) => {
   try {
-    const response = await axios.delete(
+    const response = await api.delete(
       `${RMS_BASE_URL}/api/company-contact/delete/${contactId}`,
-      getAuthHeader()
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
     return response.data;
   } catch (error) {

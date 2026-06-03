@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import api from "../../../../api/axiosInstance";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { X } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import FormTextArea from "../../../../components/forms/FormTextArea";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
+import Button from "../../../../components/Button/Button";
 
 // ===================== WRAPPER =====================
 const Wrapper = ({ children, mode, onClose }) => {
@@ -78,25 +79,25 @@ const EditStoryForm = ({
       try {
         const [storyRes, userRes, epicRes, sprintRes, statusRes] =
           await Promise.all([
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/${storyId}`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/epics`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/sprints`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
+              axiosConfig,
             ),
-            axios.get(
-              `${import.meta.env.VITE_PMS_BASE_URL}/api/projects/${projectId}/statuses`,
-              axiosConfig
+            api.get(
+              `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
+              axiosConfig,
             ),
           ]);
 
@@ -114,7 +115,7 @@ const EditStoryForm = ({
           assigneeId: data.assigneeId || "",
           reporterId: data.reporterId || "",
           startDate: data.startDate || "",
-          dueDate: data.dueDate || "",  
+          dueDate: data.dueDate || "",
         });
 
         setUsers(userRes.data.content || userRes.data || []);
@@ -123,7 +124,7 @@ const EditStoryForm = ({
         setStatuses(statusRes.data || []);
       } catch (err) {
         console.error("Error loading story:", err);
-        toast.error("Failed to load story.");
+        showStatusToast("Failed to load story.", "error");
       } finally {
         setLoading(false);
       }
@@ -171,7 +172,7 @@ const EditStoryForm = ({
       projectId: Number(projectId),
       epicId: formData.epicId,
       sprintId: formData.sprintId,
-      statusId: formData.statusId,
+       statusId: formData.statusId,
       priority: formData.priority,
 
       startDate: formData.startDate
@@ -184,13 +185,13 @@ const EditStoryForm = ({
     };
 
     try {
-      await axios.put(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/${storyId}`,
+      await api.put(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}`,
         payload,
-        axiosConfig
+        axiosConfig,
       );
 
-      toast.success("Story updated successfully!");
+      showStatusToast("Story updated successfully!", "success");
       setTimeout(() => {
         onUpdated?.();
         onClose?.();
@@ -202,10 +203,7 @@ const EditStoryForm = ({
         error.message ||
         "Failed to update story";
 
-      toast.error(msg, {
-        position: "top-right",
-        autoClose: 4000,
-      });
+      showStatusToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -213,29 +211,29 @@ const EditStoryForm = ({
 
   const validateForm = () => {
     const title = formData.title?.trim();
-  
+
     // Required validation
     if (!title) {
-      toast.error("Story title is required.");
+      showStatusToast("Story title is required.", "error");
       return false;
     }
-  
+
     // Length validation
     if (title.length < 2 || title.length > 200) {
-      toast.error("Story title must be between 2 and 200 characters.");
+      showStatusToast("Story title must be between 2 and 200 characters.", "error");
       return false;
     }
-    
+
     // Start Date vs Due Date validation
     if (formData.startDate && formData.dueDate) {
       const start = new Date(formData.startDate);
       const due = new Date(formData.dueDate);
       if (due < start) {
-        toast.error("Due date cannot be earlier than the start date.");
+        showStatusToast("Due date cannot be earlier than the start date.", "error");
         return false;
       }
     }
-  
+
     return true;
   };
 
@@ -244,7 +242,7 @@ const EditStoryForm = ({
     return (
       <Wrapper mode={mode} onClose={onClose}>
         <div className="flex-1 flex items-center justify-center py-10">
-          <p className="text-gray-600">Loading story details...</p>
+          <LoadingSpinner size="md" text="Loading story details..." />
         </div>
       </Wrapper>
     );
@@ -253,23 +251,28 @@ const EditStoryForm = ({
   // ===================== UI =====================
   return (
     <Wrapper mode={mode} onClose={onClose}>
-      {/* HEADER */}
-      <div className="flex justify-between items-center p-6 border-b shrink-0">
-        <h2 className="text-xl font-semibold text-gray-800">Edit User Story</h2>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 transition-colors">
-          <X size={20} />
-        </button>
-      </div>
+      <form onSubmit={handleSubmit} className="flex flex-col min-h-full">
+        {/* HEADER */}
+        <div className="flex justify-between items-center p-6 border-b shrink-0">
+          <h2 className="text-xl font-semibold text-gray-800">Edit User Story</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
 
-      {/* BODY */}
-      <div className="p-6 overflow-y-auto flex-1 space-y-6">
-        <FormInput
-          label="Title *"
-          name="title"
-          value={formData.title}
-          onChange={handleChange}
-          required
-        />
+        {/* BODY */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          <FormInput
+            label="Title *"
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
+            required
+          />
 
         <FormTextArea
           label="Description"
@@ -303,7 +306,7 @@ const EditStoryForm = ({
             ]}
           />
 
-          <FormSelect
+          {/* <FormSelect
             label="Status *"
             name="statusId"
             value={formData.statusId || ""}
@@ -312,7 +315,7 @@ const EditStoryForm = ({
               { label: "Select Status", value: "" },
               ...statuses.map((s) => ({ label: s.name, value: s.id })),
             ]}
-          />
+          /> */}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -365,42 +368,30 @@ const EditStoryForm = ({
               ...users.map((u) => ({ label: u.name, value: u.id })),
             ]}
           />
-         
-          <FormDatePicker 
-            label="Start Date" 
-            name="startDate" 
-            value={formData.startDate || ""} 
-            onChange={handleChange}  
+
+          <FormDatePicker
+            label="Start Date"
+            name="startDate"
+            value={formData.startDate || ""}
+            onChange={handleChange}
           />
 
-          <FormDatePicker 
-            label="Due Date" 
-            name="dueDate" 
-            value={formData.dueDate || ""} 
+          <FormDatePicker
+            label="Due Date"
+            name="dueDate"
+            value={formData.dueDate || ""}
             onChange={handleChange}
           />
         </div>
       </div>
 
-      {/* FOOTER */}
-      <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3 shrink-0">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
-        >
-          Cancel
-        </button>
+        {/* FOOTER */}
+        <div className="sticky bottom-0 bg-white p-4 border-t flex justify-end gap-3 shrink-0">
+          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
 
-        <button
-          type="button"
-          disabled={loading}
-          onClick={handleSubmit}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-        >
-          {loading ? "Saving..." : "Update Story"}
-        </button>
-      </div>
+          <Button variant="primary" type="submit" disabled={loading}>Update Story</Button>
+        </div>
+      </form>
     </Wrapper>
   );
 };

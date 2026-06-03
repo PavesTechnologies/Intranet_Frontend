@@ -7,9 +7,13 @@ export default function JobForm({
   handleChange,
   designations = [],
   departments = [],
-  isEditMode,
+  managerOptions = [],
+ 
 }) {
   const employeeTypes = ["Full-Time", "Intern", "Contract"];
+  const employeeTypeOptions = form.employeeType
+    ? Array.from(new Set([form.employeeType, ...employeeTypes]))
+    : employeeTypes;
   const workModes = ["Remote", "Hybrid", "Office"];
   const experienceOptions = ["0", "0.5", "1"];
   const employeeStatus = [
@@ -18,6 +22,8 @@ export default function JobForm({
     "Resigned",
     "Terminated",
     "Absconded",
+    "Exited",
+    "On-Notice",
   ];
 
   const filteredDesignations = designations.filter(
@@ -35,7 +41,6 @@ export default function JobForm({
           value: d.department_uuid,
           label: d.department_name,
         }))}
-        disabled={isEditMode}
       />
 
       <FormSelect
@@ -55,8 +60,8 @@ export default function JobForm({
         name="employeeType"
         value={form.employeeType || ""}
         onChange={handleChange}
-        options={employeeTypes}
-        disabled={isEditMode}
+        options={employeeTypeOptions}
+        
       />
 
       <FormSelect
@@ -65,7 +70,6 @@ export default function JobForm({
         value={form.workMode || ""}
         onChange={handleChange}
         options={workModes}
-        disabled={isEditMode}
       />
 
       <FormInput
@@ -73,7 +77,6 @@ export default function JobForm({
         name="location"
         value={form.location || ""}
         onChange={handleChange}
-        disabled={isEditMode}
       />
 
       <FormInput
@@ -82,14 +85,15 @@ export default function JobForm({
         name="joiningDate"
         value={form.joiningDate || ""}
         onChange={handleChange}
-        disabled={isEditMode}
+        
       />
 
-      <FormInput
+      <FormSelect
         label="Reporting Manager"
         name="reportingManagerUuid"
         value={form.reportingManagerUuid || ""}
         onChange={handleChange}
+        options={managerOptions}
       />
 
       <FormSelect
@@ -98,6 +102,7 @@ export default function JobForm({
         value={form.employmentStatus || ""}
         onChange={handleChange}
         options={employeeStatus}
+        
       />
 
       <FormSelect

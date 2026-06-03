@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { FiEye, FiEyeOff } from "react-icons/fi"; // import icons
 import PhoneInput from "react-phone-input-2";
@@ -26,18 +26,20 @@ export default function Register() {
       // ✅ Normalize contact with "+"
       const payload = {
         ...form,
-        contact: form.contact.startsWith("+") ? form.contact : `+${form.contact.replace(/\D/g, "")}`,
+        contact: form.contact.startsWith("+")
+          ? form.contact
+          : `+${form.contact.replace(/\D/g, "")}`,
       };
-      await axios.post(
-        `${import.meta.env.VITE_USER_MANAGEMENT_URL}/auth/register`,
-        payload
+      await api.post(
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/register`,
+        payload,
       );
       showStatusToast("Registered successfully!", "success");
       navigate("/");
     } catch (err) {
       showStatusToast(
         "Registration failed: " + (err.response?.data?.detail || err.message),
-        "error"
+        "error",
       );
     }
   };

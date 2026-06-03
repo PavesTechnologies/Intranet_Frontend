@@ -11,7 +11,7 @@ import { CalendarDays, Table2, GanttChart } from "lucide-react";
 import { RESOURCES, getKPIData } from "../../services/availabilityService";
 import { getWorkforceKPI } from "../../services/workforceService";
 import { useAvailability } from "../../hooks/useAvailability";
-import { toast } from "react-toastify";
+import { notify } from "../../utils/notify";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
 
@@ -43,7 +43,7 @@ export default function WorkforceAvailability() {
 
   // Navigate to Resource Intelligence page instead of opening a modal
   const handleResourceClick = (resource) => {
-    const id = resource.id || resource.resourceId;
+    const id = resource.employeeId || resource.resourceId || resource.userId || resource.id;
     if (!id) {
       console.warn("Resource has no id or resourceId:", resource);
       return;
@@ -63,7 +63,7 @@ export default function WorkforceAvailability() {
       setKpiData(res.data);
     } catch (err) {
       console.error("Failed to load KPI data", err);
-      toast.error(err.response?.data?.message || "Failed to load KPI data");
+      notify.error(err, "Failed to load KPI data");
     } finally {
       setKpiLoading(false);
     }
@@ -179,16 +179,11 @@ export default function WorkforceAvailability() {
                 )}
               </div>
 
-              <div className="p-4 min-h-[600px] relative">
+              <div className="pt-1 px-2 pb-2 sm:pt-1.5 sm:px-3 sm:pb-3 min-h-[600px] relative">
                 {loading && (
-                  <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-[1px] transition-all duration-300">
-                    {/* <div className="flex flex-col items-center gap-2 p-6 rounded-xl bg-card shadow-xl border animate-in fade-in zoom-in duration-300"> */}
-                      <LoadingSpinner text="Fetching Resources" />
-                      {/* <div className="flex flex-col items-center -mt-2">
-                        <p className="text-sm font-bold text-slate-900">Fetching Resources</p>
-                        <p className="text-[11px] text-slate-500 font-medium text-center">Updating your view...</p>
-                      </div> */}
-                    {/* </div> */}
+                  // <div> className="absolute inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-[1px] transition-all duration-300"
+                  <div>
+                    <LoadingSpinner text="Fetching Resources" />
                   </div>
                 )}
                 <TabsContent value="calendar" className="mt-0 outline-none">
@@ -197,9 +192,10 @@ export default function WorkforceAvailability() {
                       filteredResources={filteredResources}
                       onDayClick={handleDayClick}
                       selectedResourceId={null}
-                      onSelectResource={handleResourceClick}
+                      onSelectResource={null}
                       currentDate={currentDate}
                       onNavigate={setCurrentDate}
+                      kpiData={kpiData}
                     />
                   </div>
                 </TabsContent>
@@ -236,7 +232,7 @@ export default function WorkforceAvailability() {
                 </TabsContent>
 
                 <TabsContent value="table" className="mt-0 outline-none">
-                  <div className="flex flex-col gap-5">
+                  <div className="flex flex-col gap-2">
                     <ResourceTable
                       resources={filteredResources}
                       onResourceClick={handleResourceClick}

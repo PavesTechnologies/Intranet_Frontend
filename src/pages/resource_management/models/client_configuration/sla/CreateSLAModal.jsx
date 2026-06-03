@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { X } from "lucide-react";
+import { CloseIcon } from "@/components/icons";
+import FilterListbox from "../../../../../components/filter/FilterListbox";
 
 const CreateSLAModal = ({ open, onClose }) => {
   const [formData, setFormData] = useState({
@@ -44,7 +45,7 @@ const CreateSLAModal = ({ open, onClose }) => {
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 
@@ -56,17 +57,16 @@ const CreateSLAModal = ({ open, onClose }) => {
             <label className="text-sm font-medium text-gray-700">
               SLA Type <span className="text-red-500">*</span>
             </label>
-            <select
-              name="sla_type"
+            <FilterListbox
+              options={[
+                { value: "", label: "Select SLA type" },
+                { value: "New Demand", label: "New Demand" },
+                { value: "Replacement", label: "Replacement" },
+                { value: "Emergency", label: "Emergency" },
+              ]}
               value={formData.sla_type}
-              onChange={handleChange}
-              className="w-full mt-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Select SLA type</option>
-              <option value="New Demand">New Demand</option>
-              <option value="Replacement">Replacement</option>
-              <option value="Emergency">Emergency</option>
-            </select>
+              onChange={(val) => handleChange({ target: { name: "sla_type", value: val } })}
+            />
           </div>
 
           {/* SLA Duration */}
@@ -78,6 +78,7 @@ const CreateSLAModal = ({ open, onClose }) => {
               type="number"
               name="sla_duration_days"
               value={formData.sla_duration_days}
+              onWheel={(e) => e.target.blur()}
               onChange={handleChange}
               placeholder="e.g. 15"
               className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
@@ -93,6 +94,7 @@ const CreateSLAModal = ({ open, onClose }) => {
               type="number"
               name="warning_threshold_days"
               value={formData.warning_threshold_days}
+              onWheel={(e) => e.target.blur()}
               onChange={handleChange}
               placeholder="e.g. 5"
               className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
@@ -104,20 +106,14 @@ const CreateSLAModal = ({ open, onClose }) => {
             <label className="text-sm font-medium text-gray-700">
               Status
             </label>
-            <select
-              name="active_flag"
-              value={formData.active_flag}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  active_flag: e.target.value === "true",
-                }))
-              }
-              className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
-            </select>
+            <FilterListbox
+              options={[
+                { value: "true", label: "Active" },
+                { value: "false", label: "Inactive" },
+              ]}
+              value={String(formData.active_flag)}
+              onChange={(val) => setFormData((prev) => ({ ...prev, active_flag: val === "true" }))}
+            />
           </div>
         </div>
 

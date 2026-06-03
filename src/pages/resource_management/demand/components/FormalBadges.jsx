@@ -1,10 +1,6 @@
 import React from 'react';
 import { cn } from "@/lib/utils";
-import {
-    Clock, AlertTriangle, CheckCircle2, ShieldAlert,
-    TrendingUp, Shield, Zap, Target, Activity,
-    Lock, ShieldCheck, HelpCircle, Flame
-} from "lucide-react";
+import { PendingIcon, WarningIcon, SuccessIcon, SecurityAlertIcon, ShieldIcon, ZapIcon, TargetIcon, ActivityIcon, LockIcon, InfoIcon, TargetIcon as TargetAltIcon } from "@/components/icons";
 
 /**
  * FormalBadges: Evolved Enterprise Identifiers
@@ -14,12 +10,12 @@ import {
 export const PriorityBadge = ({ priority, className }) => {
     const p = String(priority || 'Medium');
     const config = {
-        'CRITICAL': { className: 'bg-rose-600 text-white border-rose-700 shadow-rose-200', label: 'Critical', icon: Flame },
-        'HIGH': { className: 'bg-amber-500 text-white border-amber-600 shadow-amber-200', label: 'High', icon: AlertTriangle },
-        'MEDIUM': { className: 'bg-indigo-50 border-indigo-100 text-indigo-700', label: 'Medium', icon: Clock },
-        'LOW': { className: 'bg-slate-50 border-slate-200 text-slate-500', label: 'Low', icon: Clock },
+        'CRITICAL': { className: 'bg-rose-600 text-white border-rose-700 shadow-rose-200', label: 'Critical', icon: SecurityAlertIcon },
+        'HIGH': { className: 'bg-amber-500 text-white border-amber-600 shadow-amber-200', label: 'High', icon: WarningIcon },
+        'MEDIUM': { className: 'bg-indigo-50 border-indigo-100 text-indigo-700', label: 'Medium', icon: PendingIcon },
+        'LOW': { className: 'bg-slate-50 border-slate-200 text-slate-500', label: 'Low', icon: PendingIcon },
     };
-    const c = config[p.toUpperCase()] || { className: 'bg-slate-100 border-slate-200 text-slate-600', label: p, icon: HelpCircle };
+    const c = config[p.toUpperCase()] || { className: 'bg-slate-100 border-slate-200 text-slate-600', label: p, icon: InfoIcon };
 
     return (
         <span className={cn(
@@ -65,7 +61,7 @@ export const SLABadge = ({ days, isSoft }) => {
         return (
             <div className="flex flex-col items-center gap-0.5 px-2 py-0.5 rounded-lg border min-w-[80px] transition-all bg-slate-50 border-slate-100 text-slate-400">
                 <div className="flex items-center gap-1">
-                    <Clock className="h-2 w-2 opacity-40" />
+                    <PendingIcon className="h-2 w-2 opacity-40" />
                     <span className="text-[8px] font-black tracking-widest uppercase text-slate-400">SLA</span>
                 </div>
                 <span className="text-[11px] font-black tabular-nums">NO</span>
@@ -84,7 +80,7 @@ export const SLABadge = ({ days, isSoft }) => {
                     "bg-slate-50 border-slate-100 text-slate-500"
         )}>
             <div className="flex items-center gap-1">
-                {isBreached ? <ShieldAlert className="h-2.5 w-2.5" /> : <Clock className="h-2 w-2" />}
+                {isBreached ? <SecurityAlertIcon className="h-2.5 w-2.5" /> : <PendingIcon className="h-2 w-2" />}
                 <span className="text-[8px] font-black tracking-widest uppercase">{isBreached ? 'Breached' : 'Remaining'}</span>
             </div>
             <span className="text-[11px] font-black tabular-nums">{isBreached ? `${Math.abs(days)}d Over` : `${days}d`}</span>
@@ -96,7 +92,7 @@ export const DemandTypeBadge = ({ type }) => {
     const t = String(type || 'Unknown');
     return (
         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white border border-slate-200 text-[9px] font-bold tracking-tight text-slate-500 rounded-md">
-            <Target className="h-2.5 w-2.5" />
+            <TargetIcon className="h-2.5 w-2.5" />
             {t}
         </span>
     );

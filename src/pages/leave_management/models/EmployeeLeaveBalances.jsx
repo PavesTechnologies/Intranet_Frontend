@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import Pagination from "../../../components/Pagination/pagination";
 import { useNavigate } from "react-router-dom";
@@ -11,6 +11,8 @@ import { ChevronUpDownIcon, CheckIcon } from "@heroicons/react/20/solid";
 import { Plus } from "lucide-react";
 import LeaveUploadWizard from "./LeaveUploadWizard";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Button from "../../../components/Button/Button";
+import FilterListbox from "../../../components/filter/FilterListbox";
 
 export const YearDropdown = ({ value, onChange }) => {
   const currentYear = new Date().getFullYear();
@@ -40,7 +42,9 @@ export const YearDropdown = ({ value, onChange }) => {
               >
                 {({ selected }) => (
                   <>
-                    <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>
+                    <span
+                      className={`block truncate ${selected ? "font-medium" : "font-normal"}`}
+                    >
                       {year}
                     </span>
                     {selected && (
@@ -59,7 +63,7 @@ export const YearDropdown = ({ value, onChange }) => {
   );
 };
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 // ─────────────────────────────────────────────
 // Pure fetch function — used by React Query
@@ -72,7 +76,7 @@ const fetchLeaveBalances = async ({ query, year, page, rowsPerPage }) => {
       ? `${BASE_URL}/api/leave-balance/leave-balance?year=${year}&page=${pageIndex}&size=${rowsPerPage}`
       : `${BASE_URL}/api/leave-balance/search/${year}?query=${encodeURIComponent(query)}&page=${pageIndex}&size=${rowsPerPage}`;
 
-  const response = await axios.get(url, {
+  const response = await api.get(url, {
     headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
   });
 
@@ -93,20 +97,22 @@ const fetchLeaveBalances = async ({ query, year, page, rowsPerPage }) => {
         balances: {},
       };
 
-      (emp.leaves || []).forEach(({ leaveTypeId, leaveTypeName, remainingLeaves }) => {
-        if (!leaveTypeName || !leaveTypeId) return;
+      (emp.leaves || []).forEach(
+        ({ leaveTypeId, leaveTypeName, remainingLeaves }) => {
+          if (!leaveTypeName || !leaveTypeId) return;
 
-        employeeMap[emp.employeeId].balances[leaveTypeName] = {
-          leaveTypeId,
-          remainingLeaves: remainingLeaves ?? 0,
-          year: emp.year,
-          leaveType: { maxDaysPerYear: null },
-        };
+          employeeMap[emp.employeeId].balances[leaveTypeName] = {
+            leaveTypeId,
+            remainingLeaves: remainingLeaves ?? 0,
+            year: emp.year,
+            leaveType: { maxDaysPerYear: null },
+          };
 
-        if (!leaveTypeCollection[leaveTypeName]) {
-          leaveTypeCollection[leaveTypeName] = { leaveTypeName, leaveTypeId };
-        }
-      });
+          if (!leaveTypeCollection[leaveTypeName]) {
+            leaveTypeCollection[leaveTypeName] = { leaveTypeName, leaveTypeId };
+          }
+        },
+      );
     });
 
     return {
@@ -131,7 +137,8 @@ const fetchLeaveBalances = async ({ query, year, page, rowsPerPage }) => {
     if (!employeeMap[empId]) {
       employeeMap[empId] = {
         employeeId: empId,
-        employeeName: `${entry.employee?.firstName ?? ""} ${entry.employee?.lastName ?? ""}`.trim(),
+        employeeName:
+          `${entry.employee?.firstName ?? ""} ${entry.employee?.lastName ?? ""}`.trim(),
         employeeGender: entry.employee?.gender || null,
         balances: {},
       };
@@ -182,7 +189,11 @@ const EmployeeLeaveBalances = () => {
   const queryKey = ["leaveBalances", debouncedQuery, currentYear, currentPage];
 
   // ─── useQuery — fetches & caches data per unique key ───
-  const { data: queryResult, isLoading, isFetching } = useQuery({
+  const {
+    data: queryResult,
+    isLoading,
+    isFetching,
+  } = useQuery({
     queryKey,
     queryFn: () =>
       fetchLeaveBalances({
@@ -191,9 +202,9 @@ const EmployeeLeaveBalances = () => {
         page: currentPage,
         rowsPerPage,
       }),
-    keepPreviousData: true,    // ✅ show stale data while fetching next page
-    staleTime: 1000 * 60 * 2,  // ✅ cache fresh for 2 minutes
-    cacheTime: 1000 * 60 * 5,  // ✅ cache kept in memory for 5 minutes
+    keepPreviousData: true, // ✅ show stale data while fetching next page
+    staleTime: 1000 * 60 * 2, // ✅ cache fresh for 2 minutes
+    cacheTime: 1000 * 60 * 5, // ✅ cache kept in memory for 5 minutes
     onError: () => toast.error("Failed to fetch leave balances"),
   });
 
@@ -204,7 +215,7 @@ const EmployeeLeaveBalances = () => {
   // ─── useMutation — PUT update + invalidate cache on success ───
   const updateMutation = useMutation({
     mutationFn: (payload) =>
-      axios.put(`${BASE_URL}/api/leave-balance/update`, payload, {
+      api.put(`${BASE_URL}/api/leave-balance/update`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       }),
     onSuccess: (res) => {
@@ -214,7 +225,9 @@ const EmployeeLeaveBalances = () => {
       queryClient.invalidateQueries({ queryKey: ["leaveBalances"] });
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.message || "Failed to update leave balances");
+      toast.error(
+        err?.response?.data?.message || "Failed to update leave balances",
+      );
     },
   });
 
@@ -253,7 +266,12 @@ const EmployeeLeaveBalances = () => {
   useEffect(() => {
     if (currentPage < totalPages) {
       queryClient.prefetchQuery({
-        queryKey: ["leaveBalances", debouncedQuery, currentYear, currentPage + 1],
+        queryKey: [
+          "leaveBalances",
+          debouncedQuery,
+          currentYear,
+          currentPage + 1,
+        ],
         queryFn: () =>
           fetchLeaveBalances({
             query: debouncedQuery,
@@ -274,9 +292,13 @@ const EmployeeLeaveBalances = () => {
     }
     const fetchSuggestions = async () => {
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${BASE_URL}/api/leave-balance/autocomplete?query=${encodeURIComponent(searchQuery)}`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
         );
         setSuggestions(res.data);
         setShowSuggestions(true);
@@ -306,8 +328,11 @@ const EmployeeLeaveBalances = () => {
       })
       .map(({ leaveTypeName, leaveTypeId }) => ({
         leaveTypeId,
-        remainingLeaves: selectedEmployee.balances[leaveTypeName]?.remainingLeaves ?? 0,
-        year: selectedEmployee.balances[leaveTypeName]?.year ?? new Date().getFullYear(),
+        remainingLeaves:
+          selectedEmployee.balances[leaveTypeName]?.remainingLeaves ?? 0,
+        year:
+          selectedEmployee.balances[leaveTypeName]?.year ??
+          new Date().getFullYear(),
       }));
 
     updateMutation.mutate({
@@ -330,28 +355,35 @@ const EmployeeLeaveBalances = () => {
   };
 
   const handlePrevious = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
-  const handleNext = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  const handleNext = () =>
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+
+  const yearOptions = Array.from(
+    { length: 3 },
+    (_, i) => new Date().getFullYear() - i,
+  ).map((y) => ({ value: y, label: String(y) }));
 
   return (
     <div className="p-6 overflow-auto">
       {/* Loading Spinner Overlay */}
       {(isLoading || isFetching) && (
-        <div className="absolute inset-0 bg-white/70 flex justify-center items-center z-50">
+        <div className="absolute inset-0 bg-white/70 flex justify-center items-center z-50`">
           <LoadingSpinner text="Loading Leave Balances" />
         </div>
       )}
 
       {/* Title & Back Button */}
       <div className="flex items-center justify-between px-6 mb-4">
-        <h2 className="text-xl font-bold text-gray-800">Employee Leave Balances</h2>
+        <h2 className="text-xl font-bold text-gray-800">
+          Employee Leave Balances
+        </h2>
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => navigate(-1)}
-          className="flex items-center text-blue-700 font-medium hover:text-blue-900 transition-colors whitespace-nowrap"
+          className="flex items-center border border-gray-500 rounded-md px-5 py-1  text-blue-700 font-medium hover:text-blue-900 transition-colors whitespace-nowrap"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
         </motion.button>
       </div>
 
@@ -395,23 +427,25 @@ const EmployeeLeaveBalances = () => {
           )}
         </div>
 
-        <div className="relative z-50">
-          <YearDropdown
+        <div className="w-32">
+          <FilterListbox
+            options={yearOptions}
             value={currentYear}
             onChange={(year) => {
               setCurrentYear(year);
-              setCurrentPage(1); // ✅ reset page on year change
+              setCurrentPage(1);
             }}
           />
         </div>
 
-        <button
+        <Button
           onClick={() => setShowUploadWizard(true)}
-          className="flex items-center text-blue-700 font-medium hover:text-blue-900 transition-colors whitespace-nowrap"
+          variant="primary"
+          size="medium"
         >
           <Plus className="h-4 w-4 mr-1" />
           Add Leave Balance
-        </button>
+        </Button>
       </div>
 
       {/* Table */}
@@ -462,12 +496,14 @@ const EmployeeLeaveBalances = () => {
                       </td>
                     ))}
                     <td className="border px-4 py-2 text-center sticky right-0 bg-white z-10">
-                      <button
+                      <Button
                         onClick={() => handleEdit(emp)}
-                        className="text-blue-600 underline hover:text-blue-800"
+                        variant="ghost"
+                        size="small" 
+                        className="text-blue-600 hover:text-blue-800"
                       >
                         Edit
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -526,12 +562,18 @@ const EmployeeLeaveBalances = () => {
 
                 const gender = selectedEmployee?.employeeGender?.toLowerCase();
                 const totalLeaves =
-                  selectedEmployee.balances[leaveTypeName]?.leaveType?.maxDaysPerYear ?? "N/A";
+                  selectedEmployee.balances[leaveTypeName]?.leaveType
+                    ?.maxDaysPerYear ?? "N/A";
                 const currentValue =
-                  selectedEmployee.balances[leaveTypeName]?.remainingLeaves ?? "";
+                  selectedEmployee.balances[leaveTypeName]?.remainingLeaves ??
+                  "";
 
-                const isMaternity = leaveTypeName.toLowerCase().includes("maternity");
-                const isPaternity = leaveTypeName.toLowerCase().includes("paternity");
+                const isMaternity = leaveTypeName
+                  .toLowerCase()
+                  .includes("maternity");
+                const isPaternity = leaveTypeName
+                  .toLowerCase()
+                  .includes("paternity");
 
                 const isDisabled =
                   (isMaternity && gender === "male") ||
@@ -543,13 +585,17 @@ const EmployeeLeaveBalances = () => {
                     key={leaveTypeId || leaveTypeName}
                     className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                   >
-                    <label className="font-medium min-w-[150px]">{leaveTypeName}</label>
+                    <label className="font-medium min-w-[150px]">
+                      {leaveTypeName}
+                    </label>
                     <div className="flex items-center gap-2 w-full sm:w-[300px]">
                       <input
                         type="number"
                         disabled={isDisabled}
                         className={`border px-3 py-2 w-full rounded shadow-sm ${
-                          isDisabled ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""
+                          isDisabled
+                            ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                            : ""
                         }`}
                         value={isDisabled ? 0 : currentValue}
                         onChange={(e) => {
@@ -557,7 +603,8 @@ const EmployeeLeaveBalances = () => {
                           const updated = { ...selectedEmployee };
                           if (!updated.balances[leaveTypeName])
                             updated.balances[leaveTypeName] = {};
-                          updated.balances[leaveTypeName].remainingLeaves = parseFloat(e.target.value);
+                          updated.balances[leaveTypeName].remainingLeaves =
+                            parseFloat(e.target.value);
                           setSelectedEmployee(updated);
                         }}
                       />

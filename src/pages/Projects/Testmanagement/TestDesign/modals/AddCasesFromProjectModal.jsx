@@ -2,8 +2,9 @@ import React, { useEffect, useState, useMemo } from "react";
 import axiosInstance from "../../api/axiosInstance";
 import { ChevronDown, ChevronRight, Folder, FileText } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
+import { showStatusToast } from "../../../../../components/toastfy/toast";
 import LoadingSpinner from "../../../../../components/LoadingSpinner";
+import Button from "../../../../../components/Button/Button";
 export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
   const { projectId, runId } = useParams();
   const [stories, setStories] = useState([]);
@@ -20,7 +21,7 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
     setIsLoading(true);
     try {
       const res = await axiosInstance.get(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-design/test-stories/project-test-data/${projectId}`
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-design/test-stories/project-test-data/${projectId}`,
       );
 
       // Ensure structure consistency
@@ -32,7 +33,7 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
       setStories(formatted);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load test data");
+      showStatusToast("Failed to load test data", "error");
     } finally {
       setIsLoading(false);
     }
@@ -56,8 +57,8 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
   // SELECTION MANAGEMENT
   // =====================================================
   const getAllCaseIdsInStory = (story) => {
-    return story.scenarios.flatMap((sc) =>
-      sc.testCases?.map((tc) => tc.id) || []
+    return story.scenarios.flatMap(
+      (sc) => sc.testCases?.map((tc) => tc.id) || [],
     );
   };
 
@@ -71,7 +72,7 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
     setSelectedCases((prev) =>
       isSelected
         ? Array.from(new Set([...prev, ...allIds]))
-        : prev.filter((id) => !allIds.includes(id))
+        : prev.filter((id) => !allIds.includes(id)),
     );
   };
 
@@ -82,13 +83,13 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
     setSelectedCases((prev) =>
       isSelected
         ? Array.from(new Set([...prev, ...allIds]))
-        : prev.filter((id) => !allIds.includes(id))
+        : prev.filter((id) => !allIds.includes(id)),
     );
   };
 
   const toggleCase = (id) => {
     setSelectedCases((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -100,18 +101,16 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
 
     for (const story of stories) {
       const storyCaseIds = getAllCaseIdsInStory(story);
-      const selected = storyCaseIds.filter((id) =>
-        selectedCases.includes(id)
-      );
+      const selected = storyCaseIds.filter((id) => selectedCases.includes(id));
 
       status.stories[story.id] =
         storyCaseIds.length === 0
           ? "disabled"
           : selected.length === storyCaseIds.length
-          ? "checked"
-          : selected.length > 0
-          ? "indeterminate"
-          : "unchecked";
+            ? "checked"
+            : selected.length > 0
+              ? "indeterminate"
+              : "unchecked";
 
       story.scenarios.forEach((sc) => {
         const scIds = getAllCaseIdsInScenario(sc);
@@ -121,10 +120,10 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
           scIds.length === 0
             ? "disabled"
             : scSelected.length === scIds.length
-            ? "checked"
-            : scSelected.length > 0
-            ? "indeterminate"
-            : "unchecked";
+              ? "checked"
+              : scSelected.length > 0
+                ? "indeterminate"
+                : "unchecked";
       });
     }
 
@@ -137,14 +136,14 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
   const handleAddCasesSubmit = async () => {
     try {
       await axiosInstance.post(
-        `${import.meta.env.VITE_PMS_BASE_URL}/api/test-execution/test-runs/${runId}/add-cases`,
-        { testCaseIds: selectedCases }
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-runs/${runId}/add-cases`,
+        { testCaseIds: selectedCases },
       );
 
-      toast.success("Test cases added successfully");
+      showStatusToast("Test cases added successfully", "success");
       navigate(-1);
     } catch (err) {
-      toast.error("Failed to add test cases");
+      showStatusToast("Failed to add test cases", "error");
     }
   };
 
@@ -270,14 +269,17 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
       <div className="p-6 border-b">
         <h2 className="text-xl font-bold">Add Existing Test Cases</h2>
         <p className="text-sm text-gray-500">
-          Select stories, scenarios, or individual cases. ({selectedCases.length} selected)
+          Select stories, scenarios, or individual cases. (
+          {selectedCases.length} selected)
         </p>
       </div>
 
       {/* CONTENT */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {isLoading ? (
-          <p className="text-center py-10 text-gray-500"><LoadingSpinner text="Loading..."/></p>
+          <p className="text-center py-10 text-gray-500">
+            <LoadingSpinner text="Loading..." />
+          </p>
         ) : stories.length === 0 ? (
           <p className="text-center py-10 text-gray-500">No stories found.</p>
         ) : (
@@ -287,24 +289,17 @@ export default function AddCasesFromProjectModal({ onClose, onAddCases }) {
 
       {/* FOOTER */}
       <div className="flex justify-end gap-3 p-4 border-t bg-gray-50">
-        <button
-          className="px-6 py-2 border rounded-lg"
-          onClick={() => navigate(-1)}
-        >
+        <Button variant="secondary" onClick={() => navigate(-1)}>
           Cancel
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant="primary"
           disabled={selectedCases.length === 0}
           onClick={handleAddCasesSubmit}
-          className={`px-6 py-2 text-white rounded-lg ${
-            selectedCases.length > 0
-              ? "bg-indigo-600 hover:bg-indigo-700"
-              : "bg-indigo-400 cursor-not-allowed"
-          }`}
         >
           Add {selectedCases.length} Case(s)
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
-const BASE_URL = import.meta.env.VITE_RMS_BASE_URL;
+const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
 const getAuthHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -11,7 +11,7 @@ const getAuthHeaders = () => ({
  */
 export const getBenchResources = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/bench/bench-resources`, {
+    const response = await api.get(`${BASE_URL}/api/bench/bench-resources`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -26,7 +26,7 @@ export const getBenchResources = async () => {
  */
 export const getPoolResources = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/bench/pool-resources`, {
+    const response = await api.get(`${BASE_URL}/api/bench/pool-resources`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -43,16 +43,19 @@ export const getAllResources = async () => {
   try {
     const [benchResponse, poolResponse] = await Promise.all([
       getBenchResources(),
-      getPoolResources()
+      getPoolResources(),
     ]);
 
     // Handle standard response wrapper if present (success/data)
-    const benchData = benchResponse?.data || (Array.isArray(benchResponse) ? benchResponse : []);
-    const poolData = poolResponse?.data || (Array.isArray(poolResponse) ? poolResponse : []);
+    const benchData =
+      benchResponse?.data ||
+      (Array.isArray(benchResponse) ? benchResponse : []);
+    const poolData =
+      poolResponse?.data || (Array.isArray(poolResponse) ? poolResponse : []);
 
     return {
       success: true,
-      data: [...benchData, ...poolData]
+      data: [...benchData, ...poolData],
     };
   } catch (error) {
     console.error("Failed to fetch consolidated resources", error);
@@ -65,7 +68,7 @@ export const getAllResources = async () => {
  */
 export const getBenchKPIs = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/bench/kpi`, {
+    const response = await api.get(`${BASE_URL}/api/bench/kpi`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -77,9 +80,13 @@ export const getBenchKPIs = async () => {
 
 export const updateStatusResource = async (payload) => {
   try {
-    const response = await axios.put(`${BASE_URL}/api/bench/update-resource-state`, payload, {
-      headers: getAuthHeaders(),
-    });
+    const response = await api.put(
+      `${BASE_URL}/api/bench/update-resource-state`,
+      payload,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
     return response.data;
   } catch (error) {
     console.error("Failed to update resource status", error);
@@ -91,7 +98,7 @@ export const updateStatusResource = async (payload) => {
  */
 export const getBenchMatches = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/bench/matches`, {
+    const response = await api.get(`${BASE_URL}/api/bench/matches`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -107,7 +114,7 @@ export const getBenchMatches = async () => {
 export const getOpenDemands = async () => {
   try {
     // Using /api/demand/rm/demands as generic /api/demand/* paths are being intercepted by UUID routers
-    const response = await axios.get(`${BASE_URL}/api/demand/rm/demands`, {
+    const response = await api.get(`${BASE_URL}/api/demand/rm/demands`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -121,19 +128,27 @@ export const getOpenDemands = async () => {
  * Performs a quick allocation for a benched resource to a specific demand
  * Uses application/x-www-form-urlencoded as per backend requirement
  */
-export const quickAllocate = async (resourceId, demandId, allocationPercentage = 100) => {
+export const quickAllocate = async (
+  resourceId,
+  demandId,
+  allocationPercentage = 100,
+) => {
   try {
     const params = new URLSearchParams();
     params.set("resourceId", resourceId);
     params.set("demandId", demandId);
     params.set("allocationPercentage", String(allocationPercentage));
 
-    const response = await axios.post(`${BASE_URL}/api/bench/quick-allocate`, params, {
-      headers: {
-        ...getAuthHeaders(),
-        "Content-Type": "application/x-www-form-urlencoded",
+    const response = await api.post(
+      `${BASE_URL}/api/bench/quick-allocate`,
+      params,
+      {
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
       },
-    });
+    );
     return response.data;
   } catch (error) {
     console.error("Quick allocation failed", error);
@@ -146,7 +161,7 @@ export const quickAllocate = async (resourceId, demandId, allocationPercentage =
  */
 export const getBenchPoolReport = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/reports/bench-pool`, {
+    const response = await api.get(`${BASE_URL}/api/reports/bench-pool`, {
       headers: getAuthHeaders(),
     });
     return response.data;
@@ -161,10 +176,13 @@ export const getBenchPoolReport = async () => {
  */
 export const exportBenchPoolReport = async () => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/reports/bench-pool/export`, {
-      headers: getAuthHeaders(),
-      responseType: "blob",
-    });
+    const response = await api.get(
+      `${BASE_URL}/api/reports/bench-pool/export`,
+      {
+        headers: getAuthHeaders(),
+        responseType: "blob",
+      },
+    );
     return response.data;
   } catch (error) {
     console.error("Failed to export bench pool report", error);

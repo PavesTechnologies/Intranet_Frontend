@@ -1,72 +1,60 @@
 import { useState } from "react";
+import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import DonutChart from "./DonutChart";
 import RawDataModal from "./RawDataModal";
+import ViewRawButton from "./ViewRawButton";
 
-export default function ChartCard({ title, data, total, colors }) {
+export default function ChartCard({ title, data, total, colors, accentColor }) {
   const [showRaw, setShowRaw] = useState(false);
 
   return (
     <>
-      <div
-        style={{
-          background: "white",
-          borderRadius: 10,
-          padding: 18,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-        }}
+      <PageCard
+        className="relative h-full min-h-[330px] overflow-hidden rounded-2xl border-slate-200 bg-white"
       >
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 10,
-          }}
-        >
-          <h3 style={{ margin: 0 }}>{title}</h3>
-
-          <button
-            onClick={() => setShowRaw(true)}
-            style={{
-              border: "none",
-              background: "transparent",
-              color: "#6c5ce7",
-              cursor: "pointer",
-              fontSize: 13,
-            }}
-          >
-            👁 View Raw Data
-          </button>
-        </div>
-
-        {/* Body */}
-        <div style={{ display: "flex", alignItems: "center", gap: 30 }}>
-          <DonutChart data={data} total={total} colors={colors} />
-
-          <div>
-            {[...(data || [])]
-              .sort((a, b) => b.value - a.value)
-              .map((d, i) => (
-                <div key={i} style={{ marginBottom: 8 }}>
-                  <span
-                    style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: "50%",
-                      display: "inline-block",
-                      marginRight: 6,
-                      background:
-                        d.color || colors?.[i % colors.length] || "#ccc",
-                    }}
-                  />
-                  {d.label} <b>{d.value}</b>
-                </div>
-              ))}
+        <span
+          className="absolute inset-y-0 left-0 w-1 rounded-l-2xl"
+          style={{ backgroundColor: accentColor || colors?.[0] || "#6366F1" }}
+        />
+        <PageCardContent className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-base font-bold text-slate-900">{title}</h3>
+            <ViewRawButton onClick={() => setShowRaw(true)} />
           </div>
-        </div>
-      </div>
 
-      {/* Raw Data Modal */}
+          <div className="flex min-h-[250px] flex-col items-center justify-center gap-8 xl:flex-row xl:items-center xl:justify-start">
+            <div className="flex min-w-[280px] justify-center">
+              <DonutChart
+                data={data}
+                total={total}
+                colors={colors}
+                size={270}
+                innerRadius={62}
+                outerRadius={118}
+              />
+            </div>
+
+            <div className="w-full max-w-[260px] space-y-3 text-base text-slate-700">
+              {[...(data || [])]
+                .sort((a, b) => b.value - a.value)
+                .map((item, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <span
+                      className="inline-block h-3.5 w-3.5 rounded-full"
+                      style={{
+                        background: item.color || colors?.[index % colors.length] || "#ccc",
+                      }}
+                    />
+                    <span>
+                      {item.label} <b>{item.value}</b>
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </PageCardContent>
+      </PageCard>
+
       {showRaw && (
         <RawDataModal
           title={title}
@@ -77,81 +65,3 @@ export default function ChartCard({ title, data, total, colors }) {
     </>
   );
 }
-// import { useState } from "react";
-// import DonutChart from "./DonutChart";
-// import RawDataModal from "./RawDataModal";
-
-// export default function ChartCard({ title, data, total }) {
-//   const [showRaw, setShowRaw] = useState(false);
-
-//   return (
-//     <>
-//       <div
-//         style={{
-//           background: "white",
-//           borderRadius: 10,
-//           padding: 18,
-//           boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-//         }}
-//       >
-//         {/* Header */}
-//         <div
-//           style={{
-//             display: "flex",
-//             justifyContent: "space-between",
-//             marginBottom: 10,
-//           }}
-//         >
-//           <h3 style={{ margin: 0 }}>{title}</h3>
-
-//           <button
-//             onClick={() => setShowRaw(true)}
-//             style={{
-//               border: "none",
-//               background: "transparent",
-//               color: "#6c5ce7",
-//               cursor: "pointer",
-//               fontSize: 13,
-//             }}
-//           >
-//             👁 View Raw Data
-//           </button>
-//         </div>
-
-//         {/* Body */}
-//         <div style={{ display: "flex", alignItems: "center", gap: 30 }}>
-//           <DonutChart data={data} total={total} />
-
-//           <div>
-//   {[...(data || [])]
-//     .sort((a, b) => b.value - a.value)
-//     .map((d, i) => (
-//       <div key={i} style={{ marginBottom: 8 }}>
-//         <span
-//           style={{
-//             width: 10,
-//             height: 10,
-//             borderRadius: "50%",
-//             display: "inline-block",
-//             marginRight: 6,
-//             background: d.color || "#ccc", // ✅ safe fallback
-//           }}
-//         />
-//         {d.label} <b>{d.value}</b>
-//       </div>
-//     ))}
-// </div>
-//         </div>
-//       </div>
-
-//       {/* Raw Data Modal */}
-//       {showRaw && (
-//         <RawDataModal
-//           title={title}
-//           data={data}
-//           onClose={() => setShowRaw(false)}
-//         />
-//       )}
-//     </>
-//   );
-// }

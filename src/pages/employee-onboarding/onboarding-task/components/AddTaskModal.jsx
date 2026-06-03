@@ -1,355 +1,307 @@
-"use client";
+import React, { useEffect, useState } from "react";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import Button from "../../../../components/Button/Button";
+import FormInput from "../../../../components/forms/FormInput";
+import { Fonts } from "../../../../components/Fonts/Fonts";
+import Modal from "../../../../components/Modal/modal";
 
-import React, { useState } from "react";
-
-export default function AddTaskModal({ isOpen, onClose, onSave }) {
-  const [formData, setFormData] = useState({
-    title: "",
-    employee: "",
-    priority: "medium",
-    dueDate: "",
-    description: "",
-  });
-
-  if (!isOpen) return null;
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = () => {
-    if (!formData.title) return;
-
-    onSave({
-      ...formData,
-      id: Date.now(),
-      progress: 0,
-      status: "todo",
-    });
-
-    setFormData({
-      title: "",
-      employee: "",
-      priority: "medium",
-      dueDate: "",
-      description: "",
-    });
-
-    onClose();
-  };
-
-  const inputStyle = {
-    width: "100%",
-    border: "1px solid #e2e8f0",
-    borderRadius: 8,
-    padding: "8px 10px",
-    fontSize: 13,
-    outline: "none",
-  };
-
-  const labelStyle = {
-    fontSize: 12,
-    fontWeight: 600,
-    marginBottom: 4,
-    display: "block",
-    color: "#334155",
-  };
-
+function ModalHeaderCard({ title, description }) {
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.35)",
-        backdropFilter: "blur(2px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 50,
-      }}
-    >
-      {/* Modal Card */}
-      <div
-        style={{
-          background: "#ffffff",
-          borderRadius: 14,
-          width: "92%",
-          maxWidth: 520,
-          padding: 24,
-          boxShadow: "0 18px 40px rgba(0,0,0,0.18)",
-          animation: "fadeIn 0.18s ease",
-        }}
-      >
-        {/* Header */}
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>
-          Create New Task
-        </h2>
-        <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16 }}>
-          Fill the details to create onboarding task.
-        </p>
-
-        {/* Form */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-
-          {/* Title */}
-          <div>
-            <label style={labelStyle}>Task Title</label>
-            <input
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              style={inputStyle}
-            />
-          </div>
-
-          {/* Employee */}
-          <div>
-            <label style={labelStyle}>Assign Employee</label>
-            <input
-              name="employee"
-              value={formData.employee}
-              onChange={handleChange}
-              style={inputStyle}
-            />
-          </div>
-
-          {/* Priority + Date */}
-          <div style={{ display: "flex", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Priority</label>
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleChange}
-                style={inputStyle}
-              >
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Due Date</label>
-              <input
-                type="date"
-                name="dueDate"
-                value={formData.dueDate}
-                onChange={handleChange}
-                style={inputStyle}
-              />
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label style={labelStyle}>Task Description</label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              rows={3}
-              style={{ ...inputStyle, resize: "none" }}
-            />
-          </div>
-        </div>
-
-        {/* Buttons */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: 10,
-            marginTop: 16,
-          }}
-        >
-          <button
-            onClick={onClose}
-            style={{
-              background: "#e2e8f0",
-              border: "none",
-              padding: "8px 14px",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-
-          <button
-            onClick={handleSubmit}
-            style={{
-              background: "#4f6df5",
-              color: "white",
-              border: "none",
-              padding: "8px 14px",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
-          >
-            Save Task
-          </button>
+    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+      <div className="flex items-start gap-4">
+        <span className="mt-0.5 h-12 w-1.5 shrink-0 rounded-full bg-indigo-600" />
+        <div className="min-w-0">
+          <h2 className={Fonts.heading4}>{title}</h2>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
         </div>
       </div>
     </div>
   );
 }
 
+const normalizeStatusValue = (status) => {
+  if (!status) return "todo";
+  const normalized = status.toLowerCase();
+  if (normalized.includes("progress")) return "progress";
+  if (normalized.includes("complete")) return "completed";
+  return "todo";
+};
 
-// "use client";
+const formatDate = (date) => {
+  if (!date) return "";
+  try {
+    return new Date(date).toISOString().split("T")[0];
+  } catch {
+    return "";
+  }
+};
 
-// import React, { useState } from "react";
+const createInitialFormData = (data) => {
+  const current = data ?? {};
+  const due = formatDate(current.due_date || current.dueDate);
+  const reminder = formatDate(current.reminder_date || current.reminderDate);
 
-// export default function AddTaskModal({ isOpen, onClose, onSave }) {
-//   const [formData, setFormData] = useState({
-//     title: "",
-//     employee: "",
-//     priority: "medium",
-//     dueDate: "",
-//     description: "",
-//   });
+  return {
+    title: current.task_title || current.title || "Untitled Task",
+    taskType: current.task_type || current.taskType || "Onboarding",
+    user_uuid: String(current.user_uuid || ""),
+    assigned_to: String(current.assigned_to || ""),
+    assigned_team: current.assigned_team || "IT Team",
+    priority: current.priority || "Medium",
+    status: normalizeStatusValue(current.status),
+    progress: current.progress ?? 0,
+    dueDate: due,
+    reminderDate: reminder || due,
+    description: current.description || "",
+    created_by: current.created_by || "Admin",
+    updated_by: current.updated_by || "Admin",
+  };
+};
 
-//   if (!isOpen) return null;
+export default function AddTaskModal({
+  isOpen,
+  onClose,
+  onSave,
+  employees = [],
+  assignees = [],
+  initialData,
+  mode = "create",
+  saving = false,
+}) {
+  const [formData, setFormData] = useState(createInitialFormData(initialData));
 
-//   const handleChange = (e) => {
-//     setFormData({ ...formData, [e.target.name]: e.target.value });
-//   };
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(createInitialFormData(initialData));
+    }
+  }, [isOpen, initialData]);
 
-//   const handleSubmit = () => {
-//     if (!formData.title) return;
+  if (!isOpen) return null;
 
-//     onSave({
-//       ...formData,
-//       id: Date.now(),
-//       progress: 0,
-//       status: "todo",
-//     });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
 
-//     setFormData({
-//       title: "",
-//       employee: "",
-//       priority: "medium",
-//       dueDate: "",
-//       description: "",
-//     });
+    if (name === "user_uuid") {
+      setFormData((previous) => ({ ...previous, user_uuid: value }));
+      return;
+    }
 
-//     onClose();
-//   };
+    if (name === "assigned_to") {
+      setFormData((previous) => ({
+        ...previous,
+        assigned_to: String(value || ""),
+      }));
+      return;
+    }
 
-//   return (
-//     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-      
-//       {/* Modal Card */}
-//       <div className="bg-white rounded-xl shadow-lg w-[92%] max-w-lg p-8 relative animate-fadeIn">
-        
-//         {/* Header */}
-//         <h2 className="text-xl font-semibold text-gray-900">
-//           Create New Task
-//         </h2>
-//         <p className="text-gray-500 mb-6">
-//           Fill the details to create onboarding task.
-//         </p>
+    setFormData((previous) => ({ ...previous, [name]: value }));
+  };
 
-//         {/* Form */}
-//         <div className="space-y-5">
+  const isFormValid = () => {
+    const titleValid =
+      formData.title && typeof formData.title === "string" && formData.title.trim();
+    const userValid =
+      formData.user_uuid &&
+      typeof formData.user_uuid === "string" &&
+      formData.user_uuid.trim();
+    const assignedValid =
+      formData.assigned_to &&
+      typeof formData.assigned_to === "string" &&
+      formData.assigned_to.trim();
 
-//           {/* Task Title */}
-//           <div>
-//             <label className="block text-sm font-medium text-gray-700 mb-1">
-//               Task Title
-//             </label>
-//             <input
-//               type="text"
-//               name="title"
-//               value={formData.title}
-//               onChange={handleChange}
-//               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-//             />
-//           </div>
+    return titleValid && userValid && assignedValid;
+  };
 
-//           {/* Assign Employee */}
-//           <div>
-//             <label className="block text-sm font-medium text-gray-700 mb-1">
-//               Assign Employee
-//             </label>
-//             <input
-//               type="text"
-//               name="employee"
-//               value={formData.employee}
-//               onChange={handleChange}
-//               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-//             />
-//           </div>
+  const disabled = !isFormValid() || saving;
 
-//           {/* Priority + Date */}
-//           <div className="grid grid-cols-2 gap-4">
+  const handleSubmit = () => {
+    if (!formData.title || typeof formData.title !== "string" || !formData.title.trim()) {
+      alert("Please enter a Task Title");
+      return;
+    }
+    if (
+      !formData.user_uuid ||
+      typeof formData.user_uuid !== "string" ||
+      !formData.user_uuid.trim()
+    ) {
+      alert("Please select an Employee");
+      return;
+    }
+    if (
+      !formData.assigned_to ||
+      typeof formData.assigned_to !== "string" ||
+      !formData.assigned_to.trim()
+    ) {
+      alert("Please select who to assign this task to");
+      return;
+    }
 
-//             <div>
-//               <label className="block text-sm font-medium text-gray-700 mb-1">
-//                 Priority
-//               </label>
-//               <select
-//                 name="priority"
-//                 value={formData.priority}
-//                 onChange={handleChange}
-//                 className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-//               >
-//                 <option value="high">High</option>
-//                 <option value="medium">Medium</option>
-//                 <option value="low">Low</option>
-//               </select>
-//             </div>
+    const payload = {
+      user_uuid: formData.user_uuid.trim(),
+      task_title: formData.title.trim(),
+      task_type: formData.taskType || "Onboarding",
+      description: formData.description.trim(),
+      assigned_to: formData.assigned_to.trim(),
+      assigned_team: formData.assigned_team || "IT Team",
+      priority: formData.priority || "Medium",
+      status:
+        formData.status === "todo"
+          ? "To Do"
+          : formData.status === "progress"
+            ? "In Progress"
+            : "Completed",
+      progress: parseInt(formData.progress, 10) || 0,
+      due_date: formData.dueDate || initialData?.due_date,
+      reminder_date: formData.reminderDate || initialData?.reminder_date,
+      send_notification: true,
+      escalation_owner: "Manager",
+      internal_notes: "",
+      comments: "",
+      created_by: "Admin",
+      updated_by: "Admin",
+    };
 
-//             <div>
-//               <label className="block text-sm font-medium text-gray-700 mb-1">
-//                 Due Date
-//               </label>
-//               <input
-//                 type="date"
-//                 name="dueDate"
-//                 value={formData.dueDate}
-//                 onChange={handleChange}
-//                 className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-//               />
-//             </div>
+    if (mode === "edit" && initialData?.task_uuid) {
+      payload.task_uuid = initialData.task_uuid;
+    }
 
-//           </div>
+    if (typeof onSave === "function") {
+      onSave(payload);
+    } else {
+      alert("Error: Unable to save task. Please refresh the page and try again.");
+    }
+  };
 
-//           {/* Description */}
-//           <div>
-//             <label className="block text-sm font-medium text-gray-700 mb-1">
-//               Task Description
-//             </label>
-//             <textarea
-//               name="description"
-//               value={formData.description}
-//               onChange={handleChange}
-//               rows={3}
-//               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-//             />
-//           </div>
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={saving ? () => {} : onClose}
+      size="4xl"
+      maxHeight="max-h-[90vh]"
+      showHeader={false}
+      bodyClassName="p-0"
+      panelClassName="overflow-hidden"
+      footerClassName="px-6 py-4"
+      footer={
+        <div className="flex justify-end gap-3">
+          <Button type="button" variant="outline" size="medium" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="medium"
+            onClick={handleSubmit}
+            disabled={disabled}
+            loading={saving}
+            loadingText={mode === "edit" ? "Updating..." : "Creating..."}
+          >
+            {mode === "edit" ? "Update Task" : "Create Task"}
+          </Button>
+        </div>
+      }
+    >
+      <div className="px-6 py-5">
+        <ModalHeaderCard
+          title={mode === "edit" ? "Edit Task" : "Create Task"}
+          description="Configure the employee, owner, priority, and dates for this task."
+        />
+      </div>
 
-//         </div>
+      <div className="grid grid-cols-1 gap-4 px-6 pb-6 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <FormInput name="title" label="Task Title" value={formData.title} onChange={handleChange} />
+        </div>
 
-//         {/* Buttons */}
-//         <div className="flex justify-end gap-4 mt-6">
+        <Field label="Employee">
+          <FilterListbox
+            options={[{ value: "", label: "Select" }, ...employees]}
+            value={String(formData.user_uuid)}
+            onChange={(value) => handleChange({ target: { name: "user_uuid", value } })}
+          />
+        </Field>
 
-//           <button
-//             onClick={onClose}
-//             className="px-5 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition"
-//           >
-//             Cancel
-//           </button>
+        <Field label="Assigned To">
+          <FilterListbox
+            options={[{ value: "", label: "Select" }, ...assignees]}
+            value={String(formData.assigned_to)}
+            onChange={(value) => handleChange({ target: { name: "assigned_to", value } })}
+          />
+        </Field>
 
-//           <button
-//             onClick={handleSubmit}
-//             className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition shadow"
-//           >
-//             Save Task
-//           </button>
+        <Field label="Priority">
+          <FilterListbox
+            options={[
+              { value: "High", label: "High" },
+              { value: "Medium", label: "Medium" },
+              { value: "Low", label: "Low" },
+            ]}
+            value={formData.priority}
+            onChange={(value) => handleChange({ target: { name: "priority", value } })}
+          />
+        </Field>
 
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
+        <Field label="Status">
+          <FilterListbox
+            options={[
+              { value: "todo", label: "To Do" },
+              { value: "progress", label: "In Progress" },
+              { value: "completed", label: "Completed" },
+            ]}
+            value={formData.status}
+            onChange={(value) => handleChange({ target: { name: "status", value } })}
+          />
+        </Field>
+
+        <Field label="Task Type">
+          <FilterListbox
+            options={[
+              { value: "Onboarding", label: "Onboarding" },
+              { value: "Exit", label: "Exit" },
+              { value: "IT Provisioning", label: "IT Provisioning" },
+              { value: "Finance Clearance", label: "Finance Clearance" },
+              { value: "Admin", label: "Admin" },
+            ]}
+            value={formData.taskType}
+            onChange={(value) => handleChange({ target: { name: "taskType", value } })}
+          />
+        </Field>
+
+        <FormInput
+          type="date"
+          name="dueDate"
+          label="Due Date"
+          value={formData.dueDate}
+          onChange={handleChange}
+        />
+
+        <FormInput
+          type="date"
+          name="reminderDate"
+          label="Reminder Date"
+          value={formData.reminderDate}
+          onChange={handleChange}
+        />
+
+        <div className="md:col-span-2">
+          <label className={`${Fonts.label} mb-1 block`}>Description</label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            className="min-h-24 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
+          />
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div className="space-y-1">
+      <label className={Fonts.label}>{label}</label>
+      {children}
+    </div>
+  );
+}
