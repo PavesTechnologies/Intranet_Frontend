@@ -151,7 +151,7 @@ const IssueTracker = () => {
     const numId = Number(projectId);
     if (!numId || isNaN(numId)) return;
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${numId}/risks/issues`,
         { headers, params: { page: 0, size: 5000 } },
       );
