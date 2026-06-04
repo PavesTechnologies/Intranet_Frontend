@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { useParams } from "react-router-dom";
 import { getBugsByAssignee, updateBugStatus } from "../api/bugApi";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
@@ -79,7 +79,7 @@ export default function DevDashboard() {
 
   useEffect(() => {
     if (!projectId) return;
-    axios
+    api
       .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
@@ -107,7 +107,7 @@ export default function DevDashboard() {
     setLoadingDetails(true);
     setBugDetails(null);
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/testing/bugs/${bug.id}`,
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
       );

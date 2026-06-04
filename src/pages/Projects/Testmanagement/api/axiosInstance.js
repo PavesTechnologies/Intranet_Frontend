@@ -1,12 +1,12 @@
 // src/api/axiosInstance.js
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
 // Detect / load backend base URL
 const BASE_URL =
   window.__APP_CONFIG__.PMS_BASE_URL || "http://localhost:8080/api";
 
 // Create instance
-const axiosInstance = axios.create({
+const axiosInstance = api.create({
   baseURL: BASE_URL,
   headers: {
     "Content-Type": "application/json",

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { AlertIcon, CalendarIcon } from "../../../../components/icons";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -93,7 +93,7 @@ export default function RisksPanel({
   const [riskSearch, setRiskSearch] = useState("");
 
   const axiosInstance = useMemo(() => {
-    const instance = axios.create({
+    const instance = api.create({
       baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
       headers: {
         "Content-Type": "application/json",

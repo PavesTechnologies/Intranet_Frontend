@@ -1,8 +1,7 @@
-import axios from "axios";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axiosInstance from "../api/axiosInstance";
+import api from "../../../../api/axiosInstance";
 import RunTestCaseComponent from "./RunTestCaseComponent";
 import TestCaseResultComponent from "./TestCaseResultComponent";
 import Select from "react-select";
@@ -69,7 +68,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
   // ── Load test cases ───────────────────────────────────────────────────────
   const loadTestCases = async () => {
     try {
-      const res = await axiosInstance.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-runs/${run.id}/cases`,
       );
       console.log("🔍 Test cases loaded:", res.data);
@@ -82,7 +81,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
   // ── Load employees ────────────────────────────────────────────────────────
   const loadEmployees = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
         {
           headers: {
@@ -100,7 +99,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
   // ── Assign ────────────────────────────────────────────────────────────────
   const addAssignee = async (testCaseId, userId) => {
     try {
-      await axios.post(
+      await api.post(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-runs/assign/apply`,
         {
           runId: run.id,
@@ -131,7 +130,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
     }
     try {
       setSaving(true);
-      await axiosInstance.put(`api/test-execution/test-runs/${run.id}`, {
+      await api.put(`api/test-execution/test-runs/${run.id}`, {
         name: editForm.name,
         status: editForm.status,
         description: editForm.description || null,

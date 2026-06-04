@@ -209,17 +209,15 @@ export default function EmployeeDocumentsPage() {
           api.get(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/employees/documents`,
             {
-              method: "GET",
               headers: {
                 accept: "application/json",
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
               },
             },
           ),
-          fetch(
+          api.get(
             `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/user_id/details`,
             {
-              method: "GET",
               headers: {
                 accept: "application/json",
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -227,11 +225,9 @@ export default function EmployeeDocumentsPage() {
             },
           ),
         ]);
-        
- 
-       const documentsData = documentsResponse.data;
 
-const offersData = await offersResponse.json();
+        const documentsData = documentsResponse.data;
+        const offersData = offersResponse.data;
  
         const allowedUserUuids = new Set(
   (Array.isArray(offersData)

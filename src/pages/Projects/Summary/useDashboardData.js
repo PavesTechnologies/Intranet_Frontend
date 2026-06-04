@@ -1,6 +1,6 @@
 // Summary/useDashboardData.js
 import { useEffect, useState, useRef } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { getCache, setCache, getPending, setPending } from "./apiCache";
 
 const DEFAULT_TTL = 30_000; // 30 seconds cache
@@ -70,7 +70,7 @@ export default function useDashboardData(projectId) {
           })
           .catch((err) => {
             /** ignore canceled — no console noise */
-            if (axios.isCancel(err) || err?.code === "ERR_CANCELED") return;
+            if (api.isCancel(err) || err?.code === "ERR_CANCELED") return;
             console.error("fetch error", key, err?.message);
           });
       }
@@ -79,7 +79,7 @@ export default function useDashboardData(projectId) {
       const controller = new AbortController();
       controllersRef.current[key] = controller;
 
-      const promise = axios
+      const promise = api
         .get(url, {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
@@ -96,7 +96,7 @@ export default function useDashboardData(projectId) {
           return payload;
         })
         .catch((err) => {
-          if (axios.isCancel(err) || err?.code === "ERR_CANCELED") {
+          if (api.isCancel(err) || err?.code === "ERR_CANCELED") {
             /** silently ignore aborts */
             return;
           }

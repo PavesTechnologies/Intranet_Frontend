@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 
-import { useSprintBurnup }       from "./hooks/useSprintBurnup";
-import { useSprintBurndown }     from "./hooks/useSprintBurnDown";
-import { useSprintScopeChanges } from "./hooks/useSprintScopeChanges";
+import { useSprintBurnup }        from "./hooks/useSprintBurnup";
+import { useSprintBurndown }      from "./hooks/useSprintBurnDown";
+import { useSprintScopeChanges }  from "./hooks/useSprintScopeChanges";
+import { useSprintDayOverrides }  from "./hooks/useSprintDayOverrides";
 import { toBurndownDatasetsFromBurndown } from "./utils/chartDataTransform";
 import KpiCards                  from "./components/KpiCards";
 import ChartTabBar               from "./components/ChartTabBar";
@@ -46,7 +47,7 @@ const SprintAnalyticsPage = ({
   //   setSprintLoading(true);
   //   setSprintError(null);
 
-  //   axios
+  //   api
   //     .get(
   //       `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/active/project/${projectId}`,
   //       { headers: { Authorization: `Bearer ${token}` } }
@@ -75,7 +76,7 @@ useEffect(() => {
   setSprintLoading(true);
   setSprintError(null);
 
-  axios
+  api
     .get(
       `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
       { headers: { Authorization: `Bearer ${token}` } }
@@ -98,6 +99,7 @@ useEffect(() => {
   const { data, loading: burnupLoading, error: burnupError } = useSprintBurnup(sprintId);
   const { data: burndownRaw, loading: burndownLoading, error: burndownError, refetch: refetchBurndown } = useSprintBurndown(sprintId);
   const { changes: scopeChanges } = useSprintScopeChanges(sprintId);
+  const { holidays } = useSprintDayOverrides(sprintId, refetchBurndown);
 
   if (sprintLoading || (sprintId && (burnupLoading || burndownLoading))) return <AnalyticsSkeleton />;
 
@@ -159,8 +161,8 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header bar */}
-      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <select
             value={sprintId ?? ""}
             onChange={(e) => setSprintId(e.target.value)}
@@ -173,11 +175,11 @@ useEffect(() => {
             ))}
           </select>
 
-          {/* Sprint day overrides trigger */}
+          {/* Sprint day overrides trigger — badge shows holiday count */}
           <button
             onClick={() => setShowOverrides(true)}
             title="Configure holidays & working weekends"
-            className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+            className="relative p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -185,11 +187,32 @@ useEffect(() => {
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
+            {holidays.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                {holidays.length}
+              </span>
+            )}
           </button>
+
+          {/* Holiday chips */}
+          {holidays.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">Holidays:</span>
+              {holidays.map((dateKey) => (
+                <span
+                  key={dateKey}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 border border-amber-300 text-amber-700"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  {new Date(dateKey).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {startDate && endDate && (
-          <span className="text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">
+          <span className="text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-lg shrink-0">
             {startDate} – {endDate}
           </span>
         )}

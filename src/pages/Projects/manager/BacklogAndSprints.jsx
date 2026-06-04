@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { Plus, List, ChevronRight, ChevronDown } from "lucide-react";
@@ -71,7 +71,7 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   // Fetch a single story
   // =======================================
   const fetchStoryById = async (storyId) => {
-    const res = await axios.get(
+    const res = await api.get(
       `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}`,
       { headers },
     );
@@ -119,7 +119,7 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
       const fullStory = await fetchStoryById(storyId);
       const body = buildUpdatedStoryBody(fullStory, sprintId);
 
-      await axios.put(
+      await api.put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}`,
         body,
         { headers },
@@ -147,7 +147,7 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   // =======================================
 const handleSprintStatus = async (sprintId, action) => {
     try {
-        await axios.put(
+        await api.put(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}/${action}`,
             {},
             { headers },
@@ -209,7 +209,7 @@ const handleSprintStatus = async (sprintId, action) => {
   // =======================================
   const handleAssignEpicToStory = async (storyId, epicId) => {
     try {
-      await axios.put(
+      await api.put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/${storyId}/assign-epic/${epicId}`,
         {},
         {
@@ -233,7 +233,7 @@ const handleSprintStatus = async (sprintId, action) => {
         prev.map((t) => (t.id === taskId ? { ...t, sprintId } : t)),
       );
 
-      await axios.patch(
+      await api.patch(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}/assign-sprint/${sprintId}`,
         {},
         {
@@ -254,7 +254,7 @@ const handleSprintStatus = async (sprintId, action) => {
   // =======================================
   const handleAssignTaskToStory = async (taskId, storyId) => {
     try {
-      await axios.put(
+      await api.put(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/tasks/${taskId}/assign-story/${storyId}`,
         {},
         { headers },
@@ -270,7 +270,7 @@ const handleSprintStatus = async (sprintId, action) => {
   // =======================================
   const fetchStories = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
         {
           headers: {
@@ -289,7 +289,7 @@ const handleSprintStatus = async (sprintId, action) => {
 
   const fetchPermissions = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/permissions`,
         { headers },
       );
@@ -302,7 +302,7 @@ const handleSprintStatus = async (sprintId, action) => {
 
   const fetchTasks = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
         {
           headers: {
@@ -321,7 +321,7 @@ const handleSprintStatus = async (sprintId, action) => {
 
   const fetchEpics = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
         {
           headers: {
@@ -338,7 +338,7 @@ const handleSprintStatus = async (sprintId, action) => {
 
   const fetchSprints = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
         {
           headers: {
@@ -360,7 +360,7 @@ const handleSprintStatus = async (sprintId, action) => {
     setDeleteSprintConfirmOpen(false);
     setSprintIdToDelete(null);
     try {
-      await axios.delete(
+      await api.delete(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/sprints/${sprintId}`,
         {
           headers: {
@@ -393,7 +393,7 @@ const handleSprintStatus = async (sprintId, action) => {
     const numId = Number(projectId);
     if (!numId || isNaN(numId)) return;
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${numId}/risks/issues`,
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }, params: { page: 0, size: 5000 } },
       );

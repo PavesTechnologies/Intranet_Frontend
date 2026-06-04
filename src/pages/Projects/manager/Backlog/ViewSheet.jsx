@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import Button from "../../../../components/Button/Button";
 import CommentBox from "../CommentBox";
 import { useAuth } from "../../../../contexts/AuthContext";
@@ -44,7 +44,7 @@ const ViewSheet = () => {
       if (!endpoint) return;
 
       setLoading(true);
-      axios
+      api
         .get(`${window.__APP_CONFIG__.PMS_BASE_URL}${endpoint}`, { headers })
         .then((res) => setIssue(res.data))
         .catch((err) => console.error("Failed to fetch issue:", err))
@@ -59,7 +59,7 @@ const ViewSheet = () => {
 
     const fetchName = async (endpoint, field) => {
       try {
-        const res = await axios.get(`${base}${endpoint}`, { headers });
+        const res = await api.get(`${base}${endpoint}`, { headers });
         return (
           res.data.name ||
           res.data.title ||

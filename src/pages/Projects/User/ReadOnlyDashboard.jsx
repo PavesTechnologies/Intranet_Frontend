@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { useAuth } from "../../../contexts/AuthContext";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -31,7 +31,7 @@ const ReadOnlyDashboard = () => {
 
   const token = localStorage.getItem("token");
 
-  const axiosInstance = axios.create({
+  const axiosInstance = api.create({
     baseURL: window.__APP_CONFIG__.PMS_BASE_URL,
     headers: { "Content-Type": "application/json" },
   });

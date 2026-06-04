@@ -1,6 +1,6 @@
 // ProjectStatusReportWrapper.jsx
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import ProjectStatusReport from "./ProjectStatusReport";
 import { useParams } from "react-router-dom";
 
@@ -24,28 +24,28 @@ function ProjectStatusReportWrapper() {
           bugsRes,
           usersRes,
         ] = await Promise.all([
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}`,
             { headers },
           ),
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
             { headers },
           ),
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
             { headers },
           ),
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
             { headers },
           ),
-          //axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`, { headers }),
-          axios.get(
+          //api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`, { headers }),
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/bugs/project/${projectId}`,
             { headers },
           ),
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/members-with-owner`,
             { headers },
           ),

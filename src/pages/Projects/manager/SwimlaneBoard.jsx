@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import Button from "../../../components/Button/Button";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
@@ -214,7 +214,7 @@ const SwimlaneBoard = ({
     try {
       let sprintId = null;
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `${BASE}/api/sprints/active/project/${projectId}`,
           { headers: headersWithToken() }
         );
@@ -224,28 +224,28 @@ const SwimlaneBoard = ({
         console.error("Sprint fetch:", err?.response?.data || err?.message);
       }
 
-      const statusReq = axios.get(
+      const statusReq = api.get(
         `${BASE}/api/projects/${projectId}/statuses`,
         { headers: headersWithToken() }
       );
       const tasksUrl = sprintId
         ? `${BASE}/api/projects/sprint/${sprintId}/tasks`
         : `${BASE}/api/projects/${projectId}/tasks`;
-      const tasksReq = axios.get(tasksUrl, { headers: headersWithToken() });
+      const tasksReq = api.get(tasksUrl, { headers: headersWithToken() });
 
       const storiesReq = sprintId
-        ? axios
+        ? api
             .get(`${BASE}/api/stories/sprint/${sprintId}`, { headers: headersWithToken() })
             .catch(() =>
-              axios
+              api
                 .get(`${BASE}/api/stories/project/${projectId}`, { headers: headersWithToken() })
                 .catch(() => ({ data: [] }))
             )
-        : axios
+        : api
             .get(`${BASE}/api/stories/project/${projectId}`, { headers: headersWithToken() })
             .catch(() => ({ data: [] }));
 
-      const membersReq = axios
+      const membersReq = api
         .get(`${BASE}/api/projects/${projectId}/members`, { headers: headersWithToken() })
         .catch(() => ({ data: [] }));
 
@@ -369,7 +369,7 @@ const SwimlaneBoard = ({
         setStatuses(newOrder);
         const mapping = {};
         newOrder.forEach((s, i) => (mapping[String(s.id)] = i + 1));
-        await axios.post(`${BASE}/api/statuses/reorder`, mapping, { headers: headersWithToken() });
+        await api.post(`${BASE}/api/statuses/reorder`, mapping, { headers: headersWithToken() });
         showStatusToast("Columns reordered", "success");
         return;
       }
@@ -379,7 +379,7 @@ const SwimlaneBoard = ({
         setTasks((prev) =>
           prev.map((t) => t.id === taskId ? { ...t, statusId: destStatusId } : t)
         );
-        await axios.patch(
+        await api.patch(
           `${BASE}/api/tasks/${taskId}/status`,
           { statusId: destStatusId },
           { headers: headersWithToken() }
@@ -398,7 +398,7 @@ const SwimlaneBoard = ({
     if (!name) { showStatusToast("Column name required", "error"); return; }
     setCreatingStatus(true);
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${BASE}/api/projects/${projectId}/statuses`,
         { name },
         { headers: headersWithToken() }
@@ -425,7 +425,7 @@ const SwimlaneBoard = ({
   };
   const doDirectDelete = async (statusId) => {
     try {
-      await axios.delete(`${BASE}/api/statuses/${statusId}`, { headers: headersWithToken() });
+      await api.delete(`${BASE}/api/statuses/${statusId}`, { headers: headersWithToken() });
       showStatusToast("Column deleted", "success");
       setStatuses((prev) => prev.filter((s) => s.id !== statusId));
       await loadBoard();
@@ -438,7 +438,7 @@ const SwimlaneBoard = ({
   const confirmDeleteWithMigration = async (newStatusId) => {
     if (!statusToDelete) return;
     try {
-      await axios.delete(`${BASE}/api/statuses/${statusToDelete.id}`, {
+      await api.delete(`${BASE}/api/statuses/${statusToDelete.id}`, {
         params: { newStatusId },
         headers: headersWithToken(),
       });
@@ -459,7 +459,7 @@ const SwimlaneBoard = ({
     if (!name) { showStatusToast("Name required", "error"); return; }
     try {
       const payload = statuses.map((s) => (s.id === statusId ? { ...s, name } : s));
-      await axios.put(
+      await api.put(
         `${BASE}/api/projects/${projectId}/statuses`,
         payload,
         { headers: headersWithToken() }
@@ -479,7 +479,7 @@ const SwimlaneBoard = ({
     if (!activeSprintId) return;
     setIsFinishingSprint(true);
     try {
-      await axios.post(
+      await api.post(
         `${BASE}/api/sprints/${activeSprintId}/finish`,
         null,
         { params: { option }, headers: headersWithToken() }

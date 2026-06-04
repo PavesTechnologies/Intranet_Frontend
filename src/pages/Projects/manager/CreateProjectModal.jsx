@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { motion, AnimatePresence } from "motion/react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -1131,22 +1131,23 @@ const Step4 = ({ statuses, setStatuses, statusError }) => {
 };
 
 /* ─── Step 5 — Review ─────────────────────────────────────────────────────── */
-const Step5 = ({ fd, statuses, users, clients, resources }) => {
+const Step5 = ({ fd, statuses, users, clients, resources, projectManagers, resourceManagers, deliveryOwners }) => {
+  const allUsers = [...(projectManagers || []), ...(resourceManagers || []), ...(deliveryOwners || []), ...(users || [])];
+
   const getName = (id) => {
-    const user = users.find((u) => u?.id?.toString() === id?.toString());
+    if (!id) return null;
+    const user = allUsers.find((u) => u?.id?.toString() === id?.toString());
     if (user) return user.name;
     const client = clients.find((c) => c?.clientId?.toString() === id?.toString());
     if (client) return client.clientName;
-    const resource = resources.find(
-  (r) => r?.resourceId?.toString() === id?.toString()
-);
-if (resource) return resource.resourceName;
+    const resource = resources.find((r) => r?.resourceId?.toString() === id?.toString());
+    if (resource) return resource.resourceName;
     return id;
   };
   const memberNames = fd.memberIds.map(getName).filter(Boolean).join(", ");
-  const fmtBudget = (v) =>
+  const fmtBudget = (v, currency) =>
     v
-      ? `USD ${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+      ? `${currency || "USD"} ${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
       : null;
 
   return (
@@ -1173,7 +1174,7 @@ if (resource) return resource.resourceName;
           <RCell label="Delivery" value={fd.deliveryModel} />
           <RCell label="Start Date" value={fd.startDate} />
           <RCell label="End Date" value={fd.endDate} />
-          <RCell label="Budget" value={fmtBudget(fd.projectBudget)} />
+          <RCell label="Budget" value={fmtBudget(fd.projectBudget, fd.projectBudgetCurrency)} />
           <RCell
             label="Risk"
             value={fd.riskLevel}
@@ -1291,11 +1292,11 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
       setKeyAuto(false);
       setLoading(true);
       Promise.all([
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${editingProjectId}/edit`,
           { headers: { Authorization: `Bearer ${token}` } },
         ),
-        axios.get(
+        api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${editingProjectId}/statuses`,
           { headers: { Authorization: `Bearer ${token}` } },
         ),
@@ -1345,7 +1346,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
   /* ── Fetch users ──────────────────────────────────────────────────────── */
   // useEffect(() => {
   //   if (!isOpen) return;
-  //   axios
+  //   api
   //     .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users?page=0&size=100`, {
   //       headers: { Authorization: `Bearer ${token}` },
   //     })
@@ -1359,7 +1360,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
   /* ── Fetch clients ────────────────────────────────────────────────────── */
   useEffect(() => {
     if (!isOpen) return;
-    axios
+    api
       .get(`${window.__APP_CONFIG__.RMS_BASE_URL}/api/client/get-active-clients`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -1374,7 +1375,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
   useEffect(() => {
   if (!isOpen || !editingProjectId) return;
 
-  axios
+  api
     .get(`${window.__APP_CONFIG__.RMS_BASE_URL}/api/allocation/get-all-resources/${editingProjectId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -1389,15 +1390,15 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
   useEffect(() => {
   if (!isOpen) return;
 
-  axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/project_manager`, { headers: { Authorization: `Bearer ${token}` } })
+  api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/project_manager`, { headers: { Authorization: `Bearer ${token}` } })
     .then(res => setProjectManagers(res.data || []))
     .catch(console.error);
 
-  axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/resource-managers`, { headers: { Authorization: `Bearer ${token}` } })
+  api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/resource-managers`, { headers: { Authorization: `Bearer ${token}` } })
     .then(res => setResourceManagers(res.data || []))
     .catch(console.error);
 
-  axios.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/delivery-owners`, { headers: { Authorization: `Bearer ${token}` } })
+  api.get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/users/delivery-owners`, { headers: { Authorization: `Bearer ${token}` } })
     .then(res => setDeliveryOwners(res.data || []))
     .catch(console.error);
 
@@ -1551,13 +1552,13 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
       let pid = editingProjectId;
 
       if (editingProjectId) {
-        await axios.put(
+        await api.put(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${editingProjectId}`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } },
         );
       } else {
-        const res = await axios.post(
+        const res = await api.post(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } },
@@ -1566,7 +1567,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
       }
 
       try {
-        await axios.put(
+        await api.put(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${pid}/statuses`,
           statusPayload,
           { headers: { Authorization: `Bearer ${token}` } },
@@ -1668,7 +1669,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
         statusError={statusErr}
       />
     ),
-    5: <Step5 fd={fd} statuses={statuses} users={users} clients={clients} resources={resources} />,
+    5: <Step5 fd={fd} statuses={statuses} users={users} clients={clients} resources={resources} projectManagers={projectManagers} resourceManagers={resourceManagers} deliveryOwners={deliveryOwners} />,
   };
 
   return (

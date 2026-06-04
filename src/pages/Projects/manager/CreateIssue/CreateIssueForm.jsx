@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../../api/axiosInstance";
 import { X } from "lucide-react";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
@@ -73,12 +73,12 @@ const CreateIssueForm = ({
       try {
         const pid = initialProjectId;
         const [projectsRes, usersRes] = await Promise.all([
-          axios.get(
+          api.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
             axiosConfig,
           ),
           pid
-            ? axios.get(
+            ? api.get(
                 `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${pid}/members-with-owner`,
                 axiosConfig,
               )
@@ -110,31 +110,31 @@ const CreateIssueForm = ({
       deps.forEach((dep) => {
         if (dep === "statuses") {
           requests.push(
-            axios.get(`${base}/api/projects/${pid}/statuses`, axiosConfig),
+            api.get(`${base}/api/projects/${pid}/statuses`, axiosConfig),
           );
           setters.push((res) => setStatuses(res.data || []));
         }
         if (dep === "epics") {
           requests.push(
-            axios.get(`${base}/api/projects/${pid}/epics`, axiosConfig),
+            api.get(`${base}/api/projects/${pid}/epics`, axiosConfig),
           );
           setters.push((res) => setEpics(res.data || []));
         }
         if (dep === "stories") {
           requests.push(
-            axios.get(`${base}/api/projects/${pid}/stories`, axiosConfig),
+            api.get(`${base}/api/projects/${pid}/stories`, axiosConfig),
           );
           setters.push((res) => setStories(res.data || []));
         }
         if (dep === "tasks") {
           requests.push(
-            axios.get(`${base}/api/projects/${pid}/tasks`, axiosConfig),
+            api.get(`${base}/api/projects/${pid}/tasks`, axiosConfig),
           );
           setters.push((res) => setTasks(res.data || []));
         }
         if (dep === "sprints") {
           requests.push(
-            axios.get(`${base}/api/projects/${pid}/sprints`, axiosConfig),
+            api.get(`${base}/api/projects/${pid}/sprints`, axiosConfig),
           );
           setters.push((res) => setSprints(res.data || []));
         }
@@ -254,7 +254,7 @@ const CreateIssueForm = ({
     if (err) return showStatusToast(err, "error");
 
     try {
-      await axios.post(
+      await api.post(
         `${window.__APP_CONFIG__.PMS_BASE_URL}${endpoint}`,
         payload,
         axiosConfig,

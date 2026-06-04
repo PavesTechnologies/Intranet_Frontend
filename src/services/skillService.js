@@ -1,5 +1,5 @@
 
-import axios from "axios";
+import api from "../api/axiosInstance";
 
 const API_URL = window.__APP_CONFIG__.RMS_BASE_URL + "/api";
 
@@ -11,7 +11,7 @@ export const skillService = {
   // ✅ GET Categories
   getSkillTree: async () => {
     try {
-      const response = await axios.get(`${API_URL}/skill-categories`, {
+      const response = await api.get(`${API_URL}/skill-categories`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -26,7 +26,7 @@ export const skillService = {
   // ✅ GET Proficiency Levels
   getProficiencies: async () => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${API_URL}/proficiency/get-all-proficiency-levels`,
         {
           headers: {
@@ -43,7 +43,7 @@ export const skillService = {
   // Get employee's current skills
   getEmployeeSkills: async (employeeId) => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${API_URL}/employee-skills/${employeeId}`,
         {
           headers: authHeaders(),
@@ -58,7 +58,7 @@ export const skillService = {
 
   saveEmployeeSkills: async (payload) => {
     try {
-      const response = await axios.post(`${API_URL}/employee-skills`, payload, {
+      const response = await api.post(`${API_URL}/employee-skills`, payload, {
         headers: authHeaders(),
       });
       return response.data;
@@ -70,7 +70,7 @@ export const skillService = {
 
   saveSkillTaxonomyRequest: async (payload) => {
     try {
-      const response = await axios.post(`${API_URL}/skill-taxonomy/requests`, payload, {
+      const response = await api.post(`${API_URL}/skill-taxonomy/requests`, payload, {
         headers: authHeaders(),
       });
       return response.data;
@@ -82,7 +82,7 @@ export const skillService = {
 
   getSkillTaxonomyRequests: async () => {
     try {
-      const response = await axios.get(`${API_URL}/skill-taxonomy/requests`, {
+      const response = await api.get(`${API_URL}/skill-taxonomy/requests`, {
         headers: authHeaders(),
       });
       return response.data;
@@ -94,7 +94,7 @@ export const skillService = {
 
   getMySkillTaxonomyRequests: async (resourceId) => {
     try {
-      const response = await axios.get(`${API_URL}/skill-taxonomy/requests/${resourceId}`, {
+      const response = await api.get(`${API_URL}/skill-taxonomy/requests/${resourceId}`, {
         headers: authHeaders(),
       });
       return response.data;
@@ -106,7 +106,7 @@ export const skillService = {
 
   approveSkillRequest: async (id, approvedBy) => {
     try {
-      const response = await axios.put(
+      const response = await api.put(
         `${API_URL}/skill-taxonomy/requests/${id}/approve?approvedBy=${encodeURIComponent(approvedBy)}`,
         {},
         { headers: authHeaders() },
@@ -120,7 +120,7 @@ export const skillService = {
 
   rejectSkillRequest: async (id, remarks) => {
     try {
-      const response = await axios.put(
+      const response = await api.put(
         `${API_URL}/skill-taxonomy/requests/${id}/reject`,
         { remarks },
         { headers: authHeaders() },
@@ -135,7 +135,7 @@ export const skillService = {
   // Save a primary skill
   saveSkill: async (skillData) => {
     try {
-      const response = await axios.post(`${API_URL}/resource-skills`, skillData, {
+      const response = await api.post(`${API_URL}/resource-skills`, skillData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -150,7 +150,7 @@ export const skillService = {
   // Update a primary skill
   updateSkill: async (id, skillData) => {
     try {
-      const response = await axios.put(`${API_URL}/resource-skills/skill/${id}`, skillData, {
+      const response = await api.put(`${API_URL}/resource-skills/skill/${id}`, skillData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -167,7 +167,7 @@ export const skillService = {
 
   try {
 
-    const response = await axios.delete(
+    const response = await api.delete(
       `${API_URL}/skills/${skillId}`,
       {
         headers: {
@@ -192,7 +192,7 @@ export const skillService = {
   // Save multiple skills (Bulk)
   saveBulkSkills: async (bulkData) => {
     try {
-      const response = await axios.post(`${API_URL}/resource-skills/bulk`, bulkData, {
+      const response = await api.post(`${API_URL}/resource-skills/bulk`, bulkData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -207,7 +207,7 @@ export const skillService = {
   // Get sub-skills for a resource and skill
   getResourceSubSkills: async (resourceId, skillId) => {
     try {
-      const response = await axios.get(`${API_URL}/resource-sub-skills/resource/${resourceId}/skill/${skillId}`, {
+      const response = await api.get(`${API_URL}/resource-sub-skills/resource/${resourceId}/skill/${skillId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -222,7 +222,7 @@ export const skillService = {
   // Save a sub-skill
   saveSubSkill: async (subSkillData) => {
     try {
-      const response = await axios.post(`${API_URL}/resource-sub-skills`, subSkillData, {
+      const response = await api.post(`${API_URL}/resource-sub-skills`, subSkillData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -238,7 +238,7 @@ export const skillService = {
  deleteSubSkill: async (subSkillId) => {
   try {
 
-    const response = await axios.delete(
+    const response = await api.delete(
       `${API_URL}/sub-skills/${subSkillId}`,
       {
         headers: {
@@ -262,7 +262,7 @@ export const skillService = {
 
   getSkills: async () => {
     try {
-      const response = await axios.get(`${API_URL}/skills/active`, {
+      const response = await api.get(`${API_URL}/skills/active`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -277,7 +277,7 @@ export const skillService = {
   // Delete a taxonomy skill (mapped to backend DELETE /skills/{skillId})
   deleteTaxonomySkill: async (id) => {
     try {
-      const response = await axios.delete(`${API_URL}/skills/${id}`, {
+      const response = await api.delete(`${API_URL}/skills/${id}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -291,7 +291,7 @@ export const skillService = {
 
   getSkillsByCategory: async (categoryId) => {
     try {
-      const response = await axios.get(`${API_URL}/skills/category/${categoryId}`, {
+      const response = await api.get(`${API_URL}/skills/category/${categoryId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -305,7 +305,7 @@ export const skillService = {
 
   getCategoryDtos: async () => {
     try {
-      const response = await axios.get(`${API_URL}/skill-categories/dto`, {
+      const response = await api.get(`${API_URL}/skill-categories/dto`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -319,7 +319,7 @@ export const skillService = {
 
   deleteCategory: async (categoryId) => {
     try {
-      const response = await axios.delete(`${API_URL}/skill-categories/${categoryId}`, {
+      const response = await api.delete(`${API_URL}/skill-categories/${categoryId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -333,7 +333,7 @@ export const skillService = {
 
   downloadSkillTaxonomyExcel: async () => {
 
-  const response = await axios.get(
+  const response = await api.get(
     `${API_URL}/skill-categories/taxonomy/export`,
     {
       responseType: "blob",
@@ -349,7 +349,7 @@ export const skillService = {
 
   getSkillsByCategoryDto: async (categoryId) => {
     try {
-      const response = await axios.get(`${API_URL}/skill-categories/${categoryId}/skills-dto`, {
+      const response = await api.get(`${API_URL}/skill-categories/${categoryId}/skills-dto`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -363,7 +363,7 @@ export const skillService = {
 
   getSubSkillsBySkillDto: async (skillId) => {
     try {
-      const response = await axios.get(`${API_URL}/skill-categories/skills/${skillId}/subskills-dto`, {
+      const response = await api.get(`${API_URL}/skill-categories/skills/${skillId}/subskills-dto`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -377,7 +377,7 @@ export const skillService = {
 
   saveSkillTaxonomy: async (taxonomyData) => {
     try {
-      const response = await axios.post(`${API_URL}/skill-categories/taxonomy`, taxonomyData, {
+      const response = await api.post(`${API_URL}/skill-categories/taxonomy`, taxonomyData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -391,7 +391,7 @@ export const skillService = {
 
   uploadSkillTaxonomy: async (formData) => {
     try {
-      const response = await axios.post(`${API_URL}/skill-categories/taxonomy/upload`, formData, {
+      const response = await api.post(`${API_URL}/skill-categories/taxonomy/upload`, formData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "multipart/form-data",
@@ -406,7 +406,7 @@ export const skillService = {
 
   getAllCategories: async () => {
     try {
-      const response = await axios.get(`${API_URL}/skill-categories`, {
+      const response = await api.get(`${API_URL}/skill-categories`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -420,7 +420,7 @@ export const skillService = {
 
   getCertificates: async () => {
     try {
-      const response = await axios.get(`${API_URL}/certificates`, {
+      const response = await api.get(`${API_URL}/certificates`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -434,7 +434,7 @@ export const skillService = {
 
   getCertificateById: async (certificateId) => {
     try {
-      const response = await axios.get(`${API_URL}/certificates/${certificateId}`, {
+      const response = await api.get(`${API_URL}/certificates/${certificateId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -448,7 +448,7 @@ export const skillService = {
 
   getCertificationSkillsByCategory: async (categoryId) => {
     try {
-      const response = await axios.get(`${API_URL}/certificates/category/${categoryId}`, {
+      const response = await api.get(`${API_URL}/certificates/category/${categoryId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -462,7 +462,7 @@ export const skillService = {
 
   createCertificate: async (certificateData) => {
     try {
-      const response = await axios.post(`${API_URL}/certificates/create`, certificateData, {
+      const response = await api.post(`${API_URL}/certificates/create`, certificateData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -476,7 +476,7 @@ export const skillService = {
 
   updateCertificate: async (certificateId, certificateData) => {
     try {
-      const response = await axios.put(`${API_URL}/certificates/${certificateId}`, certificateData, {
+      const response = await api.put(`${API_URL}/certificates/${certificateId}`, certificateData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -489,7 +489,7 @@ export const skillService = {
   },
   deleteCertificate: async (certificateId) => {
     try {
-      const response = await axios.delete(`${API_URL}/certificates/${certificateId}`, {
+      const response = await api.delete(`${API_URL}/certificates/${certificateId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
