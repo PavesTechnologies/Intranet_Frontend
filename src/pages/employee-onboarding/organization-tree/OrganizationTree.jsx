@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import Tree from "react-d3-tree";
 import { jwtDecode } from "jwt-decode";
 import Button  from "../../../components/Button/Button";
+import api from "../../../api/axiosInstance";
 
 /* ---------------- AVATAR HELPERS ---------------- */
 
