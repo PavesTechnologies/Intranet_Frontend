@@ -52,11 +52,7 @@ const CreateTaskForm = ({
       try {
         const [storyRes, userRes] = await Promise.all([
           api.get(
-            `${import.meta.env.VITE_PMS_BASE_URL}/api/stories/sprint/${defaultSprintId}`,
-=========
-          axios.get(
             `${window.__APP_CONFIG__.PMS_BASE_URL}/api/stories/sprint/${defaultSprintId}`,
->>>>>>>>> Temporary merge branch 2
             axiosConfig
           ),
           api.get(
