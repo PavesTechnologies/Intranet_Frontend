@@ -22,6 +22,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import api from "../../../api/axiosInstance";
 
 const STATUS = {
   JOINING: "JOINING",
