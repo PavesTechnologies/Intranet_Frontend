@@ -92,10 +92,11 @@ export const EO_SUBMENU = [
   {
     label: "Manage Skill Taxonomy",
     to: "/employee-onboarding/manage-skill-taxonomy",
-    allowedRoles: MANAGEMENT_ROLES,
+    allowedRoles: ADMIN_ROLES,
     children: [
-      { label: "Skill Taxonomy", to: "/employee-onboarding/manage-skill-taxonomy", allowedRoles: HR_ADMIN },
-      { label: "Requests",       to: "/employee-onboarding/manage-skill-taxonomy/requests", allowedRoles: HR_ADMIN },    
+      { label: "Skill Taxonomy", to: "/employee-onboarding/manage-skill-taxonomy", allowedRoles: ADMIN_ROLES },
+      { label: "Requests",       to: "/employee-onboarding/manage-skill-taxonomy/requests", allowedRoles: ADMIN_ROLES },
+      { label: "Certificates",   to: "/employee-onboarding/manage-skill-taxonomy/certificates", allowedRoles: ADMIN_ROLES },
     ],
   },
   {

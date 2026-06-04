@@ -377,7 +377,7 @@ export const skillService = {
 
   saveSkillTaxonomy: async (taxonomyData) => {
     try {
-      const response = await api.post(`${API_URL}/skill-categories/taxonomy`, taxonomyData, {
+      const response = await axios.post(`${API_URL}/skill-categories/taxonomy/save`, taxonomyData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },

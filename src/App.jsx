@@ -205,7 +205,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   // ✅ Role-based restriction check
   if (allowedRoles && allowedRoles.length > 0) {
-    const hasRole = user?.roles?.some((role) => allowedRoles.includes(role));
+    const normalizedAllowedRoles = allowedRoles.map((role) => role.toUpperCase());
+    const hasRole = user?.roles?.some((role) =>
+      normalizedAllowedRoles.includes(role.toUpperCase())
+    );
     console.log("ProtectedRoute check:", {
       isAuthenticated,
       user,
@@ -487,10 +490,10 @@ const AppRoutes = () => {
             <Route path="analytics" element={<ProtectedRoute roles={["HR", "MANAGER"]}><HeadcountDemographicsPage /></ProtectedRoute>} />
 
             <Route path="weekly-joining-report-dashboard" element={<ProtectedRoute roles={["HR", "MANAGER"]}><WeeklyJoiningDashboard /></ProtectedRoute>} />
-            <Route path="manage-skill-taxonomy" element={<ProtectedRoute roles={["HR", "ADMIN"]}><ManageSkillTaxonomy /></ProtectedRoute>} />
-            <Route path="manage-skill-taxonomy/requests" element={<ProtectedRoute roles={["HR", "ADMIN"]}><ManageSkillTaxonomy /></ProtectedRoute>} />
-            <Route path="manage-skill-taxonomy/certificates" element={<ProtectedRoute roles={["HR", "ADMIN"]}><AddCertificate /></ProtectedRoute>} />
-            <Route path="manage-skill-taxonomy/certificates/general" element={<ProtectedRoute roles={["HR", "ADMIN"]}><AddCertificate /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy" element={<ProtectedRoute allowedRoles={["ADMIN"]}><ManageSkillTaxonomy /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy/requests" element={<ProtectedRoute allowedRoles={["ADMIN"]}><ManageSkillTaxonomy /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy/certificates" element={<ProtectedRoute allowedRoles={["ADMIN"]}><AddCertificate /></ProtectedRoute>} />
+            <Route path="manage-skill-taxonomy/certificates/general" element={<ProtectedRoute allowedRoles={["ADMIN"]}><AddCertificate /></ProtectedRoute>} />
             <Route path="document-templates" element={<ProtectedRoute roles={["HR"]}><DocumentTemplates /></ProtectedRoute>} />
             <Route path="offer/:user_uuid" element={<ViewEmpDetails />} />
             <Route path="offer-preview/:offerId" element={<OfferPreview />} />
