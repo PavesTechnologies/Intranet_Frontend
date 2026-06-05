@@ -263,6 +263,57 @@ const IssueTracker = () => {
     ].filter(Boolean)),
   ).sort();
 
+  // Auto-expand epics/stories that contain matching children when a filter is active
+  useEffect(() => {
+    const hasActiveFilter =
+      filters.search ||
+      filters.type     !== "ALL" ||
+      filters.priority !== "ALL" ||
+      filters.status   !== "ALL" ||
+      filters.assignee !== "ALL";
+
+    if (!hasActiveFilter) return;
+
+    const matchItem = (issue) => {
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        if (!issue.title?.toLowerCase().includes(q) &&
+            !issue.reporterName?.toLowerCase().includes(q) &&
+            !issue.assigneeName?.toLowerCase().includes(q)) return false;
+      }
+      if (filters.type     !== "ALL" && issue.type     !== filters.type)     return false;
+      if (filters.priority !== "ALL" && issue.priority !== filters.priority) return false;
+      if (filters.status   !== "ALL") {
+        const st = String(issue.status || "").toUpperCase().replace(/\s+/g, "_");
+        if (st !== filters.status) return false;
+      }
+      if (filters.assignee !== "ALL" && issue.assigneeName !== filters.assignee) return false;
+      return true;
+    };
+
+    // Expand stories whose tasks match
+    const storiesToOpen = issues.storiesData
+      .filter((story) =>
+        issues.tasksData.filter((t) => t.storyId === story.id).some(matchItem)
+      )
+      .map((s) => s.id);
+
+    // Expand epics whose stories or tasks match
+    const epicsToOpen = issues.epicsData
+      .filter((epic) => {
+        const epicStories = issues.storiesData.filter((s) => s.epicId === epic.id);
+        return epicStories.some(
+          (story) =>
+            matchItem(story) ||
+            issues.tasksData.filter((t) => t.storyId === story.id).some(matchItem)
+        );
+      })
+      .map((e) => e.id);
+
+    setOpenEpics((prev) => [...new Set([...prev, ...epicsToOpen])]);
+    setOpenStories((prev) => [...new Set([...prev, ...storiesToOpen])]);
+  }, [filters, issues]);
+
   const matchesFilters = (issue) => {
     // Search
     if (filters.search) {
