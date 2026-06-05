@@ -808,9 +808,9 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                         }
                       >
                         {request.employeeFullName}
-                        <div className="text-gray-500 text-ellipsis whitespace-nowrap overflow-hidden max-w-[100px]">
+                        {/* <div className="text-gray-500 text-ellipsis whitespace-nowrap overflow-hidden max-w-[100px]">
                           {request.jobTitle}
-                        </div>
+                        </div> */}
                       </button>
                     </td>
                     {/* ... other <td> cells for your data ... */}

@@ -510,7 +510,7 @@ const ProjectDashboard = () => {
                 <EmployeeIcon size={16} />
                 My Work
               </Button>
-              <Button
+              {/* <Button
                 onClick={() => navigate(`/block-leave-dates/${user?.user_id}`)}
                 variant="secondary"
                 size="medium"
@@ -518,7 +518,7 @@ const ProjectDashboard = () => {
               >
                 <LeaveIcon size={16} />
                 Manage Leave Blocks
-              </Button>
+              </Button> */}
 
               <Button
                 variant="primary"

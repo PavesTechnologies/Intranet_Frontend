@@ -359,6 +359,12 @@ const EmployeeDashboard = ({ employeeId }) => {
   const [isLoading, setIsLoading]                             = useState(false);
   const [pendingRequests, setPendingRequests]                 = useState([]);
   const [currentYear, setCurrentYear]                         = useState(new Date().getFullYear());
+  const [refreshKey, setRefreshKey] = useState(0); 
+
+  const handleLeaveSuccess = () => {
+    fetchRequests();
+    setRefreshKey((prev) => prev + 1);
+  };
 
   const BASE_URL      = window.__APP_CONFIG__.BASE_URL;
   const user          = JSON.parse(localStorage.getItem("user"));
@@ -392,6 +398,7 @@ const EmployeeDashboard = ({ employeeId }) => {
       console.error("Failed to fetch comp-off requests:", err);
     } finally {
       setTimeout(() => { inFlightRef.current = false; }, 300);
+      console.log("RefreshKey after fetch:", refreshKey);
     }
   }, [BASE_URL, employeeId]); // stable — only changes if employeeId/BASE_URL changes
 
@@ -458,6 +465,7 @@ const EmployeeDashboard = ({ employeeId }) => {
           <PendingLeaveRequests
             employeeId={employeeId}
             year={currentYear}
+            onLeaveCancel={() => setRefreshKey(prev => prev + 1)} // child can trigger refresh when a leave is cancelled
             refresh={pendingRequests} // can be used by child to trigger manual refresh if needed
           />
         </div>
@@ -486,14 +494,14 @@ const EmployeeDashboard = ({ employeeId }) => {
       <h2 className="text-small font-semibold m-4">My Leave Stats</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* ✅ No refreshKey — each owns its own WS subscription */}
-        <WeeklyPattern employeeId={employeeId} year={currentYear} />
-        <CustomActiveShapePieChart employeeId={employeeId} year={currentYear} />
-        <MonthlyStats employeeId={employeeId} year={currentYear} />
+        <WeeklyPattern employeeId={employeeId} year={currentYear} refreshKey={refreshKey} />
+        <CustomActiveShapePieChart employeeId={employeeId} year={currentYear} refreshKey={refreshKey} />
+        <MonthlyStats employeeId={employeeId} year={currentYear} refreshKey={refreshKey} />
       </div>
 
       <h2 className="text-small font-semibold m-4">Leave Balances</h2>
       {/* ✅ No refreshKey — LeaveDashboard subscribes to "employee-update" directly */}
-      <LeaveDashboard employeeId={employeeId} year={currentYear} />
+      <LeaveDashboard employeeId={employeeId} year={currentYear} refreshKey={refreshKey} />
 
       <h2 className="text-small font-semibold m-4">Leave History</h2>
       {/* ✅ No refreshKey — LeaveHistory subscribes to "employee-update" directly */}
@@ -504,7 +512,7 @@ const EmployeeDashboard = ({ employeeId }) => {
         year={currentYear}
         onClose={() => setIsRequestLeaveModalOpen(false)}
         employeeId={employeeId}
-        onSuccess={fetchRequests} // ✅ only refreshes compoff section
+        onSuccess={handleLeaveSuccess} // ✅ only refreshes compoff section
       />
     </>
   );
