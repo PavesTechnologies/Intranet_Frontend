@@ -12,6 +12,21 @@ const ComplianceForm = ({ formData, setFormData }) => {
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  const isSkillRequirement = formData.requirementType === "SKILL";
+  const isCertificationRequirement = formData.requirementType === "CERTIFICATION";
+  const hasFixedRequirementName = isSkillRequirement || isCertificationRequirement;
+
+  const getSelectedSkillName = (skillId) =>
+    skills.find((skill) => String(skill.id) === String(skillId))?.name ||
+    formData.skill?.name ||
+    "";
+
+  const getSelectedCertificateName = (certificateId) =>
+    certificates.find((cert) => String(cert.certificateId) === String(certificateId))
+      ?.certificateName ||
+    formData.certificate?.certificateName ||
+    "";
+
   const fetchSkills = async () => {
     setLoading(true);
     try {
@@ -43,27 +58,55 @@ const ComplianceForm = ({ formData, setFormData }) => {
   }, []);
 
   useEffect(() => {
-    if (formData.requirementType === "SKILL") {
+    if (isSkillRequirement) {
       fetchSkills();
     }
-    if (formData.requirementType === "CERTIFICATION") {
+    if (isCertificationRequirement) {
       fetchCertificates();
     }
   }, [formData.requirementType]);
+
+  useEffect(() => {
+    if (!hasFixedRequirementName) return;
+
+    const fixedRequirementName = isSkillRequirement
+      ? getSelectedSkillName(formData.skill?.id)
+      : getSelectedCertificateName(formData.certificate?.certificateId);
+
+    if ((formData.requirementName || "") !== fixedRequirementName) {
+      setFormData((prev) => ({
+        ...prev,
+        requirementName: fixedRequirementName,
+      }));
+    }
+  }, [
+    hasFixedRequirementName,
+    isSkillRequirement,
+    formData.skill?.id,
+    formData.certificate?.certificateId,
+    skills,
+    certificates,
+  ]);
 
   // Updated handler to shape the data based on the input name
   const handleChange = (e) => {
     const { name, value } = e.target;
 
     if (name === "skill") {
+      const requirementName = getSelectedSkillName(value);
+
       setFormData((prev) => ({
         ...prev,
         skill: { id: value },
+        requirementName,
       }));
     } else if (name === "certificate") {
+      const requirementName = getSelectedCertificateName(value);
+
       setFormData((prev) => ({
         ...prev,
         certificate: { certificateId: value },
+        requirementName,
       }));
     } else if (name === "requirementType") {
       setFormData((prev) => {
@@ -71,6 +114,7 @@ const ComplianceForm = ({ formData, setFormData }) => {
         return {
           ...rest,
           [name]: value,
+          requirementName: "",
         };
       });
     } else {
@@ -102,7 +146,7 @@ const ComplianceForm = ({ formData, setFormData }) => {
 
         {/* Dynamic Skill/Certificate/Placeholder */}
         <div>
-          {formData.requirementType === "SKILL" ? (
+          {isSkillRequirement ? (
             <>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">
                 Skills *
@@ -117,7 +161,7 @@ const ComplianceForm = ({ formData, setFormData }) => {
                 disabled={loading}
               />
             </>
-          ) : formData.requirementType === "CERTIFICATION" ? (
+          ) : isCertificationRequirement ? (
             <>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">
                 Certificate *
@@ -144,10 +188,19 @@ const ComplianceForm = ({ formData, setFormData }) => {
           </label>
           <input
             name="requirementName"
-            placeholder="e.g. ISO 27001"
+            placeholder={
+              hasFixedRequirementName
+                ? "Auto-filled from selected skill/certificate"
+                : "e.g. ISO 27001"
+            }
             value={formData.requirementName || ""}
-            onChange={handleChange}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none bg-gray-50/50"
+            onChange={hasFixedRequirementName ? undefined : handleChange}
+            readOnly={hasFixedRequirementName}
+            className={`w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] transition-all outline-none ${
+              hasFixedRequirementName
+                ? "bg-gray-100 text-slate-500 cursor-not-allowed"
+                : "bg-gray-50/50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            }`}
           />
         </div>
 
