@@ -19,10 +19,12 @@ const StoryCard = ({
   riskCount = 0,
   projectId,
   navigate,
+  readOnly = false,
 }) => {
   const [{ isDragging }, dragRef] = useDrag({
     type: "STORY",
     item: { id: story.id, type: "STORY" },
+    canDrag: !readOnly,
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
@@ -59,11 +61,11 @@ const StoryCard = ({
 
   return (
     <div
-      ref={dragRef}
-      onClick={() => onClick?.()}
-      className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm hover:border-indigo-300 cursor-pointer flex items-center gap-3 transition-all ${
-        isDragging ? "opacity-50 scale-95 ring-2 ring-indigo-400" : ""
-      }`}
+      ref={readOnly ? undefined : dragRef}
+      onClick={() => !readOnly && onClick?.()}
+      className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm flex items-center gap-3 transition-all ${
+        readOnly ? "cursor-default opacity-80" : "hover:border-indigo-300 cursor-pointer"
+      } ${isDragging ? "opacity-50 scale-95 ring-2 ring-indigo-400" : ""}`}
     >
       {/* STORY label */}
       <div className="flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[10px] font-bold shrink-0">
