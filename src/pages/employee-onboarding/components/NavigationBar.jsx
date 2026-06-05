@@ -95,6 +95,7 @@ export default function OnboardingNavBar() {
         "/employee-onboarding/bulk-upload",
         "/employee-onboarding/onboarding-task",
         "/employee-onboarding/hr-configuration",
+        "/employee-onboarding/admin/offer-letters",
       ],
       exactRoot: true,
       redirect: isManager && isGeneral
@@ -148,17 +149,16 @@ export default function OnboardingNavBar() {
       ]
     }] : []),
 
-    // ✅ Offboarding → HR, MANAGER
-    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
-      label: "Offboarding",
-      match: ["/employee-exit"],
-      redirect: "/employee-exit",
-    }] : []),
-
     ...(hasRole(["ADMIN"]) ? [{
       label: "ManageSkillTaxonomy",
       match: ["/employee-onboarding/manage-skill-taxonomy"],
       redirect: "/employee-onboarding/manage-skill-taxonomy",
+    }] : []),
+
+    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
+      label: "Offboarding",
+      match: ["/employee-exit"],
+      redirect: "/employee-exit",
     }] : []),
   ];
 
@@ -168,6 +168,9 @@ export default function OnboardingNavBar() {
     ...(!isOnlyGeneral
       ? [{ label: "Workflow Overview", path: "/employee-onboarding" }]
       : []),
+    ...(isAdmin ? [
+      { label: "Admin Dashboard", path: "/employee-onboarding/admin/offer-letters" }
+    ] : []),
     ...(hasRole(["HR"]) ? [
       { label: "Offer Management", path: "/employee-onboarding/create" },
       { label: "Data Import", path: "/employee-onboarding/bulk-upload" }
@@ -214,10 +217,6 @@ export default function OnboardingNavBar() {
     { label: "Reporting Dashboard", path: "/employee-onboarding/weekly-joining-report-dashboard" },
   ];
 
-  const offboardingNav = [
-    { label: "Offboarding Overview", path: "/employee-exit" },
-  ];
-
   const certificateNavOptions = [
     {
       label: "Skill Certifications",
@@ -237,6 +236,10 @@ export default function OnboardingNavBar() {
       path: "/employee-onboarding/manage-skill-taxonomy/certificates",
       children: certificateNavOptions,
     },
+  ];
+
+  const offboardingNav = [
+    { label: "Offboarding Overview", path: "/employee-exit" },
   ];
 
   /* ================= NAV SWITCH LOGIC ================= */
@@ -266,12 +269,12 @@ export default function OnboardingNavBar() {
   else if (path.startsWith("/employee-onboarding/weekly-joining-report-dashboard")) {
     navToRender = reportsNav;
   } 
-  else if (path.startsWith("/employee-exit")) {
-    navToRender = offboardingNav;
-  } 
   else if (path.startsWith("/employee-onboarding/manage-skill-taxonomy")) {
     navToRender = skillTaxonomyNav;
   }
+  else if (path.startsWith("/employee-exit")) {
+    navToRender = offboardingNav;
+  } 
   else if (path.startsWith("/employee-onboarding")) {
     navToRender = managementNav;
   }

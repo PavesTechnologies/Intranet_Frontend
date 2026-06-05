@@ -10,7 +10,7 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
   const [formData, setFormData] = useState({
     name: "",
     goal: "",
-    startDate: "",
+    startedAt: "",
     endDate: "",
     status: "",
     projectId: projectId,
@@ -33,7 +33,8 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
         setFormData({
           name: sprint.name,
           goal: sprint.goal,
-          startDate: sprint.startDate?.slice(0, 16),
+          startDate: sprint.startDate,
+          startedAt: (sprint.startedAt ?? sprint.startDate)?.slice(0, 16),
           endDate: sprint.endDate?.slice(0, 16),
           status: sprint.status,
           projectId: sprint.projectId,
@@ -111,9 +112,9 @@ const EditSprintForm = ({ sprintId, projectId, onClose, onUpdated }) => {
         <label className="block font-medium">Start Date</label>
         <input
           type="datetime-local"
-          name="startDate"
+          name="startedAt"
           className="w-full border p-2 rounded"
-          value={formData.startDate}
+          value={formData.startedAt}
           onChange={handleChange}
         />
       </div>
