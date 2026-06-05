@@ -5,10 +5,10 @@ window.__APP_CONFIG__ = {
   USER_MANAGEMENT_URL: "http://13.207.112.154/ums",
   BASE_URL: "http://13.204.95.26:9999",
 //   PMS_BASE_URL: "http://localhost:8080",
-  PMS_BASE_URL: "http://13.204.95.26:8080",
+  PMS_BASE_URL: "http://localhost:8080/pms",
   MSOffice_USER_MANAGEMENT_URL: "http://127.0.0.1:8000",
 //   MSOffice_USER_MANAGEMENT_URL: "http://13.204.95.26:8000",
-  EMPLOYEE_ONBOARDING_URL: "http://localhost:8001/ems",  
+  EMPLOYEE_ONBOARDING_URL: "http://localhost:8000/ems",  
   // RMS_BASE_URL: "http://13.204.95.26:8002",
 RMS_BASE_URL: "http://localhost:8080",
 };

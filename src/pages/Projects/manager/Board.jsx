@@ -145,7 +145,8 @@ const Board = ({ projectId, sprintId, projectName }) => {
         );
         fetchedSprintId = res.data[0]?.id;
         setActiveSprintName(res.data[0]?.name ?? "");
-        setSprintStartDate(res.data[0]?.startDate ?? null);
+      
+        setSprintStartDate(res.data[0]?.startedAt ?? res.data[0]?.startDate ?? null);
         setSprintEndDate(res.data[0]?.endDate ?? null);
         setActiveSprintId(fetchedSprintId);
       } catch (err) {
