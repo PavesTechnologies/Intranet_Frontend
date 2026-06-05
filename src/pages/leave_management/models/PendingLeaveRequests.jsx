@@ -9,7 +9,7 @@ import NoPendingLeaves from "../../../components/icons/no_pending_leaves.svg";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
 // ✅ Removed refreshKey prop — self-sufficient now
-const PendingLeaveRequests = ({ refresh, year }) => {
+const PendingLeaveRequests = ({ refresh, year, onLeaveCancel }) => {
   const [pendingLeaves, setPendingLeaves]   = useState([]);
   const [leaveTypes, setLeaveTypes]         = useState([]);
   const [leaveBalances, setLeaveBalances]   = useState({});
@@ -77,6 +77,7 @@ const PendingLeaveRequests = ({ refresh, year }) => {
   // ─── Stable ref for grandchild ────────────────────────────────────────
   const handleChildRefresh = useCallback(() => {
     fetchData();
+    onLeaveCancel?.(); // Notify parent if a leave was cancelled
   }, [fetchData]);
 
   // ─── Pagination ───────────────────────────────────────────────────────
