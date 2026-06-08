@@ -10,5 +10,5 @@ window.__APP_CONFIG__ = {
 //   MSOffice_USER_MANAGEMENT_URL: "http://13.204.95.26:8000",
   EMPLOYEE_ONBOARDING_URL: "http://localhost:8001/ems",  
   // RMS_BASE_URL: "http://13.204.95.26:8002",
-RMS_BASE_URL: "http://localhost:8080",
+RMS_BASE_URL: "http://13.207.112.154/rms",
 };
