@@ -450,16 +450,26 @@ const RMSProjectDetails = () => {
   };
 
   const handleEditCompliance = (comp) => {
-    setFormData({
+    const nextFormData = {
       projectComplianceId: comp.projectComplianceId,
       requirementType: comp.requirementType,
       requirementName: comp.requirementName,
       mandatoryFlag: comp.mandatoryFlag,
       activeFlag: comp.activeFlag,
       project: { pmsProjectId: projectId },
-    });
+    };
 
-    setConfigType("compliance");
+    if (comp.requirementType === "SKILL") {
+      nextFormData.skill = { id: comp.skill?.id || null };
+    } else if (comp.requirementType === "CERTIFICATION") {
+      nextFormData.certificate = {
+        certificateId: comp.certificate?.certificateId || null,
+      };
+    }
+
+    setFormData(nextFormData);
+
+    setConfigType("pre-requisites");
     setOpenConfigModal(true);
     setInheritMode(false);
   };
