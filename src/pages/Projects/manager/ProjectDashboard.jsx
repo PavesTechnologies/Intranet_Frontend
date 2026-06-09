@@ -86,19 +86,28 @@ const AVATAR_COLORS = [
 ];
 const avatarColor = (str) => AVATAR_COLORS[(str?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length];
 
-const PersonRow = ({ role, name, email, subtitle }) => {
+const ROLE_COLORS = {
+  indigo:  "bg-indigo-50 text-indigo-700 border border-indigo-200",
+  violet:  "bg-violet-50 text-violet-700 border border-violet-200",
+  blue:    "bg-blue-50 text-blue-700 border border-blue-200",
+  emerald: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  default: "bg-slate-100 text-slate-500 border border-slate-200",
+};
+
+const PersonRow = ({ role, name, email, subtitle, roleColor }) => {
   if (!name) return null;
+  const badgeCls = ROLE_COLORS[roleColor] ?? ROLE_COLORS.default;
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-slate-50 last:border-0">
+    <div className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
       <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(name)}`}>
         {getInitials(name)}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-slate-800 truncate">{name}</p>
+        <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
         <p className="text-xs text-slate-400 truncate">{email || subtitle || ""}</p>
       </div>
       {role && (
-        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded shrink-0">
+        <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 ${badgeCls}`}>
           {role}
         </span>
       )}
@@ -122,8 +131,8 @@ const ProjectDetailDrawer = ({ projectId, onClose, navigate, getStatusStyles, fo
     const base    = window.__APP_CONFIG__.PMS_BASE_URL;
 
     Promise.all([
-      axios.get(`${base}/api/projects/${projectId}`,                    { headers }),
-      axios.get(`${base}/api/projects/${projectId}/members-with-owner`, { headers }),
+      api.get(`${base}/api/projects/${projectId}`,                    { headers }),
+      api.get(`${base}/api/projects/${projectId}/members-with-owner`, { headers }),
     ])
       .then(([projRes, membersRes]) => {
         setDetail(projRes.data);
@@ -135,24 +144,36 @@ const ProjectDetailDrawer = ({ projectId, onClose, navigate, getStatusStyles, fo
 
   const p = detail;
 
-  // resolve people from project fields (nested objects) or from members list by role
+  // look up a member object by numeric ID (covers both id and userId fields)
+  const findMember = (id) =>
+    id ? members.find((m) => m.id === id || m.userId === id) : null;
+
+  // resolve display name from a member object or a nested person object
   const resolveName = (obj) =>
     obj?.name ?? (obj?.firstName ? `${obj.firstName} ${obj.lastName ?? ""}`.trim() : null);
 
-  const projectOwner    = resolveName(p?.owner    ?? p?.projectOwner);
-  const ownerEmail      = p?.owner?.email    ?? p?.projectOwner?.email;
-  const resourceManager = resolveName(p?.resourceManager ?? p?.rm);
-  const rmEmail         = p?.resourceManager?.email ?? p?.rm?.email;
-  const deliveryManager = resolveName(p?.deliveryOwner ?? p?.deliveryManager ?? p?.deliveryOwnerId);
-  const dmEmail         = p?.deliveryOwner?.email ?? p?.deliveryManager?.email;
+  // prefer nested objects (full API), fall back to ID-based member lookup
+  const pmObj           = p?.projectManager ?? p?.owner ?? p?.projectOwner ?? findMember(p?.ownerId);
+  const projectManager  = resolveName(pmObj);
+  const pmEmail         = pmObj?.email;
+
+  const rmObj           = p?.resourceManager ?? p?.rm ?? findMember(p?.rmId);
+  const resourceManager = resolveName(rmObj);
+  const rmEmail         = rmObj?.email;
+
+  const doObj           = p?.deliveryOwner ?? p?.deliveryManager ?? findMember(p?.deliveryOwnerId);
+  const deliveryOwner   = resolveName(doObj);
+  const doEmail         = doObj?.email;
+
   const clientName      = p?.client?.clientName ?? p?.clientName ?? p?.client?.name;
   const clientEmail     = p?.client?.email ?? p?.clientEmail;
 
-  // team members (exclude already-shown key roles to avoid duplication)
+  // exclude key-role people from the generic team members list
   const keyIds = new Set([
-    p?.owner?.id, p?.projectOwner?.id,
-    p?.resourceManager?.id, p?.rm?.id,
-    p?.deliveryOwner?.id, p?.deliveryManager?.id,
+    p?.ownerId, p?.rmId, p?.deliveryOwnerId,
+    pmObj?.id, pmObj?.userId,
+    rmObj?.id, rmObj?.userId,
+    doObj?.id, doObj?.userId,
   ].filter(Boolean));
 
   const teamMembers = members.filter((m) => !keyIds.has(m.id) && !keyIds.has(m.userId));
@@ -231,32 +252,18 @@ const ProjectDetailDrawer = ({ projectId, onClose, navigate, getStatusStyles, fo
                 </div>
               </div>
 
-              {/* ── Key People ── */}
-              <div className="px-5 py-4">
-                <SectionTitle>Key People</SectionTitle>
-                <div className="mt-1">
-                  <PersonRow role="Project Owner"     name={projectOwner}    email={ownerEmail} />
-                  <PersonRow role="Resource Manager"  name={resourceManager} email={rmEmail} />
-                  <PersonRow role="Delivery Manager"  name={deliveryManager} email={dmEmail} />
-                  {clientName && (
-                    <PersonRow role="Client" name={clientName} email={clientEmail} />
-                  )}
-                  {!projectOwner && !resourceManager && !deliveryManager && !clientName && (
-                    <p className="text-xs text-slate-400 italic py-1">No key people data available.</p>
-                  )}
-                </div>
-              </div>
-
               {/* ── Team Members ── */}
-              {members.length > 0 && (
+              {(members.length > 0 || projectManager || deliveryOwner || resourceManager) && (
                 <div className="px-5 py-4">
-                  <SectionTitle>Team Members ({members.length})</SectionTitle>
+                  <SectionTitle>Team Members</SectionTitle>
                   <div className="mt-1">
-                    {members.map((m, i) => {
-                      const name  = resolveName(m) ?? m.email ?? `Member ${i + 1}`;
-                      const email = m.email;
-                      const role  = m.role ?? m.designation ?? m.projectRole ?? m.memberRole;
-                      return <PersonRow key={m.id ?? m.userId ?? i} name={name} email={email} role={role} />;
+                    <PersonRow role="Project Manager"  name={projectManager}  email={pmEmail} roleColor="indigo" />
+                    <PersonRow role="Delivery Owner"   name={deliveryOwner}   email={doEmail} roleColor="violet" />
+                    <PersonRow role="Resource Manager" name={resourceManager} email={rmEmail} roleColor="blue" />
+                    {members.filter((m) => !keyIds.has(m.id) && !keyIds.has(m.userId)).map((m, i) => {
+                      const name = resolveName(m) ?? m.email ?? `Member ${i + 1}`;
+                      const role = m.role ?? m.designation ?? m.projectRole ?? m.memberRole;
+                      return <PersonRow key={m.id ?? m.userId ?? i} name={name} email={m.email} role={role} />;
                     })}
                   </div>
                 </div>
@@ -503,7 +510,7 @@ const ProjectDashboard = () => {
                 <EmployeeIcon size={16} />
                 My Work
               </Button>
-              <Button
+              {/* <Button
                 onClick={() => navigate(`/block-leave-dates/${user?.user_id}`)}
                 variant="secondary"
                 size="medium"
@@ -511,7 +518,7 @@ const ProjectDashboard = () => {
               >
                 <LeaveIcon size={16} />
                 Manage Leave Blocks
-              </Button>
+              </Button> */}
 
               <Button
                 variant="primary"

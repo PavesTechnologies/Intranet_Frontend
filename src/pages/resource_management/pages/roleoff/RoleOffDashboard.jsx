@@ -381,7 +381,7 @@ const RoleOffDashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 font-sans">
+    <div className="min-h-screen bg-gray-50 px-2 py-6 sm:px-4 font-sans">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
@@ -422,7 +422,7 @@ const RoleOffDashboard = () => {
         </div>
 
         {/* High Risk Patterns */}
-        <div className="flex min-w-[200px] flex-1 items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all hover:border-slate-200">
+        <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all hover:border-slate-200">
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm ${
             data.hasHighRiskPatterns 
               ? 'border-rose-100 bg-rose-50 text-rose-700' 
@@ -439,7 +439,7 @@ const RoleOffDashboard = () => {
         </div>
 
         {/* Projects Affected */}
-        <div className="flex min-w-[200px] flex-1 items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all hover:border-slate-200">
+        <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all hover:border-slate-200">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-100 bg-amber-50 shadow-sm text-amber-700">
             <ZapIcon className="h-5 w-5" />
           </div>
@@ -450,7 +450,7 @@ const RoleOffDashboard = () => {
         </div>
 
         {/* Risk Score */}
-        <div className="flex min-w-[200px] flex-1 items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all hover:border-slate-200">
+        <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all hover:border-slate-200">
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm ${
             (data.riskMetrics?.riskLevel === 'HIGH' || data.riskMetrics?.riskLevel === 'CRITICAL') 
               ? 'border-rose-100 bg-rose-50 text-rose-700' 

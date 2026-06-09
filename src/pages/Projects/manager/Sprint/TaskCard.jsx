@@ -17,10 +17,12 @@ const TaskCard = ({
   riskCount = 0,
   projectId,
   navigate,
+  readOnly = false,
 }) => {
   const [{ isDragging }, dragRef] = useDrag({
     type: "TASK",
     item: { id: task.id, type: "TASK" },
+    canDrag: !readOnly,
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
@@ -60,11 +62,11 @@ const TaskCard = ({
 
   return (
     <div
-      ref={dragRef}
-      onClick={() => onClick?.()}
-      className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm hover:border-indigo-300 cursor-pointer flex items-center gap-3 ${
-        isDragging ? "opacity-50 scale-95 ring-2 ring-indigo-400" : ""
-      }`}
+      ref={readOnly ? undefined : dragRef}
+      onClick={() => !readOnly && onClick?.()}
+      className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm flex items-center gap-3 ${
+        readOnly ? "cursor-default opacity-80" : "hover:border-indigo-300 cursor-pointer"
+      } ${isDragging ? "opacity-50 scale-95 ring-2 ring-indigo-400" : ""}`}
     >
       {/* TASK label */}
       <div className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold shrink-0">

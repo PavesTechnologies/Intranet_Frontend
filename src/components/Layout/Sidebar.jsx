@@ -91,13 +91,11 @@ const Sidebar = ({ isCollapsed }) => {
   const filteredEoSubmenu = filterMenuByRole(EO_SUBMENU, hasRole);
 
   // Role checks
-  const isAdmin =
-    user?.roles?.includes("Admin") || user?.roles?.includes("Super_Admin");
-  const isRMSAdmin = user?.roles?.includes("Admin");
-  const isRM = user?.roles?.includes("Resource_Manager");
-  const isPM = user?.roles?.includes("Project_Manager");
-  const isDM = user?.roles?.includes("Delivery_Manager");
-  const isGeneral = user?.roles?.includes("General");
+  const isAdmin = hasRole(["ADMIN", "SUPER_ADMIN"]);
+  const isRM = hasRole(["RESOURCE_MANAGER"]);
+  const isPM = hasRole(["PROJECT_MANAGER"]);
+  const isDM = hasRole(["DELIVERY_MANAGER"]);
+  const isGeneral = hasRole(["GENERAL"]);
 
   // State for User Management Hover
   const [userHovered, setUserHovered] = useState(false);
@@ -213,6 +211,12 @@ const Sidebar = ({ isCollapsed }) => {
       setEoHovered(false);
     }, 200);
   };
+
+  const resourceManagementItems = isAdmin
+    ? resourceManagementSubmenu
+    : isDM
+      ? deliveryManagerResourceManagementSubmenu
+      : resourceManagementSubmenu;
 
   useEffect(() => {
     setUserHovered(false);
@@ -440,15 +444,15 @@ const Sidebar = ({ isCollapsed }) => {
           )}
 
           {/* Resource Management (With Pop Label/Submenu) */}
-          {(isRMSAdmin || isRM || isDM) && (
+          {(isAdmin || isRM || isDM) && (
             <li
               ref={rmRef}
               className="relative"
-              onMouseEnter={(isRM || isDM || isRMSAdmin) ? handleRmMouseEnter : undefined}
-              onMouseLeave={(isRM || isDM || isRMSAdmin) ? handleRmMouseLeave : undefined}
+              onMouseEnter={handleRmMouseEnter}
+              onMouseLeave={handleRmMouseLeave}
             >
               {/* If Admin → Direct Link */}
-              {isRMSAdmin && !isRM && !isDM ? (
+              {false ? (
                 <Link
                   to="/resource-management"
                   onMouseEnter={closeAllSubmenus}
@@ -484,7 +488,7 @@ const Sidebar = ({ isCollapsed }) => {
                   </div>
 
                   {/* Show submenu only for Resource Manager or Delivery Manager */}
-                  {rmHovered && (isRM || isDM || isRMSAdmin) && (
+                  {rmHovered && (
                     <ul
                       className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
                         }`}
@@ -492,10 +496,7 @@ const Sidebar = ({ isCollapsed }) => {
                       onMouseEnter={handleRmMouseEnter}
                       onMouseLeave={handleRmMouseLeave}
                     >
-                      {(isDM
-                        ? deliveryManagerResourceManagementSubmenu
-                        : resourceManagementSubmenu
-                      ).map((item) => (
+                      {resourceManagementItems.map((item) => (
                         <li key={item.label} className="group relative">
                           <NavLink
                             to={item.to}

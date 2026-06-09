@@ -1799,7 +1799,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   }, [bulkActionState, mode, pmActiveTab, dmActiveTab, selectedRows, visibleRows]);
 
   return (
-    <div className={embedded ? "bg-gray-50 p-0" : "min-h-screen bg-gray-50 p-6"}>
+    <div className={embedded ? "bg-gray-50 p-0" : "min-h-screen bg-gray-50 px-2 py-6 sm:px-4"}>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex-1">
           {!embedded ? (

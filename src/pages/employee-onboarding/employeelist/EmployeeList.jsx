@@ -139,7 +139,14 @@ export default function EmployeeListPage() {
 
       designation: designationMap[emp.designation_uuid] || "N/A",
 
-      manager: "-",
+      manager: emp.reporting_manager_name || emp.reporting_manager || (() => {
+        const manager = data.find(m => m.employee_id === emp.reporting_manager_uuid || m.employee_uuid === emp.reporting_manager_uuid);
+        return manager ? `${manager.first_name} ${manager.last_name}` : emp.reporting_manager_uuid;
+      })() || "N/A",
+      reporting_manager_uuid: emp.reporting_manager_name || emp.reporting_manager || (() => {
+        const manager = data.find(m => m.employee_id === emp.reporting_manager_uuid || m.employee_uuid === emp.reporting_manager_uuid);
+        return manager ? `${manager.first_name} ${manager.last_name}` : emp.reporting_manager_uuid;
+      })() || "N/A",
 
       doj: formatDate(emp.joining_date),
 
@@ -147,9 +154,7 @@ export default function EmployeeListPage() {
 
       experience: calculateExperience(emp.joining_date),
 
-      // TEMP (audit logs later)
-      loginStatus: "Registered",
-      loginDate: formatDate(emp.joining_date),
+      
     }));
 
     setEmployees(formatted);

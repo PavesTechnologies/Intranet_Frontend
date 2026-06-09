@@ -1131,22 +1131,23 @@ const Step4 = ({ statuses, setStatuses, statusError }) => {
 };
 
 /* ─── Step 5 — Review ─────────────────────────────────────────────────────── */
-const Step5 = ({ fd, statuses, users, clients, resources }) => {
+const Step5 = ({ fd, statuses, users, clients, resources, projectManagers, resourceManagers, deliveryOwners }) => {
+  const allUsers = [...(projectManagers || []), ...(resourceManagers || []), ...(deliveryOwners || []), ...(users || [])];
+
   const getName = (id) => {
-    const user = users.find((u) => u?.id?.toString() === id?.toString());
+    if (!id) return null;
+    const user = allUsers.find((u) => u?.id?.toString() === id?.toString());
     if (user) return user.name;
     const client = clients.find((c) => c?.clientId?.toString() === id?.toString());
     if (client) return client.clientName;
-    const resource = resources.find(
-  (r) => r?.resourceId?.toString() === id?.toString()
-);
-if (resource) return resource.resourceName;
+    const resource = resources.find((r) => r?.resourceId?.toString() === id?.toString());
+    if (resource) return resource.resourceName;
     return id;
   };
   const memberNames = fd.memberIds.map(getName).filter(Boolean).join(", ");
-  const fmtBudget = (v) =>
+  const fmtBudget = (v, currency) =>
     v
-      ? `USD ${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+      ? `${currency || "USD"} ${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
       : null;
 
   return (
@@ -1173,7 +1174,7 @@ if (resource) return resource.resourceName;
           <RCell label="Delivery" value={fd.deliveryModel} />
           <RCell label="Start Date" value={fd.startDate} />
           <RCell label="End Date" value={fd.endDate} />
-          <RCell label="Budget" value={fmtBudget(fd.projectBudget)} />
+          <RCell label="Budget" value={fmtBudget(fd.projectBudget, fd.projectBudgetCurrency)} />
           <RCell
             label="Risk"
             value={fd.riskLevel}
@@ -1668,7 +1669,7 @@ const [deliveryOwners, setDeliveryOwners] = useState([]);
         statusError={statusErr}
       />
     ),
-    5: <Step5 fd={fd} statuses={statuses} users={users} clients={clients} resources={resources} />,
+    5: <Step5 fd={fd} statuses={statuses} users={users} clients={clients} resources={resources} projectManagers={projectManagers} resourceManagers={resourceManagers} deliveryOwners={deliveryOwners} />,
   };
 
   return (

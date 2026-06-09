@@ -266,6 +266,7 @@ const SprintColumn = ({
                       sprints={sprints}
                       onAddToSprint={onDropStory}
                       onClick={() => onStoryClick(story.id)}
+                      readOnly={isCompleted}
                     />
                   </div>
                 </div>
@@ -282,6 +283,7 @@ const SprintColumn = ({
                         onSelectParentStory={onSelectParentStory}
                         onAddToSprint={onDropTask}
                         onClick={() => onTaskClick(task.id)}
+                        readOnly={isCompleted}
                       />
                     ))}
                   </div>
@@ -306,6 +308,7 @@ const SprintColumn = ({
                       onSelectParentStory={onSelectParentStory}
                       onAddToSprint={onDropTask}
                       onClick={() => onTaskClick(task.id)}
+                      readOnly={isCompleted}
                     />
                   </div>
                 ))}
