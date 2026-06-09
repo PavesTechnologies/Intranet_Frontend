@@ -13,7 +13,7 @@ const cardConfig = {
     icon: LayersIcon,
     colorClass: "bg-slate-100 text-slate-600",
   },
-  "Pending Role-Offs": {
+  "Pending Roll-Offs": {
     icon: UserMinusIcon,
     colorClass: "bg-amber-100 text-amber-600",
   },
@@ -21,7 +21,7 @@ const cardConfig = {
     icon: WarningIcon,
     colorClass: "bg-rose-100 text-rose-600",
   },
-  "Total RoleOff": {
+  "Total Roll-Off": {
     icon: DoubleCheckIcon,
     colorClass: "bg-indigo-100 text-indigo-600",
   },

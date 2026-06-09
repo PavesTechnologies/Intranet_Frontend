@@ -179,7 +179,7 @@ const RoleOffDashboard = () => {
       setData(response);
     } catch (err) {
       console.error(err);
-      notify.error(error, "Failed To Fetch Role-Off Report Data");
+      notify.error(error, "Failed To Fetch Roll-Off Report Data");
     } finally {
       setIsLoading(false);
     }
@@ -201,7 +201,7 @@ const RoleOffDashboard = () => {
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `role-off-report-${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `roll-off-report-${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -387,13 +387,13 @@ const RoleOffDashboard = () => {
           <button
             onClick={() => navigate('/resource-management/roleoff')}
             className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm shrink-0"
-            title="Back to Role-Off Operations"
+            title="Back to Roll-Off Operations"
           >
             <PrevIcon size={18} />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Role-Off Reporting Dashboard</h1>
-            <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">Strategic tracking and predictive analysis of resource role-off events</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Roll-Off Reporting Dashboard</h1>
+            <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">Strategic tracking and predictive analysis of resource roll-off events</p>
           </div>
         </div>
         <div>
@@ -410,7 +410,7 @@ const RoleOffDashboard = () => {
 
       {/* KPI Cards - Compact version */}
       <div className="flex flex-nowrap gap-3 overflow-x-auto mb-4 pb-1">
-        {/* Total Role-Offs */}
+        {/* Total Roll-Offs */}
         <div className="flex min-w-[200px] flex-1 items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all hover:border-slate-200">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 shadow-sm text-blue-700">
             <ActivityIcon className="h-5 w-5" />
@@ -594,7 +594,7 @@ const RoleOffDashboard = () => {
                 </div>
                 
                 <div className="col-span-2 space-y-1.5 pt-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Primary Role-Off Reason</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Primary Roll-Off Reason</label>
                   <FilterListbox
                     options={[
                       { value: "", label: "All Reasons" },
@@ -650,7 +650,7 @@ const RoleOffDashboard = () => {
             <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm flex flex-col items-center hover:shadow-md transition-shadow relative overflow-hidden group">
               <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-all" />
               <div className="flex items-center justify-between w-full mb-2">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Role-Off Reasons</h3>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Roll-Off Reasons</h3>
                 <ActivityIcon size={12} className="text-indigo-400" />
               </div>
               
@@ -700,7 +700,7 @@ const RoleOffDashboard = () => {
               <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-all" />
               <div className="flex items-center justify-between w-full mb-6">
                 <div className="flex flex-col gap-0.5">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Role-Off Trend</h3>
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Roll-Off Trend</h3>
                   <p className="text-[9px] font-medium text-slate-400 italic">Timeline trajectory of resource movements</p>
                 </div>
                 <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-inner">
@@ -762,7 +762,7 @@ const RoleOffDashboard = () => {
       {activeTab === 'risk' && (
         <div className="space-y-4">
           <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
-            <h3 className="text-[10px] font-bold text-[#081534] mb-4 uppercase tracking-widest opacity-60">Top Projects by Role-Offs</h3>
+            <h3 className="text-[10px] font-bold text-[#081534] mb-4 uppercase tracking-widest opacity-60">Top Projects by Roll-Offs</h3>
             <div className="h-52 w-full">
               {barData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -861,11 +861,11 @@ const RoleOffDashboard = () => {
         </div>
       )}
 
-      {/* Role-Off Details Modal */}
+      {/* Roll-Off Details Modal */}
       <Modal
         isOpen={!!selectedEvent}
         onClose={() => setSelectedEvent(null)}
-        title="Role-Off Details"
+        title="Roll-Off Details"
         className="max-w-md"
       >
         {selectedEvent && (() => {

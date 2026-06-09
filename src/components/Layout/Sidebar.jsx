@@ -45,13 +45,13 @@ const resourceManagementSubmenu = [
   { label: "Resource Project Management", to: "/resource-management/projects" },
   { label: "Workforce Availability", to: "/resource-management/workforce-availability" },
   { label: "Demand Management", to: "/resource-management/demand" },
-  { label: "Role-Off Management", to: "/resource-management/roleoff" },
+  { label: "Roll-Off Management", to: "/resource-management/roleoff" },
   { label: "Bench Management", to: "/resource-management/bench" },
   { label: "Utilization & Performance", to: "/resource-management/bench/utilization-performance" },
 ];
 
 const deliveryManagerResourceManagementSubmenu = resourceManagementSubmenu.filter(
-  (item) => item.label === "Demand Management" || item.label === "Role-Off Management"
+  (item) => item.label === "Demand Management" || item.label === "Roll-Off Management"
 );
 
 // EO_SUBMENU is now config-driven from src/config/sidebarConfig.js.
