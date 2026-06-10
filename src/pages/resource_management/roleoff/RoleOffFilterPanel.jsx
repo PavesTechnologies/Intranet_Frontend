@@ -19,7 +19,7 @@ const RoleOffFilterPanel = ({
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
         <div>
           <p className="text-sm font-bold text-[#081534]">Filters</p>
-          <p className="text-xs text-gray-500">Refine the role-off queue</p>
+          <p className="text-xs text-gray-500">Refine the roll-off queue</p>
         </div>
         <button
           type="button"

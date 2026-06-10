@@ -84,7 +84,7 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
       try {
         setLoading(true);
         const res = await api.get(
-          `${BASE_URL}/api/leave-requests/employee/${employeeId}/${year}`,
+          `${BASE_URL}/api/leave-requests/patterns/employee/${employeeId}/${year}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,

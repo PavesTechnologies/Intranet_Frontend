@@ -17,7 +17,7 @@ const CancelRoleOffModal = ({
         <div className="flex items-start justify-between border-b border-gray-200 px-5 py-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
-              Cancel Role-Off
+              Cancel Roll-Off
             </p>
             <h2 className="mt-1 text-lg font-bold text-[#081534]">{record.resource}</h2>
             <p className="mt-1 text-sm text-gray-500">
@@ -37,7 +37,7 @@ const CancelRoleOffModal = ({
         <div className="px-5 py-5">
           <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
-            <p>Are you sure you want to cancel this role-off request?</p>
+            <p>Are you sure you want to cancel this roll-off request?</p>
           </div>
         </div>
 
