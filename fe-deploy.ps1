@@ -1,4 +1,4 @@
-# Stop the script if any native PowerShell command fails
+# Stop the script if any native PowerShell command fail
 $ErrorActionPreference = "Stop"
 
 # Helper function to check if the last external command (npm/docker) succeeded
