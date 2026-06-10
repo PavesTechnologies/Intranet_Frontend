@@ -1,6 +1,5 @@
 import AvatarCircle from "./AvatarCircle";
 import StatusBadge from "./StatusBadge";
-import ActionMenu from "./ActionMenu";
 
 export default function EmployeeRow({ emp , index}) {
   return (
@@ -18,16 +17,6 @@ export default function EmployeeRow({ emp , index}) {
         </div>
       </td>
 
-      
-
-      <td>
-        <StatusBadge text={emp.loginStatus} />
-        <div style={{ fontSize: 11, color: "#777" }}>
-          on {emp.loginDate}
-        </div>
-      </td>
-
-      <td>{emp.username}</td>
       <td>
         <div className="font-semibold">{emp.department || ""}</div>
         <div className="text-gray-500 text-sm">{emp.location}</div>
@@ -40,13 +29,12 @@ export default function EmployeeRow({ emp , index}) {
         <StatusBadge text={emp.emailStatus} />
       </td>
       <td>{emp.designation}</td>
-      <td>{emp.manager}</td>
+      <td>{emp.reporting_manager_uuid}</td>
       <td>{emp.doj}</td>
       <td>
         {emp.employeeType} 
         </td>
       <td>{emp.experience}</td>
-      <td><ActionMenu /></td>
     </tr>
   );
 }

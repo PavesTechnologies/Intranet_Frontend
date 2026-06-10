@@ -99,6 +99,7 @@ import DegreeMasterManagement from "./pages/employee-onboarding/hr-configuration
 // import AdminApprovalActions from "./pages/employee-onboarding/admin/AdminApprovalActions.jsx";
 import AdminApprovalDashboard from "./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx";
 import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
+import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
 import HrOnboardingDashboard from "./pages/employee-onboarding/hr/HrOnboardingDashboard.jsx";
 import HrProfileView from "./pages/employee-onboarding/hr/HrProfileView.jsx";
 import BackgroundCheckPage from "./pages/employee-onboarding/hr/BackgroundCheckPage.jsx";
@@ -471,6 +472,7 @@ const AppRoutes = () => {
 
             <Route path="admin/approval-dashboard" element={<ProtectedRoute roles={["ADMIN", "HR"]}><AdminApprovalDashboard /></ProtectedRoute>} />
             <Route path="admin/offer/:user_uuid" element={<ProtectedRoute roles={["ADMIN", "HR"]}><AdminOfferView /></ProtectedRoute>} />
+            <Route path="admin/offer-letters" element={<ProtectedRoute allowedRoles={["ADMIN"]}><AdminOfferLettersDashboard /></ProtectedRoute>} />
 
             <Route path="employee-directory" element={<ProtectedRoute ><EmployeeDirectory /></ProtectedRoute>} />
             <Route path="employeelist" element={<ProtectedRoute ><EmployeeListPage /></ProtectedRoute>} />

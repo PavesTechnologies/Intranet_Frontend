@@ -147,7 +147,7 @@ const RESOURCE_TABS = [
   { name: "Configurations", tab: "configurations"     },
   { name: "Deliverable Roles", tab: "deliverable-roles" },
   { name: "Demand",         tab: "demand-management"  },
-  { name: "RoleOff",        tab: "roleoff-management" },
+  { name: "Roll-Off",        tab: "roleoff-management" },
 ];
 
 const ResourceDropdown = ({ selectedTab, onSelect }) => {

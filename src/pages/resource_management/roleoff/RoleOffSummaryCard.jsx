@@ -13,7 +13,7 @@ const cardConfig = {
     icon: LayersIcon,
     colorClass: "bg-slate-100 text-slate-600",
   },
-  "Pending Role-Offs": {
+  "Pending Roll-Offs": {
     icon: UserMinusIcon,
     colorClass: "bg-amber-100 text-amber-600",
   },
@@ -21,7 +21,7 @@ const cardConfig = {
     icon: WarningIcon,
     colorClass: "bg-rose-100 text-rose-600",
   },
-  "Total RoleOff": {
+  "Total Roll-Off": {
     icon: DoubleCheckIcon,
     colorClass: "bg-indigo-100 text-indigo-600",
   },
@@ -40,7 +40,7 @@ const RoleOffSummaryCard = ({ title, description, metrics = [], action = null })
 
       <div
         className={cn(
-          "grid gap-4",
+          "grid w-full gap-4",
           metrics.length === 4 && "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
           metrics.length !== 4 && "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
         )}
@@ -55,6 +55,7 @@ const RoleOffSummaryCard = ({ title, description, metrics = [], action = null })
               value={metric.count}
               icon={<Icon className="h-5 w-5" />}
               color={config.colorClass}
+              className="h-full w-full"
             />
           );
         })}

@@ -63,162 +63,56 @@ export default function BulkUpload() {
       return;
     }
 
-    if (!previewData || previewData.length === 0) {
-      toast.error("No valid data found in file to upload");
+    if (!file) {
+      toast.error("No valid file found to upload");
       return;
     }
 
     setUploading(true);
     setResult(null);
 
-    let successCount = 0;
-    let failedCount = 0;
-    const failedOffers = [];
+    const formData = new FormData();
+    formData.append("file", file);
 
-    for (let i = 0; i < previewData.length; i++) {
-      const row = previewData[i];
-
-      const standardColumns = new Set([
-        "First Name",
-        "Middle Name",
-        "Last Name",
-        "Email",
-        "Country Code",
-        "Contact Number",
-        "Designation",
-        "Employee Type",
-        "CC Mails",
-        "Annual CTC",
-      ]);
-
-      const compensation_components = [];
-
-      for (const key of Object.keys(row)) {
-        if (!standardColumns.has(key)) {
-          const val = row[key];
-          if (val !== "" && val !== null && !isNaN(Number(val))) {
-            let cName = key.trim();
-            let cType = "Fixed";
-            let cFreq = "Monthly";
-
-            const match = cName.match(/^(.*?)\s*\((.*?),\s*(.*?)\)$/i);
-            if (match) {
-              cName = match[1].trim();
-              cType = match[2].trim();
-              cFreq = match[3].trim();
-            }
-
-            compensation_components.push({
-              name: String(cName),
-              type: cType,
-              frequency: cFreq,
-              amount: Number(val),
-            });
-          }
-        }
-      }
-
-      const empType = row["Employee Type"] || "Full-Time";
-      const validTypes = ["Full-Time", "Part-Time", "Contractor", "Intern"];
-      if (!validTypes.includes(empType)) {
-        failedCount++;
-        failedOffers.push({
-          row: i + 2,
-          error: `Invalid Employee Type '${empType}'. Must be exactly: ${validTypes.join(", ")}`,
-        });
-        continue;
-      }
-
-      const payload = {
-        first_name: row["First Name"] || "",
-        middle_name: row["Middle Name"] || "",
-        last_name: row["Last Name"] || "",
-        mail: row["Email"] || "",
-        country_code: row["Country Code"] ? String(row["Country Code"]) : "+91",
-        contact_number: row["Contact Number"] ? String(row["Contact Number"]) : "",
-        designation: row["Designation"] || "",
-        employee_type: empType,
-        cc_mails: row["CC Mails"]
-          ? String(row["CC Mails"])
-              .split(",")
-              .map((m) => m.trim())
-              .filter(Boolean)
-          : [],
-        total_ctc: Number(row["Annual CTC"] || 0),
-        compensation_components,
-      };
-
-      try {
-        await api.post(
-          `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/create`,
-          payload,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
+    try {
+      const response = await api.post(
+        `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/bulk_create`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "multipart/form-data",
           },
-        );
-        successCount++;
-      } catch (err) {
-        failedCount++;
-
-        let rawError =
-          err.response?.data?.detail?.[0]?.msg ||
-          err.response?.data?.detail ||
-          "Failed to create";
-        if (typeof rawError !== "string") rawError = JSON.stringify(rawError);
-
-        let friendlyError = rawError;
-        if (rawError.includes("Data truncated for column 'employee_type'")) {
-          friendlyError =
-            "Invalid Employee Type. Check for typos (Use Full-Time, Part-Time, Contractor, Intern).";
-        } else if (rawError.includes("Duplicate entry")) {
-          friendlyError =
-            "An offer with this Email or Details already exists in the system.";
-        } else if (rawError.includes("not a valid email")) {
-          friendlyError = "Invalid Email Address format.";
-        } else if (rawError.includes("Field required")) {
-          friendlyError =
-            "A required field is missing. Please ensure all mandatory fields are filled.";
-        } else if (rawError.includes("Data truncated for column")) {
-          const fieldMatch = rawError.match(/column '(.+?)'/);
-          friendlyError = `The text entered for '${
-            fieldMatch ? fieldMatch[1] : "a field"
-          }' is too long or invalid.`;
-        } else if (rawError.includes("FOREIGN KEY constraint failed")) {
-          friendlyError = "Invalid reference. Please check fields like Country Code.";
         }
+      );
 
-        failedOffers.push({
-          row: i + 2,
-          error: friendlyError,
+      const resData = response.data;
+      setResult({
+        total_rows: resData.total_rows,
+        processed_rows: resData.processed_rows,
+        successful_count: resData.successful_count,
+        failed_count: resData.failed_count,
+        failed_offers: resData.failed_offers,
+        skipped_rows: resData.skipped_rows,
+      });
+
+      if (resData.failed_count > 0 && resData.successful_count === 0) {
+        toast.error("Bulk upload failed for all rows.", { autoClose: 2000 });
+      } else if (resData.failed_count > 0) {
+        toast.warning(`Completed with ${resData.failed_count} errors.`, {
+          autoClose: 2500,
+        });
+      } else {
+        toast.success("Bulk upload completed successfully!", {
+          autoClose: 1500,
         });
       }
+    } catch (err) {
+      console.error(err);
+      toast.error("An error occurred during bulk upload.");
+    } finally {
+      setUploading(false);
     }
-
-    const resData = {
-      total_rows: previewData.length,
-      processed_rows: successCount + failedCount,
-      successful_count: successCount,
-      failed_count: failedCount,
-      failed_offers: failedOffers,
-      skipped_rows: 0,
-    };
-    setResult(resData);
-
-    if (failedCount > 0 && successCount === 0) {
-      toast.error("Bulk upload failed for all rows.", { autoClose: 2000 });
-    } else if (failedCount > 0) {
-      toast.warning(`Completed with ${failedCount} errors.`, {
-        autoClose: 2500,
-      });
-    } else {
-      toast.success("Bulk upload completed successfully!", {
-        autoClose: 1500,
-      });
-    }
-
-    setUploading(false);
   };
 
   const resetForm = () => {
@@ -230,17 +124,17 @@ export default function BulkUpload() {
   const downloadTemplate = () => {
     const templateData = [
       {
-        "First Name": "",
-        "Middle Name": "",
-        "Last Name": "",
-        Email: "",
-        "Country Code": "",
-        "Contact Number": "",
-        Designation: "",
-        "Employee Type": "",
-        "CC Mails": "",
-        "Annual CTC": "",
-        "Basic Pay": "",
+        first_name: "",
+        middle_name: "",
+        last_name: "",
+        mail: "",
+        country_code: "",
+        contact_number: "",
+        designation: "",
+        employee_type: "",
+        total_ctc: "",
+        currency: "",
+        cc_emails: "",
       },
     ];
 
@@ -254,9 +148,9 @@ export default function BulkUpload() {
       { wch: 15 },
       { wch: 20 },
       { wch: 15 },
+      { wch: 15 },
+      { wch: 10 },
       { wch: 30 },
-      { wch: 15 },
-      { wch: 15 },
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -327,12 +221,12 @@ export default function BulkUpload() {
                       className={idx !== Math.min(previewData.length, 5) - 1 ? "border-b border-slate-100" : ""}
                     >
                       <td className="px-4 py-3 font-medium text-slate-900">
-                        {row["First Name"] || "-"} {row["Last Name"] || ""}
+                        {row["first_name"] || "-"} {row["last_name"] || ""}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{row["Email"] || "-"}</td>
-                      <td className="px-4 py-3 text-slate-600">{row["Designation"] || "-"}</td>
+                      <td className="px-4 py-3 text-slate-600">{row["mail"] || "-"}</td>
+                      <td className="px-4 py-3 text-slate-600">{row["designation"] || "-"}</td>
                       <td className="px-4 py-3 text-right font-medium text-slate-900">
-                        Rs {Number(row["Annual CTC"] || 0).toLocaleString()}
+                        Rs {Number(row["total_ctc"] || 0).toLocaleString()}
                       </td>
                     </tr>
                   ))}
