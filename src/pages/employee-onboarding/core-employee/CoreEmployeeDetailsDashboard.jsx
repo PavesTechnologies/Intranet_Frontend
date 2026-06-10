@@ -376,7 +376,9 @@ const handleExportPreview = async () => {
 
         mail: emp.mail,
 
-        contact: emp.contact,
+        contact: emp.country_code
+          ? `+${emp.country_code} ${emp.contact}`
+          : emp.contact || "",
 
         Department:
           departmentMap[
