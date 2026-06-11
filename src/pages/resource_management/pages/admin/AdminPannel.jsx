@@ -25,26 +25,26 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import ExcelJS from "exceljs/dist/exceljs.min.js"; // Robust Vite Import
 import { saveAs } from "file-saver";
 import StatusBadge from "../../../../components/status/statusbadge";
- 
+
 const priorityColor = {
   HIGH: "text-red-600 bg-red-50",
   MEDIUM: "text-yellow-600 bg-yellow-50",
   LOW: "text-green-600 bg-green-50",
 };
- 
+
 const statusColor = {
   ACTIVE: "text-xs text-green-600 font-semibold",
   INACTIVE: "text-xs text-red-600 font-semibold",
   PROSPECT: "text-xs text-blue-600 font-semibold",
 };
- 
+
 const AdminPannel = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const roles = user?.roles || [];
   const permissions = user?.permissions || [];
   const canCreateClient = roles.includes("Admin");
- 
+
   const [clientDetails, setClientDetails] = useState([]);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -52,14 +52,14 @@ const AdminPannel = () => {
   const [openCreateClient, setOpenCreateClient] = useState(false);
   const [openSkillManagement, setOpenSkillManagement] = useState(false);
   const [kpiData, setKpiData] = useState(null);
- 
+
   const [pageInfo, setPageInfo] = useState({
     current: 0,
     size: 8,
     totalElements: 0,
     totalPages: 0,
   });
- 
+
   const [filters, setFilters] = useState({
     search: "",
     region: "",
@@ -69,7 +69,7 @@ const AdminPannel = () => {
     startDate: "",
     endDate: "",
   });
- 
+
   const fetchKPIs = async () => {
     try {
       const response = await getAdminKPI();
@@ -84,12 +84,12 @@ const AdminPannel = () => {
       console.error("KPI Error:", error);
     }
   };
- 
+
   const handleFilterUpdate = (updates) => {
     setFilters((prev) => ({ ...prev, ...updates }));
     setPageInfo((prev) => ({ ...prev, current: 0 }));
   };
- 
+
   const fetchClients = useCallback(async () => {
     setLoading(true);
     try {
@@ -144,7 +144,7 @@ const AdminPannel = () => {
       setLoading(false);
     }
   }, [filters, pageInfo.current, pageInfo.size]);
- 
+
   useEffect(() => {
     fetchKPIs();
   }, []);
@@ -152,28 +152,28 @@ const AdminPannel = () => {
     const handler = setTimeout(() => fetchClients(), 400);
     return () => clearTimeout(handler);
   }, [fetchClients]);
- 
+
   const handleExport = async () => {
     if (pageInfo.totalElements === 0) {
       notify.warning("Nothing to download: Current view is empty.");
       return;
     }
- 
+
     const isFiltered = Object.values(filters).some((x) => x !== "");
     const startMsg = isFiltered
       ? `Explicitly downloading ${pageInfo.totalElements} filtered records...`
       : `Explicitly downloading full list of ${pageInfo.totalElements} clients...`;
- 
+
     notify.info(startMsg, { icon: "📊" });
- 
+
     setExporting(true);
     setExportProgress(0);
- 
+
     try {
       let allRecords = [];
       let currentPage = 0;
       let totalPagesToFetch = 1;
- 
+
       while (currentPage < totalPagesToFetch) {
         const response = await searchClients(filters, currentPage, 50);
         let currentRecords = [];
@@ -212,10 +212,10 @@ const AdminPannel = () => {
           break;
         }
       }
- 
+
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Inventory");
- 
+
       worksheet.columns = [
         { header: "CLIENT NAME", key: "clientName", width: 30 },
         { header: "TYPE", key: "clientType", width: 15 },
@@ -224,7 +224,7 @@ const AdminPannel = () => {
         { header: "STATUS", key: "status", width: 15 },
         { header: "CREATED DATE", key: "createdAt", width: 20 },
       ];
- 
+
       worksheet.getRow(1).eachCell((cell) => {
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
         cell.fill = {
@@ -234,7 +234,7 @@ const AdminPannel = () => {
         };
         cell.alignment = { vertical: "middle", horizontal: "center" };
       });
- 
+
       const rows = allRecords.map((record) => ({
         ...record,
         clientType: record.clientType?.replace(/_/g, " "),
@@ -242,16 +242,16 @@ const AdminPannel = () => {
           ? new Date(record.createdAt).toLocaleDateString()
           : "N/A",
       }));
- 
+
       worksheet.addRows(rows);
- 
+
       const buffer = await workbook.xlsx.writeBuffer();
       const fileName = isFiltered ? "Filtered_Clients" : "Full_Inventory";
- 
+
       const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
- 
+
       saveAs(
         blob,
         `${fileName}_${new Date().toISOString().split("T")[0]}.xlsx`,
@@ -265,7 +265,7 @@ const AdminPannel = () => {
       setExportProgress(0);
     }
   };
- 
+
   const KPI_DATA = [
     {
       label: "Total Clients",
@@ -296,7 +296,7 @@ const AdminPannel = () => {
       bg: kpiData?.growthPositive ? "bg-emerald-100" : "bg-red-100",
     },
   ];
- 
+
   return (
     <div className="p-6 space-y-8">
       <div className="flex justify-between items-start">
@@ -308,7 +308,7 @@ const AdminPannel = () => {
             Monitor clients, priorities, and engagement status
           </p>
         </div>
- 
+
         <div className="flex items-center gap-3">
           <Button
             onClick={handleExport}
@@ -337,7 +337,7 @@ const AdminPannel = () => {
           </Button>
         </div>
       </div>
- 
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {KPI_DATA.map((kpi, index) => (
           <KPICard
@@ -349,7 +349,7 @@ const AdminPannel = () => {
           />
         ))}
       </div>
- 
+
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">
@@ -374,7 +374,7 @@ const AdminPannel = () => {
             )}
           </div>
         </div>
- 
+
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner text="loading..." />
@@ -422,7 +422,7 @@ const AdminPannel = () => {
                   </div>
                 ))}
               </div>
- 
+
               <div className="flex items-center justify-center pt-4">
                 <Pagination
                   currentPage={pageInfo.current + 1}
@@ -443,7 +443,7 @@ const AdminPannel = () => {
           )
         )}
       </div>
- 
+
       <Modal
         isOpen={openCreateClient}
         onClose={() => setOpenCreateClient(false)}
@@ -466,6 +466,6 @@ const AdminPannel = () => {
     </div>
   );
 };
- 
+
 export default AdminPannel;
- 
+

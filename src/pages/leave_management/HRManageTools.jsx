@@ -2,11 +2,17 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/axiosInstance";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, Trash2, Settings, Users, CalendarDays, ClipboardCheck, History } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  Settings,
+  Users,
+  CalendarDays,
+  ClipboardCheck,
+  History,
+} from "lucide-react";
 import { toast } from "react-toastify";
 import Button from "../../components/Button/Button";
-
-
 
 // Modals
 import AddEmployeeModal from "./models/AddEmployeeModal";
@@ -16,6 +22,7 @@ import EffectiveDeactivationDate from "./models/EffectiveDeactivationDate";
 import CarryForwardTrigger from "./models/CarryForwardTrigger";
 import ApplyLeaveOnBehalf from "./models/ApplyLeaveOnBehalf";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { useAuth } from "../../contexts/AuthContext";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -27,13 +34,17 @@ const HRManageTools = ({ employeeId }) => {
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [genderBasedLeaveTypes, setGenderBasedLeaveTypes] = useState([]);
   const [editLeaveType, setEditLeaveType] = useState(null);
-  const [selectedLeaveTypeIdToDelete, setSelectedLeaveTypeIdToDelete] = useState(null);
+  const [selectedLeaveTypeIdToDelete, setSelectedLeaveTypeIdToDelete] =
+    useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [effectiveDeactivationDate, setEffectiveDeactivationDate] = useState("");
+  const [effectiveDeactivationDate, setEffectiveDeactivationDate] =
+    useState("");
   const [isEffectiveModalOpen, setIsEffectiveModalOpen] = useState(false);
   const [isCarryModalOpen, setIsCarryModalOpen] = useState(false);
   const [OnBehalfOpen, setOnBehalfOpen] = useState(false);
+  const user = useAuth().user;
+
 
   const navigate = useNavigate();
 
@@ -59,10 +70,13 @@ const HRManageTools = ({ employeeId }) => {
   const executeDelete = async () => {
     setIsDeleting(true);
     try {
-      await api.delete(`${BASE_URL}/api/leave/delete-leave-type/${selectedLeaveTypeIdToDelete}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        data: { deactivationEffectiveDate: effectiveDeactivationDate },
-      });
+      await api.delete(
+        `${BASE_URL}/api/leave/delete-leave-type/${selectedLeaveTypeIdToDelete}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          data: { deactivationEffectiveDate: effectiveDeactivationDate },
+        },
+      );
       toast.success("Leave type deleted successfully");
       fetchLeaveTypes();
     } catch (error) {
@@ -75,16 +89,31 @@ const HRManageTools = ({ employeeId }) => {
   };
 
   const tabs = [
-    { id: "leaveTypes", label: "Leave Configuration", icon: <Settings size={18} /> },
-    { id: "employeeActions", label: "Employee Management", icon: <Users size={18} /> },
-    { id: "holidaySettings", label: "Holiday Management", icon: <CalendarDays size={18} /> },
+    {
+      id: "leaveTypes",
+      label: "Leave Configuration",
+      icon: <Settings size={18} />,
+    },
+    {
+      id: "employeeActions",
+      label: "Employee Management",
+      icon: <Users size={18} />,
+    },
+    {
+      id: "holidaySettings",
+      label: "Holiday Management",
+      icon: <CalendarDays size={18} />,
+    },
   ];
 
   return (
     <div className="space-y-6 py-6 px-6 max-w-7xl mx-auto">
       <header>
         <h1 className="text-2xl font-bold text-gray-800">HR Administration</h1>
-        <p className="text-gray-500 text-sm mt-1">Configure system leave types, manage team balances, and holiday calendars.</p>
+        <p className="text-gray-500 text-sm mt-1">
+          Configure system leave types, manage team balances, and holiday
+          calendars.
+        </p>
       </header>
 
       {/* TABS - Matching LeaveSection Style */}
@@ -96,7 +125,13 @@ const HRManageTools = ({ employeeId }) => {
               onClick={() => setActiveTab(tab.id)}
               className="relative pb-3 font-medium transition-colors focus:outline-none flex items-center gap-2"
             >
-              <span className={activeTab === tab.id ? "text-indigo-600" : "text-gray-500 hover:text-gray-900"}>
+              <span
+                className={
+                  activeTab === tab.id
+                    ? "text-indigo-600"
+                    : "text-gray-500 hover:text-gray-900"
+                }
+              >
                 {tab.icon}
                 <span className="ml-1">{tab.label}</span>
               </span>
@@ -124,31 +159,75 @@ const HRManageTools = ({ employeeId }) => {
               className="space-y-6"
             >
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-800">System Leave Types</h3>
-                <Button
-                  onClick={() => { setEditLeaveType(null); setIsAddLeaveTypeModalOpen(true); }}
-                  variant="primary"
-                  size="medium"
-                >
-                  + Add Leave Type
-                </Button>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  System Leave Types
+                </h3>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => {
+                      setEditLeaveType(null);
+                      setIsAddLeaveTypeModalOpen(true);
+                    }}
+                    variant="primary"
+                    size="medium"
+                  >
+                    + Add Leave Type
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      window.open(
+                        "https://celebrated-renewal-07a16fae8e.strapiapp.com/admin/auth/login",
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                    }}
+                    variant="secondary"
+                    size="medium"
+                  >
+                    Leave Policies
+                  </Button>
+                  {(user?.roles?.includes("Admin") ||
+                    user?.roles?.includes("Super_Admin")) && (
+                    <Button
+                      onClick={() => navigate("/approval-rules")}
+                      variant="primary"
+                      size="medium"
+                    >
+                      Approval Rules
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {isLoading ? (
-                <div className="flex justify-center py-20"><LoadingSpinner /></div>
+                <div className="flex justify-center py-20">
+                  <LoadingSpinner />
+                </div>
               ) : (
                 <div className="space-y-8">
-                  <LeaveTable 
-                    title="Gender Based Policies" 
-                    data={genderBasedLeaveTypes} 
-                    onEdit={(lt) => { setEditLeaveType(lt); setIsAddLeaveTypeModalOpen(true); }}
-                    onDelete={(id) => { setSelectedLeaveTypeIdToDelete(id); setIsEffectiveModalOpen(true); }}
+                  <LeaveTable
+                    title="Gender Based Policies"
+                    data={genderBasedLeaveTypes}
+                    onEdit={(lt) => {
+                      setEditLeaveType(lt);
+                      setIsAddLeaveTypeModalOpen(true);
+                    }}
+                    onDelete={(id) => {
+                      setSelectedLeaveTypeIdToDelete(id);
+                      setIsEffectiveModalOpen(true);
+                    }}
                   />
-                  <LeaveTable 
-                    title="Regular Policies" 
-                    data={leaveTypes} 
-                    onEdit={(lt) => { setEditLeaveType(lt); setIsAddLeaveTypeModalOpen(true); }}
-                    onDelete={(id) => { setSelectedLeaveTypeIdToDelete(id); setIsEffectiveModalOpen(true); }}
+                  <LeaveTable
+                    title="Regular Policies"
+                    data={leaveTypes}
+                    onEdit={(lt) => {
+                      setEditLeaveType(lt);
+                      setIsAddLeaveTypeModalOpen(true);
+                    }}
+                    onDelete={(id) => {
+                      setSelectedLeaveTypeIdToDelete(id);
+                      setIsEffectiveModalOpen(true);
+                    }}
                   />
                 </div>
               )}
@@ -164,28 +243,28 @@ const HRManageTools = ({ employeeId }) => {
               exit={{ opacity: 0, y: -10 }}
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
             >
-              <AdminCard 
-                title="Onboard Employee" 
-                desc="Create new system credentials and profiles." 
-                icon={<Users className="text-blue-500" />} 
+              <AdminCard
+                title="Onboard Employee"
+                desc="Create new system credentials and profiles."
+                icon={<Users className="text-blue-500" />}
                 onClick={() => setIsAddEmployeeModalOpen(true)}
               />
-              <AdminCard 
-                title="Leave Balances" 
-                desc="Manually adjust or review employee quotas." 
-                icon={<ClipboardCheck className="text-emerald-500" />} 
+              <AdminCard
+                title="Leave Balances"
+                desc="Manually adjust or review employee quotas."
+                icon={<ClipboardCheck className="text-emerald-500" />}
                 onClick={() => navigate(`/employee-leave-balance`)}
               />
-              <AdminCard 
-                title="Apply on Behalf" 
-                desc="Submit leave requests for other employees." 
-                icon={<History className="text-orange-500" />} 
+              <AdminCard
+                title="Apply on Behalf"
+                desc="Submit leave requests for other employees."
+                icon={<History className="text-orange-500" />}
                 onClick={() => setOnBehalfOpen(true)}
               />
-              <AdminCard 
-                title="Carry Forward" 
-                desc="Process unused leaves to the next cycle." 
-                icon={<History className="text-purple-500" />} 
+              <AdminCard
+                title="Carry Forward"
+                desc="Process unused leaves to the next cycle."
+                icon={<History className="text-purple-500" />}
                 onClick={() => setIsCarryModalOpen(true)}
               />
             </motion.div>
@@ -200,16 +279,16 @@ const HRManageTools = ({ employeeId }) => {
               exit={{ opacity: 0, y: -10 }}
               className="grid grid-cols-1 md:grid-cols-2 gap-4"
             >
-              <AdminCard 
-                title="Bulk Add Holidays" 
-                desc="Upload or add multiple calendar holidays." 
-                icon={<CalendarDays className="text-red-500" />} 
+              <AdminCard
+                title="Add Holidays"
+                desc="Upload or add multiple calendar holidays."
+                icon={<CalendarDays className="text-red-500" />}
                 onClick={() => setIsAddHolidaysModalOpen(true)}
               />
-              <AdminCard 
-                title="Modify Calendar" 
-                desc="Edit or remove existing holiday dates." 
-                icon={<Pencil className="text-gray-500" />} 
+              <AdminCard
+                title="Modify Calendar"
+                desc="Edit or remove existing holiday dates."
+                icon={<Pencil className="text-gray-500" />}
                 onClick={() => navigate(`/edit-holidays`)}
               />
             </motion.div>
@@ -218,12 +297,37 @@ const HRManageTools = ({ employeeId }) => {
       </div>
 
       {/* Modals */}
-      <AddEmployeeModal isOpen={isAddEmployeeModalOpen} onClose={() => setIsAddEmployeeModalOpen(false)} />
-      <AddLeaveTypeModal isOpen={isAddLeaveTypeModalOpen} onClose={() => setIsAddLeaveTypeModalOpen(false)} editData={editLeaveType} onSuccess={fetchLeaveTypes} />
-      <EffectiveDeactivationDate isOpen={isEffectiveModalOpen} onConfirm={executeDelete} onCancel={() => setIsEffectiveModalOpen(false)} isLoading={isDeleting} effectiveDate={effectiveDeactivationDate} setEffectiveDate={setEffectiveDeactivationDate} />
-      <AddHolidaysModal isOpen={isAddHolidaysModalOpen} onClose={() => setIsAddHolidaysModalOpen(false)} />
-      <CarryForwardTrigger isOpen={isCarryModalOpen} onClose={() => setIsCarryModalOpen(false)} />
-      <ApplyLeaveOnBehalf isOpen={OnBehalfOpen} onClose={() => setOnBehalfOpen(false)} year={new Date().getFullYear()} />
+      <AddEmployeeModal
+        isOpen={isAddEmployeeModalOpen}
+        onClose={() => setIsAddEmployeeModalOpen(false)}
+      />
+      <AddLeaveTypeModal
+        isOpen={isAddLeaveTypeModalOpen}
+        onClose={() => setIsAddLeaveTypeModalOpen(false)}
+        editData={editLeaveType}
+        onSuccess={fetchLeaveTypes}
+      />
+      <EffectiveDeactivationDate
+        isOpen={isEffectiveModalOpen}
+        onConfirm={executeDelete}
+        onCancel={() => setIsEffectiveModalOpen(false)}
+        isLoading={isDeleting}
+        effectiveDate={effectiveDeactivationDate}
+        setEffectiveDate={setEffectiveDeactivationDate}
+      />
+      <AddHolidaysModal
+        isOpen={isAddHolidaysModalOpen}
+        onClose={() => setIsAddHolidaysModalOpen(false)}
+      />
+      <CarryForwardTrigger
+        isOpen={isCarryModalOpen}
+        onClose={() => setIsCarryModalOpen(false)}
+      />
+      <ApplyLeaveOnBehalf
+        isOpen={OnBehalfOpen}
+        onClose={() => setOnBehalfOpen(false)}
+        year={new Date().getFullYear()}
+      />
     </div>
   );
 };
@@ -231,7 +335,7 @@ const HRManageTools = ({ employeeId }) => {
 // --- Sub-Components ---
 
 const AdminCard = ({ title, desc, icon, onClick }) => (
-  <button 
+  <button
     onClick={onClick}
     className="flex items-start gap-4 p-5 bg-white border border-gray-200 rounded-2xl hover:border-indigo-300 hover:shadow-md transition-all text-left"
   >
@@ -257,9 +361,7 @@ const LeaveTable = ({ title, data, onEdit, onDelete }) => {
       return (
         <span
           className={`px-2 py-1 rounded-full text-xs font-semibold ${
-            value
-              ? "bg-green-100 text-green-700"
-              : "bg-red-100 text-red-600"
+            value ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
           }`}
         >
           {value ? "True" : "False"}

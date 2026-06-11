@@ -57,7 +57,7 @@ const StatusDropdown = ({ item, onStatusChange }) => {
 
       {open && statuses.length > 0 && (
         <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200
-          rounded-xl shadow-xl z-50 min-w-[160px] max-h-56 overflow-y-auto py-1">
+          rounded-xl shadow-xl z-[200] min-w-[160px] max-h-56 overflow-y-auto py-1">
           {statuses.map((s) => {
             const name  = item.type === "BUG" ? s.label : s.name;
             const isCurrent = item.type === "BUG"
@@ -108,7 +108,7 @@ const OverflowMenu = ({ item, onPriorityChange }) => {
 
       {open && (
         <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200
-          rounded-xl shadow-xl z-50 min-w-[160px] py-1">
+          rounded-xl shadow-xl z-[200] min-w-[160px] py-1">
           <div className="px-3 py-1.5 text-xs text-slate-400 font-medium uppercase tracking-wide">
             Change Priority
           </div>

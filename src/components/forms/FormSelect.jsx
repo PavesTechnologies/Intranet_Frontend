@@ -3,20 +3,30 @@ import { Listbox } from "@headlessui/react";
 import { Check, ChevronDown } from "lucide-react";
 import classNames from "classnames";
 
-const FormSelect = ({ label, options, value, onChange, name }) => {
+const FormSelect = ({
+  label,
+  options,
+  value,
+  onChange,
+  name,
+  className = "",
+  buttonClassName = "",
+}) => {
   const selectedOption = options.find((opt) => opt.value === value);
 
   return (
-    <div className="space-y-1 w-full">
+    <div className={`space-y-1 w-full min-w-0 ${className}`.trim()}>
       {label && (
         <label className="block text-sm font-medium text-gray-700">{label}</label>
       )}
       <Listbox value={value} onChange={(val) => onChange({ target: { name, value: val } })}>
-        <div className="relative">
+        <div className="relative min-w-0">
           <Listbox.Button
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            className={`w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${buttonClassName}`.trim()}
           >
-            <span>{selectedOption?.label || "Select"}</span>
+            <span className="block truncate pr-6">
+              {selectedOption?.label || "Select"}
+            </span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <ChevronDown className="w-4 h-4 text-gray-500" />
             </span>

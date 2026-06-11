@@ -453,16 +453,16 @@ const mapPendingRoleOffToRequest = (item) => {
 
 const titleMap = {
   pm: {
-    title: "Role-Off Management",
-    subtitle: "Project Manager Workspace For Initiating And Tracking Role-Off Requests On Active Allocations.",
+    title: "Roll-Off Management",
+    subtitle: "Project Manager Workspace For Initiating And Tracking Roll-Off Requests On Active Allocations.",
   },
   rm: {
-    title: "Role-Off Operations",
-    subtitle: "Resource Manager View Across All Role-Off Requests, Replacement Planning, And Cancellation Controls.",
+    title: "Roll-Off Operations",
+    subtitle: "Resource Manager View Across All Roll-Off Requests, Replacement Planning, And Cancellation Controls.",
   },
   dm: {
-    title: "Role-Off Approvals",
-    subtitle: "Delivery Manager Approval Queue For Pending Role-Off Decisions And High Impact Review Handling.",
+    title: "Roll-Off Approvals",
+    subtitle: "Delivery Manager Approval Queue For Pending Roll-Off Decisions And High Impact Review Handling.",
   },
 };
 
@@ -502,7 +502,7 @@ const buildKpis = (mode, allocations, roleOffRequests, selectedRows, approvedTod
         iconWrapperClassName: "border-blue-100 bg-blue-50 text-blue-700",
       },
       {
-        label: "Pending Role-Offs",
+        label: "Pending Roll-Offs",
         value: pendingRequests.length,
         icon: <UserMinusIcon className="h-5 w-5" />,
         iconWrapperClassName: "border-amber-100 bg-amber-50 text-amber-700",
@@ -592,9 +592,9 @@ const buildPmDemandStyleKpis = (allocations, roleOffRequests, selectedRows) => {
 
   return [
     { label: "Active Allocations", count: activeAllocations.length },
-    { label: "Pending Role-Offs", count: pendingRequests.length },
+    { label: "Pending Roll-Offs", count: pendingRequests.length },
     { label: "High Impact Allocations", count: activeAllocations.filter((item) => item.impact === "High").length },
-    { label: "Total RoleOff", count: totalRoleOffs.length },
+    { label: "Total Roll-Off", count: totalRoleOffs.length },
   ];
 };
 
@@ -612,7 +612,7 @@ const normalizePmKpis = (kpiPayload, fallbackMetrics = []) => {
       ),
     },
     {
-      label: "Pending Role-Offs",
+      label: "Pending Roll-Offs",
       count: getNumericMetricValue(
         source,
         ["pendingRoleOffs", "pendingRoleOffCount", "pendingRequests", "pendingRequestCount", "pending", "pendingCount"],
@@ -628,7 +628,7 @@ const normalizePmKpis = (kpiPayload, fallbackMetrics = []) => {
       ),
     },
     {
-      label: "Total RoleOff",
+      label: "Total Roll-Off",
       count: getNumericMetricValue(
         source,
         ["totalRoleOff", "totalRoleOffs", "roleOffCount", "totalRoleOffCount", "totalRequests", "totalCount"],
@@ -659,7 +659,7 @@ const readRoleOffFormCache = () => {
     const raw = window.sessionStorage.getItem(ROLE_OFF_FORM_CACHE_KEY);
     return raw ? JSON.parse(raw) : {};
   } catch (error) {
-    console.error("Failed to read role-off form cache", error);
+    console.error("Failed to read roll-off form cache", error);
     return {};
   }
 };
@@ -670,7 +670,7 @@ const writeRoleOffFormCache = (cache) => {
   try {
     window.sessionStorage.setItem(ROLE_OFF_FORM_CACHE_KEY, JSON.stringify(cache));
   } catch (error) {
-    console.error("Failed to write role-off form cache", error);
+    console.error("Failed to write roll-off form cache", error);
   }
 };
 
@@ -706,9 +706,9 @@ const removeCachedRoleOffDetails = (keys = []) => {
 
 const PM_QUEUE_TABS = [
   { id: "active", label: "Active" },
-  { id: "process", label: "Role-Off Process" },
-  { id: "fulfilled", label: "Fulfilled Role-Off" },
-  { id: "rejected", label: "Rejected Role-Off" },
+  { id: "process", label: "Roll-Off Process" },
+  { id: "fulfilled", label: "Fulfilled Roll-Off" },
+  { id: "rejected", label: "Rejected Roll-Off" },
 ];
 
 const DM_QUEUE_TABS = [
@@ -794,7 +794,7 @@ const createBulkPanelRecord = (records = []) => {
     resource: `${count} Selected Resources`,
     project: projectNames.length === 1 ? projectNames[0] : `${projectNames.length} Projects`,
     client: "-",
-    role: "Planned Role-Off",
+    role: "Planned Roll-Off",
     department: "-",
     skill: "-",
     impact: highImpactCount > 0 ? "High" : "Medium",
@@ -902,21 +902,21 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         setAllocations(nextAllocations);
       } else {
         setAllocations([]);
-        notify.error("Failed To Load Role-Off Resources");
+        notify.error("Failed To Load Roll-Off Resources");
       }
 
       if (kpiResult.status === "fulfilled") {
         setProjectKpiData(kpiResult.value);
       } else {
         setProjectKpiData(null);
-        console.error("Failed to load role-off project KPI", kpiResult.reason);
+        console.error("Failed to load roll-off project KPI", kpiResult.reason);
       }
     } catch (error) {
       if (!isActiveRef()) return;
 
       setAllocations([]);
       setProjectKpiData(null);
-      notify.error("Failed To Load Role-Off Resources");
+      notify.error("Failed To Load Roll-Off Resources");
     } finally {
       if (isActiveRef()) setLoading(false);
     }
@@ -970,7 +970,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           setApprovedTodayCount(getApprovedTodayCount(approvedTodayResult.value));
         } else {
           setApprovedTodayCount(0);
-          console.error("Failed to load approved-today role-off KPI", approvedTodayResult.reason);
+          console.error("Failed to load approved-today roll-off KPI", approvedTodayResult.reason);
         }
       } else {
         setApprovedTodayCount(0);
@@ -982,8 +982,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       setApprovedTodayCount(0);
       notify.error(
         mode === "dm"
-          ? "Failed To Load Dm Role-Off Requests"
-          : "Failed To Load Pending Role-Off Requests",
+          ? "Failed To Load Dm Roll-Off Requests"
+          : "Failed To Load Pending Roll-Off Requests",
       );
     } finally {
       if (isActiveRef()) setLoading(false);
@@ -1250,8 +1250,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         getApiMessage(
           response,
           request?.isBulk
-            ? `${request.records.length} Role-Off Request(s) Approved By Rm`
-            : "Role-Off Request Approved By Rm",
+            ? `${request.records.length} Roll-Off Request(s) Approved By Rm`
+            : "Roll-Off Request Approved By Rm",
         ),
       );
       refreshAll();
@@ -1284,8 +1284,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         getApiMessage(
           response,
           request?.isBulk
-            ? `${request.records.length} Role-Off Request(s) Rejected By Rm`
-            : "Role-Off Request Rejected By Rm",
+            ? `${request.records.length} Roll-Off Request(s) Rejected By Rm`
+            : "Roll-Off Request Rejected By Rm",
         ),
       );
       refreshAll();
@@ -1309,7 +1309,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     }
 
     if (mode === "pm" && (action === "roleoff" || action === "edit" || action === "view")) {
-      // Prevent opening a create panel if a role-off is already in progress
+      // Prevent opening a create panel if a roll-off is already in progress
       if (
         pmActiveTab === "active" &&
         action !== "view" &&
@@ -1318,8 +1318,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         row.roleOffStatus !== "REJECTED"
       ) {
         notify.warning(
-          `A Role-Off Request Is Already In Progress For ${row.resource} (Status: ${row.roleOffStatus}). ` +
-          `Please Check The "Roleoff Process" Tab.`
+          `A Roll-Off Request Is Already In Progress For ${row.resource} (Status: ${row.roleOffStatus}). ` +
+          `Please Check The "Roll-Off Process" Tab.`
         );
         setPmActiveTab("process");
         return;
@@ -1343,7 +1343,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     if (mode === "rm" && action === "approve") {
       try {
         const response = await rmApprove(row.id);
-        notify.success(getApiMessage(response, "Role-Off Request Approved By Rm"));
+        notify.success(getApiMessage(response, "Roll-Off Request Approved By Rm"));
         refreshAll();
       } catch (err) {
         console.error(err);
@@ -1356,7 +1356,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     if (mode === "rm" && action === "reject") {
       try {
         const response = await rmReject(row.id, "Rejected by RM");
-        notify.success(getApiMessage(response, "Role-Off Request Rejected By Rm"));
+        notify.success(getApiMessage(response, "Roll-Off Request Rejected By Rm"));
         refreshAll();
       } catch (err) {
         console.error(err);
@@ -1382,7 +1382,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     if (mode === "dm" && action === "reject") {
       try {
         const response = await dlReject(row.id, "Rejected by DL");
-        notify.success(getApiMessage(response, "Role-Off Request Rejected By Dm"));
+        notify.success(getApiMessage(response, "Roll-Off Request Rejected By Dm"));
         refreshAll();
       } catch (err) {
         console.error(err);
@@ -1394,7 +1394,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
   const handleRowClick = (row) => {
     if (mode === "pm") {
-      // Prevent opening a create panel if a role-off is already in progress
+      // Prevent opening a create panel if a roll-off is already in progress
       if (
         pmActiveTab === "active" &&
         row.roleOffStatus &&
@@ -1402,8 +1402,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         row.roleOffStatus !== "REJECTED"
       ) {
         notify.warning(
-          `A Role-Off Request Is Already In Progress For ${row.resource} (Status: ${row.roleOffStatus}). ` +
-          `Please Check The "Role-Off Process" Tab.`
+          `A Roll-Off Request Is Already In Progress For ${row.resource} (Status: ${row.roleOffStatus}). ` +
+          `Please Check The "Roll-Off Process" Tab.`
         );
         setPmActiveTab("process");
         return;
@@ -1421,7 +1421,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       const records = allocation?.isBulk ? allocation.records || [] : [allocation];
 
       if (records.length === 0) {
-        throw new Error("No Allocations Selected For Role-Off");
+        throw new Error("No Allocations Selected For Roll-Off");
       }
 
       let confirmationResponse = null;
@@ -1433,13 +1433,13 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         );
 
         if (eligibleRecords.length === 0) {
-          notify.warning("All Selected Allocations Already Have Role-Off Requests");
+          notify.warning("All Selected Allocations Already Have Roll-Off Requests");
           setPanelState({ open: false, actionType: "create", record: null });
           return { success: true };
         }
 
         if (eligibleRecords.length < records.length) {
-          notify.info(`${records.length - eligibleRecords.length} Allocation(s) Skipped As They Already Have Role-Off Requests`);
+          notify.info(`${records.length - eligibleRecords.length} Allocation(s) Skipped As They Already Have Roll-Off Requests`);
         }
 
         const bulkPayload = {
@@ -1481,7 +1481,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
         setPanelState({ open: false, actionType: "create", record: null });
         notify.success(
-          getApiMessage(response, `${eligibleRecords.length} Planned Role-Off Request(s) Created`),
+          getApiMessage(response, `${eligibleRecords.length} Planned Roll-Off Request(s) Created`),
         );
         refreshAll();
         setSelectedRows([]);
@@ -1497,7 +1497,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           currentStatus !== "NOT_REQUESTED" &&
           currentStatus !== "REJECTED"
         ) {
-          notify.warning(`Role-Off Request Already Exists For ${currentAllocation.resource}`);
+          notify.warning(`Roll-Off Request Already Exists For ${currentAllocation.resource}`);
           continue;
         }
 
@@ -1572,8 +1572,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         getApiMessage(
           lastResponse,
           panelState.actionType === "update"
-            ? "Role-Off Request Updated"
-            : "Role-Off Request Created",
+            ? "Roll-Off Request Updated"
+            : "Roll-Off Request Created",
         ),
       );
 
@@ -1582,10 +1582,10 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     } catch (err) {
       console.error(err);
       const fallbackMessage = panelState.actionType === "bulk-create"
-        ? "Failed To Create Bulk Role-Off"
+        ? "Failed To Create Bulk Roll-Off"
         : panelState.actionType === "update"
-          ? "Failed To Update Role-Off"
-          : "Failed To Create Role-Off";
+          ? "Failed To Update Roll-Off"
+          : "Failed To Create Roll-Off";
       notify.error(getErrorMessage(err, fallbackMessage));
       throw err;
     }
@@ -1594,7 +1594,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   const handlePmCancelRoleOff = async () => {
     const record = cancelModalState.record;
     if (!record?.roleOffId) {
-      notify.error("Role-Off Id Is Missing");
+      notify.error("Roll-Off Id Is Missing");
       return;
     }
 
@@ -1605,11 +1605,11 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       removeCachedRoleOffDetails([record?.roleOffId, record?.allocationId, record?.id]);
       await refreshAll();
       setCancelModalState({ open: false, record: null, isSubmitting: false });
-      notify.success(getApiMessage(response, "Role-Off Request Cancelled"));
+      notify.success(getApiMessage(response, "Roll-Off Request Cancelled"));
     } catch (err) {
       console.error(err);
       setCancelModalState((prev) => ({ ...prev, isSubmitting: false }));
-      notify.error(getErrorMessage(err, "Failed To Cancel Role-Off"));
+      notify.error(getErrorMessage(err, "Failed To Cancel Roll-Off"));
     }
   };
 
@@ -1636,9 +1636,9 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   //   } catch (err) {
   //     setRoleOffRequests([]);
   //     if (err.response?.status === 403) {
-  //       toast.error("You do not have access to view role-off requests");
+  //       toast.error("You do not have access to view roll-off requests");
   //     } else {
-  //       toast.error("Failed To Load Role-Off Requests");
+  //       toast.error("Failed To Load Roll-Off Requests");
   //     }
   //     console.error(err);
   //   }
@@ -1661,7 +1661,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
   //   setRoleOffRequests((prev) => [...requests, ...prev]);
   //   setSelectedRows([]);
-  //   toast.success(`${requests.length} role-off requests created`);
+  //   toast.success(`${requests.length} roll-off requests created`);
   // };
 
   const handleApproveRequest = async (request) => {
@@ -1680,8 +1680,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       setPanelState({ open: false, actionType: "view", record: null });
       notify.success(
         request?.isBulk
-          ? `${request.records.length} Role-Off Request(s) Fulfilled By Dm`
-          : `${request.resource} Role-Off Fulfilled By Dm`,
+          ? `${request.records.length} Roll-Off Request(s) Fulfilled By Dm`
+          : `${request.resource} Roll-Off Fulfilled By Dm`,
       );
     } catch (err) {
       console.error(err);
@@ -1713,8 +1713,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         getApiMessage(
           response,
           request?.isBulk
-            ? `${request.records.length} Role-Off Request(s) Rejected`
-            : `${request.resource} Role-Off Rejected`,
+            ? `${request.records.length} Roll-Off Request(s) Rejected`
+            : `${request.resource} Roll-Off Rejected`,
         ),
       );
     } catch (err) {
@@ -1728,13 +1728,13 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   const bulkBarConfig = useMemo(() => {
     if (mode === "pm" && pmActiveTab === "active") {
       return {
-        title: `${selectedRows.length} Role-Off Request(s) Selected`,
-        description: "Create Planned Role-Off Requests For The Selected Allocations.",
+        title: `${selectedRows.length} Roll-Off Request(s) Selected`,
+        description: "Create Planned Roll-Off Requests For The Selected Allocations.",
         actions: [
           {
             label: bulkActionState.loading && bulkActionState.key === "pm-create"
               ? "Opening..."
-              : "Create Bulk Role-Off",
+              : "Create Bulk Roll-Off",
             onClick: handleOpenBulkRoleOff,
             loading: bulkActionState.loading && bulkActionState.key === "pm-create",
             disabled: bulkActionState.loading,
@@ -1746,7 +1746,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     if (mode === "rm") {
       return {
         title: `${selectedRows.length} Request(s) Selected`,
-        description: "Approve Or Reject The Selected Role-Off Requests In Bulk.",
+        description: "Approve Or Reject The Selected Roll-Off Requests In Bulk.",
         actions: [
           {
             label: bulkActionState.loading && bulkActionState.key === "rm-approve"
@@ -1772,7 +1772,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     if (mode === "dm" && dmActiveTab !== "fulfilled") {
       return {
         title: `${selectedRows.length} Request(s) Selected`,
-        description: "Fulfill Or Reject The Selected Role-Off Requests In Bulk.",
+        description: "Fulfill Or Reject The Selected Roll-Off Requests In Bulk.",
         actions: [
           {
             label: bulkActionState.loading && bulkActionState.key === "dm-fulfill"
@@ -1799,7 +1799,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
   }, [bulkActionState, mode, pmActiveTab, dmActiveTab, selectedRows, visibleRows]);
 
   return (
-    <div className={embedded ? "bg-gray-50 p-0" : "min-h-screen bg-gray-50 p-6"}>
+    <div className={embedded ? "bg-gray-50 p-0" : "min-h-screen bg-gray-50 px-2 py-6 sm:px-4"}>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex-1">
           {!embedded ? (
@@ -1828,11 +1828,11 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       <div className="space-y-6">
         {mode === "pm" ? (
           <RoleOffSummaryCard
-            title="Role-Off Management"
+            title="Roll-Off Management"
             description={
               projectName
-                ? `Project Manager Workspace For Initiating And Tracking Role-Off Requests On Active Allocations. Current Project: ${projectName}.`
-                : "Project Manager Workspace For Initiating And Tracking Role-Off Requests On Active Allocations."
+                ? `Project Manager Workspace For Initiating And Tracking Roll-Off Requests On Active Allocations. Current Project: ${projectName}.`
+                : "Project Manager Workspace For Initiating And Tracking Roll-Off Requests On Active Allocations."
             }
             metrics={pmKpis}
             action={(
@@ -1842,7 +1842,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                   className="inline-flex items-center gap-2 rounded-md bg-[#081534] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#10214f]"
                 >
                   <ClipboardCheckIcon className="h-4 w-4" />
-                   Role-Off Report
+                   Roll-Off Report
                 </button>
               </div>
             )}
@@ -1870,7 +1870,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
                 {/* LEFT - TITLE */}
                 <div className="shrink-0">
                   <h3 className="text-lg font-bold text-[#081534] whitespace-nowrap">
-                    Role-Off Queue
+                    Roll-Off Queue
                   </h3>
                 </div>
 

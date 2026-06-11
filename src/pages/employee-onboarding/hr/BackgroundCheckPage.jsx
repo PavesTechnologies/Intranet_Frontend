@@ -389,7 +389,7 @@ export default function BackgroundCheckPage() {
     } catch (err) {
       console.error("Failed to fetch profile:", err);
       showStatusToast("Profile API unavailable. Showing available background check data.", "warning");
-      prof = MOCK_PROFILES[emp.user_uuid] || DEFAULT_PROFILE(emp);
+      prof = {};
     }
     setProfile(prof);
     setLoadingProfile(false);
@@ -405,7 +405,7 @@ export default function BackgroundCheckPage() {
     } catch (err) {
       // Endpoint may not exist yet — silently continue with PENDING statuses
       console.warn("Background checks endpoint not available, defaulting to PENDING:", err?.response?.status);
-      raw = MOCK_CHECKS[emp.user_uuid] || DEFAULT_CHECKS;
+      raw = [];
     }
  
     // ── Build dynamic checks from profile documents ──

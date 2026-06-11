@@ -315,14 +315,35 @@ export default function HrOnboardingDashboard() {
     );
   }, [data, employeeUserIds, editDisabledUserIds]);
 
+  // Pre-compute displayStatus once per employee so KPI counts and table filter
+  // always use the identical value — avoids stale-memo / repeated-localStorage divergence.
+  const pageDataWithStatus = useMemo(() => {
+    return pageData.map((emp) => ({
+      ...emp,
+      _displayStatus: getNormalizedStatus(getOfferDisplayStatus(emp, employeeUserIds)),
+    }));
+  }, [pageData, employeeUserIds]);
+
+  // DEBUG – remove before shipping
+  useEffect(() => {
+    console.group("[HR Dashboard] data flow");
+    console.log("raw data (API):", data);
+    console.log("pageData (tracked):", pageData);
+    console.log(
+      "pageDataWithStatus (computed statuses):",
+      pageDataWithStatus.map((e) => ({ uuid: e.user_uuid, name: `${e.first_name} ${e.last_name}`, _displayStatus: e._displayStatus, rawStatus: e.status }))
+    );
+    console.groupEnd();
+  }, [pageDataWithStatus]);
+
   const filteredData = useMemo(() => {
-    return pageData.filter((emp) => {
+    return pageDataWithStatus.filter((emp) => {
       const searchText =
         `${emp.first_name} ${emp.last_name} ${emp.designation}`.toLowerCase();
 
       const matchesSearch = searchText.includes(searchTerm.toLowerCase());
 
-      const status = getHrDisplayStatus(emp);
+      const status = emp._displayStatus;
       const filter = statusFilter.trim().toUpperCase();
 
       if (filter === "ALL") {
@@ -332,27 +353,45 @@ export default function HrOnboardingDashboard() {
       return matchesSearch && status === filter;
     });
   }, [
-    pageData,
+    pageDataWithStatus,
     searchTerm,
     statusFilter,
-    employeeUserIds,
-    editDisabledUserIds,
   ]);
 
+  // DEBUG – remove before shipping
+  useEffect(() => {
+    const filter = statusFilter.trim().toUpperCase();
+    console.group(`[HR Dashboard] filteredData (statusFilter="${filter}")`);
+    console.log("count:", filteredData.length);
+    console.log(
+      "records:",
+      filteredData.map((e) => ({ uuid: e.user_uuid, name: `${e.first_name} ${e.last_name}`, _displayStatus: e._displayStatus }))
+    );
+    console.groupEnd();
+  }, [filteredData, statusFilter]);
+
   const categoryData = useMemo(() => {
+    const counts = {};
+    pageDataWithStatus.forEach((e) => {
+      counts[e._displayStatus] = (counts[e._displayStatus] || 0) + 1;
+    });
+
+    // DEBUG – remove before shipping
+    console.log("[HR Dashboard] KPI counts:", counts);
+
     return HR_CATEGORY_GROUPS.map((group) => ({
       key: group.key,
       title: group.title,
       cards: group.statusDefs.map((def) => ({
         status:    def.status,
         label:     def.label,
-        count:     pageData.filter((e) => getHrDisplayStatus(e) === def.status).length,
+        count:     counts[def.status] || 0,
         icon:      def.icon,
         iconBg:    def.iconBg,
         iconColor: def.iconColor,
       })),
     }));
-  }, [pageData, employeeUserIds]);
+  }, [pageDataWithStatus]);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
@@ -654,19 +693,17 @@ export default function HrOnboardingDashboard() {
       className="h-4 w-4 cursor-pointer"
       onChange={(e) => {
         if (e.target.checked) {
-          // Select only IDs of candidates who are VERIFIED
           const verifiedIds = filteredData
-            .filter((emp) => getHrDisplayStatus(emp) === "VERIFIED")
+            .filter((emp) => (emp._displayStatus ?? getHrDisplayStatus(emp)) === "VERIFIED")
             .map((emp) => emp.user_uuid);
           setSelectedIds(verifiedIds);
         } else {
           setSelectedIds([]);
         }
       }}
-      // Check if all available verified candidates are selected
       checked={
         selectedIds.length > 0 &&
-        selectedIds.length === filteredData.filter(e => getHrDisplayStatus(e) === "VERIFIED").length
+        selectedIds.length === filteredData.filter(e => (e._displayStatus ?? getHrDisplayStatus(e)) === "VERIFIED").length
       }
     />
   ) : null,
@@ -707,7 +744,7 @@ export default function HrOnboardingDashboard() {
     return filteredData
       .slice(startIndex, startIndex + PAGE_SIZE)
       .map((emp) => {
-        const displayStatus = getHrDisplayStatus(emp);
+        const displayStatus = emp._displayStatus ?? getHrDisplayStatus(emp);
         const isEmployeeCreated = displayStatus === "COMPLETED";
         const isVerified = displayStatus === "VERIFIED";
         const isJoining = displayStatus === "JOINING";
