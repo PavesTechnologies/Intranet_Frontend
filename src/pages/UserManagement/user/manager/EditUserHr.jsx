@@ -38,7 +38,7 @@ export default function EditUserHr() {
 
 
     try {
-      await axios.put(
+      await api.put(
         `${
           window.__APP_CONFIG__.USER_MANAGEMENT_URL
         }/general_user/edit-user/${user_id}`,
