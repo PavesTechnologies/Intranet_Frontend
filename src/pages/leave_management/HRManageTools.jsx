@@ -280,7 +280,7 @@ const HRManageTools = ({ employeeId }) => {
               className="grid grid-cols-1 md:grid-cols-2 gap-4"
             >
               <AdminCard
-                title="Bulk Add Holidays"
+                title="Add Holidays"
                 desc="Upload or add multiple calendar holidays."
                 icon={<CalendarDays className="text-red-500" />}
                 onClick={() => setIsAddHolidaysModalOpen(true)}
