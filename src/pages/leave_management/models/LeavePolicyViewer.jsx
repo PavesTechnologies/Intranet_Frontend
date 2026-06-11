@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import api from "../../../api/axiosInstance";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, ArrowLeft } from "lucide-react";
@@ -232,11 +231,10 @@ export default function LeavePolicyViewer() {
               <div
                 key={policy.id}
                 onClick={() => setSelectedPolicyId(policy.id)}
-                className={`px-3 py-1.5 cursor-pointer rounded-md ${
-                  isActive
+                className={`px-3 py-1.5 cursor-pointer rounded-md ${isActive
                     ? "bg-blue-100 text-blue-800"
                     : "hover:bg-gray-200"
-                }`}
+                  }`}
               >
                 {policy.title}
               </div>

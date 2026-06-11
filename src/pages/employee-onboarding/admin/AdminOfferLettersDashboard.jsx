@@ -10,7 +10,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { ViewIcon } from "../../../components/icons/ActionIcons";
-import axios from "axios";
+import api from "../../../api/axiosInstance";
 import { useNavigate, Navigate } from "react-router-dom";
 import Pagination from "../../../components/Pagination/pagination";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -43,7 +43,7 @@ export default function AdminOfferLettersDashboard() {
     const fetchOfferLetters = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`${BASE_URL}/offerletters/`, {
+        const res = await api.get(`${BASE_URL}/offerletters/`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
         setData(res.data || []);
