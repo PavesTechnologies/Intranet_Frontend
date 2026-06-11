@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import api from "../../../../api/axiosInstance"
+import api from "../../../../api/axiosInstance";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import Modal from "../../../../components/Modal/modal";
 import Button from "../../../../components/Button/Button";
 
@@ -27,22 +28,17 @@ export default function AddCountryModal({ onClose, onSuccess, BASE_URL }) {
         }
       );
 
+      showStatusToast("Country added successfully", "success");
+
       // Fetch the newly added country
-      const countriesRes = await apiget(`${BASE_URL}/masters/country`, {
+      const countriesRes = await api.get(`${BASE_URL}/masters/country`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const newCountry = countriesRes.data.find(
-        (c) => c.calling_code === callingCode
+        (c) => String(c.calling_code) === String(callingCode)
       );
 
-      if (!newCountry) {
-        if (window.showError) window.showError("Failed to fetch new country");
-        return;
-      }
-
-      if (window.showSuccess) window.showSuccess("Country added successfully");
-
-      onSuccess(newCountry); // Add instantly
+      onSuccess(newCountry || { calling_code: callingCode });
       onClose();
     } catch (err) {
       setError(
