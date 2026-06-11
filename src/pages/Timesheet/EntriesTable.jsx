@@ -443,34 +443,32 @@ const EntriesTable = ({
   };
 
   const showActions = window.location.pathname === "/timesheets";
-  const dataColumnWidths = showActions
-    ? selectionMode
-      ? ["13%", "13%", "10%", "10%", "14%", "21%", "7%", "8%"]
-      : ["14%", "14%", "11%", "11%", "14%", "22%", "6%", "8%"]
-    : selectionMode
-      ? ["15%", "15%", "11%", "11%", "15%", "22%", "7%"]
-      : ["16%", "16%", "12%", "12%", "16%", "22%", "6%"];
-  const tableColumnWidths = [
-    ...(selectionMode ? ["4%"] : []),
-    ...dataColumnWidths,
-  ];
-  const tableColumnCount = tableColumnWidths.length;
+  
+  const headerCellClass = "px-3 py-2 text-left break-words";
+  const bodyCellClass =
+  "px-3 py-2 text-left align-middle break-words whitespace-normal";
+  const actionCellClass = "px-2 py-2 text-left align-middle";
+  const compactSelectProps = {
+    className: "min-w-0",
+    buttonClassName: "px-3 text-sm",
+  };
+  const compactTimeProps = {
+    className: "min-w-0",
+    inputClassName: "min-w-0 text-sm",
+  };
 
   return (
     <>
-    <table className="w-full table-fixed border-collapse rounded">
-      <colgroup>
-        {tableColumnWidths.map((width, index) => (
-          <col key={`${width}-${index}`} style={{ width }} />
-        ))}
-      </colgroup>
+    <div className="w-full pb-1">
+  <table className="w-full table-auto border-collapse rounded">
+      
            
       <thead>
                
         <tr className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm">
                    
           {selectionMode && (
-            <th className="px-4 py-2">
+            <th className="px-3 py-2">
                            
               <input
                 type="checkbox"
@@ -496,15 +494,15 @@ const EntriesTable = ({
                          
             </th>
           )}
-                    <th className="text-left px-4 py-2">Project</th>         
-          <th className="text-left px-4 py-2">Task</th>         
-          <th className="text-left px-4 py-2">Start</th>         
-          <th className="text-left px-4 py-2">End</th>         
-          <th className="text-left px-4 py-2">Work Location</th>         
-          <th className="text-left px-4 py-2">Description</th>         
-          <th className="text-left px-4 py-2">Billable</th>         
+                    <th className={headerCellClass}>Project</th>         
+          <th className={headerCellClass}>Task</th>         
+          <th className={headerCellClass}>Start</th>         
+          <th className={headerCellClass}>End</th>         
+          <th className={headerCellClass}>Work Location</th>         
+          <th className={headerCellClass}>Description</th>         
+          <th className={headerCellClass}>Billable</th>         
           {showActions && (
-            <th className="text-left px-4 py-2">Actions</th>
+            <th className={headerCellClass}>Actions</th>
           )}
                  
         </tr>
@@ -524,7 +522,7 @@ const EntriesTable = ({
           >
                        
             {selectionMode && (
-              <td className="px-4 py-2 text-center">
+              <td className="px-3 py-2 text-center">
                                
                 <input
                   type="checkbox"
@@ -545,60 +543,65 @@ const EntriesTable = ({
             {editIndex === idx ? (
               <>
                                
-                <td className="px-4 py-2 text-left">
+                <td className={bodyCellClass}>
                                    
                   <FormSelect
                     name="projectId"
                     value={editData.projectId}
                     options={projectOptions}
                     onChange={handleChange}
+                    {...compactSelectProps}
                   />
                                  
                 </td>
                                
-                <td className="px-4 py-2 text-left">
+                <td className={bodyCellClass}>
                                    
                   <FormSelect
                     name="taskId"
                     value={editData.taskId}
                     options={getTaskOptions(editData.projectId)}
                     onChange={handleChange}
+                    {...compactSelectProps}
                   />
                                  
                 </td>
                                
-                <td className="px-4 py-2 text-left">
+                <td className={bodyCellClass}>
                                    
                   <FormTime
                     name="fromTime"
                     value={editData.fromTime}
                     onChange={handleChange}
+                    {...compactTimeProps}
                   />
                                  
                 </td>
                                
-                <td className="px-4 py-2 text-left">
+                <td className={bodyCellClass}>
                                    
                   <FormTime
                     name="toTime"
                     value={editData.toTime}
                     onChange={handleChange}
+                    {...compactTimeProps}
                   />
                                  
                 </td>
                                
-                <td className="px-4 py-2 text-left">
+                <td className={bodyCellClass}>
                                    
                   <FormSelect
                     name="workType"
                     value={editData.workType}
                     options={workTypeOptions}
                     onChange={handleChange}
+                    {...compactSelectProps}
                   />
                                  
                 </td>
                                
-                <td className="px-4 py-2 text-left">
+                <td className={bodyCellClass}>
                                    
                   <FormInput
                     name="description"
@@ -608,7 +611,7 @@ const EntriesTable = ({
                                  
                 </td>
                                
-                <td className="px-4 py-2 text-left">
+                <td className={bodyCellClass}>
                                    
                   {(
                     editData.isBillable !== undefined
@@ -620,7 +623,7 @@ const EntriesTable = ({
                 </td>
                                
                 {showActions && (
-                  <td className="px-4 py-2 text-left">
+                  <td className={actionCellClass}>
                                        
                     <div className="flex gap-2">
                                            
@@ -642,7 +645,7 @@ const EntriesTable = ({
             ) : (
               <>
                                
-                <td className="px-4 py-2 text-left">
+                <td className={bodyCellClass}>
                                    
                   {entry.projectName ||
                     projectIdToName[entry.projectId] ||
@@ -650,24 +653,28 @@ const EntriesTable = ({
                                  
                 </td>
                                
-                <td className="px-4 py-2 text-left">
+                <td className={bodyCellClass}>
                                    
                   {entry.taskName || taskIdToName[entry.taskId] || "N/A"}       
                          
                 </td>
                                
-                <td className="px-4 py-2 text-left">{prettyTime(entry.fromTime)}</td>     
+                <td className={bodyCellClass}>{prettyTime(entry.fromTime)}</td>     
                          
-                <td className="px-4 py-2 text-left">{prettyTime(entry.toTime)}</td>       
+                <td className={bodyCellClass}>{prettyTime(entry.toTime)}</td>       
                        
-                <td className="px-4 py-2 text-left">{mapWorkType(entry.workLocation)}</td>
+                <td className={bodyCellClass}>{mapWorkType(entry.workLocation)}</td>
                                
-                <td className="px-4 py-2 text-left">{entry.description}</td>             
+                <td
+  className={`${bodyCellClass} max-w-[250px] break-words whitespace-normal`}
+>
+  {entry.description}
+</td>
                  
-                <td className="px-4 py-2 text-left">{entry.isBillable ? "Yes" : "No"}</td>
+                <td className={bodyCellClass}>{entry.isBillable ? "Yes" : "No"}</td>
                                
                 {showActions && (
-                  <td className="px-4 py-2 text-left">
+                  <td className={actionCellClass}>
                     {console.log("Status from entries table: ", status)}       
                                
                     {(status?.toLowerCase() === "draft" ||
@@ -712,62 +719,67 @@ const EntriesTable = ({
             key="add-new"
             className="text-sm bg-white hover:bg-blue-50 transition"
           >
-                        {selectionMode && <td className="px-4 py-2 text-left"></td>}     
+                        {selectionMode && <td className={bodyCellClass}></td>}     
                  
-            <td className="px-4 py-2 text-left">
+            <td className={bodyCellClass}>
                             
               <FormSelect
                 name="projectId"
                 value={addData.projectId || ""}
                 options={projectOptions}
                 onChange={handleAddChange}
+                {...compactSelectProps}
               />
                          
             </td>
                        
-            <td className="px-4 py-2 text-left">
+            <td className={bodyCellClass}>
                             
               <FormSelect
                 name="taskId"
                 value={addData.taskId || ""}
                 options={getTaskOptions(addData.projectId)}
                 onChange={handleAddChange}
+                {...compactSelectProps}
               />
                          
             </td>
                        
-            <td className="px-4 py-2 text-left">
+            <td className={bodyCellClass}>
                             
               <FormTime
                 name="fromTime"
                 value={addData.fromTime || ""}
                 onChange={handleAddChange}
+                {...compactTimeProps}
               />
                          
             </td>
                        
-            <td className="px-4 py-2 text-left">
+            <td className={bodyCellClass}>
                             
               <FormTime
                 name="toTime"
                 value={addData.toTime || ""}
                 onChange={handleAddChange}
+                {...compactTimeProps}
               />
                          
             </td>
                        
-            <td className="px-4 py-2 text-left">
+            <td className={bodyCellClass}>
                             
               <FormSelect
                 name="workType"
                 value={addData.workType}
                 options={workTypeOptions}
                 onChange={handleAddChange}
+                {...compactSelectProps}
               />
                          
             </td>
                        
-            <td className="px-4 py-2 text-left">
+            <td className={bodyCellClass}>
                             
               <FormInput
                 name="description"
@@ -777,7 +789,7 @@ const EntriesTable = ({
                          
             </td>
                        
-            <td className="px-4 py-2 text-left">
+            <td className={bodyCellClass}>
                             
               {addData.projectId &&
               taskIdToBillablity[addData.taskId] !== undefined
@@ -789,7 +801,7 @@ const EntriesTable = ({
             </td>
                        
             {showActions && (
-            <td className="px-4 py-2 text-left">
+            <td className={actionCellClass}>
                             
               <div className="flex gap-2">
                                
@@ -816,7 +828,10 @@ const EntriesTable = ({
                    
           <tr>
                        
-            <td colSpan={tableColumnCount} className="px-4 py-1">
+            <td
+  colSpan={selectionMode ? (showActions ? 8 : 7) : (showActions ? 7 : 6)}
+  className="px-4 py-1"
+>
                            
               <div className="flex justify-end py-1">
                                
@@ -859,6 +874,7 @@ const EntriesTable = ({
       )}
          
     </table>
+    </div>
     <ConfirmDialog
       open={isConfirmOpen}
       title="Confirm Delete"
