@@ -29,11 +29,27 @@ const BurndownChart = forwardRef(({ burndownData, scopeMarkers = [], dailyBurnup
           if (!nonWorking) return;
           const xStart = x.getPixelForValue(i - 0.5);
           const xEnd   = x.getPixelForValue(i + 0.5);
+          const colW   = xEnd - xStart;
           ctx.save();
           ctx.fillStyle = d.isHoliday
-            ? "rgba(251, 191, 36, 0.18)"   // amber — holiday
-            : "rgba(148, 163, 184, 0.15)"; // slate  — non-working weekend
-          ctx.fillRect(xStart, top, xEnd - xStart, bottom - top);
+            ? "rgba(251, 191, 36, 0.22)"
+            : "rgba(148, 163, 184, 0.15)";
+          ctx.fillRect(xStart, top, colW, bottom - top);
+          if (d.isHoliday) {
+            // amber top border line
+            ctx.fillStyle = "rgba(245, 158, 11, 0.7)";
+            ctx.fillRect(xStart, top, colW, 2);
+            // "Holiday" label rotated inside the column
+            ctx.save();
+            ctx.translate(xStart + colW / 2, bottom - 6);
+            ctx.rotate(-Math.PI / 2);
+            ctx.font = "bold 9px sans-serif";
+            ctx.fillStyle = "rgba(180, 83, 9, 0.75)";
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            ctx.fillText("Holiday", 0, 0);
+            ctx.restore();
+          }
           ctx.restore();
         });
       },

@@ -849,6 +849,8 @@ const coreData = coreRes.data;
     } catch (err) { console.error("Error fetching raw certifications:", err); }
   };
 
+  const uploadingRef = useRef(false);
+
   const [about, setAbout] = useState({ about_me: "", work_enjoyment: "", interests_hobbies: "" });
   const [aboutUuid, setAboutUuid] = useState(null);
   const [savingAbout, setSavingAbout] = useState(false);
@@ -984,8 +986,78 @@ const coreData = coreRes.data;
     } finally { setIsDeleting(false); setIsDeleteModalOpen(false); setFieldToDelete(null); }
   };
 
+  useEffect(() => {
+    if (!hrData) return;
+    const profileUrl =
+      hrData?.personal_details?.profile_photo_path ||
+      hrData?.personal_details?.profile_photo_url ||
+      hrData?.profile_photo_url ||
+      null;
+    console.log("profileImg state", profileImg);
+    console.log("API image URL", hrData?.personal_details?.profile_photo_path);
+    if (profileUrl) {
+      setProfileImg(profileUrl);
+    }
+  }, [hrData]);
   const formatText = (cmd) => document.execCommand(cmd, false, null);
-  const handleProfileChange = (file) => { if (file) setProfileImg(URL.createObjectURL(file)); };
+ const handleProfileChange = async (file) => {
+  if (!file || uploadingRef.current) return;
+
+  // Show local file as preview instantly — no S3 round-trip needed for display
+  const localPreviewUrl = URL.createObjectURL(file);
+  setProfileImg(localPreviewUrl);
+
+  uploadingRef.current = true;
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await api.post(
+      `${BASE_URL}/employee-details/profile-photo/${employee.user_uuid}`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    const newUrl =
+      response.data?.profile_photo_url ||
+      response.data?.data?.profile_photo_url ||
+      response.data?.photo_url ||
+      response.data?.url;
+
+    if (newUrl) {
+      setProfileImg(newUrl);
+      // Patch hrData so the useEffect([hrData]) never overwrites this upload
+      setHrData(prev => ({
+        ...prev,
+        personal_details: {
+          ...(prev?.personal_details || {}),
+          profile_photo_path: newUrl,
+          profile_photo_url: newUrl,
+        },
+      }));
+    }
+
+    if (profileRef.current) profileRef.current.value = "";
+    URL.revokeObjectURL(localPreviewUrl);
+
+    showStatusToast("Profile photo updated successfully", "success");
+  } catch (error) {
+    URL.revokeObjectURL(localPreviewUrl);
+    // Restore whichever image was showing before the failed upload
+    setProfileImg(hrData?.personal_details?.profile_photo_path || hrData?.personal_details?.profile_photo_url || null);
+    showStatusToast(
+      error?.response?.data?.detail || "Failed to upload profile photo",
+      "error"
+    );
+  } finally {
+    uploadingRef.current = false;
+  }
+};
 
   const filteredMySkillRequests = useMemo(() => {
     const search = mySkillRequestsSearch.trim().toLowerCase();
@@ -1182,7 +1254,13 @@ const coreData = coreRes.data;
               <div className="epv3-av-ring">
                 <div className="epv3-av" onClick={() => profileRef.current?.click()}>
                   {profileImg
-                    ? <img src={profileImg} className="w-full h-full object-cover" alt="Profile" />
+                    ? <img
+                        key={profileImg}
+                        src={profileImg}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                        onError={() => setProfileImg(hrData?.personal_details?.profile_photo_url || null)}
+                      />
                     : <span className="epv3-display font-bold text-white select-none" style={{ fontSize: 38 }}>{initials || "?"}</span>
                   }
                   <div className="epv3-av-ov">

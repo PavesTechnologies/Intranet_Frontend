@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import Tree from "react-d3-tree";
 import { jwtDecode } from "jwt-decode";
 import Button  from "../../../components/Button/Button";
+import api from "../../../api/axiosInstance";
 
 /* ---------------- AVATAR HELPERS ---------------- */
 
@@ -287,7 +288,7 @@ export default function OrganizationTree() {
   try {
 
     const response = await api.get(
-      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/hr/organization-hierarchy/${employeeId}`,
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/organization-hierarchy/${employeeId}`,
       {
         headers: {
           "Content-Type": "application/json",

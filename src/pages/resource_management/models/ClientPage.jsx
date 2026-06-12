@@ -198,20 +198,51 @@ const ProjectAssets = ({ assets, loading }) => {
       />
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <GenericTable
-          headers={["Asset Name", "Serial / ID", "Assigned User", "Status"]}
-          columns={["asset_info", "serial_info", "assigned_info", "status_info"]}
-          rows={assets.map((asset, index) => ({
-            ...asset,
-            asset_info: <span>{asset.asset?.assetName || asset.assetName || "—"}</span>,
-            serial_info: <span className="font-mono text-gray-600">{asset.serialNumber || asset.serial || "—"}</span>,
-            assigned_info: <span>{asset.assignedBy || asset.assignedTo || "—"}</span>,
-            status_info: (
-              <StatusBadge label={asset.asset?.status || asset.status || "UNKNOWN"} size="sm" />
-            )
-          }))}
+  <GenericTable
+    headers={[
+      "Asset Name",
+      "Serial / ID",
+      "User",
+      "Assigned User",
+      "Status",
+    ]}
+    columns={[
+      "asset_info",
+      "serial_info",
+      "user_info",
+      "assigned_info",
+      "status_info",
+    ]}
+    rows={assets.map((asset) => ({
+      ...asset,
+
+      asset_info: (
+        <span>{asset.asset?.assetName || "—"}</span>
+      ),
+
+      serial_info: (
+        <span className="font-mono text-gray-600">
+          {asset.serialNumber || "—"}
+        </span>
+      ),
+
+      user_info: (
+        <span>{asset.resourceName || "—"}</span>
+      ),
+
+      assigned_info: (
+        <span>{asset.assignedBy || "—"}</span>
+      ),
+
+      status_info: (
+        <StatusBadge
+          label={asset.assignmentStatus || "UNKNOWN"}
+          size="sm"
         />
-      </div>
+      ),
+    }))}
+  />
+</div>
     </div>
   );
 };
@@ -927,23 +958,6 @@ const ClientPage = () => {
         <div className="col-span-12 lg:col-span-8 bg-white border rounded-xl shadow-sm">
           {selectedProject ? (
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm min-h-[600px] flex flex-col">
-              {/* Project Header */}
-              <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50 rounded-t-xl">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {selectedProject.projectName}
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Managed by{" "}
-                    <span className="font-medium text-gray-900">
-                      {selectedProject.projectManagerId}
-                    </span>
-                  </p>
-                </div>
-                {/* <button className="text-gray-400 hover:text-gray-600">
-                  <MoreHorizontalIcon />
-                </button> */}
-              </div>
 
               {/* Dynamic Tabs */}
               <div className="flex border-b border-gray-200 px-6 overflow-x-auto no-scrollbar">

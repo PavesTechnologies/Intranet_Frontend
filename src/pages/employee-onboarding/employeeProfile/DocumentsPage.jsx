@@ -1378,33 +1378,56 @@ formData.append(
   );
 
   let response;
+  let apiUrl = "";
 
   const identityAxiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   // ✅ UPDATE
   if (uploadModal.docId) {
+    apiUrl = `${BASE_URL}/identity/employee-document/${uploadModal.docId}`;
+    console.log("DEBUG [Identity Upload] - Action: UPDATE");
+    console.log("DEBUG [Identity Upload] - API URL:", apiUrl);
+    console.log("DEBUG [Identity Upload] - uploadModal.docId:", uploadModal.docId);
+    console.log("DEBUG [Identity Upload] - document_uuid:", uploadFormData.document_uuid || uploadModal.docId);
+    console.log("DEBUG [Identity Upload] - mapping_uuid:", uploadFormData.mapping_uuid);
+    console.log("DEBUG [Identity Upload] - selected record:", uploadFormData);
+
     response = await api.put(
-      `${BASE_URL}/identity/employee-document/${uploadModal.docId}`,
+      apiUrl,
       formData,
       identityAxiosConfig,
     );
   }
   // ✅ CREATE
   else {
+    apiUrl = `${BASE_URL}/employee-upload/identity-documents`;
+    console.log("DEBUG [Identity Upload] - Action: CREATE");
+    console.log("DEBUG [Identity Upload] - API URL:", apiUrl);
+    console.log("DEBUG [Identity Upload] - uploadModal.docId:", uploadModal.docId);
+    console.log("DEBUG [Identity Upload] - document_uuid: null (New Document)");
+    console.log("DEBUG [Identity Upload] - mapping_uuid:", uploadFormData.mapping_uuid);
+    console.log("DEBUG [Identity Upload] - selected record:", uploadFormData);
+
     response = await api.post(
-      `${BASE_URL}/employee-upload/identity-documents`,
+      apiUrl,
       formData,
       identityAxiosConfig,
     );
   }
 
+  const responseData = response?.data || {};
+  const returnedDocumentUuid = responseData?.document_uuid || responseData?.data?.document_uuid || responseData?.identity_uuid || null;
+  console.log("DEBUG [Identity Upload] - Returned document_uuid:", returnedDocumentUuid);
+
   const newFilePath = uploadFile
     ? URL.createObjectURL(uploadFile)
     : uploadFormData.file_path || null;
 
+  const finalDocId = uploadModal.docId || returnedDocumentUuid;
+
   const updatedDoc = {
-    id: uploadModal.docId || `identity-${Date.now()}`,
-    document_uuid: uploadModal.docId || null,
+    id: finalDocId || `identity-${Date.now()}`,
+    document_uuid: finalDocId || null,
     mapping_uuid: uploadFormData.mapping_uuid,
     identity_type_uuid: uploadFormData.identity_type_uuid,
     type: uploadFormData.identity_type || "",
@@ -1805,7 +1828,9 @@ else if (category === "identity") {
       category,
       docId: category === "experience"
         ? (doc.experience_uuid || doc.id)
-        : (doc.document_uuid || doc.id),
+        : category === "identity"
+          ? (doc.document_uuid || null)
+          : (doc.document_uuid || doc.id),
     });
   };
 

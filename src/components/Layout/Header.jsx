@@ -47,9 +47,13 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const employees = Array.isArray(res.data) ? res.data : res.data.data || [];
+        console.log("Logged in employee_id:", user?.employee_id);
+        console.log("API Response:", res.data);
+        console.log("Employees Array:", employees);
         const matched = employees.find(
           (emp) => String(emp.employee_id) === String(user?.employee_id)
         );
+        console.log("Matched Employee:", matched);
         setEmployeeProfile(matched);
       } catch (err) {
         console.error("Failed to fetch employee profile", err);

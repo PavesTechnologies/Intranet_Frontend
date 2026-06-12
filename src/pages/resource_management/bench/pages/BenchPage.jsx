@@ -129,8 +129,8 @@ const BenchPage = () => {
     setLoadingMatches(true);
     try {
       const res = await getBenchMatches();
-      // const rawData = Array.isArray(res) ? res : res?.data || [];
-      setLiveMatches(res.data);
+      const rawData = Array.isArray(res) ? res : res?.data || [];
+      setLiveMatches(rawData);
     } catch (error) {
       console.error("Match fetch error", error);
       setLiveMatches([]);
