@@ -704,67 +704,36 @@ const coreData = coreRes.data;
     setEmployeeSkillsLoading(true);
     setEmployeeSkillsError("");
     try {
-      // Fetch employee-skills list AND resource-skills records in parallel.
-      // The employee-skills endpoint returns display data but its item.id is the taxonomy
-      // skill UUID, NOT the resource-skill join-table UUID needed for the PUT URL.
-      // The resource-skills endpoint returns the correct join-table UUID (rs.id).
-      const [empResult, rsResult] = await Promise.allSettled([
-        skillService.getEmployeeSkills(targetId),
-        skillService.getResourceSkillsByResource(targetId),
-      ]);
+      // Use the resource-skills endpoint which provides the correct structure with all UUIDs
+      const rsResult = await skillService.getResourceSkillsByResource(targetId);
 
-      if (empResult.status === "rejected") throw empResult.reason;
-      const res = empResult.value;
-
-      const rawData = Array.isArray(res?.data?.skills)
-        ? res.data.skills
-        : Array.isArray(res?.skills)
-          ? res.skills
-          : Array.isArray(res?.data)
-            ? res.data
-            : [];
-
-      // Build lookup: taxonomySkillId → resourceSkillId, skillName → resourceSkillId
-      const rsLookup = {};
-      if (rsResult.status === "fulfilled") {
-        const rsRaw = rsResult.value?.data || rsResult.value || [];
-        (Array.isArray(rsRaw) ? rsRaw : []).forEach(rs => {
-          const rsSkillId = String(rs.skill?.id || rs.skillId || "");
-          const rsSkillName = (rs.skill?.name || "").toLowerCase().trim();
-          if (rsSkillId) rsLookup[rsSkillId] = rs.id;
-          if (rsSkillName) rsLookup[rsSkillName] = rs.id;
-        });
-      }
+      const rawData = Array.isArray(rsResult?.data)
+        ? rsResult.data
+        : [];
 
       const mapped = rawData.map(item => {
-        const taxonomySkillId = item.skill?.id || item.skillId || item.skill_id || "";
-        const skillNameKey = (item.skillName || item.skill?.name || "").toLowerCase().trim();
-
-        // Resolve resourceSkillId: try taxonomy UUID match → item.id match → name match
-        const resourceSkillId =
-          rsLookup[taxonomySkillId] ||
-          rsLookup[String(item.id || "")] ||
-          rsLookup[skillNameKey] ||
-          "";
+        // Map subSkills from API structure
+        const subSkillsArray = (item.subSkills || []).map(ss => ({
+          id: ss.subSkillId || "",
+          subSkillId: ss.subSkillId || "",
+          name: ss.subSkillName || "Unnamed Subskill",
+          proficiencyName: ss.proficiency || "Not Set",
+          proficiencyId: ss.proficiency || "",  // Will be resolved to UUID in modal
+          status: ss.active ? "ACTIVE" : "INACTIVE"
+        }));
 
         return {
-          resourceSkillId,
-          id: resourceSkillId || item.resourceSkillId || item.employeeSkillId || item.id || item.skillId,
-          categoryId: item.categoryId || item.skill?.category?.id || item.category?.id || "",
-          categoryName: item.categoryName || item.category || item.skill?.category?.name || item.category?.name || "General",
-          skillId: item.skill?.id || item.skillId || item.skill_id || "",
-          skillName: item.skillName || item.skill?.name || item.skill || "Unnamed Skill",
-          skillProficiencyId: item.skillProficiencyCode || item.proficiencyId || item.skillProficiencyId || item.proficiency?.proficiencyId || "",
-          proficiencyName: item.skillProficiency || item.proficiencyName || "Not Set",
-          status: item.status || item.skillStatus || "ACTIVE",
-          subSkills: (item.subSkills || item.resourceSubSkills || []).map(ss => ({
-            id: ss.employeeSubSkillId || ss.resourceSubSkillId || ss.id || ss.subSkillId,
-            subSkillId: ss.subSkillId || ss.id || "",
-            name: ss.subSkillName || ss.subSkill || ss.name || "Unnamed Subskill",
-            proficiencyName: ss.proficiency || ss.proficiencyName || "Not Set",
-            proficiencyId: ss.proficiencyCode || ss.proficiencyId || "",
-            status: ss.status || "ACTIVE"
-          }))
+          resourceSkillId: item.resourceSkillId || "",
+          id: item.resourceSkillId || "",
+          categoryId: item.categoryId || "",
+          categoryName: item.categoryName || "General",
+          skillId: item.skillId || "",
+          skillName: item.skillName || "Unnamed Skill",
+          skillProficiencyId: item.proficiency || "",  // Will be resolved to UUID in modal
+          proficiencyName: item.proficiency || "Not Set",
+          proficiency: item.proficiency || "Not Set",  // Keep for modal mapping
+          status: item.active ? "ACTIVE" : "INACTIVE",
+          subSkills: subSkillsArray
         };
       });
 
@@ -1077,6 +1046,13 @@ const coreData = coreRes.data;
     });
   }, [mySkillRequests, mySkillRequestsSearch, mySkillRequestsStatus]);
 
+  // Group skills by skillName and categoryName to show multiple subskills in same card
+  const groupedEmployeeSkills = useMemo(() => {
+    // New API already returns skills properly grouped with nested subSkills
+    // Just return as-is, no additional grouping needed
+    return employeeSkills;
+  }, [employeeSkills]);
+
   /* ── LOADING SCREEN ── */
   if (!employee || hrData === null) {
     return (
@@ -1313,11 +1289,11 @@ const coreData = coreRes.data;
                       {mappedEmployee.employmentType}
                     </span>
                   )}
-                  {Array.isArray(employeeSkills) &&
- employeeSkills.length > 0 && (
+                  {Array.isArray(groupedEmployeeSkills) &&
+ groupedEmployeeSkills.length > 0 && (
                     <span className="epv3-float-chip green">
                       <Award size={14} />
-                      {employeeSkills.length} Skill{employeeSkills.length !== 1 ? "s" : ""}
+                      {groupedEmployeeSkills.length} Skill{groupedEmployeeSkills.length !== 1 ? "s" : ""}
                     </span>
                   )}
                 </div>
@@ -1452,7 +1428,7 @@ const coreData = coreRes.data;
                 { icon: Sparkles, title: "Education",
 label: "Total Education",
 value: (hrData?.education_documents || []).length,                             bg: "#d1fae5", color: "#059669", tab: "documents", config: { folder: "education", search: "" } },
-                { icon: Award,    title: "Skills Overview",   label: "Total Skills",   value: employeeSkills.length,           bg: "#fce7f3", color: "#db2777", tab: "about",     config: null },
+                { icon: Award,    title: "Skills Overview",   label: "Total Skills",   value: groupedEmployeeSkills.length,           bg: "#fce7f3", color: "#db2777", tab: "about",     config: null },
               ].map(({ icon: Icon, title, label, value, bg, color, tab, config }) => (
                 <div key={title} className="epv3-nav-card"
                   onClick={() => handleTabChange(tab, config)}>
@@ -1492,7 +1468,7 @@ value: (hrData?.education_documents || []).length,                             b
                   <div>
                     <h3 className="epv3-display text-white text-sm font-bold">Professional Skillset</h3>
                     <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
-                      {employeeSkills.length} skill{employeeSkills.length !== 1 ? "s" : ""} on record
+                      {groupedEmployeeSkills.length} skill{groupedEmployeeSkills.length !== 1 ? "s" : ""} on record
                     </p>
                   </div>
                 </div>
@@ -1545,9 +1521,9 @@ value: (hrData?.education_documents || []).length,                             b
                       Retry
                     </button>
                   </div>
-                ) : employeeSkills.length > 0 ? (
+                ) : groupedEmployeeSkills.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {employeeSkills.map((record, idx) => {
+                    {groupedEmployeeSkills.map((record, idx) => {
                       const skillId = record.id || `skill-${idx}`;
                       const isExp = expandedSkills.has(skillId);
                       const pfClass = pf(record.proficiencyName);
@@ -1579,7 +1555,7 @@ value: (hrData?.education_documents || []).length,                             b
                               </span>
                               <div className="flex items-center gap-0.5 border-l border-slate-100 pl-2">
                                 <button
-                                  onClick={e => { e.stopPropagation(); setSelectedSkill(record); setIsEditModalOpen(true); }}
+                                  onClick={e => { e.stopPropagation(); setSelectedSkill(record); setIsSkillModalOpen(true); }}
                                   className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#263383] hover:bg-blue-50 transition-all"
                                   title="Edit">
                                   <Edit2 size={11} />
@@ -1788,17 +1764,9 @@ value: (hrData?.education_documents || []).length,                             b
       {isSkillModalOpen && (
         <SkillModal
           employeeId={employee.employee_id}
-          selectedSkill={null}
-          onClose={() => setIsSkillModalOpen(false)}
-          onSaveSuccess={async () => { await fetchEmployeeSkills(); await fetchMySkillRequests(); setIsSkillModalOpen(false); }}
-        />
-      )}
-      {isEditModalOpen && (
-        <EditSkillModal
-          employeeId={employee.employee_id}
-          skillData={selectedSkill}
-          onClose={() => { setIsEditModalOpen(false); setSelectedSkill(null); }}
-          onSaveSuccess={() => { fetchEmployeeSkills(); setIsEditModalOpen(false); setSelectedSkill(null); }}
+          selectedSkill={selectedSkill}
+          onClose={() => { setIsSkillModalOpen(false); setSelectedSkill(null); }}
+          onSaveSuccess={async () => { await fetchEmployeeSkills(); await fetchMySkillRequests(); setIsSkillModalOpen(false); setSelectedSkill(null); }}
         />
       )}
       <ConfirmationModal
