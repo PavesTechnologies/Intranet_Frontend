@@ -182,7 +182,7 @@ export default function EditSkillModal({ employeeId, skillData, onClose, onSaveS
         const mappedSkills = Array.isArray(skillsList) ? skillsList : [];
         setAvailableSkills([...mappedSkills, { id: "OTHER", name: "Other", subSkills: [] }]);
 
-        // Derive skillId if missing
+        // Derive skillId if missingF
         let finalSkillId = sId;
         if (!finalSkillId && skillData.skillName) {
           const found = skillsList.find(s => s.name?.toLowerCase() === skillData.skillName.toLowerCase());
@@ -369,7 +369,33 @@ export default function EditSkillModal({ employeeId, skillData, onClose, onSaveS
           }))
       };
 
-      await skillService.updateSkill(skillData.id, payload);
+      // skillData.resourceSkillId is pre-populated by fetchEmployeeSkills via
+      // GET /api/resource-skills/resource/{resourceId}/skills (the join-table UUID).
+      // Fallback: re-fetch and match by canonical taxonomy skillId (formState.skillId / payload.skillId).
+      let resourceSkillId = skillData.resourceSkillId;
+
+      if (!resourceSkillId && payload.skillId) {
+        const rsRes = await skillService.getResourceSkillsByResource(employeeId);
+        const rsRecords = Array.isArray(rsRes?.data) ? rsRes.data : (Array.isArray(rsRes) ? rsRes : []);
+        const match = rsRecords.find(rs =>
+          String(rs.skill?.id || rs.skillId || "") === String(payload.skillId)
+        );
+        resourceSkillId = match?.id;
+      }
+
+      if (!resourceSkillId) {
+        setError("Unable to resolve resource skill ID. Please reload the page and try again.");
+        return;
+      }
+
+      console.log("🔍 [EditSkillModal] Pre-update:", {
+        resourceSkillId,
+        skillId: payload.skillId,
+        resourceId: Number(employeeId),
+        payload,
+      });
+
+      await skillService.updateSkill(resourceSkillId, payload);
       showStatusToast("Skill mastery updated successfully", "success");
       onSaveSuccess();
     } catch (err) {

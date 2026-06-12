@@ -617,6 +617,7 @@ export default function EmployeeProfileView() {
   const [rawCertifications, setRawCertifications] = useState(null);
   const [expandedSkills, setExpandedSkills] = useState(new Set());
   const [selectedSkill, setSelectedSkill] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, resourceSkillId: null, isDeleting: false });
 
   const toggleExpand = (skillId) => {
     setExpandedSkills(prev => {
@@ -703,7 +704,18 @@ const coreData = coreRes.data;
     setEmployeeSkillsLoading(true);
     setEmployeeSkillsError("");
     try {
-      const res = await skillService.getEmployeeSkills(targetId);
+      // Fetch employee-skills list AND resource-skills records in parallel.
+      // The employee-skills endpoint returns display data but its item.id is the taxonomy
+      // skill UUID, NOT the resource-skill join-table UUID needed for the PUT URL.
+      // The resource-skills endpoint returns the correct join-table UUID (rs.id).
+      const [empResult, rsResult] = await Promise.allSettled([
+        skillService.getEmployeeSkills(targetId),
+        skillService.getResourceSkillsByResource(targetId),
+      ]);
+
+      if (empResult.status === "rejected") throw empResult.reason;
+      const res = empResult.value;
+
       const rawData = Array.isArray(res?.data?.skills)
         ? res.data.skills
         : Array.isArray(res?.skills)
@@ -711,24 +723,51 @@ const coreData = coreRes.data;
           : Array.isArray(res?.data)
             ? res.data
             : [];
-      const mapped = rawData.map(item => ({
-        id: item.employeeSkillId || item.resourceSkillId || item.id || item.skillId,
-        categoryId: item.categoryId || item.skill?.category?.id || item.category?.id || "",
-        categoryName: item.categoryName || item.category || item.skill?.category?.name || item.category?.name || "General",
-        skillId: item.skillId || item.skill_id || item.skill?.id || "",
-        skillName: item.skillName || item.skill?.name || item.skill || "Unnamed Skill",
-        skillProficiencyId: item.skillProficiencyCode || item.proficiencyId || item.skillProficiencyId || item.proficiency?.proficiencyId || "",
-        proficiencyName: item.skillProficiency || item.proficiencyName || "Not Set",
-        status: item.status || item.skillStatus || "ACTIVE",
-        subSkills: (item.subSkills || item.resourceSubSkills || []).map(ss => ({
-          id: ss.employeeSubSkillId || ss.resourceSubSkillId || ss.id || ss.subSkillId,
-          subSkillId: ss.subSkillId || ss.id || "",
-          name: ss.subSkillName || ss.subSkill || ss.name || "Unnamed Subskill",
-          proficiencyName: ss.proficiency || ss.proficiencyName || "Not Set",
-          proficiencyId: ss.proficiencyCode || ss.proficiencyId || "",
-          status: ss.status || "ACTIVE"
-        }))
-      }));
+
+      // Build lookup: taxonomySkillId → resourceSkillId, skillName → resourceSkillId
+      const rsLookup = {};
+      if (rsResult.status === "fulfilled") {
+        const rsRaw = rsResult.value?.data || rsResult.value || [];
+        (Array.isArray(rsRaw) ? rsRaw : []).forEach(rs => {
+          const rsSkillId = String(rs.skill?.id || rs.skillId || "");
+          const rsSkillName = (rs.skill?.name || "").toLowerCase().trim();
+          if (rsSkillId) rsLookup[rsSkillId] = rs.id;
+          if (rsSkillName) rsLookup[rsSkillName] = rs.id;
+        });
+      }
+
+      const mapped = rawData.map(item => {
+        const taxonomySkillId = item.skill?.id || item.skillId || item.skill_id || "";
+        const skillNameKey = (item.skillName || item.skill?.name || "").toLowerCase().trim();
+
+        // Resolve resourceSkillId: try taxonomy UUID match → item.id match → name match
+        const resourceSkillId =
+          rsLookup[taxonomySkillId] ||
+          rsLookup[String(item.id || "")] ||
+          rsLookup[skillNameKey] ||
+          "";
+
+        return {
+          resourceSkillId,
+          id: resourceSkillId || item.resourceSkillId || item.employeeSkillId || item.id || item.skillId,
+          categoryId: item.categoryId || item.skill?.category?.id || item.category?.id || "",
+          categoryName: item.categoryName || item.category || item.skill?.category?.name || item.category?.name || "General",
+          skillId: item.skill?.id || item.skillId || item.skill_id || "",
+          skillName: item.skillName || item.skill?.name || item.skill || "Unnamed Skill",
+          skillProficiencyId: item.skillProficiencyCode || item.proficiencyId || item.skillProficiencyId || item.proficiency?.proficiencyId || "",
+          proficiencyName: item.skillProficiency || item.proficiencyName || "Not Set",
+          status: item.status || item.skillStatus || "ACTIVE",
+          subSkills: (item.subSkills || item.resourceSubSkills || []).map(ss => ({
+            id: ss.employeeSubSkillId || ss.resourceSubSkillId || ss.id || ss.subSkillId,
+            subSkillId: ss.subSkillId || ss.id || "",
+            name: ss.subSkillName || ss.subSkill || ss.name || "Unnamed Subskill",
+            proficiencyName: ss.proficiency || ss.proficiencyName || "Not Set",
+            proficiencyId: ss.proficiencyCode || ss.proficiencyId || "",
+            status: ss.status || "ACTIVE"
+          }))
+        };
+      });
+
       setEmployeeSkills(mapped);
     } catch (err) {
       console.error("Error fetching employee skills:", err);
@@ -767,15 +806,23 @@ const coreData = coreRes.data;
     }
   }, [skillPanelTab]);
 
-  const handleDeleteSkill = async (id) => {
-    if (!window.confirm("Are you sure you want to remove this skill from the profile?")) return;
+  const handleDeleteSkill = (resourceSkillId) => {
+    setDeleteConfirm({ isOpen: true, resourceSkillId, isDeleting: false });
+  };
+
+  const confirmDeleteSkill = async () => {
+    const { resourceSkillId } = deleteConfirm;
+    console.log("🗑️ [confirmDeleteSkill] resourceSkillId:", resourceSkillId);
+    setDeleteConfirm(prev => ({ ...prev, isDeleting: true }));
     try {
-      await skillService.deleteSkill(id);
+      await skillService.deleteSkill(resourceSkillId);
       showStatusToast("Skill removed from profile successfully", "success");
       fetchEmployeeSkills();
     } catch (err) {
       console.error("Delete failed:", err);
-      showStatusToast(err.message || "Failed to delete skill", "error");
+      showStatusToast(err.response?.data?.message || err.message || "Failed to delete skill", "error");
+    } finally {
+      setDeleteConfirm({ isOpen: false, resourceSkillId: null, isDeleting: false });
     }
   };
 
@@ -1460,7 +1507,7 @@ value: (hrData?.education_documents || []).length,                             b
                                   <Edit2 size={11} />
                                 </button>
                                 <button
-                                  onClick={e => { e.stopPropagation(); handleDeleteSkill(record.id); }}
+                                  onClick={e => { e.stopPropagation(); handleDeleteSkill(record.resourceSkillId || record.id); }}
                                   className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
                                   title="Delete">
                                   <Trash2 size={11} />
@@ -1676,6 +1723,17 @@ value: (hrData?.education_documents || []).length,                             b
           onSaveSuccess={() => { fetchEmployeeSkills(); setIsEditModalOpen(false); setSelectedSkill(null); }}
         />
       )}
+      <ConfirmationModal
+        isOpen={deleteConfirm.isOpen}
+        title="Remove Skill"
+        message="Are you sure you want to remove this skill from the profile? This action cannot be undone."
+        confirmText="Remove"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleteConfirm.isDeleting}
+        onConfirm={confirmDeleteSkill}
+        onCancel={() => setDeleteConfirm({ isOpen: false, resourceSkillId: null, isDeleting: false })}
+      />
     </div>
   );
 }
