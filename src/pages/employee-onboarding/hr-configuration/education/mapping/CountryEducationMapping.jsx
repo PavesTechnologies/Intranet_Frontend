@@ -33,8 +33,7 @@ export default function CountryEducationMapping() {
   /* ================= LOAD COUNTRIES ONLY ================= */
   useEffect(() => {
     if (!canView) return;
-    axios
-      .get(`${BASE}/masters/country`, 
+   api.get(`${BASE}/masters/country`, 
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }

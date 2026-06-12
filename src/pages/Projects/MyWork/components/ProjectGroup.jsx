@@ -34,14 +34,14 @@ export default function ProjectGroup({ group, onStatusChange, onMarkDone, onCard
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-3
+    <div className="bg-white border border-slate-200 rounded-xl mb-3
       shadow-sm transition-shadow hover:shadow-md">
 
       {/* ── Group header ────────────────────────────────────────────────────── */}
       <button
         onClick={() => toggleGroup(group.projectId)}
         className="w-full flex items-center justify-between px-4 py-3
-          bg-slate-50 hover:bg-slate-100 transition-colors border-b border-slate-100"
+          bg-slate-50 hover:bg-slate-100 transition-colors border-b border-slate-100 rounded-t-xl"
       >
         <div className="flex items-center gap-2.5">
           {isCollapsed

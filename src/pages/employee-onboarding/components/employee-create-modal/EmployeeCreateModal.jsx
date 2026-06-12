@@ -247,19 +247,24 @@ export default function EmployeeCreateModal({
     }
   };
 
+  // Fetch fresh data only when the modal opens — NOT when initialDepartments /
+  // initialDesignations change, because their default value is a new [] on every
+  // render and would otherwise trigger an infinite fetch loop.
   useEffect(() => {
     if (!isOpen) return;
 
     setActiveTab("Profile");
     setError("");
-    if (initialDepartments.length) {
-      setDepartments(initialDepartments);
-    }
-    if (initialDesignations.length) {
-      setDesignations(initialDesignations);
-    }
     fetchDepartments();
     fetchManagers();
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Seed lists from caller-provided values (only fires when the caller actually
+  // passes non-empty arrays — harmless when they are the default []).
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialDepartments.length) setDepartments(initialDepartments);
+    if (initialDesignations.length) setDesignations(initialDesignations);
   }, [isOpen, initialDepartments, initialDesignations]);
 
   useEffect(() => {

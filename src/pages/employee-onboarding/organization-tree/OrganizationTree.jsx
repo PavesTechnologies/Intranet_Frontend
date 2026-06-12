@@ -278,9 +278,10 @@ export default function OrganizationTree() {
   const [searchValue, setSearchValue] = useState("");
   const [employees, setEmployees] =useState([]);
   const [currentEmployee, setCurrentEmployee] = useState(null);
-  const employeeUuid = localStorage.getItem("employee_id")|| "5100025";
   const token = localStorage.getItem("token");
   const decodedToken = token ? jwtDecode(token) : null;
+  // Use the employee_id from the JWT token — localStorage can hold stale values from previous sessions
+  const employeeUuid = decodedToken?.employee_id || localStorage.getItem("employee_id") || "";
   const [viewMode, setViewMode] = useState("full");
 
 
@@ -373,7 +374,6 @@ const handleExpand = async (node) => {
 };
 
 const loadInitialHierarchy = async () => {
-console.log("employeeUuid", employeeUuid);
   const data = await fetchHierarchy(
     employeeUuid
   );
