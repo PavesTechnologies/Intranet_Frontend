@@ -22,6 +22,7 @@ import EffectiveDeactivationDate from "./models/EffectiveDeactivationDate";
 import CarryForwardTrigger from "./models/CarryForwardTrigger";
 import ApplyLeaveOnBehalf from "./models/ApplyLeaveOnBehalf";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { useAuth } from "../../contexts/AuthContext";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -42,6 +43,8 @@ const HRManageTools = ({ employeeId }) => {
   const [isEffectiveModalOpen, setIsEffectiveModalOpen] = useState(false);
   const [isCarryModalOpen, setIsCarryModalOpen] = useState(false);
   const [OnBehalfOpen, setOnBehalfOpen] = useState(false);
+  const user = useAuth().user;
+
 
   const navigate = useNavigate();
 
@@ -161,28 +164,38 @@ const HRManageTools = ({ employeeId }) => {
                 </h3>
                 <div className="flex gap-3">
                   <Button
-                  onClick={() => {
-                    setEditLeaveType(null);
-                    setIsAddLeaveTypeModalOpen(true);
-                  }}
-                  variant="primary"
-                  size="medium"
-                >
-                  + Add Leave Type
-                </Button>
-                <Button
-                  onClick={() => {
-                    window.open(
-                      "https://celebrated-renewal-07a16fae8e.strapiapp.com/admin/auth/login",
-                      "_blank",
-                      "noopener,noreferrer",
-                    );
-                  }}
-                  variant="secondary"
-                  size="medium"
-                >
-                  Leave Policies
-                </Button>
+                    onClick={() => {
+                      setEditLeaveType(null);
+                      setIsAddLeaveTypeModalOpen(true);
+                    }}
+                    variant="primary"
+                    size="medium"
+                  >
+                    + Add Leave Type
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      window.open(
+                        "https://celebrated-renewal-07a16fae8e.strapiapp.com/admin/auth/login",
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                    }}
+                    variant="secondary"
+                    size="medium"
+                  >
+                    Leave Policies
+                  </Button>
+                  {(user?.roles?.includes("Admin") ||
+                    user?.roles?.includes("Super_Admin")) && (
+                    <Button
+                      onClick={() => navigate("/approval-rules")}
+                      variant="primary"
+                      size="medium"
+                    >
+                      Approval Rules
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -267,7 +280,7 @@ const HRManageTools = ({ employeeId }) => {
               className="grid grid-cols-1 md:grid-cols-2 gap-4"
             >
               <AdminCard
-                title="Bulk Add Holidays"
+                title="Add Holidays"
                 desc="Upload or add multiple calendar holidays."
                 icon={<CalendarDays className="text-red-500" />}
                 onClick={() => setIsAddHolidaysModalOpen(true)}
