@@ -1054,9 +1054,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
       (item) =>
         item.status === "ACTIVE" &&
         item.roleOffStatus !== "FULFILLED" &&
-        item.roleOffStatus !== "CANCELLED" &&
         item.roleOffStatus !== "CLOSED" &&
-        (item.roleOffStatus === "NOT_REQUESTED" || item.roleOffStatus === "REJECTED"),
+        (item.roleOffStatus === "NOT_REQUESTED" || item.roleOffStatus === "REJECTED" || item.roleOffStatus === "CANCELLED"),
     ).length,
     process: scopedAllocations.filter(
       (item) =>
@@ -1091,9 +1090,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             return (
               item.status === "ACTIVE" &&
               item.roleOffStatus !== "FULFILLED" &&
-              item.roleOffStatus !== "CANCELLED" &&
               item.roleOffStatus !== "CLOSED" &&
-              (item.roleOffStatus === "NOT_REQUESTED" || item.roleOffStatus === "REJECTED")
+              (item.roleOffStatus === "NOT_REQUESTED" || item.roleOffStatus === "REJECTED" || item.roleOffStatus === "CANCELLED")
             );
           }
 
@@ -1118,8 +1116,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
           return (
             item.status === "ACTIVE" &&
             item.roleOffStatus !== "FULFILLED" &&
-            item.roleOffStatus !== "CANCELLED" &&
-            (item.roleOffStatus === "NOT_REQUESTED" || item.roleOffStatus === "REJECTED")
+            (item.roleOffStatus === "NOT_REQUESTED" || item.roleOffStatus === "REJECTED" || item.roleOffStatus === "CANCELLED")
           );
         })
         : mode === "rm"
@@ -1315,7 +1312,8 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
         action !== "view" &&
         row.roleOffStatus &&
         row.roleOffStatus !== "NOT_REQUESTED" &&
-        row.roleOffStatus !== "REJECTED"
+        row.roleOffStatus !== "REJECTED" &&
+        row.roleOffStatus !== "CANCELLED"
       ) {
         notify.warning(
           `A Roll-Off Request Is Already In Progress For ${row.resource} (Status: ${row.roleOffStatus}). ` +

@@ -453,69 +453,80 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
       if (isEditMode) {
         if (!activeSkill) throw new Error("No active skill to update.");
 
-        // Validate that we have the required skillId
-        if (!activeSkill.skillId) {
-          setError("Skill ID is missing. Cannot update skill.");
-          setSaving(false);
-          return;
-        }
+        const catName =
+          selectedSkill?.categoryName ||
+          categories.find(c => c.id === activeSkill.categoryId)?.name ||
+          "";
 
-        // Backend expects only UUID fields, no names
         const payload = {
           resourceId: String(employeeId),
-          skillId: activeSkill.skillId,
-          proficiencyId: activeSkill.skillProficiencyId,
-          subSkills: activeSkill.subSkills.map(ss => ({
-            subSkillId: ss.id,
-            proficiencyId: ss.proficiencyId
-          }))
+          skills: [
+            {
+              categoryId: activeSkill.categoryId || selectedSkill?.categoryId || null,
+              categoryName: catName,
+              categoryActive: true,
+              skillId: activeSkill.skillId || null,
+              skillName: activeSkill.skillName,
+              proficiencyId: activeSkill.skillProficiencyId,
+              status: "ACTIVE",
+              subSkills: activeSkill.subSkills.map(ss => ({
+                subSkillId: ss.id || null,
+                subSkillName: ss.name,
+                proficiencyId: ss.proficiencyId,
+                status: "ACTIVE",
+              })),
+            },
+          ],
         };
 
-        await skillService.updateSkill(selectedSkill.resourceSkillId, payload);
-        showStatusToast("Skill mastery updated successfully", "success");
-      } else {
-        const hasNewTaxonomy = isNewCategory || draftSkills.some(item => !item.skillId);
-        const payload = hasNewTaxonomy
-          ? {
-              resourceId: String(employeeId),
-              categories: [{
-                categoryName: isNewCategory ? newCategoryName : categories.find(c => c.id === selectedCategoryId)?.name,
-                skills: draftSkills.map(item => ({
-                  skillName: item.skillName,
-                  proficiencyId: item.skillProficiencyId,
-                  status: "ACTIVE",
-                  subSkills: item.subSkills.map(ss => ({
-                    subSkillName: ss.name,
-                    proficiencyId: ss.proficiencyId,
-                    status: "ACTIVE"
-                  }))
-                }))
-              }]
-            }
-          : {
-              resourceId: String(employeeId),
-              skills: draftSkills.map(item => ({
-                skillId: item.skillId || null,
-                skillName: item.skillName,
-                proficiencyId: item.skillProficiencyId,
-                status: "ACTIVE",
-                subSkills: item.subSkills.map(ss => ({
-                  subSkillId: ss.id || null,
-                  subSkillName: ss.name,
-                  proficiencyId: ss.proficiencyId,
-                  status: "ACTIVE"
-                }))
-              }))
-            };
+        await skillService.saveEmployeeSkills(payload);
 
-        if (hasNewTaxonomy) {
-          await skillService.saveSkillTaxonomyRequest(payload);
+        const newSubCount = activeSkill.subSkills.filter(ss => !ss.id).length;
+        if (newSubCount > 0) {
+          showStatusToast(`Skill updated. ${newSubCount} new subskill(s) sent for admin approval`, "success");
         } else {
-          await skillService.saveEmployeeSkills(payload);
+          showStatusToast("Skill mastery updated successfully", "success");
         }
+      } else {
+        const catName = isNewCategory
+          ? newCategoryName.trim()
+          : categories.find(c => c.id === selectedCategoryId)?.name || "";
 
-        showStatusToast("Skills saved to profile successfully", "success");
+        const payload = {
+          resourceId: String(employeeId),
+          skills: draftSkills.map(item => ({
+            categoryId: item.categoryId || null,
+            categoryName: catName,
+            categoryActive: true,
+            skillId: item.skillId || null,
+            skillName: item.skillName,
+            proficiencyId: item.skillProficiencyId,
+            status: "ACTIVE",
+            subSkills: item.subSkills.map(ss => ({
+              subSkillId: ss.id || null,
+              subSkillName: ss.name,
+              proficiencyId: ss.proficiencyId,
+              status: "ACTIVE",
+            })),
+          })),
+        };
+
+        await skillService.saveEmployeeSkills(payload);
+
+        const newSkillCount = draftSkills.filter(s => !s.skillId).length;
+        const newSubSkillCount = draftSkills.reduce((acc, s) => acc + s.subSkills.filter(ss => !ss.id).length, 0);
+        const pendingCount = newSkillCount + newSubSkillCount;
+        const mappedCount = draftSkills.filter(s => s.skillId).length;
+
+        if (pendingCount > 0 && mappedCount > 0) {
+          showStatusToast(`${mappedCount} skill(s) mapped, ${pendingCount} item(s) sent for admin approval`, "success");
+        } else if (pendingCount > 0) {
+          showStatusToast(`${pendingCount} item(s) sent for admin approval`, "success");
+        } else {
+          showStatusToast("Skills saved to profile successfully", "success");
+        }
       }
+
       setDraftSkills([]);
       setActiveSkillId("");
       setSelectedCategoryId("");
@@ -652,6 +663,7 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
                   <div className="mt-4 flex flex-wrap gap-2">
                     {draftSkills.map((skill) => {
                       const isActive = String(skill.id) === String(activeSkillId);
+                      const isPending = !skill.skillId;
                       return (
                         <button
                           key={skill.id}
@@ -659,11 +671,18 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
                           onClick={() => setActiveSkillId(skill.id)}
                           className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                             isActive
-                              ? "border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm"
+                              ? isPending
+                                ? "border-amber-300 bg-amber-50 text-amber-700 shadow-sm"
+                                : "border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm"
                               : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                           }`}
                         >
                           <span>{skill.skillName}</span>
+                          {isPending && (
+                            <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[9px] font-bold text-amber-800 leading-none">
+                              NEW
+                            </span>
+                          )}
                           <span
                             role="button"
                             onClick={(e) => {
@@ -977,35 +996,53 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
                     No skills drafted yet
                   </div>
                 ) : (
-                  draftSkills.map((skill, idx) => (
-                    <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span className="text-sm font-semibold text-slate-800">{skill.skillName}</span>
-                          <div className="mt-1">
-                            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold bg-indigo-100 text-indigo-700">
-                              {proficiencies.find(p => String(p.id) === String(skill.skillProficiencyId))?.name || "Not Set"}
-                            </span>
+                  draftSkills.map((skill, idx) => {
+                    const isNewSkillEntry = !skill.skillId;
+                    return (
+                      <div key={idx} className={`rounded-xl border p-3 space-y-2 ${isNewSkillEntry ? "border-amber-200 bg-amber-50/40" : "border-slate-200 bg-slate-50"}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-semibold text-slate-800">{skill.skillName}</span>
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold bg-indigo-100 text-indigo-700">
+                                {proficiencies.find(p => String(p.id) === String(skill.skillProficiencyId))?.name || "Not Set"}
+                              </span>
+                              {isNewSkillEntry && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
+                                  ⏳ Pending approval
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {skill.subSkills.length > 0 ? (
-                        <div className="mt-3 space-y-2 border-l-2 border-slate-200 pl-3">
-                          {skill.subSkills.map((ss, ssIdx) => (
-                            <div key={ssIdx} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
-                              <span className="text-xs font-medium text-slate-700">{ss.name}</span>
-                              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-600">
-                                {proficiencies.find(p => String(p.id) === String(ss.proficiencyId))?.name || ""}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="mt-3 text-xs text-slate-400 italic">No subskills added.</p>
-                      )}
-                    </div>
-                  ))
+                        {skill.subSkills.length > 0 ? (
+                          <div className="mt-3 space-y-2 border-l-2 border-slate-200 pl-3">
+                            {skill.subSkills.map((ss, ssIdx) => {
+                              const isNewSub = !ss.id;
+                              return (
+                                <div key={ssIdx} className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 ${isNewSub ? "bg-amber-50 border border-amber-100" : "bg-white"}`}>
+                                  <span className="text-xs font-medium text-slate-700">{ss.name}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-600">
+                                      {proficiencies.find(p => String(p.id) === String(ss.proficiencyId))?.name || ""}
+                                    </span>
+                                    {isNewSub && (
+                                      <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                        ⏳ Pending
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-xs text-slate-400 italic">No subskills added.</p>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
