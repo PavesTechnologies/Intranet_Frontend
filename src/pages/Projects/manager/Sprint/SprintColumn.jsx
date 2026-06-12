@@ -63,6 +63,14 @@ const SprintColumn = ({
 
   const isCompleted = sprint.status === "COMPLETED";
 
+  const getNameSize = (name = "") => {
+    const len = name.length;
+    if (len <= 10) return "text-base";
+    if (len <= 20) return "text-lg";
+    if (len <= 30) return "text-xl";
+    return "text-2xl";
+  };
+
   const formatPrettyDate = (dateStr) => {
     if (!dateStr) return "-";
     const d = new Date(dateStr);
@@ -138,7 +146,7 @@ const SprintColumn = ({
         <div className="flex items-center gap-3">
           {expanded ? <ChevronDownIcon size={20} className="text-gray-500" /> : <ChevronRightIcon size={20} className="text-gray-500" />}
 
-          <h3 className="font-semibold text-gray-900 text-[16px]">
+          <h3 className={`font-semibold text-gray-900 ${getNameSize(sprint.name)}`}>
             {sprint.name || "Unnamed Sprint"}
           </h3>
 

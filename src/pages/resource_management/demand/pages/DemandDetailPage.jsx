@@ -62,6 +62,33 @@ const InfoRow = ({ label, value, icon: Icon, colorClass = "text-slate-900" }) =>
     </div>
 );
 
+const parseDemandDate = (dateValue) => {
+    if (!dateValue) return null;
+    const parsedDate = new Date(dateValue);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
+
+const formatDemandDate = (dateValue) => {
+    const parsedDate = parseDemandDate(dateValue);
+    return parsedDate
+        ? parsedDate.toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+        })
+        : null;
+};
+
+const getDaysBetween = (startDate, endDate) => {
+    const start = parseDemandDate(startDate);
+    const end = parseDemandDate(endDate);
+
+    if (!start || !end) return null;
+
+    const millisecondsPerDay = 1000 * 60 * 60 * 24;
+    return Math.max(0, Math.round((end - start) / millisecondsPerDay));
+};
+
 const normalizeDemandDetail = (demand = {}) => {
     const normalizedDemandType =
         demand.demandType ||
@@ -118,6 +145,7 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
     const slaId = sla?.demandSlaId;
     const remainingDays = sla?.remainingDays ?? 0;
     const progress = Math.min(100, Math.max(0, ((sla?.slaDurationDays - remainingDays) / sla?.slaDurationDays) * 100)) || 0;
+    const fulfilledDate = formatDemandDate(sla?.fulfillDate);
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -171,14 +199,24 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
                         ) : (
                             <div className="space-y-3">
                                 <div className="flex justify-between items-end">
-                                    <span className={cn("text-lg font-black tracking-tighter", remainingDays < 0 ? "text-rose-600" : "text-slate-900")}>
-                                        {remainingDays} Days Left
+                                    <span className={cn("text-lg font-black tracking-tighter", fulfilledDate ? "text-emerald-600" : remainingDays < 0 ? "text-rose-600" : "text-slate-900")}>
+                                        {fulfilledDate ? "Fulfilled" : `${remainingDays} Days Left`}
                                     </span>
-                                    <PendingIcon className="h-4 w-4 text-indigo-500" />
+                                    {fulfilledDate ? (
+                                        <SuccessIcon className="h-4 w-4 text-emerald-500" />
+                                    ) : (
+                                        <PendingIcon className="h-4 w-4 text-indigo-500" />
+                                    )}
                                 </div>
                                 <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                                    <div className="h-full bg-indigo-600 rounded-full transition-all duration-1000" style={{ width: `${progress}%` }} />
+                                    <div className={cn("h-full rounded-full transition-all duration-1000", fulfilledDate ? "bg-emerald-500" : "bg-indigo-600")} style={{ width: `${progress}%` }} />
                                 </div>
+                                {fulfilledDate && (
+                                    <div className="flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2">
+                                        <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Fulfilled Date</span>
+                                        <span className="text-[10px] font-black text-emerald-700">{fulfilledDate}</span>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </DetailCard>
@@ -604,9 +642,14 @@ const SLAInsightsTab = ({ sla }) => {
     const totalDays = sla?.slaDurationDays || 30;
     const remaining = sla?.remainingDays || 0;
     const warningDays = sla?.warningThresholdDays || 5;
+    const fulfilledDate = formatDemandDate(sla?.fulfillDate);
+    const fulfilledDay = getDaysBetween(sla?.slaCreatedAt, sla?.fulfillDate);
 
     // Position marker for "Today"
-    const todayPos = ((totalDays - remaining) / totalDays) * 100;
+    const todayPos = Math.min(100, Math.max(0, ((totalDays - remaining) / totalDays) * 100));
+    const fulfilledPos = fulfilledDay === null
+        ? null
+        : Math.min(100, Math.max(0, (fulfilledDay / totalDays) * 100));
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -635,6 +678,16 @@ const SLAInsightsTab = ({ sla }) => {
                             </div>
                         </div>
 
+                        {/* Fulfilled Marker */}
+                        {fulfilledPos !== null && (
+                            <div className="absolute top-0" style={{ left: `${fulfilledPos}%`, transform: 'translateX(-50%)' }}>
+                                <div className="flex flex-col items-center">
+                                    <div className="px-1 py-0.5 bg-emerald-600 text-white rounded text-[6px] font-black mb-0.5 shadow-lg ring-4 ring-white">Fulfilled</div>
+                                    <div className="h-8 w-1 bg-emerald-600 shadow-[0_0_12px_rgba(5,150,105,0.35)]" />
+                                </div>
+                            </div>
+                        )}
+
                         {/* Endpoints */}
                         <div className="flex justify-between items-center mt-2 text-[7px] font-black tracking-widest text-slate-400">
                             <div className="flex flex-col">
@@ -650,8 +703,12 @@ const SLAInsightsTab = ({ sla }) => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-50">
                         <div className="text-center">
-                            <span className="text-2xl font-black text-slate-900 tracking-tighter">{remaining}</span>
-                            <p className="text-[8px] font-bold text-slate-400 tracking-widest mt-1">Days Remaining</p>
+                            <span className={cn("text-2xl font-black tracking-tighter", fulfilledDate ? "text-emerald-600" : "text-slate-900")}>
+                                {fulfilledDate ? fulfilledDate : remaining}
+                            </span>
+                            <p className="text-[8px] font-bold text-slate-400 tracking-widest mt-1">
+                                {fulfilledDate ? "Fulfilled Date" : "Days Remaining"}
+                            </p>
                         </div>
                         <div className="text-center">
                             <span className="text-2xl font-black text-amber-600 tracking-tighter">{warningDays}</span>

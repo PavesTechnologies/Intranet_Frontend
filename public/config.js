@@ -1,3 +1,4 @@
+// public/config.js -> for FRONTEND only
 window.__APP_CONFIG__ = {
   // TIMESHEET_API_ENDPOINT: "http://13.204.95.26:5000",
   TIMESHEET_API_ENDPOINT: "http://localhost:5000",
@@ -11,4 +12,6 @@ window.__APP_CONFIG__ = {
   EMPLOYEE_ONBOARDING_URL: "http://localhost:8001/ems",  
   // RMS_BASE_URL: "http://13.204.95.26:8002",
 RMS_BASE_URL: "http://13.207.112.154/rms",
+  
+    // RMS_BASE_URL: "http://localhost:8080"
 };
