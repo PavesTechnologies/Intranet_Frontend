@@ -1,53 +1,17 @@
-name: Deploy Frontend to EC2
+name: Restrict Merges to Main
 
 on:
-  push:
+  pull_request:
     branches:
       - main
 
 jobs:
-  build-and-deploy:
+  verify-source-branch:
     runs-on: ubuntu-latest
-
     steps:
-      # 1) Checkout source code
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # 2) Login to Docker Hub
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      # 3) Build Docker image
-      - name: Build Docker image
+      - name: Check if source is dev
+        if: github.head_ref != 'dev'
         run: |
-          docker build -t pavesadmin/intranet-fe:latest .
-
-      # 4) Push Docker image
-      - name: Push Docker image
-        run: |
-          docker push pavesadmin/intranet-fe:latest
-
-      # 5) Deploy only frontend on EC2
-      - name: Deploy frontend
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd ~/deploy
-
-            echo "Pulling latest frontend image..."
-            docker compose pull 
-
-            echo "Recreating ONLY the frontend container..."
-            docker compose up -d --force-recreate frontend
-
-            echo "Cleaning old unused images..."
-            docker image prune -f
-
-            echo "Frontend deployed successfully to EC2."
+          echo "FAIL: Merges into 'main' are only allowed from the 'dev' branch."
+          echo "Your source branch is currently '${{ github.head_ref }}'."
+          exit 1
