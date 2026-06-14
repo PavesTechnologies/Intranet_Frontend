@@ -77,7 +77,7 @@ const Timeline = ({ projectId }) => {
   const toEnd = (d) => (d ? dayjs(d).endOf("day") : null);
 
   const fallbackStart = (item) =>
-    toStart(item?.startDate || item?.start_date) || startTimeline;
+    toStart(item?.startedAt || item?.startDate || item?.start_date) || startTimeline;
   const fallbackEnd = (item) =>
     toEnd(item?.endDate || item?.end_date || item?.dueDate || item?.due_date) ||
     fallbackStart(item).add(6, "day");

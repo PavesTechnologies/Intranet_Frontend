@@ -45,6 +45,7 @@ export const EO_SUBMENU = [
     allowedRoles: MANAGEMENT_ROLES,
     children: [
       { label: "Workflow Overview",   to: "/employee-onboarding" },
+      { label: "Admin Dashboard",   to: "/employee-onboarding/admin/offer-letters", allowedRoles: ADMIN_ROLES },
       { label: "Offer Management",     to: "/employee-onboarding/create",           allowedRoles: [ROLES.HR] },
       { label: "Data Import",       to: "/employee-onboarding/bulk-upload",      allowedRoles: [ROLES.HR] },
       { label: "Task Configuration",         to: "/employee-onboarding/onboarding-task",  allowedRoles: HR_ADMIN },

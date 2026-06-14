@@ -1095,23 +1095,152 @@ const ManageSkillTaxonomy = () => {
   };
 
   const handleDownloadTaxonomy = async () => {
-    try {
-      setDownloadingTaxonomy(true);
-
-      const blob = await skillService.downloadSkillTaxonomyExcel();
+    const downloadBlob = (blob, filename) => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
-
       link.href = url;
-      link.download = "skill-taxonomy.xlsx";
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+    };
 
-      notify.success("Skill taxonomy downloaded successfully.");
-    } catch (error) {
-      notify.error(error, "Failed to download taxonomy.");
+    const escapeCsv = (value) => {
+      if (value === null || value === undefined) return "";
+      const s = String(value);
+      if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
+    const exportCsvFallback = async () => {
+      try {
+        const categoriesResp = await skillService.getAllCategories();
+        const categories = Array.isArray(categoriesResp?.data) ? categoriesResp.data : categoriesResp;
+
+        // Build CSV header
+        const headers = [
+          "Category ID",
+          "Category Name",
+          "Category Description",
+          "Category Active",
+          "Skill ID",
+          "Skill Name",
+          "Skill Description",
+          "Skill Active",
+          "SubSkill ID",
+          "SubSkill Name",
+          "SubSkill Description",
+          "SubSkill Active",
+        ];
+
+        const rows = [headers.join(",")];
+
+        for (const category of categories || []) {
+          let skills = [];
+          try {
+            const resp = await skillService.getSkillsByCategoryDto(category.id);
+            skills = Array.isArray(resp?.data) ? resp.data : resp;
+          } catch (_) {
+            skills = [];
+          }
+
+          if (!skills || skills.length === 0) {
+            const row = [
+              escapeCsv(category.id),
+              escapeCsv(category.name),
+              escapeCsv(category.description),
+              escapeCsv(category.active),
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+            ];
+            rows.push(row.join(","));
+            continue;
+          }
+
+          for (const skill of skills) {
+            let subSkills = [];
+            try {
+              const resp = await skillService.getSubSkillsBySkillDto(skill.id);
+              subSkills = Array.isArray(resp?.data) ? resp.data : resp;
+            } catch (_) {
+              subSkills = [];
+            }
+
+            if (!subSkills || subSkills.length === 0) {
+              const row = [
+                escapeCsv(category.id),
+                escapeCsv(category.name),
+                escapeCsv(category.description),
+                escapeCsv(category.active),
+                escapeCsv(skill.id),
+                escapeCsv(skill.name),
+                escapeCsv(skill.description),
+                escapeCsv(skill.active),
+                "",
+                "",
+                "",
+                "",
+              ];
+              rows.push(row.join(","));
+              continue;
+            }
+
+            for (const sub of subSkills) {
+              const row = [
+                escapeCsv(category.id),
+                escapeCsv(category.name),
+                escapeCsv(category.description),
+                escapeCsv(category.active),
+                escapeCsv(skill.id),
+                escapeCsv(skill.name),
+                escapeCsv(skill.description),
+                escapeCsv(skill.active),
+                escapeCsv(sub.id),
+                escapeCsv(sub.name),
+                escapeCsv(sub.description),
+                escapeCsv(sub.active),
+              ];
+              rows.push(row.join(","));
+            }
+          }
+        }
+
+        const csvContent = rows.join("\r\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        downloadBlob(blob, "skill-taxonomy.csv");
+        notify.success("Skill taxonomy exported as CSV successfully.");
+      } catch (err) {
+        notify.error(err, "Failed to export taxonomy fallback.");
+      }
+    };
+
+    try {
+      setDownloadingTaxonomy(true);
+
+      // Primary: try server-side Excel export
+      try {
+        const blob = await skillService.downloadSkillTaxonomyExcel();
+        if (blob) {
+          downloadBlob(blob, "skill-taxonomy.xlsx");
+          notify.success("Skill taxonomy downloaded successfully.");
+          return;
+        }
+      } catch (err) {
+        // fallthrough to CSV fallback
+        console.warn("Server-side export failed, falling back to client CSV export", err);
+      }
+
+      // Fallback: build CSV from API data
+      await exportCsvFallback();
     } finally {
       setDownloadingTaxonomy(false);
     }
@@ -1496,15 +1625,26 @@ const ManageSkillTaxonomy = () => {
                     </Button>
                   )}
                 </div>
-                <Button
-                  variant="primary"
-                  size="medium"
-                  onClick={() => setOpenSkillManagement(true)}
-                  className="h-11 px-5"
-                >
-                  <JobIcon className="h-4 w-4" />
-                  Skill Management
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="medium"
+                    onClick={handleDownloadTaxonomy}
+                    className="h-11 px-4"
+                    loading={downloadingTaxonomy}
+                  >
+                    Export Taxonomy
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="medium"
+                    onClick={() => setOpenSkillManagement(true)}
+                    className="h-11 px-5"
+                  >
+                    <JobIcon className="h-4 w-4" />
+                    Skill Management
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="relative w-full shrink-0 sm:w-80 lg:w-96">

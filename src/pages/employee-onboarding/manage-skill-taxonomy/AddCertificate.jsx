@@ -312,13 +312,11 @@ const SearchableSkillSelect = ({
             >
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Combobox.Input
-                className="w-full border-none bg-transparent py-2.5 pl-9 pr-10 text-sm text-gray-900 outline-none focus:ring-0 disabled:cursor-not-allowed"
+                className="w-full border-none bg-transparent py-2.5 pl-9 pr-10 text-sm text-gray-900 outline-none focus:ring-0"
                 displayValue={() => selectedOption?.name || ""}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={
-                  loading ? "Loading skills..." : "Search and select a skill"
-                }
-                autoComplete="off"
+                onFocus={() => onFocus && onFocus()}
+                placeholder="Select Skill"
+                readOnly
               />
               {loading ? (
                 <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-indigo-500" />
@@ -343,6 +341,17 @@ const SearchableSkillSelect = ({
               afterLeave={() => setQuery("")}
             >
               <Combobox.Options className="absolute z-50 mt-2 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl focus:outline-none">
+                {/* ADD THIS SEARCH BOX */}
+                <div className="sticky top-0 bg-white p-2 border-b">
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search Skill..."
+                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                  />
+                </div>
+
                 {filteredOptions.length === 0 ? (
                   <div className="rounded-lg bg-gray-50 px-3 py-4 text-center text-sm text-gray-500">
                     No skills found
@@ -360,6 +369,124 @@ const SearchableSkillSelect = ({
                               ? "bg-indigo-50 text-indigo-700"
                               : "text-gray-700"
                         }`
+                      }
+                    >
+                      {({ selected }) => (
+                        <>
+                          <span className="block truncate">{option.name}</span>
+                          {selected ? (
+                            <Check className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                          ) : null}
+                        </>
+                      )}
+                    </Combobox.Option>
+                  ))
+                )}
+              </Combobox.Options>
+            </Transition>
+          </div>
+        )}
+      </Combobox>
+      <FieldError message={error} />
+    </div>
+  );
+};
+
+const SearchableCategorySelect = ({
+  value,
+  onChange,
+  options,
+  loading,
+  error,
+  disabled,
+  onFocus,
+}) => {
+  const [query, setQuery] = useState("");
+  const selectedOption = options.find(
+    (option) => String(option.id) === String(value),
+  );
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = normalize(query);
+    if (!normalizedQuery) return options;
+    return options.filter((option) =>
+      `${option.name} ${option.description || ""}`
+        .toLowerCase()
+        .includes(normalizedQuery),
+    );
+  }, [options, query]);
+
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-semibold text-gray-800">
+        Skill Category
+      </label>
+      <Combobox
+        value={value}
+        onChange={(nextValue) => {
+          onChange(nextValue);
+          setQuery("");
+        }}
+        disabled={disabled}
+      >
+        {({ open }) => (
+          <div className="relative">
+            <Combobox.Button
+              as="div"
+              className={`relative w-full rounded-xl border bg-white shadow-sm transition ${
+                error
+                  ? "border-rose-300 focus-within:border-rose-500 focus-within:ring-2 focus-within:ring-rose-500/10"
+                  : "border-gray-200 hover:border-indigo-300 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/10"
+              } ${disabled ? "cursor-not-allowed bg-gray-50 opacity-70" : ""}`}
+            >
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Combobox.Input
+                className="w-full border-none bg-transparent py-2.5 pl-9 pr-10 text-sm text-gray-900 outline-none focus:ring-0"
+                displayValue={() => selectedOption?.name || ""}
+                onFocus={() => onFocus && onFocus()}
+                placeholder="Select Category"
+                readOnly
+              />
+              {loading ? (
+                <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-indigo-500" />
+              ) : (
+                <ChevronDown
+                  className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 transition ${open ? "rotate-180 text-indigo-600" : ""}`}
+                />
+              )}
+            </Combobox.Button>
+
+            <Transition
+              as={Fragment}
+              show={open}
+              enter="transition ease-out duration-150"
+              enterFrom="translate-y-1 opacity-0"
+              enterTo="translate-y-0 opacity-100"
+              leave="transition ease-in duration-100"
+              leaveFrom="translate-y-0 opacity-100"
+              leaveTo="translate-y-1 opacity-0"
+              afterLeave={() => setQuery("")}
+            >
+              <Combobox.Options className="absolute z-50 mt-2 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl focus:outline-none">
+                <div className="sticky top-0 bg-white p-2 border-b">
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search category..."
+                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                  />
+                </div>
+                {filteredOptions.length === 0 ? (
+                  <div className="rounded-lg bg-gray-50 px-3 py-4 text-center text-sm text-gray-500">
+                    No categories found
+                  </div>
+                ) : (
+                  filteredOptions.map((option) => (
+                    <Combobox.Option
+                      key={option.id}
+                      value={option.id}
+                      className={({ active, selected }) =>
+                        `relative cursor-pointer rounded-lg py-2.5 pl-10 pr-4 text-sm transition ${selected ? "bg-indigo-600 font-semibold text-white" : active ? "bg-indigo-50 text-indigo-700" : "text-gray-700"}`
                       }
                     >
                       {({ selected }) => (
@@ -727,17 +854,14 @@ const CertificateForm = ({
           />
           {!isGeneralCertificate ? (
             <>
-              <SelectField
-                label="Skill Category"
+              <SearchableCategorySelect
                 value={form.categoryId}
                 onChange={(value) => updateField("categoryId", value)}
                 options={categories}
+                loading={loadingCategories}
+                error={errors.categoryId}
+                disabled={loadingCategories}
                 onFocus={loadCategories}
-                placeholder={
-                  loadingCategories
-                    ? "Loading categories..."
-                    : "Select category"
-                }
               />
               <SearchableSkillSelect
                 value={form.skillId}
@@ -775,24 +899,23 @@ const CertificateForm = ({
       </div>
 
       <div className="flex flex-col-reverse gap-3 border-t border-gray-100 bg-gray-50/70 px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
-        <Button
+        <button
           type="button"
-          variant="outline"
           onClick={onCancel}
-          className="w-full sm:w-auto"
+          disabled={saving}
+          className="rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 w-full sm:w-auto"
         >
-          <X className="h-4 w-4" />
           Cancel
-        </Button>
-        <Button
+        </button>
+
+        <button
           type="submit"
-          loading={saving}
-          loadingText="Saving..."
-          className="w-full sm:w-auto"
+          disabled={saving}
+          className="inline-flex min-w-[92px] items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:bg-indigo-300 disabled:shadow-none w-full sm:w-auto"
         >
-          <Check className="h-4 w-4" />
-          Save
-        </Button>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          <span>{saving ? "Saving..." : "Save"}</span>
+        </button>
       </div>
     </form>
   );
@@ -965,7 +1088,11 @@ const CertificateLanding = () => {
   }, [certificates, isGeneral, searchTerm]);
 
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(visibleCertificates.length / CERTIFICATES_PAGE_SIZE)),
+    () =>
+      Math.max(
+        1,
+        Math.ceil(visibleCertificates.length / CERTIFICATES_PAGE_SIZE),
+      ),
     [visibleCertificates.length],
   );
 
@@ -1281,8 +1408,12 @@ const CertificateLanding = () => {
                   <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
-                    onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                    onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    onPrevious={() =>
+                      setCurrentPage((page) => Math.max(1, page - 1))
+                    }
+                    onNext={() =>
+                      setCurrentPage((page) => Math.min(totalPages, page + 1))
+                    }
                   />
                 </div>
               )}

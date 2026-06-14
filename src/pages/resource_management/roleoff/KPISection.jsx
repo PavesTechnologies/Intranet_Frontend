@@ -3,7 +3,7 @@ import { KPICard } from "../../../components/kpi/KPI";
 
 const KPISection = ({ items = [] }) => {
   return (
-    <div className="flex flex-nowrap gap-4 overflow-x-auto">
+    <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {items.map((item) => (
         <KPICard
           key={item.label}
@@ -11,7 +11,7 @@ const KPISection = ({ items = [] }) => {
           value={item.value}
           icon={item.icon}
           color={item.iconWrapperClassName || "bg-slate-100 text-slate-700"}
-          className="min-w-[220px] flex-1"
+          className="h-full w-full"
         />
       ))}
     </div>
