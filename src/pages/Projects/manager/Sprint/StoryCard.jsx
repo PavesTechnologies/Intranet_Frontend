@@ -38,14 +38,16 @@ const StoryCard = ({
   const menuRef = useRef(null);
   const menuBtnRef = useRef(null);
   const epicBtnRef = useRef(null);
+  const sprintDropdownRef = useRef(null);
+  const epicDropdownRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (
-        menuRef.current && !menuRef.current.contains(event.target) &&
-        (!menuBtnRef.current || !menuBtnRef.current.contains(event.target)) &&
-        (!epicBtnRef.current || !epicBtnRef.current.contains(event.target))
-      ) {
+      const inMenuBtn        = menuBtnRef.current?.contains(event.target);
+      const inEpicBtn        = epicBtnRef.current?.contains(event.target);
+      const inSprintDropdown = sprintDropdownRef.current?.contains(event.target);
+      const inEpicDropdown   = epicDropdownRef.current?.contains(event.target);
+      if (!inMenuBtn && !inEpicBtn && !inSprintDropdown && !inEpicDropdown) {
         setShowMenu(false);
         setShowEpicList(false);
       }
@@ -117,7 +119,7 @@ const StoryCard = ({
       </span>
 
       {/* Add Epic */}
-      {story.epicId === null && (
+      {!story.epicId && (
         <button
           ref={epicBtnRef}
           onClick={handleToggleEpicList}
@@ -145,6 +147,7 @@ const StoryCard = ({
       {/* Sprint dropdown — fixed portal to escape overflow containers */}
       {showMenu && ReactDOM.createPortal(
         <div
+          ref={sprintDropdownRef}
           style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
           className="w-44 bg-white border border-gray-100 rounded-lg shadow-xl py-1 overflow-hidden"
         >
@@ -175,6 +178,7 @@ const StoryCard = ({
       {/* Epic dropdown — fixed portal to escape overflow containers */}
       {showEpicList && ReactDOM.createPortal(
         <div
+          ref={epicDropdownRef}
           style={{ position: "fixed", top: epicPos.top, right: epicPos.right, zIndex: 9999 }}
           className="w-48 bg-white border rounded shadow-lg"
         >
