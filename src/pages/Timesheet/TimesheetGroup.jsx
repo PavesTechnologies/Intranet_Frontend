@@ -292,7 +292,7 @@ const TimesheetGroup = ({
 
   const handleDeleteClick = () => {
     if (selectedEntryIds.length === 0) {
-      alert("No entries selected for deletion.");
+      showStatusToast("No entries selected for deletion.", "error");
       return;
     }
 

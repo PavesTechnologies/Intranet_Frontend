@@ -593,6 +593,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
   const validateForm = () => {
     const e = {};
 
+    // For non-manager/PM users in edit mode, only validate status and rejection reason
     if (mode === "edit" && !isManagerOrPM) {
       const allowedEditStatuses = computedEditStatuses.map((s) => String(s.value).toUpperCase());
       const selectedStatus = String(form.demandStatus || "").toUpperCase();
@@ -609,6 +610,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
       return e;
     }
 
+    // For create mode OR edit mode with manager/PM, validate all fields
     if (!form.projectId) e.projectId = "Project Selection Is Required";
     if (!form.demandName?.trim()) e.demandName = "Demand Name Is Required";
     if (!form.deliveryRole) e.deliveryRole = "Role Is Required";
@@ -616,10 +618,46 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
 
 
 
-    if (!form.demandStartDate) e.demandStartDate = "Start Date Is Required";
-    if (!form.demandEndDate) e.demandEndDate = "End Date Is Required";
-    if (form.demandStartDate && form.demandEndDate && form.demandEndDate < form.demandStartDate) {
-      e.demandEndDate = "End Date Cannot Be Before Start Date";
+    if (!form.demandStartDate) {
+      e.demandStartDate = "Start Date Is Required";
+    } else {
+      // Check if start date is today or future (only for create mode)
+      if (mode !== "edit") {
+        const today = new Date().toISOString().split("T")[0];
+        if (form.demandStartDate < today) {
+          e.demandStartDate = "Start Date Must Be Today Or A Future Date";
+        }
+      }
+
+      // Check if start date is within project date range (for both create and edit)
+      const projectStartDate = toDateInputValue(projectDetails?.startDate);
+      const projectEndDate = toDateInputValue(projectDetails?.endDate);
+
+      if (projectStartDate && form.demandStartDate < projectStartDate) {
+        e.demandStartDate = "Start Date Cannot Be Before Project Start Date";
+      }
+      if (projectEndDate && form.demandStartDate > projectEndDate) {
+        e.demandStartDate = "Start Date Cannot Be After Project End Date";
+      }
+    }
+
+    if (!form.demandEndDate) {
+      e.demandEndDate = "End Date Is Required";
+    } else {
+      // Check if end date is within project date range
+      const projectEndDate = toDateInputValue(projectDetails?.endDate);
+      const projectStartDate = toDateInputValue(projectDetails?.startDate);
+
+      if (projectStartDate && form.demandEndDate < projectStartDate) {
+        e.demandEndDate = "End Date Cannot Be Before Project Start Date";
+      }
+      if (projectEndDate && form.demandEndDate > projectEndDate) {
+        e.demandEndDate = "End Date Cannot Be After Project End Date";
+      }
+    }
+
+    if (form.demandStartDate && form.demandEndDate && form.demandEndDate <= form.demandStartDate) {
+      e.demandEndDate = "End Date Must Be After Start Date";
     }
 
     const alloc = parseFloat(form.allocationPercentage);
