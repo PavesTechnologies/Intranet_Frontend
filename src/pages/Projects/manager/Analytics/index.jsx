@@ -149,6 +149,14 @@ useEffect(() => {
     : velocity;
 
   const sprintName = kpis.sprintName ?? "Sprint";
+
+  const getSprintNameSize = (name = "") => {
+    const len = name.length;
+    if (len <= 10) return "text-2xl";
+    if (len <= 20) return "text-xl";
+    if (len <= 30) return "text-lg";
+    return "text-base";
+  };
   const startDate  = kpis.startDate
     ? new Date(kpis.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "";
@@ -162,7 +170,11 @@ useEffect(() => {
     <div className="min-h-screen bg-slate-50">
       {/* Header bar */}
       <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <h1 className={`font-bold text-slate-800 leading-tight truncate ${getSprintNameSize(sprintName)}`}>
+            {sprintName}
+          </h1>
+          <div className="flex items-center gap-2 flex-wrap">
           <select
             value={sprintId ?? ""}
             onChange={(e) => setSprintId(e.target.value)}
@@ -209,6 +221,7 @@ useEffect(() => {
               ))}
             </div>
           )}
+          </div>
         </div>
 
         {startDate && endDate && (
