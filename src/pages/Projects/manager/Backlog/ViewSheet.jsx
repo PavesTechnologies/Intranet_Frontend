@@ -238,7 +238,7 @@ const ViewSheet = () => {
             }
           />
 
-          <Detail
+          {/* <Detail
             label="Created On"
             value={
               issue.createdOn
@@ -247,7 +247,7 @@ const ViewSheet = () => {
                   ? new Date(issue.createdAt).toLocaleDateString()
                   : "-"
             }
-          />
+          /> */}
 
           {/* --- EPIC SPECIFIC --- */}
           {type === "epic" && (

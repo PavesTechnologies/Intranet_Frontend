@@ -10,6 +10,7 @@ import {
 } from "@/components/icons";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../../../contexts/AuthContext";
 import { notify } from "../utils/notify";
 import KPISection from "./KPISection";
 import RoleOffTable from "./RoleOffTable";
@@ -19,6 +20,13 @@ import RoleOffSidePanel from "./RoleOffSidePanel";
 import RoleOffSummaryCard from "./RoleOffSummaryCard";
 import CancelRoleOffModal from "./CancelRoleOffModal";
 import Pagination from "../../../components/Pagination/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   bulkDlFulfill,
   bulkDlReject,
@@ -466,6 +474,54 @@ const titleMap = {
   },
 };
 
+const ROLE_OFF_ROLE_LABELS = {
+  Delivery_Manager: "Delivery Manager",
+  Resource_Manager: "Resource Manager",
+};
+
+const ROLE_OFF_ROLE_TO_MODE = {
+  Delivery_Manager: "dm",
+  Resource_Manager: "rm",
+};
+
+const ROLE_OFF_MODE_TO_ROLE = {
+  dm: "Delivery_Manager",
+  rm: "Resource_Manager",
+};
+
+const normalizeRoleKey = (role = "") =>
+  String(role || "")
+    .replace(/^ROLE[-_\s]/i, "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+
+const toRoleOffRole = (role = "") => {
+  const normalizedRole = normalizeRoleKey(role);
+  if (normalizedRole === "DELIVERYMANAGER") return "Delivery_Manager";
+  if (normalizedRole === "RESOURCEMANAGER") return "Resource_Manager";
+  return "";
+};
+
+const getRoleOffRoleOptions = (roles = []) => {
+  const roleList = Array.isArray(roles)
+    ? roles
+    : String(roles || "")
+      .split(",")
+      .map((role) => role.trim())
+      .filter(Boolean);
+
+  const seen = new Set();
+  return roleList.reduce((options, role) => {
+    const value = toRoleOffRole(role);
+    if (!value || seen.has(value)) return options;
+
+    seen.add(value);
+    options.push({ value, label: ROLE_OFF_ROLE_LABELS[value] });
+    return options;
+  }, []);
+};
+
 
 const buildKpis = (mode, allocations, roleOffRequests, selectedRows, approvedTodayCount = null) => {
   const activeAllocations = allocations.filter(
@@ -839,10 +895,21 @@ const createBulkRequestRecord = (records = [], actionLabel = "Selected Requests"
   };
 };
 
-const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, projectName = "" }) => {
+const RoleOffWorkspace = ({ mode: requestedMode, embedded = false, projectId: projectIdProp, projectName = "" }) => {
   const params = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const projectId = projectIdProp || params.projectId;
+  const roleOffRoleOptions = useMemo(() => getRoleOffRoleOptions(user?.roles), [user?.roles]);
+  const requestedRole = ROLE_OFF_MODE_TO_ROLE[requestedMode] || "";
+  const [selectedRole, setSelectedRole] = useState(requestedRole);
+  const selectedMode = ROLE_OFF_ROLE_TO_MODE[selectedRole];
+  const mode = selectedMode || requestedMode || "pm";
+  const showRoleSwitcher =
+    !embedded &&
+    requestedMode !== "pm" &&
+    roleOffRoleOptions.some((option) => option.value === "Delivery_Manager") &&
+    roleOffRoleOptions.some((option) => option.value === "Resource_Manager");
   const [loading, setLoading] = useState(false);
   const [allocations, setAllocations] = useState([]);
   const [roleOffRequests, setRoleOffRequests] = useState([]);
@@ -872,6 +939,34 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
     key: null,
     loading: false,
   });
+
+  useEffect(() => {
+    if (!selectedRole && requestedRole) {
+      setSelectedRole(requestedRole);
+      return;
+    }
+
+    if (selectedRole && !roleOffRoleOptions.some((option) => option.value === selectedRole)) {
+      setSelectedRole(requestedRole);
+    }
+  }, [requestedRole, roleOffRoleOptions, selectedRole]);
+
+  useEffect(() => {
+    setSelectedRows([]);
+    setFilterPanelCollapsed(true);
+    setFilters({ search: "", status: "", impact: "", reason: "" });
+    setPanelState({ open: false, actionType: "view", record: null });
+    setCancelModalState({ open: false, record: null, isSubmitting: false });
+    setBulkActionState({ key: null, loading: false });
+
+    if (mode === "rm" || mode === "dm") {
+      setPmActiveTab("active");
+    }
+
+    if (mode === "dm") {
+      setDmActiveTab("queue");
+    }
+  }, [mode]);
 
 
   const loadPmResources = useCallback(async (isActiveRef = () => true) => {
@@ -1798,7 +1893,7 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
 
   return (
     <div className={embedded ? "bg-gray-50 p-0" : "min-h-screen bg-gray-50 px-2 py-6 sm:px-4"}>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex-1">
           {!embedded ? (
             mode !== "pm" ? (
@@ -1820,7 +1915,30 @@ const RoleOffWorkspace = ({ mode, embedded = false, projectId: projectIdProp, pr
             ) : null
           )}
         </div>
-
+        {showRoleSwitcher ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="whitespace-nowrap text-[11px] font-semibold text-gray-500">View As:</span>
+            <Select
+              value={selectedRole || requestedRole}
+              onValueChange={(value) => setSelectedRole(value)}
+            >
+              <SelectTrigger className="h-9 min-w-[170px] rounded-xl border border-gray-200 bg-white px-3 text-[12px] font-bold text-gray-700 shadow-sm outline-none transition-all focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10">
+                <SelectValue placeholder="View As" />
+              </SelectTrigger>
+              <SelectContent>
+                {roleOffRoleOptions.map((option) => (
+                  <SelectItem
+                    key={option.value}
+                    value={option.value}
+                    className="py-2 text-xs font-semibold"
+                  >
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-6">
