@@ -22,6 +22,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import api from "../../../api/axiosInstance";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
@@ -570,59 +571,7 @@ console.log(
 
         setAllCertificates(res.data?.data || []);
 
-        // Fetch admin-configured provider master. Use only admin-managed
-        // providers (do NOT derive from user-entered certificate records).
-        let formattedProviders = [];
-        const provEndpoints = [
-          `${BASE_URL}/api/certificate-providers`,
-          `${BASE_URL}/api/certification-providers`,
-          `${BASE_URL}/api/providers`,
-        ];
-
-        for (const ep of provEndpoints) {
-          try {
-            const provRes = await api.get(ep, {
-              headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-            });
-
-            const adminList = provRes.data?.data || provRes.data || [];
-            if (Array.isArray(adminList) && adminList.length > 0) {
-              // Prefer only active/enabled providers. Support common flag
-              // names like `active`, `isActive`, `status` or `enabled`.
-              const activeOnly = adminList.filter((p) => {
-                if (typeof p === "string") return true;
-                return (
-                  p.active === true ||
-                  p.isActive === true ||
-                  p.enabled === true ||
-                  p.is_enabled === true ||
-                  String(p.status || "").toLowerCase() === "active" ||
-                  // If no explicit flag, treat it as active by default.
-                  (p.active === undefined && p.isActive === undefined && p.enabled === undefined && !p.status)
-                );
-              });
-
-              formattedProviders = activeOnly.map((p) => ({
-                value: p.id || p.uuid || p.name || p.providerName || String(p),
-                label: p.name || p.providerName || String(p),
-              }));
-              break;
-            }
-          } catch (e) {
-            // endpoint not available — try next
-          }
-        }
-
-        // Always expose the admin-managed provider list. If none are
-        // returned by any endpoint, fall back to only offering `Other`.
-        if (formattedProviders.length === 0) {
-          formattedProviders = [];
-        }
-
-        // Ensure the special `Other` option is always available for
-        // employees to enter a custom provider for that certificate only.
-        formattedProviders.push({ value: "other", label: "Other" });
-        setProviders(formattedProviders);
+        setProviders([]);
       } catch (err) {
         console.error(err);
       }
@@ -926,10 +875,7 @@ useEffect(() => {
     }
 
     const certificateName = uploadFormData.customCertificateName?.trim();
-    const providerName =
-      selectedProvider?.value === "other"
-        ? uploadFormData.customProvider?.trim()
-        : selectedProvider?.label || uploadFormData.customProvider?.trim();
+    const providerName = selectedProvider?.label?.trim() || uploadFormData.customProvider?.trim();
 
     if (!certificateName) {
       showStatusToast("Please enter certificate name", "error");
@@ -3069,15 +3015,19 @@ else if (category === "identity") {
                             options={filteredCertificates}
                             value={selectedCertificate}
                             isDisabled={certificateMode === "skill" && !selectedSkill}
+                            isSearchable={true}
+                            isClearable={true}
                             onChange={(val) => {
                               setSelectedCertificate(val);
-                              setSelectedProvider(null); // 🔥 reset provider
+                              setSelectedProvider(null);
                             }}
                             placeholder={
                               certificateMode === "skill" && !selectedSkill
                                 ? "Select skill first"
-                                : "Select Certificate"
+                                : "Search or select certificate"
                             }
+                            menuPlacement="auto"
+                            classNamePrefix="react-select"
                           />
                         </div>
                         {selectedCertificate?.value === "other" && (
@@ -3097,25 +3047,18 @@ else if (category === "identity") {
                           <label className="text-sm font-medium text-gray-700">
                             Issuing Organization
                           </label>
-                          <Select
+                          <CreatableSelect
                             options={filteredProviders}
                             value={selectedProvider}
                             onChange={setSelectedProvider}
-                            placeholder="Select Provider"
+                            isSearchable={true}
+                            isClearable={true}
+                            placeholder="Type or search issuing organization"
+                            formatCreateLabel={(inputValue) => `Use "${inputValue}"`}
+                            menuPlacement="auto"
+                            classNamePrefix="react-select"
                           />
                         </div>
-                        {selectedProvider?.value === "other" && (
-                          <div className="sm:col-span-2">
-                            <UploadField
-                              label="Custom Provider Name"
-                              placeholder="Enter custom provider name"
-                              value={uploadFormData.customProvider || ""}
-                              onChange={(v) =>
-                                setUploadFormData(d => ({ ...d, customProvider: v }))
-                              }
-                            />
-                          </div>
-                        )}
 
                         {/* 🔥 Issue Date */}
                         <UploadField
