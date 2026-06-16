@@ -167,7 +167,7 @@ export function useDemand(projectId = null) {
     const [filters, setFilters] = useState(defaultFilters);
     const [statusFilter, setStatusFilter] = useState(null);
     const [filterPanelCollapsed, setFilterPanelCollapsed] = useState(false);
-    const [activeTab, setActiveTab] = useState("active"); // breached, at_risk, pending, active, soft
+    const [activeTab, setActiveTab] = useState("breached"); // breached, at_risk, pending, active, soft
     const [isLoading, setIsLoading] = useState(true);
     const [demands, setDemands] = useState([]);
     const [kpiData, setKpiData] = useState(null);
@@ -191,15 +191,9 @@ export function useDemand(projectId = null) {
         }
     }, [demandRoleOptions, selectedRole]);
 
-    // Automatically set default active tab based on role requirements
+    // Reset to first tab when role changes
     useEffect(() => {
-        const isRM = effectiveRole === "Resource_Manager";
-        const isDM = effectiveRole === "Delivery_Manager";
-        if (isRM || isDM) {
-            setActiveTab("pending");
-        } else {
-            setActiveTab("active");
-        }
+        setActiveTab("breached");
     }, [effectiveRole]);
 
     // Fetch master demands and kpis
@@ -314,11 +308,13 @@ export function useDemand(projectId = null) {
         // 'all' fallthrough shows everything minus cancelled/closed if we want to be strict, 
         // but usually 'all' means all relevant demands.
 
-        // Standard Filter: Remove Cancelled/Closed unless explicitly requested
-        if (activeTab !== 'all' && activeTab !== 'rejected') {
-            list = list.filter(d => !isCancelledOrClosedDemand(d) && !isRejectedDemand(d));
-        } else if (activeTab !== 'all') {
+        // Standard Filter: Remove Cancelled/Closed/Fulfilled unless in their respective tabs
+        if (activeTab === 'rejected') {
+            list = list.filter(d => !isCancelledOrClosedDemand(d) && !isFulfilledDemand(d));
+        } else if (activeTab === 'fulfilled') {
             list = list.filter(d => !isCancelledOrClosedDemand(d));
+        } else if (activeTab !== 'all') {
+            list = list.filter(d => !isCancelledOrClosedDemand(d) && !isRejectedDemand(d) && !isFulfilledDemand(d));
         }
 
         // Search
