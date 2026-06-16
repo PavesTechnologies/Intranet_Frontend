@@ -132,6 +132,77 @@ const getCategoryDisplayName = (certificate) =>
   certificate.category?.category_name ||
   (certificate.categoryId ? String(certificate.categoryId) : null);
 
+const getCertificateMappedCount = (certificate) => {
+  const count = [
+    certificate?.mappedResourceCount,
+    certificate?.resourceMappedCount,
+    certificate?.resourceCount,
+    certificate?.mappedCount,
+    certificate?.mappingCount,
+    certificate?.usageCount,
+    certificate?.resourceCertificateCount,
+  ].find((value) => Number(value) > 0);
+
+  if (count) return Number(count);
+
+  const resources =
+    certificate?.mappedResources ||
+    certificate?.resources ||
+    certificate?.resourceCertificates ||
+    certificate?.mappings;
+
+  return Array.isArray(resources) ? resources.length : 0;
+};
+
+const isCertificateMappedFromRecord = (certificate) =>
+  Boolean(
+    certificate?.isMapped === true ||
+      certificate?.mapped === true ||
+      certificate?.alreadyMapped === true ||
+      certificate?.isAlreadyMapped === true ||
+      certificate?.mappedToResources === true ||
+      getCertificateMappedCount(certificate) > 0,
+  );
+
+const getMappedCountFromResponse = (response, certificateId) => {
+  const payload = response?.data ?? response;
+  const list = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.content)
+      ? payload.content
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.results)
+          ? payload.results
+          : null;
+
+  if (Array.isArray(list)) {
+    if (!certificateId) return list.length;
+
+    return list.filter((item) => {
+      const itemCertificateId =
+        item?.certificateId ||
+        item?.certificate?.certificateId ||
+        item?.certificate?.id ||
+        item?.certificate_id;
+      return String(itemCertificateId || "") === String(certificateId);
+    }).length;
+  }
+
+  const count = [
+    payload?.mappedResourceCount,
+    payload?.resourceMappedCount,
+    payload?.resourceCount,
+    payload?.mappedCount,
+    payload?.mappingCount,
+    payload?.totalElements,
+    payload?.totalCount,
+  ].find((value) => Number(value) > 0);
+
+  if (count) return Number(count);
+  return 0;
+};
+
 const getApiList = (response) => {
   if (Array.isArray(response)) return response;
   if (Array.isArray(response?.data)) return response.data;
@@ -940,8 +1011,17 @@ const EmptyState = ({ isGeneral, onAdd }) => (
   </div>
 );
 
-const CertificateCard = ({ certificate, isGeneral, onEdit, onDelete }) => {
+const CertificateCard = ({
+  certificate,
+  isGeneral,
+  onEdit,
+  onDelete,
+  checkingEditId,
+}) => {
   const validity = getValidityLabel(certificate);
+  const certificateId = getCertificateId(certificate);
+  const editChecking =
+    checkingEditId && String(checkingEditId) === String(certificateId);
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-100 hover:shadow-md lg:hidden">
       <div className="flex items-start justify-between gap-3">
@@ -967,10 +1047,15 @@ const CertificateCard = ({ certificate, isGeneral, onEdit, onDelete }) => {
           <button
             type="button"
             onClick={() => onEdit && onEdit(certificate)}
+            disabled={editChecking}
             aria-label="Edit certificate"
-            className="rounded p-1 text-indigo-600 hover:bg-indigo-50"
+            className="rounded p-1 text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Pencil className="h-4 w-4" />
+            {editChecking ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Pencil className="h-4 w-4" />
+            )}
           </button>
           <button
             type="button"
@@ -1027,6 +1112,7 @@ const CertificateLanding = () => {
     certificate: null,
   });
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [checkingEditId, setCheckingEditId] = useState(null);
 
   const title = isGeneral ? "General Certifications" : "Skill Certifications";
   const description = isGeneral
@@ -1130,7 +1216,38 @@ const CertificateLanding = () => {
     setEditingCertificate(null);
   };
 
-  const openEdit = (certificate) => {
+  const openEdit = async (certificate) => {
+    const id = getCertificateId(certificate);
+
+    if (!id) {
+      notify.error("Cannot determine certificate id to edit.");
+      return;
+    }
+
+    if (isCertificateMappedFromRecord(certificate)) {
+      notify.error(
+        "This certificate is already mapped to one or more resources and cannot be edited.",
+      );
+      return;
+    }
+
+    try {
+      setCheckingEditId(id);
+      const response = await skillService.getCertificateResourceMappings(id);
+      if (getMappedCountFromResponse(response, id) > 0) {
+        notify.error(
+          "This certificate is already mapped to one or more resources and cannot be edited.",
+        );
+        await fetchCertificates();
+        return;
+      }
+    } catch (error) {
+      notify.error(error, "Unable to verify certificate mappings.");
+      return;
+    } finally {
+      setCheckingEditId(null);
+    }
+
     setEditingCertificate(certificate);
     setFormOpen(true);
   };
@@ -1279,6 +1396,7 @@ const CertificateLanding = () => {
                     isGeneral={isGeneral}
                     onEdit={openEdit}
                     onDelete={handleDelete}
+                    checkingEditId={checkingEditId}
                   />
                 ))}
               </div>
@@ -1314,10 +1432,14 @@ const CertificateLanding = () => {
                   <tbody className="divide-y divide-gray-100 bg-white">
                     {paginatedCertificates.map((certificate) => {
                       const validity = getValidityLabel(certificate);
+                      const certificateId = getCertificateId(certificate);
+                      const editChecking =
+                        checkingEditId &&
+                        String(checkingEditId) === String(certificateId);
                       return (
                         <tr
                           key={
-                            getCertificateId(certificate) ||
+                            certificateId ||
                             `${certificate.certificateName}-${certificate.providerName}`
                           }
                           className="transition hover:bg-indigo-50/30"
@@ -1382,10 +1504,15 @@ const CertificateLanding = () => {
                               <button
                                 type="button"
                                 onClick={() => openEdit(certificate)}
+                                disabled={editChecking}
                                 aria-label="Edit certificate"
-                                className="rounded p-1 text-indigo-600 hover:bg-indigo-50"
+                                className="rounded p-1 text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                <Pencil className="h-4 w-4" />
+                                {editChecking ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Pencil className="h-4 w-4" />
+                                )}
                               </button>
                               <button
                                 type="button"
