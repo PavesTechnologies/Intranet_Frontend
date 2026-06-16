@@ -22,6 +22,7 @@ import EditSkillModal from "./EditSkillModal";
 import { skillService } from "../../../services/skillService";
 import GlobalStatusBadge from "../../../components/status/statusbadge";
 import api from "../../../api/axiosInstance";
+import ProfilePhotoModal from "./ProfilePhotoModal";
 
 /* ═══════════════════════════════════════════════════════════════════
    DESIGN SYSTEM  v3  —  Brand palette
@@ -595,7 +596,9 @@ export default function EmployeeProfileView() {
   };
 
   const [profileImg, setProfileImg] = useState(null);
-  const profileRef = useRef(null);
+  const [isProfilePhotoModalOpen, setIsProfilePhotoModalOpen] = useState(false);
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  const [isPhotoDeleting, setIsPhotoDeleting] = useState(false);
 
   const initialCoreFetchDoneRef = useRef(false);
   const initialAboutFetchDoneRef = useRef(false);
@@ -842,7 +845,7 @@ const coreData = coreRes.data;
     } catch (err) { console.error("Error fetching raw certifications:", err); }
   };
 
-  const uploadingRef = useRef(false);
+  // uploadingRef removed — upload guard is now handled via isPhotoUploading state + disabled button
 
   const [about, setAbout] = useState({ about_me: "", work_enjoyment: "", interests_hobbies: "" });
   const [aboutUuid, setAboutUuid] = useState(null);
@@ -992,64 +995,85 @@ const coreData = coreRes.data;
     }
   }, [hrData]);
   const formatText = (cmd) => document.execCommand(cmd, false, null);
- const handleProfileChange = async (file) => {
-  if (!file || uploadingRef.current) return;
 
-  // Show local file as preview instantly — no S3 round-trip needed for display
-  const localPreviewUrl = URL.createObjectURL(file);
-  setProfileImg(localPreviewUrl);
+  const handleUpdatePhoto = async (file) => {
+    if (!file || isPhotoUploading) return;
 
-  uploadingRef.current = true;
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
+    const hadExistingPhoto = !!profileImg;
+    const localPreviewUrl = URL.createObjectURL(file);
+    setProfileImg(localPreviewUrl);
+    setIsPhotoUploading(true);
 
-    const response = await api.post(
-      `${BASE_URL}/employee-details/profile-photo/${employee.user_uuid}`,
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "multipart/form-data",
-        },
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const url = `${BASE_URL}/employee-details/profile-photo/${employee.user_uuid}`;
+      const headers = {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        "Content-Type": "multipart/form-data",
+      };
+      const response = hadExistingPhoto
+        ? await api.put(url, formData, { headers })
+        : await api.post(url, formData, { headers });
+
+      const newUrl =
+        response.data?.profile_photo_url ||
+        response.data?.data?.profile_photo_url ||
+        response.data?.photo_url ||
+        response.data?.url;
+
+      if (newUrl) {
+        setProfileImg(newUrl);
+        setHrData(prev => ({
+          ...prev,
+          personal_details: {
+            ...(prev?.personal_details || {}),
+            profile_photo_path: newUrl,
+            profile_photo_url: newUrl,
+          },
+        }));
       }
-    );
 
-    const newUrl =
-      response.data?.profile_photo_url ||
-      response.data?.data?.profile_photo_url ||
-      response.data?.photo_url ||
-      response.data?.url;
+      URL.revokeObjectURL(localPreviewUrl);
+      showStatusToast("Profile photo updated successfully", "success");
+    } catch (error) {
+      URL.revokeObjectURL(localPreviewUrl);
+      setProfileImg(
+        hadExistingPhoto
+          ? (hrData?.personal_details?.profile_photo_path || hrData?.personal_details?.profile_photo_url || null)
+          : null
+      );
+      showStatusToast(error?.response?.data?.detail || "Failed to upload profile photo", "error");
+    } finally {
+      setIsPhotoUploading(false);
+    }
+  };
 
-    if (newUrl) {
-      setProfileImg(newUrl);
-      // Patch hrData so the useEffect([hrData]) never overwrites this upload
+  const handleDeletePhoto = async () => {
+    if (isPhotoDeleting || isPhotoUploading) return;
+    setIsPhotoDeleting(true);
+    try {
+      await api.delete(
+        `${BASE_URL}/employee-details/profile-photo/${employee.user_uuid}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      );
+      setProfileImg(null);
       setHrData(prev => ({
         ...prev,
         personal_details: {
           ...(prev?.personal_details || {}),
-          profile_photo_path: newUrl,
-          profile_photo_url: newUrl,
+          profile_photo_path: null,
+          profile_photo_url: null,
         },
       }));
+      showStatusToast("Profile photo deleted successfully", "success");
+      setIsProfilePhotoModalOpen(false);
+    } catch (error) {
+      showStatusToast(error?.response?.data?.detail || "Failed to delete profile photo", "error");
+    } finally {
+      setIsPhotoDeleting(false);
     }
-
-    if (profileRef.current) profileRef.current.value = "";
-    URL.revokeObjectURL(localPreviewUrl);
-
-    showStatusToast("Profile photo updated successfully", "success");
-  } catch (error) {
-    URL.revokeObjectURL(localPreviewUrl);
-    // Restore whichever image was showing before the failed upload
-    setProfileImg(hrData?.personal_details?.profile_photo_path || hrData?.personal_details?.profile_photo_url || null);
-    showStatusToast(
-      error?.response?.data?.detail || "Failed to upload profile photo",
-      "error"
-    );
-  } finally {
-    uploadingRef.current = false;
-  }
-};
+  };
 
   const filteredMySkillRequests = useMemo(() => {
     const search = mySkillRequestsSearch.trim().toLowerCase();
@@ -1251,7 +1275,7 @@ const coreData = coreRes.data;
             {/* Avatar — ring via CSS, pink dot via ::after on ring */}
             <div className="relative z-10">
               <div className="epv3-av-ring">
-                <div className="epv3-av" onClick={() => profileRef.current?.click()}>
+                <div className="epv3-av" onClick={() => setIsProfilePhotoModalOpen(true)}>
                   {profileImg
                     ? <img
                         key={profileImg}
@@ -1270,8 +1294,6 @@ const coreData = coreRes.data;
                   </div>
                 </div>
               </div>
-              <input hidden ref={profileRef} type="file" accept="image/*"
-                onChange={e => handleProfileChange(e.target.files[0])} />
             </div>
           </div>
 
@@ -1784,6 +1806,16 @@ value: (hrData?.education_documents || []).length,                             b
       </div>
 
       {/* ── MODALS ── */}
+      <ProfilePhotoModal
+        isOpen={isProfilePhotoModalOpen}
+        profileImg={profileImg}
+        initials={initials}
+        onClose={() => setIsProfilePhotoModalOpen(false)}
+        onUpdatePhoto={handleUpdatePhoto}
+        onDeletePhoto={handleDeletePhoto}
+        isUploading={isPhotoUploading}
+        isDeleting={isPhotoDeleting}
+      />
       {isSkillModalOpen && (
         <SkillModal
           employeeId={employee.employee_id}
