@@ -999,9 +999,23 @@ const coreData = coreRes.data;
   const handleUpdatePhoto = async (file) => {
     if (!file || isPhotoUploading) return;
 
+    // Client-side validation — before any state change or API call
+    const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png"];
+    const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      showStatusToast("Only JPG, JPEG, and PNG files are allowed.", "error");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      showStatusToast("File size must not exceed 5 MB.", "error");
+      return;
+    }
+
+    // Snapshot the current image — used to restore exactly on failure
+    const previousImg = profileImg;
     const hadExistingPhoto = !!profileImg;
-    const localPreviewUrl = URL.createObjectURL(file);
-    setProfileImg(localPreviewUrl);
+
     setIsPhotoUploading(true);
 
     try {
@@ -1034,16 +1048,16 @@ const coreData = coreRes.data;
         }));
       }
 
-      URL.revokeObjectURL(localPreviewUrl);
       showStatusToast("Profile photo updated successfully", "success");
     } catch (error) {
-      URL.revokeObjectURL(localPreviewUrl);
-      setProfileImg(
-        hadExistingPhoto
-          ? (hrData?.personal_details?.profile_photo_path || hrData?.personal_details?.profile_photo_url || null)
-          : null
+      // Restore exactly what was shown before — never set to null
+      setProfileImg(previousImg);
+      showStatusToast(
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Failed to upload profile photo",
+        "error"
       );
-      showStatusToast(error?.response?.data?.detail || "Failed to upload profile photo", "error");
     } finally {
       setIsPhotoUploading(false);
     }
