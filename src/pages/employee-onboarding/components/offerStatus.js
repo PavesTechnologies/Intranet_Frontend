@@ -154,20 +154,17 @@ export const getOfferDisplayStatus = (offer, employeeUserIds = []) => {
     return OFFER_STATUS.RESCHEDULED;
   }
 
-  if (
-    baseStatus === OFFER_STATUS.JOINING ||
-    mergedStatus === OFFER_STATUS.JOINING
-  ) {
-    return OFFER_STATUS.JOINING;
-  }
+  if (isEmployeeCreated) {
+  clearJoiningStatus(offer?.user_uuid);
+  return OFFER_STATUS.COMPLETED;
+}
 
-  if (
-    isEmployeeCreated &&
-    (baseStatus === OFFER_STATUS.VERIFIED || joiningInitiated)
-  ) {
-    clearJoiningStatus(offer?.user_uuid);
-    return OFFER_STATUS.COMPLETED;
-  }
+if (
+  baseStatus === OFFER_STATUS.JOINING ||
+  mergedStatus === OFFER_STATUS.JOINING
+) {
+  return OFFER_STATUS.JOINING;
+}
   
   if (joiningInitiated) {
     return OFFER_STATUS.JOINING;
