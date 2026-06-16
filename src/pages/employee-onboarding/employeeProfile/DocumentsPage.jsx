@@ -22,6 +22,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import api from "../../../api/axiosInstance";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
@@ -73,6 +74,76 @@ const buildExperienceDocuments = (employmentType, paths) => {
     .filter(Boolean);
 };
 
+const getCertificateValidityMonths = (certificate) => {
+  const value =
+    certificate?.validityMonths ??
+    certificate?.validity_months ??
+    certificate?.validityPeriod ??
+    certificate?.validity_period ??
+    certificate?.validity ??
+    null;
+  const months = Number(value);
+  return Number.isFinite(months) && months > 0 ? months : null;
+};
+
+const isTimeBoundCertificate = (certificate) => {
+  if (!certificate) return false;
+
+  const explicitFlag =
+    certificate.timeBound ??
+    certificate.isTimeBound ??
+    certificate.time_bound ??
+    certificate.is_time_bound;
+
+  if (typeof explicitFlag === "boolean") return explicitFlag;
+  if (typeof explicitFlag === "string") {
+    const normalizedFlag = explicitFlag.trim().toLowerCase();
+    if (["true", "yes", "y", "1"].includes(normalizedFlag)) return true;
+    if (["false", "no", "n", "0"].includes(normalizedFlag)) return false;
+  }
+
+  const validityType = String(
+    certificate.validityType ||
+      certificate.validity_status ||
+      certificate.validityStatus ||
+      "",
+  ).toLowerCase();
+
+  if (
+    validityType.includes("permanent") ||
+    validityType.includes("lifetime") ||
+    validityType.includes("non")
+  ) {
+    return false;
+  }
+
+  return validityType.includes("expire") || !!getCertificateValidityMonths(certificate);
+};
+
+const findCertificateMaster = (certificates, selectedCertificate) => {
+  if (!selectedCertificate || selectedCertificate.value === "other") return null;
+  return certificates.find(
+    (cert) =>
+      String(cert.certificateId || cert.id || cert.certificate_id || "") ===
+      String(selectedCertificate.value),
+  );
+};
+
+const addMonthsToDateInput = (dateInput, months) => {
+  if (!dateInput || !months) return "";
+
+  const [year, month, day] = dateInput.split("-").map(Number);
+  if (!year || !month || !day) return "";
+
+  const date = new Date(year, month - 1, day);
+  date.setMonth(date.getMonth() + months);
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 export default function DocumentsPage({ employee, user_uuid, hrData = {}, identityTypes = [], config = null, rawCertifications = [], refreshCertifications }) {
   const { employee_uuid } = useParams();
   
@@ -104,6 +175,11 @@ const [formattedEducationTypes, setFormattedEducationTypes] = useState([]);
   const [allCertificates, setAllCertificates] = useState([]);
   const [filteredCertificates, setFilteredCertificates] = useState([]);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
+  const selectedCertificateMaster = findCertificateMaster(allCertificates, selectedCertificate);
+  const selectedCertificateValidityMonths = getCertificateValidityMonths(selectedCertificateMaster);
+  const selectedCertificateIsTimeBound =
+    isTimeBoundCertificate(selectedCertificateMaster) && !!selectedCertificateValidityMonths;
+  const isGeneralCertificateMode = certificateMode === "general";
   const [experienceFiles, setExperienceFiles] =
   useState({
     payslip: null,
@@ -570,59 +646,7 @@ console.log(
 
         setAllCertificates(res.data?.data || []);
 
-        // Fetch admin-configured provider master. Use only admin-managed
-        // providers (do NOT derive from user-entered certificate records).
-        let formattedProviders = [];
-        const provEndpoints = [
-          `${BASE_URL}/api/certificate-providers`,
-          `${BASE_URL}/api/certification-providers`,
-          `${BASE_URL}/api/providers`,
-        ];
-
-        for (const ep of provEndpoints) {
-          try {
-            const provRes = await api.get(ep, {
-              headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-            });
-
-            const adminList = provRes.data?.data || provRes.data || [];
-            if (Array.isArray(adminList) && adminList.length > 0) {
-              // Prefer only active/enabled providers. Support common flag
-              // names like `active`, `isActive`, `status` or `enabled`.
-              const activeOnly = adminList.filter((p) => {
-                if (typeof p === "string") return true;
-                return (
-                  p.active === true ||
-                  p.isActive === true ||
-                  p.enabled === true ||
-                  p.is_enabled === true ||
-                  String(p.status || "").toLowerCase() === "active" ||
-                  // If no explicit flag, treat it as active by default.
-                  (p.active === undefined && p.isActive === undefined && p.enabled === undefined && !p.status)
-                );
-              });
-
-              formattedProviders = activeOnly.map((p) => ({
-                value: p.id || p.uuid || p.name || p.providerName || String(p),
-                label: p.name || p.providerName || String(p),
-              }));
-              break;
-            }
-          } catch (e) {
-            // endpoint not available — try next
-          }
-        }
-
-        // Always expose the admin-managed provider list. If none are
-        // returned by any endpoint, fall back to only offering `Other`.
-        if (formattedProviders.length === 0) {
-          formattedProviders = [];
-        }
-
-        // Ensure the special `Other` option is always available for
-        // employees to enter a custom provider for that certificate only.
-        formattedProviders.push({ value: "other", label: "Other" });
-        setProviders(formattedProviders);
+        setProviders([]);
       } catch (err) {
         console.error(err);
       }
@@ -633,7 +657,7 @@ console.log(
   useEffect(() => {
     const otherOption = { value: "other", label: "Other" };
 
-    if (certificateMode === "general") {
+    if (isGeneralCertificateMode) {
       const generalCertificates = allCertificates.filter((cert) => {
         const type = String(cert.certificateType || cert.type || "").toUpperCase();
         return type === "ACHIEVEMENT" || type === "GENERAL" || !cert.skillId;
@@ -675,7 +699,7 @@ console.log(
       otherOption,
       ]
     );
-  }, [selectedSkill, certificateMode, allCertificates]);
+  }, [selectedSkill, isGeneralCertificateMode, allCertificates]);
   useEffect(() => {
     if (!selectedCertificate) {
       setFilteredProviders([]);
@@ -683,12 +707,63 @@ console.log(
       return;
     }
 
-    // Always use admin-managed provider master for dropdown choices.
-    // Do not derive provider options from user-entered certificate records.
+    if (selectedCertificate.value !== "other") {
+      const certificateMaster = allCertificates.find(
+        (cert) =>
+          String(cert.certificateId || cert.id || cert.certificate_id || "") ===
+          String(selectedCertificate.value),
+      );
+      const providerName =
+        certificateMaster?.providerName || certificateMaster?.provider || "";
+
+      if (providerName) {
+        const providerOption = { value: providerName, label: providerName };
+        setFilteredProviders([providerOption]);
+        setSelectedProvider(providerOption);
+        setUploadFormData((current) => ({ ...current, customProvider: "" }));
+        return;
+      }
+    }
+
+    // Custom certificates still use admin-managed provider choices.
     setFilteredProviders(providers);
     setSelectedProvider(null);
 
   }, [selectedCertificate, allCertificates, providers]);
+
+  useEffect(() => {
+    if (uploadModal.category !== "certifications") return;
+
+    setUploadFormData((current) => {
+      if (isGeneralCertificateMode || !selectedCertificateIsTimeBound) {
+        return current.expiry_date
+          ? { ...current, expiry_date: "" }
+          : current;
+      }
+
+      const calculatedExpiryDate = addMonthsToDateInput(
+        current.issue_date,
+        selectedCertificateValidityMonths,
+      );
+
+      if (!calculatedExpiryDate) {
+        return current.expiry_date
+          ? { ...current, expiry_date: "" }
+          : current;
+      }
+
+      return current.expiry_date === calculatedExpiryDate
+        ? current
+        : { ...current, expiry_date: calculatedExpiryDate };
+    });
+  }, [
+    uploadModal.category,
+    selectedCertificate,
+    isGeneralCertificateMode,
+    selectedCertificateIsTimeBound,
+    selectedCertificateValidityMonths,
+    uploadFormData.issue_date,
+  ]);
 
   
   useEffect(() => {
@@ -926,10 +1001,7 @@ useEffect(() => {
     }
 
     const certificateName = uploadFormData.customCertificateName?.trim();
-    const providerName =
-      selectedProvider?.value === "other"
-        ? uploadFormData.customProvider?.trim()
-        : selectedProvider?.label || uploadFormData.customProvider?.trim();
+    const providerName = selectedProvider?.label?.trim() || uploadFormData.customProvider?.trim();
 
     if (!certificateName) {
       showStatusToast("Please enter certificate name", "error");
@@ -1044,8 +1116,9 @@ useEffect(() => {
           issuedDate:
             uploadFormData.issue_date ?? existingDoc?.issue_date,
 
-          expiryDate:
-            uploadFormData.expiry_date ?? existingDoc?.expiry_date,
+          expiryDate: isGeneralCertificateMode
+            ? null
+            : uploadFormData.expiry_date ?? existingDoc?.expiry_date,
 
           activeFlag: true,
         };
@@ -1059,7 +1132,7 @@ useEffect(() => {
               ? null
               : selectedSkill?.value,
           issuedDate: uploadFormData.issue_date,
-          expiryDate: uploadFormData.expiry_date || null,
+          expiryDate: isGeneralCertificateMode ? null : uploadFormData.expiry_date || null,
           activeFlag: true,
         };
       }
@@ -2467,7 +2540,9 @@ else if (category === "identity") {
                         <DocField label="Issuing Organization" value={doc.issuing_org} />
 
                         <DocField label="Issue Date" value={doc.issue_date} />
-                        <DocField label="Expiry Date" value={doc.expiry_date} />
+                        {doc.skillId && (
+                          <DocField label="Expiry Date" value={doc.expiry_date} />
+                        )}
                         {doc.credential_id && (
                           <DocField
                             label="Credential ID"
@@ -3015,6 +3090,7 @@ else if (category === "identity") {
                                     ...d,
                                     customCertificateName: "",
                                     customProvider: "",
+                                    expiry_date: mode.value === "general" ? "" : d.expiry_date,
                                   }));
                                 }}
                                 className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
@@ -3069,15 +3145,19 @@ else if (category === "identity") {
                             options={filteredCertificates}
                             value={selectedCertificate}
                             isDisabled={certificateMode === "skill" && !selectedSkill}
+                            isSearchable={true}
+                            isClearable={true}
                             onChange={(val) => {
                               setSelectedCertificate(val);
-                              setSelectedProvider(null); // 🔥 reset provider
+                              setSelectedProvider(null);
                             }}
                             placeholder={
                               certificateMode === "skill" && !selectedSkill
                                 ? "Select skill first"
-                                : "Select Certificate"
+                                : "Search or select certificate"
                             }
+                            menuPlacement="auto"
+                            classNamePrefix="react-select"
                           />
                         </div>
                         {selectedCertificate?.value === "other" && (
@@ -3097,25 +3177,22 @@ else if (category === "identity") {
                           <label className="text-sm font-medium text-gray-700">
                             Issuing Organization
                           </label>
-                          <Select
+                          <CreatableSelect
                             options={filteredProviders}
                             value={selectedProvider}
                             onChange={setSelectedProvider}
-                            placeholder="Select Provider"
+                            isDisabled={
+                              !!selectedCertificate &&
+                              selectedCertificate.value !== "other"
+                            }
+                            placeholder={
+                              selectedCertificate?.value &&
+                              selectedCertificate.value !== "other"
+                                ? "Provider from Certificate Master"
+                                : "Select Provider"
+                            }
                           />
                         </div>
-                        {selectedProvider?.value === "other" && (
-                          <div className="sm:col-span-2">
-                            <UploadField
-                              label="Custom Provider Name"
-                              placeholder="Enter custom provider name"
-                              value={uploadFormData.customProvider || ""}
-                              onChange={(v) =>
-                                setUploadFormData(d => ({ ...d, customProvider: v }))
-                              }
-                            />
-                          </div>
-                        )}
 
                         {/* 🔥 Issue Date */}
                         <UploadField
@@ -3128,14 +3205,17 @@ else if (category === "identity") {
                         />
 
                         {/* 🔥 Expiry Date */}
-                        <UploadField
-                          label="Expiry Date"
-                          type="date"
-                          value={uploadFormData.expiry_date || ""}
-                          onChange={(v) =>
-                            setUploadFormData((d) => ({ ...d, expiry_date: v }))
-                          }
-                        />
+                        {certificateMode === "skill" && (
+                          <UploadField
+                            label="Expiry Date"
+                            type="date"
+                            value={uploadFormData.expiry_date || ""}
+                            disabled={true}
+                            onChange={(v) =>
+                              setUploadFormData((d) => ({ ...d, expiry_date: v }))
+                            }
+                          />
+                        )}
                       </div>
                     </div>
                   )}
@@ -3529,6 +3609,7 @@ const UploadField = ({
   value,
   onChange,
   type = "text",
+  disabled = false,
 }) => (
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -3537,9 +3618,16 @@ const UploadField = ({
     <input
       type={type}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        if (!disabled) onChange(e.target.value);
+      }}
       placeholder={placeholder}
-      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 bg-white placeholder-gray-400 hover:border-gray-400 transition-all"
+      disabled={disabled}
+      className={`w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 placeholder-gray-400 transition-all ${
+        disabled
+          ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+          : "bg-white hover:border-gray-400"
+      }`}
     />
   </div>
 );

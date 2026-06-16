@@ -273,6 +273,7 @@ const SprintColumn = ({
                       statuses={statuses}
                       sprints={sprints}
                       onAddToSprint={onDropStory}
+                      onSelectEpic={onSelectEpic}
                       onClick={() => onStoryClick(story.id)}
                       readOnly={isCompleted}
                     />
