@@ -596,6 +596,7 @@ export default function EmployeeProfileView() {
 
   const [profileImg, setProfileImg] = useState(null);
   const profileRef = useRef(null);
+
   const initialCoreFetchDoneRef = useRef(false);
   const initialAboutFetchDoneRef = useRef(false);
   const [employee, setEmployee] = useState(null);
@@ -627,7 +628,27 @@ export default function EmployeeProfileView() {
       return next;
     });
   };
+const fetchProfilePhoto = async (userUuid) => {
+  try {
+    const response = await api.get(
+      `${BASE_URL}/employee-details/profile-photo/${userUuid}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
 
+    setProfileImg(
+      response.data.profile_photo_url
+    );
+  } catch (error) {
+    console.error(
+      "Error fetching profile photo",
+      error
+    );
+  }
+};
   /* ── FETCH ALL DATA ── */
   const fetchAllData = async () => {
     try {
@@ -673,9 +694,12 @@ const coreData = coreRes.data;
       coreData.resolved_department_name = deptData.department_name || coreData.department_uuid;
       coreData.resolved_designation_name = desigData.designation_name || desigData.name || coreData.designation_uuid;
       setEmployee(coreData);
-      console.log("Employee core data with resolved names:", coreData);
-      console.log("hrData full response:", hrResult);
-      console.log("hrData location field:", hrResult?.location, "| coreData location:", coreData?.location);
+      if (coreData.user_uuid) {
+        fetchProfilePhoto(
+          coreData.user_uuid
+        );
+      }
+
       setHrData(hrResult);
 
       const addresses = Array.isArray(hrResult?.addresses)
@@ -962,8 +986,7 @@ const coreData = coreRes.data;
       hrData?.personal_details?.profile_photo_url ||
       hrData?.profile_photo_url ||
       null;
-    console.log("profileImg state", profileImg);
-    console.log("API image URL", hrData?.personal_details?.profile_photo_path);
+
     if (profileUrl) {
       setProfileImg(profileUrl);
     }
