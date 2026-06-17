@@ -499,6 +499,37 @@ export const skillService = {
       throw error;
     }
   },
+
+  getCertificateResourceMappings: async (certificateId) => {
+    const encodedId = encodeURIComponent(certificateId);
+    const endpoints = [
+      `${API_URL}/resource-certificates/certificate/${encodedId}`,
+      `${API_URL}/resource-certificates/by-certificate/${encodedId}`,
+      `${API_URL}/resource-certificates?certificateId=${encodedId}`,
+      `${API_URL}/resource-certificates`,
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await api.get(endpoint, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        return response.data;
+      } catch (error) {
+        if (![404, 405].includes(error?.response?.status)) {
+          console.error(
+            `Error fetching certificate mappings for ${certificateId}:`,
+            error,
+          );
+          throw error;
+        }
+      }
+    }
+
+    return null;
+  },
 };
 
 

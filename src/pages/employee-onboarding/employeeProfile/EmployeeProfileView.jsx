@@ -22,6 +22,7 @@ import EditSkillModal from "./EditSkillModal";
 import { skillService } from "../../../services/skillService";
 import GlobalStatusBadge from "../../../components/status/statusbadge";
 import api from "../../../api/axiosInstance";
+import ProfilePhotoModal from "./ProfilePhotoModal";
 
 /* ═══════════════════════════════════════════════════════════════════
    DESIGN SYSTEM  v3  —  Brand palette
@@ -595,7 +596,10 @@ export default function EmployeeProfileView() {
   };
 
   const [profileImg, setProfileImg] = useState(null);
-  const profileRef = useRef(null);
+  const [isProfilePhotoModalOpen, setIsProfilePhotoModalOpen] = useState(false);
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  const [isPhotoDeleting, setIsPhotoDeleting] = useState(false);
+
   const initialCoreFetchDoneRef = useRef(false);
   const initialAboutFetchDoneRef = useRef(false);
   const [employee, setEmployee] = useState(null);
@@ -627,7 +631,27 @@ export default function EmployeeProfileView() {
       return next;
     });
   };
+const fetchProfilePhoto = async (userUuid) => {
+  try {
+    const response = await api.get(
+      `${BASE_URL}/employee-details/profile-photo/${userUuid}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
 
+    setProfileImg(
+      response.data.profile_photo_url
+    );
+  } catch (error) {
+    console.error(
+      "Error fetching profile photo",
+      error
+    );
+  }
+};
   /* ── FETCH ALL DATA ── */
   const fetchAllData = async () => {
     try {
@@ -673,9 +697,12 @@ const coreData = coreRes.data;
       coreData.resolved_department_name = deptData.department_name || coreData.department_uuid;
       coreData.resolved_designation_name = desigData.designation_name || desigData.name || coreData.designation_uuid;
       setEmployee(coreData);
-      console.log("Employee core data with resolved names:", coreData);
-      console.log("hrData full response:", hrResult);
-      console.log("hrData location field:", hrResult?.location, "| coreData location:", coreData?.location);
+      if (coreData.user_uuid) {
+        fetchProfilePhoto(
+          coreData.user_uuid
+        );
+      }
+
       setHrData(hrResult);
 
       const addresses = Array.isArray(hrResult?.addresses)
@@ -704,67 +731,36 @@ const coreData = coreRes.data;
     setEmployeeSkillsLoading(true);
     setEmployeeSkillsError("");
     try {
-      // Fetch employee-skills list AND resource-skills records in parallel.
-      // The employee-skills endpoint returns display data but its item.id is the taxonomy
-      // skill UUID, NOT the resource-skill join-table UUID needed for the PUT URL.
-      // The resource-skills endpoint returns the correct join-table UUID (rs.id).
-      const [empResult, rsResult] = await Promise.allSettled([
-        skillService.getEmployeeSkills(targetId),
-        skillService.getResourceSkillsByResource(targetId),
-      ]);
+      // Use the resource-skills endpoint which provides the correct structure with all UUIDs
+      const rsResult = await skillService.getResourceSkillsByResource(targetId);
 
-      if (empResult.status === "rejected") throw empResult.reason;
-      const res = empResult.value;
-
-      const rawData = Array.isArray(res?.data?.skills)
-        ? res.data.skills
-        : Array.isArray(res?.skills)
-          ? res.skills
-          : Array.isArray(res?.data)
-            ? res.data
-            : [];
-
-      // Build lookup: taxonomySkillId → resourceSkillId, skillName → resourceSkillId
-      const rsLookup = {};
-      if (rsResult.status === "fulfilled") {
-        const rsRaw = rsResult.value?.data || rsResult.value || [];
-        (Array.isArray(rsRaw) ? rsRaw : []).forEach(rs => {
-          const rsSkillId = String(rs.skill?.id || rs.skillId || "");
-          const rsSkillName = (rs.skill?.name || "").toLowerCase().trim();
-          if (rsSkillId) rsLookup[rsSkillId] = rs.id;
-          if (rsSkillName) rsLookup[rsSkillName] = rs.id;
-        });
-      }
+      const rawData = Array.isArray(rsResult?.data)
+        ? rsResult.data
+        : [];
 
       const mapped = rawData.map(item => {
-        const taxonomySkillId = item.skill?.id || item.skillId || item.skill_id || "";
-        const skillNameKey = (item.skillName || item.skill?.name || "").toLowerCase().trim();
-
-        // Resolve resourceSkillId: try taxonomy UUID match → item.id match → name match
-        const resourceSkillId =
-          rsLookup[taxonomySkillId] ||
-          rsLookup[String(item.id || "")] ||
-          rsLookup[skillNameKey] ||
-          "";
+        // Map subSkills from API structure
+        const subSkillsArray = (item.subSkills || []).map(ss => ({
+          id: ss.subSkillId || "",
+          subSkillId: ss.subSkillId || "",
+          name: ss.subSkillName || "Unnamed Subskill",
+          proficiencyName: ss.proficiency || "Not Set",
+          proficiencyId: ss.proficiency || "",  // Will be resolved to UUID in modal
+          status: ss.active ? "ACTIVE" : "INACTIVE"
+        }));
 
         return {
-          resourceSkillId,
-          id: resourceSkillId || item.resourceSkillId || item.employeeSkillId || item.id || item.skillId,
-          categoryId: item.categoryId || item.skill?.category?.id || item.category?.id || "",
-          categoryName: item.categoryName || item.category || item.skill?.category?.name || item.category?.name || "General",
-          skillId: item.skill?.id || item.skillId || item.skill_id || "",
-          skillName: item.skillName || item.skill?.name || item.skill || "Unnamed Skill",
-          skillProficiencyId: item.skillProficiencyCode || item.proficiencyId || item.skillProficiencyId || item.proficiency?.proficiencyId || "",
-          proficiencyName: item.skillProficiency || item.proficiencyName || "Not Set",
-          status: item.status || item.skillStatus || "ACTIVE",
-          subSkills: (item.subSkills || item.resourceSubSkills || []).map(ss => ({
-            id: ss.employeeSubSkillId || ss.resourceSubSkillId || ss.id || ss.subSkillId,
-            subSkillId: ss.subSkillId || ss.id || "",
-            name: ss.subSkillName || ss.subSkill || ss.name || "Unnamed Subskill",
-            proficiencyName: ss.proficiency || ss.proficiencyName || "Not Set",
-            proficiencyId: ss.proficiencyCode || ss.proficiencyId || "",
-            status: ss.status || "ACTIVE"
-          }))
+          resourceSkillId: item.resourceSkillId || "",
+          id: item.resourceSkillId || "",
+          categoryId: item.categoryId || "",
+          categoryName: item.categoryName || "General",
+          skillId: item.skillId || "",
+          skillName: item.skillName || "Unnamed Skill",
+          skillProficiencyId: item.proficiency || "",  // Will be resolved to UUID in modal
+          proficiencyName: item.proficiency || "Not Set",
+          proficiency: item.proficiency || "Not Set",  // Keep for modal mapping
+          status: item.active ? "ACTIVE" : "INACTIVE",
+          subSkills: subSkillsArray
         };
       });
 
@@ -849,7 +845,7 @@ const coreData = coreRes.data;
     } catch (err) { console.error("Error fetching raw certifications:", err); }
   };
 
-  const uploadingRef = useRef(false);
+  // uploadingRef removed — upload guard is now handled via isPhotoUploading state + disabled button
 
   const [about, setAbout] = useState({ about_me: "", work_enjoyment: "", interests_hobbies: "" });
   const [aboutUuid, setAboutUuid] = useState(null);
@@ -993,71 +989,105 @@ const coreData = coreRes.data;
       hrData?.personal_details?.profile_photo_url ||
       hrData?.profile_photo_url ||
       null;
-    console.log("profileImg state", profileImg);
-    console.log("API image URL", hrData?.personal_details?.profile_photo_path);
+
     if (profileUrl) {
       setProfileImg(profileUrl);
     }
   }, [hrData]);
   const formatText = (cmd) => document.execCommand(cmd, false, null);
- const handleProfileChange = async (file) => {
-  if (!file || uploadingRef.current) return;
 
-  // Show local file as preview instantly — no S3 round-trip needed for display
-  const localPreviewUrl = URL.createObjectURL(file);
-  setProfileImg(localPreviewUrl);
+  const handleUpdatePhoto = async (file) => {
+    if (!file || isPhotoUploading) return;
 
-  uploadingRef.current = true;
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
+    // Client-side validation — before any state change or API call
+    const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png"];
+    const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
-    const response = await api.post(
-      `${BASE_URL}/employee-details/profile-photo/${employee.user_uuid}`,
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "multipart/form-data",
-        },
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      showStatusToast("Only JPG, JPEG, and PNG files are allowed.", "error");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      showStatusToast("File size must not exceed 5 MB.", "error");
+      return;
+    }
+
+    // Snapshot the current image — used to restore exactly on failure
+    const previousImg = profileImg;
+    const hadExistingPhoto = !!profileImg;
+
+    setIsPhotoUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const url = `${BASE_URL}/employee-details/profile-photo/${employee.user_uuid}`;
+      const headers = {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        "Content-Type": "multipart/form-data",
+      };
+      const response = hadExistingPhoto
+        ? await api.put(url, formData, { headers })
+        : await api.post(url, formData, { headers });
+
+      const newUrl =
+        response.data?.profile_photo_url ||
+        response.data?.data?.profile_photo_url ||
+        response.data?.photo_url ||
+        response.data?.url;
+
+      if (newUrl) {
+        setProfileImg(newUrl);
+        setHrData(prev => ({
+          ...prev,
+          personal_details: {
+            ...(prev?.personal_details || {}),
+            profile_photo_path: newUrl,
+            profile_photo_url: newUrl,
+          },
+        }));
       }
-    );
 
-    const newUrl =
-      response.data?.profile_photo_url ||
-      response.data?.data?.profile_photo_url ||
-      response.data?.photo_url ||
-      response.data?.url;
+      showStatusToast("Profile photo updated successfully", "success");
+    } catch (error) {
+      // Restore exactly what was shown before — never set to null
+      setProfileImg(previousImg);
+      showStatusToast(
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Failed to upload profile photo",
+        "error"
+      );
+    } finally {
+      setIsPhotoUploading(false);
+    }
+  };
 
-    if (newUrl) {
-      setProfileImg(newUrl);
-      // Patch hrData so the useEffect([hrData]) never overwrites this upload
+  const handleDeletePhoto = async () => {
+    if (isPhotoDeleting || isPhotoUploading) return;
+    setIsPhotoDeleting(true);
+    try {
+      await api.delete(
+        `${BASE_URL}/employee-details/profile-photo/${employee.user_uuid}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      );
+      setProfileImg(null);
       setHrData(prev => ({
         ...prev,
         personal_details: {
           ...(prev?.personal_details || {}),
-          profile_photo_path: newUrl,
-          profile_photo_url: newUrl,
+          profile_photo_path: null,
+          profile_photo_url: null,
         },
       }));
+      showStatusToast("Profile photo deleted successfully", "success");
+      setIsProfilePhotoModalOpen(false);
+    } catch (error) {
+      showStatusToast(error?.response?.data?.detail || "Failed to delete profile photo", "error");
+    } finally {
+      setIsPhotoDeleting(false);
     }
-
-    if (profileRef.current) profileRef.current.value = "";
-    URL.revokeObjectURL(localPreviewUrl);
-
-    showStatusToast("Profile photo updated successfully", "success");
-  } catch (error) {
-    URL.revokeObjectURL(localPreviewUrl);
-    // Restore whichever image was showing before the failed upload
-    setProfileImg(hrData?.personal_details?.profile_photo_path || hrData?.personal_details?.profile_photo_url || null);
-    showStatusToast(
-      error?.response?.data?.detail || "Failed to upload profile photo",
-      "error"
-    );
-  } finally {
-    uploadingRef.current = false;
-  }
-};
+  };
 
   const filteredMySkillRequests = useMemo(() => {
     const search = mySkillRequestsSearch.trim().toLowerCase();
@@ -1076,6 +1106,13 @@ const coreData = coreRes.data;
       return matchesSearch && matchesStatus;
     });
   }, [mySkillRequests, mySkillRequestsSearch, mySkillRequestsStatus]);
+
+  // Group skills by skillName and categoryName to show multiple subskills in same card
+  const groupedEmployeeSkills = useMemo(() => {
+    // New API already returns skills properly grouped with nested subSkills
+    // Just return as-is, no additional grouping needed
+    return employeeSkills;
+  }, [employeeSkills]);
 
   /* ── LOADING SCREEN ── */
   if (!employee || hrData === null) {
@@ -1252,7 +1289,7 @@ const coreData = coreRes.data;
             {/* Avatar — ring via CSS, pink dot via ::after on ring */}
             <div className="relative z-10">
               <div className="epv3-av-ring">
-                <div className="epv3-av" onClick={() => profileRef.current?.click()}>
+                <div className="epv3-av" onClick={() => setIsProfilePhotoModalOpen(true)}>
                   {profileImg
                     ? <img
                         key={profileImg}
@@ -1271,8 +1308,6 @@ const coreData = coreRes.data;
                   </div>
                 </div>
               </div>
-              <input hidden ref={profileRef} type="file" accept="image/*"
-                onChange={e => handleProfileChange(e.target.files[0])} />
             </div>
           </div>
 
@@ -1313,11 +1348,11 @@ const coreData = coreRes.data;
                       {mappedEmployee.employmentType}
                     </span>
                   )}
-                  {Array.isArray(employeeSkills) &&
- employeeSkills.length > 0 && (
+                  {Array.isArray(groupedEmployeeSkills) &&
+ groupedEmployeeSkills.length > 0 && (
                     <span className="epv3-float-chip green">
                       <Award size={14} />
-                      {employeeSkills.length} Skill{employeeSkills.length !== 1 ? "s" : ""}
+                      {groupedEmployeeSkills.length} Skill{groupedEmployeeSkills.length !== 1 ? "s" : ""}
                     </span>
                   )}
                 </div>
@@ -1452,7 +1487,7 @@ const coreData = coreRes.data;
                 { icon: Sparkles, title: "Education",
 label: "Total Education",
 value: (hrData?.education_documents || []).length,                             bg: "#d1fae5", color: "#059669", tab: "documents", config: { folder: "education", search: "" } },
-                { icon: Award,    title: "Skills Overview",   label: "Total Skills",   value: employeeSkills.length,           bg: "#fce7f3", color: "#db2777", tab: "about",     config: null },
+                { icon: Award,    title: "Skills Overview",   label: "Total Skills",   value: groupedEmployeeSkills.length,           bg: "#fce7f3", color: "#db2777", tab: "about",     config: null },
               ].map(({ icon: Icon, title, label, value, bg, color, tab, config }) => (
                 <div key={title} className="epv3-nav-card"
                   onClick={() => handleTabChange(tab, config)}>
@@ -1492,7 +1527,7 @@ value: (hrData?.education_documents || []).length,                             b
                   <div>
                     <h3 className="epv3-display text-white text-sm font-bold">Professional Skillset</h3>
                     <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
-                      {employeeSkills.length} skill{employeeSkills.length !== 1 ? "s" : ""} on record
+                      {groupedEmployeeSkills.length} skill{groupedEmployeeSkills.length !== 1 ? "s" : ""} on record
                     </p>
                   </div>
                 </div>
@@ -1545,9 +1580,9 @@ value: (hrData?.education_documents || []).length,                             b
                       Retry
                     </button>
                   </div>
-                ) : employeeSkills.length > 0 ? (
+                ) : groupedEmployeeSkills.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {employeeSkills.map((record, idx) => {
+                    {groupedEmployeeSkills.map((record, idx) => {
                       const skillId = record.id || `skill-${idx}`;
                       const isExp = expandedSkills.has(skillId);
                       const pfClass = pf(record.proficiencyName);
@@ -1579,7 +1614,7 @@ value: (hrData?.education_documents || []).length,                             b
                               </span>
                               <div className="flex items-center gap-0.5 border-l border-slate-100 pl-2">
                                 <button
-                                  onClick={e => { e.stopPropagation(); setSelectedSkill(record); setIsEditModalOpen(true); }}
+                                  onClick={e => { e.stopPropagation(); setSelectedSkill(record); setIsSkillModalOpen(true); }}
                                   className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#263383] hover:bg-blue-50 transition-all"
                                   title="Edit">
                                   <Edit2 size={11} />
@@ -1785,20 +1820,22 @@ value: (hrData?.education_documents || []).length,                             b
       </div>
 
       {/* ── MODALS ── */}
+      <ProfilePhotoModal
+        isOpen={isProfilePhotoModalOpen}
+        profileImg={profileImg}
+        initials={initials}
+        onClose={() => setIsProfilePhotoModalOpen(false)}
+        onUpdatePhoto={handleUpdatePhoto}
+        onDeletePhoto={handleDeletePhoto}
+        isUploading={isPhotoUploading}
+        isDeleting={isPhotoDeleting}
+      />
       {isSkillModalOpen && (
         <SkillModal
           employeeId={employee.employee_id}
-          selectedSkill={null}
-          onClose={() => setIsSkillModalOpen(false)}
-          onSaveSuccess={async () => { await fetchEmployeeSkills(); await fetchMySkillRequests(); setIsSkillModalOpen(false); }}
-        />
-      )}
-      {isEditModalOpen && (
-        <EditSkillModal
-          employeeId={employee.employee_id}
-          skillData={selectedSkill}
-          onClose={() => { setIsEditModalOpen(false); setSelectedSkill(null); }}
-          onSaveSuccess={() => { fetchEmployeeSkills(); setIsEditModalOpen(false); setSelectedSkill(null); }}
+          selectedSkill={selectedSkill}
+          onClose={() => { setIsSkillModalOpen(false); setSelectedSkill(null); }}
+          onSaveSuccess={async () => { await fetchEmployeeSkills(); await fetchMySkillRequests(); setIsSkillModalOpen(false); setSelectedSkill(null); }}
         />
       )}
       <ConfirmationModal
