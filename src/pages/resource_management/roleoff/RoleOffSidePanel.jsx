@@ -532,52 +532,7 @@ const RoleOffSidePanel = ({
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-          {reviewState?.requiresConfirmation && (
-            <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="mt-1">
-                  <WarningIcon className="h-5 w-5 text-amber-600" />
-                </div>
-
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-amber-900">
-                    Review Roll-Off Impact
-                  </h3>
-
-                  <p className="mt-1 text-sm text-amber-800 whitespace-pre-line">
-                    {reviewState.warning}
-                  </p>
-                </div>
-              </div>
-
-              <label className="flex items-start gap-3 rounded-lg border border-amber-300 bg-white p-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.reviewConfirmed}
-                  onChange={(e) =>
-                    updateField("reviewConfirmed", e.target.checked)
-                  }
-                  className="mt-1 h-4 w-4 rounded border-gray-300"
-                />
-
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    I reviewed the impact analysis
-                  </p>
-
-                  <p className="text-xs text-gray-500 mt-1">
-                    Confirm to proceed with roll-off request.
-                  </p>
-                </div>
-              </label>
-
-              {fieldErrors.reviewConfirmed && (
-                <p className="text-xs text-red-600">
-                  {fieldErrors.reviewConfirmed}
-                </p>
-              )}
-            </section>
-          )}
+          {/* Review confirmation is handled elsewhere; UI removed to avoid duplicate */}
           <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <ClipboardIcon className="h-4 w-4 text-gray-600" />

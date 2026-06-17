@@ -145,6 +145,38 @@ function UtilizationChart({ data }) {
     );
 }
 
+// ── Stacked Monthly Bars (Billable on top, Non-Billable below) ───────────
+function StackedMonthlyBars({ data }) {
+    const list = Array.isArray(data) ? data : [];
+    if (!list || list.length === 0) {
+        return <div className="flex items-center justify-center h-full text-[10px] text-slate-400 font-medium">No Trend Data Available</div>;
+    }
+
+    const maxVal = Math.max(...list.map(d => (Number(d.billable || 0) + Number(d.nonBillable || 0))), 1);
+
+    return (
+        <div className="w-full flex items-start gap-2 h-36">
+            {list.map((d, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center">
+                        <div
+                            className="w-full flex flex-col justify-start h-28 rounded-md overflow-hidden cursor-pointer"
+                            title={`${d.period} - Billable: ${formatHours(d.billable)} | Non-Billable: ${formatHours(d.nonBillable)} | Total: ${formatHours((Number(d.billable||0)+Number(d.nonBillable||0)))}`}>
+                        <div
+                            style={{ height: `${((Number(d.billable || 0) / maxVal) * 100).toFixed(2)}%` }}
+                            className="w-full bg-blue-700 transition-all rounded-t-md"
+                        />
+                        <div
+                            style={{ height: `${((Number(d.nonBillable || 0) / maxVal) * 100).toFixed(2)}%` }}
+                            className="w-full bg-blue-300 transition-all rounded-b-md"
+                        />
+                    </div>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase mt-2">{d.period}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 // ── Timeline Bar ───────────────────────────────────────────────────────────
 function TimelineBar({ resource }) {
     const blocks = resource.allocationTimeline || []
@@ -310,17 +342,17 @@ export default function OverviewTab({ resource }) {
     const totalProjPages = Math.ceil(currentProjects.length / ITEMS_PER_PAGE);
 
     return (
-        <div className="space-y-6 font-sans">
+        <div className="space-y-4 font-sans">
 
             {/* ── TOP METRICS GRID (3-Columns) ───────────────────────────────── */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 font-sans">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 font-sans items-stretch">
 
                 {/* COLUMN 1: Profile Summary (25%) */}
-                <div className="md:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm h-full flex flex-col transition-all hover:shadow-md">
+                <div className="md:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm h-full flex flex-col transition-all hover:shadow-md min-h-[300px]">
                     <h3 className="text-sm font-heading font-bold text-slate-900 mb-4 flex items-center gap-2">
                         <Users className="h-4 w-4 text-indigo-500" /> Profile Summary
                     </h3>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 flex-1">
                         <MiniInfoRow icon={MapPin} label="Location" value={resource.location} />
                         <MiniInfoRow icon={Briefcase} label="Experience" value={`${resource.experience || 0} Yrs`} />
                         <MiniInfoRow icon={Calendar} label="Available From" value={resource.availableFrom} />
@@ -335,21 +367,21 @@ export default function OverviewTab({ resource }) {
                 </div>
 
                 {/* COLUMN 2: Allocation Metrics (45%) */}
-                <div className="md:col-span-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm h-full transition-all hover:shadow-md">
+                <div className="md:col-span-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm h-full transition-all hover:shadow-md min-h-[300px] flex flex-col">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
                         <h3 className="text-sm font-heading font-bold text-slate-900 flex items-center gap-2">
                             <TrendingUp className="h-4 w-4 text-indigo-500" /> Performance & Utilization
                         </h3>
                         {!utilLoading && (
                             <div className="flex flex-wrap gap-3 sm:gap-4 text-[9px] sm:text-[10px] font-bold font-sans">
-                                <div className="flex items-center gap-1.5 text-emerald-600"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Billable</div>
-                                <div className="flex items-center gap-1.5 text-slate-400"><span className="h-2 w-2 rounded-full bg-slate-200" /> Non-Billable</div>
+                                <div className="flex items-center gap-1.5 text-slate-900"><span className="h-2 w-2 rounded-full bg-indigo-800" /> Billable</div>
+                                <div className="flex items-center gap-1.5 text-slate-400"><span className="h-2 w-2 rounded-full bg-indigo-300" /> Non-Billable</div>
                             </div>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-end">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch flex-1">
+                        <div className="space-y-4 flex flex-col flex-1">
                             <div className="flex justify-between items-baseline pt-2">
                                 <span className="text-xs font-black text-slate-400 font-sans uppercase tracking-widest">Active Workload</span>
                                 <span className="text-3xl font-black text-indigo-600 font-sans tabular-nums tracking-tighter">{resource.currentAllocation || 0}%</span>
@@ -368,33 +400,30 @@ export default function OverviewTab({ resource }) {
                                 </div>
                             </div>
 
-                            <div className="bg-indigo-50/30 rounded-lg p-3 border border-indigo-100/50">
-                                <p className="text-[10px] font-bold text-indigo-700/70 font-sans uppercase tracking-[0.2em]">
-                                    {billableSummary?.dateRange?.startDate && billableSummary?.dateRange?.endDate
-                                        ? `${formatShortDate(billableSummary.dateRange.startDate)} - ${formatShortDate(billableSummary.dateRange.endDate)}`
-                                        : "Current + Previous 3 Months"}
-                                </p>
-                                <p className="text-[11px] font-medium text-indigo-900 mt-1 leading-relaxed">
-                                    Total Logged Hours Are <span className="font-black">{formatHours(billableSummary?.totalHours)}</span>, With Billable Utilization At <span className="font-black">{(billableSummary?.billablePercentage || 0).toFixed(2).replace(/\.00$/, "")}%</span>.
-                                </p>
-                            </div>
+                            {/* Utilization summary removed per design request to free vertical space */}
                         </div>
 
-                        <div className="h-36 flex flex-col pb-1">
-                            <div className="flex justify-between items-center mb-3">
-                                <span className="text-[10px] font-black text-slate-400 font-sans uppercase tracking-widest">Monthly Hours</span>
+                        <div className="flex flex-col justify-center items-stretch flex-1">
+                            <div className="flex flex-col justify-center items-center h-full">
+                                <div className="w-full px-2 max-w-full">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="text-[10px] font-black text-slate-400 font-sans uppercase tracking-widest">Monthly Hours</span>
+                                    </div>
+                                    {utilLoading ? (
+                                        <div className="h-36 w-full bg-slate-50 animate-pulse rounded-lg" />
+                                    ) : (
+                                        <div className="mx-auto w-full">
+                                            <StackedMonthlyBars data={utilization} />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                            {utilLoading ? (
-                                <div className="h-full w-full bg-slate-50 animate-pulse rounded-lg" />
-                            ) : (
-                                <UtilizationChart data={utilization} />
-                            )}
                         </div>
                     </div>
                 </div>
 
                 {/* COLUMN 3: Allocation Timeline & Risk (30%) */}
-                <div className="md:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm h-full flex flex-col transition-all hover:shadow-md">
+                <div className="md:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm h-full flex flex-col transition-all hover:shadow-md min-h-[300px]">
                     <h3 className="text-sm font-heading font-bold text-slate-900 mb-4 flex items-center gap-2">
                         <Percent className="h-4 w-4 text-indigo-500" /> Allocation Breakdown
                     </h3>
