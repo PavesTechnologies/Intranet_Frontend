@@ -520,8 +520,8 @@ const UtilizationPerformanceDashboard = () => {
       if (!summaryData) return KPI_STATS;
 
       // Map from new API fields if present, with fallbacks to old names
-      let utilVal = summaryData.utilization ?? summaryData.overallUtilizationPercentage ?? 0;
-      if (!summaryData.utilization && !summaryData.overallUtilizationPercentage && summaryData.monthly && summaryData.monthly.length > 0) {
+      let utilVal = summaryData.utilizationPercentage ?? summaryData.overallUtilizationPercentage ?? 0;
+      if (!summaryData.utilizationPercentage && !summaryData.overallUtilizationPercentage && summaryData.monthly && summaryData.monthly.length > 0) {
          const sumUtil = summaryData.monthly.reduce((acc, m) => acc + m.util, 0);
          utilVal = sumUtil / summaryData.monthly.length;
       }

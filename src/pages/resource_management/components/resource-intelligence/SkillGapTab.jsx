@@ -83,7 +83,16 @@ export default function SkillGapTab({ resource, demand }) {
                 // If demand is provided, we fetch resources to compare against.
                 const response = resource ? await fetchDemands() : await fetchResources();
                 const data = resource ? response : response.data; // resource.js returns the full response object
-                if (!c) setSelectionList(Array.isArray(data) ? data : []);
+                if (!c) {
+                    if (resource) {
+                        const approved = Array.isArray(data)
+                            ? data.filter(d => ((d.demandStatus || d.status || "") + "").toString().toUpperCase() === 'APPROVED')
+                            : [];
+                        setSelectionList(approved);
+                    } else {
+                        setSelectionList(Array.isArray(data) ? data : []);
+                    }
+                }
             }
             catch (err) { console.error("Failed to fetch selection list:", err); }
             finally { if (!c) setLoading(false); }

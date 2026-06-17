@@ -44,11 +44,14 @@ export function useSkillGapAnalysis(resourceId) {
         setDemandsError(null);
         try {
             const res = await fetchDemands();
-            if (res?.success && Array.isArray(res.data)) {
-                setDemands(res.data);
-            } else {
-                setDemands([]);
-            }
+            let arr = [];
+            if (Array.isArray(res)) arr = res;
+            else if (res?.success && Array.isArray(res.data)) arr = res.data;
+            else if (res?.data && Array.isArray(res.data)) arr = res.data;
+
+            // Only include demands that are approved
+            const approved = arr.filter(d => ((d.demandStatus || d.status || "") + "").toString().toUpperCase() === 'APPROVED');
+            setDemands(approved);
         } catch (err) {
             console.error("Failed to fetch demands:", err);
             setDemandsError(

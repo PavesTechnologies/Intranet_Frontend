@@ -140,6 +140,11 @@ export const getOfferDisplayStatus = (offer, employeeUserIds = []) => {
     mergedStatus === OFFER_STATUS.JOINING ||
     (baseStatus === OFFER_STATUS.VERIFIED && hasJoiningDetails(mergedOffer));
 
+  if (isEmployeeCreated) {
+    clearJoiningStatus(offer?.user_uuid);
+    return OFFER_STATUS.COMPLETED;
+  }
+
   if (
     baseStatus === OFFER_STATUS.JOINING_PENDING ||
     mergedStatus === OFFER_STATUS.JOINING_PENDING
@@ -159,14 +164,6 @@ export const getOfferDisplayStatus = (offer, employeeUserIds = []) => {
     mergedStatus === OFFER_STATUS.JOINING
   ) {
     return OFFER_STATUS.JOINING;
-  }
-
-  if (
-    isEmployeeCreated &&
-    (baseStatus === OFFER_STATUS.VERIFIED || joiningInitiated)
-  ) {
-    clearJoiningStatus(offer?.user_uuid);
-    return OFFER_STATUS.COMPLETED;
   }
   
   if (joiningInitiated) {

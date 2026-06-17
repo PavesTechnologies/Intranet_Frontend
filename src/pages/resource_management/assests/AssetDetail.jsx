@@ -490,9 +490,31 @@ const AssetDetail = () => {
     }
   };
 
-  const openEditModal = (a) => {
+  const openEditModal = async (a) => {
+    // mark editing target so availableProjectResources allows it
     setEditingAssignment(a);
 
+    // fetch project resources for the assignment's project so the resource list contains the current resource
+    try {
+      if (a.projectId) {
+        setProjectResourcesLoading(true);
+        const res = await projectResourceDetails(a.projectId);
+        const fetched = res?.data || [];
+
+        // If the resource in the assignment isn't present in fetched list, add it so the listbox can show it
+        if (a.resourceName && !fetched.find((r) => r.resourceName === a.resourceName)) {
+          fetched.push({ resourceName: a.resourceName, resourceRole: a.resourceRole || "" });
+        }
+
+        setProjectResources(fetched);
+      }
+    } catch (err) {
+      console.error("Failed to load project resources for edit modal", err);
+    } finally {
+      setProjectResourcesLoading(false);
+    }
+
+    // populate form with existing assignment values
     setFormData({
       resourceName: a.resourceName || "",
       projectId: a.projectId || "",
@@ -507,6 +529,7 @@ const AssetDetail = () => {
       serialNumber: a.serialNumber || "",
     });
 
+    // ensure serials are loaded
     fetchAvailableSerials();
     setShowModal(true);
   };
@@ -875,7 +898,9 @@ const AssetDetail = () => {
                   name="assignmentStatus"
                   value={formData.assignmentStatus}
                   onChange={handleFormChange}
-                  options={["ASSIGNED", "REQUESTED", "REJECTED"]}
+                  // When creating a new assignment, only allow ASSIGNED.
+                  // When editing an existing assignment, keep existing options.
+                  options={editingAssignment ? ["ASSIGNED", "REQUESTED", "REJECTED"] : ["ASSIGNED"]}
                   required
                   error={errors.assignmentStatus}
                 />
