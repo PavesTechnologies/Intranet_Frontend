@@ -4,9 +4,9 @@ import HoverActions from "./HoverActions";
 import StatusIndicator from "./StatusIndicator";
 import { getAgingTone } from "../models/benchModel";
 
-const formatCurrency = (value) => {
+const formatCurrency = (value, currencyType) => {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "NA";
-  return `Rs ${Number(value).toLocaleString("en-IN")}`;
+  return `${currencyType || "Rs"} ${Number(value).toLocaleString("en-IN")}`;
 };
 
 const getAvailabilityTone = (availability) => {
@@ -128,7 +128,7 @@ const BenchRow = ({ row, active, onView, onEdit, onAllocate }) => {
         <div className="flex items-center justify-start md:justify-end">
           <div>
             <p className={`text-sm font-semibold ${row.warnings.highCost ? "text-rose-200" : "text-slate-100"}`}>
-              {formatCurrency(row.costPerDay)}
+              {formatCurrency(row.costPerDay, row.currencyType)}
             </p>
             <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">Daily cost</p>
           </div>

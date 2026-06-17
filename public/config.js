@@ -6,6 +6,6 @@ window.__APP_CONFIG__ = {
     PMS_BASE_URL: "https://d15j2ej3bear0q.cloudfront.net/pms",
     MSOffice_USER_MANAGEMENT_URL: "https://d15j2ej3bear0q.cloudfront.net/ums",
     EMPLOYEE_ONBOARDING_URL: "http://localhost:8001/ems",
-    RMS_BASE_URL: "https://d15j2ej3bear0q.cloudfront.net/rms"
-    // RMS_BASE_URL: "http://localhost:8080"
+    //RMS_BASE_URL: "https://d15j2ej3bear0q.cloudfront.net/rms"
+    RMS_BASE_URL: "http://localhost:8080/rms"
 };

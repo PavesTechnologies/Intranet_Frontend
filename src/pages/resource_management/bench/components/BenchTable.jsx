@@ -43,6 +43,12 @@ const renderPill = (text, className) => (
   </span>
 );
 
+const getCurrencyTone = (currencyType) => {
+  if (currencyType === "USD") return "border-blue-200 bg-blue-50 text-blue-700";
+  if (currencyType === "INR") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  return "border-slate-200 bg-slate-50 text-slate-600";
+};
+
 const BenchTable = ({
   rows,
   selectedRows,
@@ -243,10 +249,11 @@ const BenchTable = ({
                 </div>
               ),
               cost_info: (
-                <div className="flex flex-col text-right">
+                <div className="flex items-center justify-end gap-1.5">
                   <span className={`text-[12px] font-bold ${row.warnings.highCost ? "text-rose-700" : "text-slate-900"}`}>
-                    {row.costPerDay === null ? "—" : `₹${row.costPerDay.toLocaleString()}`}
+                    {row.costPerDay === null ? "—" : row.costPerDay.toLocaleString()}
                   </span>
+                  {row.currencyType && renderPill(row.currencyType, `${getCurrencyTone(row.currencyType)} !px-1.5 !py-0.5 !text-[9px] whitespace-nowrap`)}
                 </div>
               ),
               actions: (
