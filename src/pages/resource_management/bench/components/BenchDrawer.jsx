@@ -75,7 +75,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
               <div className={`${cardIconWrapperClass} from-amber-400 to-yellow-500`} />
               <p className="relative z-10 text-[10px] font-bold capitalize tracking-widest text-slate-500">Gross Exposure</p>
               <p className={`relative z-10 mt-2 text-2xl font-black tracking-tight ${resource.warnings?.highCost || resource.warnings?.longAging ? "text-rose-600" : "text-slate-900"}`}>
-                {formatCurrency(resource.costExposure)}
+                {resource.costExposure === null ? "—" : `₹${formatCurrency(resource.costExposure.toLocaleString())}`}
               </p>
             </div>
           </div>
@@ -145,7 +145,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Burn Rate (Per Day)</p>
-                  <p className="text-[12px] font-semibold text-slate-800 mt-0.5">{resource.costPerDay === null ? "Unavailable" : formatCurrency(resource.costPerDay)}</p>
+                  <p className="text-[12px] font-semibold text-slate-800 mt-0.5">{resource.costPerDay === null ? "Unavailable" : `${resource.currencyType || "₹"} ${formatCurrency(resource.costPerDay.toLocaleString())}`}</p>
                 </div>
               </div>
             </div>

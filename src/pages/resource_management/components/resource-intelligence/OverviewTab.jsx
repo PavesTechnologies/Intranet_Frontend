@@ -105,12 +105,12 @@ const normalizeBillableSummary = (summary) => {
 // ── Mini Info Row ──────────────────────────────────────────────────────────
 function MiniInfoRow({ label, value, icon: Icon }) {
     return (
-        <div className="flex flex-wrap items-center justify-between py-2 border-b border-slate-50 last:border-0 font-sans gap-2">
-            <div className="flex items-center gap-2 text-slate-400 min-w-[100px]">
-                <Icon className="h-3.5 w-3.5" />
-                <span className="text-[11px] sm:text-xs font-medium text-slate-500 whitespace-nowrap">{label}</span>
+        <div className="flex flex-wrap items-center justify-between py-1.5 border-b border-slate-50 last:border-0 font-sans gap-1.5">
+            <div className="flex items-center gap-1.5 text-slate-400 min-w-[90px]">
+                <Icon className="h-3 w-3" />
+                <span className="text-[11px] font-medium text-slate-500 whitespace-nowrap">{label}</span>
             </div>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-900 truncate max-w-[120px] sm:max-w-none">{value || "—"}</span>
+            <span className="text-[11px] font-bold text-slate-900 truncate max-w-[120px] sm:max-w-none">{value || "—"}</span>
         </div>
     );
 }
@@ -145,6 +145,38 @@ function UtilizationChart({ data }) {
     );
 }
 
+// ── Stacked Monthly Bars (Billable on top, Non-Billable below) ───────────
+function StackedMonthlyBars({ data }) {
+    const list = Array.isArray(data) ? data : [];
+    if (!list || list.length === 0) {
+        return <div className="flex items-center justify-center h-full text-[10px] text-slate-400 font-medium">No Trend Data Available</div>;
+    }
+
+    const maxVal = Math.max(...list.map(d => (Number(d.billable || 0) + Number(d.nonBillable || 0))), 1);
+
+    return (
+        <div className="w-full flex items-start justify-around gap-3 h-24">
+            {list.map((d, i) => (
+                <div key={i} className="w-8 flex flex-col items-center">
+                    <div
+                        className="w-full flex flex-col justify-start h-16 rounded-sm overflow-hidden cursor-pointer"
+                        title={`${d.period} - Billable: ${formatHours(d.billable)} | Non-Billable: ${formatHours(d.nonBillable)} | Total: ${formatHours((Number(d.billable||0)+Number(d.nonBillable||0)))}`}>
+                        <div
+                            style={{ height: `${((Number(d.billable || 0) / maxVal) * 100).toFixed(2)}%` }}
+                            className="w-full bg-indigo-600 transition-all rounded-t-sm"
+                        />
+                        <div
+                            style={{ height: `${((Number(d.nonBillable || 0) / maxVal) * 100).toFixed(2)}%` }}
+                            className="w-full bg-indigo-200 transition-all rounded-b-sm"
+                        />
+                    </div>
+                    <span className="text-[8px] font-bold text-slate-400 uppercase mt-1">{d.period}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 // ── Timeline Bar ───────────────────────────────────────────────────────────
 function TimelineBar({ resource }) {
     const blocks = resource.allocationTimeline || []
@@ -158,8 +190,8 @@ function TimelineBar({ resource }) {
     const today = Date.now()
 
     return (
-        <div className="relative pt-4 pb-2 font-sans">
-            <div className="relative h-6 sm:h-8 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden shadow-inner">
+        <div className="relative pt-2 pb-1 font-sans">
+            <div className="relative h-5 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden shadow-inner">
                 {blocks.map((block, i) => {
                     const start = parseDate(block.startDate).getTime()
                     const end = parseDate(block.endDate).getTime()
@@ -310,17 +342,17 @@ export default function OverviewTab({ resource }) {
     const totalProjPages = Math.ceil(currentProjects.length / ITEMS_PER_PAGE);
 
     return (
-        <div className="space-y-6 font-sans">
+        <div className="space-y-4 font-sans">
 
             {/* ── TOP METRICS GRID (3-Columns) ───────────────────────────────── */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 font-sans">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 font-sans items-stretch">
 
                 {/* COLUMN 1: Profile Summary (25%) */}
-                <div className="md:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm h-full flex flex-col transition-all hover:shadow-md">
-                    <h3 className="text-sm font-heading font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <div className="md:col-span-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm h-full flex flex-col transition-all hover:shadow-md">
+                    <h3 className="text-sm font-heading font-bold text-slate-900 mb-3 flex items-center gap-2">
                         <Users className="h-4 w-4 text-indigo-500" /> Profile Summary
                     </h3>
-                    <div className="space-y-1.5">
+                    <div className="space-y-0.5 flex-1">
                         <MiniInfoRow icon={MapPin} label="Location" value={resource.location} />
                         <MiniInfoRow icon={Briefcase} label="Experience" value={`${resource.experience || 0} Yrs`} />
                         <MiniInfoRow icon={Calendar} label="Available From" value={resource.availableFrom} />
@@ -335,73 +367,68 @@ export default function OverviewTab({ resource }) {
                 </div>
 
                 {/* COLUMN 2: Allocation Metrics (45%) */}
-                <div className="md:col-span-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm h-full transition-all hover:shadow-md">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
+                <div className="md:col-span-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm h-full transition-all hover:shadow-md flex flex-col">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
                         <h3 className="text-sm font-heading font-bold text-slate-900 flex items-center gap-2">
                             <TrendingUp className="h-4 w-4 text-indigo-500" /> Performance & Utilization
                         </h3>
                         {!utilLoading && (
-                            <div className="flex flex-wrap gap-3 sm:gap-4 text-[9px] sm:text-[10px] font-bold font-sans">
-                                <div className="flex items-center gap-1.5 text-emerald-600"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Billable</div>
-                                <div className="flex items-center gap-1.5 text-slate-400"><span className="h-2 w-2 rounded-full bg-slate-200" /> Non-Billable</div>
+                            <div className="flex flex-wrap gap-2 sm:gap-3 text-[9px] sm:text-[10px] font-bold font-sans">
+                                <div className="flex items-center gap-1.5 text-slate-900"><span className="h-2 w-2 rounded-full bg-indigo-600" /> Billable</div>
+                                <div className="flex items-center gap-1.5 text-slate-400"><span className="h-2 w-2 rounded-full bg-indigo-200" /> Non-Billable</div>
                             </div>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-end">
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-baseline pt-2">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch flex-1">
+                        <div className="space-y-3 flex flex-col flex-1">
+                            <div className="flex justify-between items-baseline">
                                 <span className="text-xs font-black text-slate-400 font-sans uppercase tracking-widest">Active Workload</span>
-                                <span className="text-3xl font-black text-indigo-600 font-sans tabular-nums tracking-tighter">{resource.currentAllocation || 0}%</span>
+                                <span className="text-2xl font-black text-indigo-600 font-sans tabular-nums tracking-tighter">{resource.currentAllocation || 0}%</span>
                             </div>
 
                             <TimelineBar resource={{ ...resource, allocationTimeline: sortedTimeline }} />
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-2.5">
                                     <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Billable</p>
-                                    <p className="mt-1 text-lg font-black text-emerald-700 tabular-nums">{formatHours(billableSummary?.billableHours)}</p>
+                                    <p className="mt-0.5 text-base font-black text-emerald-700 tabular-nums">{formatHours(billableSummary?.billableHours)}</p>
                                 </div>
-                                <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                                <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5">
                                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Non-Billable</p>
-                                    <p className="mt-1 text-lg font-black text-slate-800 tabular-nums">{formatHours(billableSummary?.nonBillableHours)}</p>
+                                    <p className="mt-0.5 text-base font-black text-slate-800 tabular-nums">{formatHours(billableSummary?.nonBillableHours)}</p>
                                 </div>
-                            </div>
-
-                            <div className="bg-indigo-50/30 rounded-lg p-3 border border-indigo-100/50">
-                                <p className="text-[10px] font-bold text-indigo-700/70 font-sans uppercase tracking-[0.2em]">
-                                    {billableSummary?.dateRange?.startDate && billableSummary?.dateRange?.endDate
-                                        ? `${formatShortDate(billableSummary.dateRange.startDate)} - ${formatShortDate(billableSummary.dateRange.endDate)}`
-                                        : "Current + Previous 3 Months"}
-                                </p>
-                                <p className="text-[11px] font-medium text-indigo-900 mt-1 leading-relaxed">
-                                    Total Logged Hours Are <span className="font-black">{formatHours(billableSummary?.totalHours)}</span>, With Billable Utilization At <span className="font-black">{(billableSummary?.billablePercentage || 0).toFixed(2).replace(/\.00$/, "")}%</span>.
-                                </p>
                             </div>
                         </div>
 
-                        <div className="h-36 flex flex-col pb-1">
-                            <div className="flex justify-between items-center mb-3">
-                                <span className="text-[10px] font-black text-slate-400 font-sans uppercase tracking-widest">Monthly Hours</span>
+                        <div className="flex flex-col justify-center items-stretch flex-1">
+                            <div className="flex flex-col justify-center items-center h-full">
+                                <div className="w-full max-w-full">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-[10px] font-black text-slate-400 font-sans uppercase tracking-widest">Monthly Hours</span>
+                                    </div>
+                                    {utilLoading ? (
+                                        <div className="h-24 w-full bg-slate-50 animate-pulse rounded-lg" />
+                                    ) : (
+                                        <div className="mx-auto w-full">
+                                            <StackedMonthlyBars data={utilization} />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                            {utilLoading ? (
-                                <div className="h-full w-full bg-slate-50 animate-pulse rounded-lg" />
-                            ) : (
-                                <UtilizationChart data={utilization} />
-                            )}
                         </div>
                     </div>
                 </div>
 
                 {/* COLUMN 3: Allocation Timeline & Risk (30%) */}
-                <div className="md:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm h-full flex flex-col transition-all hover:shadow-md">
-                    <h3 className="text-sm font-heading font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <div className="md:col-span-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm h-full flex flex-col transition-all hover:shadow-md">
+                    <h3 className="text-sm font-heading font-bold text-slate-900 mb-3 flex items-center gap-2">
                         <Percent className="h-4 w-4 text-indigo-500" /> Allocation Breakdown
                     </h3>
 
-                    <div className="flex-1 space-y-4">
+                    <div className="flex-1 space-y-3">
                         {/* Breakdown List */}
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             {sortedTimeline.length > 0 ? (
                                 sortedTimeline.map((block, i) => (
                                     <div key={i} className="flex items-center justify-between group/item">
@@ -428,32 +455,32 @@ export default function OverviewTab({ resource }) {
                             )}
                         </div>
 
-                        <div className="h-px bg-slate-50 my-2" />
+                        <div className="h-px bg-slate-50" />
 
-                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
+                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <Shield className="h-3 w-3" /> Risk Status
                         </h3>
 
                         {isNotice ? (
-                            <div className="bg-rose-50 border border-rose-100 p-3 rounded-lg">
+                            <div className="bg-rose-50 border border-rose-100 p-2.5 rounded-lg">
                                 <div className="flex items-center gap-2 text-rose-600 mb-1">
-                                    <AlertTriangle className="h-4 w-4" />
+                                    <AlertTriangle className="h-3.5 w-3.5" />
                                     <span className="text-xs font-bold font-sans tracking-tight">Critical Outcome</span>
                                 </div>
                                 <p className="text-[10px] font-medium text-rose-500 leading-tight font-sans">Serving Notice Period. Immediate Bench Risk Upon Completion.</p>
                             </div>
                         ) : resource.currentAllocation === 0 ? (
-                            <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg">
+                            <div className="bg-amber-50 border border-amber-100 p-2.5 rounded-lg">
                                 <div className="flex items-center gap-2 text-amber-600 mb-1">
-                                    <AlertTriangle className="h-4 w-4" />
+                                    <AlertTriangle className="h-3.5 w-3.5" />
                                     <span className="text-xs font-bold font-sans tracking-tight">Bench Risk</span>
                                 </div>
                                 <p className="text-[10px] font-medium text-amber-500 leading-tight font-sans">Resource Unallocated. Prioritize Project Matching.</p>
                             </div>
                         ) : (
-                            <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-lg">
+                            <div className="bg-emerald-50 border border-emerald-100 p-2.5 rounded-lg">
                                 <div className="flex items-center gap-2 text-emerald-600 mb-1">
-                                    <CheckCircle2 className="h-4 w-4" />
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
                                     <span className="text-xs font-bold font-sans tracking-tight">Stable Capacity</span>
                                 </div>
                                 <p className="text-[10px] font-medium text-emerald-500 leading-tight font-sans">Active Allocation Within Optimal Performance Range.</p>
@@ -464,29 +491,29 @@ export default function OverviewTab({ resource }) {
             </div>
 
             {/* ── SECONDARY METRICS ────────────────── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 font-sans">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 font-sans">
 
                 {/* Certifications Quick View */}
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md">
-                    <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                    <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                         <h3 className="text-sm font-heading font-bold text-slate-900 flex items-center gap-2">
-                            <Award className="h-4.5 w-4.5 text-indigo-500" /> Certification Inventory
+                            <Award className="h-4 w-4 text-indigo-500" /> Certification Inventory
                         </h3>
                         <Badge className="bg-indigo-50 text-indigo-600 text-[10px] font-bold border-none px-2.5 font-sans">{resource.certifications?.length || 0} Records</Badge>
                     </div>
-                    <div className="p-5 flex-1 flex flex-col">
+                    <div className="p-4 flex-1 flex flex-col">
                         {paginatedCerts.length > 0 ? (
                             <>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
                                     {paginatedCerts.map((c, i) => {
                                         const name = typeof c === 'string' ? c : (c.certificateName || c.name);
                                         const provider = typeof c === 'string' ? 'Verified' : c.providerName;
                                         const isExpired = c.expiryDate && new Date(c.expiryDate) < new Date();
 
                                         return (
-                                            <div key={i} className="flex items-start gap-4 p-3 rounded-xl border border-slate-100 bg-slate-50/30 group hover:border-indigo-200 hover:bg-white transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-                                                <div className="h-10 w-10 rounded-lg bg-white flex items-center justify-center text-indigo-500 shrink-0 border border-slate-100 shadow-sm transition-colors group-hover:bg-indigo-50">
-                                                    <Award className="h-5 w-5" />
+                                            <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg border border-slate-100 bg-slate-50/30 group hover:border-indigo-200 hover:bg-white transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                                                <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center text-indigo-500 shrink-0 border border-slate-100 shadow-sm transition-colors group-hover:bg-indigo-50">
+                                                    <Award className="h-4 w-4" />
                                                 </div>
                                                 <div className="min-w-0">
                                                     <p className="text-xs font-bold text-slate-900 leading-snug truncate font-sans">{name}</p>
@@ -499,7 +526,7 @@ export default function OverviewTab({ resource }) {
                                     })}
                                 </div>
                                 {totalCertPages > 1 && (
-                                    <div className="mt-4 pt-4 border-t border-slate-50">
+                                    <div className="mt-3 pt-3 border-t border-slate-50">
                                         <Pagination
                                             currentPage={certPage}
                                             totalPages={totalCertPages}
@@ -510,7 +537,7 @@ export default function OverviewTab({ resource }) {
                                 )}
                             </>
                         ) : (
-                            <div className="h-full flex flex-col items-center justify-center py-8 text-slate-300 font-sans">
+                            <div className="h-full flex flex-col items-center justify-center py-6 text-slate-300 font-sans">
                                 <Award className="h-8 w-8 mb-2 opacity-20" />
                                 <p className="text-xs font-bold">No Active Records Found</p>
                             </div>
@@ -520,9 +547,9 @@ export default function OverviewTab({ resource }) {
 
                 {/* Active Projects Quick View */}
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md">
-                    <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                    <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                         <h3 className="text-sm font-heading font-bold text-slate-900 flex items-center gap-2">
-                            <FolderKanban className="h-4.5 w-4.5 text-indigo-500" /> Employment History
+                            <FolderKanban className="h-4 w-4 text-indigo-500" /> Employment History
                         </h3>
                         <Badge className="bg-slate-100 text-slate-600 text-[10px] font-bold border-none px-2.5 font-sans whitespace-nowrap">{currentProjects.length} Projects</Badge>
                     </div>
@@ -531,24 +558,24 @@ export default function OverviewTab({ resource }) {
                             <>
                                 <div className="divide-y divide-slate-100 flex-1">
                                     {paginatedProjs.map((projectName, i) => (
-                                        <div key={i} className="px-5 py-4 hover:bg-slate-50 transition-colors flex items-center justify-between group font-sans">
-                                            <div className="flex items-center gap-4">
-                                                <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
-                                                    <FolderKanban className="h-5 w-5" />
+                                        <div key={i} className="px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between group font-sans">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+                                                    <FolderKanban className="h-4 w-4" />
                                                 </div>
                                                 <div>
                                                     <p className="text-xs font-bold text-slate-900 font-sans">{projectName}</p>
                                                     <p className="text-[10px] font-medium text-slate-500 mt-0.5 whitespace-nowrap font-sans">Active Client Engagement</p>
                                                 </div>
                                             </div>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <ArrowRight className="h-4 w-4 text-slate-400" />
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
                                             </Button>
                                         </div>
                                     ))}
                                 </div>
                                 {totalProjPages > 1 && (
-                                    <div className="p-4 border-t border-slate-50">
+                                    <div className="p-3 border-t border-slate-50">
                                         <Pagination
                                             currentPage={projPage}
                                             totalPages={totalProjPages}
@@ -559,7 +586,7 @@ export default function OverviewTab({ resource }) {
                                 )}
                             </>
                         ) : (
-                            <div className="py-16 text-center font-sans">
+                            <div className="py-12 text-center font-sans">
                                 <FolderKanban className="h-10 w-10 text-slate-200 mx-auto mb-3" />
                                 <p className="text-xs font-bold text-slate-400">No Active Project Engagements Found</p>
                             </div>

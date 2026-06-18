@@ -40,7 +40,8 @@ export default function FilterListbox({ options, value, onChange, disabled = fal
           leaveTo="opacity-0"
         >
           <Listbox.Options
-            className={`absolute left-0 z-[9999] ${openUp ? "bottom-full mb-1" : "top-full mt-1"} ${optionsClassName} max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm`}
+            className={`absolute left-0 z-[9999] ${openUp ? "bottom-full mb-1" : "top-full mt-1"} min-w-full ${optionsClassName} max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm`}
+            style={{ minWidth: "max-content" }}
           >
             {options.map((option, idx) => (
               <Listbox.Option

@@ -181,7 +181,7 @@ const BenchPoolDashboard = () => {
   }), [content]);
 
   // Calculations
-  const totalCost = useMemo(() => filteredContent.reduce((acc, curr) => acc + ((curr.cost || 0) * (curr.benchDays || 0)), 0), [filteredContent]);
+  const skillsGapCount = useMemo(() => filteredContent.filter(r => !r.skills || r.skills.length === 0).length, [filteredContent]);
   const avgBenchDays = useMemo(() => filteredContent.length > 0 ? (filteredContent.reduce((acc, curr) => acc + (curr.benchDays || 0), 0) / filteredContent.length).toFixed(1) : 0, [filteredContent]);
   const highRiskCount = useMemo(() => filteredContent.filter(r => r.riskLevel === 'HIGH').length, [filteredContent]);
   
@@ -272,9 +272,9 @@ const BenchPoolDashboard = () => {
       </div>
 
       {/* KPI Cards - Match Role-Off Style */}
-      <div className="flex flex-nowrap gap-3 overflow-x-auto mb-4 pb-1">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KPICard title="Total Bench" value={filteredContent.length} icon={<EmployeeIcon />} trend="Actual" subText="Resources on Bench" color="text-blue-700" bgColor="bg-blue-50" borderColor="border-blue-100" />
-        <KPICard title="Accumulated Cost" value={`₹${Math.round(totalCost).toLocaleString()}`} icon={<TrendingUpIcon />} trend="Exposure" subText="Financial Impact" color="text-rose-700" bgColor="bg-rose-50" borderColor="border-rose-100" />
+        <KPICard title="Skills Gap" value={skillsGapCount} icon={<AlertIcon />} trend={`${filteredContent.length > 0 ? Math.round((skillsGapCount / filteredContent.length) * 100) : 0}% of Bench`} subText="No Skills Mapped" color="text-orange-700" bgColor="bg-orange-50" borderColor="border-orange-100" />
         <KPICard title="Aging Avg" value={`${avgBenchDays}d`} icon={<PendingIcon />} trend="Velocity" subText="Days on Bench" color="text-amber-700" bgColor="bg-amber-50" borderColor="border-amber-100" />
         <KPICard title="Risk Alerts" value={highRiskCount} icon={<SecurityAlertIcon />} trend={highRiskCount > 0 ? "Alert" : "Stable"} subText="Action Required" color={highRiskCount > 0 ? "text-rose-700" : "text-emerald-700"} bgColor={highRiskCount > 0 ? "bg-rose-50" : "bg-emerald-50"} borderColor={highRiskCount > 0 ? "border-rose-100" : "border-emerald-100"} />
       </div>
@@ -513,7 +513,7 @@ const BenchPoolDashboard = () => {
                         aging_info: (
                           <div className="flex flex-col items-center text-center">
                             <span className={`text-[12px] font-bold ${row.benchDays > 30 ? 'text-rose-600' : 'text-slate-900'}`}>{row.benchDays} Days</span>
-                            <span className="text-[9px] font-medium text-slate-400 italic">Impact: ₹{Math.round((row.cost || 0) * (row.benchDays || 0)).toLocaleString()}</span>
+                            {/* <span className="text-[9px] font-medium text-slate-400 italic">Impact: ₹{Math.round((row.cost || 0) * (row.benchDays || 0)).toLocaleString()}</span> */}
                           </div>
                         ),
                         risk_info: (
@@ -559,7 +559,7 @@ const BenchPoolDashboard = () => {
 };
 
 const KPICard = ({ title, value, icon, trend, subText, color, bgColor, borderColor }) => (
-  <div className={`flex min-w-[200px] flex-1 items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all hover:border-slate-200`}>
+  <div className={`flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all hover:border-slate-200`}>
     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${bgColor} ${color} ${borderColor} shadow-sm`}>
       {React.cloneElement(icon, { size: 20 })}
     </div>
@@ -572,5 +572,7 @@ const KPICard = ({ title, value, icon, trend, subText, color, bgColor, borderCol
     </div>
   </div>
 );
+
+
 
 export default BenchPoolDashboard;
