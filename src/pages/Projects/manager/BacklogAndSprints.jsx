@@ -110,9 +110,20 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   // Move Story (Sprint <-> Backlog)
   // =======================================
   const handleDropStory = async (storyId, sprintId) => {
-    // Optimistic UI update
+    // Optimistic: move the story
     setStories((prev) =>
       prev.map((s) => (s.id === storyId ? { ...s, sprintId } : s)),
+    );
+    setBacklogStories((prev) =>
+      sprintId ? prev.filter((s) => s.id !== storyId) : prev,
+    );
+
+    // Optimistic: also move all tasks that belong to this story
+    setTasks((prev) =>
+      prev.map((t) => (t.storyId === storyId ? { ...t, sprintId } : t)),
+    );
+    setBacklogTasks((prev) =>
+      sprintId ? prev.filter((t) => t.storyId !== storyId) : prev,
     );
 
     try {
@@ -130,15 +141,18 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
         "success",
       );
       fetchStories();
+      fetchTasks();
     } catch (err) {
       const errorMessage =
-        err?.response?.data?.message || // backend message
-        err?.message || // axios/network message
-        "Failed to move story"; // fallback
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to move story";
 
       showStatusToast(errorMessage, "error");
 
-      fetchStories(); // rollback to server truth
+      // Rollback both stories and tasks to server truth
+      fetchStories();
+      fetchTasks();
     }
   };
 
@@ -300,6 +314,7 @@ const handleSprintStatus = async (sprintId, action) => {
     }
   };
 
+
   const fetchTasks = async () => {
     try {
       const res = await api.get(
@@ -393,7 +408,7 @@ const handleSprintStatus = async (sprintId, action) => {
     const numId = Number(projectId);
     if (!numId || isNaN(numId)) return;
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${numId}/risks/issues`,
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }, params: { page: 0, size: 5000 } },
       );

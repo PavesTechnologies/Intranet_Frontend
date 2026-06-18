@@ -55,7 +55,7 @@ const getPmExtraColumnConfig = (pmTab) => {
 
   if (pmTab === "process") {
     return {
-      header: "Role-Off Status",
+      header: "Roll-Off Status",
       renderCell: (row) => renderBadge(row.roleOffStatus || "NOT_REQUESTED", STATUS_STYLES),
     };
   }
@@ -88,7 +88,7 @@ const RoleOffTable = ({
   const pmExtraColumn = getPmExtraColumnConfig(pmTab);
   const emptyStateMessage = hasActiveFilters
     ? "No Records Match The Current Filters."
-    : "No Role-Off Records Available.";
+    : "No Roll-Off Records Available.";
 
   const canPmCancel = (row) =>
     pmTab === "process" &&
@@ -98,7 +98,7 @@ const RoleOffTable = ({
     if (pmTab === "active") {
       return {
         key: "roleoff",
-        label: "Role-Off",
+        label: "Roll-Off",
         icon: NextCircleIcon,
       };
     }
@@ -126,7 +126,7 @@ const RoleOffTable = ({
 
     return {
       key: "roleoff",
-      label: "Role-Off",
+      label: "Roll-Off",
       icon: NextCircleIcon,
     };
   };

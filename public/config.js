@@ -1,29 +1,12 @@
-// window.__APP_CONFIG__ = {
-//   // TIMESHEET_API_ENDPOINT: "http://13.204.95.26:5000",
-//   TIMESHEET_API_ENDPOINT: "http://localhost:5000",
-// //   USER_MANAGEMENT_URL: "http://127.0.0.1:8000",
-//   USER_MANAGEMENT_URL: "http://13.204.95.26:8000/ums",
-//   BASE_URL: "http://13.204.95.26:9999",
-// //   PMS_BASE_URL: "http://localhost:8080",
-//   PMS_BASE_URL: "http://13.204.95.26:8080",
-//   MSOffice_USER_MANAGEMENT_URL: "http://127.0.0.1:8000",
-// //   MSOffice_USER_MANAGEMENT_URL: "http://13.204.95.26:8000",
-//   EMPLOYEE_ONBOARDING_URL: "http://localhost:8000/ems",  
-//   // RMS_BASE_URL: "http://13.204.95.26:8002",
-// RMS_BASE_URL: "http://localhost:8080",
-// };
-
+// public/config.js
 window.__APP_CONFIG__ = {
-  // TIMESHEET_API_ENDPOINT: "http://13.204.95.26:5000",
-  TIMESHEET_API_ENDPOINT: "http://localhost:5000",
-//   USER_MANAGEMENT_URL: "http://127.0.0.1:8000",
-  USER_MANAGEMENT_URL: "http://13.207.112.154/ums",
-  BASE_URL: "http://13.204.95.26:9999",
-//   PMS_BASE_URL: "http://localhost:8080",
-  PMS_BASE_URL: "http://13.204.95.26:8080",
-  MSOffice_USER_MANAGEMENT_URL: "http://127.0.0.1:8000",
-//   MSOffice_USER_MANAGEMENT_URL: "http://13.204.95.26:8000",
-  EMPLOYEE_ONBOARDING_URL: "http://localhost:8000/ems",  
-  // RMS_BASE_URL: "http://13.204.95.26:8002",
-RMS_BASE_URL: "http://localhost:8080",
+    TIMESHEET_API_ENDPOINT: "https://d15j2ej3bear0q.cloudfront.net/tms",
+    USER_MANAGEMENT_URL: "https://d15j2ej3bear0q.cloudfront.net/ums",
+    BASE_URL: "https://d15j2ej3bear0q.cloudfront.net/lms",
+    PMS_BASE_URL: "https://d15j2ej3bear0q.cloudfront.net/pms",
+    MSOffice_USER_MANAGEMENT_URL: "https://d15j2ej3bear0q.cloudfront.net/ums",
+    // EMPLOYEE_ONBOARDING_URL: "http://localhost:8001/ems",
+    EMPLOYEE_ONBOARDING_URL: "https://d15j2ej3bear0q.cloudfront.net/ems",
+    //RMS_BASE_URL: "https://d15j2ej3bear0q.cloudfront.net/rms"
+    RMS_BASE_URL: "http://localhost:8080/rms"
 };

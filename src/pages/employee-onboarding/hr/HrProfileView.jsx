@@ -215,10 +215,12 @@ export default function HrProfileView() {
         hasSectionVerificationFlag(profileData, ["education_verification_status"]) ||
         areAllItemsVerified(educationDocs),
       experience:
-        hasSectionVerificationFlag(profileData, ["experience_verification_status"]) ||
-        (experienceDocs.length > 0
-          ? areAllItemsVerified(experienceDocs)
-          : areAllItemsVerified(experienceRecords)),
+  experienceRecords.length === 0
+    ? true
+    : hasSectionVerificationFlag(profileData, ["experience_verification_status"]) ||
+      (experienceDocs.length > 0
+        ? areAllItemsVerified(experienceDocs)
+        : areAllItemsVerified(experienceRecords)),
       "identity documents":
         hasSectionVerificationFlag(profileData, [
           "identity_documents_verification_status",
@@ -836,17 +838,19 @@ export default function HrProfileView() {
 
             <div className="flex items-center gap-4">
               {!sectionStatus[activeTab] &&
-                !isVerificationFinalized && (
-                  <button
-                    onClick={verifySection}
-                    className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all transform active:scale-95"
-                  >
-                    <Check size={18} strokeWidth={3} /> Verify{" "}
-                    {activeTab === "identity documents"
-                      ? "Documents"
-                      : activeTab}
-                  </button>
-                )}
+  !isVerificationFinalized &&
+  !(activeTab === "experience" && !hasExperienceRecords) && (
+    <button
+      onClick={verifySection}
+      className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all transform active:scale-95"
+    >
+      <Check size={18} strokeWidth={3} />
+      Verify{" "}
+      {activeTab === "identity documents"
+        ? "Documents"
+        : activeTab}
+    </button>
+)}
 
               {activeTab !== "identity documents" ? (
                 <button

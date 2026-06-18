@@ -315,21 +315,22 @@ const UtilizationPerformanceDashboard = () => {
          try {
             setIsResourceLoading(true);
             const data = await utilizationService.getRMSResources(currentPage - 1, ITEMS_PER_PAGE, startDate, endDate);
-            
+            console.log('[Resource Capability] Raw API response:', data);
+
             if (data && data.content) {
-                // If API supports search on backend, it might return filtered data.
-                // Otherwise, we set what we get.
                 let content = data.content;
                 if (searchQuery) {
-                   content = content.filter(res => res.userName?.toLowerCase().includes(searchQuery.toLowerCase()));
+                   content = content.filter(res => res.resourceName?.toLowerCase().includes(searchQuery.toLowerCase()));
                 }
+                console.log('[Resource Capability] Transformed table rows:', content);
                 setPaginatedResources(content);
                 setTotalResourcePages(data.totalPages || 1);
             } else if (Array.isArray(data)) {
                 let content = data;
                 if (searchQuery) {
-                   content = content.filter(res => res.userName?.toLowerCase().includes(searchQuery.toLowerCase()));
+                   content = content.filter(res => res.resourceName?.toLowerCase().includes(searchQuery.toLowerCase()));
                 }
+                console.log('[Resource Capability] Transformed table rows:', content);
                 setPaginatedResources(content);
                 setTotalResourcePages(1);
             } else {
@@ -519,8 +520,8 @@ const UtilizationPerformanceDashboard = () => {
       if (!summaryData) return KPI_STATS;
 
       // Map from new API fields if present, with fallbacks to old names
-      let utilVal = summaryData.utilization ?? summaryData.overallUtilizationPercentage ?? 0;
-      if (!summaryData.utilization && !summaryData.overallUtilizationPercentage && summaryData.monthly && summaryData.monthly.length > 0) {
+      let utilVal = summaryData.utilizationPercentage ?? summaryData.overallUtilizationPercentage ?? 0;
+      if (!summaryData.utilizationPercentage && !summaryData.overallUtilizationPercentage && summaryData.monthly && summaryData.monthly.length > 0) {
          const sumUtil = summaryData.monthly.reduce((acc, m) => acc + m.util, 0);
          utilVal = sumUtil / summaryData.monthly.length;
       }
@@ -961,8 +962,8 @@ const UtilizationPerformanceDashboard = () => {
                               ...res,
                               resource_info: (
                                  <div className="flex flex-col text-left">
-                                    <span className="text-[13px] font-bold text-slate-900 capitalize tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{res.userName}</span>
-                                    <span className="text-[10px] font-medium text-slate-400 mt-1.5 capitalize tracking-widest italic">Resource</span>
+                                    <span className="text-[13px] font-bold text-slate-900 capitalize tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{res.resourceName}</span>
+                                    <span className="text-[10px] font-medium text-slate-400 mt-1.5 capitalize tracking-widest italic">{res.role || res.designation || 'Resource'}</span>
                                  </div>
                               ),
                               hours_info: (
@@ -974,14 +975,16 @@ const UtilizationPerformanceDashboard = () => {
                               ),
                               trend_info: (
                                  <div className="flex flex-col items-center gap-0.5">
-                                    <div className="text-indigo-600 flex items-center gap-1 text-[10px] font-black capitalize"><ZapIcon size={14} /> Stable</div>
+                                    <div className={`flex items-center gap-1 text-[10px] font-black capitalize ${res.trendSignal === 'DOWN' ? 'text-rose-500' : res.trendSignal === 'UP' ? 'text-emerald-500' : 'text-indigo-600'}`}>
+                                       <ZapIcon size={14} /> {res.trendSignal ? res.trendSignal.charAt(0) + res.trendSignal.slice(1).toLowerCase() : 'Stable'}
+                                    </div>
                                  </div>
                               ),
                               utilization_info: (
                                  <div className="flex flex-col items-end">
-                                    <span className="text-[16px] font-black text-slate-900">{res.billablePercentage}%</span>
+                                    <span className="text-[16px] font-black text-slate-900">{res.utilizationPercentage ?? 0}%</span>
                                     <div className="h-1 w-12 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
-                                       <div className="h-full bg-indigo-500" style={{ width: `${res.billablePercentage}%` }} />
+                                       <div className="h-full bg-indigo-500" style={{ width: `${Math.min(res.utilizationPercentage ?? 0, 100)}%` }} />
                                     </div>
                                  </div>
                               ),

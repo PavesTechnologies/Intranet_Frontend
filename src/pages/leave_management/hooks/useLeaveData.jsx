@@ -21,7 +21,7 @@ const useLeaveData = (employeeId, refreshKey, year) => {
       setLoading(true);
 
       const response = await api.get(
-        `${BASE_URL}/api/leave-requests/employee/${employeeId}/${year}`,
+        `${BASE_URL}/api/leave-requests/patterns/employee/${employeeId}/${year}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,

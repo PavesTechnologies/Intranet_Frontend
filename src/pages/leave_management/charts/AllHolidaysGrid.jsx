@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import Button from "../../../components/Button/Button";
-import { XCircle } from "lucide-react";
+import { X } from "lucide-react";
 export default function AllHolidaysGrid({ holidays, onClose }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -55,23 +55,12 @@ export default function AllHolidaysGrid({ holidays, onClose }) {
               </span>
             </div>
           </div>
-          <Button
-            onClick={onClose}
-            className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-4 h-4"
-            >
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-            {/* <XCircle className="w-8 h-8 text-white" /> */}
-          </Button>
+          <button
+  onClick={onClose}
+  className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 transition-all"
+>
+  <X className="w-6 h-6 text-white stroke-[3]" />
+</button>
         </div>
 
         {/* Scrollable Grid */}

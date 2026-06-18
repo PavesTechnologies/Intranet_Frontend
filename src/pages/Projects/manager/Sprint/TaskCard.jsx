@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import ReactDOM from "react-dom";
 import { useDrag } from "react-dnd";
 import {
   MoreHorizontalIcon,
@@ -17,10 +18,12 @@ const TaskCard = ({
   riskCount = 0,
   projectId,
   navigate,
+  readOnly = false,
 }) => {
   const [{ isDragging }, dragRef] = useDrag({
     type: "TASK",
     item: { id: task.id, type: "TASK" },
+    canDrag: !readOnly,
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
@@ -28,21 +31,47 @@ const TaskCard = ({
 
   const [showMenu, setShowMenu] = useState(false);
   const [showStoryList, setShowStoryList] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
+  const [storyPos, setStoryPos] = useState({ top: 0, right: 0 });
 
-  const menuRef = useRef(null);
+  const menuBtnRef = useRef(null);
+  const storyBtnRef = useRef(null);
+  const sprintDropdownRef = useRef(null);
+  const storyDropdownRef = useRef(null);
 
-  // Close menu on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+      const inMenuBtn        = menuBtnRef.current?.contains(event.target);
+      const inStoryBtn       = storyBtnRef.current?.contains(event.target);
+      const inSprintDropdown = sprintDropdownRef.current?.contains(event.target);
+      const inStoryDropdown  = storyDropdownRef.current?.contains(event.target);
+      if (!inMenuBtn && !inStoryBtn && !inSprintDropdown && !inStoryDropdown) {
         setShowMenu(false);
         setShowStoryList(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const handleToggleMenu = () => {
+    if (menuBtnRef.current) {
+      const rect = menuBtnRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setShowMenu((prev) => !prev);
+    setShowStoryList(false);
+  };
+
+  const handleToggleStoryList = (e) => {
+    e.stopPropagation();
+    if (storyBtnRef.current) {
+      const rect = storyBtnRef.current.getBoundingClientRect();
+      setStoryPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setShowStoryList((prev) => !prev);
+    setShowMenu(false);
+  };
 
   const handleSelectSprint = (sprintId) => {
     onAddToSprint?.(task.id, sprintId);
@@ -60,11 +89,11 @@ const TaskCard = ({
 
   return (
     <div
-      ref={dragRef}
-      onClick={() => onClick?.()}
-      className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm hover:border-indigo-300 cursor-pointer flex items-center gap-3 ${
-        isDragging ? "opacity-50 scale-95 ring-2 ring-indigo-400" : ""
-      }`}
+      ref={readOnly ? undefined : dragRef}
+      onClick={() => !readOnly && onClick?.()}
+      className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm flex items-center gap-3 ${
+        readOnly ? "cursor-default opacity-80" : "hover:border-indigo-300 cursor-pointer"
+      } ${isDragging ? "opacity-50 scale-95 ring-2 ring-indigo-400" : ""}`}
     >
       {/* TASK label */}
       <div className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold shrink-0">
@@ -84,13 +113,10 @@ const TaskCard = ({
       </span>
 
       {/* Add Story */}
-      {task.storyId === null && (
+      {!task.storyId && (
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowStoryList((prev) => !prev);
-            setShowMenu(false);
-          }}
+          ref={storyBtnRef}
+          onClick={handleToggleStoryList}
           className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 shrink-0"
         >
           <AddIcon size={13} /> Story
@@ -99,62 +125,79 @@ const TaskCard = ({
 
       {/* Three Dot Menu */}
       <div
-        ref={menuRef}
-        className="relative shrink-0"
+        className="shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
         <button
-          onClick={() => {
-            setShowMenu((prev) => !prev);
-            setShowStoryList(false);
-          }}
+          ref={menuBtnRef}
+          onClick={handleToggleMenu}
           className="p-1 text-gray-500 hover:text-gray-800"
         >
           <MoreHorizontalIcon size={16} />
         </button>
+      </div>
 
-        {showMenu && (
-          <div className="absolute right-0 mt-1 w-40 bg-white border rounded shadow-lg z-50">
-            <div className="px-3 py-1 text-xs text-gray-500 border-b">
+      {/* Sprint dropdown — portal to escape overflow containers */}
+      {showMenu && ReactDOM.createPortal(
+        <div
+          ref={sprintDropdownRef}
+          style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
+          className="w-44 bg-white border border-gray-100 rounded-lg shadow-xl py-1 overflow-hidden"
+        >
+          <div className="px-3 py-2 border-b border-gray-50 bg-gray-50/50">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
               Move to Sprint
-            </div>
-
-            {sprints.length === 0 ? (
-              <p className="text-xs text-gray-400 p-2 text-center">
-                No sprints
-              </p>
-            ) : (
-              sprints.map((sprint) => (
+            </span>
+          </div>
+          {sprints.length === 0 ? (
+            <p className="text-xs text-gray-400 p-3 text-center italic">No active sprints</p>
+          ) : (
+            <div className="max-h-40 overflow-y-auto">
+              {sprints.map((sprint) => (
                 <button
                   key={sprint.id}
                   onClick={() => handleSelectSprint(sprint.id)}
-                  className="block w-full text-left px-3 py-2 text-sm hover:bg-indigo-50"
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
                 >
                   {sprint.name}
                 </button>
-              ))
-            )}
-          </div>
-        )}
-
-        {showStoryList && (
-          <div className="absolute right-0 bottom-full mb-2 w-48 bg-white border rounded shadow-lg z-50">
-            <div className="px-3 py-1 text-xs text-gray-500 border-b">
-              Assign Story
+              ))}
             </div>
+          )}
+        </div>,
+        document.body
+      )}
 
-            {stories.map((story) => (
-              <button
-                key={story.id}
-                onClick={() => handleSelectStory(story.id)}
-                className="block w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 truncate"
-              >
-                {story.title}
-              </button>
-            ))}
+      {/* Story dropdown — portal to escape overflow containers */}
+      {showStoryList && ReactDOM.createPortal(
+        <div
+          ref={storyDropdownRef}
+          style={{ position: "fixed", top: storyPos.top, right: storyPos.right, zIndex: 9999 }}
+          className="w-48 bg-white border border-gray-100 rounded-lg shadow-xl py-1 overflow-hidden"
+        >
+          <div className="px-3 py-2 border-b border-gray-50 bg-gray-50/50">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Assign Story
+            </span>
           </div>
-        )}
-      </div>
+          {stories.length === 0 ? (
+            <p className="text-xs text-gray-400 p-3 text-center italic">No stories</p>
+          ) : (
+            <div className="max-h-40 overflow-y-auto">
+              {stories.map((story) => (
+                <button
+                  key={story.id}
+                  onClick={() => handleSelectStory(story.id)}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors truncate"
+                >
+                  {story.title}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

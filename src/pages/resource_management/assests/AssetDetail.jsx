@@ -94,26 +94,35 @@ const Modal = ({ title, children, onClose }) => (
   </div>
 );
 
-const Input = ({ label, ...props }) => (
-  <div className="space-y-1.5">
+const Input = ({ label, required, error, ...props }) => (
+  <div className="space-y-1.5 w-full">
     <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
-      {label}
+      {label} {required && <span className="text-red-500">*</span>}
     </label>
     <input
       {...props}
-      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+      className={`w-full bg-slate-50 border rounded-xl px-3 py-2 text-sm outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+        error
+          ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+          : "border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+      }`}
     />
+    {error && <p className="text-[11px] text-red-500 font-medium ml-1 mt-0.5">{error}</p>}
   </div>
 );
 
-const Select = ({ label, options, ...props }) => (
-  <div className="space-y-1.5">
+const Select = ({ label, options, required, error, ...props }) => (
+  <div className="space-y-1.5 w-full">
     <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
-      {label}
+      {label} {required && <span className="text-red-500">*</span>}
     </label>
     <select
       {...props}
-      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 appearance-none cursor-pointer"
+      className={`w-full bg-slate-50 border rounded-xl px-3 py-2 text-sm outline-none appearance-none cursor-pointer ${
+        error
+          ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+          : "border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+      }`}
     >
       {options.map((opt) => (
         <option key={opt} value={opt}>
@@ -121,6 +130,7 @@ const Select = ({ label, options, ...props }) => (
         </option>
       ))}
     </select>
+    {error && <p className="text-[11px] text-red-500 font-medium ml-1 mt-0.5">{error}</p>}
   </div>
 );
 
@@ -145,6 +155,7 @@ const AssetDetail = () => {
   const [editingAssignment, setEditingAssignment] = useState(null);
   const [returnItem, setReturnItem] = useState(null);
   const [kpiData, setKPIData] = useState(null);
+  const [errors, setErrors] = useState({});
 
   const [availableSerials, setAvailableSerials] = useState([]);
   const [serialLoading, setSerialLoading] = useState(false);
@@ -342,6 +353,13 @@ const AssetDetail = () => {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors((prev) => {
+        const copy = { ...prev };
+        delete copy[name];
+        return copy;
+      });
+    }
   };
 
   const handleReturnChange = (e) => {
@@ -349,8 +367,48 @@ const AssetDetail = () => {
     setReturnData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const listboxButtonClass = (hasError) => 
+    `w-full cursor-default rounded-lg border py-2 pl-4 pr-10 text-left text-sm shadow-sm transition focus:outline-none focus:ring-2 bg-white ${
+      hasError
+        ? "border-red-500 focus:ring-red-500/20 focus:border-red-500"
+        : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+    }`;
+
   const handleAssignSave = async (e) => {
     e.preventDefault();
+
+    // Field validations
+    const newErrors = {};
+    if (!formData.projectId) {
+      newErrors.projectId = "Project is required.";
+    }
+    if (!formData.resourceName) {
+      newErrors.resourceName = "Resource Name is required.";
+    }
+    if (!formData.serialNumber) {
+      newErrors.serialNumber = "Serial Number is required.";
+    }
+    if (!formData.expectedReturnDate) {
+      newErrors.expectedReturnDate = "Expected Return Date is required.";
+    }
+    if (!formData.assignmentStatus) {
+      newErrors.assignmentStatus = "Assignment Status is required.";
+    }
+    if (!formData.locationType) {
+      newErrors.locationType = "Work Type is required.";
+    }
+    if (!formData.locationDetails || !formData.locationDetails.trim()) {
+      newErrors.locationDetails = "Location Details are required.";
+    }
+    if (!formData.description || !formData.description.trim()) {
+      newErrors.description = "Description is required.";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      notify.error("Please fill in all mandatory fields.");
+      return;
+    }
 
     const payload = {
       asset: {
@@ -432,9 +490,31 @@ const AssetDetail = () => {
     }
   };
 
-  const openEditModal = (a) => {
+  const openEditModal = async (a) => {
+    // mark editing target so availableProjectResources allows it
     setEditingAssignment(a);
 
+    // fetch project resources for the assignment's project so the resource list contains the current resource
+    try {
+      if (a.projectId) {
+        setProjectResourcesLoading(true);
+        const res = await projectResourceDetails(a.projectId);
+        const fetched = res?.data || [];
+
+        // If the resource in the assignment isn't present in fetched list, add it so the listbox can show it
+        if (a.resourceName && !fetched.find((r) => r.resourceName === a.resourceName)) {
+          fetched.push({ resourceName: a.resourceName, resourceRole: a.resourceRole || "" });
+        }
+
+        setProjectResources(fetched);
+      }
+    } catch (err) {
+      console.error("Failed to load project resources for edit modal", err);
+    } finally {
+      setProjectResourcesLoading(false);
+    }
+
+    // populate form with existing assignment values
     setFormData({
       resourceName: a.resourceName || "",
       projectId: a.projectId || "",
@@ -449,6 +529,7 @@ const AssetDetail = () => {
       serialNumber: a.serialNumber || "",
     });
 
+    // ensure serials are loaded
     fetchAvailableSerials();
     setShowModal(true);
   };
@@ -456,6 +537,7 @@ const AssetDetail = () => {
   const closeModal = () => {
     setShowModal(false);
     setEditingAssignment(null);
+    setErrors({});
     setFormData({
       resourceName: "",
       projectId: "",
@@ -702,7 +784,7 @@ const AssetDetail = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
-                    Project
+                    Project <span className="text-red-500">*</span>
                   </label>
                   <FilterListbox
                     options={[
@@ -710,19 +792,30 @@ const AssetDetail = () => {
                       ...clientProjects.map((p) => ({ value: p.pmsProjectId, label: p.projectName }))
                     ]}
                     value={formData.projectId || ""}
-                    onChange={(val) =>
+                    buttonClassName={listboxButtonClass(!!errors.projectId)}
+                    onChange={(val) => {
                       setFormData((prev) => ({
                         ...prev,
                         projectId: val,
                         projectName: clientProjects.find((p) => p.pmsProjectId == val)?.projectName || "",
-                      }))
-                    }
+                      }));
+                      if (errors.projectId) {
+                        setErrors((prev) => {
+                          const copy = { ...prev };
+                          delete copy.projectId;
+                          return copy;
+                        });
+                      }
+                    }}
                   />
+                  {errors.projectId && (
+                    <p className="text-[11px] text-red-500 font-medium ml-1 mt-0.5">{errors.projectId}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
-                    Resource Name
+                    Resource Name <span className="text-red-500">*</span>
                   </label>
                   <FilterListbox
                     options={[
@@ -730,13 +823,26 @@ const AssetDetail = () => {
                       ...availableProjectResources.map((res) => ({ value: res.resourceName, label: `${res.resourceName} - ${res.resourceRole}` }))
                     ]}
                     value={formData.resourceName || ""}
-                    onChange={(val) => handleFormChange({ target: { name: "resourceName", value: val } })}
+                    buttonClassName={listboxButtonClass(!!errors.resourceName)}
+                    onChange={(val) => {
+                      handleFormChange({ target: { name: "resourceName", value: val } });
+                      if (errors.resourceName) {
+                        setErrors((prev) => {
+                          const copy = { ...prev };
+                          delete copy.resourceName;
+                          return copy;
+                        });
+                      }
+                    }}
                   />
+                  {errors.resourceName && (
+                    <p className="text-[11px] text-red-500 font-medium ml-1 mt-0.5">{errors.resourceName}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
-                    Serial Number
+                    Serial Number <span className="text-red-500">*</span>
                   </label>
 
                   <FilterListbox
@@ -746,8 +852,21 @@ const AssetDetail = () => {
                       ...availableSerials.map((s) => ({ value: s.serialNumber, label: s.serialNumber }))
                     ]}
                     value={formData.serialNumber}
-                    onChange={(val) => handleFormChange({ target: { name: "serialNumber", value: val } })}
+                    buttonClassName={listboxButtonClass(!!errors.serialNumber)}
+                    onChange={(val) => {
+                      handleFormChange({ target: { name: "serialNumber", value: val } });
+                      if (errors.serialNumber) {
+                        setErrors((prev) => {
+                          const copy = { ...prev };
+                          delete copy.serialNumber;
+                          return copy;
+                        });
+                      }
+                    }}
                   />
+                  {errors.serialNumber && (
+                    <p className="text-[11px] text-red-500 font-medium ml-1 mt-0.5">{errors.serialNumber}</p>
+                  )}
                 </div>
                 <Input
                   label="Assigned By"
@@ -771,13 +890,19 @@ const AssetDetail = () => {
                   value={formData.expectedReturnDate}
                   onChange={handleFormChange}
                   min={today}
+                  required
+                  error={errors.expectedReturnDate}
                 />
                 <Select
                   label="Status"
                   name="assignmentStatus"
                   value={formData.assignmentStatus}
                   onChange={handleFormChange}
-                  options={["ASSIGNED", "REQUESTED", "REJECTED"]}
+                  // When creating a new assignment, only allow ASSIGNED.
+                  // When editing an existing assignment, keep existing options.
+                  options={editingAssignment ? ["ASSIGNED", "REQUESTED", "REJECTED"] : ["ASSIGNED"]}
+                  required
+                  error={errors.assignmentStatus}
                 />
                 <Input
                   label="Location"
@@ -785,10 +910,12 @@ const AssetDetail = () => {
                   value={formData.locationDetails}
                   onChange={handleFormChange}
                   placeholder="e.g. Hyderabad"
+                  required
+                  error={errors.locationDetails}
                 />
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
-                    Work Type
+                    Work Type <span className="text-red-500">*</span>
                   </label>
                   <FilterListbox
                     options={[
@@ -798,21 +925,42 @@ const AssetDetail = () => {
                       { value: "CLIENT_LOCATION", label: "Client Location" },
                     ]}
                     value={formData.locationType || ""}
-                    onChange={(val) => setFormData((prev) => ({ ...prev, locationType: val }))}
+                    buttonClassName={listboxButtonClass(!!errors.locationType)}
+                    onChange={(val) => {
+                      setFormData((prev) => ({ ...prev, locationType: val }));
+                      if (errors.locationType) {
+                        setErrors((prev) => {
+                          const copy = { ...prev };
+                          delete copy.locationType;
+                          return copy;
+                        });
+                      }
+                    }}
                   />
+                  {errors.locationType && (
+                    <p className="text-[11px] text-red-500 font-medium ml-1 mt-0.5">{errors.locationType}</p>
+                  )}
                 </div>
               </div>
               <div>
                 <label className="text-[11px] font-bold text-slate-500 uppercase ml-1">
-                  Description
+                  Description <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   name="description"
                   value={formData.description}
                   onChange={handleFormChange}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 mt-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className={`w-full bg-slate-50 border rounded-xl p-3 mt-1.5 text-sm outline-none transition-all focus:ring-2 ${
+                    errors.description
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
+                      : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
+                  }`}
                   rows={3}
+                  required
                 />
+                {errors.description && (
+                  <p className="text-[11px] text-red-500 font-medium ml-1 mt-1">{errors.description}</p>
+                )}
               </div>
             </div>
             {/* FOOTER */}

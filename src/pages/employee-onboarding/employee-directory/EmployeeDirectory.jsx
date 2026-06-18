@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import api from "../../../api/axiosInstance";
 import { Search } from "lucide-react";
 
@@ -8,6 +8,9 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 import { Fonts } from "../../../components/Fonts/Fonts";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import EmployeeCard from "../components/EmployeeCard";
+import Pagination from "../../../components/Pagination/pagination";
+
+const PAGE_SIZE = 12;
 
 function SectionHeaderCard({ title, description }) {
   return (
@@ -32,6 +35,7 @@ const EmployeeDirectory = () => {
 
   const [departmentsList, setDepartmentsList] = useState([]);
   const [designationsList, setDesignationsList] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
@@ -154,16 +158,24 @@ const mappedEmployees = employeeData.map((emp) => {
 
   const departments = ["All", ...departmentsList.map((dept) => dept.department_name)];
 
-  const filteredEmployees = employees.filter((employee) => {
+  const filteredEmployees = useMemo(() => {
+    setCurrentPage(1);
     const searchValue = search.toLowerCase();
-    const matchesSearch =
-      employee.name.toLowerCase().includes(searchValue) ||
-      employee.role.toLowerCase().includes(searchValue);
+    return employees.filter((employee) => {
+      const matchesSearch =
+        employee.name.toLowerCase().includes(searchValue) ||
+        employee.role.toLowerCase().includes(searchValue);
+      const matchesDepartment =
+        department === "All" || employee.department === department;
+      return matchesSearch && matchesDepartment;
+    });
+  }, [employees, search, department]);
 
-    const matchesDepartment = department === "All" || employee.department === department;
-
-    return matchesSearch && matchesDepartment;
-  });
+  const totalPages = Math.ceil(filteredEmployees.length / PAGE_SIZE);
+  const paginatedEmployees = filteredEmployees.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   return (
     <div className="p-6">
@@ -221,7 +233,7 @@ const mappedEmployees = employeeData.map((emp) => {
                 </Button>
               </div>
             ) : filteredEmployees.length > 0 ? (
-              filteredEmployees.map((employee, index) => (
+              paginatedEmployees.map((employee, index) => (
                 <EmployeeCard
                   key={employee.employee_uuid || employee.employeeId || index}
                   employee={employee}
@@ -234,6 +246,13 @@ const mappedEmployees = employeeData.map((emp) => {
               </div>
             )}
           </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+            onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+          />
         </PageCardContent>
       </PageCard>
     </div>

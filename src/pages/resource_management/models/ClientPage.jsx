@@ -28,6 +28,7 @@ import {
 } from "@/components/icons";
 
 import { useAuth } from "../../../contexts/AuthContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { KPICard } from "../../../components/kpi/KPI";
 
 import ClientSection from "./ClientSection";
@@ -198,20 +199,51 @@ const ProjectAssets = ({ assets, loading }) => {
       />
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <GenericTable
-          headers={["Asset Name", "Serial / ID", "Assigned User", "Status"]}
-          columns={["asset_info", "serial_info", "assigned_info", "status_info"]}
-          rows={assets.map((asset, index) => ({
-            ...asset,
-            asset_info: <span>{asset.asset?.assetName || asset.assetName || "—"}</span>,
-            serial_info: <span className="font-mono text-gray-600">{asset.serialNumber || asset.serial || "—"}</span>,
-            assigned_info: <span>{asset.assignedBy || asset.assignedTo || "—"}</span>,
-            status_info: (
-              <StatusBadge label={asset.asset?.status || asset.status || "UNKNOWN"} size="sm" />
-            )
-          }))}
+  <GenericTable
+    headers={[
+      "Asset Name",
+      "Serial / ID",
+      "User",
+      "Assigned User",
+      "Status",
+    ]}
+    columns={[
+      "asset_info",
+      "serial_info",
+      "user_info",
+      "assigned_info",
+      "status_info",
+    ]}
+    rows={assets.map((asset) => ({
+      ...asset,
+
+      asset_info: (
+        <span>{asset.asset?.assetName || "—"}</span>
+      ),
+
+      serial_info: (
+        <span className="font-mono text-gray-600">
+          {asset.serialNumber || "—"}
+        </span>
+      ),
+
+      user_info: (
+        <span>{asset.resourceName || "—"}</span>
+      ),
+
+      assigned_info: (
+        <span>{asset.assignedBy || "—"}</span>
+      ),
+
+      status_info: (
+        <StatusBadge
+          label={asset.assignmentStatus || "UNKNOWN"}
+          size="sm"
         />
-      </div>
+      ),
+    }))}
+  />
+</div>
     </div>
   );
 };
@@ -338,9 +370,34 @@ const ClientPage = () => {
   const { user } = useAuth();
   const permissions = user?.permissions || [];
   const roles = user?.roles || [];
-  const canConfigAgreements = roles.includes("Admin");  // permissions.includes("ADD_CONFIGURATION");
-  const canManageAssets = roles.includes("Resource_Manager"); // permissions.includes("ASSETS_MANAGEMENT");
-  const canEditProfile = roles.includes("Admin");  // permissions.includes("EDIT_CLIENT_PROFILE");
+  // Role switching: allow users with both Project_Manager and Resource_Manager
+  const normalizeRoleKey = (role = "") =>
+    String(role || "").replace(/^ROLE[-_\s]/i, "").trim();
+
+  const getConfigRoleOptions = (rolesList = []) => {
+    const opts = [];
+    if (!Array.isArray(rolesList)) return opts;
+    if (rolesList.includes("Project_Manager")) opts.push({ value: "Project_Manager", label: "Project Manager" });
+    if (rolesList.includes("Resource_Manager")) opts.push({ value: "Resource_Manager", label: "Resource Manager" });
+    return opts;
+  };
+
+  const pickPrimaryConfigRole = (rolesList = []) => {
+    if (rolesList.includes("Project_Manager")) return "Project_Manager";
+    if (rolesList.includes("Resource_Manager")) return "Resource_Manager";
+    return null;
+  };
+
+  const configRoleOptions = getConfigRoleOptions(roles);
+  const [selectedRole, setSelectedRole] = React.useState(null);
+  const effectiveRole = selectedRole || pickPrimaryConfigRole(roles);
+
+  const isPM = effectiveRole === "Project_Manager";
+  const isRM = effectiveRole === "Resource_Manager";
+
+  const canConfigAgreements = isPM || roles.includes("Admin");
+  const canManageAssets = isRM || roles.includes("Resource_Manager");
+  const canEditProfile = roles.includes("Admin");
   const navigate = useNavigate();
 
   // State declarations - ALL hooks inside component
@@ -927,23 +984,6 @@ const ClientPage = () => {
         <div className="col-span-12 lg:col-span-8 bg-white border rounded-xl shadow-sm">
           {selectedProject ? (
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm min-h-[600px] flex flex-col">
-              {/* Project Header */}
-              <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50 rounded-t-xl">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {selectedProject.projectName}
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Managed by{" "}
-                    <span className="font-medium text-gray-900">
-                      {selectedProject.projectManagerId}
-                    </span>
-                  </p>
-                </div>
-                {/* <button className="text-gray-400 hover:text-gray-600">
-                  <MoreHorizontalIcon />
-                </button> */}
-              </div>
 
               {/* Dynamic Tabs */}
               <div className="flex border-b border-gray-200 px-6 overflow-x-auto no-scrollbar">

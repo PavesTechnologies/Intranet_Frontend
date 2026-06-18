@@ -197,7 +197,7 @@ const RoleOffSidePanel = ({
           setReasons(Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []);
         }
       } catch (err) {
-        console.error("Failed to load role off reasons:", err);
+        console.error("Failed to load roll-off reasons:", err);
       }
     };
     fetchReasons();
@@ -274,12 +274,12 @@ const RoleOffSidePanel = ({
   const bulkSummary = isBulkRecord ? getBulkSummary(record) : null;
   const panelTitle = isPM
     ? actionType === "view"
-      ? "View Role-Off"
+      ? "View Roll-Off"
       : actionType === "update"
-        ? (isBulkPmEdit ? "Update Bulk Role-Off" : "Update Role-Off")
+        ? (isBulkPmEdit ? "Update Bulk Roll-Off" : "Update Roll-Off")
         : isBulkPmCreate
-          ? "Create Bulk Role-Off"
-          : "Create Role-Off"
+          ? "Create Bulk Roll-Off"
+          : "Create Roll-Off"
     : isRM
       ? (
         actionType === "bulk-rm-approve"
@@ -336,13 +336,13 @@ const RoleOffSidePanel = ({
         !form.replacementRequired &&
         !form.skipReason?.trim()
       ) {
-        nextFieldErrors.skipReason = "Skip Reason Is Required For Planned Role-Off.";
+        nextFieldErrors.skipReason = "Skip Reason Is Required For Planned Roll-Off.";
       }
       if (!isBulkPmFlow && needsRiskAck && !form.acknowledgeRisk) {
         nextFieldErrors.acknowledgeRisk = "High Impact Requests Require Acknowledgement.";
       }
       if (reviewState?.requiresConfirmation && !form.reviewConfirmed) {
-        nextFieldErrors.reviewConfirmed = "Please Review The Role-Off Impact And Confirm To Proceed.";
+        nextFieldErrors.reviewConfirmed = "Please Review The Roll-Off Impact And Confirm To Proceed.";
       }
 
       if (Object.keys(nextFieldErrors).length > 0) {
@@ -370,8 +370,8 @@ const RoleOffSidePanel = ({
         }
         onClose?.();
       } catch (error) {
-        console.error("Error submitting role-off:", error);
-        setError("Failed To Submit Role-Off Request.");
+        console.error("Error submitting roll-off:", error);
+        setError("Failed To Submit Roll-Off Request.");
       } finally {
         setSubmittingAction(null);
       }
@@ -532,52 +532,7 @@ const RoleOffSidePanel = ({
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-          {reviewState?.requiresConfirmation && (
-            <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="mt-1">
-                  <WarningIcon className="h-5 w-5 text-amber-600" />
-                </div>
-
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-amber-900">
-                    Review Role-Off Impact
-                  </h3>
-
-                  <p className="mt-1 text-sm text-amber-800 whitespace-pre-line">
-                    {reviewState.warning}
-                  </p>
-                </div>
-              </div>
-
-              <label className="flex items-start gap-3 rounded-lg border border-amber-300 bg-white p-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.reviewConfirmed}
-                  onChange={(e) =>
-                    updateField("reviewConfirmed", e.target.checked)
-                  }
-                  className="mt-1 h-4 w-4 rounded border-gray-300"
-                />
-
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    I reviewed the impact analysis
-                  </p>
-
-                  <p className="text-xs text-gray-500 mt-1">
-                    Confirm to proceed with role-off request.
-                  </p>
-                </div>
-              </label>
-
-              {fieldErrors.reviewConfirmed && (
-                <p className="text-xs text-red-600">
-                  {fieldErrors.reviewConfirmed}
-                </p>
-              )}
-            </section>
-          )}
+          {/* Review confirmation is handled elsewhere; UI removed to avoid duplicate */}
           <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <ClipboardIcon className="h-4 w-4 text-gray-600" />
@@ -722,7 +677,7 @@ const RoleOffSidePanel = ({
                 <>
                   {isPM ? (
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-gray-500">Role-Off Status</span>
+                      <span className="text-gray-500">Roll-Off Status</span>
                       <Badge
                         className={cn(
                           "text-[11px] font-semibold",
@@ -794,7 +749,7 @@ const RoleOffSidePanel = ({
               <section className="space-y-4 rounded-lg border border-gray-200 p-4">
                 <div>
                   <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    Role-Off Type
+                    Roll-Off Type
                   </label>
                   <FilterListbox
                     options={[
@@ -975,7 +930,7 @@ const RoleOffSidePanel = ({
                         }
                         className="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
                       />
-                      <span>{reviewState.message || "Please review the role-off impact and confirm to proceed"}</span>
+                      <span>{reviewState.message || "Please review the roll-off impact and confirm to proceed"}</span>
                     </label>
                   </section>
                 ) : null}
@@ -991,7 +946,7 @@ const RoleOffSidePanel = ({
               <div className="grid grid-cols-1 gap-4 text-sm">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    Role-Off Type
+                    Roll-Off Type
                   </p>
                   <p className="mt-1 font-medium text-gray-800">{form.type || "-"}</p>
                 </div>
@@ -1018,7 +973,7 @@ const RoleOffSidePanel = ({
                 <span className="text-sm font-semibold text-[#081534]">{record.status}</span>
               </div>
               <p className="text-sm text-gray-600 italic">
-                Review the role-off request details here, then approve or reject the request using the actions below.
+                Review the roll-off request details here, then approve or reject the request using the actions below.
               </p>
               <div ref={rejectReasonRef}>
                 <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
@@ -1131,14 +1086,14 @@ const RoleOffSidePanel = ({
                 {submittingAction === "submit"
                   ? (
                     actionType === "bulk-create"
-                      ? "Creating Bulk Role-Off..."
+                      ? "Creating Bulk Roll-Off..."
                       : actionType === "update"
                         ? "Updating..."
                         : "Creating..."
                   )
                   : (
                     actionType === "bulk-create"
-                      ? "Create Bulk Role-Off"
+                      ? "Create Bulk Roll-Off"
                       : actionType === "update"
                         ? "Update Request"
                         : "Create Request"

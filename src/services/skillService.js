@@ -147,6 +147,19 @@ export const skillService = {
     }
   },
 
+  // GET all resource-skill records for a resource (returns the join-table UUIDs needed for PUT)
+  getResourceSkillsByResource: async (resourceId) => {
+    try {
+      const response = await api.get(`${API_URL}/resource-skills/resource/${resourceId}/skills`, {
+        headers: authHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching resource skills for resource ${resourceId}:`, error);
+      throw error;
+    }
+  },
+
   // Update a primary skill
   updateSkill: async (id, skillData) => {
     try {
@@ -163,31 +176,17 @@ export const skillService = {
   },
 
   // Delete a skill (and potentially its subskills)
-  deleteSkill: async (skillId) => {
-
-  try {
-
-    const response = await api.delete(
-      `${API_URL}/skills/${skillId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
-
-    return response.data;
-
-  } catch (error) {
-
-    console.error(
-      "Error deleting skill:",
-      error
-    );
-
-    throw error;
-  }
-},
+  deleteSkill: async (resourceSkillId) => {
+    try {
+      const response = await api.delete(`${API_URL}/resource-skills/skill/${resourceSkillId}`, {
+        headers: authHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting skill:", error);
+      throw error;
+    }
+  },
 
   // Save multiple skills (Bulk)
   saveBulkSkills: async (bulkData) => {
@@ -377,7 +376,7 @@ export const skillService = {
 
   saveSkillTaxonomy: async (taxonomyData) => {
     try {
-      const response = await axios.post(`${API_URL}/skill-categories/taxonomy/save`, taxonomyData, {
+      const response = await api.post(`${API_URL}/skill-categories/taxonomy/save`, taxonomyData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -499,6 +498,37 @@ export const skillService = {
       console.error(`Error deleting certificate ${certificateId}:`, error);
       throw error;
     }
+  },
+
+  getCertificateResourceMappings: async (certificateId) => {
+    const encodedId = encodeURIComponent(certificateId);
+    const endpoints = [
+      `${API_URL}/resource-certificates/certificate/${encodedId}`,
+      `${API_URL}/resource-certificates/by-certificate/${encodedId}`,
+      `${API_URL}/resource-certificates?certificateId=${encodedId}`,
+      `${API_URL}/resource-certificates`,
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await api.get(endpoint, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        return response.data;
+      } catch (error) {
+        if (![404, 405].includes(error?.response?.status)) {
+          console.error(
+            `Error fetching certificate mappings for ${certificateId}:`,
+            error,
+          );
+          throw error;
+        }
+      }
+    }
+
+    return null;
   },
 };
 

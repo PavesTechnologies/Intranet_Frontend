@@ -22,7 +22,9 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import api from "../../../api/axiosInstance";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
 
 /* ─── Employment-type → relevant path keys ───────────────────────────── */
@@ -72,6 +74,76 @@ const buildExperienceDocuments = (employmentType, paths) => {
     .filter(Boolean);
 };
 
+const getCertificateValidityMonths = (certificate) => {
+  const value =
+    certificate?.validityMonths ??
+    certificate?.validity_months ??
+    certificate?.validityPeriod ??
+    certificate?.validity_period ??
+    certificate?.validity ??
+    null;
+  const months = Number(value);
+  return Number.isFinite(months) && months > 0 ? months : null;
+};
+
+const isTimeBoundCertificate = (certificate) => {
+  if (!certificate) return false;
+
+  const explicitFlag =
+    certificate.timeBound ??
+    certificate.isTimeBound ??
+    certificate.time_bound ??
+    certificate.is_time_bound;
+
+  if (typeof explicitFlag === "boolean") return explicitFlag;
+  if (typeof explicitFlag === "string") {
+    const normalizedFlag = explicitFlag.trim().toLowerCase();
+    if (["true", "yes", "y", "1"].includes(normalizedFlag)) return true;
+    if (["false", "no", "n", "0"].includes(normalizedFlag)) return false;
+  }
+
+  const validityType = String(
+    certificate.validityType ||
+      certificate.validity_status ||
+      certificate.validityStatus ||
+      "",
+  ).toLowerCase();
+
+  if (
+    validityType.includes("permanent") ||
+    validityType.includes("lifetime") ||
+    validityType.includes("non")
+  ) {
+    return false;
+  }
+
+  return validityType.includes("expire") || !!getCertificateValidityMonths(certificate);
+};
+
+const findCertificateMaster = (certificates, selectedCertificate) => {
+  if (!selectedCertificate || selectedCertificate.value === "other") return null;
+  return certificates.find(
+    (cert) =>
+      String(cert.certificateId || cert.id || cert.certificate_id || "") ===
+      String(selectedCertificate.value),
+  );
+};
+
+const addMonthsToDateInput = (dateInput, months) => {
+  if (!dateInput || !months) return "";
+
+  const [year, month, day] = dateInput.split("-").map(Number);
+  if (!year || !month || !day) return "";
+
+  const date = new Date(year, month - 1, day);
+  date.setMonth(date.getMonth() + months);
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 export default function DocumentsPage({ employee, user_uuid, hrData = {}, identityTypes = [], config = null, rawCertifications = [], refreshCertifications }) {
   const { employee_uuid } = useParams();
   
@@ -94,6 +166,7 @@ const [formattedEducationTypes, setFormattedEducationTypes] = useState([]);
   const [skills, setSkills] = useState([]);
   const [selectedSkill, setSelectedSkill] = useState(null);
   const [customSkill, setCustomSkill] = useState("");
+  const [certificateMode, setCertificateMode] = useState("skill");
 
   const [providers, setProviders] = useState([]);
   const [selectedProvider, setSelectedProvider] = useState(null);
@@ -102,6 +175,11 @@ const [formattedEducationTypes, setFormattedEducationTypes] = useState([]);
   const [allCertificates, setAllCertificates] = useState([]);
   const [filteredCertificates, setFilteredCertificates] = useState([]);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
+  const selectedCertificateMaster = findCertificateMaster(allCertificates, selectedCertificate);
+  const selectedCertificateValidityMonths = getCertificateValidityMonths(selectedCertificateMaster);
+  const selectedCertificateIsTimeBound =
+    isTimeBoundCertificate(selectedCertificateMaster) && !!selectedCertificateValidityMonths;
+  const isGeneralCertificateMode = certificateMode === "general";
   const [experienceFiles, setExperienceFiles] =
   useState({
     payslip: null,
@@ -568,21 +646,7 @@ console.log(
 
         setAllCertificates(res.data?.data || []);
 
-        const providerSet = new Set();
-        (res.data?.data || []).forEach((cert) => {
-          if (cert.providerName) {
-            providerSet.add(cert.providerName);
-          }
-        });
-
-        const formattedProviders = [...providerSet].map((p) => ({
-          value: p,
-          label: p,
-        }));
-
-        formattedProviders.push({ value: "other", label: "Other" });
-
-        setProviders(formattedProviders);
+        setProviders([]);
       } catch (err) {
         console.error(err);
       }
@@ -591,8 +655,30 @@ console.log(
     fetchCertificates();
   }, []);
   useEffect(() => {
-    if (!selectedSkill) {
-      setFilteredCertificates([]);
+    const otherOption = { value: "other", label: "Other" };
+
+    if (isGeneralCertificateMode) {
+      const generalCertificates = allCertificates.filter((cert) => {
+        const type = String(cert.certificateType || cert.type || "").toUpperCase();
+        return type === "ACHIEVEMENT" || type === "GENERAL" || !cert.skillId;
+      });
+
+      const unique = Array.from(
+        new Map(generalCertificates.map((c) => [c.certificateName, c])).values()
+      );
+
+      setFilteredCertificates([
+        ...unique.map((c) => ({
+          value: c.certificateId,
+          label: c.certificateName,
+        })),
+        otherOption,
+      ]);
+      return;
+    }
+
+    if (!selectedSkill || selectedSkill.value === "other") {
+      setFilteredCertificates([otherOption]);
       return;
     }
 
@@ -605,12 +691,15 @@ console.log(
     );
 
     setFilteredCertificates(
-      unique.map((c) => ({
+      [
+      ...unique.map((c) => ({
         value: c.certificateId,
         label: c.certificateName,
-      }))
+      })),
+      otherOption,
+      ]
     );
-  }, [selectedSkill]);
+  }, [selectedSkill, isGeneralCertificateMode, allCertificates]);
   useEffect(() => {
     if (!selectedCertificate) {
       setFilteredProviders([]);
@@ -618,23 +707,63 @@ console.log(
       return;
     }
 
-    const providers = allCertificates
-      .filter(cert => cert.certificateId === selectedCertificate.value)
-      .map(cert => cert.providerName)
-      .filter(Boolean);
+    if (selectedCertificate.value !== "other") {
+      const certificateMaster = allCertificates.find(
+        (cert) =>
+          String(cert.certificateId || cert.id || cert.certificate_id || "") ===
+          String(selectedCertificate.value),
+      );
+      const providerName =
+        certificateMaster?.providerName || certificateMaster?.provider || "";
 
-    const uniqueProviders = [...new Set(providers)];
+      if (providerName) {
+        const providerOption = { value: providerName, label: providerName };
+        setFilteredProviders([providerOption]);
+        setSelectedProvider(providerOption);
+        setUploadFormData((current) => ({ ...current, customProvider: "" }));
+        return;
+      }
+    }
 
-    const formatted = uniqueProviders.map(p => ({
-      value: p,
-      label: p,
-    }));
+    // Custom certificates still use admin-managed provider choices.
+    setFilteredProviders(providers);
+    setSelectedProvider(null);
 
-    formatted.push({ value: "other", label: "Other" });
+  }, [selectedCertificate, allCertificates, providers]);
 
-    setFilteredProviders(formatted);
+  useEffect(() => {
+    if (uploadModal.category !== "certifications") return;
 
-  }, [selectedCertificate, allCertificates]);
+    setUploadFormData((current) => {
+      if (isGeneralCertificateMode || !selectedCertificateIsTimeBound) {
+        return current.expiry_date
+          ? { ...current, expiry_date: "" }
+          : current;
+      }
+
+      const calculatedExpiryDate = addMonthsToDateInput(
+        current.issue_date,
+        selectedCertificateValidityMonths,
+      );
+
+      if (!calculatedExpiryDate) {
+        return current.expiry_date
+          ? { ...current, expiry_date: "" }
+          : current;
+      }
+
+      return current.expiry_date === calculatedExpiryDate
+        ? current
+        : { ...current, expiry_date: calculatedExpiryDate };
+    });
+  }, [
+    uploadModal.category,
+    selectedCertificate,
+    isGeneralCertificateMode,
+    selectedCertificateIsTimeBound,
+    selectedCertificateValidityMonths,
+    uploadFormData.issue_date,
+  ]);
 
   
   useEffect(() => {
@@ -851,6 +980,92 @@ useEffect(() => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  const normalizeText = (value) => String(value || "").trim().toLowerCase();
+
+  const getCertificateId = (certificate) =>
+    certificate?.certificateId || certificate?.id || certificate?.certificate_id;
+
+  const refreshCertificateMasters = async () => {
+    const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+    const res = await api.get(`${BASE_URL}/api/certificates`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    const certificates = Array.isArray(res.data) ? res.data : res.data?.data || [];
+    setAllCertificates(certificates);
+    return certificates;
+  };
+
+  const resolveSelectedCertificateId = async (token) => {
+    if (selectedCertificate?.value && selectedCertificate.value !== "other") {
+      return selectedCertificate.value;
+    }
+
+    const certificateName = uploadFormData.customCertificateName?.trim();
+    const providerName = selectedProvider?.label?.trim() || uploadFormData.customProvider?.trim();
+
+    if (!certificateName) {
+      showStatusToast("Please enter certificate name", "error");
+      return null;
+    }
+
+    if (!providerName) {
+      showStatusToast("Please enter issuing organization", "error");
+      return null;
+    }
+
+    if (certificateMode === "skill" && (!selectedSkill || selectedSkill.value === "other")) {
+      showStatusToast("Please select an existing skill to map this certificate", "error");
+      return null;
+    }
+
+    const duplicate = allCertificates.find((cert) => {
+      const sameName = normalizeText(cert.certificateName) === normalizeText(certificateName);
+      const sameProvider = normalizeText(cert.providerName) === normalizeText(providerName);
+      const certSkillId = String(cert.skillId || "");
+
+      if (certificateMode === "general") {
+        const type = String(cert.certificateType || cert.type || "").toUpperCase();
+        return sameName && sameProvider && (type === "ACHIEVEMENT" || type === "GENERAL" || !cert.skillId);
+      }
+
+      return sameName && sameProvider && certSkillId === String(selectedSkill.value);
+    });
+
+    if (duplicate) {
+      return getCertificateId(duplicate);
+    }
+
+    const BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
+    const payload = {
+      certificateName,
+      providerName,
+      certificateType: certificateMode === "general" ? "ACHIEVEMENT" : "SKILL_BASED",
+      skillId: certificateMode === "general" ? null : selectedSkill.value,
+      timeBound: false,
+      validityMonths: null,
+    };
+
+    const response = await api.post(`${BASE_URL}/api/certificates/create`, payload, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const created = response.data?.data || response.data || {};
+    const createdId = getCertificateId(created);
+    if (createdId) {
+      await refreshCertificateMasters();
+      return createdId;
+    }
+
+    const refreshed = await refreshCertificateMasters();
+    const createdFromList = refreshed.find((cert) => {
+      const sameName = normalizeText(cert.certificateName) === normalizeText(certificateName);
+      const sameProvider = normalizeText(cert.providerName) === normalizeText(providerName);
+      return sameName && sameProvider;
+    });
+
+    return getCertificateId(createdFromList);
+  };
+
  const handleUpload = async () => {
 // ✅ NEW DOCUMENT → file required
 
@@ -864,14 +1079,17 @@ useEffect(() => {
 
       // ✅ VALIDATION
       if (!employee?.empId) {
-        alert("Employee ID missing");
+        showStatusToast("Employee ID missing", "error");
         return;
       }
 
-      if (!selectedCertificate?.value) {
-        alert("Please select a certificate");
+      if (certificateMode === "skill" && (!selectedSkill || selectedSkill.value === "other")) {
+        showStatusToast("Please select an existing skill for skill-based certificate", "error");
         return;
       }
+
+      const resolvedCertificateId = await resolveSelectedCertificateId(token);
+      if (!resolvedCertificateId) return;
 
       const isEdit = !!uploadModal.docId;
 
@@ -888,18 +1106,19 @@ useEffect(() => {
           resourceId: Number(employee.empId),
 
           certificateId:
-            selectedCertificate?.value || existingDoc?.certificateId,
+            resolvedCertificateId || existingDoc?.certificateId,
 
           skillId:
-            selectedSkill?.value === "other"
+            certificateMode === "general" || selectedSkill?.value === "other"
               ? null
               : selectedSkill?.value ?? existingDoc?.skillId,
 
           issuedDate:
             uploadFormData.issue_date ?? existingDoc?.issue_date,
 
-          expiryDate:
-            uploadFormData.expiry_date ?? existingDoc?.expiry_date,
+          expiryDate: isGeneralCertificateMode
+            ? null
+            : uploadFormData.expiry_date ?? existingDoc?.expiry_date,
 
           activeFlag: true,
         };
@@ -907,13 +1126,13 @@ useEffect(() => {
         // 🔥 CREATE (all required fields)
         certData = {
           resourceId: Number(employee.empId),
-          certificateId: selectedCertificate.value,
+          certificateId: resolvedCertificateId,
           skillId:
-            selectedSkill?.value === "other"
+            certificateMode === "general" || selectedSkill?.value === "other"
               ? null
               : selectedSkill?.value,
           issuedDate: uploadFormData.issue_date,
-          expiryDate: uploadFormData.expiry_date || null,
+          expiryDate: isGeneralCertificateMode ? null : uploadFormData.expiry_date || null,
           activeFlag: true,
         };
       }
@@ -952,10 +1171,9 @@ useEffect(() => {
         : await api.post(url.toString(), formData, certAxiosConfig);
 
       // ✅ SUCCESS
-      alert(
-        isEdit
-          ? "Certification updated successfully"
-          : "Certification saved successfully"
+      showStatusToast(
+        isEdit ? "Certification updated successfully" : "Certification saved successfully",
+        "success"
       );
 
       // ✅ REFRESH DATA
@@ -966,6 +1184,9 @@ useEffect(() => {
       setUploadFormData({});
       setSelectedSkill(null);
       setSelectedCertificate(null);
+      setSelectedProvider(null);
+      setCustomSkill("");
+      setCertificateMode("skill");
       setUploadFile(null);
 
       return;
@@ -1378,33 +1599,56 @@ formData.append(
   );
 
   let response;
+  let apiUrl = "";
 
   const identityAxiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   // ✅ UPDATE
   if (uploadModal.docId) {
+    apiUrl = `${BASE_URL}/identity/employee-document/${uploadModal.docId}`;
+    console.log("DEBUG [Identity Upload] - Action: UPDATE");
+    console.log("DEBUG [Identity Upload] - API URL:", apiUrl);
+    console.log("DEBUG [Identity Upload] - uploadModal.docId:", uploadModal.docId);
+    console.log("DEBUG [Identity Upload] - document_uuid:", uploadFormData.document_uuid || uploadModal.docId);
+    console.log("DEBUG [Identity Upload] - mapping_uuid:", uploadFormData.mapping_uuid);
+    console.log("DEBUG [Identity Upload] - selected record:", uploadFormData);
+
     response = await api.put(
-      `${BASE_URL}/identity/employee-document/${uploadModal.docId}`,
+      apiUrl,
       formData,
       identityAxiosConfig,
     );
   }
   // ✅ CREATE
   else {
+    apiUrl = `${BASE_URL}/employee-upload/identity-documents`;
+    console.log("DEBUG [Identity Upload] - Action: CREATE");
+    console.log("DEBUG [Identity Upload] - API URL:", apiUrl);
+    console.log("DEBUG [Identity Upload] - uploadModal.docId:", uploadModal.docId);
+    console.log("DEBUG [Identity Upload] - document_uuid: null (New Document)");
+    console.log("DEBUG [Identity Upload] - mapping_uuid:", uploadFormData.mapping_uuid);
+    console.log("DEBUG [Identity Upload] - selected record:", uploadFormData);
+
     response = await api.post(
-      `${BASE_URL}/employee-upload/identity-documents`,
+      apiUrl,
       formData,
       identityAxiosConfig,
     );
   }
 
+  const responseData = response?.data || {};
+  const returnedDocumentUuid = responseData?.document_uuid || responseData?.data?.document_uuid || responseData?.identity_uuid || null;
+  console.log("DEBUG [Identity Upload] - Returned document_uuid:", returnedDocumentUuid);
+
   const newFilePath = uploadFile
     ? URL.createObjectURL(uploadFile)
     : uploadFormData.file_path || null;
 
+  const finalDocId = uploadModal.docId || returnedDocumentUuid;
+
   const updatedDoc = {
-    id: uploadModal.docId || `identity-${Date.now()}`,
-    document_uuid: uploadModal.docId || null,
+    id: finalDocId || `identity-${Date.now()}`,
+    document_uuid: finalDocId || null,
     mapping_uuid: uploadFormData.mapping_uuid,
     identity_type_uuid: uploadFormData.identity_type_uuid,
     type: uploadFormData.identity_type || "",
@@ -1463,8 +1707,15 @@ formData.append(
     await api.post(`${BASE_URL}/hr/upload-document`, formData, {
       headers: { Authorization: `Bearer ${token}` },
     });
-
     setUploadSuccess(true);
+
+    // Show toast for certificate uploads
+    if (uploadModal.category === "certifications") {
+      showStatusToast(
+        uploadModal.docId ? "Certificate updated successfully" : "Certificate uploaded successfully",
+        "success"
+      );
+    }
     setTimeout(() => {
       setUploadModal({ open: false, category: "", docId: null });
       setUploadFile(null);
@@ -1483,6 +1734,11 @@ formData.append(
     setUploadFile(null);
     setUploadFormData({});
     setUploadSuccess(false);
+    setSelectedSkill(null);
+    setSelectedCertificate(null);
+    setSelectedProvider(null);
+    setCustomSkill("");
+    setCertificateMode("skill");
     setExperienceFiles({
       payslip: null,
       exp_certificate: null,
@@ -1777,6 +2033,7 @@ else if (category === "identity") {
 
       // ✅ Update complementary dropdown states
       const skillObj = skills.find((s) => s.value === doc.skillId);
+      setCertificateMode(doc.skillId ? "skill" : "general");
       setSelectedSkill(skillObj || null);
 
       setSelectedCertificate({
@@ -1805,7 +2062,9 @@ else if (category === "identity") {
       category,
       docId: category === "experience"
         ? (doc.experience_uuid || doc.id)
-        : (doc.document_uuid || doc.id),
+        : category === "identity"
+          ? (doc.document_uuid || null)
+          : (doc.document_uuid || doc.id),
     });
   };
 
@@ -2216,6 +2475,11 @@ else if (category === "identity") {
               description="This section contains course certificates, online certifications, credits, and other professional certifications."
               onUpload={() => {
                 setUploadFormData({});
+                setSelectedSkill(null);
+                setSelectedCertificate(null);
+                setSelectedProvider(null);
+                setCustomSkill("");
+                setCertificateMode("skill");
                 setUploadModal({
                   open: true,
                   category: "certifications",
@@ -2232,6 +2496,11 @@ else if (category === "identity") {
                   }
                   onUpload={() => {
                     setUploadFormData({});
+                    setSelectedSkill(null);
+                    setSelectedCertificate(null);
+                    setSelectedProvider(null);
+                    setCustomSkill("");
+                    setCertificateMode("skill");
                     setUploadModal({
                       open: true,
                       category: "certifications",
@@ -2271,7 +2540,9 @@ else if (category === "identity") {
                         <DocField label="Issuing Organization" value={doc.issuing_org} />
 
                         <DocField label="Issue Date" value={doc.issue_date} />
-                        <DocField label="Expiry Date" value={doc.expiry_date} />
+                        {doc.skillId && (
+                          <DocField label="Expiry Date" value={doc.expiry_date} />
+                        )}
                         {doc.credential_id && (
                           <DocField
                             label="Credential ID"
@@ -2797,20 +3068,66 @@ else if (category === "identity") {
                       </p>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-                        {/* 🔥 Skill Dropdown */}
                         <div className="sm:col-span-2">
-                          <label className="text-sm font-medium text-gray-700">Skill</label>
-                          <Select
-                            options={skills}
-                            value={selectedSkill}
-                            onChange={setSelectedSkill}
-                            placeholder="Select Skill"
-                          />
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Certificate Type
+                          </label>
+                          <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+                            {[
+                              { value: "skill", label: "Skill Based" },
+                              { value: "general", label: "General" },
+                            ].map((mode) => (
+                              <button
+                                key={mode.value}
+                                type="button"
+                                onClick={() => {
+                                  setCertificateMode(mode.value);
+                                  setSelectedSkill(null);
+                                  setSelectedCertificate(null);
+                                  setSelectedProvider(null);
+                                  setCustomSkill("");
+                                  setUploadFormData((d) => ({
+                                    ...d,
+                                    customCertificateName: "",
+                                    customProvider: "",
+                                    expiry_date: mode.value === "general" ? "" : d.expiry_date,
+                                  }));
+                                }}
+                                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+                                  certificateMode === mode.value
+                                    ? "bg-white text-[#263383] shadow-sm"
+                                    : "text-gray-500 hover:text-gray-700"
+                                }`}
+                              >
+                                {mode.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
 
+                        {/* 🔥 Skill Dropdown */}
+                        {certificateMode === "skill" && (
+                          <div className="sm:col-span-2">
+                            <label className="text-sm font-medium text-gray-700">Skill</label>
+                            <Select
+                              options={skills}
+                              value={selectedSkill}
+                              onChange={(val) => {
+                                setSelectedSkill(val);
+                                setSelectedCertificate(null);
+                                setSelectedProvider(null);
+                              }}
+                              placeholder="Search or select skill"
+                              isSearchable={true}
+                              isClearable={true}
+                              menuPlacement="auto"
+                              classNamePrefix="react-select"
+                            />
+                          </div>
+                        )}
+
                         {/* 🔥 Custom Skill */}
-                        {selectedSkill?.value === "other" && (
+                        {certificateMode === "skill" && selectedSkill?.value === "other" && (
                           <div className="sm:col-span-2">
                             <UploadField
                               label="Custom Skill"
@@ -2827,37 +3144,55 @@ else if (category === "identity") {
                           <Select
                             options={filteredCertificates}
                             value={selectedCertificate}
+                            isDisabled={certificateMode === "skill" && !selectedSkill}
+                            isSearchable={true}
+                            isClearable={true}
                             onChange={(val) => {
                               setSelectedCertificate(val);
-                              setSelectedProvider(null); // 🔥 reset provider
+                              setSelectedProvider(null);
                             }}
-                            placeholder="Select Certificate"
+                            placeholder={
+                              certificateMode === "skill" && !selectedSkill
+                                ? "Select skill first"
+                                : "Search or select certificate"
+                            }
+                            menuPlacement="auto"
+                            classNamePrefix="react-select"
                           />
                         </div>
+                        {selectedCertificate?.value === "other" && (
+                          <div className="sm:col-span-2">
+                            <UploadField
+                              label="Certificate Name"
+                              placeholder="Enter certificate name"
+                              value={uploadFormData.customCertificateName || ""}
+                              onChange={(v) =>
+                                setUploadFormData(d => ({ ...d, customCertificateName: v }))
+                              }
+                            />
+                          </div>
+                        )}
                         {/* 🔥 Provider Dropdown */}
                         <div className="sm:col-span-2">
                           <label className="text-sm font-medium text-gray-700">
                             Issuing Organization
                           </label>
-                          <Select
+                          <CreatableSelect
                             options={filteredProviders}
                             value={selectedProvider}
                             onChange={setSelectedProvider}
-                            placeholder="Select Provider"
+                            isDisabled={
+                              !!selectedCertificate &&
+                              selectedCertificate.value !== "other"
+                            }
+                            placeholder={
+                              selectedCertificate?.value &&
+                              selectedCertificate.value !== "other"
+                                ? "Provider from Certificate Master"
+                                : "Select Provider"
+                            }
                           />
                         </div>
-                        {selectedProvider?.value === "other" && (
-                          <div className="sm:col-span-2">
-                            <UploadField
-                              label="Custom Provider"
-                              placeholder="Enter provider name"
-                              value={uploadFormData.customProvider || ""}
-                              onChange={(v) =>
-                                setUploadFormData(d => ({ ...d, customProvider: v }))
-                              }
-                            />
-                          </div>
-                        )}
 
                         {/* 🔥 Issue Date */}
                         <UploadField
@@ -2870,14 +3205,17 @@ else if (category === "identity") {
                         />
 
                         {/* 🔥 Expiry Date */}
-                        <UploadField
-                          label="Expiry Date"
-                          type="date"
-                          value={uploadFormData.expiry_date || ""}
-                          onChange={(v) =>
-                            setUploadFormData((d) => ({ ...d, expiry_date: v }))
-                          }
-                        />
+                        {certificateMode === "skill" && (
+                          <UploadField
+                            label="Expiry Date"
+                            type="date"
+                            value={uploadFormData.expiry_date || ""}
+                            disabled={true}
+                            onChange={(v) =>
+                              setUploadFormData((d) => ({ ...d, expiry_date: v }))
+                            }
+                          />
+                        )}
                       </div>
                     </div>
                   )}
@@ -3026,47 +3364,27 @@ else if (category === "identity") {
         </div>
       )}
 
-      {/* ==================== CONFIRM MODAL ==================== */}
-      {confirmModal.open && (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in">
-            {/* Body */}
-            <div className="px-6 py-6 flex flex-col items-center text-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
-                <AlertTriangle size={28} className="text-red-500" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                  {confirmModal.title}
-                </h3>
-                <p className="text-sm text-gray-500">{confirmModal.message}</p>
-              </div>
-            </div>
-            {/* Footer */}
-            <div className="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-              <button
-                onClick={() =>
-                  setConfirmModal({
-                    open: false,
-                    title: "",
-                    message: "",
-                    onConfirm: null,
-                  })
-                }
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmModal.onConfirm}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-sm transition-all"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal
+        isOpen={!!confirmModal.open}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={async () => {
+          try {
+            if (typeof confirmModal.onConfirm === "function") {
+              await confirmModal.onConfirm();
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        }}
+        onCancel={() =>
+          setConfirmModal({ open: false, title: "", message: "", onConfirm: null })
+        }
+        isLoading={confirmModal.isLoading || !!deletingDoc || uploading}
+        confirmText={confirmModal.confirmText || "Delete"}
+        cancelText="Cancel"
+        variant={confirmModal.variant || "danger"}
+      />
     </div>
   );
 }
@@ -3291,6 +3609,7 @@ const UploadField = ({
   value,
   onChange,
   type = "text",
+  disabled = false,
 }) => (
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -3299,9 +3618,16 @@ const UploadField = ({
     <input
       type={type}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        if (!disabled) onChange(e.target.value);
+      }}
       placeholder={placeholder}
-      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 bg-white placeholder-gray-400 hover:border-gray-400 transition-all"
+      disabled={disabled}
+      className={`w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10 placeholder-gray-400 transition-all ${
+        disabled
+          ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+          : "bg-white hover:border-gray-400"
+      }`}
     />
   </div>
 );

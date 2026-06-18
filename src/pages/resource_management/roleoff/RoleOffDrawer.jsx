@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-const STEPS = ["Allocation", "Role-Off", "Approval", "Closure"];
+const STEPS = ["Allocation", "Roll-Off", "Approval", "Closure"];
 const REASONS = [
   "Project Completion",
   "Client Ramp Down",
@@ -22,7 +22,7 @@ const impactStyles = {
 };
 
 const getCurrentStep = (mode, request) => {
-  if (mode === "create") return "Role-Off";
+  if (mode === "create") return "Roll-Off";
   if (!request) return "Allocation";
   if (request.status === "Pending Approval") return "Approval";
   return "Closure";
@@ -100,10 +100,10 @@ const RoleOffDrawer = ({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
-                {mode === "create" ? "Role-Off Request" : "Request Details"}
+                {mode === "create" ? "Roll-Off Request" : "Request Details"}
               </p>
               <h2 className="mt-1 text-xl font-bold text-[#081534]">
-                {record?.resource || "Role-Off"}
+                {record?.resource || "Roll-Off"}
               </h2>
               <p className="mt-1 text-sm text-gray-500">
                 {record?.project} · {record?.role}
@@ -177,7 +177,7 @@ const RoleOffDrawer = ({
           <section className="grid gap-5 md:grid-cols-2">
             <div>
               <label className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                Role-Off Type
+                Roll-Off Type
               </label>
               <FilterListbox
                 options={[
@@ -267,7 +267,7 @@ const RoleOffDrawer = ({
                 <div className="flex items-start gap-2">
                   <WarningIcon className="mt-0.5 h-4 w-4 text-rose-700" />
                   <div className="text-sm text-rose-800">
-                    This role-off impacts a critical delivery path and requires explicit acknowledgement.
+                    This roll-off impacts a critical delivery path and requires explicit acknowledgement.
                   </div>
                 </div>
                 {mode === "create" ? (
@@ -283,7 +283,7 @@ const RoleOffDrawer = ({
                       }
                       className="mt-0.5 h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
                     />
-                    <span>I acknowledge the delivery and client risk for this high impact role-off.</span>
+                    <span>I acknowledge the delivery and client risk for this high impact roll-off.</span>
                   </label>
                 ) : null}
                 {errors.acknowledgeRisk ? (
@@ -315,7 +315,7 @@ const RoleOffDrawer = ({
               <div>
                 <h3 className="text-sm font-semibold text-[#081534]">Replacement Planning</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Flag if backfill activity should be tracked alongside the role-off.
+                  Flag if backfill activity should be tracked alongside the roll-off.
                 </p>
               </div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
