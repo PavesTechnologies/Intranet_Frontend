@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import api from "../../../../api/axiosInstance";
 import { EditIcon, DeleteIcon, PrevIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,13 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Pagination from "../../../../components/Pagination/pagination";
 import Button from "../../../../components/Button/Button";
 import { Tabs, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Modal from "../../../../components/Modal/modal";
 import GenericTable from "../../../../components/Table/table";
 
@@ -27,7 +34,65 @@ const ProjectConfigurations = ({ projectId }) => {
   const { getEnumValues } = useEnums();
   const { user } = useAuth();
   const roles = user?.roles;
-  const isRM = roles?.includes("Resource_Manager");
+
+  // Role mapping & switcher (support multi-role users: PM / RM / DL)
+  const ROLE_LABELS = {
+    Project_Manager: "Project Manager",
+    Resource_Manager: "Resource Manager",
+    Delivery_Manager: "Delivery Manager",
+  };
+
+  const normalizeRoleKey = (role = "") =>
+    String(role || "")
+      .replace(/^ROLE[-_\s]/i, "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+
+  const toConfigRole = (role = "") => {
+    const n = normalizeRoleKey(role);
+    if (n.includes("PROJECT") || n.includes("PROJECTMANAGER"))
+      return "Project_Manager";
+    if (n.includes("RESOURCEMANAGER") || n.includes("RESOURCEMANAGER"))
+      return "Resource_Manager";
+    if (
+      n.includes("DELIVERYMANAGER") ||
+      n.includes("DELIVERY") ||
+      n.includes("DELIVERY_LEAD")
+    )
+      return "Delivery_Manager";
+    return "";
+  };
+
+  const getRoleOptions = (roles = []) => {
+    const roleList = Array.isArray(roles)
+      ? roles
+      : String(roles || "")
+          .split(",")
+          .map((r) => r.trim())
+          .filter(Boolean);
+
+    const seen = new Set();
+    return roleList.reduce((options, role) => {
+      const value = toConfigRole(role);
+      if (!value || seen.has(value)) return options;
+      seen.add(value);
+      options.push({ value, label: ROLE_LABELS[value] || value });
+      return options;
+    }, []);
+  };
+
+  const roleOptions = useMemo(() => getRoleOptions(roles), [roles]);
+  const [selectedRole, setSelectedRole] = useState(() => {
+    if (!roleOptions || roleOptions.length === 0) return "";
+    // Prefer Project Manager view when present
+    if (roleOptions.some((o) => o.value === "Project_Manager"))
+      return "Project_Manager";
+    return roleOptions[0].value;
+  });
+
+  const isRM = selectedRole === "Resource_Manager";
+  const canEdit = selectedRole === "Project_Manager";
 
   const [project, setProject] = useState(null);
   const [activeTab, setActiveTab] = useState("sla");
@@ -76,7 +141,9 @@ const ProjectConfigurations = ({ projectId }) => {
     try {
       setLoading(true);
       const res = await getProjectById(projectId);
-      setProject(res.data);
+      const projectObj = res?.data?.data ?? res?.data ?? null;
+      setProject(projectObj);
+      console.debug("Loaded project:", projectObj);
     } catch (err) {
       console.error("Failed to fetch project details", err);
       showStatusToast(
@@ -140,11 +207,29 @@ const ProjectConfigurations = ({ projectId }) => {
     if (activeTab === "escalation") fetchProjectEscalations();
   }, [activeTab, projectId]);
 
+  // Refetch lists when the active role changes so data/permissions reflect current context
+  useEffect(() => {
+    // reset pagination when switching roles
+    setSlaPage(1);
+    setCompliancePage(1);
+    setEscalationPage(1);
+    // reload whatever tab is active
+    if (activeTab === "sla") fetchProjectSLAs();
+    if (activeTab === "pre-requisites") fetchProjectCompliance();
+    if (activeTab === "escalation") fetchProjectEscalations();
+  }, [selectedRole]);
+
   // ---------------------------------------------------------
   // 2. SLA HANDLERS
   // ---------------------------------------------------------
 
   const handleInheritClick = async () => {
+    if (!project?.clientId) {
+      console.warn("Client ID not available yet; cannot fetch client SLAs.");
+      showStatusToast("Client data not loaded yet.", "warning");
+      return;
+    }
+
     try {
       const res = await api.get(
         `${RMS_BASE_URL}/api/client-sla/clientSLA/${project.clientId}`,
@@ -171,7 +256,7 @@ const ProjectConfigurations = ({ projectId }) => {
       if (projectSlas.length + selectedClientSlas.length > 3) {
         showStatusToast(
           "Adding these would exceed the limit of 3 SLAs for this project.",
-          "warning"
+          "warning",
         );
         return;
       }
@@ -202,14 +287,20 @@ const ProjectConfigurations = ({ projectId }) => {
       const isEditing = !!formData.projectSlaId;
       if (!isEditing) {
         if (projectSlas.length >= 3) {
-          showStatusToast("Maximum of 3 SLA configurations allowed per project.", "warning");
+          showStatusToast(
+            "Maximum of 3 SLA configurations allowed per project.",
+            "warning",
+          );
           return;
         }
         const isDuplicate = projectSlas.some(
           (sla) => sla.slaType === formData.slaType,
         );
         if (isDuplicate) {
-          showStatusToast(`The SLA type "${formData.slaType}" is already configured.`, "warning");
+          showStatusToast(
+            `The SLA type "${formData.slaType}" is already configured.`,
+            "warning",
+          );
           return;
         }
       }
@@ -223,7 +314,10 @@ const ProjectConfigurations = ({ projectId }) => {
       showStatusToast("SLA configuration saved successfully.", "success");
     } catch (err) {
       console.error("Error saving project SLA", err);
-      showStatusToast(err.response?.data?.message || "Failed to save SLA configuration", "error");
+      showStatusToast(
+        err.response?.data?.message || "Failed to save SLA configuration",
+        "error",
+      );
     }
   };
 
@@ -307,7 +401,10 @@ const ProjectConfigurations = ({ projectId }) => {
       setInheritMode(false);
       setSelectedClientCompliance([]);
       fetchProjectCompliance();
-      showStatusToast("Compliance requirements inherited successfully.", "success");
+      showStatusToast(
+        "Compliance requirements inherited successfully.",
+        "success",
+      );
     } catch (err) {
       console.error("Error inheriting compliance", err);
     }
@@ -323,7 +420,7 @@ const ProjectConfigurations = ({ projectId }) => {
       if (isDuplicate && !formData.projectComplianceId) {
         showStatusToast(
           `The compliance requirement "${formData.requirementType}" is already configured for this project.`,
-          "warning"
+          "warning",
         );
         return;
       }
@@ -334,10 +431,16 @@ const ProjectConfigurations = ({ projectId }) => {
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectCompliance();
-      showStatusToast("Compliance configuration saved successfully.", "success");
+      showStatusToast(
+        "Compliance configuration saved successfully.",
+        "success",
+      );
     } catch (err) {
       console.error("Error saving project compliance", err);
-      showStatusToast(err.response?.data?.message || "An error occurred during save.", "error");
+      showStatusToast(
+        err.response?.data?.message || "An error occurred during save.",
+        "error",
+      );
     }
   };
 
@@ -408,13 +511,9 @@ const ProjectConfigurations = ({ projectId }) => {
         type: "inherit",
         contactId: selectedClientEscalations,
       };
-      await api.post(
-        `${RMS_BASE_URL}/api/projects/escalations/save`,
-        payload,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
-      );
+      await api.post(`${RMS_BASE_URL}/api/projects/escalations/save`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
       setOpenConfigModal(false);
       setInheritMode(false);
       setSelectedClientEscalations([]);
@@ -428,13 +527,9 @@ const ProjectConfigurations = ({ projectId }) => {
   const handleEscalationManualSave = async () => {
     try {
       const payload = { ...formData, projectId: projectId, type: "manual" };
-      await api.post(
-        `${RMS_BASE_URL}/api/projects/escalations/save`,
-        payload,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
-      );
+      await api.post(`${RMS_BASE_URL}/api/projects/escalations/save`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
       setOpenConfigModal(false);
       setFormData(DEFAULT_FORM_STATE);
       fetchProjectEscalations();
@@ -515,14 +610,11 @@ const ProjectConfigurations = ({ projectId }) => {
     setDeleteLoading(true);
     try {
       if (deleteType === "sla") {
-        await api.delete(
-          `${RMS_BASE_URL}/api/project-sla/${deleteConfigId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
+        await api.delete(`${RMS_BASE_URL}/api/project-sla/${deleteConfigId}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        );
+        });
         fetchProjectSLAs();
         showStatusToast("SLA configuration deleted successfully.", "success");
       }
@@ -536,7 +628,10 @@ const ProjectConfigurations = ({ projectId }) => {
           },
         );
         fetchProjectCompliance();
-        showStatusToast("Compliance configuration deleted successfully.", "success");
+        showStatusToast(
+          "Compliance configuration deleted successfully.",
+          "success",
+        );
       }
       if (deleteType === "escalation") {
         await api.delete(
@@ -587,13 +682,19 @@ const ProjectConfigurations = ({ projectId }) => {
     escalationPage * ITEMS_PER_PAGE,
   );
   const totalSlaPages = Math.ceil(projectSlas.length / ITEMS_PER_PAGE);
-  const totalCompliancePages = Math.ceil(validCompliance.length / ITEMS_PER_PAGE);
-  const totalEscalationPages = Math.ceil(projectEscalations.length / ITEMS_PER_PAGE);
+  const totalCompliancePages = Math.ceil(
+    validCompliance.length / ITEMS_PER_PAGE,
+  );
+  const totalEscalationPages = Math.ceil(
+    projectEscalations.length / ITEMS_PER_PAGE,
+  );
 
   const renderSourceBadge = (isInherited) => (
     <span
       className={`px-2 py-1 rounded text-[10px] font-bold ${
-        isInherited ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"
+        isInherited
+          ? "bg-blue-50 text-blue-600"
+          : "bg-purple-50 text-purple-600"
       }`}
     >
       {isInherited ? "INHERITED" : "CUSTOM"}
@@ -616,14 +717,18 @@ const ProjectConfigurations = ({ projectId }) => {
     duration: sla.slaDurationDays ?? "-",
     warning: sla.warningThresholdDays ?? "-",
     status: renderSourceBadge(sla.isInherited),
-    actions: (
+    actions: canEdit ? (
       <div className="flex justify-center gap-1">
         <Button
           onClick={() => !sla.isInherited && handleEditSla(sla)}
           variant="ghost"
           size="icon"
           disabled={sla.isInherited}
-          className={sla.isInherited ? "!text-gray-300" : "!text-blue-600 hover:!bg-blue-50"}
+          className={
+            sla.isInherited
+              ? "!text-gray-300"
+              : "!text-blue-600 hover:!bg-blue-50"
+          }
         >
           <EditIcon className="h-4 w-4" />
         </Button>
@@ -636,12 +741,16 @@ const ProjectConfigurations = ({ projectId }) => {
           <DeleteIcon className="h-4 w-4" />
         </Button>
       </div>
+    ) : (
+      <span className="text-gray-400">View Only</span>
     ),
   }));
 
   const complianceRows = paginatedCompliance.map((comp) => ({
     ...comp,
-    requirement_type: <span className="font-semibold">{comp.requirementType}</span>,
+    requirement_type: (
+      <span className="font-semibold">{comp.requirementType}</span>
+    ),
     requirement_name: comp.requirementName || "-",
     mandatory: comp.mandatoryFlag ? "Yes" : "No",
     status: (
@@ -654,14 +763,18 @@ const ProjectConfigurations = ({ projectId }) => {
         )}
       </div>
     ),
-    actions: (
+    actions: canEdit ? (
       <div className="flex justify-center gap-1">
         <Button
           onClick={() => !comp.isInherited && handleEditCompliance(comp)}
           variant="ghost"
           size="icon"
           disabled={comp.isInherited}
-          className={comp.isInherited ? "!text-gray-300" : "!text-blue-600 hover:!bg-blue-50"}
+          className={
+            comp.isInherited
+              ? "!text-gray-300"
+              : "!text-blue-600 hover:!bg-blue-50"
+          }
         >
           <EditIcon className="h-4 w-4" />
         </Button>
@@ -674,12 +787,16 @@ const ProjectConfigurations = ({ projectId }) => {
           <DeleteIcon className="h-4 w-4" />
         </Button>
       </div>
+    ) : (
+      <span className="text-gray-400">View Only</span>
     ),
   }));
 
   const escalationRows = paginatedEscalations.map((esc) => ({
     ...esc,
-    level: <span className="font-semibold">{formatLevel(esc.escalationLevel)}</span>,
+    level: (
+      <span className="font-semibold">{formatLevel(esc.escalationLevel)}</span>
+    ),
     contact_name: esc.contactName || "-",
     contact_role: esc.contactRole || "-",
     status: (
@@ -692,14 +809,20 @@ const ProjectConfigurations = ({ projectId }) => {
         )}
       </div>
     ),
-    actions: (
+    actions: canEdit ? (
       <div className="flex justify-center gap-1">
         <Button
-          onClick={() => esc.source !== "INHERITED" && handleEditEscalation(esc)}
+          onClick={() =>
+            esc.source !== "INHERITED" && handleEditEscalation(esc)
+          }
           variant="ghost"
           size="icon"
           disabled={esc.source === "INHERITED"}
-          className={esc.source === "INHERITED" ? "!text-gray-300" : "!text-blue-600 hover:!bg-blue-50"}
+          className={
+            esc.source === "INHERITED"
+              ? "!text-gray-300"
+              : "!text-blue-600 hover:!bg-blue-50"
+          }
         >
           <EditIcon className="h-4 w-4" />
         </Button>
@@ -712,6 +835,8 @@ const ProjectConfigurations = ({ projectId }) => {
           <DeleteIcon className="h-4 w-4" />
         </Button>
       </div>
+    ) : (
+      <span className="text-gray-400">View Only</span>
     ),
   }));
 
@@ -811,30 +936,69 @@ const ProjectConfigurations = ({ projectId }) => {
   return (
     <div className="space-y-6">
       {/* Sub-Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="border-b border-gray-200">
-        <TabsList className="!inline-flex !h-auto !bg-transparent !p-0 !rounded-none items-center gap-6">
-          {["sla", "pre-requisites", "escalation"].map((tab) => (
-            <TabsTrigger
-              key={tab}
-              value={tab}
-              className={cn(
-                "pb-3 text-sm font-medium capitalize relative !rounded-none !bg-transparent !shadow-none border-b-2 -mb-px",
-                "data-[state=active]:!text-[#263383] data-[state=active]:!border-[#263383]",
-                "data-[state=inactive]:text-gray-500 data-[state=inactive]:border-transparent hover:text-gray-700"
-              )}
-            >
-              {tab === "sla" ? "SLA" : tab === "pre-requisites" ? "Pre-Requisites" : tab}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="flex items-start justify-between">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="border-b border-gray-200"
+        >
+          <TabsList className="!inline-flex !h-auto !bg-transparent !p-0 !rounded-none items-center gap-6">
+            {["sla", "pre-requisites", "escalation"].map((tab) => (
+              <TabsTrigger
+                key={tab}
+                value={tab}
+                className={cn(
+                  "pb-3 text-sm font-medium capitalize relative !rounded-none !bg-transparent !shadow-none border-b-2 -mb-px",
+                  "data-[state=active]:!text-[#263383] data-[state=active]:!border-[#263383]",
+                  "data-[state=inactive]:text-gray-500 data-[state=inactive]:border-transparent hover:text-gray-700",
+                )}
+              >
+                {tab === "sla"
+                  ? "SLA"
+                  : tab === "pre-requisites"
+                    ? "Pre-Requisites"
+                    : tab}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        {roleOptions && roleOptions.length > 1 ? (
+          <div className="ml-4 mt-1 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="whitespace-nowrap text-[12px] font-semibold text-gray-500">
+                View As:
+              </span>
+              <Select
+                value={selectedRole}
+                onValueChange={(v) => setSelectedRole(v)}
+              >
+                <SelectTrigger className="h-9 min-w-[160px] rounded-xl border border-gray-200 bg-white px-3 text-[12px] font-bold text-gray-700 shadow-sm">
+                  <SelectValue placeholder="View As" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roleOptions.map((opt) => (
+                    <SelectItem
+                      key={opt.value}
+                      value={opt.value}
+                      className="py-2 text-xs font-semibold"
+                    >
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {/* SLA TAB */}
       {activeTab === "sla" && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-semibold">Project SLA Configuration</h3>
-            {!isRM && (
+            {canEdit && (
               <Button
                 disabled={projectSlas.length >= 3}
                 onClick={() => {
@@ -845,13 +1009,21 @@ const ProjectConfigurations = ({ projectId }) => {
                 variant="primary"
                 size="small"
               >
-                {projectSlas.length >= 3 ? "Limit Reached (3/3)" : "+ Create SLA"}
+                {projectSlas.length >= 3
+                  ? "Limit Reached (3/3)"
+                  : "+ Create SLA"}
               </Button>
             )}
           </div>
           <div className="overflow-x-auto">
             <GenericTable
-              headers={["Type", "Duration (Days)", "Warning (Days)", "Status", "Actions"]}
+              headers={[
+                "Type",
+                "Duration (Days)",
+                "Warning (Days)",
+                "Status",
+                "Actions",
+              ]}
               columns={["type", "duration", "warning", "status", "actions"]}
               rows={slaRows}
             />
@@ -862,9 +1034,7 @@ const ProjectConfigurations = ({ projectId }) => {
                 currentPage={slaPage}
                 totalPages={totalSlaPages}
                 onPrevious={() => setSlaPage((p) => Math.max(p - 1, 1))}
-                onNext={() =>
-                  setSlaPage((p) => Math.min(p + 1, totalSlaPages))
-                }
+                onNext={() => setSlaPage((p) => Math.min(p + 1, totalSlaPages))}
               />
             </div>
           )}
@@ -878,7 +1048,7 @@ const ProjectConfigurations = ({ projectId }) => {
             <h3 className="text-lg font-semibold">
               Project Pre-requisites Configuration
             </h3>
-            {!isRM && (
+            {canEdit && (
               <Button
                 onClick={() => {
                   setFormData(DEFAULT_FORM_STATE);
@@ -894,8 +1064,20 @@ const ProjectConfigurations = ({ projectId }) => {
           </div>
           <div className="overflow-x-auto">
             <GenericTable
-              headers={["Requirement Type", "Name", "Mandatory", "Status", "Actions"]}
-              columns={["requirement_type", "requirement_name", "mandatory", "status", "actions"]}
+              headers={[
+                "Requirement Type",
+                "Name",
+                "Mandatory",
+                "Status",
+                "Actions",
+              ]}
+              columns={[
+                "requirement_type",
+                "requirement_name",
+                "mandatory",
+                "status",
+                "actions",
+              ]}
               rows={complianceRows}
             />
           </div>
@@ -906,7 +1088,9 @@ const ProjectConfigurations = ({ projectId }) => {
                 totalPages={totalCompliancePages}
                 onPrevious={() => setCompliancePage((p) => Math.max(p - 1, 1))}
                 onNext={() =>
-                  setCompliancePage((p) => Math.min(p + 1, totalCompliancePages))
+                  setCompliancePage((p) =>
+                    Math.min(p + 1, totalCompliancePages),
+                  )
                 }
               />
             </div>
@@ -919,7 +1103,7 @@ const ProjectConfigurations = ({ projectId }) => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-semibold">Project Escalation Matrix</h3>
-            {!isRM && (
+            {canEdit && (
               <Button
                 onClick={() => {
                   setConfigType("escalation");
@@ -935,7 +1119,13 @@ const ProjectConfigurations = ({ projectId }) => {
           <div className="overflow-x-auto">
             <GenericTable
               headers={["Level", "Name", "Role", "Status", "Actions"]}
-              columns={["level", "contact_name", "contact_role", "status", "actions"]}
+              columns={[
+                "level",
+                "contact_name",
+                "contact_role",
+                "status",
+                "actions",
+              ]}
               rows={escalationRows}
             />
           </div>
@@ -946,7 +1136,9 @@ const ProjectConfigurations = ({ projectId }) => {
                 totalPages={totalEscalationPages}
                 onPrevious={() => setEscalationPage((p) => Math.max(p - 1, 1))}
                 onNext={() =>
-                  setEscalationPage((p) => Math.min(p + 1, totalEscalationPages))
+                  setEscalationPage((p) =>
+                    Math.min(p + 1, totalEscalationPages),
+                  )
                 }
               />
             </div>
@@ -965,7 +1157,13 @@ const ProjectConfigurations = ({ projectId }) => {
         title={
           inheritMode
             ? `Inherit from ${project?.client?.client_name || "Client"}`
-            : `Create ${configType}`
+            : `${
+                formData.projectSlaId ||
+                formData.projectComplianceId ||
+                formData.projectEscalationId
+                  ? "Update"
+                  : "Create"
+              } ${configType}`
         }
         size="2xl"
         animation="zoom"
@@ -982,7 +1180,11 @@ const ProjectConfigurations = ({ projectId }) => {
                 />
               </div>
               <div className="flex justify-end gap-3 mt-4">
-                <Button variant="ghost" size="small" onClick={() => setInheritMode(false)}>
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={() => setInheritMode(false)}
+                >
                   Manual
                 </Button>
                 <Button
@@ -999,10 +1201,18 @@ const ProjectConfigurations = ({ projectId }) => {
             <div className="space-y-4">
               <SLAForm formData={formData} setFormData={setFormData} />
               <div className="flex justify-between mt-4">
-                <Button variant="link" size="small" onClick={handleInheritClick}>
+                <Button
+                  variant="link"
+                  size="small"
+                  onClick={handleInheritClick}
+                >
                   <PrevIcon className="w-3.5 h-3.5" /> Inherit
                 </Button>
-                <Button variant="primary" size="small" onClick={handleManualSave}>
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={handleManualSave}
+                >
                   Save
                 </Button>
               </div>
@@ -1014,13 +1224,27 @@ const ProjectConfigurations = ({ projectId }) => {
             <div className="space-y-4">
               <div className="overflow-x-auto">
                 <GenericTable
-                  headers={["Select", "Requirement Type", "Requirement Name", "Mapping"]}
-                  columns={["selection", "requirement_type", "requirement_name", "mapping"]}
+                  headers={[
+                    "Select",
+                    "Requirement Type",
+                    "Requirement Name",
+                    "Mapping",
+                  ]}
+                  columns={[
+                    "selection",
+                    "requirement_type",
+                    "requirement_name",
+                    "mapping",
+                  ]}
                   rows={clientComplianceRows}
                 />
               </div>
               <div className="flex justify-end gap-3 mt-4">
-                <Button variant="ghost" size="small" onClick={() => setInheritMode(false)}>
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={() => setInheritMode(false)}
+                >
                   Manual
                 </Button>
                 <Button
@@ -1037,10 +1261,18 @@ const ProjectConfigurations = ({ projectId }) => {
             <div className="space-y-4">
               <ComplianceForm formData={formData} setFormData={setFormData} />
               <div className="flex justify-between mt-4">
-                <Button variant="link" size="small" onClick={handleComplianceInheritClick}>
+                <Button
+                  variant="link"
+                  size="small"
+                  onClick={handleComplianceInheritClick}
+                >
                   <PrevIcon className="w-3.5 h-3.5" /> Inherit
                 </Button>
-                <Button variant="primary" size="small" onClick={handleComplianceManualSave}>
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={handleComplianceManualSave}
+                >
                   Save
                 </Button>
               </div>
@@ -1058,7 +1290,11 @@ const ProjectConfigurations = ({ projectId }) => {
                 />
               </div>
               <div className="flex justify-end gap-3 mt-4">
-                <Button variant="ghost" size="small" onClick={() => setInheritMode(false)}>
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={() => setInheritMode(false)}
+                >
                   Manual
                 </Button>
                 <Button
@@ -1075,13 +1311,21 @@ const ProjectConfigurations = ({ projectId }) => {
             <div className="space-y-4">
               <EscalationForm formData={formData} setFormData={setFormData} />
               <div className="flex justify-between mt-4">
-                <Button variant="link" size="small" onClick={handleEscalationInheritClick}>
+                <Button
+                  variant="link"
+                  size="small"
+                  onClick={handleEscalationInheritClick}
+                >
                   <PrevIcon className="w-3.5 h-3.5" /> Inherit
                 </Button>
                 <Button
                   variant="primary"
                   size="small"
-                  onClick={formData.projectEscalationId ? handleEscalationUpdate : handleEscalationManualSave}
+                  onClick={
+                    formData.projectEscalationId
+                      ? handleEscalationUpdate
+                      : handleEscalationManualSave
+                  }
                 >
                   Save
                 </Button>
