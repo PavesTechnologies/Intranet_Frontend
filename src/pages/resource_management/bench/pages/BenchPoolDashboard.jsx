@@ -573,4 +573,6 @@ const KPICard = ({ title, value, icon, trend, subText, color, bgColor, borderCol
   </div>
 );
 
+
+
 export default BenchPoolDashboard;
