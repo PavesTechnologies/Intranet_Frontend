@@ -817,6 +817,18 @@ const DemandWorkspacePage = () => {
                                                         <span className="text-[10px] text-slate-400 italic font-bold">No Reason Specified</span>
                                                     )}
                                                 </div>
+                                            ) : isFulfilled ? (
+                                                demand.slaBreached ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-tight border border-transparent shadow-sm bg-rose-50 text-rose-700">
+                                                        <div className="h-1 w-1 rounded-full shrink-0 animate-pulse bg-rose-500" />
+                                                        Violated
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-tight border border-transparent shadow-sm bg-emerald-50 text-emerald-700">
+                                                        <div className="h-1 w-1 rounded-full shrink-0 animate-pulse bg-emerald-500" />
+                                                        Satisfied
+                                                    </span>
+                                                )
                                             ) : (demand.demandSlaId || demand.slaId) ? (
                                                 <SLABadge
                                                     days={demand.slaDays}

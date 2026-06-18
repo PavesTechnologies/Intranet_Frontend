@@ -884,6 +884,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                 onClose={() => setDeliverableModalOpen(false)}
                 categories={categories}
                 proficiencyLevels={proficiencyLevels}
+                onSuccess={() => setDeliverableModalOpen(false)}
             />
 
             <DeleteDemandModal

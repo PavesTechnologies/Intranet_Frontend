@@ -182,6 +182,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               allowNegativeBalance: formData.allowNegativeBalance,
               noticePeriodRestriction: formData.noticePeriodRestriction,
               weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
+              requiresDocumentation: formData.requiresDocumentation,
               active: formData.active,
               effectiveStartDate: formData.effectiveStartDate,
             },
