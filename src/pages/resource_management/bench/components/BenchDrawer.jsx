@@ -7,9 +7,9 @@ const statCardClassName = "relative group overflow-hidden rounded-2xl border bor
 
 const formatCurrency = (value) => {
   if (value === null || value === undefined) return "—";
-  if (value >= 1_000_000) return `₹${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  if (value >= 1_000) return `₹${(value / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
-  return `₹${value}`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0/, "")}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0/, "")}K`;
+  return `${value}`;
 };
 const cardIconWrapperClass = "absolute -right-4 -top-4 h-24 w-24 rounded-full bg-gradient-to-br opacity-20 transition-all group-hover:scale-110";
 
@@ -75,7 +75,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
               <div className={`${cardIconWrapperClass} from-amber-400 to-yellow-500`} />
               <p className="relative z-10 text-[10px] font-bold capitalize tracking-widest text-slate-500">Gross Exposure</p>
               <p className={`relative z-10 mt-2 text-2xl font-black tracking-tight ${resource.warnings?.highCost || resource.warnings?.longAging ? "text-rose-600" : "text-slate-900"}`}>
-                {resource.costExposure === null ? "—" : `₹${formatCurrency(resource.costExposure.toLocaleString())}`}
+                {resource.costExposure === null ? "—" : `${resource.currencyType || "₹"} ${formatCurrency(resource.costExposure)}`}
               </p>
             </div>
           </div>
