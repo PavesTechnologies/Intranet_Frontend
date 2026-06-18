@@ -153,11 +153,11 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
                 {/* Column 1: Demand Specification */}
                 <DetailCard title="Demand Specification" icon={DocumentIcon}>
                     <div className="space-y-0.5">
-                        <InfoRow label="Internal Id" value={demand.demandId?.slice(0, 8)} colorClass="font-mono text-indigo-600" />
-                        <InfoRow label="Demand Type" value={demand.demandType} />
-                        <InfoRow label="Priority" value={<PriorityBadge priority={demand.demandPriority} />} />
-                        <InfoRow label="Resources Needed" value={demand.resourceRequired || "1"} />
-                        <InfoRow label="Experience Min" value={`${demand.minExp || 0} Years`} />
+                        <InfoRow label="Internal Id" value={demand.demandId?.slice(0, 8)} colorClass="font-mono text-indigo-600" icon={HashIcon} />
+                        <InfoRow label="Demand Type" value={demand.demandType} icon={LayersIcon} />
+                        <InfoRow label="Priority" value={<PriorityBadge priority={demand.demandPriority} />} icon={TargetIcon} />
+                        <InfoRow label="Resources Needed" value={demand.resourceRequired || "1"} icon={TeamIcon} />
+                        <InfoRow label="Experience Min" value={`${demand.minExp || 0} Years`} icon={StarIcon} />
                         <InfoRow label="Start Date" value={demand.demandStartDate} icon={CalendarIcon} />
                         <InfoRow label="End Date" value={demand.demandEndDate} icon={CalendarIcon} />
                     </div>
@@ -174,9 +174,9 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
                             )}>
                                 {project.riskLevel || "LOW"}
                             </div>
-                        } />
-                        <InfoRow label="Status" value={project.status || "ACTIVE"} colorClass="text-emerald-600 uppercase" />
-                        <InfoRow label="Lifecycle" value={project.lifecycle} />
+                        } icon={ShieldIcon} />
+                        <InfoRow label="Status" value={project.status || "ACTIVE"} colorClass="text-emerald-600 uppercase" icon={ActivityIcon} />
+                        <InfoRow label="Lifecycle" value={project.lifecycle} icon={HistoryIcon} />
                         <InfoRow label="Location" value={project.location} icon={MapPinIcon} />
                         <InfoRow label="Delivery" value={project.deliveryModel || demand.deliveryModel} icon={GlobalIcon} />
                     </div>
@@ -186,8 +186,8 @@ const OverviewTab = ({ demand, project, clientInfo, passedClientName, sla, rejec
                 <div className="space-y-6">
                     <DetailCard title="Partner Profile" icon={BuildingIcon}>
                         <div className="space-y-0.5">
-                            <InfoRow label="Client" value={clientInfo?.clientName || passedClientName} icon={SuccessIcon} />
-                            <InfoRow label="Priority Score" value={demand.priorityScore || "N/A"} colorClass="text-indigo-600 font-black" />
+                            <InfoRow label="Client" value={clientInfo?.clientName || passedClientName} icon={BuildingIcon} />
+                            <InfoRow label="Priority Score" value={demand.priorityScore || "N/A"} colorClass="text-indigo-600 font-black" icon={TrendingUpIcon} />
                         </div>
                     </DetailCard>
 

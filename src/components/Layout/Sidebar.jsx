@@ -43,16 +43,25 @@ const userManagementSubmenu = [
 const resourceManagementSubmenu = [
   { label: "Client Management", to: "/resource-management" },
   { label: "Resource Project Management", to: "/resource-management/projects" },
-  { label: "Workforce Availability", to: "/resource-management/workforce-availability" },
+  {
+    label: "Workforce Availability",
+    to: "/resource-management/workforce-availability",
+  },
   { label: "Demand Management", to: "/resource-management/demand" },
   { label: "Roll-Off Management", to: "/resource-management/roleoff" },
   { label: "Bench Management", to: "/resource-management/bench" },
-  { label: "Utilization & Performance", to: "/resource-management/bench/utilization-performance" },
+  {
+    label: "Utilization & Performance",
+    to: "/resource-management/bench/utilization-performance",
+  },
 ];
 
-const deliveryManagerResourceManagementSubmenu = resourceManagementSubmenu.filter(
-  (item) => item.label === "Demand Management" || item.label === "Roll-Off Management"
-);
+const deliveryManagerResourceManagementSubmenu =
+  resourceManagementSubmenu.filter(
+    (item) =>
+      item.label === "Demand Management" ||
+      item.label === "Roll-Off Management",
+  );
 
 // EO_SUBMENU is now config-driven from src/config/sidebarConfig.js.
 // filterMenuByRole() trims it to only the items allowed for the current user's roles.
@@ -73,7 +82,15 @@ const Sidebar = ({ isCollapsed }) => {
     if (item.name === "Projects") {
       const userRoles = user?.roles?.map((r) => r.toUpperCase()) || [];
       // Roles that should not see Projects by default
-      const forbiddenRoles = ["ADMIN", "Super_Admin", "HR", "HR_MANAGER", "RESOURCE_MANAGER", "DELIVERY_MANAGER", "REPORTING_MANAGER"];
+      const forbiddenRoles = [
+        "ADMIN",
+        "Super_Admin",
+        "HR",
+        "HR_MANAGER",
+        "RESOURCE_MANAGER",
+        "DELIVERY_MANAGER",
+        "REPORTING_MANAGER",
+      ];
       // Roles that override the forbidden roles
       const strongRoles = ["PROJECT_MANAGER", "TESTER"];
 
@@ -226,8 +243,9 @@ const Sidebar = ({ isCollapsed }) => {
 
   return (
     <aside
-      className={`fixed top-0 left-0 h-screen bg-[#081534] text-white flex flex-col z-50 transition-all duration-300 ${isCollapsed ? "w-20" : "w-64"
-        } border-r border-[#0f1a3a]`}
+      className={`fixed top-0 left-0 h-screen bg-[#081534] text-white flex flex-col z-50 transition-all duration-300 ${
+        isCollapsed ? "w-20" : "w-64"
+      } border-r border-[#0f1a3a]`}
     >
       {/* Branding */}
       <div className="p-6 border-b border-[#0f1a3a] flex items-center justify-between gap-3">
@@ -260,10 +278,11 @@ const Sidebar = ({ isCollapsed }) => {
               <Link
                 to="/dashboard"
                 onMouseEnter={closeAllSubmenus}
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${location.pathname === "/dashboard"
-                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                  }`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${
+                  location.pathname === "/dashboard"
+                    ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                    : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                }`}
                 title={isCollapsed ? "Dashboard" : ""}
               >
                 <LayoutDashboard className="h-5 w-5 shrink-0" />
@@ -273,7 +292,7 @@ const Sidebar = ({ isCollapsed }) => {
           }
 
           {/* Employee Onboarding (Non-General, Non-DM) */}
-          {(
+          {
             <li
               ref={eoRef}
               className="relative"
@@ -281,11 +300,12 @@ const Sidebar = ({ isCollapsed }) => {
               onMouseLeave={handleEoMouseLeave}
             >
               <div
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname == "/employee-onboarding" ||
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${
+                  location.pathname == "/employee-onboarding" ||
                   location.pathname == "/employee-onboarding/"
-                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                  }`}
+                    ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                    : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                }`}
                 title={isCollapsed ? "Employee Onboarding" : ""}
               >
                 <Handshake className="h-5 w-5 shrink-0" />
@@ -293,9 +313,10 @@ const Sidebar = ({ isCollapsed }) => {
                 {!isCollapsed && (
                   <>
                     <span className="flex-1">Employee Onboarding</span>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform duration-200 ${eoHovered ? "rotate-180" : ""
-                        }`}
+                    <ChevronRight
+                      className={`h-4 w-4 transition-all duration-300 ${
+                        eoHovered ? "translate-x-1" : ""
+                      }`}
                     />
                   </>
                 )}
@@ -304,8 +325,9 @@ const Sidebar = ({ isCollapsed }) => {
               {/* SAME POPUP STYLE AS RESOURCE MANAGEMENT */}
               {eoHovered && (
                 <ul
-                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
-                    }`}
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${
+                    isCollapsed ? "left-20" : "left-64"
+                  }`}
                   style={{ top: `${submenuTop}px` }}
                   onMouseEnter={() => {
                     parentHoverRef.current = true;
@@ -328,9 +350,10 @@ const Sidebar = ({ isCollapsed }) => {
                       <NavLink
                         to={item.to}
                         className={({ isActive }) =>
-                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
-                            ? "bg-blue-100 text-[#0a174e] font-semibold"
-                            : "hover:bg-[#263383] hover:text-white"
+                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${
+                            isActive
+                              ? "bg-blue-100 text-[#0a174e] font-semibold"
+                              : "hover:bg-[#263383] hover:text-white"
                           }`
                         }
                       >
@@ -345,8 +368,9 @@ const Sidebar = ({ isCollapsed }) => {
               )}
               {childMenu && (
                 <ul
-                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[300px]" : "left-[520px]"
-                    }`}
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${
+                    isCollapsed ? "left-[300px]" : "left-[520px]"
+                  }`}
                   style={{ top: `${childTop - 4}px` }}
                   onMouseEnter={() => {
                     childHoverRef.current = true;
@@ -366,9 +390,10 @@ const Sidebar = ({ isCollapsed }) => {
                       <NavLink
                         to={child.to}
                         className={({ isActive }) =>
-                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
-                            ? "bg-blue-100 text-[#0a174e] font-semibold"
-                            : "hover:bg-[#263383] hover:text-white"
+                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${
+                            isActive
+                              ? "bg-blue-100 text-[#0a174e] font-semibold"
+                              : "hover:bg-[#263383] hover:text-white"
                           }`
                         }
                       >
@@ -382,7 +407,7 @@ const Sidebar = ({ isCollapsed }) => {
                 </ul>
               )}
             </li>
-          )}
+          }
 
           {/* User Management (Admin Only) */}
           {isAdmin && (
@@ -393,19 +418,21 @@ const Sidebar = ({ isCollapsed }) => {
               onMouseLeave={handleUserMouseLeave}
             >
               <div
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/user-management")
-                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                  }`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${
+                  location.pathname.startsWith("/user-management")
+                    ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                    : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                }`}
                 title={isCollapsed ? "User Management" : ""}
               >
                 <Users className="h-5 w-5 shrink-0" />
                 {!isCollapsed && (
                   <>
                     <span className="flex-1">User Management</span>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform duration-200 ${userHovered ? "rotate-180" : ""
-                        }`}
+                    <ChevronRight
+                      className={`h-4 w-4 transition-all duration-300 ${
+                        userHovered ? "translate-x-1" : ""
+                      }`}
                     />
                   </>
                 )}
@@ -414,8 +441,9 @@ const Sidebar = ({ isCollapsed }) => {
               {/* User Management Submenu */}
               {userHovered && (
                 <ul
-                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
-                    }`}
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${
+                    isCollapsed ? "left-20" : "left-64"
+                  }`}
                   style={{ top: `${submenuTop}px` }}
                   onMouseEnter={handleUserMouseEnter}
                   onMouseLeave={handleUserMouseLeave}
@@ -425,9 +453,10 @@ const Sidebar = ({ isCollapsed }) => {
                       <NavLink
                         to={item.to}
                         className={({ isActive }) =>
-                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
-                            ? "bg-blue-100 text-[#0a174e] font-semibold"
-                            : "hover:bg-[#263383] hover:text-white"
+                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${
+                            isActive
+                              ? "bg-blue-100 text-[#0a174e] font-semibold"
+                              : "hover:bg-[#263383] hover:text-white"
                           }`
                         }
                       >
@@ -456,10 +485,11 @@ const Sidebar = ({ isCollapsed }) => {
                 <Link
                   to="/resource-management"
                   onMouseEnter={closeAllSubmenus}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${location.pathname.startsWith("/resource-management")
-                    ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                    : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                    }`}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${
+                    location.pathname.startsWith("/resource-management")
+                      ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                      : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                  }`}
                   title={isCollapsed ? "Resource Management" : ""}
                 >
                   <UserCog2 className="h-5 w-5 shrink-0" />
@@ -469,10 +499,11 @@ const Sidebar = ({ isCollapsed }) => {
                 <>
                   {/* Resource Manager / Delivery Manager → Show Hover Menu */}
                   <div
-                    className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/resource-management")
-                      ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                      : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                      }`}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${
+                      location.pathname.startsWith("/resource-management")
+                        ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                        : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                    }`}
                   >
                     <UserCog2 className="h-5 w-5 shrink-0" />
 
@@ -480,8 +511,9 @@ const Sidebar = ({ isCollapsed }) => {
                       <>
                         <span className="flex-1">Resource Management</span>
                         <ChevronRight
-                          className={`h-4 w-4 transition-all duration-300 ${rmHovered ? "translate-x-1" : ""
-                            }`}
+                          className={`h-4 w-4 transition-all duration-300 ${
+                            rmHovered ? "translate-x-1" : ""
+                          }`}
                         />
                       </>
                     )}
@@ -490,8 +522,9 @@ const Sidebar = ({ isCollapsed }) => {
                   {/* Show submenu only for Resource Manager or Delivery Manager */}
                   {rmHovered && (
                     <ul
-                      className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
-                        }`}
+                      className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${
+                        isCollapsed ? "left-20" : "left-64"
+                      }`}
                       style={{ top: `${submenuTop}px` }}
                       onMouseEnter={handleRmMouseEnter}
                       onMouseLeave={handleRmMouseLeave}
@@ -502,9 +535,10 @@ const Sidebar = ({ isCollapsed }) => {
                             to={item.to}
                             end
                             className={({ isActive }) =>
-                              `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
-                                ? "bg-blue-100 text-[#0a174e] font-semibold"
-                                : "hover:bg-[#263383] hover:text-white"
+                              `flex items-center justify-between px-4 py-2 text-xs transition-colors ${
+                                isActive
+                                  ? "bg-blue-100 text-[#0a174e] font-semibold"
+                                  : "hover:bg-[#263383] hover:text-white"
                               }`
                             }
                           >
@@ -530,10 +564,11 @@ const Sidebar = ({ isCollapsed }) => {
                 <Link
                   to={item.href}
                   onMouseEnter={closeAllSubmenus}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${isActive
-                    ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                    : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                    }`}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${
+                    isActive
+                      ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                      : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                  }`}
                   title={isCollapsed ? item.name : ""}
                 >
                   <item.icon className="h-5 w-5 shrink-0" />

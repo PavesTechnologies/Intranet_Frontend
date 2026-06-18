@@ -4,6 +4,13 @@ import { getAgingTone, isSkillStale } from "../models/benchModel";
 // import { getBenchMatches } from "../services/benchService";
 
 const statCardClassName = "relative group overflow-hidden rounded-2xl border border-white/40 bg-gradient-to-br from-white/60 to-white/30 px-5 py-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-md transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-0.5";
+
+const formatCurrency = (value) => {
+  if (value === null || value === undefined) return "—";
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0/, "")}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0/, "")}K`;
+  return `${value}`;
+};
 const cardIconWrapperClass = "absolute -right-4 -top-4 h-24 w-24 rounded-full bg-gradient-to-br opacity-20 transition-all group-hover:scale-110";
 
 const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMatches, loadingMatches, activeTab = "bench" }) => {
@@ -68,7 +75,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
               <div className={`${cardIconWrapperClass} from-amber-400 to-yellow-500`} />
               <p className="relative z-10 text-[10px] font-bold capitalize tracking-widest text-slate-500">Gross Exposure</p>
               <p className={`relative z-10 mt-2 text-2xl font-black tracking-tight ${resource.warnings?.highCost || resource.warnings?.longAging ? "text-rose-600" : "text-slate-900"}`}>
-                {resource.costExposure === null ? "—" : `${resource.currencyType || "₹"} ${resource.costExposure.toLocaleString()}`}
+                {resource.costExposure === null ? "—" : `${resource.currencyType || "₹"} ${formatCurrency(resource.costExposure)}`}
               </p>
             </div>
           </div>
@@ -138,7 +145,7 @@ const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMa
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Burn Rate (Per Day)</p>
-                  <p className="text-[12px] font-semibold text-slate-800 mt-0.5">{resource.costPerDay === null ? "Unavailable" : `${resource.currencyType || "₹"} ${resource.costPerDay.toLocaleString()}`}</p>
+                  <p className="text-[12px] font-semibold text-slate-800 mt-0.5">{resource.costPerDay === null ? "Unavailable" : `${resource.currencyType || "₹"} ${formatCurrency(resource.costPerDay.toLocaleString())}`}</p>
                 </div>
               </div>
             </div>

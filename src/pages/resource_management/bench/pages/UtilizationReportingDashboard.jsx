@@ -249,7 +249,7 @@ const UtilizationReportingDashboard = () => {
         ...(tab === 'RESOURCE' ? { resourceUtilizations: [] } : {}),
         ...(tab === 'PROJECT' ? { projectUtilizations: [] } : {}),
         ...(tab === 'ROLE' ? { roleUtilizations: [] } : {}),
-        ...(tab === 'CLIENT' ? { clientUtilizations: [] } : {}),
+        // ...(tab === 'CLIENT' ? { clientUtilizations: [] } : {}),
       }));
       setSectionErrors((prev) => ({
         ...prev,
@@ -441,7 +441,7 @@ const UtilizationReportingDashboard = () => {
                     { value: "SUMMARY", label: "SUMMARY" },
                     { value: "RESOURCE", label: "RESOURCE" },
                     { value: "PROJECT", label: "PROJECT" },
-                    { value: "CLIENT", label: "CLIENT" },
+                    // { value: "CLIENT", label: "CLIENT" },
                     { value: "ROLE", label: "ROLE" },
                   ]}
                   value={reportParams.reportType}
@@ -529,10 +529,10 @@ const UtilizationReportingDashboard = () => {
 
           {/* Navigation Tabs */}
           <div className="flex border-b border-slate-200 overflow-x-auto scrollbar-hide">
-             {['ANOMALIES', 'RESOURCE', 'PROJECT', 'ROLE', 'CLIENT'].map(tab => {
+             {['ANOMALIES', 'RESOURCE', 'PROJECT', 'ROLE'].map(tab => { //, 'CLIENT'].map(tab => {
                 const getTabText = (t) => {
                   if (t === 'ANOMALIES') return 'Utilization Anomalies';
-                  if (t === 'CLIENT') return 'Client Utilization';
+                  // if (t === 'CLIENT') return 'Client Utilization';
                   if (t === 'RESOURCE') return 'Resource Utilization Report';
                   if (t === 'PROJECT') return 'Project Utilization Report';
                   if (t === 'ROLE') return 'Role Utilization Report';
@@ -678,12 +678,12 @@ const UtilizationReportingDashboard = () => {
                     <div className="m-6 rounded-2xl bg-amber-50 border border-amber-100 p-4 text-[12px] font-bold text-amber-700">{sectionErrors.PROJECT}</div>
                   ) : (
                     <GenericTable
-                      headers={["Project", "Client", "Resources", "Hours", "Utilization", "Status"]}
-                      columns={["project_name", "client_name_info", "resources_info", "hours_info", "utilization_info", "status_info"]}
+                      headers={["Project", "Resources", "Hours", "Utilization", "Status"]}
+                      columns={["project_name", "resources_info", "hours_info", "utilization_info", "status_info"]}
                       rows={paginatedProject.map((proj) => ({
                         ...proj,
                         project_name: <div className="text-left font-black text-[13px] text-slate-900">{proj.projectName}</div>,
-                        client_name_info: <div className="text-center text-[12px] text-slate-600">{proj.clientName}</div>,
+                        // client_name_info: <div className="text-center text-[12px] text-slate-600">{proj.clientName}</div>,
                         resources_info: <div className="text-center text-[12px] text-slate-600">{proj.uniqueResources}</div>,
                         hours_info: <div className="text-center font-bold">{proj.totalHours}h</div>,
                         utilization_info: (
