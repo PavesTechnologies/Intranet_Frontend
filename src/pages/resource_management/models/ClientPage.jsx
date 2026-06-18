@@ -28,6 +28,7 @@ import {
 } from "@/components/icons";
 
 import { useAuth } from "../../../contexts/AuthContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { KPICard } from "../../../components/kpi/KPI";
 
 import ClientSection from "./ClientSection";
@@ -369,9 +370,34 @@ const ClientPage = () => {
   const { user } = useAuth();
   const permissions = user?.permissions || [];
   const roles = user?.roles || [];
-  const canConfigAgreements = roles.includes("Admin");  // permissions.includes("ADD_CONFIGURATION");
-  const canManageAssets = roles.includes("Resource_Manager"); // permissions.includes("ASSETS_MANAGEMENT");
-  const canEditProfile = roles.includes("Admin");  // permissions.includes("EDIT_CLIENT_PROFILE");
+  // Role switching: allow users with both Project_Manager and Resource_Manager
+  const normalizeRoleKey = (role = "") =>
+    String(role || "").replace(/^ROLE[-_\s]/i, "").trim();
+
+  const getConfigRoleOptions = (rolesList = []) => {
+    const opts = [];
+    if (!Array.isArray(rolesList)) return opts;
+    if (rolesList.includes("Project_Manager")) opts.push({ value: "Project_Manager", label: "Project Manager" });
+    if (rolesList.includes("Resource_Manager")) opts.push({ value: "Resource_Manager", label: "Resource Manager" });
+    return opts;
+  };
+
+  const pickPrimaryConfigRole = (rolesList = []) => {
+    if (rolesList.includes("Project_Manager")) return "Project_Manager";
+    if (rolesList.includes("Resource_Manager")) return "Resource_Manager";
+    return null;
+  };
+
+  const configRoleOptions = getConfigRoleOptions(roles);
+  const [selectedRole, setSelectedRole] = React.useState(null);
+  const effectiveRole = selectedRole || pickPrimaryConfigRole(roles);
+
+  const isPM = effectiveRole === "Project_Manager";
+  const isRM = effectiveRole === "Resource_Manager";
+
+  const canConfigAgreements = isPM || roles.includes("Admin");
+  const canManageAssets = isRM || roles.includes("Resource_Manager");
+  const canEditProfile = roles.includes("Admin");
   const navigate = useNavigate();
 
   // State declarations - ALL hooks inside component

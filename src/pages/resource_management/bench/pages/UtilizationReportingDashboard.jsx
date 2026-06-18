@@ -447,7 +447,7 @@ const UtilizationReportingDashboard = () => {
                   value={reportParams.reportType}
                   onChange={(val) => {
                     setReportParams({ ...reportParams, reportType: val });
-                    if (val === 'SUMMARY') { setActiveTab('ANOMALIES'); } else { setActiveTab(val); }
+                    handleTabChange(val === 'SUMMARY' ? 'ANOMALIES' : val);
                   }}
                 />
               </div>
@@ -545,7 +545,7 @@ const UtilizationReportingDashboard = () => {
                      className={`px-6 py-4 text-[11px] font-black tracking-widest whitespace-nowrap transition-all border-b-2 flex-1 ${activeTab === tab ? 'text-emerald-600 border-emerald-600 bg-emerald-50/30' : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'}`}
                   >
                      {getTabText(tab)}
-                  </button>
+                  </button> 
                 );
              })}
           </div>
