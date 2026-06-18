@@ -44,8 +44,24 @@ const RMSProjectDetails = () => {
   const { getEnumValues } = useEnums();
   const { user } = useAuth();
   const location = useLocation();
-  const roles = user?.roles;
-  const isRM = roles?.includes("Resource_Manager");
+  const roles = user?.roles || [];
+  // support role switcher: prefer explicit selected role from route state or query param,
+  // otherwise pick a primary role from the user's roles
+  const urlParams = new URLSearchParams(location.search);
+  const roleFromQuery = urlParams.get("role");
+  const [selectedRole, setSelectedRole] = useState(
+    location.state?.selectedRole || roleFromQuery || null,
+  );
+
+  const pickPrimaryConfigRole = (rolesList = []) => {
+    if (rolesList.includes("Project_Manager")) return "Project_Manager";
+    if (rolesList.includes("Resource_Manager")) return "Resource_Manager";
+    return null;
+  };
+
+  const effectiveRole = selectedRole || pickPrimaryConfigRole(roles);
+  const isRM = effectiveRole === "Resource_Manager";
+  const isPM = effectiveRole === "Project_Manager";
 
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -98,6 +114,18 @@ const RMSProjectDetails = () => {
   };
   const [formData, setFormData] = useState(DEFAULT_FORM_STATE);
 
+  const isEditingConfig = Boolean(
+    formData.projectSlaId || formData.projectComplianceId || formData.projectEscalationId,
+  );
+
+  const getConfigDisplayName = (type) => {
+    if (!type) return "Configuration";
+    if (type === "sla") return "SLA";
+    if (type === "pre-requisites") return "Prerequisite";
+    if (type === "escalation") return "Escalation";
+    return type;
+  };
+
   useEffect(() => {
     if (location.state?.initialTab) {
       setActiveTab(location.state.initialTab);
@@ -106,6 +134,11 @@ const RMSProjectDetails = () => {
 
   // 1. Fetch Client SLAs when entering Inherit Mode
   const handleInheritClick = async () => {
+    if (!project?.clientId) {
+      notify.warning("Client information not loaded yet. Try again after project details load.");
+      return;
+    }
+
     try {
       const res = await api.get(
         `${RMS_BASE_URL}/api/client-sla/clientSLA/${project.clientId}`,
@@ -121,7 +154,6 @@ const RMSProjectDetails = () => {
         isAlreadyMapped: existingTypes.includes(sla.slaType),
       }));
 
-      // CHANGE: Ensure this matches the variable name declared above
       setClientSlas(validatedSlas);
       setInheritMode(true);
     } catch (err) {
@@ -687,7 +719,11 @@ const RMSProjectDetails = () => {
     try {
       setLoading(true);
       const res = await getProjectById(projectId);
-      setProject(res.data);
+      // normalize response shape: some APIs return { data: { ...project } } while
+      // others return the project directly as res.data. Prefer res.data.data when present.
+      const projectObj = res?.data?.data ?? res?.data ?? null;
+      setProject(projectObj);
+      console.debug("Loaded project:", projectObj);
     } catch (err) {
       console.error("Failed to fetch project details", err);
       notify.error(err, "Failed to fetch project details.");
@@ -1114,7 +1150,7 @@ const RMSProjectDetails = () => {
         <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-lg font-semibold">Project SLA Configuration</h3>
-            {!isRM && (
+            {isPM && (
               <button
                 disabled={projectSlas.length >= 3}
                 onClick={() => {
@@ -1148,9 +1184,7 @@ const RMSProjectDetails = () => {
                       {sla.isInherited ? "INHERITED" : "CUSTOM"}
                     </span>
                   ),
-                  actions: isRM ? (
-                    <div><p className="italic font-medium text-gray-400 text-xs">No permission</p></div>
-                  ) : (
+                  actions: isPM ? (
                     <div className="flex justify-center gap-3">
                       <button
                         onClick={() => {
@@ -1173,6 +1207,8 @@ const RMSProjectDetails = () => {
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
+                  ) : (
+                    <div><p className="italic font-medium text-gray-400 text-xs">No permission</p></div>
                   )
                 }))}
               />
@@ -1205,7 +1241,7 @@ const RMSProjectDetails = () => {
             <h3 className="text-lg font-semibold">
               Project Pre-requisites Configuration
             </h3>
-            {!isRM && (
+            {isPM && (
               <button
                 onClick={() => {
                   setFormData(DEFAULT_FORM_STATE);
@@ -1244,9 +1280,7 @@ const RMSProjectDetails = () => {
                       )}
                     </div>
                   ),
-                  actions: isRM ? (
-                    <div><p className="italic font-medium text-gray-400 text-xs">No permission</p></div>
-                  ) : (
+                  actions: isPM ? (
                     <div className="flex justify-center gap-3">
                       <button
                         onClick={() => {
@@ -1269,6 +1303,8 @@ const RMSProjectDetails = () => {
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
+                  ) : (
+                    <div><p className="italic font-medium text-gray-400 text-xs">No permission</p></div>
                   )
                 }))}
               />
@@ -1302,7 +1338,7 @@ const RMSProjectDetails = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-lg font-semibold">Project Escalation Matrix</h3>
 
-            {!isRM && (
+            {isPM && (
               <button
                 onClick={() => {
                   setConfigType("escalation");
@@ -1340,9 +1376,7 @@ const RMSProjectDetails = () => {
                       )}
                     </div>
                   ),
-                  action: isRM ? (
-                    <div><p className="text-gray-400 italic text-xs">No permission</p></div>
-                  ) : (
+                  action: isPM ? (
                     <div className="flex justify-center gap-4">
                       <button
                         onClick={() => {
@@ -1365,6 +1399,8 @@ const RMSProjectDetails = () => {
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
+                  ) : (
+                    <div><p className="text-gray-400 italic text-xs">No permission</p></div>
                   )
                 }))}
               />
@@ -1417,7 +1453,7 @@ const RMSProjectDetails = () => {
                       ? "Compliance"
                       : "Escalation Contacts"
                   } from ${project?.client?.client_name || "Client"}`
-                  : `Create ${configType} Configuration`}
+                  : `${isEditingConfig ? "Update" : "Create"} ${getConfigDisplayName(configType)}`}
               </h2>
             </div>
             <div className="flex-1 overflow-y-auto px-3 py-3">

@@ -42,8 +42,25 @@ export const getProjectById = async (projectId) => {
         },
       },
     );
-    return res.data;
+    // return the full axios response so callers can access `res.data` as before
+    return res;
   } catch (err) {
+    // If RMS doesn't have this project, attempt to fetch from PMS as a fallback
+    if (err?.response?.status === 404) {
+      try {
+        const pmsBase = window.__APP_CONFIG__?.PMS_BASE_URL;
+        if (pmsBase) {
+          const pmsRes = await api.get(`${pmsBase}/api/projects/${projectId}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          });
+          // wrap PMS response into axios-like response so callers can use `res.data`
+          return pmsRes;
+        }
+      } catch (pmsErr) {
+        // fall through to rethrow original error below
+        console.error("PMS fallback failed for getProjectById:", pmsErr);
+      }
+    }
     throw err;
   }
 };
