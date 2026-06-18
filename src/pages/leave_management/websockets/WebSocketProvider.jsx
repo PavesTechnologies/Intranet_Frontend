@@ -193,7 +193,10 @@ export default function WebSocketProvider({ children }) {
           msg.includes("JWT") ||
           msg.includes("Invalid") ||
           msg.includes("Missing") ||
-          msg.includes("Unauthenticated")
+          msg.includes("Unauthenticated")||
+          msg.includes("Not authorized") ||
+          msg.includes("Forbidden destination") ||
+          msg.includes("restricted to /app/")
         ) {
           console.error("❌ Auth failure — stopping WebSocket reconnect");
           client.deactivate();

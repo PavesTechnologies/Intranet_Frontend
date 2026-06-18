@@ -524,9 +524,8 @@ const AssetList = () => {
                     )}
                   </div>
 
-                  <p className="text-xs text-gray-400 leading-relaxed">
-                    Upload An Excel File Containing Serial Numbers. Number Of Rows
-                    Must Match The Quantity Entered.
+                  <p className="text-xs text-gray-400 leading-relaxed"> <span className="text-red-500 pr-1">*</span> 
+                    Upload an Excel file with Asset Serial Number as the first column header. Enter each asset serial number in the rows below. The total number of serial numbers must match the entered quantity.
                   </p>
                 </div>
               </div>

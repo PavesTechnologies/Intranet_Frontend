@@ -730,6 +730,7 @@ const ClientPage = () => {
     },
   ];
 
+  projects.filter((project) => project.projectStatus !== "DELETED");
   const totalPages = Math.ceil(projects.length / PROJECTS_PER_PAGE);
 
   const paginatedProjects = projects.slice(

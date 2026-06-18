@@ -90,7 +90,7 @@ export default function ApprovalRulesPage() {
       rule || {
         actionType: "",
         makerRole: "HR",
-        checkerRole: "hrAdministrator",
+        checkerRole: "hr_administrator",
         approvalLevel: 1,
         approvalCondition: "",
         approverType: "",
