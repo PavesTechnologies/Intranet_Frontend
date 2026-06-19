@@ -672,7 +672,7 @@ const AdminApprovalTable = ({
       setReason("");
     } catch (err) {
       console.error("Error adding holiday exclude user:", err);
-      showStatusToast("Failed to add user", "error");
+      showStatusToast("Failed to add employee", "error");
     }
   };
 
@@ -979,7 +979,7 @@ const AdminApprovalTable = ({
                   size="small"
                   onClick={handleAddUserClick}
                 >
-                  Add User
+                  Add Employee
                 </Button>
 
                 <Button
@@ -1005,7 +1005,7 @@ const AdminApprovalTable = ({
                     showStatusToast("Select a record above to update.", "info");
                   }}
                 >
-                  Update User
+                  Update Employee
                 </Button>
 
                 {!isRemoveMode ? (
@@ -1024,7 +1024,7 @@ const AdminApprovalTable = ({
                       toggleRemoveMode();
                     }}
                   >
-                    Remove User
+                    Remove Employee
                   </Button>
                 ) : (
                   <Button
@@ -1048,7 +1048,7 @@ const AdminApprovalTable = ({
               {showAddUserSection && (
                 <div className="mt-6 border-t pt-4 transition-all space-y-4">
                   <h3 className="text-lg font-semibold text-gray-800">
-                    Add Holiday Excluded User
+                    Add Holiday ExcludedEmployee
                   </h3>
 
                   {addUserLoading ? (
@@ -1127,20 +1127,20 @@ const AdminApprovalTable = ({
                 </div>
               )}
 
-              {/* 🆕 Update User Section */}
+              {/* 🆕 UpdateEmployee Section */}
               {isUpdateMode && selectedUpdateRecord && (
                 <div
                   ref={updateSectionRef}
                   className="mt-6 border-t pt-4 transition-all space-y-4 bg-blue-50 p-4 rounded-lg"
                 >
                   <h3 className="text-lg font-semibold text-gray-800">
-                    Update Holiday Excluded User
+                    Update Holiday ExcludedEmployee
                   </h3>
 
-                  {/* 🆕 User Info (Read-only) */}
+                  {/* 🆕 Employee Info (Read-only) */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      User
+                      Employee
                     </label>
                     <input
                       type="text"

@@ -829,7 +829,7 @@ const EntriesTable = ({
           <tr>
                        
             <td
-  colSpan={selectionMode ? (showActions ? 8 : 7) : (showActions ? 7 : 6)}
+  colSpan={selectionMode ? (showActions ? 9 : 8) : (showActions ? 8 : 7)}
   className="px-4 py-1"
 >
                            
