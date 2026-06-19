@@ -858,7 +858,7 @@ const DemandModal = ({ open, onClose, onSuccess, initialData = null, projectDeta
                     <FormField id="field-ProjectName" label="Project" required>
                       <input
                         type="text"
-                        value={projectDetails?.name || projectDetails?.projectName || initialData?.projectName || initialData?.ProjectName || "Loading..."}
+                        value={projectDetails?.projectName || "Loading..."}
                         disabled
                         className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 px-3 text-sm text-slate-500 cursor-not-allowed font-medium"
                       />
