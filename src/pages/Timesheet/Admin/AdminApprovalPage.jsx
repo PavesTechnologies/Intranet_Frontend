@@ -200,14 +200,23 @@ const AdminApprovalPage = () => {
       return;
     }
     try {
-      await api.put(
-        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/emailSettings/${emailData.id
-        }`,
-        { email: editValue },
-      );
+      if (emailData?.id) {
+        const res = await api.put(
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/emailSettings/${emailData.id
+          }`,
+          { email: editValue },
+        );
+        setEmailData(res.data);
+        toast.success("Email updated successfully!");
+      } else {
+        const res = await api.post(
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/emailSettings`,
+          { email: editValue },
+        );
+        setEmailData(res.data);
+        toast.success("Email added successfully!");
+      }
       setIsEditing(false);
-      setEmailData({ ...emailData, email: editValue });
-      toast.success("Email updated successfully!");
     } catch (err) {
       toast.error("Failed to update email.");
     }
@@ -255,7 +264,7 @@ const AdminApprovalPage = () => {
         </div>
         <h3 className="flex items-center text-lg text-gray-500 font-semibold">
           Finance Report Email:&nbsp;
-          {!isEditing ? (
+          {!isEditing && emailData?.email ? (
             <button
               className="text-blue-600 font-semibold text-[15px]"
               onClick={() => {
@@ -285,10 +294,12 @@ const AdminApprovalPage = () => {
                 onClick={handleSaveEmail}
               />
 
-              <XCircle
-                className="text-red-500 hover:text-red-800 w-5 h-5 cursor-pointer"
-                onClick={() => setIsEditing(false)}
-              />
+              {emailData?.email && (
+                <XCircle
+                  className="text-red-500 hover:text-red-800 w-5 h-5 cursor-pointer"
+                  onClick={() => setIsEditing(false)}
+                />
+              )}
             </div>
           )}
         </h3>
