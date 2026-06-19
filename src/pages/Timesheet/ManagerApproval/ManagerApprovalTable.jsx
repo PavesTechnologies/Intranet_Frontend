@@ -749,7 +749,7 @@ const ManagerApprovalTable = ({
       setReason("");
     } catch (err) {
       console.error("Error adding holiday exclude user:", err);
-      showStatusToast("Failed to add user", "error");
+      showStatusToast("Failed to add employee", "error");
     }
   };
 
@@ -810,7 +810,7 @@ const ManagerApprovalTable = ({
       setUpdateReason("");
     } catch (err) {
       console.error("Error updating record:", err);
-      showStatusToast("Failed to update user", "error");
+      showStatusToast("Failed to update employee", "error");
     }
   };
 
@@ -1052,7 +1052,7 @@ const ManagerApprovalTable = ({
                   size="small"
                   onClick={handleAddUserClick}
                 >
-                  Add User
+                  Add Employee
                 </Button>
 
                 <Button
@@ -1078,7 +1078,7 @@ const ManagerApprovalTable = ({
                     showStatusToast("Select a record above to update.", "info");
                   }}
                 >
-                  Update User
+                  Update Employee
                 </Button>
 
                 {!isRemoveMode ? (
@@ -1097,7 +1097,7 @@ const ManagerApprovalTable = ({
                       toggleRemoveMode();
                     }}
                   >
-                    Remove User
+                    Remove Employee
                   </Button>
                 ) : (
                   <Button
@@ -1121,7 +1121,7 @@ const ManagerApprovalTable = ({
               {showAddUserSection && (
                 <div className="mt-6 border-t pt-4 transition-all space-y-4">
                   <h3 className="text-lg font-semibold text-gray-800">
-                    Add Holiday Excluded User
+                    Add Holiday Excluded Employee
                   </h3>
 
                   {addUserLoading ? (
@@ -1207,17 +1207,17 @@ const ManagerApprovalTable = ({
                   className="mt-6 border-t pt-4 transition-all space-y-4 bg-blue-50 p-4 rounded-lg"
                 >
                   <h3 className="text-lg font-semibold text-gray-800">
-                    Update Holiday Excluded User
+                    Update Holiday Excluded Employee
                   </h3>
 
                   {/* 🆕 User Info (Read-only) */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      User
+                      Employee
                     </label>
                     <input
                       type="text"
-                      value={`${selectedUpdateRecord.userName} (User ID: ${selectedUpdateRecord.userId})`}
+                      value={`${selectedUpdateRecord.userName} (Employee ID: ${selectedUpdateRecord.userId})`}
                       readOnly
                       className="w-full border rounded-lg p-2 bg-gray-100 text-gray-700 cursor-not-allowed"
                     />
