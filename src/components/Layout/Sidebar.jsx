@@ -301,8 +301,7 @@ const Sidebar = ({ isCollapsed }) => {
             >
               <div
                 className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${
-                  location.pathname == "/employee-onboarding" ||
-                  location.pathname == "/employee-onboarding/"
+                  location.pathname.startsWith("/employee-onboarding")
                     ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
                     : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
                 }`}
