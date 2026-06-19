@@ -31,7 +31,6 @@ const getAllocationStartDate = (demandStartDate) => {
 const EMPTY_ARRAY = [];
 
 const AllocationModal = ({ isOpen, onClose, demand, initialResourceIds = EMPTY_ARRAY, isBenchMode = false, benchMatches = EMPTY_ARRAY, onSuccess }) => {
-    console.log("Demand for allocation: ", demand);
     const [resources, setResources] = useState([]);
     const [isLoadingResources, setIsLoadingResources] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);

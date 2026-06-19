@@ -1538,7 +1538,7 @@ const DemandDetailPage = ({ demandId: propDemandId, onBack: propOnBack, initialD
                     {isRM && activeTab === 'skillGap' && <SkillGapTab demand={demand} />}
                     {activeTab === 'approvalFlow' && <ApprovalFlowTab demand={demand} rejectionInfo={rejectionInfo} />}
                     {activeTab === 'slaInsights' && <SLAInsightsTab sla={sla} />}
-                    {!isDM && activeTab === 'allocationResults' && <AllocationResultsTab results={allocationResults} />}
+                    {(isRM || !isDM) && activeTab === 'allocationResults' && <AllocationResultsTab results={allocationResults} />}
                 </div>
             </main>
 
