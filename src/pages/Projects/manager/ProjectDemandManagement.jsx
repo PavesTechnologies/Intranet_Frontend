@@ -847,7 +847,7 @@ const ProjectDemandManagement = ({ projectId, projectName }) => {
                 <DemandModal
                     open={demandModalOpen}
                     onClose={() => setDemandModalOpen(false)}
-                    projectDetails={project}
+                    projectDetails={project.data}
                     userRole={effectiveRole}
                     onSuccess={async () => {
                         setDemandModalOpen(false);
