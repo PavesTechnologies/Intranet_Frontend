@@ -701,6 +701,8 @@ console.log(
     );
   }, [selectedSkill, isGeneralCertificateMode, allCertificates]);
   useEffect(() => {
+    const otherOption = { value: "other", label: "Other" };
+
     if (!selectedCertificate) {
       setFilteredProviders([]);
       setSelectedProvider(null);
@@ -718,7 +720,7 @@ console.log(
 
       if (providerName) {
         const providerOption = { value: providerName, label: providerName };
-        setFilteredProviders([providerOption]);
+        setFilteredProviders([providerOption, otherOption]);
         setSelectedProvider(providerOption);
         setUploadFormData((current) => ({ ...current, customProvider: "" }));
         return;
@@ -726,7 +728,7 @@ console.log(
     }
 
     // Custom certificates still use admin-managed provider choices.
-    setFilteredProviders(providers);
+    setFilteredProviders([...providers, otherOption]);
     setSelectedProvider(null);
 
   }, [selectedCertificate, allCertificates, providers]);
@@ -1001,7 +1003,10 @@ useEffect(() => {
     }
 
     const certificateName = uploadFormData.customCertificateName?.trim();
-    const providerName = selectedProvider?.label?.trim() || uploadFormData.customProvider?.trim();
+    const providerName =
+      selectedProvider?.value === "other"
+        ? uploadFormData.customProvider?.trim()
+        : selectedProvider?.label?.trim() || uploadFormData.customProvider?.trim();
 
     if (!certificateName) {
       showStatusToast("Please enter certificate name", "error");
@@ -3180,18 +3185,27 @@ else if (category === "identity") {
                           <CreatableSelect
                             options={filteredProviders}
                             value={selectedProvider}
-                            onChange={setSelectedProvider}
-                            isDisabled={
-                              !!selectedCertificate &&
-                              selectedCertificate.value !== "other"
-                            }
-                            placeholder={
-                              selectedCertificate?.value &&
-                              selectedCertificate.value !== "other"
-                                ? "Provider from Certificate Master"
-                                : "Select Provider"
-                            }
+                            onChange={(val) => {
+                              setSelectedProvider(val);
+                              if (val?.value !== "other") {
+                                setUploadFormData((d) => ({ ...d, customProvider: "" }));
+                              }
+                            }}
+                            placeholder="Select or type organization"
+                            menuPlacement="auto"
+                            classNamePrefix="react-select"
                           />
+                          {selectedProvider?.value === "other" && (
+                            <input
+                              type="text"
+                              className="mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10"
+                              placeholder="Enter issuing organization name"
+                              value={uploadFormData.customProvider || ""}
+                              onChange={(e) =>
+                                setUploadFormData((d) => ({ ...d, customProvider: e.target.value }))
+                              }
+                            />
+                          )}
                         </div>
 
                         {/* 🔥 Issue Date */}
