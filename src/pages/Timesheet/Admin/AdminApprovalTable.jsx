@@ -634,7 +634,11 @@ const AdminApprovalTable = ({
       setShowRemoveConfirm(false); // Close confirmation modal
     } catch (err) {
       console.error("Error removing users:", err);
-      showStatusToast("Error while removing users", "error");
+      const serverMsg =
+        typeof err?.response?.data === "string"
+          ? err.response.data
+          : err?.response?.data?.message;
+      showStatusToast(serverMsg || "Error while removing users", "error");
     } finally {
       setRemoveLoading(false);
     }
@@ -676,7 +680,11 @@ const AdminApprovalTable = ({
       setReason("");
     } catch (err) {
       console.error("Error adding holiday exclude user:", err);
-      showStatusToast("Failed to add employee", "error");
+      const serverMsg =
+        typeof err?.response?.data === "string"
+          ? err.response.data
+          : err?.response?.data?.message;
+      showStatusToast(serverMsg || "Failed to add employee", "error");
     }
   };
 
@@ -738,7 +746,11 @@ const AdminApprovalTable = ({
       setUpdateReason("");
     } catch (err) {
       console.error("Error updating record:", err);
-      showStatusToast("Failed to update user", "error");
+      const serverMsg =
+        typeof err?.response?.data === "string"
+          ? err.response.data
+          : err?.response?.data?.message;
+      showStatusToast(serverMsg || "Failed to update user", "error");
     }
   };
 

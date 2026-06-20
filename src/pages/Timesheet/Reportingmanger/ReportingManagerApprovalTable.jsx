@@ -7,9 +7,11 @@ import { reviewTimesheet, handleBulkReviewAdmin, handleMixedReview } from "../ap
 import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
+import FilterListbox from "../../../components/filter/FilterListbox";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 import RejectWithSelectionModal from "../RejectWithSelectionModal";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, MoreVertical, X } from "lucide-react";
 
 const ReportingManagerApprovalTable = ({
   loading,
@@ -61,6 +63,226 @@ const ReportingManagerApprovalTable = ({
 
   const handleCancelModal = () => {
     setRejectAllCancellationModal(!rejectAllCancellationModal);
+  };
+
+  // -----------------------------
+  // Holiday Excluded Users (Add / Update / Remove)
+  // Reporting-manager scoped: the employee dropdown is fed by
+  // /api/timesheets/reporting-manager/users (the current RM's direct reports).
+  // -----------------------------
+  const [showHolidayModal, setShowHolidayModal] = useState(false);
+  const [holidayData, setHolidayData] = useState([]);
+  const [holidayLoading, setHolidayLoading] = useState(false);
+
+  const [isUpdateMode, setIsUpdateMode] = useState(false);
+  const [selectedUpdateRecord, setSelectedUpdateRecord] = useState(null);
+  const [updateHoliday, setUpdateHoliday] = useState("");
+  const [updateReason, setUpdateReason] = useState("");
+  const updateSectionRef = React.useRef(null);
+
+  const [isRemoveMode, setIsRemoveMode] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [removeLoading, setRemoveLoading] = useState(false);
+
+  const [showAddUserSection, setShowAddUserSection] = useState(false);
+  const [managerUsers, setManagerUsers] = useState([]);
+  const [monthlyHolidays, setMonthlyHolidays] = useState([]);
+  const [selectedAddUser, setSelectedAddUser] = useState("");
+  const [selectedHoliday, setSelectedHoliday] = useState("");
+  const [reason, setReason] = useState("");
+  const [addUserLoading, setAddUserLoading] = useState(false);
+
+  const fetchHolidayExcludedUsers = async () => {
+    setHolidayLoading(true);
+    try {
+      const res = await api.get(
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        }/api/holiday-exclude-users`,
+      );
+      setHolidayData(res.data);
+    } catch (err) {
+      console.error("Error fetching holiday users:", err);
+      showStatusToast("Failed to load holiday data", "error");
+    } finally {
+      setHolidayLoading(false);
+    }
+  };
+
+  const handleShowHolidayModal = () => {
+    setShowHolidayModal(true);
+    fetchHolidayExcludedUsers();
+  };
+
+  // Toggle remove mode
+  const toggleRemoveMode = () => {
+    if (isRemoveMode) {
+      setIsRemoveMode(false);
+      setSelectedUsers([]);
+    } else {
+      setIsRemoveMode(true);
+    }
+  };
+
+  // Select single record (multi-select in remove mode, single in update mode)
+  const handleSelectUser = (record) => {
+    if (isRemoveMode) {
+      setSelectedUsers((prev) =>
+        prev.includes(record.id)
+          ? prev.filter((id) => id !== record.id)
+          : [...prev, record.id],
+      );
+      return;
+    }
+
+    if (isUpdateMode) {
+      setSelectedUpdateRecord(record);
+      setUpdateHoliday(record.holidayDate);
+      setUpdateReason(record.reason || "");
+
+      setTimeout(() => {
+        updateSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 200);
+    }
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedUsers.length === holidayData.length) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(holidayData.map((u) => u.id));
+    }
+  };
+
+  const handleRemoveSelectedUsers = async () => {
+    if (selectedUsers.length === 0) return;
+
+    setRemoveLoading(true);
+    try {
+      for (const id of selectedUsers) {
+        await api.delete(
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+          }/api/holiday-exclude-users/${id}`,
+        );
+      }
+
+      showStatusToast("Selected user(s) removed successfully!", "success");
+      fetchHolidayExcludedUsers();
+      setSelectedUsers([]);
+      setIsRemoveMode(false);
+      setShowRemoveConfirm(false);
+    } catch (err) {
+      console.error("Error removing users:", err);
+      const serverMsg =
+        typeof err?.response?.data === "string"
+          ? err.response.data
+          : err?.response?.data?.message;
+      showStatusToast(serverMsg || "Error while removing users", "error");
+    } finally {
+      setRemoveLoading(false);
+    }
+  };
+
+  const handleConfirmAddUser = async () => {
+    if (!selectedAddUser || !selectedHoliday || !reason.trim()) {
+      showStatusToast("Please fill all fields before confirming.", "warning");
+      return;
+    }
+
+    try {
+      await api.post(
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        }/api/holiday-exclude-users/create`,
+        {
+          userId: parseInt(selectedAddUser, 10),
+          holidayDate: selectedHoliday,
+          reason,
+        },
+      );
+
+      showStatusToast(
+        "User added to holiday exclusion successfully!",
+        "success",
+      );
+      fetchHolidayExcludedUsers();
+      setShowAddUserSection(false);
+      setSelectedAddUser("");
+      setSelectedHoliday("");
+      setReason("");
+    } catch (err) {
+      console.error("Error adding holiday exclude user:", err);
+      const serverMsg =
+        typeof err?.response?.data === "string"
+          ? err.response.data
+          : err?.response?.data?.message;
+      showStatusToast(serverMsg || "Failed to add employee", "error");
+    }
+  };
+
+  const handleAddUserClick = async () => {
+    setShowAddUserSection(true);
+    setAddUserLoading(true);
+    try {
+      // Run both API calls in parallel and wait for both to finish.
+      // Employees come from the reporting-manager scoped endpoint.
+      const [usersRes, holidaysRes] = await Promise.all([
+        api.get(
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/timesheets/reporting-manager/users`,
+        ),
+        api.get(
+          `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+          }/api/holidays/currentMonth`,
+        ),
+      ]);
+
+      setManagerUsers(usersRes.data);
+      setMonthlyHolidays(holidaysRes.data);
+    } catch (err) {
+      console.error("Error loading add-user data:", err);
+      showStatusToast("Failed to load user or holiday data", "error");
+    } finally {
+      setAddUserLoading(false);
+    }
+  };
+
+  const handleConfirmUpdateUser = async () => {
+    if (!selectedUpdateRecord) {
+      showStatusToast("Please select a record to update.", "warning");
+      return;
+    }
+    if (!updateHoliday || !updateReason.trim()) {
+      showStatusToast("Please fill all fields before confirming.", "warning");
+      return;
+    }
+
+    try {
+      await api.put(
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        }/api/holiday-exclude-users/${selectedUpdateRecord.id}`,
+        {
+          userId: selectedUpdateRecord.userId,
+          holidayDate: updateHoliday,
+          reason: updateReason,
+        },
+      );
+
+      showStatusToast("Holiday exclusion updated successfully!", "success");
+      fetchHolidayExcludedUsers();
+      setIsUpdateMode(false);
+      setSelectedUpdateRecord(null);
+      setUpdateHoliday("");
+      setUpdateReason("");
+    } catch (err) {
+      console.error("Error updating record:", err);
+      const serverMsg =
+        typeof err?.response?.data === "string"
+          ? err.response.data
+          : err?.response?.data?.message;
+      showStatusToast(serverMsg || "Failed to update employee", "error");
+    }
   };
 
   // -----------------------------
@@ -514,6 +736,13 @@ const ReportingManagerApprovalTable = ({
             <Button variant="secondary" size="medium" onClick={exportPDF}>
               Export PDF
             </Button>
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={handleShowHolidayModal}
+            >
+              <MoreVertical size={15} />
+            </Button>
           </div>
 
           {enrichedGroupedData.length === 0 ? (
@@ -632,6 +861,331 @@ const ReportingManagerApprovalTable = ({
           )}
         </>
       )}
+
+      {/* ----------------------------- */}
+      {/* Holiday Modal */}
+      {/* ----------------------------- */}
+      {showHolidayModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 relative max-h-[85vh] overflow-y-auto">
+            <button
+              onClick={() => setShowHolidayModal(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+            >
+              <X size={18} />
+            </button>
+
+            <h2 className="text-2xl font-semibold mb-4 text-gray-800">
+              Holiday Excluded Users
+            </h2>
+
+            {holidayLoading ? (
+              <LoadingSpinner text="Loading holiday data..." />
+            ) : holidayData.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">
+                No users found who worked on holidays.
+              </p>
+            ) : (
+              <>
+                {/* --- Select All / Deselect All --- */}
+                {isRemoveMode && (
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm text-gray-600">
+                      {selectedUsers.length === holidayData.length
+                        ? "All users selected"
+                        : `${selectedUsers.length} selected`}
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      onClick={handleToggleSelectAll}
+                    >
+                      {selectedUsers.length === holidayData.length
+                        ? "Deselect All"
+                        : "Select All"}
+                    </Button>
+                  </div>
+                )}
+
+                {/* --- User List --- */}
+                <div className="overflow-y-auto max-h-80 space-y-3">
+                  {holidayData.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => handleSelectUser(item)}
+                      className={`border rounded-lg p-4 transition-all ${isRemoveMode ? "cursor-pointer" : "cursor-default"
+                        } ${isRemoveMode && selectedUsers.includes(item.id)
+                          ? "bg-red-100 border-red-400"
+                          : "bg-gray-50 hover:bg-gray-100"
+                        }`}
+                    >
+                      <h3 className="font-semibold text-gray-800 text-lg">
+                        {item.userName} (User ID: {item.userId})
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        <span className="font-medium">Holiday Date:</span>{" "}
+                        {new Date(item.holidayDate).toLocaleDateString()}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        <span className="font-medium">Reason:</span>{" "}
+                        {item.reason}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <div className="mt-6 space-y-4">
+              <div className="flex justify-between gap-3">
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={handleAddUserClick}
+                >
+                  Add Employee
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={() => {
+                    if (!holidayData || holidayData.length === 0) {
+                      showStatusToast(
+                        "No holiday excluded users found. Please create one first.",
+                        "info",
+                      );
+                      return;
+                    }
+
+                    setIsUpdateMode(true);
+                    setShowAddUserSection(false);
+                    setIsRemoveMode(false);
+                    setSelectedUsers([]);
+                    setSelectedAddUser(null);
+                    setSelectedHoliday("");
+                    setReason("");
+                    showStatusToast("Select a record above to update.", "info");
+                  }}
+                >
+                  Update Employee
+                </Button>
+
+                {!isRemoveMode ? (
+                  <Button
+                    variant="danger"
+                    size="small"
+                    onClick={() => {
+                      if (!holidayData || holidayData.length === 0) {
+                        showStatusToast(
+                          "No holiday excluded users found. Please create one first.",
+                          "info",
+                        );
+                        return;
+                      }
+                      toggleRemoveMode();
+                    }}
+                  >
+                    Remove Employee
+                  </Button>
+                ) : (
+                  <Button
+                    variant="danger"
+                    size="small"
+                    disabled={selectedUsers.length === 0}
+                    onClick={() => setShowRemoveConfirm(true)}
+                  >
+                    {selectedUsers.length > 0
+                      ? `Confirm Remove (${selectedUsers.length})`
+                      : "Confirm Remove"}
+                  </Button>
+                )}
+              </div>
+
+              {/* ---------- Add User Section ---------- */}
+              {showAddUserSection && (
+                <div className="mt-6 border-t pt-4 transition-all space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Add Holiday Excluded Employee
+                  </h3>
+
+                  {addUserLoading ? (
+                    <LoadingSpinner text="Loading user & holiday data..." />
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Select Employee
+                        </label>
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "-- Select Employee --" },
+                            ...managerUsers.map((u) => ({ value: u.id, label: `${u.id} - ${u.fullName}` })),
+                          ]}
+                          value={selectedAddUser}
+                          onChange={setSelectedAddUser}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Select Holiday
+                        </label>
+                        <FilterListbox
+                          options={[
+                            { value: "", label: "-- Select Holiday --" },
+                            ...monthlyHolidays.map((h) => ({ value: h.holidayDate, label: `${h.holidayDate} - ${h.holidayName}` })),
+                          ]}
+                          value={selectedHoliday}
+                          onChange={setSelectedHoliday}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Reason
+                        </label>
+                        <textarea
+                          className="w-full border rounded-lg p-2 h-20 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          placeholder="Enter reason for exclusion..."
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-3">
+                        <Button
+                          variant="primary"
+                          size="small"
+                          onClick={handleConfirmAddUser}
+                        >
+                          Confirm
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="small"
+                          onClick={() => {
+                            setShowAddUserSection(false);
+                            setReason("");
+                            setSelectedAddUser("");
+                            setSelectedHoliday("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Update User Section */}
+              {isUpdateMode && selectedUpdateRecord && (
+                <div
+                  ref={updateSectionRef}
+                  className="mt-6 border-t pt-4 transition-all space-y-4 bg-blue-50 p-4 rounded-lg"
+                >
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Update Holiday Excluded Employee
+                  </h3>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Employee
+                    </label>
+                    <input
+                      type="text"
+                      value={`${selectedUpdateRecord.userName} (Employee ID: ${selectedUpdateRecord.userId})`}
+                      readOnly
+                      className="w-full border rounded-lg p-2 bg-gray-100 text-gray-700 cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Select Holiday
+                    </label>
+                    <FilterListbox
+                      options={[
+                        { value: "", label: "-- Select Holiday --" },
+                        ...monthlyHolidays.map((h) => ({ value: h.holidayDate, label: `${h.holidayDate} - ${h.holidayDescription}` })),
+                      ]}
+                      value={updateHoliday}
+                      onChange={setUpdateHoliday}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Reason
+                    </label>
+                    <textarea
+                      className="w-full border rounded-lg p-2 h-20 resize-none focus:ring-2 focus:ring-blue-400"
+                      placeholder="Enter reason for exclusion..."
+                      value={updateReason}
+                      onChange={(e) => setUpdateReason(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-3">
+                    <Button
+                      variant="primary"
+                      size="small"
+                      disabled={!updateHoliday || !updateReason.trim()}
+                      onClick={handleConfirmUpdateUser}
+                    >
+                      Confirm Update
+                    </Button>
+
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      onClick={() => {
+                        setIsUpdateMode(false);
+                        setSelectedUpdateRecord(null);
+                        setUpdateHoliday("");
+                        setUpdateReason("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => {
+                    setIsRemoveMode(false);
+                    setSelectedUsers([]);
+                    setIsUpdateMode(false);
+                    setShowAddUserSection(false);
+                    setSelectedUpdateRecord(null);
+                    setShowHolidayModal(false);
+                  }}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove confirmation (Confirm → delete, Cancel → close) */}
+      <ConfirmationModal
+        isOpen={showRemoveConfirm}
+        title="Remove Employee"
+        message={`Are you sure you want to remove ${selectedUsers.length} user(s) from holiday exclusion?`}
+        confirmText="Yes, Remove"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={removeLoading}
+        onConfirm={handleRemoveSelectedUsers}
+        onCancel={() => setShowRemoveConfirm(false)}
+      />
     </div>
   );
 };
