@@ -14,6 +14,7 @@ import InternalActivities from "./InternalActivities";
 import HourSettingsModal from "./HourSettingsModal";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 import RejectWithSelectionModal from "../RejectWithSelectionModal";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
 const AdminApprovalTable = ({
   loading,
@@ -30,6 +31,10 @@ const AdminApprovalTable = ({
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectAllCancellationModal, setRejectAllCancellationModal] =
     useState(false);
+
+  // 🆕 Remove-confirmation modal (replaces native window.confirm)
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [removeLoading, setRemoveLoading] = useState(false);
 
   // 🆕 Update User feature hooks — moved here to fix undefined error
   const [isUpdateMode, setIsUpdateMode] = useState(false);
@@ -613,11 +618,7 @@ const AdminApprovalTable = ({
   const handleRemoveSelectedUsers = async () => {
     if (selectedUsers.length === 0) return;
 
-    const confirmDelete = window.confirm(
-      `Are you sure you want to remove ${selectedUsers.length} user(s)?`,
-    );
-    if (!confirmDelete) return;
-
+    setRemoveLoading(true);
     try {
       for (const id of selectedUsers) {
         await api.delete(
@@ -630,9 +631,12 @@ const AdminApprovalTable = ({
       fetchHolidayExcludedUsers();
       setSelectedUsers([]);
       setIsRemoveMode(false); // Exit remove mode after success
+      setShowRemoveConfirm(false); // Close confirmation modal
     } catch (err) {
       console.error("Error removing users:", err);
       showStatusToast("Error while removing users", "error");
+    } finally {
+      setRemoveLoading(false);
     }
   };
 
@@ -1031,11 +1035,7 @@ const AdminApprovalTable = ({
                     variant="danger"
                     size="small"
                     disabled={selectedUsers.length === 0}
-                    onClick={async () => {
-                      await handleRemoveSelectedUsers();
-                      setIsRemoveMode(false);
-                      setSelectedUsers([]);
-                    }}
+                    onClick={() => setShowRemoveConfirm(true)}
                   >
                     {selectedUsers.length > 0
                       ? `Confirm Remove (${selectedUsers.length})`
@@ -1099,13 +1099,7 @@ const AdminApprovalTable = ({
                         <Button
                           variant="primary"
                           size="small"
-                          onClick={async () => {
-                            await handleConfirmAddUser();
-                            setShowAddUserSection(false);
-                            setReason("");
-                            setSelectedAddUser("");
-                            setSelectedHoliday("");
-                          }}
+                          onClick={handleConfirmAddUser}
                         >
                           Confirm
                         </Button>
@@ -1184,13 +1178,7 @@ const AdminApprovalTable = ({
                       variant="primary"
                       size="small"
                       disabled={!updateHoliday || !updateReason.trim()}
-                      onClick={async () => {
-                        await handleConfirmUpdateUser();
-                        setSelectedUpdateRecord(null);
-                        setIsUpdateMode(false);
-                        setUpdateHoliday("");
-                        setUpdateReason("");
-                      }}
+                      onClick={handleConfirmUpdateUser}
                     >
                       Confirm Update
                     </Button>
@@ -1231,6 +1219,19 @@ const AdminApprovalTable = ({
           </div>
         </div>
       )}
+
+      {/* 🆕 Remove confirmation (Yes → delete, Cancel → close) */}
+      <ConfirmationModal
+        isOpen={showRemoveConfirm}
+        title="Remove Employee"
+        message={`Are you sure you want to remove ${selectedUsers.length} user(s) from holiday exclusion?`}
+        confirmText="Yes, Remove"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={removeLoading}
+        onConfirm={handleRemoveSelectedUsers}
+        onCancel={() => setShowRemoveConfirm(false)}
+      />
 
       <Modal
         title="Internal Activities"
