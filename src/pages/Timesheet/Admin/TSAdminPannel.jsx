@@ -44,10 +44,11 @@ const TSAdminPanel = () => {
     <div className="p-6 bg-gray-100 min-h-screen">
       {/* Reviewed Logs sits to the left of "View as"; when the role toggle
           isn't available it falls back to the far right on its own. */}
-      <div className="mb-6 flex justify-end items-center gap-4">
+      <div className="mb-0 flex justify-end items-center gap-4">
         <Button
           variant="primary"
           size="medium"
+          className="h-8"
           onClick={() => setShowReviewedModal(true)}
         >
           Reviewed Logs
@@ -62,6 +63,7 @@ const TSAdminPanel = () => {
                 value={activeView}
                 options={viewOptions}
                 onChange={(e) => handleViewChange(e.target.value)}
+                buttonClassName="h-10 flex items-center text-sm"
               />
             </div>
           </div>
