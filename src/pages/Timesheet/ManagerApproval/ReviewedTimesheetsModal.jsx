@@ -66,7 +66,11 @@ const ReviewedTimesheetsModal = ({ isOpen, onClose }) => {
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(50);
 
-  const [reviewees, setReviewees] = useState([]);
+  // Users discovered in the audit results (id -> label). Accumulated across
+  // fetches so the User filter is built entirely from the reviewed data and
+  // works in every view (Manager / Reporting-Manager / Admin) without needing
+  // a separate users endpoint.
+  const [auditUsers, setAuditUsers] = useState({});
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -102,6 +106,24 @@ const ReviewedTimesheetsModal = ({ isOpen, onClose }) => {
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/timesheets/review/audit?${buildQuery(overrides)}`,
       );
       setData(res.data);
+
+      // Accumulate distinct users seen in the audit so the User filter is
+      // populated from the reviewed data itself.
+      const content = res.data?.content || [];
+      if (content.length) {
+        setAuditUsers((prev) => {
+          const next = { ...prev };
+          for (const row of content) {
+            if (row?.userId == null) continue;
+            const key = String(row.userId);
+            if (!next[key]) {
+              next[key] =
+                row.userName?.trim() || row.userEmail || `User #${row.userId}`;
+            }
+          }
+          return next;
+        });
+      }
     } catch (e) {
       const status = e.response?.status;
       const message = status
@@ -114,24 +136,12 @@ const ReviewedTimesheetsModal = ({ isOpen, onClose }) => {
     }
   };
 
-  const fetchReviewees = async () => {
-    try {
-      const res = await api.get(
-        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/manager/users`,
-      );
-      const users = res.data;
-      setReviewees(Array.isArray(users) ? users : []);
-    } catch (e) {
-      // Silent — user filter just won't be populated
-    }
-  };
-
   useEffect(() => {
     if (!isOpen) return;
     setPage(0);
     setExpandedUsers({});
     setExpandedWeeks({});
-    fetchReviewees();
+    setAuditUsers({});
     fetchAudit({ page: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -208,13 +218,13 @@ const ReviewedTimesheetsModal = ({ isOpen, onClose }) => {
 
   const userOptions = useMemo(() => {
     const opts = [{ value: "ALL", label: "All Users" }];
-    for (const u of reviewees) {
-      if (u?.id == null) continue;
-      const label = u.fullName?.trim() || u.email || `User #${u.id}`;
-      opts.push({ value: String(u.id), label });
-    }
+    // Built entirely from users found in the reviewed (audit) data.
+    const entries = Object.entries(auditUsers).sort((a, b) =>
+      a[1].localeCompare(b[1]),
+    );
+    for (const [value, label] of entries) opts.push({ value, label });
     return opts;
-  }, [reviewees]);
+  }, [auditUsers]);
 
   const weekStatus = (week) => {
     const statuses = week.rows.map((r) => r.status);

@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
 import Button from "../../components/Button/Button";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import ManagerMonthlyReport from "./ManagerMonthlyReport";
 import { ArrowLeft } from "lucide-react";
-import ReviewedTimesheetsModal from "./ManagerApproval/ReviewedTimesheetsModal";
 
 const TimesheetHeader = () => {
   const navigate = useNavigate();
@@ -12,7 +11,6 @@ const TimesheetHeader = () => {
   const { user } = useAuth();
   const canApprove = user?.permissions?.includes("APPROVE_TIMESHEET");
   const canViewFinance = user?.permissions?.includes("VIEW_FINANCE_REPORT");
-  const [showReviewedModal, setShowReviewedModal] = useState(false);
 
   return (
     <div className="flex justify-between items-center">
@@ -87,13 +85,6 @@ const TimesheetHeader = () => {
 
         {pathname === "/managerapproval" && (
           <>
-            <Button
-              variant="primary"
-              size="medium"
-              onClick={() => setShowReviewedModal(true)}
-            >
-              Reviewed Logs 
-            </Button>
             {canViewFinance ? (
               <Button
                 variant="secondary"
@@ -147,13 +138,6 @@ const TimesheetHeader = () => {
           </Button>
         )} */}
       </div>
-
-      {pathname === "/managerapproval" && (
-        <ReviewedTimesheetsModal
-          isOpen={showReviewedModal}
-          onClose={() => setShowReviewedModal(false)}
-        />
-      )}
     </div>
   );
 };

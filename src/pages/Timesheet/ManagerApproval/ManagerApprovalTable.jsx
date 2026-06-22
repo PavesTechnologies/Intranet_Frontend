@@ -32,6 +32,10 @@ const ManagerApprovalTable = ({
     useState(false);
   const [approveAll, setApproveAll] = useState(false);
   const [approveAllWeeks, setApproveAllWeeks] = useState(false);
+
+  // 🆕 Remove-confirmation modal (replaces native window.confirm)
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [removeLoading, setRemoveLoading] = useState(false);
   // 🆕 Update User feature hooks — moved here to fix undefined error
   const [isUpdateMode, setIsUpdateMode] = useState(false);
   const [selectedUpdateRecord, setSelectedUpdateRecord] = useState(null);
@@ -690,11 +694,7 @@ const ManagerApprovalTable = ({
   const handleRemoveSelectedUsers = async () => {
     if (selectedUsers.length === 0) return;
 
-    const confirmDelete = window.confirm(
-      `Are you sure you want to remove ${selectedUsers.length} user(s)?`,
-    );
-    if (!confirmDelete) return;
-
+    setRemoveLoading(true);
     try {
       for (const id of selectedUsers) {
         await api.delete(
@@ -707,9 +707,16 @@ const ManagerApprovalTable = ({
       fetchHolidayExcludedUsers();
       setSelectedUsers([]);
       setIsRemoveMode(false); // Exit remove mode after success
+      setShowRemoveConfirm(false); // Close confirmation modal
     } catch (err) {
       console.error("Error removing users:", err);
-      showStatusToast("Error while removing users", "error");
+      const serverMsg =
+        typeof err?.response?.data === "string"
+          ? err.response.data
+          : err?.response?.data?.message;
+      showStatusToast(serverMsg || "Error while removing users", "error");
+    } finally {
+      setRemoveLoading(false);
     }
   };
 
@@ -749,7 +756,11 @@ const ManagerApprovalTable = ({
       setReason("");
     } catch (err) {
       console.error("Error adding holiday exclude user:", err);
-      showStatusToast("Failed to add employee", "error");
+      const serverMsg =
+        typeof err?.response?.data === "string"
+          ? err.response.data
+          : err?.response?.data?.message;
+      showStatusToast(serverMsg || "Failed to add employee", "error");
     }
   };
 
@@ -810,7 +821,11 @@ const ManagerApprovalTable = ({
       setUpdateReason("");
     } catch (err) {
       console.error("Error updating record:", err);
-      showStatusToast("Failed to update employee", "error");
+      const serverMsg =
+        typeof err?.response?.data === "string"
+          ? err.response.data
+          : err?.response?.data?.message;
+      showStatusToast(serverMsg || "Failed to update employee", "error");
     }
   };
 
@@ -1104,11 +1119,7 @@ const ManagerApprovalTable = ({
                     variant="danger"
                     size="small"
                     disabled={selectedUsers.length === 0}
-                    onClick={async () => {
-                      await handleRemoveSelectedUsers();
-                      setIsRemoveMode(false);
-                      setSelectedUsers([]);
-                    }}
+                    onClick={() => setShowRemoveConfirm(true)}
                   >
                     {selectedUsers.length > 0
                       ? `Confirm Remove (${selectedUsers.length})`
@@ -1172,13 +1183,7 @@ const ManagerApprovalTable = ({
                         <Button
                           variant="primary"
                           size="small"
-                          onClick={async () => {
-                            await handleConfirmAddUser();
-                            setShowAddUserSection(false);
-                            setReason("");
-                            setSelectedAddUser("");
-                            setSelectedHoliday("");
-                          }}
+                          onClick={handleConfirmAddUser}
                         >
                           Confirm
                         </Button>
@@ -1257,13 +1262,7 @@ const ManagerApprovalTable = ({
                       variant="primary"
                       size="small"
                       disabled={!updateHoliday || !updateReason.trim()}
-                      onClick={async () => {
-                        await handleConfirmUpdateUser();
-                        setSelectedUpdateRecord(null);
-                        setIsUpdateMode(false);
-                        setUpdateHoliday("");
-                        setUpdateReason("");
-                      }}
+                      onClick={handleConfirmUpdateUser}
                     >
                       Confirm Update
                     </Button>
@@ -1304,6 +1303,17 @@ const ManagerApprovalTable = ({
           </div>
         </div>
       )}
+
+      {/* 🆕 Remove confirmation (Confirm → delete, Cancel → close) */}
+      <ConfirmationModal
+        isOpen={showRemoveConfirm}
+        title="Remove Employee"
+        message={`Are you sure you want to remove ${selectedUsers.length} user(s) from holiday exclusion?`}
+        confirmText="Remove"
+        isLoading={removeLoading}
+        onConfirm={handleRemoveSelectedUsers}
+        onCancel={() => setShowRemoveConfirm(false)}
+      />
     </div>
   );
 };
