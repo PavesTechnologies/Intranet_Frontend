@@ -97,8 +97,15 @@ import CountryEducationMapping from "./pages/employee-onboarding/hr-configuratio
 import DegreeMasterManagement from "./pages/employee-onboarding/hr-configuration/education/degrees/DegreeMasterManagement.jsx";
 
 // import AdminApprovalActions from "./pages/employee-onboarding/admin/AdminApprovalActions.jsx";
-import AdminApprovalDashboard from "./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx";
-import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
+import AdminApprovalDashboard from "./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx";import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
+
+// AI Screening (AIRS)
+import AirsDashboard from "./pages/airs/AirsDashboard.jsx";
+import JdLibrary from "./pages/airs/JdLibrary.jsx";
+import JdCreate from "./pages/airs/JdCreate.jsx";
+import JdDetails from "./pages/airs/JdDetails.jsx";
+import AirsPlaceholder from "./pages/airs/AirsPlaceholder.jsx";
+
 import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
 import HrOnboardingDashboard from "./pages/employee-onboarding/hr/HrOnboardingDashboard.jsx";
 import HrProfileView from "./pages/employee-onboarding/hr/HrProfileView.jsx";
@@ -930,8 +937,90 @@ const AppRoutes = () => {
                 <RoleOffDashboard />
               </ProtectedRoute>
             }
+          />          {/* AI Screening (AIRS) Routes */}
+          <Route
+            path="/airs/dashboard"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsDashboard />
+              </ProtectedRoute>
+            }
           />
+          <Route
+            path="/airs/jds"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <JdLibrary />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/jds/create"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <JdCreate />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/jds/:id"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <JdDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/campaigns"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/resume-intake"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/candidates"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/talent-pool"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/analytics"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/settings"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+
           {/* employee exit routes*/}
+
           <Route element={<EmployeeOnboardingLayout />}>
             <Route path="/employee-exit" element={<EmployeeExitDashboard />} />
             <Route path="/employee-exit/:exit_uuid" element={<ExitDetailsPage />} />
