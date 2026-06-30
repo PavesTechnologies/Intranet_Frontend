@@ -12,7 +12,9 @@ import {
   Handshake,
   UserCog2,
   AlertCircle,
+  Briefcase,
 } from "lucide-react";
+
 import { useAuth } from "../../contexts/AuthContext";
 import { EO_SUBMENU } from "../../config/sidebarConfig";
 import { filterMenuByRole } from "../../utils/sidebarPermissions";
@@ -55,6 +57,18 @@ const resourceManagementSubmenu = [
     to: "/resource-management/bench/utilization-performance",
   },
 ];
+
+const airsSubmenu = [
+  { label: "Dashboard", to: "/airs/dashboard" },
+  { label: "JD Management", to: "/airs/jds" },
+  { label: "Campaigns", to: "/airs/campaigns" },
+  { label: "Resume Intake", to: "/airs/resume-intake" },
+  { label: "Candidates", to: "/airs/candidates" },
+  { label: "Talent Pool", to: "/airs/talent-pool" },
+  { label: "Analytics", to: "/airs/analytics" },
+  { label: "Settings", to: "/airs/settings" },
+];
+
 
 const deliveryManagerResourceManagementSubmenu =
   resourceManagementSubmenu.filter(
@@ -125,6 +139,10 @@ const Sidebar = ({ isCollapsed }) => {
   const [rmHovered, setRmHovered] = useState(false);
   const rmRef = useRef(null);
 
+  // State for AI Screening Hover
+  const [airsHovered, setAirsHovered] = useState(false);
+  const airsRef = useRef(null);
+
   const [submenuTop, setSubmenuTop] = useState(0);
   const hoverTimeout = useRef(null);
   const [childMenu, setChildMenu] = useState(null);
@@ -137,8 +155,10 @@ const Sidebar = ({ isCollapsed }) => {
     setUserHovered(false);
     setRmHovered(false);
     setEoHovered(false);
+    setAirsHovered(false);
     setChildMenu(null);
   };
+
 
   // --- Handlers for User Management ---
   const handleUserMouseEnter = () => {
@@ -229,6 +249,23 @@ const Sidebar = ({ isCollapsed }) => {
     }, 200);
   };
 
+  // --- Handlers for AI Screening ---
+  const handleAirsMouseEnter = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    closeAllSubmenus();
+    if (airsRef.current) {
+      const rect = airsRef.current.getBoundingClientRect();
+      setSubmenuTop(rect.top);
+    }
+    setAirsHovered(true);
+  };
+
+  const handleAirsMouseLeave = () => {
+    hoverTimeout.current = setTimeout(() => {
+      setAirsHovered(false);
+    }, 200);
+  };
+
   const resourceManagementItems = isAdmin
     ? resourceManagementSubmenu
     : isDM
@@ -239,7 +276,9 @@ const Sidebar = ({ isCollapsed }) => {
     setUserHovered(false);
     setRmHovered(false);
     setEoHovered(false);
+    setAirsHovered(false);
   }, [location.pathname]);
+
 
   return (
     <aside
@@ -555,7 +594,68 @@ const Sidebar = ({ isCollapsed }) => {
             </li>
           )}
 
+          {/* AI Screening (AIRS) Menu */}
+          {isGeneral && (
+            <li
+              ref={airsRef}
+              className="relative"
+              onMouseEnter={handleAirsMouseEnter}
+              onMouseLeave={handleAirsMouseLeave}
+            >
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${
+                  location.pathname.startsWith("/airs")
+                    ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                    : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                }`}
+                title={isCollapsed ? "AI Screening" : ""}
+              >
+                <Briefcase className="h-5 w-5 shrink-0" />
+
+                {!isCollapsed && (
+                  <>
+                    <span className="flex-1">AI Screening</span>
+                    <ChevronRight
+                      className={`h-4 w-4 transition-all duration-300 ${
+                        airsHovered ? "translate-x-1" : ""
+                      }`}
+                    />
+                  </>
+                )}
+              </div>
+
+              {airsHovered && (
+                <ul
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${
+                    isCollapsed ? "left-20" : "left-64"
+                  }`}
+                  style={{ top: `${submenuTop}px` }}
+                  onMouseEnter={handleAirsMouseEnter}
+                  onMouseLeave={handleAirsMouseLeave}
+                >
+                  {airsSubmenu.map((item) => (
+                    <li key={item.label} className="group relative">
+                      <NavLink
+                        to={item.to}
+                        className={({ isActive }) =>
+                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${
+                            isActive
+                              ? "bg-blue-100 text-[#0a174e] font-semibold"
+                              : "hover:bg-[#263383] hover:text-white"
+                          }`
+                        }
+                      >
+                        <span>{item.label}</span>
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          )}
+
           {/* 5. Remaining Items (Leave, Timesheets, Calendar) */}
+
           {filteredNavigation.slice(1).map((item) => {
             const isActive = location.pathname === item.href;
             return (
