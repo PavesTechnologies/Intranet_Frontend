@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAirsStore } from "./airsStore";
+import { getJDById, updateJDById } from "../service/jdservice";
 import {
   FileText,
   FileUp,
@@ -22,7 +23,9 @@ import toast from "react-hot-toast";
 export default function JdCreate() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { jds, addJd, addJdVersion } = useAirsStore();
+  const { jds, addJd, addJdVersion, updateJd } = useAirsStore();
+  const editId = searchParams.get("edit");
+  const isEditMode = !!editId;
 
   // URL trigger check (e.g. ?input=paste or ?input=upload)
   const initialInputMode = searchParams.get("input") === "upload" ? "upload" : "paste";
@@ -37,6 +40,73 @@ export default function JdCreate() {
   const [experience, setExperience] = useState("3-5 years");
   const [education, setEducation] = useState("Bachelor's Degree");
   const [rawText, setRawText] = useState("");
+
+  useEffect(() => {
+    if (editId) {
+      const fetchJd = async () => {
+        try {
+          const data = await getJDById(editId);
+          if (data) {
+            setTitle(data.title || "");
+            setJurisdiction(data.jurisdiction || "India");
+            
+            // Experience mapping
+            let exp = data.experience;
+            if (!exp && data.min_experience_years !== null && data.min_experience_years !== undefined) {
+              if (data.min_experience_years <= 3) exp = "1-3 years";
+              else if (data.min_experience_years <= 5) exp = "3-5 years";
+              else if (data.min_experience_years <= 8) exp = "5-8 years";
+              else exp = "8+ years";
+            }
+            setExperience(exp || "3-5 years");
+
+            // Education mapping
+            let edu = data.education;
+            if (!edu && data.education_criteria) {
+              const degree = data.education_criteria.degree || "";
+              if (degree.toLowerCase().includes("master")) edu = "Master's Degree";
+              else if (degree.toLowerCase().includes("phd") || degree.toLowerCase().includes("doctor")) edu = "PhD";
+              else edu = "Bachelor's Degree";
+            }
+            setEducation(edu || "Bachelor's Degree");
+            setRawText(data.rawText || data.raw_text || "");
+
+            setDetectedExp(exp || "3-5 years");
+            setDetectedEdu(edu || "Bachelor's Degree");
+
+            // Map skills
+            const rawSkills = data.skills || data.parsed_skills || data.required_skills || [];
+            const mappedSkills = rawSkills.map(sk => {
+              if (typeof sk === "string") {
+                return {
+                  name: sk,
+                  mandatory: false,
+                  verified: true,
+                  weight: 15,
+                  confidence: 90,
+                  mappedTo: sk,
+                  mappingType: "Alias"
+                };
+              }
+              return {
+                name: sk.name || sk.skill_name || sk.skill || "",
+                mandatory: sk.mandatory || sk.is_mandatory || false,
+                verified: sk.verified !== undefined ? sk.verified : true,
+                weight: sk.weight !== undefined ? sk.weight : 15,
+                confidence: sk.confidence !== undefined ? sk.confidence : 90,
+                mappedTo: sk.mappedTo || sk.mapped_to || sk.name || sk.skill || "",
+                mappingType: sk.mappingType || sk.mapping_type || "Alias"
+              };
+            });
+            setExtractedSkills(mappedSkills);
+          }
+        } catch (err) {
+          toast.error("Failed to load Job Description details for editing.");
+        }
+      };
+      fetchJd();
+    }
+  }, [editId]);
 
   // Upload Fields State
   const [dragActive, setDragActive] = useState(false);
@@ -60,19 +130,19 @@ export default function JdCreate() {
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
 
   // Set default initial values for text paste for demo help
-  const handlePreFill = (roleType) => {
-    if (roleType === "react") {
-      setTitle("Senior React & Frontend Engineer");
-      setRawText("We are hiring a Senior React Developer to join our UI team. Required skills include ReactJS, TypeScript, NodeJS, TailwindCSS, CSS3, and Git. The ideal candidate will have 4 years of frontend development experience and a Bachelor's degree.");
-      setExperience("3-5 years");
-      setEducation("Bachelor's Degree");
-    } else if (roleType === "java") {
-      setTitle("Java Spring Boot Platform Lead");
-      setRawText("Looking for a Java Lead Developer to build high scalability APIs. Technologies needed: Java, Spring Boot, Microservices, Kubernetes, PostgreSQL, AWS, and Git. Requires a Master's degree in CS and 6 years in backend systems.");
-      setExperience("5-8 years");
-      setEducation("Master's Degree");
-    }
-  };
+  // const handlePreFill = (roleType) => {
+  //   if (roleType === "react") {
+  //     setTitle("Senior React & Frontend Engineer");
+  //     setRawText("We are hiring a Senior React Developer to join our UI team. Required skills include ReactJS, TypeScript, NodeJS, TailwindCSS, CSS3, and Git. The ideal candidate will have 4 years of frontend development experience and a Bachelor's degree.");
+  //     setExperience("3-5 years");
+  //     setEducation("Bachelor's Degree");
+  //   } else if (roleType === "java") {
+  //     setTitle("Java Spring Boot Platform Lead");
+  //     setRawText("Looking for a Java Lead Developer to build high scalability APIs. Technologies needed: Java, Spring Boot, Microservices, Kubernetes, PostgreSQL, AWS, and Git. Requires a Master's degree in CS and 6 years in backend systems.");
+  //     setExperience("5-8 years");
+  //     setEducation("Master's Degree");
+  //   }
+  // };
 
   // Drag and Drop handlers
   const handleDrag = (e) => {
@@ -188,15 +258,17 @@ export default function JdCreate() {
         return;
       }
       
-      // Perform duplicate check
-      const duplicate = jds.find(
-        (j) => j.title.toLowerCase().trim() === title.toLowerCase().trim() && j.status !== "Closed"
-      );
-      
-      if (duplicate) {
-        setDuplicateJd(duplicate);
-        setDuplicateModalOpen(true);
-        return;
+      if (!isEditMode) {
+        // Perform duplicate check
+        const duplicate = jds.find(
+          (j) => j.title.toLowerCase().trim() === title.toLowerCase().trim() && j.status !== "Closed"
+        );
+        
+        if (duplicate) {
+          setDuplicateJd(duplicate);
+          setDuplicateModalOpen(true);
+          return;
+        }
       }
       
       // Run parser animation on text
@@ -252,7 +324,57 @@ export default function JdCreate() {
   };
 
   // Step 3 Submission
-  const handleFinalSubmit = () => {
+  const parseMinExperience = (expStr) => {
+    if (!expStr) return 3;
+    if (expStr.includes("1-3")) return 1;
+    if (expStr.includes("3-5")) return 3;
+    if (expStr.includes("5-8")) return 5;
+    if (expStr.includes("8+")) return 8;
+    return 3;
+  };
+
+  const getEducationCriteria = (eduStr) => {
+    if (!eduStr) return { degree: "Bachelor's Degree", field: "Computer Science" };
+    if (eduStr.includes("Master")) return { degree: "Master's Degree", field: "Computer Science" };
+    if (eduStr.includes("PhD")) return { degree: "PhD", field: "Computer Science" };
+    return { degree: "Bachelor's Degree", field: "Computer Science" };
+  };
+
+  const handleFinalSubmit = async () => {
+    if (isEditMode) {
+      const updatedFieldsStore = {
+        title,
+        jurisdiction,
+        experience: detectedExp,
+        education: detectedEdu,
+        skills: extractedSkills,
+        mandatorySkills: extractedSkills.filter(s => s.mandatory).map(s => s.name),
+        rawText
+      };
+
+      const updatedFieldsBackend = {
+        title,
+        raw_text: rawText,
+        jurisdiction,
+        parsed_skills: extractedSkills,
+        required_skills: extractedSkills.filter(s => s.mandatory).map(s => s.name),
+        min_experience_years: parseMinExperience(detectedExp),
+        education_criteria: getEducationCriteria(detectedEdu),
+        source_format: inputMode === "paste" ? "TEXT" : "PDF",
+        is_active_version: true
+      };
+
+      try {
+        await updateJDById(editId, updatedFieldsBackend);
+        updateJd(editId, updatedFieldsStore);
+        toast.success(`Job Description updated successfully!`);
+        navigate("/airs/jds");
+      } catch (err) {
+        toast.error("Failed to save changes to the database.");
+      }
+      return;
+    }
+
     const newJdId = `JD-${String(jds.length + 1).padStart(4, "0")}`;
     const newJdObj = {
       id: newJdId,
@@ -296,7 +418,7 @@ export default function JdCreate() {
 
       {/* Stepper Header */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mb-6 flex justify-between items-center">
-        <h1 className="text-lg font-bold">Create Job Description</h1>
+        <h1 className="text-lg font-bold">{isEditMode ? "Edit Job Description" : "Create Job Description"}</h1>
         
         {/* Stepper indicators */}
         <div className="flex items-center gap-2">
@@ -358,7 +480,7 @@ export default function JdCreate() {
           {/* Paste Text Form */}
           {inputMode === "paste" && (
             <form onSubmit={handleSubmitInputStep} className="space-y-4">
-              <div className="flex justify-between items-center bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs">
+              {/* <div className="flex justify-between items-center bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs">
                 <span className="text-blue-800 font-semibold flex items-center gap-1.5">
                   <Sparkles className="h-4 w-4" /> Quick Demo Autocomplete:
                 </span>
@@ -378,7 +500,7 @@ export default function JdCreate() {
                     Java Spring Lead
                   </button>
                 </div>
-              </div>
+              </div> */}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -450,7 +572,7 @@ export default function JdCreate() {
               </div>
 
               {/* Toggle parsing failure simulation */}
-              <div className="flex items-center gap-2 border-t border-slate-150 pt-4">
+              {/* <div className="flex items-center gap-2 border-t border-slate-150 pt-4">
                 <input
                   type="checkbox"
                   id="fail-toggle"
@@ -461,7 +583,7 @@ export default function JdCreate() {
                 <label htmlFor="fail-toggle" className="text-xs font-semibold text-slate-600 cursor-pointer">
                   Simulate parser crash (Parse Failure State)
                 </label>
-              </div>
+              </div> */}
 
               <div className="flex justify-end gap-3 pt-2">
                 <button
@@ -475,7 +597,7 @@ export default function JdCreate() {
                   type="submit"
                   className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-xs font-bold transition shadow-sm"
                 >
-                  Create JD & Parse <ArrowRight className="h-4 w-4" />
+                  {isEditMode ? "Update JD & Parse" : "Create JD & Parse"} <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
             </form>
@@ -855,7 +977,7 @@ export default function JdCreate() {
               onClick={handleFinalSubmit}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5 py-2 text-xs font-bold transition shadow-sm"
             >
-              Submit & Add to Library
+              {isEditMode ? "Update & Save to Library" : "Submit & Add to Library"}
             </button>
           </div>
         </div>
