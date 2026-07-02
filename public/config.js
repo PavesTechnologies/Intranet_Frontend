@@ -8,6 +8,7 @@ window.__APP_CONFIG__ = {
     MSOffice_USER_MANAGEMENT_URL: "https://d15j2ej3bear0q.cloudfront.net/ums",
     // EMPLOYEE_ONBOARDING_URL: "http://localhost:8001/ems",
     EMPLOYEE_ONBOARDING_URL: "https://d15j2ej3bear0q.cloudfront.net/ems",
-    RMS_BASE_URL: "https://d15j2ej3bear0q.cloudfront.net/rms"
+    RMS_BASE_URL: "https://d15j2ej3bear0q.cloudfront.net/rms",
+    AIRS_BASE_URL : "http://127.0.0.1:8000",
     //RMS_BASE_URL: "http://localhost:8080/rms"
 };
