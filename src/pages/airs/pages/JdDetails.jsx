@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAirsStore } from "./airsStore";
+import { getJDById } from "../service/jdservice";
 import {
   ArrowLeft,
   Briefcase,
@@ -24,7 +25,8 @@ import {
   X,
   UserPlus
 } from "lucide-react";
-import toast from "react-hot-toast";
+import { toast } from "react-toastify";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 export default function JdDetails() {
   const { id } = useParams();
@@ -32,6 +34,26 @@ export default function JdDetails() {
   const { jds, campaigns, updateJd, restoreJdVersion, linkCampaignToJd, addCampaign } = useAirsStore();
 
   const jd = jds.find((j) => j.id === id);
+
+  const [jdDetail, setJdDetail] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchJd = async () => {
+      setIsLoading(true);
+      try {
+        const data = await getJDById(id);
+        if (data) {
+          setJdDetail(data);
+        }
+      } catch (err) {
+        toast.error("Failed to load job description from server.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchJd();
+  }, [id]);
 
   // Tabs: overview, skills, campaigns, versions, audit
   const [activeTab, setActiveTab] = useState("overview");
@@ -52,7 +74,17 @@ export default function JdDetails() {
   const [newCampaignName, setNewCampaignName] = useState("");
   const [selectedExistingCampaignId, setSelectedExistingCampaignId] = useState("");
 
-  if (!jd) {
+  if (isLoading) {
+    return (
+      <div className="text-center min-h-screen flex flex-col justify-center items-center">
+        <LoadingSpinner text="Job Description details..."></LoadingSpinner>
+      </div>
+    );
+  }
+
+  const currentJd = jdDetail || jd;
+
+  if (!currentJd) {
     return (
       <div className="p-8 text-center bg-[#F8FAFC] min-h-screen flex flex-col justify-center items-center">
         <AlertTriangle className="h-12 w-12 text-rose-500 mb-4" />
@@ -65,46 +97,92 @@ export default function JdDetails() {
     );
   }
 
+  const version = currentJd.version || currentJd.version_number || 1;
+  const title = currentJd.title || "";
+  const rawText = currentJd.rawText || currentJd.raw_text || "";
+  const jurisdiction = currentJd.jurisdiction || "";
+  const experience = currentJd.experience || (currentJd.min_experience_years !== null && currentJd.min_experience_years !== undefined ? `${currentJd.min_experience_years} years` : "Not Specified");
+  const education = currentJd.education || (currentJd.education_criteria ? `${currentJd.education_criteria.degree || ""} in ${currentJd.education_criteria.field || ""}` : "Not Specified");
+  const source = currentJd.source || (currentJd.source_format === "TEXT" ? "Manual" : currentJd.source_format === "PDF" ? "PDF Upload" : currentJd.source_format === "DOCX" ? "DOCX Upload" : currentJd.source_format || "Manual");
+  const status = currentJd.status || (currentJd.is_active_version ? "Ready" : "Closed");
+  const createdBy = currentJd.createdBy || currentJd.created_by || "System";
+  const createdDate = currentJd.createdDate || (currentJd.created_at ? currentJd.created_at.split('T')[0] : "");
+  const updatedDate = currentJd.updatedDate || (currentJd.updated_at ? currentJd.updated_at.split('T')[0] : createdDate);
+  const confidence = currentJd.confidence !== undefined ? currentJd.confidence : 95;
+  const campaignCount = currentJd.campaignCount !== undefined ? currentJd.campaignCount : 0;
+
+  // Skills mapper
+  const skillsList = (() => {
+    if (currentJd.skills) return currentJd.skills;
+    const rawSkills = currentJd.parsed_skills || currentJd.required_skills || [];
+    return rawSkills.map((sk) => {
+      if (typeof sk === "string") {
+        return {
+          name: sk,
+          mandatory: false,
+          verified: true,
+          weight: 15,
+          confidence: 90,
+          mappedTo: sk,
+          mappingType: "Alias"
+        };
+      }
+      return {
+        name: sk.name || sk.skill_name || sk.skill || "",
+        mandatory: sk.mandatory || sk.is_mandatory || false,
+        verified: sk.verified !== undefined ? sk.verified : true,
+        weight: sk.weight !== undefined ? sk.weight : 15,
+        confidence: sk.confidence !== undefined ? sk.confidence : 90,
+        mappedTo: sk.mappedTo || sk.mapped_to || sk.name || sk.skill || "",
+        mappingType: sk.mappingType || sk.mapping_type || "Alias"
+      };
+    });
+  })();
+
   // --- Skills Tab Handlers ---
   const handleToggleVerifySkill = (index) => {
-    const updatedSkills = [...jd.skills];
+    const updatedSkills = [...skillsList];
     updatedSkills[index].verified = !updatedSkills[index].verified;
-    updateJd(jd.id, { skills: updatedSkills });
+    setJdDetail(prev => ({ ...prev, skills: updatedSkills }));
+    updateJd(id, { skills: updatedSkills });
     toast.success(`Skill '${updatedSkills[index].name}' verification status toggled.`);
   };
 
   const handleDeleteSkill = (index) => {
-    const updatedSkills = jd.skills.filter((_, idx) => idx !== index);
-    updateJd(jd.id, { skills: updatedSkills });
+    const updatedSkills = skillsList.filter((_, idx) => idx !== index);
+    setJdDetail(prev => ({ ...prev, skills: updatedSkills }));
+    updateJd(id, { skills: updatedSkills });
     toast.success("Skill removed from JD profile.");
   };
 
   const handleEditSkillStart = (index) => {
     setEditingSkillIdx(index);
-    setEditedSkillWeight(jd.skills[index].weight);
-    setEditedSkillConfidence(jd.skills[index].confidence);
+    setEditedSkillWeight(skillsList[index].weight);
+    setEditedSkillConfidence(skillsList[index].confidence);
   };
 
   const handleEditSkillSave = (index) => {
-    const updatedSkills = [...jd.skills];
+    const updatedSkills = [...skillsList];
     updatedSkills[index].weight = Number(editedSkillWeight);
     updatedSkills[index].confidence = Number(editedSkillConfidence);
-    updateJd(jd.id, { skills: updatedSkills });
+    setJdDetail(prev => ({ ...prev, skills: updatedSkills }));
+    updateJd(id, { skills: updatedSkills });
     setEditingSkillIdx(null);
     toast.success("Skill parameters updated successfully.");
   };
 
   const handleReplaceSkill = (index) => {
-    const newName = prompt("Replace skill with standard canonical name:", jd.skills[index].name);
+    const newName = prompt("Replace skill with standard canonical name:", skillsList[index].name);
     if (!newName) return;
-    
-    const updatedSkills = [...jd.skills];
+
+    const updatedSkills = [...skillsList];
     updatedSkills[index].name = newName;
     updatedSkills[index].mappedTo = newName;
     updatedSkills[index].verified = true;
     updatedSkills[index].mappingType = "Alias";
-    
-    updateJd(jd.id, { skills: updatedSkills });
+
+    setJdDetail(prev => ({ ...prev, skills: updatedSkills }));
+    updateJd(id, { skills: updatedSkills });
     toast.success(`Replaced with canonical: ${newName}`);
   };
 
@@ -117,6 +195,8 @@ export default function JdDetails() {
       }
       setCampaignLinkStep(2);
     } else if (campaignLinkStep === 2) {
+      const nextCount = campaignCount + 1;
+      setJdDetail(prev => ({ ...prev, campaignCount: nextCount }));
       if (newCampaignName) {
         const newCmpId = `CMP-${String(campaigns.length + 1).padStart(3, "0")}`;
         addCampaign({
@@ -126,9 +206,9 @@ export default function JdDetails() {
           candidates: 0,
           createdDate: new Date().toISOString().split("T")[0]
         });
-        linkCampaignToJd(jd.id, newCmpId);
+        linkCampaignToJd(id, newCmpId);
       } else {
-        linkCampaignToJd(jd.id, selectedExistingCampaignId);
+        linkCampaignToJd(id, selectedExistingCampaignId);
       }
       setCampaignLinkStep(3);
     }
@@ -138,7 +218,7 @@ export default function JdDetails() {
   const getDiffText = (oldText, newText) => {
     const oldLines = oldText.split("\n");
     const newLines = newText.split("\n");
-    
+
     // Simplistic diff render for prototype showing green/red lines
     return (
       <div className="grid grid-cols-2 gap-4 text-xs font-mono h-[350px] overflow-y-auto border rounded-lg bg-slate-50 p-4">
@@ -172,39 +252,42 @@ export default function JdDetails() {
 
   const handleRestoreConfirm = () => {
     if (restoreConfirmVersion) {
-      restoreJdVersion(jd.id, restoreConfirmVersion);
+      restoreJdVersion(id, restoreConfirmVersion);
       toast.success(`Successfully rolled back JD to version ${restoreConfirmVersion}`);
       setRestoreConfirmVersion(null);
+      const restored = jds.find(j => j.id === id);
+      if (restored) {
+        setJdDetail(restored);
+      }
     }
   };
 
   // Readiness checklist check
-  const isJdReady = jd.skills.length > 0 && jd.skills.every((s) => s.verified);
+  const isJdReady = skillsList.length > 0 && skillsList.every((s) => s.verified);
 
   return (
-    <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans max-w-5xl mx-auto">
-      {/* Back to Library */}
-      <button
-        onClick={() => navigate("/airs/jds")}
-        className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition mb-6"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to JD Library
-      </button>
+    <div className="bg-[#F8FAFC] text-slate-900 font-sans">
 
       {/* Profile Header */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold font-mono">
-            <span>{jd.id}</span>
-            <span>•</span>
-            <span>Version {jd.version}</span>
-            <span>•</span>
-            <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 uppercase text-[9px] font-bold">
-              AI confidence {jd.confidence}%
-            </span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold font-mono">
+              <span>Version {version}</span>
+              <span>•</span>
+              <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 uppercase text-[9px] font-bold">
+                AI confidence {confidence}%
+              </span>
+            </div>
+            <h1 className="text-xl font-bold text-slate-900 mt-1">{title}</h1>
+            <p className="text-xs text-slate-500 mt-0.5">Created by {createdBy} on {createdDate}</p>
           </div>
-          <h1 className="text-xl font-bold text-slate-900 mt-1">{jd.title}</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Created by {jd.createdBy} on {jd.createdDate}</p>
         </div>
 
         {/* Readiness Checklist Status Indicator */}
@@ -243,7 +326,7 @@ export default function JdDetails() {
           { id: "skills", label: "Skills Taxonomy", icon: Sparkles },
           { id: "campaigns", label: "Campaigns", icon: Briefcase },
           { id: "versions", label: "Version History", icon: History },
-          { id: "audit", label: "Audit Log", icon: Activity }
+          // { id: "audit", label: "Audit Log", icon: Activity }
         ].map((t) => (
           <button
             key={t.id}
@@ -251,11 +334,10 @@ export default function JdDetails() {
               setActiveTab(t.id);
               setCompareMode(false);
             }}
-            className={`flex items-center gap-2 pb-3 text-xs font-bold border-b-2 transition ${
-              activeTab === t.id
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-slate-400 hover:text-slate-600"
-            }`}
+            className={`flex items-center gap-2 pb-3 text-xs font-bold border-b-2 transition ${activeTab === t.id
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-400 hover:text-slate-600"
+              }`}
           >
             <t.icon className="h-4 w-4" /> {t.label}
           </button>
@@ -270,7 +352,7 @@ export default function JdDetails() {
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
               <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-3">Extracted Raw Text</h3>
               <div className="max-h-[350px] overflow-y-auto border border-slate-100 rounded-lg p-4 bg-slate-50 font-mono text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
-                {jd.rawText}
+                {rawText}
               </div>
             </div>
           </div>
@@ -278,28 +360,28 @@ export default function JdDetails() {
           {/* Quick stats side panel */}
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4 h-fit">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest border-b pb-2 mb-2">JD Specifications</h3>
-            
+
             <div className="space-y-3">
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Jurisdiction (Region)</span>
-                <span className="text-xs font-bold text-slate-800">{jd.jurisdiction}</span>
+                <span className="text-xs font-bold text-slate-800">{jurisdiction}</span>
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Experience Requirement</span>
-                <span className="text-xs font-bold text-slate-800">{jd.experience}</span>
+                <span className="text-xs font-bold text-slate-800">{experience}</span>
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Education Minimum</span>
-                <span className="text-xs font-bold text-slate-800">{jd.education}</span>
+                <span className="text-xs font-bold text-slate-800">{education}</span>
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">System Source</span>
-                <span className="text-xs font-bold text-slate-800">{jd.source}</span>
+                <span className="text-xs font-bold text-slate-800">{source}</span>
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Status</span>
                 <span className="inline-block mt-0.5 bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded text-[10px] border border-blue-100">
-                  {jd.status}
+                  {status}
                 </span>
               </div>
             </div>
@@ -320,10 +402,11 @@ export default function JdDetails() {
                 const newSkill = prompt("Add skill to this JD profile:");
                 if (!newSkill) return;
                 const updated = [
-                  ...jd.skills,
+                  ...skillsList,
                   { name: newSkill, mandatory: false, verified: true, weight: 15, confidence: 95, mappedTo: newSkill, mappingType: "Alias" }
                 ];
-                updateJd(jd.id, { skills: updated });
+                setJdDetail(prev => ({ ...prev, skills: updated }));
+                updateJd(id, { skills: updated });
                 toast.success(`Skill '${newSkill}' added.`);
               }}
               className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-2.5 py-1.5 text-xs font-bold transition shadow-sm"
@@ -346,7 +429,7 @@ export default function JdDetails() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-150 font-medium">
-              {jd.skills.map((sk, idx) => (
+              {skillsList.map((sk, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/50 transition">
                   <td className="px-6 py-4 font-bold text-slate-900">{sk.name}</td>
                   <td className="px-6 py-4 text-slate-500 italic flex items-center gap-1">
@@ -375,9 +458,10 @@ export default function JdDetails() {
                       type="checkbox"
                       checked={sk.mandatory}
                       onChange={() => {
-                        const updated = [...jd.skills];
+                        const updated = [...skillsList];
                         updated[idx].mandatory = !updated[idx].mandatory;
-                        updateJd(jd.id, { skills: updated });
+                        setJdDetail(prev => ({ ...prev, skills: updated }));
+                        updateJd(id, { skills: updated });
                       }}
                       className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                     />
@@ -407,9 +491,8 @@ export default function JdDetails() {
                     )}
                     <button
                       onClick={() => handleToggleVerifySkill(idx)}
-                      className={`px-2 py-1 rounded text-[10px] font-bold transition ${
-                        sk.verified ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      }`}
+                      className={`px-2 py-1 rounded text-[10px] font-bold transition ${sk.verified ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                        }`}
                     >
                       {sk.verified ? "Revert Verify" : "Verify"}
                     </button>
@@ -464,14 +547,14 @@ export default function JdDetails() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-150 font-medium">
-              {jd.campaignCount === 0 ? (
+              {campaignCount === 0 ? (
                 <tr>
                   <td colSpan="4" className="px-6 py-8 text-center text-slate-400 italic">
                     No campaigns linked to this JD. Click 'Initiate Campaign' to map a recruiter pipeline.
                   </td>
                 </tr>
               ) : (
-                campaigns.slice(0, jd.campaignCount).map((c, idx) => (
+                campaigns.slice(0, campaignCount).map((c, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/50 transition">
                     <td className="px-6 py-4 font-bold text-slate-900">{c.name}</td>
                     <td className="px-6 py-4">
@@ -508,8 +591,8 @@ export default function JdDetails() {
 
               {/* Print Diff side-by-side */}
               {getDiffText(
-                jd.history.find(h => h.version === Number(compareVersionNumber))?.rawText || "",
-                jd.rawText
+                historyList.find(h => h.version === Number(compareVersionNumber))?.rawText || "",
+                rawText
               )}
             </div>
           ) : (
@@ -517,7 +600,7 @@ export default function JdDetails() {
               {/* Timeline list */}
               <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest border-b pb-2 mb-4">Timelined Revisions</h3>
-                
+
                 <div className="space-y-6 relative border-l border-slate-200 pl-6 ml-3">
                   {/* Current Active */}
                   <div className="relative">
@@ -526,23 +609,23 @@ export default function JdDetails() {
                     </span>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="text-xs font-bold text-slate-900">Version {jd.version} (Active)</h4>
+                        <h4 className="text-xs font-bold text-slate-900">Version {version} (Active)</h4>
                         <span className="bg-blue-100 text-blue-800 text-[9px] font-bold px-1.5 rounded">Current</span>
                       </div>
-                      <p className="text-[10px] text-slate-500 mt-1">Updated on {jd.updatedDate || jd.createdDate} by Current User</p>
-                      <p className="text-xs text-slate-700 mt-1.5">Active structure configured with {jd.skills.length} taxonomy skill filters.</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Updated on {updatedDate || createdDate} by Current User</p>
+                      <p className="text-xs text-slate-700 mt-1.5">Active structure configured with {skillsList.length} taxonomy skill filters.</p>
                     </div>
                   </div>
 
                   {/* Previous versions */}
-                  {jd.history && jd.history.map((hist, idx) => (
+                  {historyList && historyList.map((hist, idx) => (
                     <div key={idx} className="relative">
                       <span className="absolute -left-[30px] top-1 w-4 h-4 rounded-full border-2 border-slate-350 bg-white flex items-center justify-center" />
                       <div>
                         <h4 className="text-xs font-bold text-slate-700">Version {hist.version}</h4>
                         <p className="text-[10px] text-slate-500 mt-1">Updated on {hist.updatedDate} by {hist.updatedBy}</p>
                         <p className="text-xs text-slate-500 mt-1.5 italic">"{hist.changesSummary}"</p>
-                        
+
                         <div className="flex gap-2.5 mt-3">
                           <button
                             onClick={() => {
@@ -569,10 +652,10 @@ export default function JdDetails() {
               {/* Lineage Tree card */}
               <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col h-fit">
                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest border-b pb-2 mb-4">Lineage Branch Tree</h3>
-                
+
                 {/* Vertical tree representation using basic CSS borders */}
                 <div className="flex flex-col items-center py-4 space-y-4">
-                  {jd.history && jd.history.map((h, i) => (
+                  {historyList && historyList.map((h, i) => (
                     <React.Fragment key={i}>
                       <div className="w-24 border border-slate-200 rounded-lg p-2 text-center bg-slate-50 shadow-sm">
                         <span className="text-[9px] uppercase font-bold text-slate-400 block">Rev v{h.version}</span>
@@ -581,10 +664,10 @@ export default function JdDetails() {
                       <div className="h-4 border-l-2 border-dashed border-slate-300" />
                     </React.Fragment>
                   ))}
-                  
+
                   {/* Current version node */}
                   <div className="w-28 border-2 border-blue-600 rounded-lg p-2.5 text-center bg-blue-50/50 shadow-md">
-                    <span className="text-[9px] uppercase font-bold text-blue-600 block">Rev v{jd.version}</span>
+                    <span className="text-[9px] uppercase font-bold text-blue-600 block">Rev v{version}</span>
                     <span className="text-[10px] font-black text-blue-900">Active Node</span>
                   </div>
                 </div>
@@ -595,10 +678,10 @@ export default function JdDetails() {
       )}
 
       {/* --- AUDIT TIMELINE TAB --- */}
-      {activeTab === "audit" && (
+      {/* {activeTab === "audit" && (
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
           <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest border-b pb-2 mb-6">Historical Audit Timeline</h3>
-          
+
           <div className="space-y-6 relative border-l border-slate-200 pl-6 ml-4">
             {jd.auditTimeline && jd.auditTimeline.map((item, idx) => (
               <div key={idx} className="relative">
@@ -617,7 +700,7 @@ export default function JdDetails() {
             ))}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* dialog overlays */}
 
@@ -693,11 +776,11 @@ export default function JdDetails() {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-400 font-medium">Linked JD:</span>
-                    <span className="font-bold text-slate-800">{jd.title}</span>
+                    <span className="font-bold text-slate-800">{title}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-400 font-medium">Mandatory Skill Nodes:</span>
-                    <span className="font-bold text-slate-850">{jd.skills.filter(s => s.mandatory).map(s => s.name).join(", ")}</span>
+                    <span className="font-bold text-slate-850">{skillsList.filter(s => s.mandatory).map(s => s.name).join(", ")}</span>
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-400 italic leading-snug">
@@ -759,9 +842,9 @@ export default function JdDetails() {
               <div className="p-2 bg-amber-50 rounded-full"><AlertTriangle className="h-5 w-5" /></div>
               <h3 className="text-sm font-bold text-slate-900">Rollback Confirmation</h3>
             </div>
-            
+
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-              Are you sure you want to rollback back to <span className="font-bold text-slate-800">Version {restoreConfirmVersion}</span>? 
+              Are you sure you want to rollback back to <span className="font-bold text-slate-800">Version {restoreConfirmVersion}</span>?
               This will overwrite the active JD text and matching skills taxonomy, creating a backup history point of your current state.
             </p>
 
