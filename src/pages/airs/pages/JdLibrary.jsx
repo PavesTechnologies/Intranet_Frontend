@@ -29,6 +29,7 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 import { Badge } from "../../../components/ui/badge";
 import GenericTable from "../../../components/Table/table";
 import { deleteJDById } from "../service/jdservice";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const statusOptions = [
   { label: "All Statuses", value: "All" },
@@ -127,7 +128,8 @@ export default function JdLibrary() {
         order: sortOrder,
       };
 
-      const data = await getAllJDs(params);
+      const res = await getAllJDs(params);
+      const data = res.data
       if (data) {
         setJdsList(data.items || []);
         setTotalItems(data.total || 0);
@@ -451,7 +453,10 @@ export default function JdLibrary() {
 
       {/* Table Card */}
       <div className="overflow-x-auto mb-6">
-        {paginatedJds.length === 0 ? (
+        {isLoading ? 
+          <div className="h-40 flex items-center justify-center">
+            <LoadingSpinner text="Loading JDs..."></LoadingSpinner>
+          </div> : paginatedJds.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">
             <Archive className="h-10 w-10 mx-auto stroke-1 mb-2" />
             No Job Descriptions found matching the criteria.
