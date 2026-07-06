@@ -4,7 +4,11 @@ const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
 export const getAllJDs = async (params) => {
     try {
-        const response = await api.get(`${BASE_URL}/api/v1/job-descriptions`, { params });
+        const response = await api.get(`${BASE_URL}/airs/job-descriptions`, {
+            params, headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
         return response.data;
     } catch (error) {
         console.error("Error fetching JDs:", error);
@@ -14,7 +18,11 @@ export const getAllJDs = async (params) => {
 
 export const getJDById = async (jdId) => {
     try {
-        const response = await api.get(`${BASE_URL}/api/v1/job-descriptions/${jdId}`);
+        const response = await api.get(`${BASE_URL}/airs/job-descriptions/${jdId}`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
         return response.data;
     } catch (error) {
         console.error("Error fetching JD:", error);
@@ -24,7 +32,11 @@ export const getJDById = async (jdId) => {
 
 export const deleteJDById = async (jdId) => {
     try {
-        const response = await api.delete(`${BASE_URL}/api/v1/job-descriptions/${jdId}`);
+        const response = await api.delete(`${BASE_URL}/airs/job-descriptions/${jdId}`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
         return response.data;
     } catch (error) {
         console.error("Error deleting JD: ", error);
@@ -34,7 +46,11 @@ export const deleteJDById = async (jdId) => {
 
 export const updateJDById = async (jdId, updatedData) => {
     try {
-        const response = await api.put(`${BASE_URL}/api/v1/job-descriptions/${jdId}`, updatedData);
+        const response = await api.put(`${BASE_URL}/airs/job-descriptions/${jdId}`, updatedData, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
         return response.data;
     } catch (error) {
         console.error("Error updating JD:", error);

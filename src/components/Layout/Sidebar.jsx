@@ -129,6 +129,7 @@ const Sidebar = ({ isCollapsed }) => {
   const isPM = hasRole(["PROJECT_MANAGER"]);
   const isDM = hasRole(["DELIVERY_MANAGER"]);
   const isGeneral = hasRole(["GENERAL"]);
+  const airsRBACAccess = hasRole(["HIRING_MANAGER", "HR", "HR_ADMIN", "RECRUITER"]);
 
   // State for User Management Hover
   const [userHovered, setUserHovered] = useState(false);
@@ -331,7 +332,7 @@ const Sidebar = ({ isCollapsed }) => {
           }
 
           {/* AI Screening (AIRS) Menu */}
-          {isGeneral && (
+          {airsRBACAccess && (
             <li
               ref={airsRef}
               className="relative"
